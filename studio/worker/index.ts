@@ -19,6 +19,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { apiRouter } from "./api/router";
+import { scheduledCleanup } from "./api/cleanup";
 import { handleAuthRoute, isAuthRoute } from "./auth/callback";
 import {
   type StudioAuthEnv,
@@ -131,6 +132,15 @@ const worker = {
       if (session) forwarded = withUserHeader(request, session.user);
     }
     return withSecurityHeaders(await handler.fetch(forwarded, env, ctx));
+  },
+
+  // Storage cleanup cron (STUDIO_PLAN decision 4, step CLEANUP): expired
+  // sessions, stale pending/abandoned revisions, soft-deleted projects past
+  // retention, committed-revision pruning, and the low-frequency R2<->D1
+  // reconciliation. Work is capped per run (see api/cleanup.ts), so the
+  // hourly cron in studio/wrangler.jsonc stays well inside Workers limits.
+  scheduled(_event: unknown, env: Env, ctx: ExecutionContext): void {
+    scheduledCleanup(env, ctx);
   },
 };
 

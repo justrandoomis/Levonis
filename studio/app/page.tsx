@@ -5,10 +5,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const user = await getStudioUser();
-  // SlicerClient still types its prop as { displayName, email } from the old
-  // header-based identity. The new handoff deliberately transfers NO email
-  // (mandate §3 — minimum identity only), so email is honestly empty until
-  // the shell's prop shape is updated by its owner. Guests stay null and can
-  // keep editing without an account.
-  return <SlicerClient user={user ? { displayName: user.displayName, email: "" } : null} />;
+  // Handoff identity is the minimum only (mandate §3): opaque id + display
+  // name — no email, no phone. The id keys the client's draft namespace and
+  // account project sync; guests stay null and keep editing locally.
+  return <SlicerClient user={user ? { id: user.id, displayName: user.displayName } : null} />;
 }

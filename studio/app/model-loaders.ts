@@ -36,6 +36,51 @@ function fileStem(name: string) {
   return leaf.replace(/\.[^.]+$/, "") || "model";
 }
 
+/**
+ * Imported model files are untrusted input, and several formats (GLTF, OBJ/MTL
+ * via DAE/KMZ, FBX) can reference external assets by URL. Those references are
+ * NEVER fetched (no network I/O from a model import): image-like references
+ * resolve to an embedded transparent pixel so geometry-only imports still
+ * succeed, and every other external reference (e.g. a .bin geometry buffer)
+ * resolves to an empty payload so the parse fails fast — `withLocalAssetsOnly`
+ * then reports the blocked references in a clear error instead of a confusing
+ * parser message.
+ */
+const TRANSPARENT_PIXEL_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const EMPTY_PAYLOAD_URL = "data:application/octet-stream;base64,";
+const IMAGE_URL_PATTERN = /\.(?:png|jpe?g|webp|gif|bmp|tga|dds|ktx2?)(?:[?#].*)?$/i;
+
+function createLocalOnlyManager(): { manager: THREE.LoadingManager; blockedUrls: string[] } {
+  const blockedUrls: string[] = [];
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((url) => {
+    if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+    blockedUrls.push(url);
+    return IMAGE_URL_PATTERN.test(url) ? TRANSPARENT_PIXEL_URL : EMPTY_PAYLOAD_URL;
+  });
+  return { manager, blockedUrls };
+}
+
+async function withLocalAssetsOnly<T>(
+  sourceName: string,
+  run: (manager: THREE.LoadingManager) => T | Promise<T>,
+): Promise<T> {
+  const { manager, blockedUrls } = createLocalOnlyManager();
+  try {
+    return await run(manager);
+  } catch (reason) {
+    if (blockedUrls.length) {
+      const unique = [...new Set(blockedUrls)];
+      const listed = unique.slice(0, 3).join(", ") + (unique.length > 3 ? ` (+${unique.length - 3} more)` : "");
+      throw new Error(
+        `${sourceName} references external files that are not fetched for safety: ${listed}. `
+        + "Use a self-contained export (e.g. GLB with embedded buffers) or include the referenced files.",
+      );
+    }
+    throw reason;
+  }
+}
+
 function geometryTriangles(geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) {
   const position = geometry.getAttribute("position");
   if (!position || position.count < 3) return null;
@@ -167,32 +212,38 @@ export async function registerExtendedModelLoaders() {
   registerLoader(["glb", "gltf"], async (buffer, name) => {
     const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
     const data = name.toLowerCase().endsWith(".gltf") ? new TextDecoder().decode(buffer) : buffer;
-    const gltf = await new GLTFLoader().parseAsync(data, "");
-    return sceneObjects(gltf.scene, name);
+    return withLocalAssetsOnly(name, async (manager) => {
+      const gltf = await new GLTFLoader(manager).parseAsync(data, "");
+      return sceneObjects(gltf.scene, name);
+    });
   });
   registerLoader("fbx", async (buffer, name) => {
     const { FBXLoader } = await import("three/examples/jsm/loaders/FBXLoader.js");
-    return sceneObjects(new FBXLoader().parse(buffer, ""), name);
+    return withLocalAssetsOnly(name, (manager) => sceneObjects(new FBXLoader(manager).parse(buffer, ""), name));
   });
   registerLoader("dae", async (buffer, name) => {
     const { ColladaLoader } = await import("three/examples/jsm/loaders/ColladaLoader.js");
-    return sceneObjects(new ColladaLoader().parse(new TextDecoder().decode(buffer), "").scene, name);
+    return withLocalAssetsOnly(name, (manager) => (
+      sceneObjects(new ColladaLoader(manager).parse(new TextDecoder().decode(buffer), "").scene, name)
+    ));
   });
   registerLoader("3ds", async (buffer, name) => {
     const { TDSLoader } = await import("three/examples/jsm/loaders/TDSLoader.js");
-    return sceneObjects(new TDSLoader().parse(buffer, ""), name);
+    return withLocalAssetsOnly(name, (manager) => sceneObjects(new TDSLoader(manager).parse(buffer, ""), name));
   });
   registerLoader(["wrl", "vrml"], async (buffer, name) => {
     const { VRMLLoader } = await import("three/examples/jsm/loaders/VRMLLoader.js");
-    return sceneObjects(new VRMLLoader().parse(new TextDecoder().decode(buffer), ""), name);
+    return withLocalAssetsOnly(name, (manager) => (
+      sceneObjects(new VRMLLoader(manager).parse(new TextDecoder().decode(buffer), ""), name)
+    ));
   });
   registerLoader("usdz", async (buffer, name) => {
     const { USDZLoader } = await import("three/examples/jsm/loaders/USDZLoader.js");
-    return sceneObjects(new USDZLoader().parse(buffer), name);
+    return withLocalAssetsOnly(name, (manager) => sceneObjects(new USDZLoader(manager).parse(buffer), name));
   });
   registerLoader("kmz", async (buffer, name) => {
     const { KMZLoader } = await import("three/examples/jsm/loaders/KMZLoader.js");
-    return sceneObjects(new KMZLoader().parse(buffer).scene, name);
+    return withLocalAssetsOnly(name, (manager) => sceneObjects(new KMZLoader(manager).parse(buffer).scene, name));
   });
   registerLoader(["vtk", "vtp"], async (buffer, name) => {
     const { VTKLoader } = await import("three/examples/jsm/loaders/VTKLoader.js");

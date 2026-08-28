@@ -31,12 +31,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
+  // "mobile" is its own npm workspace (Capacitor app, own package.json and
+  // lockfile) whose dependencies are not installed in the web workspace —
+  // typecheck it from mobile/ with its own toolchain, not from here.
   "exclude": [
     "node_modules",
-    "mobile/node_modules",
-    "mobile/dist",
-    "mobile/ios",
-    "mobile/android",
-    "mobile/vite.config.ts"
+    "mobile"
   ]
 }

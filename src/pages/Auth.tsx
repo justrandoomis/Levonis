@@ -246,6 +246,15 @@ export default function Auth() {
     err instanceof Error && err.message ? err.message : s.genericError;
 
   const finishAuth = () => {
+    // The Studio sign-in resume leg is a WORKER route, not an SPA page:
+    // react-router would only render the catch-all for it. A full navigation
+    // lets the worker mint the single-use handoff code and 302 onward to the
+    // Studio host. dest already passed sanitizeNextPath (relative,
+    // same-origin), so this cannot become an open redirect.
+    if (dest.startsWith('/api/studio/handoff/start')) {
+      window.location.assign(dest);
+      return;
+    }
     navigate(dest, { replace: true });
   };
 

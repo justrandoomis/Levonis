@@ -1,7 +1,8 @@
 import AnimatedItem from '../components/AnimatedItem';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { Star, ChevronRight, ChevronLeft, Pause, Play, PackageSearch } from 'lucide-react';
+import { Star, ChevronRight, ChevronLeft, Pause, Play, PackageSearch, Layers } from 'lucide-react';
+import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiProduct, PublicSettings, formatIqd } from '../lib/api';
@@ -348,6 +349,35 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Services — LEVO Studio entry. A PLAIN full-page navigation to the
+            standalone subdomain (STUDIO_URL): no iframe, no embedding, no
+            prefetch/preload of any Studio asset, and no slicer code in this
+            bundle (docs/STUDIO_PLAN.md decision 6 — pinned by
+            tests/store-isolation.test.ts). Opening in a new tab stays the
+            user's own choice. */}
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 bg-olive rounded-full"></div>
+            <h2 className="text-xl md:text-2xl font-bold text-white">{t('services')}</h2>
+          </div>
+          <a
+            href={STUDIO_URL}
+            className="group flex items-center gap-4 rounded-2xl bg-gradient-to-r from-olive/15 to-zinc-900/60 border border-olive/30 p-4 sm:p-5 hover:border-olive/60 transition-colors"
+          >
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-olive/15 border border-olive/30 flex items-center justify-center shrink-0">
+              <Layers aria-hidden="true" className="w-6 h-6 sm:w-7 sm:h-7 text-olive" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-bold text-sm sm:text-base mb-0.5">{t('studioCardTitle')}</h3>
+              <p className="text-xs sm:text-sm text-zinc-400 line-clamp-2">{t('studioCardSubtitle')}</p>
+            </div>
+            <span className="shrink-0 flex items-center gap-1 text-olive text-xs sm:text-sm font-bold">
+              <span className="hidden sm:inline">{t('studioOpen')}</span>
+              {dir === 'rtl' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </span>
+          </a>
+        </div>
 
         {/* Skeletons mirror the real sections (horizontal row + grid) —
             reserved dimensions, no fake names or prices. */}

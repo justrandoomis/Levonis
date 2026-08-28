@@ -1,11 +1,13 @@
 {
   "name": "LEVO Studio",
   "short_name": "LEVO Studio",
-  "description": "Shared web and mobile plate editing, local slicing, G-code export, and capability-gated Bambu print connections.",
+  "description": "محرر ثلاثي الأبعاد وسلايسر محلي في المتصفح من LEVONIS — استيراد المجسمات، التقطيع محليًا، وتجهيز مشاريع 3MF.",
+  "lang": "ar",
+  "dir": "rtl",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1114",
-  "theme_color": "#9bd51f",
+  "background_color": "#0A1410",
+  "theme_color": "#BAA369",
   "icons": [
     {
       "src": "/favicon.svg",

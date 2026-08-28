@@ -393,8 +393,10 @@ test("full protocol: OPEN → UPLOAD (verified) → COMMIT → READ (T4/T6 core)
   assert.equal(earlyCommit.response.status, 409);
   assert.equal(earlyCommit.json.code, "FILES_NOT_VERIFIED");
 
-  // Wrong content: 422, object NOT kept, row stays pending for a retry.
-  const bad = await call(env, ctx, USER_A, "PUT", byKind.snapshot3mf.upload_url, new TextEncoder().encode("tampered-bytes-x"));
+  // Wrong content (same declared length, different bytes): 422, object NOT
+  // kept, row stays pending for a retry.
+  const tampered = new Uint8Array(open.payloads.snapshot.length).fill(0x58); // 'XXXX…'
+  const bad = await call(env, ctx, USER_A, "PUT", byKind.snapshot3mf.upload_url, tampered);
   assert.equal(bad.response.status, 422);
   assert.equal(bad.json.code, "HASH_MISMATCH");
   assert.equal(bucket.objects.size, 0);

@@ -30,6 +30,7 @@ import { returnRoutes, priceProtectionRoutes } from './routes/returns';
 import { policiesRoutes } from './routes/policies';
 import { kycRoutes } from './routes/kyc';
 import { supportRoutes } from './routes/support';
+import { studioRoutes } from './routes/studio';
 
 const app = new Hono<AppContext>();
 
@@ -69,6 +70,7 @@ app.route('/api/price-protection', priceProtectionRoutes);
 app.route('/api/policies', policiesRoutes);
 app.route('/api/kyc', kycRoutes);
 app.route('/api/support', supportRoutes);
+app.route('/api/studio', studioRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.

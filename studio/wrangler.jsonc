@@ -71,11 +71,11 @@
 
   "observability": { "enabled": true },
 
-  // No cron triggers yet. The orphan-upload cleanup cron (STUDIO_PLAN
-  // decision 4, step CLEANUP) is added here together with the worker's
-  // `scheduled` handler once the storage API lands — deploying a cron without
-  // a handler would fail at runtime, not honestly no-op.
-  "triggers": { "crons": [] },
+  // Hourly storage cleanup (STUDIO_PLAN decision 4, step CLEANUP), handled by
+  // the `scheduled` export in worker/index.ts -> worker/api/cleanup.ts.
+  // Per-run work caps keep each invocation small; the R2<->D1 reconciliation
+  // inside is itself page-capped and only touches objects older than 48h.
+  "triggers": { "crons": ["0 * * * *"] },
 
   "env": {
     // Staging: fully separate worker + D1 + R2 on workers.dev. Never attached
@@ -108,7 +108,7 @@
         "MAIN_SITE_ORIGIN": ""
       },
       "observability": { "enabled": true },
-      "triggers": { "crons": [] }
+      "triggers": { "crons": ["0 * * * *"] }
     }
   }
 }

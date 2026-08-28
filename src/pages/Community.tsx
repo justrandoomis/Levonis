@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
+import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { api, ApiError, formatIqd } from '../lib/api';
 import {
@@ -43,7 +44,7 @@ interface CommunityRequest {
 export default function Community() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { lang, dir } = useLanguage();
+  const { lang, dir, t } = useLanguage();
   const { user, isAuthenticated } = useAuth();
 
   const queryParams = new URLSearchParams(location.search);
@@ -203,8 +204,22 @@ export default function Community() {
            </div>
         </div>
 
-        {/* Banners (features not launched yet — shown honestly as coming soon) */}
+        {/* Banners. First card = LEVO Studio, a real ACTIVE entry: a plain
+            full-page navigation to the standalone subdomain (STUDIO_URL) —
+            no iframe, no prefetch/preload, no slicer code in this bundle
+            (tests/store-isolation.test.ts pins this). The rest are features
+            not launched yet, shown honestly as coming soon. */}
         <div className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
+           <a
+             href={STUDIO_URL}
+             className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/25 to-black border border-olive/50 p-4 flex flex-col justify-center snap-start relative overflow-hidden hover:border-olive transition-colors"
+           >
+             <div className="absolute right-2 bottom-0 opacity-20">
+               <Box aria-hidden="true" className="w-20 h-20 text-olive" />
+             </div>
+             <h3 className="text-white font-bold text-sm mb-1">{t('studioCardTitle')}</h3>
+             <p className="text-xs text-olive font-medium">{t('studioOpen')}</p>
+           </a>
            <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border border-purple-500/20 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
              <div className="absolute right-2 bottom-0 opacity-20">
                <Gift className="w-20 h-20" />

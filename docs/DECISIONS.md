@@ -38,6 +38,8 @@
 | 28 | Google origin_mismatch: الحل خارج الكود — إضافة https://levonis-iq.com وعنوان staging إلى Authorized JavaScript origins في Google Cloud Console (الدليل الدقيق: docs/GOOGLE_SIGNIN_FIX.md). وهل يُضاف www.levonis-iq.com؟ فقط إن كان الدخول يبدأ منه فعلًا | 🔴 لدخول Google (خطوة المالك) | Google Cloud Console |
 | 29 | وظيفة زر QR بجانب المستخدم: لا وظيفة متفق عليها في التصميم — الحالي عرض بطاقة/رابط الملف العام فقط (بلا رموز جلسات أو هواتف). حدد المطلوب إن أردت غير ذلك | ⚪ | src/pages/Profile.tsx |
 
+| 30 | **LEVO Studio — إعداد المالك (أسماء فقط)**: أسرار GitHub الاختيارية `STUDIO_HANDOFF_SECRET` (سر تبادل الدخول بين الموقع والستوديو — نفس القيمة للطرفين)، `STUDIO_STAGING_MAIN_SITE_ORIGIN` و`STUDIO_PROD_MAIN_SITE_ORIGIN` (أصل الموقع الرئيسي لكل بيئة)، `STUDIO_PROD_APP_ORIGIN` (https://studio.levonis-iq.com بعد ربط النطاق). بدونها يبقى تسليم الدخول معطلًا بصدق (503). وموافقتك على إنشاء موارد الإنتاج `levonis-studio-db` و`levonis-studio-files`، وربط نطاق studio.levonis-iq.com خطوة يدوية لاحقة منفصلة. تنبيه: حزمة worker الستوديو ≈9.1MB مضغوطة — تتطلب خطة Workers المدفوعة (حد المجانية 3MB) | 🔴 لدخول الستوديو الموحد ونشر إنتاجه | GitHub → Secrets + Cloudflare |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).

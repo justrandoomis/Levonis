@@ -24,6 +24,13 @@ export interface Env {
   /** KYC evidence encryption key, format "v1:<base64 32 bytes>" (see
    *  lib/sealbox.ts). KYC submission stays disabled until set. */
   KYC_ENC_KEY?: string;
+  /** LEVO Studio sign-in handoff (routes/studio.ts). Shared secret the Studio
+   *  worker presents on the server-to-server code exchange; handoff endpoints
+   *  answer honest 503s until it is set per environment. Never logged. */
+  STUDIO_HANDOFF_SECRET?: string;
+  /** Comma-separated exact origins allowed as Studio handoff destinations,
+   *  e.g. "https://studio.levonis-iq.com". Empty = handoff disabled. */
+  STUDIO_ALLOWED_DESTINATIONS?: string;
 }
 
 export interface SessionUser {

@@ -3,6 +3,17 @@
 // The legacy 'ku' localStorage value is migrated to 'ckb' in LanguageContext.
 export type Language = 'en' | 'ar' | 'ckb';
 
+/**
+ * LEVO Studio (the slicer web app) runs as its OWN application on its own
+ * subdomain/worker. The store links to it with a PLAIN `<a>` full-page
+ * navigation ONLY: no iframe, no embedding, no prefetch/preload of any
+ * Studio asset, and no slicer code in the store bundle
+ * (docs/STUDIO_PLAN.md decision 6; pinned by tests/store-isolation.test.ts).
+ * This constant is the single configurable navigation target — the raw URL
+ * must not be duplicated anywhere else in src/.
+ */
+export const STUDIO_URL = 'https://studio.levonis-iq.com';
+
 export const translations = {
   en: {
     active: "Active",
@@ -162,6 +173,13 @@ export const translations = {
     launchNote: "Your card is reserved and activates when the site launches",
     comingSoon: "Coming soon",
     expired: "Expired",
+
+    // LEVO Studio entry (plain navigation to the standalone subdomain —
+    // see STUDIO_URL above; no Studio code ever loads inside the store)
+    services: "Services",
+    studioCardTitle: "LEVO Studio — Print File Preparation",
+    studioCardSubtitle: "Prepare, arrange, and slice your 3D models in the browser, and save projects to your account.",
+    studioOpen: "Open LEVO Studio",
   },
   ar: {
     active: "نشط",
@@ -321,6 +339,13 @@ export const translations = {
     launchNote: "بطاقتك محجوزة وتُفعّل عند إطلاق الموقع",
     comingSoon: "قريبًا",
     expired: "منتهية",
+
+    // مدخل LEVO Studio (تنقّل عادي إلى النطاق الفرعي المستقل —
+    // انظر STUDIO_URL أعلاه؛ لا يُحمَّل أي كود من الاستوديو داخل المتجر)
+    services: "الخدمات",
+    studioCardTitle: "LEVO Studio — تجهيز ملفات الطباعة",
+    studioCardSubtitle: "جهّز مجسّماتك ثلاثية الأبعاد ورتّبها وقطّعها في المتصفح، واحفظ مشاريعك في حسابك.",
+    studioOpen: "افتح LEVO Studio",
   },
   ckb: {
     active: "چالاکە",
@@ -480,5 +505,12 @@ export const translations = {
     launchNote: "کارتەکەت پارێزراوە و لەگەڵ دەستپێکردنی سایتەکە چالاک دەبێت",
     comingSoon: "بەم زووانە",
     expired: "بەسەرچووە",
+
+    // دەروازەی LEVO Studio (گواستنەوەیەکی ئاسایی بۆ ساب-دۆمەینی سەربەخۆ —
+    // بڕوانە STUDIO_URL لە سەرەوە؛ هیچ کۆدێکی ستۆدیۆ لەناو فرۆشگەکەدا بار ناکرێت)
+    services: "خزمەتگوزارییەکان",
+    studioCardTitle: "LEVO Studio — ئامادەکردنی فایلی پرینت",
+    studioCardSubtitle: "مۆدێلە سێ دوورییەکانت لە وێبگەڕدا ئامادە بکە و ڕێکیان بخە و بۆ پرینت ئامادەیان بکە، پرۆژەکانیشت لە هەژمارەکەتدا پاشەکەوت بکە.",
+    studioOpen: "LEVO Studio بکەرەوە",
   }
 };

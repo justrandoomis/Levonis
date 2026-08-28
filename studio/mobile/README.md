@@ -1,5 +1,25 @@
 # LEVO Studio mobile
 
+> **Status (LEVONIS Studio phase): APK distribution is DISABLED.**
+>
+> - The hosted web app at `studio.levonis-iq.com` no longer links or serves any
+>   APK, and its in-app update-check UI has been removed; the UI shows an
+>   explicit "تطبيق LEVONIS الكامل — قريبًا" disabled state with no download
+>   link (owner mandate §12).
+> - This `mobile/` tree (Capacitor sources, the `LevoPrinter`/`LevoUpdater`
+>   plugins, signing docs) is kept **as reference only**. Do not develop or
+>   publish a new standalone slicer APK in this phase.
+> - The workflows under `studio/.github/workflows/` (`android-apk.yml`,
+>   `publish-levo-v1.1.0.yml`) are inert where they sit — GitHub only executes
+>   workflows from the repository-root `.github/workflows/`. Do NOT move them
+>   to the root and do NOT push `studio/` as a standalone repository: either
+>   would re-enable signed automatic APK releases on push.
+> - The future mobile app is planned to cover the FULL LEVONIS platform
+>   (store, account, community, and Studio), not a standalone slicer, and its
+>   implementation is a separate later task.
+> - Historical sources, signatures, and releases are intentionally left
+>   untouched (no deletions without owner approval).
+
 This package builds the same `SlicerClient` used by the hosted site as a local Capacitor 8 application for iOS and Android. The app bundle contains the editor and slicer; it does not frame or redirect to the hosted website.
 
 The `LevoPrinter` native plugin is the only boundary allowed to handle printer IP addresses, access codes, MQTT/FTPS sessions, printer-ready package creation, upload, and print acknowledgement. The shared web UI enables each action only when the installed native bridge reports that exact capability.

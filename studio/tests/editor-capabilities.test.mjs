@@ -10,6 +10,18 @@ const engineUrl = new URL("../node_modules/three-slicer/viewer/dist/Viewport.js"
 const archiveUrl = new URL("../app/archive-import.ts", import.meta.url);
 const loadersUrl = new URL("../app/model-loaders.ts", import.meta.url);
 const packingUrl = new URL("../app/plate-packing.ts", import.meta.url);
+const adapterUrl = new URL("../app/engine-adapter.ts", import.meta.url);
+// Fleet-refactor module map (the former monolith is now composed from owned
+// modules — these tests follow the behavior to its owning file):
+const headerUrl = new URL("../app/components/header.tsx", import.meta.url);
+const printSheetUrl = new URL("../app/components/sheets/print.tsx", import.meta.url);
+const connectSheetUrl = new URL("../app/components/sheets/connect.tsx", import.meta.url);
+const aboutSheetUrl = new URL("../app/components/sheets/about.tsx", import.meta.url);
+const i18nEnUrl = new URL("../app/i18n/en.ts", import.meta.url);
+const profilesUrl = new URL("../app/printer-profiles.ts", import.meta.url);
+const orchestratorUrl = new URL("../app/import-orchestrator.ts", import.meta.url);
+const prepareUrl = new URL("../app/makerworld/prepare.tsx", import.meta.url);
+const fflateEsmUrl = new URL("../node_modules/fflate/esm/index.mjs", import.meta.url);
 const bridgeUrl = new URL("../app/native-printer-bridge.ts", import.meta.url);
 const mobilePackageUrl = new URL("../mobile/package.json", import.meta.url);
 const mobileMainUrl = new URL("../mobile/src/main.tsx", import.meta.url);
@@ -24,6 +36,60 @@ const androidBuildUrl = new URL("../mobile/android/app/build.gradle", import.met
 const androidWorkflowUrl = new URL("../.github/workflows/android-apk.yml", import.meta.url);
 const apkUrl = new URL("../public/downloads/LEVO-Studio-Android-v1.1.0.apk", import.meta.url);
 const apkChecksumUrl = new URL("../public/downloads/LEVO-Studio-Android-v1.1.0.apk.sha256", import.meta.url);
+
+function extractContractArray(source, constName) {
+  const match = source.match(new RegExp(`export const ${constName} = \\[([^\\]]+)\\] as const`));
+  assert.ok(match, `engine-adapter contract list ${constName} is missing`);
+  const values = [...match[1].matchAll(/"([^"]+)"/g)].map((hit) => hit[1]);
+  assert.ok(values.length > 0, `engine-adapter contract list ${constName} is empty`);
+  return values;
+}
+
+test("engine adapter contract: every testid and __vpApi member exists in the installed engine", async () => {
+  const [adapter, engine] = await Promise.all([
+    readFile(adapterUrl, "utf8"),
+    readFile(engineUrl, "utf8"),
+  ]);
+
+  const staticIds = extractContractArray(adapter, "ENGINE_STATIC_TEST_IDS");
+  const actionIds = extractContractArray(adapter, "ENGINE_ACTION_TEST_IDS");
+  const apiMethods = extractContractArray(adapter, "ENGINE_API_METHODS");
+
+  for (const testId of staticIds) {
+    assert.ok(engine.includes(`data-testid": "${testId}`), `engine control ${testId} is missing from the installed build`);
+  }
+
+  // Toolbar actions render through the engine's `tool-${action.id}` template.
+  assert.ok(engine.includes('data-testid": `tool-${'), "engine tool-* testid template is missing");
+  for (const testId of actionIds) {
+    const actionId = testId.replace(/^tool-/, "");
+    assert.ok(engine.includes(`id: "${actionId}"`), `engine toolbar action ${actionId} is missing`);
+  }
+
+  // Plate tabs render through the engine's `plate-${index}` template.
+  assert.ok(engine.includes('data-testid": `plate-${'), "engine plate-* testid template is missing");
+
+  for (const method of apiMethods) {
+    assert.match(engine, new RegExp(`${method}: \\(`), `engine __vpApi.${method} is missing from the installed build`);
+  }
+
+  // The adapter finds the engine host and dispatches shortcuts via .app-shell.
+  assert.ok(engine.includes("app-shell"), "engine .app-shell marker is missing");
+
+  // Every testid hardcoded in the adapter must be covered by the contract
+  // lists (the lists are what this test verifies against the engine).
+  const declared = new Set([...staticIds, ...actionIds]);
+  for (const hit of adapter.matchAll(/data-testid="([a-z][a-z0-9-]*)"/g)) {
+    assert.ok(declared.has(hit[1]), `adapter uses testid ${hit[1]} outside the contract lists`);
+  }
+  for (const hit of adapter.matchAll(/(?:clickControl|queryControl|isControlAvailable|runPrepareAction)\("([a-z][a-z0-9-]*)"\)/g)) {
+    assert.ok(declared.has(hit[1]), `adapter clicks testid ${hit[1]} outside the contract lists`);
+  }
+
+  // Shadow-root discovery and theme injection are event-driven — the 500 ms
+  // polling interval must not come back.
+  assert.doesNotMatch(adapter, /setInterval/);
+});
 
 test("mobile and desktop controls target real editor actions", async () => {
   const [app, engine] = await Promise.all([
@@ -71,27 +137,40 @@ test("mobile and desktop controls target real editor actions", async () => {
 });
 
 test("upload, export, sharing, and official print handoff are real actions", async () => {
-  const app = await readFile(appUrl, "utf8");
+  const [app, header, adapter, printSheet, prepare, en] = await Promise.all([
+    readFile(appUrl, "utf8"),
+    readFile(headerUrl, "utf8"),
+    readFile(adapterUrl, "utf8"),
+    readFile(printSheetUrl, "utf8"),
+    readFile(prepareUrl, "utf8"),
+    readFile(i18nEnUrl, "utf8"),
+  ]);
 
-  assert.match(app, /dispatchEvent\(new Event\("change"/);
-  assert.match(app, /className="native-file-input"/);
-  assert.match(app, /data-supported-formats=\{FILE_PICKER_ACCEPT\}/);
+  // Engine file injection lives behind the S4 typed adapter now.
+  assert.match(adapter, /dispatchEvent\(new Event\("change"/);
+  assert.match(adapter, /Object\.defineProperty\(engineInput, "files"/);
+  assert.match(adapter, /typeof DataTransfer !== "function"/);
+  // The native file input moved into the owned header component.
+  assert.match(header, /className="native-file-input"/);
+  assert.match(header, /data-supported-formats=\{FILE_PICKER_ACCEPT\}/);
+  assert.doesNotMatch(header, /accept=\{FILE_PICKER_ACCEPT\}/);
   assert.doesNotMatch(app, /accept=\{FILE_PICKER_ACCEPT\}/);
-  assert.match(app, /Object\.defineProperty\(engineInput, "files"/);
-  assert.match(app, /typeof DataTransfer !== "function"/);
+
   assert.match(app, /new File\(\[gcode\], name, \{ type: "text\/x-gcode" \}\)/);
   assert.match(app, /downloadBlob\(file, file\.name\)/);
   assert.match(app, /const data: ShareData = \{ files: \[file\], title: file\.name \}/);
   assert.match(app, /await navigator\.share\(data\)/);
   assert.match(app, /triggerSlice\(true\)/);
-  assert.match(app, /https:\/\/wiki\.bambulab\.com\/en\/software\/bambu-connect/);
-  assert.match(app, /Bambu Connect or Bambu Studio/);
-  assert.match(app, /undocumented private API/);
   assert.match(app, /onExport=\{handleViewportExport\}/);
   assert.match(app, /LEVO-\$\{profile\.shortName\}-Bambu-Handy\.3mf/);
-  assert.match(app, /https:\/\/makerworld\.com\/en\/upload/);
-  assert.match(app, /Private Model/);
-  assert.match(app, /Printer, AMS and heater confirmation happens in Bambu Handy/);
+
+  // Official-path honesty moved into the print sheet + reviewed dictionaries.
+  assert.match(printSheet, /https:\/\/wiki\.bambulab\.com\/en\/software\/bambu-connect/);
+  assert.match(printSheet, /https:\/\/makerworld\.com\/en\/upload/);
+  assert.match(en, /Bambu Connect or Bambu Studio/);
+  assert.match(en, /undocumented private API/);
+  assert.match(prepare, /Private Model/);
+  assert.match(en, /Printer, AMS and heater confirmation happens in Bambu Handy/);
 });
 
 test("extended model loaders, streaming ZIP import, and no fixed app cap are wired", async () => {
@@ -109,7 +188,15 @@ test("extended model loaders, streaming ZIP import, and no fixed app cap are wir
   assert.match(archive, /new Unzip\(/);
   assert.match(archive, /file\.stream\(\)\.getReader\(\)/);
   assert.match(archive, /UnzipPassThrough/);
-  assert.match(app, /LEVO sets no fixed file-size or count cap/);
+  // The old "no fixed cap" marketing claim is gone: ZIPs are untrusted input,
+  // so extraction now runs under an explicit decompression budget with a real
+  // user confirmation before continuing past the soft limit (mandate §10/T7).
+  const orchestrator = await readFile(orchestratorUrl, "utf8");
+  assert.match(archive, /class ArchiveLimitError/);
+  assert.match(archive, /onBudgetExceeded/);
+  assert.match(archive, /"entry-count" \| "expansion-budget" \| "expansion-ratio"/);
+  assert.match(orchestrator, /onBudgetExceeded: callbacks\.onBudgetExceeded/);
+  assert.doesNotMatch(app, /LEVO sets no fixed file-size or count cap/);
   assert.doesNotMatch(app, /80 \* 1024 \* 1024|160 \* 1024 \* 1024|files\.length > 12/);
 });
 
@@ -147,11 +234,13 @@ test("mobile visual system uses solid surfaces and expandable controls", async (
 });
 
 test("verified profiles and explicit capability boundaries stay present", async () => {
-  const [app, engine] = await Promise.all([
-    readFile(appUrl, "utf8"),
+  const [profiles, engine, en] = await Promise.all([
+    readFile(profilesUrl, "utf8"),
     readFile(engineUrl, "utf8"),
+    readFile(i18nEnUrl, "utf8"),
   ]);
 
+  // Printer/preset data moved out of the monolith into printer-profiles.ts.
   for (const preset of [
     "Bambu Lab X2D 0.4 nozzle",
     "Bambu Lab H2D 0.4 nozzle",
@@ -159,14 +248,15 @@ test("verified profiles and explicit capability boundaries stay present", async 
     "0.12mm High Quality @BBL X2D",
     "0.20mm Standard @BBL H2D",
   ]) {
-    assert.ok(app.includes(preset), `profile preset ${preset} is missing`);
+    assert.ok(profiles.includes(preset), `profile preset ${preset} is missing`);
   }
 
   for (const id of ["arrange", "orient", "cut", "boolean", "text", "measure", "varlayer"]) {
     assert.ok(engine.includes(`id: "${id}"`), `boundary tool ${id} is missing`);
   }
   assert.match(engine, /Auto arrange[^\n]+Not implemented/);
-  assert.match(app, /Direct cloud printing still requires official Bambu Lab partner authorization/);
+  // The cloud-printing boundary statement lives in the reviewed dictionaries.
+  assert.match(en, /direct Bambu cloud printing requires official partner authorization that does not exist/);
 });
 
 test("web, iOS, and Android share one capability-gated printer connection surface", async () => {
@@ -181,10 +271,20 @@ test("web, iOS, and Android share one capability-gated printer connection surfac
     readFile(androidActivityUrl, "utf8"),
   ]);
   const mobilePackage = JSON.parse(mobilePackageText);
+  const [connectSheet, en] = await Promise.all([
+    readFile(connectSheetUrl, "utf8"),
+    readFile(i18nEnUrl, "utf8"),
+  ]);
 
-  assert.match(app, /\["lan", "cloud", "usb"\]/);
-  assert.match(app, /releases\/latest\/download\/LEVO-Studio-Android-v1\.2\.1\.apk/);
-  assert.match(app, /© 2026 LEVONIS/);
+  // The connection surface moved into the owned connect sheet.
+  assert.match(connectSheet, /\["lan", "cloud", "usb"\]/);
+  // APK download links are DISABLED in the web UI (mandate §12): no active
+  // download URL anywhere, an explicitly disabled "coming soon" card instead.
+  assert.doesNotMatch(app, /LEVO-Studio-Android[^\n]*\.apk/);
+  assert.doesNotMatch(connectSheet, /LEVO-Studio-Android[^\n]*\.apk|releases\/latest\/download/);
+  assert.match(connectSheet, /className="full-app-soon-card" aria-disabled="true"/);
+  assert.match(connectSheet, /t\.fullAppSoon/);
+  assert.match(en, /© 2026 LEVONIS/);
   assert.match(app, /nativeEnvironment\.capabilities\.lanConnection/);
   assert.match(app, /required\.packagePrintJob/);
   assert.match(app, /required\.rawGcodePrintJob/);
@@ -244,9 +344,12 @@ test("Android updates are in-place, origin-locked, and checksum-verified", async
     readFile(androidManifestUrl, "utf8"),
   ]);
 
-  assert.match(app, /checkForNativeUpdate/);
-  assert.match(app, /installNativeUpdate/);
-  assert.match(app, /legal-details/);
+  // The WEB UI no longer wires the native update check (mandate §12: APK and
+  // its auto-update are disabled in this phase; mobile/ sources stay as
+  // reference and keep their origin-lock + checksum discipline below).
+  assert.doesNotMatch(app, /checkForNativeUpdate|installNativeUpdate/);
+  const aboutSheet = await readFile(aboutSheetUrl, "utf8");
+  assert.match(aboutSheet, /legal-details/);
   assert.match(bridge, /LevoUpdater/);
   assert.match(activity, /registerPlugin\(LevoUpdaterPlugin\.class\)/);
   assert.match(manifest, /REQUEST_INSTALL_PACKAGES/);
@@ -303,4 +406,133 @@ test("downloadable Android APK is branded and checksum-verified", async (context
   assert.match(manifest, /android:usesCleartextTraffic="false"/);
   assert.match(strings, /<string name="app_name">LEVO Studio<\/string>/);
   assert.match(strings, /2026 LEVONIS/);
+});
+
+// ---------------------------------------------------------------------------
+// Archive decompression limits (behavioral — T7: malicious/huge ZIPs fail
+// clearly instead of exhausting the tab).
+// ---------------------------------------------------------------------------
+
+async function loadArchiveModule() {
+  const source = await readFile(archiveUrl, "utf8");
+  const javascript = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+    .replace(/import \{([^}]+)\} from "fflate";/, `import {$1} from "${fflateEsmUrl.href}";`)
+    .replace(/import \{[^}]+\} from "\.\/model-loaders";/, 'const MODEL_EXTENSIONS = ["stl", "obj", "3mf"];');
+  assert.doesNotMatch(javascript, /from "\.\/model-loaders"|from "fflate"/);
+  return import(`data:text/javascript;base64,${Buffer.from(javascript).toString("base64")}`);
+}
+
+function makeZip(entries, zipSync) {
+  const zipped = zipSync(entries);
+  return new File([zipped], "test.zip", { type: "application/zip" });
+}
+
+test("archive extraction skips unsafe entry paths and flattens safe ones", async () => {
+  const archive = await loadArchiveModule();
+  const { zipSync } = await import("fflate");
+
+  assert.equal(archive.isUnsafeArchivePath("../evil.stl"), true);
+  assert.equal(archive.isUnsafeArchivePath("a/../../evil.stl"), true);
+  assert.equal(archive.isUnsafeArchivePath("/abs.stl"), true);
+  assert.equal(archive.isUnsafeArchivePath("C:\\windows\\evil.stl"), true);
+  assert.equal(archive.isUnsafeArchivePath("models/part.stl"), false);
+
+  const stl = new TextEncoder().encode("solid demo\nendsolid demo\n");
+  const mixed = makeZip({ "../evil.stl": stl, "models/part.stl": stl }, zipSync);
+  const extracted = await archive.extractModelArchive(mixed);
+  assert.equal(extracted.length, 1);
+  assert.equal(extracted[0].name, "models__part.stl");
+
+  const onlyUnsafe = makeZip({ "../only-evil.stl": stl }, zipSync);
+  await assert.rejects(archive.extractModelArchive(onlyUnsafe), /unsafe paths/);
+});
+
+test("archive extraction enforces the declared entry-count limit", async () => {
+  const archive = await loadArchiveModule();
+  const { zipSync } = await import("fflate");
+  const stl = new TextEncoder().encode("solid demo\nendsolid demo\n");
+  const zip = makeZip({ "a.stl": stl, "b.stl": stl, "c.stl": stl }, zipSync);
+  await assert.rejects(
+    archive.extractModelArchive(zip, undefined, { limits: { maxEntries: 2 } }),
+    (error) => error instanceof Error && error.name === "ArchiveLimitError" && error.code === "entry-count",
+  );
+});
+
+test("archive expansion beyond the soft budget requires explicit confirmation", async () => {
+  const archive = await loadArchiveModule();
+  const { zipSync } = await import("fflate");
+  const big = new Uint8Array(4 * 1024 * 1024); // zeros: compresses tiny, expands big
+  const zip = makeZip({ "big.stl": big }, zipSync);
+  const limits = {
+    confirmExpandedBytes: 1024 * 1024,
+    maxTotalExpandedBytes: 64 * 1024 * 1024,
+    maxExpansionRatio: 1_000_000,
+    expansionRatioFloorBytes: Number.MAX_SAFE_INTEGER,
+  };
+
+  // No confirmation callback: the declared budget is final.
+  await assert.rejects(
+    archive.extractModelArchive(zip, undefined, { limits }),
+    (error) => error instanceof Error && error.name === "ArchiveLimitError" && error.code === "expansion-budget",
+  );
+
+  // Declined confirmation: clear failure, no silent continuation.
+  await assert.rejects(
+    archive.extractModelArchive(zip, undefined, { limits, onBudgetExceeded: () => false }),
+    (error) => error instanceof Error && error.name === "ArchiveLimitError" && error.code === "expansion-budget",
+  );
+
+  // Confirmed once: extraction completes within the hard ceiling.
+  let prompts = 0;
+  const extracted = await archive.extractModelArchive(zip, undefined, {
+    limits,
+    onBudgetExceeded: (info) => {
+      prompts += 1;
+      assert.ok(info.expandedBytes > info.budgetBytes);
+      return true;
+    },
+  });
+  assert.equal(prompts, 1);
+  assert.equal(extracted.length, 1);
+  assert.equal(extracted[0].size, big.byteLength);
+});
+
+test("archive expansion never exceeds the hard ceiling, even when confirmed", async () => {
+  const archive = await loadArchiveModule();
+  const { zipSync } = await import("fflate");
+  const big = new Uint8Array(8 * 1024 * 1024);
+  const zip = makeZip({ "bomb.stl": big }, zipSync);
+  await assert.rejects(
+    archive.extractModelArchive(zip, undefined, {
+      limits: {
+        confirmExpandedBytes: 1024 * 1024,
+        maxTotalExpandedBytes: 2 * 1024 * 1024,
+        maxExpansionRatio: 1_000_000,
+        expansionRatioFloorBytes: Number.MAX_SAFE_INTEGER,
+      },
+      onBudgetExceeded: () => true,
+    }),
+    (error) => error instanceof Error && error.name === "ArchiveLimitError"
+      && error.code === "expansion-budget" && /hard/.test(error.message),
+  );
+});
+
+test("archive extraction refuses zip-bomb expansion ratios", async () => {
+  const archive = await loadArchiveModule();
+  const { zipSync } = await import("fflate");
+  const big = new Uint8Array(4 * 1024 * 1024);
+  const zip = makeZip({ "bomb.stl": big }, zipSync);
+  await assert.rejects(
+    archive.extractModelArchive(zip, undefined, {
+      limits: {
+        confirmExpandedBytes: 1024 * 1024 * 1024,
+        maxTotalExpandedBytes: 1024 * 1024 * 1024,
+        maxExpansionRatio: 4,
+        expansionRatioFloorBytes: 64 * 1024,
+      },
+    }),
+    (error) => error instanceof Error && error.name === "ArchiveLimitError" && error.code === "expansion-ratio",
+  );
 });

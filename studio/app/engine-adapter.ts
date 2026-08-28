@@ -546,6 +546,15 @@ export class EngineAdapter {
     return parts.sort().join(";");
   }
 
+  /**
+   * Reports an adapter-external scene mutation (e.g. an orchestrated
+   * arrangement) to the scene-edit listeners, so stale-result tracking sees
+   * programmatic changes as well as user gestures.
+   */
+  notifySceneEdited(): void {
+    this.scheduleSceneEditNotification();
+  }
+
   private scheduleSceneEditNotification(): void {
     if (this.sceneEditScheduled) return;
     this.sceneEditScheduled = true;
@@ -563,7 +572,7 @@ export class EngineAdapter {
 
   // -- internals ------------------------------------------------------------
 
-  private scanExistingRoots(scope: ParentNode): void {
+  private scanExistingRoots(scope: HTMLElement | ShadowRoot): void {
     for (const element of scope.querySelectorAll<HTMLElement>("*")) {
       const root = element.shadowRoot;
       if (root) {
@@ -758,6 +767,7 @@ export async function arrangeCurrentObjects(
   }
   if (plan.targetPlates.length) adapter.selectPlate(plan.targetPlates[0]);
   api.frame();
+  if (plan.placements.length) adapter.notifySceneEdited();
 
   const result: ArrangeAllResult = {
     ok: true,
