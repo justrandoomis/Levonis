@@ -1,7 +1,9 @@
 import React, { ReactNode, useState, useRef, useEffect } from 'react';
-import { Search, Bell, Menu, User, ArrowLeft, ArrowRight, Globe, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, Menu, User, ArrowLeft, ArrowRight, Globe, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+import { api } from '../lib/api';
 
 interface SidebarItem {
   id: string;
@@ -20,14 +22,23 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTab, onTabChange, children }: DashboardLayoutProps) {
   const { dir, lang, setLang } = useLanguage();
   const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  
+  const [myStoreId, setMyStoreId] = useState<string | null>(null);
+
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+
+  // The user-menu "Settings" entry only makes sense when this shell actually
+  // has a settings tab; the admin shell calls it 'store_settings'.
+  const settingsTabId =
+    sidebarItems.find(i => i.id === 'settings')?.id ??
+    sidebarItems.find(i => i.id === 'store_settings')?.id ??
+    null;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -44,7 +55,37 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
+
+  // Resolve the signed-in user's real community store id (if any) so the
+  // "My Store" links can point at the actual page.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    api
+      .get<{ merchant: { id: string } | null }>('/api/community/my-store')
+      .then((data) => {
+        if (!cancelled && data.merchant) setMyStoreId(data.merchant.id);
+      })
+      .catch(() => { /* no store or transient error — fall back below */ });
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  const goToMyStore = () => {
+    if (myStoreId) {
+      navigate(`/community/store/${myStoreId}`);
+    } else {
+      navigate('/edit-profile');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/auth');
+    }
+  };
+
   return (
     <div className="flex h-screen w-full bg-[#18181b] overflow-hidden font-sans" dir={dir}>
       {/* Desktop Sidebar */}
@@ -55,19 +96,19 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
           </div>
           <span className="font-bold text-sm tracking-widest uppercase border border-zinc-700 px-3 py-1 rounded-lg text-white">{title}</span>
         </div>
-        
+
         <div className="px-8 py-2 text-[10px] font-bold text-zinc-500 tracking-widest uppercase mb-2">
           {dir === 'rtl' ? 'القائمة الرئيسية' : 'MAIN MENU'}
         </div>
-        
+
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
           {sidebarItems.map(item => (
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all duration-300 font-medium ${
-                activeTab === item.id 
-                  ? 'bg-[#708238] text-white shadow-[0_4px_15px_rgba(112,130,56,0.3)]' 
+                activeTab === item.id
+                  ? 'bg-[#708238] text-white shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
                   : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
               } ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}
             >
@@ -76,11 +117,15 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
             </button>
           ))}
         </nav>
-        
+
         <div className="p-6 mt-auto">
-           <div onClick={() => navigate('/store/store-123')} className="cursor-pointer w-full aspect-square rounded-[24px] bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center p-6 relative overflow-hidden group hover:border-[#D4AF37] transition-all">
+           <div onClick={goToMyStore} className="cursor-pointer w-full aspect-square rounded-[24px] bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center p-6 relative overflow-hidden group hover:border-[#D4AF37] transition-all">
              <User className="w-12 h-12 text-[#D4AF37] mb-3 group-hover:scale-110 transition-transform" />
-             <div className="text-[11px] font-bold text-white text-center">{dir === 'rtl' ? 'عرض صفحتي في ليفو' : 'View My Levo Page'}</div>
+             <div className="text-[11px] font-bold text-white text-center">
+               {myStoreId
+                 ? (dir === 'rtl' ? 'عرض صفحتي في ليفو' : 'View My Levo Page')
+                 : (dir === 'rtl' ? 'إعداد صفحتي في ليفو' : 'Set Up My Levo Page')}
+             </div>
            </div>
         </div>
       </div>
@@ -127,19 +172,18 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
                 <Menu className="w-5 h-5" />
               </button>
            </div>
-           
+
            <div className="hidden lg:flex gap-14 text-[13px] font-semibold text-zinc-400 pl-4">
              <button onClick={() => navigate('/community')} className="cursor-pointer hover:text-white transition-colors flex items-center gap-2">
                {dir === 'rtl' ? <ArrowRight className="w-4 h-4"/> : <ArrowLeft className="w-4 h-4"/>}
                {dir === 'rtl' ? 'مجتمع ليفو' : 'Levo Community'}
              </button>
-             <span className="cursor-pointer hover:text-white transition-colors" onClick={() => navigate('/feed')}>{dir === 'rtl' ? 'الرئيسية' : 'Feed'}</span>
              <div className="relative">
                <span className="cursor-pointer text-white font-bold">{dir === 'rtl' ? 'لوحة التحكم' : 'Dashboard'}</span>
                <div className="absolute -bottom-[33px] left-0 right-0 h-0.5 bg-[#D4AF37]"></div>
              </div>
            </div>
-           
+
            <div className="flex items-center gap-6 ml-auto text-zinc-400">
              {/* Language Dropdown */}
              <div className="relative" ref={langRef}>
@@ -158,22 +202,16 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
                )}
              </div>
 
-             {/* Notifications */}
+             {/* Notifications — no notification backend exists, so no fake badge */}
              <div className="relative" ref={notifRef}>
                <button onClick={() => setShowNotifications(!showNotifications)} className="hover:text-[#D4AF37] transition-colors relative">
                  <Bell className="w-5 h-5 stroke-[2]" />
-                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#708238] border-2 border-[#18181b] rounded-full text-[8px] font-bold text-white flex items-center justify-center">3</span>
                </button>
                {showNotifications && (
-                 <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-80 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-2 z-50`}>
+                 <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-72 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-2 z-50`}>
                    <div className="px-4 py-3 border-b border-zinc-800 font-bold text-white text-sm">{dir === 'rtl' ? 'الإشعارات' : 'Notifications'}</div>
-                   <div className="max-h-64 overflow-y-auto">
-                     {[1, 2, 3].map(i => (
-                       <div key={i} className="px-4 py-3 hover:bg-zinc-800/50 cursor-pointer transition-colors border-b border-zinc-800/50 last:border-0">
-                         <div className="text-sm font-semibold text-zinc-300">{dir === 'rtl' ? 'طلب جديد من مجتمع ليفو' : 'New order from Levo Community'}</div>
-                         <div className="text-xs text-zinc-500 mt-1">{i * 5} {dir === 'rtl' ? 'دقائق مضت' : 'mins ago'}</div>
-                       </div>
-                     ))}
+                   <div className="px-4 py-6 text-center text-sm text-zinc-500">
+                     {dir === 'rtl' ? 'لا توجد إشعارات' : 'No notifications'}
                    </div>
                  </div>
                )}
@@ -186,14 +224,16 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
                </div>
                {showUserMenu && (
                  <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-48 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-2 z-50`}>
-                   <button onClick={() => navigate('/store/store-123')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
+                   <button onClick={() => { setShowUserMenu(false); goToMyStore(); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
                      <User className="w-4 h-4" /> {dir === 'rtl' ? 'متجري' : 'My Store'}
                    </button>
-                   <button onClick={() => onTabChange('settings')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
-                     <SettingsIcon className="w-4 h-4" /> {dir === 'rtl' ? 'الإعدادات' : 'Settings'}
-                   </button>
+                   {settingsTabId && (
+                     <button onClick={() => { setShowUserMenu(false); onTabChange(settingsTabId); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
+                       <SettingsIcon className="w-4 h-4" /> {dir === 'rtl' ? 'الإعدادات' : 'Settings'}
+                     </button>
+                   )}
                    <div className="h-px bg-zinc-800 my-1"></div>
-                   <button onClick={() => navigate('/')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-red-400 flex items-center gap-2">
+                   <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-red-400 flex items-center gap-2">
                      <LogOut className="w-4 h-4" /> {dir === 'rtl' ? 'تسجيل الخروج' : 'Logout'}
                    </button>
                  </div>
@@ -201,7 +241,7 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
              </div>
            </div>
         </div>
-        
+
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 custom-scrollbar relative z-0">
           {children}
