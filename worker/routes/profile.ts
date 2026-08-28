@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { publicUser } from '../lib/types';
+import { publicUser, localeToDb } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, oneOf, username } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
@@ -18,7 +18,11 @@ profileRoutes.patch('/', async (c) => {
   const name = body.name !== undefined ? str(body.name, 'name', { max: 100, required: false }) : user.name;
   const bio = body.bio !== undefined ? str(body.bio, 'bio', { max: 500, required: false }) : user.bio;
   const website = body.website !== undefined ? str(body.website, 'website', { max: 200, required: false }) : user.website;
-  const locale = body.locale !== undefined ? oneOf(body.locale, 'locale', ['en', 'ar', 'ku'] as const) : user.locale;
+  // API speaks 'ckb'; the DB column stores 'ku' (see localeToDb).
+  const locale =
+    body.locale !== undefined
+      ? localeToDb(oneOf(body.locale, 'locale', ['en', 'ar', 'ckb', 'ku'] as const))
+      : user.locale;
 
   let profileJson = user.profile_json;
   if (body.profile !== undefined) {

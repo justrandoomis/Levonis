@@ -10,7 +10,8 @@
     "check": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json",
     "deploy": "npm run build && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply levonis-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply levonis-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply levonis-db --remote",
+    "test:unit": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",

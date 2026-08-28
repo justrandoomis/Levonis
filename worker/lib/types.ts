@@ -49,6 +49,16 @@ export type AppContext = {
   };
 };
 
+/** DB stores Iraqi Kurdish as 'ku'; the API speaks 'ckb' (Sorani). */
+export function localeToApi(dbLocale: string): 'ar' | 'en' | 'ckb' {
+  if (dbLocale === 'ku' || dbLocale === 'ckb') return 'ckb';
+  return dbLocale === 'ar' ? 'ar' : 'en';
+}
+export function localeToDb(apiLocale: string): 'ar' | 'en' | 'ku' {
+  if (apiLocale === 'ckb' || apiLocale === 'ku') return 'ku';
+  return apiLocale === 'ar' ? 'ar' : 'en';
+}
+
 /** Shape sent to the frontend — never includes password_hash or google_sub. */
 export function publicUser(u: SessionUser) {
   return {
@@ -61,7 +71,7 @@ export function publicUser(u: SessionUser) {
     is_investor: !!u.is_investor,
     subscription_plan: u.subscription_plan,
     subscription_expiry: u.subscription_expiry,
-    locale: u.locale,
+    locale: localeToApi(u.locale),
     avatar_key: u.avatar_key,
     bio: u.bio,
     website: u.website,
