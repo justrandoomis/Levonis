@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package, ChevronUp, ChevronDown, MessageSquare, Minus, Plus, Trash2, X, FileText, Image as ImageIcon, Settings2 } from 'lucide-react';
 import { api, ApiError, ApiProduct, CartItem, formatIqd } from '../lib/api';
+import ReviewSection from '../components/reviews/ReviewSection';
 
 type ProductSource = 'catalog' | 'community';
 
@@ -588,20 +589,9 @@ export default function Product() {
           </div>
         )}
 
-        {/* Reviews Section — reviews are not implemented server-side yet. */}
+        {/* Reviews — real server-backed reviews (final phase §5). */}
         <div className="mb-4">
-          <div className="flex items-center justify-end gap-2 mb-4">
-             <h2 className="text-white font-bold flex items-center gap-2">
-               التقييمات والمراجعات <MessageSquare className="w-5 h-5 text-zinc-400" />
-             </h2>
-          </div>
-
-          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-8 text-center">
-            <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">
-              {dir === 'rtl' ? 'لا توجد تقييمات بعد' : 'No reviews yet'}
-            </p>
-          </div>
+          <ReviewSection productId={product.id} />
         </div>
       </div>
       </div>

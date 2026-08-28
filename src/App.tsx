@@ -37,6 +37,10 @@ import Games from './pages/Games';
 import Leaderboards from './pages/Leaderboards';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
 import RequireCommunityProfile from './components/auth/RequireCommunityProfile';
+import Policies from './pages/Policies';
+import Support from './pages/Support';
+import MyGifts from './components/reviews/MyGifts';
+import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
@@ -57,7 +61,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const location = useLocation();
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/games', '/leaderboards'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/games', '/leaderboards', '/support'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
     return (
@@ -75,6 +79,7 @@ function AppContent() {
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
             <Route path="/games" element={<ProtectedRoute><Games /></ProtectedRoute>} />
             <Route path="/leaderboards" element={<ProtectedRoute><Leaderboards /></ProtectedRoute>} />
+            <Route path="/support" element={<Support />} />
           </Routes>
         
         </main>
@@ -86,6 +91,7 @@ function AppContent() {
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
       <Header />
       <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-br from-black via-black to-[#1a210e]">
+        <EmailVerifyBanner />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
@@ -110,6 +116,9 @@ function AppContent() {
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
           <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
           <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
+          <Route path="/policies" element={<Policies />} />
+          <Route path="/policies/:key" element={<Policies />} />
+          <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>
         

@@ -1,5 +1,71 @@
 # Test results
 
+## Phase: final phase (v3) — integrated, local run 2026-08-28
+
+All suites ran against `wrangler dev` (fresh D1 via migrations 0001–0010,
+then repeated on the same persistent database to prove idempotency). Local
+`.dev.vars` supplied SYNTHETIC `TELEGRAM_WEBHOOK_SECRET`/`KYC_ENC_KEY`
+values so those code paths execute locally — never the owner's real values.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Unit tests (pricing/shipping/phone/warranty/points/sealbox/telegram/email/reviews/policies/support) | `npm run test:unit` | **93 passed, 0 failed** |
+| TypeScript (frontend + worker strict) | `npm run check` | PASS (0 errors) |
+| Production build | `npm run build` | PASS |
+| Base API suite | `node scripts/api-tests.mjs` | **60 passed, 0 failed** (also re-run after policies were published — consent attached automatically) |
+| v2 API suite | `node scripts/api-tests-v2.mjs` | **39/39 fresh · 37/37 persistent**, incl. the corrected CONFIRMED PRO-delivery assertion |
+| v3 final-phase suite, fresh DB | `node scripts/api-tests-v3.mjs` | **112 passed, 0 failed, 8 blocked** |
+| v3 re-runs on the persistent DB ×3 | same | **112 passed, 0 failed, 8 blocked** each — policy-consent, gift-pool and register-bucket idempotency fixed and verified |
+
+Blocked rows (honest unconfigured preconditions, never counted as passes):
+Telegram bot token absent locally (live private-chat delivery is a staging
+check), Resend keys absent locally, printer 25k/50k fee mapping + carton
+fee + BNPL + price-protection payout channel + KYC retention pending owner
+decisions (docs/DECISIONS.md rows 3/10/16/21/22/24), full KYC cycle needs a
+Telegram-verified phone (manual staging step with synthetic documents).
+
+Restriction gating is live: an active restriction case's benefit flags now
+gate `worker/lib/entitlements.ts` benefit checks, checkout PRO context,
+shipping waiver, order priority and ticket priority — pausing benefits
+never touches orders, wallet, warranty, support access or the paid
+membership record.
+
+## Phase: final phase (v3) — original pre-integration note
+
+The final-phase acceptance suite exists at `scripts/api-tests-v3.mjs`
+(Telegram linking/webhook/OTP, email verification + one-invoice-per-order,
+serialized devices & per-unit warranty, reviews/quality-score/gift levels,
+points 999/1000/1999, returns 7-day window, price protection,
+PRO free-delivery rule at the approved address, checkout policy consent,
+KYC honest-unconfigured branch, deterministic support assistant + PRO queue
+priority, and the cross-user IDOR battery). It reports **passed / failed /
+BLOCKED** distinctly — a check whose precondition is honestly unconfigured
+(no `TELEGRAM_WEBHOOK_SECRET`, no `KYC_ENC_KEY`, unpriced printer/carton
+fees per `docs/DECISIONS.md`) records as blocked-with-reason, not as passed.
+
+**No results are recorded here yet.** The suite has not been executed —
+route mounting in `worker/index.ts` and the `awardOrderPoints` delivered-
+transition wiring land at integration, and the numbers will be filled in
+from a real run against `wrangler dev` (and then staging) at that point.
+Skeleton to be completed after the run:
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Unit tests (all `tests/*.test.ts`) | `npm run test:unit` | _pending integration run_ |
+| TypeScript (frontend + worker strict) | `npm run check` | _pending integration run_ |
+| Base API suite | `node scripts/api-tests.mjs` | _pending integration run_ |
+| v2 API suite (incl. corrected PRO-delivery assertion) | `node scripts/api-tests-v2.mjs` | _pending integration run_ |
+| v3 final-phase suite, fresh DB | `node scripts/api-tests-v3.mjs` | _pending integration run (passed / failed / blocked to be reported distinctly)_ |
+| v3 final-phase suite, persistent DB re-run | `node scripts/api-tests-v3.mjs` | _pending integration run_ |
+
+The v2 change to note for the next run: the former check
+`PRO free delivery applied (shipping 0)` was wrong under the CONFIRMED
+owner rule (`docs/DECISIONS.md` row 15) — that buyer has no approved
+default PRO address, so it is now
+`PRO delivery not waived without approved default address (5000)`.
+
+---
+
 ## Phase: products & memberships (v2) — 2026-08-28
 
 All checks below ran against `wrangler dev` (local D1/R2) on the current

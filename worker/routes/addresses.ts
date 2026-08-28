@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, notFound, str, badRequest } from '../lib/http';
 import { newId } from '../lib/crypto';
+import { addressMatchesSnapshot, getApprovedAddress } from './kyc';
 
 export const addressRoutes = new Hono<AppContext>();
 addressRoutes.use('*', requireAuth);
@@ -25,7 +26,33 @@ addressRoutes.get('/', async (c) => {
   )
     .bind(user.id)
     .all();
-  return c.json({ success: true, addresses: results });
+
+  // PRO approved-address awareness (final-phase §9): the approved snapshot
+  // in approved_addresses is an immutable COPY — editing a saved address
+  // never changes it. Here we only annotate which saved row backs the
+  // current snapshot and whether it still matches, so the UI/checkout can
+  // explain eligibility. Ordinary address CRUD is never blocked by this.
+  const approved = await getApprovedAddress(c.env.DB, user.id);
+  const addresses = results.map((a) => {
+    const backs = !!approved && approved.source_address_id === (a as { id: string }).id;
+    return {
+      ...a,
+      backs_approved_snapshot: backs,
+      matches_approved_snapshot: backs
+        ? addressMatchesSnapshot(
+            a as { name: string; phone: string; address: string; landmark: string },
+            approved!
+          )
+        : null,
+    };
+  });
+  return c.json({
+    success: true,
+    addresses,
+    approved_snapshot: approved
+      ? { version: Number(approved.version), source_address_id: approved.source_address_id || null }
+      : null,
+  });
 });
 
 addressRoutes.post('/', async (c) => {
@@ -62,7 +89,21 @@ addressRoutes.put('/:id', async (c) => {
     .bind(a.label, a.name, a.phone, a.address, a.landmark, id, user.id)
     .run();
   if (res.meta.changes === 0) throw notFound('Address not found');
-  return c.json({ success: true });
+
+  // If this saved address backs the current approved PRO snapshot, tell the
+  // client when the edit made it diverge — the snapshot itself is an
+  // immutable copy and is deliberately NOT updated here (a change to the
+  // approved record goes through the admin-reviewed request flow). The edit
+  // is never blocked.
+  let mismatch: boolean | null = null;
+  const approved = await getApprovedAddress(c.env.DB, user.id);
+  if (approved && approved.source_address_id === id) {
+    mismatch = !addressMatchesSnapshot(
+      { name: a.name, phone: a.phone, address: a.address, landmark: a.landmark },
+      approved
+    );
+  }
+  return c.json({ success: true, approved_snapshot_mismatch: mismatch });
 });
 
 addressRoutes.post('/:id/default', async (c) => {

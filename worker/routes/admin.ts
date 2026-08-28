@@ -6,6 +6,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
+import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
+import { awardOrderPoints } from '../lib/pointsOps';
 import { walletTxPublic, credit } from '../lib/wallet';
 import { productPublic } from './products';
 import { orderPublic } from './orders';
@@ -378,7 +380,36 @@ adminRoutes.patch('/orders/:id', async (c) => {
     .run();
   if (flip.meta.changes === 0) throw badRequest('The order changed while you were editing — reload and retry');
 
+  let deviceUnits: CreateUnitsResult | null = null;
+  let deviceUnitsWarning: string | null = null;
   if (next === 'delivered') {
+    // Mandate §4: create one device record per PHYSICAL unit of every
+    // serialized product, clocked to the delivered_at just stamped. Awaited
+    // (warranty clocks are account state, not a fire-and-forget message) and
+    // idempotent via UNIQUE(order_item_id, unit_index) — a replayed
+    // transition can never duplicate units or restart coverage.
+    const deliveredRow = await c.env.DB.prepare('SELECT delivered_at FROM orders WHERE id = ?')
+      .bind(id)
+      .first<{ delivered_at: string | null }>();
+    try {
+      deviceUnits = await createUnitsOnDelivery(c.env, id, deliveredRow?.delivered_at ?? new Date().toISOString());
+    } catch (e) {
+      console.error('device unit creation failed for order', id, e);
+      // Honest partial outcome: the order IS delivered, units are missing.
+      deviceUnitsWarning =
+        'Device units were not created — retry from Admin → Serials & Devices (backfill), otherwise warranty clocks for this order are missing.';
+    }
+
+    // Purchase points (decision row 20 defaults): floor(qualifying merchandise
+    // / 1000) at the delivered event. Awaited — points are account state —
+    // and idempotent via points_awards UNIQUE(order_id), so a replayed
+    // delivered transition can never double-award.
+    try {
+      await awardOrderPoints(c.env, id);
+    } catch (e) {
+      console.error('points award failed for order', id, e);
+    }
+
     // Referral 9.1 milestone: records delivered_at-based eligibility (idempotent).
     c.executionCtx.waitUntil(onOrderDelivered(c.env, id));
     // PLUS gift on printer purchase, when the owner set the milestone to
@@ -439,7 +470,11 @@ adminRoutes.patch('/orders/:id', async (c) => {
     }
   }
   await audit(c.env.DB, adminUser.id, 'order.status', id, { from, to: next });
-  return c.json({ success: true });
+  return c.json({
+    success: true,
+    ...(deviceUnits ? { device_units: deviceUnits } : {}),
+    ...(deviceUnitsWarning ? { device_units_warning: deviceUnitsWarning } : {}),
+  });
 });
 
 // ---------------------------------------------------------------- settings

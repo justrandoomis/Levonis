@@ -14,6 +14,19 @@
 import { execSync } from 'node:child_process';
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8787';
+
+// Once versioned checkout policies are published (final phase §7), every
+// order requires policyAcceptance. Fetched once; empty before publishing.
+let POLICY_ACC = [];
+async function loadPolicyAcceptance() {
+  try {
+    const res = await fetch(`${BASE}/api/policies`);
+    const j = await res.json();
+    POLICY_ACC = (j?.policies ?? [])
+      .filter((p) => p.required_for_checkout)
+      .map((p) => ({ key: p.key, version: p.version }));
+  } catch { POLICY_ACC = []; }
+}
 let passed = 0;
 let failed = 0;
 const failures = [];
@@ -80,6 +93,7 @@ const PNG_BYTES = Uint8Array.from(atob(
 ), (c) => c.charCodeAt(0));
 
 async function main() {
+  await loadPolicyAcceptance();
   const rnd = Math.random().toString(36).slice(2, 8);
   const adminEmail = `admin-${rnd}@test.local`;
   const userEmail = `user-${rnd}@test.local`;
@@ -159,20 +173,20 @@ async function main() {
   check('create address', r.status === 200 && !!addressId);
 
   const idem = `test-${rnd}-1`;
-  r = await user.post('/api/orders', { addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: idem });
+  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: idem });
   const orderId = r.data?.order?.id;
   check('order created', r.status === 200 && !!orderId, JSON.stringify(r.data));
   check('server-computed total (2×10000 + 5000 shipping)', r.data?.order?.total_iqd === 25000, `got ${r.data?.order?.total_iqd}`);
-  r = await user.post('/api/orders', { addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: idem });
+  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: idem });
   check('idempotent replay returns same order', r.data?.order?.id === orderId && r.data?.replay === true);
   r = await anon.get(`/api/products/${slug}`);
   check('stock decremented to 1', r.data?.product?.stock === 1, `got ${r.data?.product?.stock}`);
   check('cart emptied after order', (await user.get('/api/cart')).data?.items?.length === 0);
 
   await user.post('/api/cart/items', { productId, qty: 1 });
-  r = await user.post('/api/orders', { addressId, deliveryMethodId: 'nope', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-2` });
+  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'nope', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-2` });
   check('invalid delivery method rejected', r.status === 400);
-  r = await user.post('/api/orders', { addressId, deliveryMethodId: 'standard', paymentMethodId: 'full_advance', useWallet: true, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-3` });
+  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'full_advance', useWallet: true, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-3` });
   check('advance payment without balance rejected', r.status === 400 && r.data?.code === 'INSUFFICIENT_BALANCE', JSON.stringify(r.data));
 
   console.log('\n— cross-user access (IDOR)');
@@ -213,7 +227,7 @@ async function main() {
   check('withdrawal over balance rejected', (await user.post('/api/wallet/withdrawals', { amount_usd_cents: 999999 })).status === 400);
 
   console.log('\n— order cancel refund');
-  r = await user.post('/api/orders', { addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: true, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-4` });
+  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: true, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-4` });
   const order2 = r.data?.order;
   check('order with wallet applied', r.status === 200 && order2?.wallet_applied_iqd > 0, JSON.stringify(r.data?.order));
   const balAfterOrder = (await user.get('/api/wallet')).data?.balance_usd_cents;

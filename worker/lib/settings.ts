@@ -98,6 +98,12 @@ export const SETTING_DEFAULTS = {
     carton_fee_iqd: number | null;
     printer_advance_required: boolean;
   },
+  // Points for approved NON-printer product reviews (final-phase §5). The
+  // value is an owner decision (decision row 20) — disabled and unpriced
+  // until configured; reviews.ts reads it and shows an honest pending state.
+  reviewPointsConfig: { enabled: false, points: null } as {
+    enabled: boolean; points: number | null;
+  },
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

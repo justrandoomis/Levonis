@@ -10,6 +10,88 @@ import {
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
 
+// ---------------------------------------------------------------- server quote
+
+interface ShippingQuoteDto {
+  components: Array<{ kind: string; fee_iqd: number; waived: boolean; units: number; advance_required: boolean }>;
+  total_iqd: number;
+  total_before_waiver_iqd: number;
+  advance_due_iqd: number;
+  pro_waiver_applied: boolean;
+  needs_config: string[];
+  assumptions: string[];
+  reasons: string[];
+}
+
+interface CheckoutQuoteDto {
+  merchandise_iqd: number;
+  subtotal_iqd: number;
+  shipping: ShippingQuoteDto;
+  is_pickup: boolean;
+  coupon: { code?: string; discount_iqd?: number } | null;
+  points: { balance: number; applied_iqd: number };
+  wallet: { balance_iqd: number; applied_iqd: number; required_advance_iqd: number };
+  total_iqd: number;
+  due_on_delivery_iqd: number;
+  tier: { tier: string; active: boolean; at_approved_default_address: boolean; pro_benefits_context: boolean };
+  policies: Array<{ key: string; version: number }>;
+  blockers: string[];
+  can_checkout: boolean;
+}
+
+// Local trilingual strings for the new quote/consent UI (page-scoped — the
+// global dictionary is owned elsewhere).
+const STRINGS = {
+  ar: {
+    quoteLoading: 'جارٍ حساب التوصيل...',
+    quoteError: 'تعذّر حساب عرض السعر — سيُعاد التحقق عند تأكيد الطلب.',
+    needsConfig: 'رسوم توصيل جزء من هذا الطلب (طابعة/كرتونة إضافية) لم تُهيَّأ من الإدارة بعد، لذلك لا يمكن إتمام الطلب حالياً. لا نختلق رسوماً.',
+    advanceDue: (v: string) => `رسوم توصيل الطابعة (${v}) تُدفع مقدماً من المحفظة.`,
+    freeShipping: 'مجاناً',
+    whyTitle: 'تفاصيل التوصيل',
+    policyTitle: 'الموافقة على السياسات',
+    policyAgree: 'قرأتُ وأوافق على:',
+    policyRequired: 'الموافقة على السياسات المنشورة مطلوبة لإتمام الطلب.',
+    policyReset: 'تغيّر ملخص الطلب — يرجى تأكيد الموافقة مجدداً.',
+    policyNames: { terms: 'شروط الاستخدام والبيع', privacy: 'سياسة الخصوصية' } as Record<string, string>,
+    version: 'نسخة',
+    invoiceNo: 'رقم الفاتورة',
+    implicitNote: 'لا توجد سياسات منشورة تتطلب الموافقة حالياً.',
+  },
+  en: {
+    quoteLoading: 'Calculating delivery...',
+    quoteError: 'The price quote could not be calculated — it will be re-checked when you place the order.',
+    needsConfig: 'Delivery fees for part of this order (printer / extra carton) are not configured by the store yet, so the order cannot be completed right now. We never invent a fee.',
+    advanceDue: (v: string) => `Printer delivery fees (${v}) are paid in advance from your wallet.`,
+    freeShipping: 'Free',
+    whyTitle: 'Delivery details',
+    policyTitle: 'Policy consent',
+    policyAgree: 'I have read and agree to:',
+    policyRequired: 'Accepting the published policies is required to place the order.',
+    policyReset: 'The order summary changed — please confirm your agreement again.',
+    policyNames: { terms: 'Terms of Use & Sale', privacy: 'Privacy Policy' } as Record<string, string>,
+    version: 'v',
+    invoiceNo: 'Invoice number',
+    implicitNote: 'No published policies currently require acceptance.',
+  },
+  ckb: {
+    quoteLoading: 'حسابکردنی گەیاندن...',
+    quoteError: 'نرخی گەیاندن حساب نەکرا — لە کاتی تەواوکردنی داواکاری دووبارە پشکنین دەکرێت.',
+    needsConfig: 'کرێی گەیاندنی بەشێک لەم داواکارییە (پرینتەر/کارتۆنی زیادە) هێشتا لەلایەن بەڕێوەبەرایەتییەوە ڕێکنەخراوە، بۆیە ئێستا داواکارییەکە تەواو ناکرێت.',
+    advanceDue: (v: string) => `کرێی گەیاندنی پرینتەر (${v}) پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
+    freeShipping: 'بەخۆڕایی',
+    whyTitle: 'وردەکاری گەیاندن',
+    policyTitle: 'ڕەزامەندی لەسەر سیاسەتەکان',
+    policyAgree: 'خوێندمەوە و ڕازیم بە:',
+    policyRequired: 'ڕەزامەندی لەسەر سیاسەتە بڵاوکراوەکان پێویستە بۆ تەواوکردنی داواکاری.',
+    policyReset: 'پوختەی داواکارییەکە گۆڕا — تکایە دووبارە ڕەزامەندی دەربڕە.',
+    policyNames: { terms: 'مەرجەکانی بەکارهێنان و فرۆشتن', privacy: 'سیاسەتی تایبەتمەندی' } as Record<string, string>,
+    version: 'وەشان',
+    invoiceNo: 'ژمارەی پسوولە',
+    implicitNote: 'لە ئێستادا هیچ سیاسەتێکی بڵاوکراوە پێویستی بە ڕەزامەندی نییە.',
+  },
+};
+
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,6 +125,21 @@ export default function Checkout() {
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [useWalletBalance, setUseWalletBalance] = useState(false);
+
+  // Server-authoritative quote (POST /api/orders/quote): re-fetched whenever
+  // the address, cart lines, delivery/payment method or points choice change.
+  const [quote, setQuote] = useState<CheckoutQuoteDto | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+  // Versioned-policy consent: ALWAYS starts unchecked; any material quote
+  // change (totals / shipping / required versions) resets it.
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [consentResetNote, setConsentResetNote] = useState(false);
+  const quoteSignatureRef = useRef('');
+  const quoteSeqRef = useRef(0);
+  const [placedInvoiceNo, setPlacedInvoiceNo] = useState<string | null>(null);
+
+  const S = STRINGS[lang as keyof typeof STRINGS] ?? STRINGS.ar;
 
   // One stable idempotency key per checkout visit: retries after a network
   // failure can never create a duplicate order.
@@ -90,6 +187,56 @@ export default function Checkout() {
     if (!paymentMethod && filteredPaymentMethods.length > 0) setPaymentMethod(filteredPaymentMethods[0].id);
   }, [filteredPaymentMethods, paymentMethod]);
 
+  // Re-quote on every relevant selection change. The response is the ONLY
+  // source of truth for shipping/waivers/policies — local math is a fallback
+  // while the request is in flight.
+  const itemIdsKey = items.map((i) => i.id).join(',');
+  useEffect(() => {
+    if (!selectedAddressId || !deliveryMethod || items.length === 0) {
+      setQuote(null);
+      return;
+    }
+    const seq = ++quoteSeqRef.current;
+    setQuoteLoading(true);
+    setQuoteError('');
+    api
+      .post<{ quote: CheckoutQuoteDto }>('/api/orders/quote', {
+        addressId: selectedAddressId,
+        deliveryMethodId: deliveryMethod,
+        paymentMethodId: paymentMethod || undefined,
+        itemIds: items.map((i) => i.id),
+        usePoints,
+        useWallet: useWalletBalance,
+      })
+      .then((data) => {
+        if (seq !== quoteSeqRef.current) return;
+        setQuote(data.quote);
+        // Material-change detection → consent reset (§7).
+        const sig = [
+          data.quote.total_iqd,
+          data.quote.shipping.total_iqd,
+          data.quote.due_on_delivery_iqd,
+          data.quote.policies.map((p) => `${p.key}:${p.version}`).join('|'),
+        ].join('~');
+        if (quoteSignatureRef.current && quoteSignatureRef.current !== sig) {
+          setPolicyAccepted((prev) => {
+            if (prev) setConsentResetNote(true);
+            return false;
+          });
+        }
+        quoteSignatureRef.current = sig;
+      })
+      .catch((err) => {
+        if (seq !== quoteSeqRef.current) return;
+        setQuote(null);
+        setQuoteError(err instanceof Error ? err.message : 'quote failed');
+      })
+      .finally(() => {
+        if (seq === quoteSeqRef.current) setQuoteLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, itemIdsKey]);
+
   const walletBalanceIQD = usdCentsToIqd(balanceUsdCents, exchangeRate);
 
   const getMethodIcon = (iconName: string, className: string = "w-5 h-5") => {
@@ -105,11 +252,16 @@ export default function Checkout() {
 
   // Preview math mirrors the server's order pricing (worker/routes/orders.ts):
   // subtotal + delivery, minus points, then wallet. The authoritative amounts
-  // are always recomputed server-side when the order is placed.
+  // come from the server quote whenever one is loaded; the order itself is
+  // always recomputed server-side when placed.
   const total = items.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
   const selectedDelivery = checkoutDeliveryMethods.find(m => m.id === deliveryMethod);
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
-  const beforeDiscounts = total + deliveryPrice;
+  const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
+  const shippingWaived = !!quote && quote.shipping.total_iqd < quote.shipping.total_before_waiver_iqd;
+  const shippingNeedsConfig = !!quote && quote.shipping.needs_config.length > 0;
+  const requiredPolicies = quote?.policies ?? [];
+  const beforeDiscounts = total + shippingIqd;
   const pointsDiscount = usePoints ? Math.min(pointBalance, beforeDiscounts) : 0;
   const orderTotal = beforeDiscounts - pointsDiscount;
 
@@ -132,8 +284,10 @@ export default function Checkout() {
 
   // Verify if balance is sufficient for required advance
   const isBalanceSufficient = walletDiscount >= requiredAdvance;
+  const consentSatisfied = requiredPolicies.length === 0 || policyAccepted;
   const canCompleteOrder =
-    isBalanceSufficient && !submitting && items.length > 0 && !!selectedAddressId && !!deliveryMethod && !!paymentMethod;
+    isBalanceSufficient && !submitting && items.length > 0 && !!selectedAddressId && !!deliveryMethod && !!paymentMethod &&
+    !quoteLoading && !shippingNeedsConfig && consentSatisfied;
 
   const amountRemainingOnDelivery = orderTotal - walletDiscount;
 
@@ -142,7 +296,7 @@ export default function Checkout() {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const data = await api.post<{ order: ApiOrder }>('/api/orders', {
+      const data = await api.post<{ order: ApiOrder; invoice_no?: string | null }>('/api/orders', {
         addressId: selectedAddressId,
         deliveryMethodId: deliveryMethod,
         paymentMethodId: paymentMethod,
@@ -150,7 +304,13 @@ export default function Checkout() {
         usePoints,
         itemIds: items.map((i) => i.id),
         idempotencyKey: idempotencyKeyRef.current,
+        // Versioned consent (§7): only sent once the customer explicitly
+        // checked the unchecked-by-default box for these exact versions.
+        policyAcceptance: policyAccepted
+          ? requiredPolicies.map((p) => ({ key: p.key, version: p.version }))
+          : [],
       });
+      setPlacedInvoiceNo(data.invoice_no ?? null);
       setPlacedOrder(data.order);
       refreshWallet().catch(() => {});
     } catch (err) {
@@ -161,6 +321,12 @@ export default function Checkout() {
       const msg = err instanceof Error ? err.message : 'Order could not be placed. Please try again.';
       if (err instanceof ApiError && err.code === 'INSUFFICIENT_BALANCE') {
         setSubmitError(dir === 'rtl' ? `الرصيد غير كافٍ للدفع المقدم المطلوب — ${msg}` : msg);
+      } else if (err instanceof ApiError && err.code === 'POLICY_ACCEPTANCE_REQUIRED') {
+        setPolicyAccepted(false);
+        setConsentResetNote(true);
+        setSubmitError(S.policyRequired);
+      } else if (err instanceof ApiError && err.code === 'SHIPPING_NEEDS_CONFIG') {
+        setSubmitError(S.needsConfig);
       } else {
         setSubmitError(msg);
       }
@@ -170,6 +336,53 @@ export default function Checkout() {
   };
 
   const itemName = (item: CartItem) => (lang === 'ar' && item.name_ar ? item.name_ar : item.name);
+
+  // Versioned-policy consent block (§7): unchecked by default, links to the
+  // published documents, resets on material quote changes. Rendered above
+  // both CTAs. Nothing renders while no policy is published (honest empty).
+  const consentBlock =
+    requiredPolicies.length > 0 ? (
+      <div className="mt-4 mb-4 p-4 rounded-xl bg-[#050505] border border-white/10 space-y-3">
+        <div className="text-xs uppercase tracking-widest text-zinc-500">{S.policyTitle}</div>
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={policyAccepted}
+            onChange={(e) => {
+              setPolicyAccepted(e.target.checked);
+              if (e.target.checked) setConsentResetNote(false);
+            }}
+            className="mt-0.5 w-4 h-4 shrink-0 accent-white"
+          />
+          <span className="text-xs text-zinc-300 font-light leading-relaxed">
+            {S.policyAgree}{' '}
+            {requiredPolicies.map((p, i) => (
+              <React.Fragment key={p.key}>
+                {i > 0 && <span className="text-zinc-500"> · </span>}
+                <a
+                  href={`/policies/${p.key}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline text-white hover:text-zinc-300"
+                >
+                  {S.policyNames[p.key] ?? p.key}
+                </a>
+                <span className="text-zinc-500 text-[10px]"> ({S.version} {p.version})</span>
+              </React.Fragment>
+            ))}
+          </span>
+        </label>
+        {consentResetNote && (
+          <p className="text-xs text-amber-400/90 font-light flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
+            {S.policyReset}
+          </p>
+        )}
+        {!policyAccepted && !consentResetNote && (
+          <p className="text-[11px] text-zinc-500 font-light">{S.policyRequired}</p>
+        )}
+      </div>
+    ) : null;
 
   if (placedOrder) {
     return (
@@ -195,6 +408,12 @@ export default function Checkout() {
           <div className="bg-[#0a0a0a] border border-white/5 rounded-xl p-6 max-w-xs w-full mb-10 shadow-xl">
             <div className="text-xs text-zinc-500 mb-1 font-light">{dir === 'rtl' ? 'رقم الطلب' : 'Order Number'}</div>
             <div className="text-lg font-mono tracking-widest text-white">{placedOrder.id}</div>
+            {placedInvoiceNo && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="text-xs text-zinc-500 mb-1 font-light">{S.invoiceNo}</div>
+                <div className="text-sm font-mono tracking-wider text-white">{placedInvoiceNo}</div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -396,6 +615,7 @@ export default function Checkout() {
 
           {/* Mobile CTA */}
           <div className="pt-6 lg:hidden">
+            {consentBlock}
             <button
               onClick={placeOrder}
               disabled={!canCompleteOrder}
@@ -453,12 +673,49 @@ export default function Checkout() {
             </div>
             <div className="flex justify-between items-center text-zinc-400">
               <span className="font-light">{dir === 'rtl' ? 'الشحن' : 'Shipping'}</span>
-              {deliveryPrice === 0 ? (
-                <span className="text-emerald-400 font-normal">{dir === 'rtl' ? 'مجاناً' : 'Free'}</span>
+              {quoteLoading ? (
+                <span className="text-zinc-500 font-light text-xs">{S.quoteLoading}</span>
+              ) : shippingIqd === 0 ? (
+                <span className="text-emerald-400 font-normal">
+                  {shippingWaived && quote && quote.shipping.total_before_waiver_iqd > 0 && (
+                    <span className="text-zinc-500 line-through font-light mx-2 text-xs">
+                      {formatIqd(quote.shipping.total_before_waiver_iqd)}
+                    </span>
+                  )}
+                  {S.freeShipping}
+                </span>
               ) : (
-                <span className="text-white font-normal">{formatIqd(deliveryPrice)}</span>
+                <span className="text-white font-normal">{formatIqd(shippingIqd)}</span>
               )}
             </div>
+
+            {/* Server quote transparency: WHY a fee/waiver applies (§6.3). */}
+            {quote && quote.shipping.reasons.length > 0 && (
+              <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 space-y-1">
+                <div className="text-[11px] uppercase tracking-widest text-zinc-500">{S.whyTitle}</div>
+                {quote.shipping.reasons.map((r, i) => (
+                  <p key={i} className="text-xs text-zinc-400 font-light leading-relaxed">{r}</p>
+                ))}
+              </div>
+            )}
+            {quote && quote.shipping.advance_due_iqd > 0 && (
+              <p className="text-xs text-amber-400/90 font-light flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
+                {S.advanceDue(formatIqd(quote.shipping.advance_due_iqd))}
+              </p>
+            )}
+            {shippingNeedsConfig && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex gap-2 text-amber-400">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="text-xs leading-relaxed font-light">{S.needsConfig}</p>
+              </div>
+            )}
+            {quoteError && !quoteLoading && (
+              <p className="text-xs text-zinc-500 font-light flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
+                {S.quoteError}
+              </p>
+            )}
 
             {pointsDiscount > 0 && (
               <div className="flex justify-between items-center text-emerald-400">
@@ -556,6 +813,7 @@ export default function Checkout() {
           </div>
 
           <div className="pt-8 hidden lg:block">
+            {consentBlock}
             <button
               onClick={placeOrder}
               disabled={!canCompleteOrder}
@@ -577,11 +835,11 @@ export default function Checkout() {
                 {dir === 'rtl' ? 'الرصيد غير كافٍ لإتمام الدفع' : 'Insufficient balance'}
               </p>
             )}
-            <p className="text-center text-xs text-zinc-600 mt-5 max-w-xs mx-auto leading-relaxed">
-              {dir === 'rtl'
-                ? 'بالضغط على تأكيد الطلب، فإنك توافق على شروط الاستخدام وسياسة الخصوصية الخاصة بنا.'
-                : 'By placing your order, you agree to our Terms of Use and Privacy Policy.'}
-            </p>
+            {requiredPolicies.length === 0 && (
+              <p className="text-center text-xs text-zinc-600 mt-5 max-w-xs mx-auto leading-relaxed">
+                {S.implicitNote}
+              </p>
+            )}
           </div>
         </div>
       </div>

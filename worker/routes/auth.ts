@@ -359,12 +359,16 @@ const VERIFY_TOKEN_TTL_HOURS = 24;
  * policy), only the SHA-256 hash is stored, and the message goes through
  * the durable outbox (event key = token hash, so replays cannot double-
  * enqueue). The raw token exists only in the link inside the queued email.
+ * With `newEmail` set this becomes an email-CHANGE token: the message goes
+ * to the NEW address, and confirming it atomically applies the new address
+ * plus its verified stamp (see /verify-email/confirm).
  */
 async function issueEmailVerification(
   c: Context<AppContext>,
   userId: string,
   to: string,
-  lang: EmailLang
+  lang: EmailLang,
+  newEmail: string | null = null
 ): Promise<void> {
   const token = randomToken(32);
   const tokenHash = await sha256Hex(token);
@@ -372,8 +376,8 @@ async function issueEmailVerification(
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE email_verification_tokens SET used = 1 WHERE user_id = ? AND used = 0').bind(userId),
     c.env.DB.prepare(
-      'INSERT INTO email_verification_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)'
-    ).bind(tokenHash, userId, expires),
+      'INSERT INTO email_verification_tokens (token_hash, user_id, new_email, expires_at) VALUES (?, ?, ?, ?)'
+    ).bind(tokenHash, userId, newEmail, expires),
   ]);
   // The link only OPENS a page; confirmation is a separate explicit POST, so
   // a mail scanner following the link can never consume the token.
@@ -447,10 +451,10 @@ authRoutes.post('/verify-email/confirm', async (c) => {
 
   const now = new Date().toISOString();
   if (row.new_email) {
-    // Email-change verification: applying the new address and its verified
-    // stamp is one statement; UNIQUE(users.email) rejects a taken address.
-    // (No endpoint issues new_email tokens yet — consuming them is ready for
-    // the future email-change flow.)
+    // Email-change verification (issued by POST /change-email): applying the
+    // new address and its verified stamp is one statement, so the account
+    // never holds an unverified address with a verified stamp;
+    // UNIQUE(users.email) rejects an address taken in the meantime.
     try {
       await c.env.DB.prepare(
         "UPDATE users SET email = ?, email_verified_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
@@ -469,6 +473,69 @@ authRoutes.post('/verify-email/confirm', async (c) => {
   }
   await audit(c.env.DB, row.user_id, 'auth.email_verified', row.user_id, row.new_email ? { email_changed: true } : {});
   return c.json({ success: true, verified: true });
+});
+
+/**
+ * Change the account email (final-phase §3A) — change-by-verification: the
+ * stored address is NOT touched here. A verification token bound to the new
+ * address (new_email) is issued and mailed to the NEW inbox; only the
+ * explicit POST /verify-email/confirm applies the change, together with its
+ * fresh verified stamp. The old (possibly verified) address keeps working
+ * until that proof arrives, so a typo can never lock the account and an
+ * unproven address never becomes the recovery channel.
+ *
+ * Reauthentication: accounts with a password must present the current one.
+ * Google-only accounts are refused — their address is asserted by Google at
+ * each sign-in, and diverging from it here would silently break that link.
+ *
+ * Enumeration safety: the response is identical whether or not the requested
+ * address already belongs to another account (in that case no token is
+ * issued and no mail is sent).
+ */
+authRoutes.post('/change-email', requireAuth, async (c) => {
+  await rateLimit(c, 'change-email', 5, 3600);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const newMail = email(body.newEmail);
+  if (!c.env.EMAIL_API_KEY || !c.env.EMAIL_FROM) {
+    throw unavailable(
+      'Changing the account email is not available yet because no email service is configured.',
+      'EMAIL_NOT_CONFIGURED'
+    );
+  }
+
+  const row = await c.env.DB.prepare('SELECT email, locale, password_hash, google_sub FROM users WHERE id = ?')
+    .bind(user.id)
+    .first<{ email: string; locale: string; password_hash: string | null; google_sub: string | null }>();
+  if (!row) throw unauthorized();
+  if (newMail === row.email) throw badRequest('This is already the email of your account');
+
+  if (row.password_hash) {
+    const ok = await verifyPassword(String(body.currentPassword ?? ''), row.password_hash);
+    if (!ok) throw unauthorized('Current password is incorrect');
+  } else if (row.google_sub) {
+    throw badRequest(
+      'This account signs in with Google, so its email is managed by Google and cannot be changed here.',
+      'GOOGLE_MANAGED_EMAIL'
+    );
+  }
+
+  const taken = await c.env.DB.prepare('SELECT id FROM users WHERE email = ? AND id <> ?')
+    .bind(newMail, user.id)
+    .first();
+  if (!taken) {
+    const lang = emailLang(body.lang ?? localeToApi(row.locale));
+    await issueEmailVerification(c, user.id, newMail, lang, newMail);
+    // Audit with minimal personal data — the domain locates abuse patterns
+    // without copying the full address into the log.
+    await audit(c.env.DB, user.id, 'auth.email_change_requested', user.id, {
+      new_email_domain: newMail.split('@')[1] ?? '',
+    });
+  }
+  return c.json({
+    success: true,
+    message: 'If the new address can be used, a verification message has been sent to it. The change applies only after you confirm from that inbox.',
+  });
 });
 
 // Email helpers --------------------------------------------------------------

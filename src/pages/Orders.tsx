@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { ArrowLeft, ArrowRight, Package } from 'lucide-react';
 import { api, ApiOrder, formatIqd } from '../lib/api';
+import ReturnsSection from '../components/returns/ReturnsSection';
 
 const STATUS_STYLES: Record<ApiOrder['status'], string> = {
   pending: 'bg-amber-500/10 text-amber-400',
@@ -149,6 +150,7 @@ export default function Orders() {
                     </span>
                   </div>
                 </div>
+                <ReturnsSection order={order} />
               </div>
             ))}
           </div>

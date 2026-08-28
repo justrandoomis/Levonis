@@ -44,6 +44,10 @@ export interface TierStatus {
   active: boolean;
   expires_at: string | null;
   pending_launch: { tier: 'plus' | 'pro'; duration_months: number } | null;
+  /** Benefit names gated by ACTIVE restriction cases (admin decisions,
+   *  final phase §10). Gates benefit computation only — never data access,
+   *  support, warranty, repayment or login. */
+  gated_benefits: string[];
 }
 
 export async function getLaunchConfig(db: D1Database): Promise<LaunchConfig> {
@@ -79,11 +83,27 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
   const active = results.find((m) => m.state === 'active');
   const pending = results.find((m) => m.state === 'prepaid_pending_launch');
 
+  // Active restriction cases gate specific benefits (admin decision with
+  // reason + audit, worker/routes/support.ts). Merged here — the single
+  // choke point — so checkout, pricing, community and support all honor
+  // the same decision without separate wiring.
+  const gated = new Set<string>();
+  const { results: cases } = await db
+    .prepare("SELECT benefit_flags FROM restriction_cases WHERE user_id = ? AND state = 'active'")
+    .bind(userId)
+    .all<{ benefit_flags: string }>();
+  for (const r of cases) {
+    for (const f of safeParse<unknown[]>(r.benefit_flags, [])) {
+      if (typeof f === 'string') gated.add(f);
+    }
+  }
+
   const status: TierStatus = {
     tier: active ? active.tier : 'free',
     active: !!active,
     expires_at: active?.expires_at ?? null,
     pending_launch: pending ? { tier: pending.tier, duration_months: pending.duration_months } : null,
+    gated_benefits: [...gated],
   };
 
   // Keep the legacy users.* cache in sync (many read paths still use it).
@@ -111,21 +131,24 @@ export async function effectiveTier(env: Env, user: SessionUser): Promise<{ tier
 }
 
 // Benefit checks — single definitions so PLUS/PRO gates never drift apart.
+// Every check honors gated_benefits: an active restriction case pauses the
+// specific benefit without touching the paid membership record itself.
+const notGated = (t: TierStatus, name: string) => !(t.gated_benefits ?? []).includes(name);
 export const benefits = {
   /** PLUS+PRO: professional merchant profile in the community. */
-  merchantProfile: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro'),
+  merchantProfile: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantProfile'),
   /** PLUS+PRO: exclusive sections (bundles, random filament, special offers). */
-  exclusiveSections: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro'),
+  exclusiveSections: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'exclusiveSections'),
   /** PRO: explicit/policy product discounts (resolver applies pricing). */
-  proPricing: (t: TierStatus) => t.active && t.tier === 'pro',
+  proPricing: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proPricing'),
   /** PRO: free last-mile delivery on all orders. */
-  freeDelivery: (t: TierStatus) => t.active && t.tier === 'pro',
+  freeDelivery: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'freeDelivery'),
   /** PRO: preorder transport commission waived. */
-  noPreorderCommission: (t: TierStatus) => t.active && t.tier === 'pro',
+  noPreorderCommission: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'noPreorderCommission'),
   /** PRO: verified/distinguished merchant + advertising eligibility. */
-  verifiedMerchant: (t: TierStatus) => t.active && t.tier === 'pro',
+  verifiedMerchant: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'verifiedMerchant'),
   /** PRO: priority service/preparation flag on orders and support. */
-  priorityService: (t: TierStatus) => t.active && t.tier === 'pro',
+  priorityService: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'priorityService'),
   /** PRO: PRO-only products/offers/coupons eligibility. */
-  proExclusive: (t: TierStatus) => t.active && t.tier === 'pro',
+  proExclusive: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proExclusive'),
 };

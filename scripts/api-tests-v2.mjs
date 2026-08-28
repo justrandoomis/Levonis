@@ -7,6 +7,19 @@
 import { execSync } from 'node:child_process';
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8787';
+
+// Once versioned checkout policies are published (final phase §7), every
+// order requires policyAcceptance. Fetched once; empty before publishing.
+let POLICY_ACC = [];
+async function loadPolicyAcceptance() {
+  try {
+    const res = await fetch(`${BASE}/api/policies`);
+    const j = await res.json();
+    POLICY_ACC = (j?.policies ?? [])
+      .filter((p) => p.required_for_checkout)
+      .map((p) => ({ key: p.key, version: p.version }));
+  } catch { POLICY_ACC = []; }
+}
 let passed = 0, failed = 0;
 const failures = [];
 function check(name, cond, extra = '') {
@@ -43,6 +56,7 @@ function promoteAdmin(email) {
 }
 
 async function main() {
+  await loadPolicyAcceptance();
   const rnd = Math.random().toString(36).slice(2, 8);
   const admin = new Client();
   const buyer = new Client();
@@ -161,10 +175,15 @@ async function main() {
   check('PRO line: commission waived, warranty kept', line && line.unit_price_iqd === 90000 + 0 + 20000, `unit=${line?.unit_price_iqd}`);
   r = await buyer.post('/api/addresses', { label: 'Home', name: 'V2 Buyer', phone: '+9647701112233', address: 'Baghdad, Test District 9' });
   const addressId = r.data?.id;
-  r = await buyer.post('/api/orders', { addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: `v2o-${rnd}` });
+  r = await buyer.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: `v2o-${rnd}` });
   check('PRO order created', r.status === 200, JSON.stringify(r.data).slice(0, 250));
   const order = r.data?.order;
-  check('PRO free delivery applied (shipping 0)', order && order.shipping_iqd === 0, `shipping=${order?.shipping_iqd}`);
+  // CONFIRMED owner rule (final-phase §6.3, docs/DECISIONS.md row 15): the PRO
+  // free-delivery waiver requires the approved default PRO address AND order
+  // value strictly above 75,000 IQD. This buyer has NO approved default
+  // address, so ordinary delivery (5,000 IQD) applies — the old unconditional
+  // "PRO free delivery" expectation was wrong.
+  check('PRO delivery not waived without approved default address (5000)', order && order.shipping_iqd === 5000, `shipping=${order?.shipping_iqd}`);
   check('order snapshots tier', JSON.stringify(r.data).includes('pro') || order?.membership_tier_snapshot === 'pro');
 
   console.log('\n— template round-trip');

@@ -190,6 +190,71 @@ function applyTranslationTracking(doc: ProductDoc, prev: ProductDoc | null): voi
   doc.translation_meta = meta;
 }
 
+// ---------------------------------------------------------------- price history
+
+type HistoryField = 'regular' | 'pro' | 'compare_at';
+
+interface PriceDelta {
+  variant_key: string; // '' | option:<id> | color:<id>
+  field: HistoryField;
+  old_iqd: number | null;
+  new_iqd: number | null;
+}
+
+/**
+ * Monetary-field diff between the stored document and the saved one — one
+ * row per changed price (price_history, 0003). Feeds seven-day price
+ * protection (§6.8): a drop stays inspectable even after the price moves
+ * again. Costs are internal and deliberately NOT recorded here (the table
+ * is scoped to selling prices by its CHECK constraint).
+ */
+export function priceHistoryDeltas(prev: ProductDoc, next: ProductDoc): PriceDelta[] {
+  const out: PriceDelta[] = [];
+  const push = (variantKey: string, field: HistoryField, oldV: number | null, newV: number | null) => {
+    if (oldV !== newV) out.push({ variant_key: variantKey, field, old_iqd: oldV, new_iqd: newV });
+  };
+
+  push('', 'regular', prev.price_iqd, next.price_iqd);
+  push('', 'pro', prev.pro_price_iqd, next.pro_price_iqd);
+  push('', 'compare_at', prev.original_price_iqd, next.original_price_iqd);
+
+  const diffGroup = (
+    kind: 'option' | 'color',
+    prevItems: Array<{ id: string; regular_price_iqd: number | null; pro_price_iqd: number | null; compare_at_iqd: number | null }>,
+    nextItems: Array<{ id: string; regular_price_iqd: number | null; pro_price_iqd: number | null; compare_at_iqd: number | null }>
+  ) => {
+    const prevById = new Map(prevItems.map((x) => [x.id, x]));
+    const nextById = new Map(nextItems.map((x) => [x.id, x]));
+    for (const id of new Set([...prevById.keys(), ...nextById.keys()])) {
+      const p = prevById.get(id) ?? null;
+      const n = nextById.get(id) ?? null;
+      push(`${kind}:${id}`, 'regular', p?.regular_price_iqd ?? null, n?.regular_price_iqd ?? null);
+      push(`${kind}:${id}`, 'pro', p?.pro_price_iqd ?? null, n?.pro_price_iqd ?? null);
+      push(`${kind}:${id}`, 'compare_at', p?.compare_at_iqd ?? null, n?.compare_at_iqd ?? null);
+    }
+  };
+  diffGroup('option', prev.options, next.options);
+  diffGroup('color', prev.colors, next.colors);
+  return out;
+}
+
+async function recordPriceHistory(
+  db: D1Database,
+  productId: string,
+  actorId: string,
+  deltas: PriceDelta[]
+): Promise<void> {
+  if (deltas.length === 0) return;
+  const stmts = deltas.map((d) =>
+    db
+      .prepare(
+        'INSERT INTO price_history (product_id, variant_key, field, old_iqd, new_iqd, changed_by) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .bind(productId, d.variant_key, d.field, d.old_iqd, d.new_iqd, actorId)
+  );
+  await db.batch(stmts);
+}
+
 function brandOut(r: Record<string, unknown>) {
   return {
     id: r.id,
@@ -581,6 +646,21 @@ adminProductsRoutes.post('/', async (c) => {
     );
   }
 
+  // Price history (§6.8): every monetary change on an existing product —
+  // base/PRO/compare-at at product, option and color level — is snapshotted
+  // with the prior value, the actor and the change time. The product save
+  // above already stands; a history-write failure is surfaced, never hidden.
+  let priceHistoryWarning: string | null = null;
+  if (prev) {
+    try {
+      await recordPriceHistory(c.env.DB, doc.id, admin.id, priceHistoryDeltas(prev, doc));
+    } catch (e) {
+      console.error('price history write failed for product', doc.id, e instanceof Error ? e.message : String(e));
+      priceHistoryWarning =
+        'The product saved, but its price-history rows could not be written — price protection for this change may need manual review.';
+    }
+  }
+
   await audit(c.env.DB, admin.id, prev ? 'product_v2.update' : 'product_v2.create', doc.id, {
     name_ar: doc.name_ar,
     slug: doc.slug,
@@ -596,6 +676,7 @@ adminProductsRoutes.post('/', async (c) => {
     success: true,
     created: !prev,
     product: { ...projectAdmin(parseProductRow(fresh!)), catalog_ids: await catalogIdsFor(c.env.DB, doc.id) },
+    ...(priceHistoryWarning ? { price_history_warning: priceHistoryWarning } : {}),
   });
 });
 

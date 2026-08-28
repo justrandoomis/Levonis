@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
+import TelegramLink from '../components/security/TelegramLink';
 
 type PushStatus = 'unsupported' | 'blocked' | 'granted' | 'off';
 
@@ -156,6 +157,50 @@ export default function Settings() {
                 <span className="font-bold text-[16px]">Setup extension</span>
               </div>
               <span className="text-zinc-400 text-[13px] font-medium">قريباً / Coming soon</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Security — verified contact channels */}
+        <div>
+          <h3 className="text-zinc-400 text-[13px] font-semibold mb-2 ml-1">
+            {lang === 'ar' ? 'الأمان وقنوات التحقق' : lang === 'ckb' ? 'ئاسایش و پشتڕاستکردنەوە' : 'Security & verification'}
+          </h3>
+          <TelegramLink />
+        </div>
+
+        {/* Support */}
+        <div>
+          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+            <button
+              onClick={() => navigate('/support')}
+              className="flex items-center justify-between p-4 py-4.5 active:bg-gold/5 hover:bg-gold/5 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <Bell className="w-5 h-5 text-white" strokeWidth={2.2} />
+                <span className="font-bold text-[16px]">{lang === 'ar' ? 'مساعد الدعم' : lang === 'ckb' ? 'یاریدەدەری پشتگیری' : 'Support assistant'}</span>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-zinc-500 rotate-180" />
+            </button>
+            <button
+              onClick={() => navigate('/gifts')}
+              className="flex items-center justify-between p-4 py-4.5 border-t border-zinc-800 active:bg-gold/5 hover:bg-gold/5 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <Sparkles className="w-5 h-5 text-white" strokeWidth={2.2} />
+                <span className="font-bold text-[16px]">{lang === 'ar' ? 'مراجعاتي وهداياي' : lang === 'ckb' ? 'پێداچوونەوە و دیارییەکانم' : 'My reviews & gifts'}</span>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-zinc-500 rotate-180" />
+            </button>
+            <button
+              onClick={() => navigate('/policies')}
+              className="flex items-center justify-between p-4 py-4.5 border-t border-zinc-800 active:bg-gold/5 hover:bg-gold/5 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <SettingsIcon className="w-5 h-5 text-white" strokeWidth={2.2} />
+                <span className="font-bold text-[16px]">{lang === 'ar' ? 'السياسات والشروط' : lang === 'ckb' ? 'سیاسەت و مەرجەکان' : 'Policies & terms'}</span>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-zinc-500 rotate-180" />
             </button>
           </div>
         </div>

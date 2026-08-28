@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import type { AppContext } from './lib/types';
+import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, securityHeaders } from './lib/http';
 import { loadSessionUser } from './lib/session';
+import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -21,6 +22,14 @@ import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { extractRoutes } from './routes/extract';
 import { membershipsRoutes } from './routes/memberships';
+import { telegramRoutes } from './routes/telegram';
+import { invoiceRoutes } from './routes/invoices';
+import { deviceRoutes } from './routes/devices';
+import { reviewRoutes } from './routes/reviews';
+import { returnRoutes, priceProtectionRoutes } from './routes/returns';
+import { policiesRoutes } from './routes/policies';
+import { kycRoutes } from './routes/kyc';
+import { supportRoutes } from './routes/support';
 
 const app = new Hono<AppContext>();
 
@@ -51,6 +60,15 @@ app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/extract-v2', extractRoutes);
 app.route('/api/memberships', membershipsRoutes);
+app.route('/api/telegram', telegramRoutes);
+app.route('/api/invoices', invoiceRoutes);
+app.route('/api/devices', deviceRoutes);
+app.route('/api/reviews', reviewRoutes);
+app.route('/api/returns', returnRoutes);
+app.route('/api/price-protection', priceProtectionRoutes);
+app.route('/api/policies', policiesRoutes);
+app.route('/api/kyc', kycRoutes);
+app.route('/api/support', supportRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.
@@ -78,4 +96,11 @@ app.onError((err, c) => {
   return c.json({ success: false, error: 'Something went wrong. Please try again.' }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Durable jobs: outbox delivery (email/telegram), stale-challenge expiry,
+  // gated BNPL overdue stub. Idempotent — safe under overlapping runs.
+  scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runDurableJobs(env));
+  },
+};

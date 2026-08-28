@@ -9,6 +9,7 @@ import { api, formatIqd, newIdempotencyKey } from '../lib/api';
 import ScrollReveal from '../components/ScrollReveal';
 import GooeyNav from '../components/GooeyNav';
 import PixelCard from '../components/PixelCard';
+import KycSection from '../components/kyc/KycSection';
 
 /** Display-only membership number derived deterministically from the user id — cosmetic, never stored. */
 function generateConsistentNumber(seed: string): string {
@@ -486,6 +487,14 @@ export default function Subscription() {
             <p className="text-sky-200/80 text-[12px]">
               {t('launchNote')}{launch?.launch_at ? ` — ${fmtDate(launch.launch_at)}` : ''}
             </p>
+          </div>
+        )}
+
+        {/* PRO identity verification (KYC) — deliberately here in the
+            membership area, never in the public profile (final phase §9). */}
+        {(currentPlan === 'pro' || pendingLaunch?.tier === 'pro') && (
+          <div className="mt-4 w-full max-w-sm">
+            <KycSection />
           </div>
         )}
       </motion.div>

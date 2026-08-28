@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw } from 'lucide-react';
+import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown } from 'lucide-react';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import AdminProducts from '../components/AdminProducts';
 import AdminAds from '../components/AdminAds';
@@ -11,6 +11,10 @@ import AdminUsers from '../components/AdminUsers';
 import AdminWalletRequests from '../components/AdminWalletRequests';
 import AdminWalletSettings from '../components/AdminWalletSettings';
 import AdminStoreSettings from '../components/AdminStoreSettings';
+import AdminSerials from '../components/AdminSerials';
+import AdminReviews from '../components/AdminReviews';
+import AdminKyc from '../components/AdminKyc';
+import AdminMemberships from '../components/AdminMemberships';
 import DashboardLayout from '../components/DashboardLayout';
 
 type AdminTab =
@@ -22,7 +26,11 @@ type AdminTab =
   | 'wallet_requests'
   | 'wallet_settings'
   | 'store_settings'
-  | 'ads';
+  | 'ads'
+  | 'serials'
+  | 'reviews'
+  | 'kyc'
+  | 'memberships';
 
 const ORDER_TRANSITIONS: Record<ApiOrder['status'], ApiOrder['status'][]> = {
   pending: ['confirmed', 'cancelled'],
@@ -223,6 +231,10 @@ export default function Admin() {
     { id: 'wallet_settings', icon: Wallet, label: 'Wallet Settings' },
     { id: 'store_settings', icon: Settings, label: 'Store Settings' },
     { id: 'ads', icon: Megaphone, label: 'Ads & Texts' },
+    { id: 'serials', icon: Barcode, label: dir === 'rtl' ? 'الأجهزة والتسلسلات' : 'Serials & Devices' },
+    { id: 'reviews', icon: Star, label: dir === 'rtl' ? 'المراجعات والهدايا' : 'Reviews & Gifts' },
+    { id: 'kyc', icon: ShieldCheck, label: dir === 'rtl' ? 'التحقق والعناوين' : 'KYC & Addresses' },
+    { id: 'memberships', icon: Crown, label: dir === 'rtl' ? 'الأعضاء والدعم' : 'Members & Support' },
   ];
 
   return (
@@ -267,6 +279,22 @@ export default function Admin() {
 
         {activeTab === 'store_settings' && (
            <AdminStoreSettings />
+        )}
+
+        {activeTab === 'serials' && (
+           <AdminSerials />
+        )}
+
+        {activeTab === 'reviews' && (
+           <AdminReviews />
+        )}
+
+        {activeTab === 'kyc' && (
+           <AdminKyc />
+        )}
+
+        {activeTab === 'memberships' && (
+           <AdminMemberships />
         )}
       </div>
     </DashboardLayout>

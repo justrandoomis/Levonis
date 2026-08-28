@@ -54,6 +54,10 @@
 
   "observability": { "enabled": true },
 
+  // Durable jobs: outbox delivery (email/telegram), challenge expiry.
+  // The scheduled handler is idempotent — overlapping runs are safe.
+  "triggers": { "crons": ["*/15 * * * *"] },
+
   "env": {
     // Staging: fully separate Worker + D1 + R2. Deployed to workers.dev,
     // never to the production domain.
@@ -87,7 +91,8 @@
         "EMAIL_ALLOWED_RECIPIENTS": "",
         "EMAIL_FROM": ""
       },
-      "observability": { "enabled": true }
+      "observability": { "enabled": true },
+      "triggers": { "crons": ["*/15 * * * *"] }
     }
   }
 }
