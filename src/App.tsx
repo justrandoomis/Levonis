@@ -5,8 +5,7 @@ import { WalletProvider } from './WalletContext';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Navigate } from 'react-router-dom';
 import Header from './components/Header';
-import BottomNav from './components/BottomNav';
-import GradualBlur from './components/GradualBlur';
+import BottomNav, { isBottomNavHidden } from './components/BottomNav';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import Product from './pages/Product';
@@ -44,8 +43,11 @@ import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
+  const location = useLocation();
   if (!isLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
-  if (!isAuthenticated) return <Navigate to="/auth" />;
+  // Carry the intended destination so Auth can return the user after login.
+  // Auth.tsx sanitizes it via sanitizeNextPath (same-origin relative only).
+  if (!isAuthenticated) return <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
   return <>{children}</>;
 }
 
@@ -53,8 +55,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // server, so hiding the route is presentation, not the security boundary.
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoaded } = useAuth();
+  const location = useLocation();
   if (!isLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
-  if (!isAuthenticated) return <Navigate to="/auth" />;
+  if (!isAuthenticated) return <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
   if (!user?.isAdmin) return <Navigate to="/" />;
   return <>{children}</>;
 }
@@ -87,10 +90,23 @@ function AppContent() {
     );
   }
 
+  // The scroll container reserves exactly the space the floating BottomNav
+  // occupies (its bottom offset + its height + a small visual gap), instead of
+  // an oversized fixed spacer. On routes where BottomNav does not render,
+  // no artificial gap is reserved. Safe-area inset mirrors BottomNav's offset.
+  const navHidden = isBottomNavHidden(location.pathname);
+  const navClearance = navHidden
+    ? ''
+    : ' pb-[calc(72px_+_max(1rem,env(safe-area-inset-bottom)))] sm:pb-[calc(84px_+_max(1.5rem,env(safe-area-inset-bottom)))]';
+
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
       <Header />
-      <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-br from-black via-black to-[#1a210e]">
+      {/* Single intentional background: uniform LEVONIS black (matches
+          html/body/#root in index.css). The previous diagonal gradient into
+          olive-green (hex 1a210e) painted an unintended glow in the bottom
+          corner near the nav — removed at the source, not covered up. */}
+      <main id="main-scroll-container" className={`flex-1 flex flex-col overflow-y-auto bg-black${navClearance}`}>
         <EmailVerifyBanner />
         <Routes>
           <Route path="/" element={<Home />} />
@@ -121,11 +137,8 @@ function AppContent() {
           <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>
-        
-        <div className="h-36 shrink-0"></div>
       </main>
-      
-      <GradualBlur target="page" position="bottom" height="120px" strength={2} divCount={10} curve="bezier" exponential={true} opacity={1} zIndex={10} />
+
       <BottomNav />
       <BrowseMissionTimer />
     </div>

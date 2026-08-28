@@ -225,6 +225,13 @@ export default function EmailVerifyBanner() {
   // Ordinary banner: only for a signed-in, confirmed-unverified account.
   if (hidden || !isLoaded || !isAuthenticated || !status || status.verified) return null;
 
+  // Telegram-signup accounts carry a non-routable placeholder address
+  // (tg-<id>@telegram.local) until the user adds a real email. "Verify your
+  // email" is meaningless for them — no message could ever arrive — so the
+  // banner stays silent instead of offering a control that cannot work.
+  // (Adding a real email is a separate flow owned by profile/settings.)
+  if (status.email.toLowerCase().endsWith('@telegram.local')) return null;
+
   return (
     <div className="mx-3 mt-3 rounded-2xl border border-yellow-700/40 bg-[#171304] p-4 text-sm">
       <div className="flex items-start justify-between gap-3">

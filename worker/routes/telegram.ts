@@ -18,6 +18,7 @@ import {
   getBotUsername,
   sendToChat,
   verifyOtp,
+  maybeSendAuthChallengeOtp,
   OTP_PURPOSES,
   type OtpPurpose,
 } from '../lib/telegram';
@@ -98,6 +99,16 @@ const TXT_PHONE_VERIFIED =
   'تم التحقق من رقم هاتفك بنجاح. ارجع إلى موقع LEVONIS لإكمال الربط من نفس المتصفح الذي بدأت منه.\n' +
   'Your phone number is verified. Return to the LEVONIS website to finish linking from the same browser you started in.\n' +
   'ژمارەی تەلەفۆنەکەت پشتڕاستکرایەوە. بگەڕێوە بۆ ماڵپەڕی LEVONIS بۆ تەواوکردنی بەستنەوەکە لە هەمان وێبگەڕەوە.';
+
+// Auth (signup/login) variant of the verified message: the next step is the
+// code, not a browser-side "confirm link". Generic on purpose — whether the
+// code actually follows depends on server-side linkability, and the site
+// explains the specific outcome.
+const TXT_PHONE_VERIFIED_AUTH =
+  'LEVONIS ✅\n' +
+  'تم التحقق من رقم هاتفك. إذا وصلك رمز تحقق هنا فأدخله في موقع LEVONIS؛ وإن لم يصلك، ارجع إلى الموقع واتبع التعليمات.\n' +
+  'Your phone number is verified. If a verification code arrives here, enter it on the LEVONIS website; otherwise return to the site and follow the instructions.\n' +
+  'ژمارەی تەلەفۆنەکەت پشتڕاستکرایەوە. ئەگەر کۆدی پشتڕاستکردنەوە لێرە گەیشت، لە ماڵپەڕی LEVONIS بینووسە؛ ئەگەرنا بگەڕێوە بۆ ماڵپەڕەکە و ڕێنماییەکان جێبەجێبکە.';
 
 const TXT_LINKED_DONE =
   'LEVONIS ✅\n' +
@@ -446,12 +457,12 @@ async function handleContact(env: Env, msg: TgMessage): Promise<void> {
 
   const now = nowIso();
   const ch = await env.DB.prepare(
-    `SELECT id, phone_entered FROM link_challenges
+    `SELECT id, purpose, phone_entered, expires_at FROM link_challenges
       WHERE chat_id = ? AND consumed_at IS NULL AND state IN ('pending','contact_received') AND expires_at > ?
       ORDER BY created_at DESC LIMIT 1`
   )
     .bind(chatId, now)
-    .first<{ id: string; phone_entered: string }>();
+    .first<{ id: string; purpose: string; phone_entered: string; expires_at: string }>();
   if (!ch) {
     await sendToChat(env, chatId, TXT_NO_ACTIVE_REQUEST, REMOVE_KEYBOARD);
     return;
@@ -490,7 +501,28 @@ async function handleContact(env: Env, msg: TgMessage): Promise<void> {
     .bind(msg.from.id, chatId, ch.id)
     .run();
   if (res.meta && res.meta.changes > 0) {
-    await sendToChat(env, chatId, TXT_PHONE_VERIFIED, REMOVE_KEYBOARD);
+    if (ch.purpose === 'signup' || ch.purpose === 'login') {
+      // Anonymous auth flow (§4): the code can go out right away — the
+      // customer is still in this chat, saving one app switch. The guarded
+      // claim in maybeSendAuthChallengeOtp keeps this race-safe with the
+      // browser's status poll (at most one dispatch), and the browser still
+      // learns the honest outcome (otp_sent / not_linkable / send_failed)
+      // from its next poll.
+      await sendToChat(env, chatId, TXT_PHONE_VERIFIED_AUTH, REMOVE_KEYBOARD);
+      await maybeSendAuthChallengeOtp(env, {
+        id: ch.id,
+        purpose: ch.purpose,
+        phone_entered: ch.phone_entered,
+        state: 'phone_verified',
+        telegram_user_id: msg.from.id,
+        chat_id: chatId,
+        otp_sent_at: null,
+        expires_at: ch.expires_at,
+        consumed_at: null,
+      });
+    } else {
+      await sendToChat(env, chatId, TXT_PHONE_VERIFIED, REMOVE_KEYBOARD);
+    }
   }
 }
 

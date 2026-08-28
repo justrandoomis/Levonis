@@ -2,12 +2,39 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { publicUser, localeToApi } from '../lib/types';
-import { badRequest, unauthorized, conflict, unavailable, requireAuth, str, email, username } from '../lib/http';
+import {
+  HttpError,
+  badRequest,
+  unauthorized,
+  conflict,
+  unavailable,
+  requireAuth,
+  str,
+  email,
+  username,
+  oneOf,
+} from '../lib/http';
 import { newId, hashPassword, verifyPassword, isLegacyHash, randomToken, sha256Hex } from '../lib/crypto';
 import { createSession, destroySession, destroyAllSessions, loadSessionUser } from '../lib/session';
 import { verifyGoogleIdToken } from '../lib/google';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { normalizePhone, maskPhone } from '../lib/phone';
+import {
+  getBotUsername,
+  sendToChat,
+  toAsciiDigits,
+  publicAuthChallengeState,
+  cooldownRemaining,
+  resolveAuthLinkability,
+  maybeSendAuthChallengeOtp,
+  sendChallengeOtp,
+  verifyChallengeOtp,
+  TG_AUTH_PURPOSES,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  type TgAuthPurpose,
+  type AuthChallengeRow,
+} from '../lib/telegram';
 import { attributeReferral } from '../lib/membershipOps';
 import { enqueue, processOutbox } from '../lib/outbox';
 import {
@@ -111,7 +138,8 @@ authRoutes.post('/login', async (c) => {
   const fail = () => unauthorized('Incorrect email/username or password');
   if (!row) throw fail();
   if (!row.password_hash) {
-    throw unauthorized('This account uses Google Sign-In. Please continue with Google.');
+    // Provider-only account (Google or Telegram signup) — no password exists.
+    throw unauthorized('This account has no password. Please continue with Google or Telegram.');
   }
   const ok = await verifyPassword(password, row.password_hash);
   if (!ok) throw fail();
@@ -349,6 +377,361 @@ authRoutes.post('/reset-password', async (c) => {
   return c.json({ success: true });
 });
 
+// Telegram-verified phone + OTP registration & sign-in (§4) ------------------
+//
+// Builds ON the existing linking machinery (link_challenges + the
+// purpose-agnostic webhook contact verification + otp_challenges) — no
+// parallel webhook or account system. The anonymous browser is bound to its
+// challenge by a continuation token whose SHA-256 digest alone is stored
+// (link_challenges.continuation_hash); the deep-link nonce and the OTP are
+// separate secrets with separate lifetimes. Flow:
+//   POST /telegram/start   → challenge + deep link + continuation token
+//   (Telegram: /start → share contact → webhook marks phone_verified and
+//    dispatches the OTP through the one-shot otp_sent_at guard)
+//   GET  /telegram/status  → honest state for the polling browser; also
+//                            triggers the guarded OTP dispatch if the
+//                            webhook-side send didn't happen yet
+//   POST /telegram/resend  → re-send the code (60s cooldown)
+//   POST /telegram/complete→ verify + atomically consume code & challenge,
+//                            then create the session like password login
+// Enumeration safety: /start responds identically whether or not an account
+// exists for the phone; ownership-specific hints (use login / use signup /
+// contact support) appear only AFTER the person proved ownership of the
+// phone via their own Telegram contact.
+
+const TG_AUTH_TTL_MINUTES = 15;
+
+const GENERIC_AUTH_FAIL_MSG =
+  'تعذر إكمال العملية عبر تيليغرام. تحقق من الرقم وابدأ من جديد. / ' +
+  'The Telegram verification could not be completed. Check the number and start again.';
+
+const TG_SIGNUP_DONE_MSG =
+  'LEVONIS ✅\n' +
+  'تم إنشاء حسابك في LEVONIS بنجاح بهذا الرقم الموثّق.\n' +
+  'Your LEVONIS account has been created with this verified number.\n' +
+  'هەژماری LEVONISەکەت بەم ژمارە پشتڕاستکراوە دروستکرا.';
+
+interface TgAuthChallengeDbRow extends AuthChallengeRow {
+  purpose: TgAuthPurpose;
+}
+
+async function findAuthChallenge(db: D1Database, continuationToken: string): Promise<TgAuthChallengeDbRow | null> {
+  const hash = await sha256Hex(continuationToken);
+  return db
+    .prepare(
+      `SELECT id, purpose, phone_entered, state, telegram_user_id, chat_id, otp_sent_at, expires_at, consumed_at
+         FROM link_challenges
+        WHERE continuation_hash = ? AND purpose IN ('signup','login')`
+    )
+    .bind(hash)
+    .first<TgAuthChallengeDbRow>();
+}
+
+authRoutes.post('/telegram/start', async (c) => {
+  await rateLimit(c, 'tg-auth-start', 6, 600);
+  const body = await c.req.json().catch(() => ({}));
+  const purpose = oneOf(body.purpose, 'purpose', TG_AUTH_PURPOSES);
+  const raw = str(body.phone, 'phone', { min: 7, max: 32 });
+  // Arabic-Indic digits are accepted; mapping happens here because
+  // lib/phone.ts belongs to another workstream this round (see toAsciiDigits).
+  const phone = normalizePhone(toAsciiDigits(raw));
+  if (!phone) {
+    throw badRequest(
+      'رقم الهاتف غير صالح — أدخل رقم موبايل عراقي مثل 07XXXXXXXXX / Invalid phone number — enter an Iraqi mobile number like 07XXXXXXXXX',
+      'INVALID_PHONE'
+    );
+  }
+
+  if (!c.env.TELEGRAM_BOT_TOKEN) {
+    // Honest unavailability — never a dead-end fake flow.
+    throw unavailable('Telegram sign-in is not configured yet (TELEGRAM_BOT_TOKEN is unset)');
+  }
+  const botUsername = await getBotUsername(c.env);
+  if (!botUsername) {
+    throw unavailable('Telegram is unreachable right now — please try again later', 'TELEGRAM_UNAVAILABLE');
+  }
+
+  // Two independent secrets: the deep-link nonce (goes to Telegram) and the
+  // continuation token (stays in THIS browser). Only their SHA-256 digests
+  // are stored, so a DB leak exposes neither.
+  const nonce = randomToken(32);
+  const challengeId = await sha256Hex(nonce);
+  const continuationToken = randomToken(32);
+  const continuationHash = await sha256Hex(continuationToken);
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + TG_AUTH_TTL_MINUTES * 60_000).toISOString();
+
+  // NOTE: deliberately NO account lookup here — the response below is
+  // byte-identical whether or not the phone belongs to an account (no
+  // enumeration). A login for an unlinked phone, or a signup for a linked
+  // one, surfaces only AFTER Telegram-side phone-ownership proof.
+  await c.env.DB.batch([
+    // One active auth challenge per phone: retire earlier signup/login
+    // attempts so a stale deep link cannot race a newer one. The
+    // authenticated 'link' flow is untouched.
+    c.env.DB.prepare(
+      `UPDATE link_challenges SET state = 'expired', consumed_at = ?
+        WHERE purpose IN ('signup','login') AND phone_entered = ? AND consumed_at IS NULL`
+    ).bind(now, phone),
+    c.env.DB.prepare(
+      `INSERT INTO link_challenges (id, purpose, user_id, session_ref, phone_entered, state, continuation_hash, expires_at)
+       VALUES (?, ?, NULL, '', ?, 'pending', ?, ?)`
+    ).bind(challengeId, purpose, phone, continuationHash, expiresAt),
+  ]);
+
+  return c.json({
+    success: true,
+    deep_link: `https://t.me/${botUsername}?start=${nonce}`,
+    bot_username: botUsername,
+    continuation_token: continuationToken,
+    expires_at: expiresAt,
+    phone_masked: maskPhone(phone),
+    purpose,
+  });
+});
+
+authRoutes.get('/telegram/status', async (c) => {
+  // Anonymous polling keyed by IP; generous because Iraqi carrier NAT can
+  // put many customers behind one address and polls are cheap reads.
+  await rateLimit(c, 'tg-auth-status', 240, 60);
+  const token = str(c.req.query('token'), 'token', { min: 20, max: 128 });
+  const ch = await findAuthChallenge(c.env.DB, token);
+  if (!ch) throw badRequest('This request is no longer valid — start again', 'NO_CHALLENGE');
+  c.header('Cache-Control', 'no-store');
+
+  let state: string = publicAuthChallengeState(ch, Date.now());
+  let hint: string | null = null;
+  let resendIn: number | null = null;
+
+  if (state === 'phone_verified') {
+    // Phone ownership proven — dispatch the OTP exactly once (the webhook
+    // may already have; the otp_sent_at claim makes the race harmless).
+    const r = await maybeSendAuthChallengeOtp(c.env, ch);
+    if (r.status === 'sent') {
+      state = 'otp_sent';
+      resendIn = OTP_RESEND_COOLDOWN_SECONDS;
+    } else if (r.status === 'already_sent') {
+      state = 'otp_sent';
+      resendIn = cooldownRemaining(ch.otp_sent_at, Date.now());
+    } else if (r.status === 'not_linkable') {
+      // Post-proof only: guides an existing owner to login, a new phone to
+      // signup, or a recycled/transferred number to support.
+      state = 'not_linkable';
+      hint = r.hint;
+    } else if (r.status === 'send_failed') {
+      state = 'send_failed';
+    } else {
+      state = 'expired';
+    }
+  } else if (state === 'otp_sent') {
+    resendIn = cooldownRemaining(ch.otp_sent_at, Date.now());
+  }
+
+  return c.json({
+    success: true,
+    state,
+    purpose: ch.purpose,
+    phone_masked: maskPhone(ch.phone_entered),
+    expires_at: ch.expires_at,
+    resend_in: resendIn,
+    hint,
+  });
+});
+
+authRoutes.post('/telegram/resend', async (c) => {
+  await rateLimit(c, 'tg-auth-resend', 6, 600);
+  const body = await c.req.json().catch(() => ({}));
+  const token = str(body.token, 'token', { min: 20, max: 128 });
+  const ch = await findAuthChallenge(c.env.DB, token);
+  if (!ch) throw badRequest('This request is no longer valid — start again', 'NO_CHALLENGE');
+  if (ch.consumed_at || new Date(ch.expires_at).getTime() <= Date.now()) {
+    throw badRequest('This request has expired — start again', 'CHALLENGE_EXPIRED');
+  }
+  if (ch.state !== 'phone_verified' || ch.chat_id === null) {
+    throw badRequest('Phone ownership is not verified yet — finish the steps in Telegram first', 'NOT_VERIFIED');
+  }
+
+  const linkability = await resolveAuthLinkability(c.env, ch.purpose, ch.phone_entered, ch.telegram_user_id);
+  if (!linkability.linkable) throw badRequest(GENERIC_AUTH_FAIL_MSG, 'AUTH_FAILED');
+
+  if (!ch.otp_sent_at) {
+    // First dispatch goes through the one-shot guard.
+    const first = await maybeSendAuthChallengeOtp(c.env, ch);
+    if (first.status === 'sent' || first.status === 'already_sent') {
+      return c.json({ success: true, resend_in: OTP_RESEND_COOLDOWN_SECONDS });
+    }
+    throw unavailable('Could not deliver the code via Telegram — please try again', 'TELEGRAM_UNAVAILABLE');
+  }
+
+  const r = await sendChallengeOtp(c.env, ch.id, ch.purpose, ch.chat_id);
+  if (!r.ok) {
+    if (r.error === 'COOLDOWN') {
+      throw new HttpError(
+        429,
+        `الرجاء الانتظار ${r.retry_after_seconds ?? OTP_RESEND_COOLDOWN_SECONDS} ثانية قبل إعادة الإرسال / Please wait ${r.retry_after_seconds ?? OTP_RESEND_COOLDOWN_SECONDS}s before resending`,
+        'OTP_COOLDOWN'
+      );
+    }
+    if (r.error === 'NOT_CONFIGURED') throw unavailable('Telegram sign-in is not configured yet');
+    throw unavailable('Could not deliver the code via Telegram — please try again', 'TELEGRAM_UNAVAILABLE');
+  }
+  // Move the cooldown anchor forward for status polls.
+  await c.env.DB.prepare("UPDATE link_challenges SET otp_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
+    .bind(ch.id)
+    .run();
+  return c.json({ success: true, resend_in: OTP_RESEND_COOLDOWN_SECONDS });
+});
+
+authRoutes.post('/telegram/complete', async (c) => {
+  await rateLimit(c, 'tg-auth-complete', 10, 300);
+  const body = await c.req.json().catch(() => ({}));
+  const token = str(body.token, 'token', { min: 20, max: 128 });
+  const code = str(body.code, 'code', { min: 1, max: 12 });
+
+  const ch = await findAuthChallenge(c.env.DB, token);
+  if (!ch) throw badRequest('This request is no longer valid — start again', 'NO_CHALLENGE');
+  if (ch.consumed_at) throw badRequest('This request is no longer valid — start again', 'CHALLENGE_CONSUMED');
+  if (new Date(ch.expires_at).getTime() <= Date.now()) {
+    throw badRequest('This request has expired — start again', 'CHALLENGE_EXPIRED');
+  }
+  if (ch.state !== 'phone_verified' || ch.telegram_user_id === null || ch.chat_id === null) {
+    throw badRequest('Phone ownership is not verified yet — finish the steps in Telegram first', 'NOT_VERIFIED');
+  }
+  if (!ch.otp_sent_at) throw badRequest('No active code — request a new one', 'OTP_NOT_FOUND');
+
+  // Signup inputs are validated BEFORE the OTP is consumed so a taken
+  // username doesn't burn a correct code.
+  let uname: string | null = null;
+  let name = '';
+  if (ch.purpose === 'signup') {
+    uname = body.username ? username(body.username) : null;
+    name = str(body.name, 'name', { min: 0, max: 100, required: false });
+    if (uname) {
+      const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
+      if (taken) throw conflict('This username is taken');
+    }
+  }
+
+  // Atomic single-use OTP consumption (exactly one concurrent submit wins);
+  // keyed by challenge + purpose, so a code issued for login can never
+  // complete a signup and vice versa.
+  const otp = await verifyChallengeOtp(c.env, ch.id, ch.purpose, code);
+  if (!otp.ok) {
+    switch (otp.reason) {
+      case 'no_challenge':
+        throw badRequest('No active code — request a new one', 'OTP_NOT_FOUND');
+      case 'expired':
+        throw badRequest('The code has expired — request a new one', 'OTP_EXPIRED');
+      case 'too_many_attempts':
+        throw badRequest('Too many wrong attempts — request a new code', 'OTP_LOCKED');
+      default:
+        throw badRequest('Incorrect code', 'OTP_WRONG');
+    }
+  }
+
+  const now = new Date().toISOString();
+
+  if (ch.purpose === 'login') {
+    // The account is resolved through the VERIFIED telegram link: same phone
+    // AND same Telegram account. A recycled number never signs into the
+    // previous owner's account.
+    const linkability = await resolveAuthLinkability(c.env, 'login', ch.phone_entered, ch.telegram_user_id);
+    if (!linkability.linkable || !linkability.userId) throw badRequest(GENERIC_AUTH_FAIL_MSG, 'AUTH_FAILED');
+
+    const consumed = await c.env.DB.prepare(
+      `UPDATE link_challenges SET consumed_at = ?, state = 'linked'
+        WHERE id = ? AND consumed_at IS NULL AND state = 'phone_verified'`
+    )
+      .bind(now, ch.id)
+      .run();
+    if (!consumed.meta || consumed.meta.changes === 0) {
+      throw badRequest('This request is no longer valid — start again', 'CHALLENGE_CONSUMED');
+    }
+
+    await audit(c.env.DB, linkability.userId, 'auth.telegram_login', `user:${linkability.userId}`, {
+      phone_masked: maskPhone(ch.phone_entered),
+    });
+    await createSession(c, linkability.userId);
+    const user = await getFullUser(c.env.DB, linkability.userId);
+    if (!user) throw badRequest(GENERIC_AUTH_FAIL_MSG, 'AUTH_FAILED');
+    return c.json({ success: true, user: publicUser(user), created: false });
+  }
+
+  // signup — the account is created HERE, first time, in ONE transaction
+  // with the challenge consumption. Guards inside the batch make it
+  // race-proof: if the phone or Telegram account got linked meanwhile, or a
+  // concurrent complete already consumed the challenge, nothing is created
+  // and nothing is half-written. Never an auto-merge into an existing
+  // account by phone alone.
+  const id = newId('usr');
+  // users.email is NOT NULL UNIQUE — Telegram accounts get a deterministic
+  // placeholder on a reserved (non-routable) domain, unique via the user id
+  // and NEVER stamped verified (email_verified_at stays NULL).
+  const placeholderEmail = `tg-${id}@telegram.local`;
+
+  let results: D1Result[];
+  try {
+    results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO users (id, email, username, name, password_hash)
+         SELECT ?1, ?2, ?3, ?4, NULL
+          WHERE EXISTS (
+             SELECT 1 FROM link_challenges
+              WHERE id = ?5 AND consumed_at IS NULL AND state = 'phone_verified' AND expires_at > ?6
+           )
+           AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE phone_e164 = ?7 AND revoked_at IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE telegram_user_id = ?8 AND revoked_at IS NULL)`
+      ).bind(id, placeholderEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id),
+      c.env.DB.prepare(
+        `INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
+         SELECT ?1, ?2, ?3, ?4, ?5
+          WHERE EXISTS (SELECT 1 FROM users WHERE id = ?1)`
+      ).bind(id, ch.telegram_user_id, ch.chat_id, ch.phone_entered, now),
+      c.env.DB.prepare(
+        `UPDATE link_challenges SET consumed_at = ?1, state = 'linked'
+          WHERE id = ?2 AND consumed_at IS NULL AND state = 'phone_verified'
+            AND EXISTS (SELECT 1 FROM users WHERE id = ?3)`
+      ).bind(now, ch.id, id),
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE') && msg.includes('username')) throw conflict('This username is taken');
+    if (msg.includes('UNIQUE')) {
+      // telegram_user_id (possibly on a revoked row) or email collision —
+      // the person already has account history: guide to login/support.
+      throw conflict(
+        'هذا الرقم أو حساب تيليغرام مرتبط بحساب موجود — سجّل الدخول بدلًا من إنشاء حساب، أو تواصل مع الدعم. / ' +
+          'This phone or Telegram account already belongs to an existing account — please sign in instead, or contact support.'
+      );
+    }
+    throw e;
+  }
+
+  const userCreated = results[0]?.meta?.changes === 1;
+  const challengeConsumed = results[2]?.meta?.changes === 1;
+  if (!userCreated || !challengeConsumed) {
+    // The phone/Telegram became linked concurrently, or a parallel complete
+    // won the race — honest conflict, no half-created account (the batch is
+    // one transaction and its guards made every statement a no-op).
+    throw conflict(
+      'هذا الرقم مرتبط بحساب موجود بالفعل — سجّل الدخول بدلًا من إنشاء حساب. / ' +
+        'This phone already belongs to an account — please sign in instead.'
+    );
+  }
+
+  await tryAttributeReferral(c.env, id, referralCodeFrom(body));
+  await audit(c.env.DB, id, 'auth.telegram_signup', `user:${id}`, {
+    phone_masked: maskPhone(ch.phone_entered),
+    telegram_user_id: ch.telegram_user_id,
+  });
+  await createSession(c, id);
+  const user = await getFullUser(c.env.DB, id);
+  c.executionCtx.waitUntil(sendToChat(c.env, ch.chat_id, TG_SIGNUP_DONE_MSG).then(() => undefined));
+  // email_placeholder tells the UI the account has no real email yet, so it
+  // can honestly invite the user to add one — never pretending otherwise.
+  return c.json({ success: true, user: publicUser(user!), created: true, email_placeholder: true });
+});
+
 // Email verification (final-phase §3A) ---------------------------------------
 
 const VERIFY_TOKEN_TTL_HOURS = 24;
@@ -418,6 +801,12 @@ authRoutes.post('/verify-email/send', requireAuth, async (c) => {
     .first<{ email: string; email_verified_at: string | null; locale: string }>();
   if (!row) throw unauthorized();
   if (row.email_verified_at) return c.json({ success: true, verified: true });
+  if (row.email.toLowerCase().endsWith('@telegram.local')) {
+    // Telegram-signup placeholder address — non-routable by construction, so
+    // "sending a verification message" could never be true. Refuse honestly
+    // instead of returning the generic sent wording for mail that cannot exist.
+    throw badRequest('This account has no real email address yet — add an email first.', 'NO_REAL_EMAIL');
+  }
   await issueEmailVerification(c, user.id, row.email, localeToApi(row.locale));
   // Generic wording — the response never says whether the address exists at
   // the provider or whether delivery succeeded.

@@ -279,6 +279,23 @@ async function main() {
   r = await buyerA.post('/api/telegram/otp/verify', { purpose: 'reset', code: '000000' });
   check('otp/verify with no active challenge → OTP_NOT_FOUND', r.status === 400 && r.data?.code === 'OTP_NOT_FOUND', JSON.stringify(r.data).slice(0, 120));
 
+  // Telegram SIGN-IN/SIGN-UP endpoints (auth/UI mandate §4) — anonymous.
+  r = await anon.post('/api/auth/telegram/start', { phone: 'abcdefghij', purpose: 'signup' });
+  check('tg-auth start rejects an invalid phone (400 INVALID_PHONE)', r.status === 400 && r.data?.code === 'INVALID_PHONE', JSON.stringify(r.data).slice(0, 120));
+  r = await anon.post('/api/auth/telegram/start', { phone: '٠٧٧٠١٢٣٤٥٦٧', purpose: 'signup' });
+  if (r.status === 503) {
+    blocked('tg-auth start deep link (Arabic-digit phone accepted)', 'TELEGRAM_BOT_TOKEN not configured in this environment');
+  } else {
+    check('tg-auth start: Arabic-digit phone accepted, opaque link + masked phone, no phone in URL',
+      r.status === 200 && !!r.data?.deep_link && !!r.data?.continuation_token &&
+      !String(r.data.deep_link).includes('7701234567') && String(r.data?.phone_masked ?? '').includes('*'),
+      JSON.stringify(r.data).slice(0, 160));
+  }
+  r = await anon.get('/api/auth/telegram/status?token=bogus-continuation-token');
+  check('tg-auth status with a bogus token answers generically (no 500, no data)', r.status !== 500 && !JSON.stringify(r.data ?? {}).includes('@'), `status=${r.status}`);
+  r = await anon.post('/api/auth/telegram/complete', { token: 'bogus-continuation-token', code: '000000' });
+  check('tg-auth complete with a bogus token/code rejected safely', r.status >= 400 && r.status < 500, `status=${r.status}`);
+
   // ===================================================== email verification
   console.log('\n— email verification + password flows (§3)');
   r = await buyerA.get('/api/auth/verify-email/status');

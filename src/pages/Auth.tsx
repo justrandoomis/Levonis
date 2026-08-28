@@ -1,73 +1,331 @@
 import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, Gift } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../AuthContext';
-import { useLanguage } from '../LanguageContext';
+import { ArrowLeft, CheckCircle2, Gift } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../AuthContext';
+import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import AuthTextField from '../components/auth/AuthTextField';
+import TelegramAuth from '../components/auth/TelegramAuth';
+import { sanitizeNextPath } from '../components/auth/nextPath';
+import '../components/auth/auth.css';
+
+/**
+ * /auth — one dark LEVONIS screen with four clearly separated steps:
+ * sign-in, create-account, forgot-password and reset-password (?reset=TOKEN).
+ *
+ * All server contracts are unchanged from the previous version:
+ * - POST /api/auth/login    { email (or username), password }
+ * - POST /api/auth/register { username, name, email, password, referralCode? }
+ * - POST /api/auth/google   { credential, referralCode? }  (GIS credential flow)
+ * - POST /api/auth/forgot-password { email, lang }
+ * - POST /api/auth/reset-password  { token, password }
+ *
+ * Return-to-destination: `location.state.from` (a ProtectedRoute redirect) or
+ * `?next=` is honored AFTER sanitizeNextPath() — only same-origin relative
+ * paths; everything else falls back to "/" (the previous behavior).
+ */
+
+const STRINGS = {
+  ar: {
+    tagline: 'حسابك في متجر ليفونيس',
+    signInTitle: 'تسجيل الدخول',
+    signInHint: 'ادخل إلى حسابك للمتابعة.',
+    signUpTitle: 'إنشاء حساب',
+    signUpHint: 'أنشئ حسابًا جديدًا خلال دقيقة.',
+    forgotTitle: 'إعادة تعيين كلمة المرور',
+    forgotHint: 'أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.',
+    resetTitle: 'اختر كلمة مرور جديدة',
+    resetHint: 'أدخل كلمة مرور جديدة لحسابك. رابط إعادة التعيين يصلح لمرة واحدة فقط.',
+    identifier: 'البريد الإلكتروني أو اسم المستخدم',
+    email: 'البريد الإلكتروني',
+    username: 'اسم المستخدم',
+    fullName: 'الاسم',
+    password: 'كلمة المرور',
+    newPassword: 'كلمة المرور الجديدة',
+    confirmPassword: 'تأكيد كلمة المرور',
+    showPassword: 'إظهار كلمة المرور',
+    hidePassword: 'إخفاء كلمة المرور',
+    forgotLink: 'هل نسيت كلمة المرور؟',
+    signInCta: 'تسجيل الدخول',
+    signingIn: 'جارٍ تسجيل الدخول…',
+    signUpCta: 'إنشاء الحساب',
+    signingUp: 'جارٍ إنشاء الحساب…',
+    sendResetCta: 'إرسال رابط إعادة التعيين',
+    sendingReset: 'جارٍ الإرسال…',
+    setPasswordCta: 'تعيين كلمة المرور الجديدة',
+    settingPassword: 'جارٍ الحفظ…',
+    backToSignIn: 'العودة لتسجيل الدخول',
+    noAccount: 'ليس لديك حساب؟',
+    signUpAction: 'أنشئ حسابًا',
+    haveAccount: 'لديك حساب بالفعل؟',
+    signInAction: 'سجّل الدخول',
+    orContinueWith: 'أو تابع عبر',
+    googleUnavailable: 'تسجيل الدخول عبر Google غير مفعّل على هذه النسخة بعد (معرّف العميل غير مضبوط في البناء).',
+    googleServerNotConfigured: 'تسجيل الدخول عبر Google غير مهيأ على الخادم بعد.',
+    googleNoCredential: 'لم تُرجع Google بيانات الدخول. حاول مرة أخرى.',
+    googleFailed: 'تعذر تسجيل الدخول عبر Google. حاول مرة أخرى.',
+    summaryTitle: 'يتعذر المتابعة — راجع الحقول التالية:',
+    errRequired: 'هذا الحقل مطلوب',
+    errEmail: 'أدخل بريدًا إلكترونيًا صحيحًا',
+    errUsernameMin: 'اسم المستخدم يجب ألا يقل عن 3 أحرف',
+    errPasswordMin: 'كلمة المرور يجب ألا تقل عن 8 أحرف',
+    errPasswordMismatch: 'كلمتا المرور غير متطابقتين',
+    forgotSent: 'إذا كان هناك حساب بهذا البريد، فقد أُرسل إليه رابط إعادة التعيين.',
+    emailNotConfigured:
+      'إرسال بريد إعادة التعيين غير متاح بعد لأن خدمة البريد غير مهيأة على الخادم. يرجى التواصل مع الدعم.',
+    resetDoneTitle: 'تم تغيير كلمة المرور بنجاح',
+    resetDoneBody: 'يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.',
+    resetUsedTitle: 'استُخدم هذا الرابط سابقًا',
+    resetExpiredTitle: 'انتهت صلاحية الرابط',
+    resetDeadBody: 'روابط إعادة التعيين تصلح لمرة واحدة ولمدة 30 دقيقة فقط. اطلب رابطًا جديدًا للمتابعة.',
+    requestNewLink: 'طلب رابط جديد',
+    referral: (code: string) => `دعوة صديق: ${code}`,
+    genericError: 'حدث خطأ ما. حاول مرة أخرى.',
+  },
+  en: {
+    tagline: 'Your LEVONIS store account',
+    signInTitle: 'Sign in',
+    signInHint: 'Access your account to continue.',
+    signUpTitle: 'Create account',
+    signUpHint: 'Set up a new account in a minute.',
+    forgotTitle: 'Reset password',
+    forgotHint: "Enter your email address and we'll send you a reset link.",
+    resetTitle: 'Choose a new password',
+    resetHint: 'Enter a new password for your account. The reset link can only be used once.',
+    identifier: 'Email or username',
+    email: 'Email',
+    username: 'Username',
+    fullName: 'Name',
+    password: 'Password',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    forgotLink: 'Forgot password?',
+    signInCta: 'Sign in',
+    signingIn: 'Signing in…',
+    signUpCta: 'Create account',
+    signingUp: 'Creating account…',
+    sendResetCta: 'Send reset link',
+    sendingReset: 'Sending…',
+    setPasswordCta: 'Set new password',
+    settingPassword: 'Saving…',
+    backToSignIn: 'Back to sign in',
+    noAccount: "Don't have an account?",
+    signUpAction: 'Create one',
+    haveAccount: 'Already have an account?',
+    signInAction: 'Sign in',
+    orContinueWith: 'Or continue with',
+    googleUnavailable: 'Google sign-in is not enabled on this deployment yet (no client id was configured at build time).',
+    googleServerNotConfigured: "Google sign-in isn't configured on the server yet.",
+    googleNoCredential: 'Google did not return a credential. Please try again.',
+    googleFailed: 'Google sign-in failed. Please try again.',
+    summaryTitle: 'Please fix the following:',
+    errRequired: 'This field is required',
+    errEmail: 'Enter a valid email address',
+    errUsernameMin: 'Username must be at least 3 characters',
+    errPasswordMin: 'Password must be at least 8 characters',
+    errPasswordMismatch: 'Passwords do not match',
+    forgotSent: 'If an account exists for that email, a reset link has been sent.',
+    emailNotConfigured:
+      'Password reset email is not available yet because no email service is configured on the server. Please contact support.',
+    resetDoneTitle: 'Password updated',
+    resetDoneBody: 'You can now sign in with your new password.',
+    resetUsedTitle: 'This link has already been used',
+    resetExpiredTitle: 'This link has expired',
+    resetDeadBody: 'Reset links work once and expire after 30 minutes. Request a new link to continue.',
+    requestNewLink: 'Request a new link',
+    referral: (code: string) => `Friend invite: ${code}`,
+    genericError: 'Something went wrong. Please try again.',
+  },
+  ckb: {
+    tagline: 'هەژمارەکەت لە فرۆشگای LEVONIS',
+    signInTitle: 'چوونەژوورەوە',
+    signInHint: 'بچۆرە ناو هەژمارەکەت بۆ بەردەوامبوون.',
+    signUpTitle: 'دروستکردنی هەژمار',
+    signUpHint: 'هەژمارێکی نوێ لە خولەکێکدا دروست بکە.',
+    forgotTitle: 'ڕێکخستنەوەی وشەی نهێنی',
+    forgotHint: 'ئیمەیلەکەت بنووسە، بەستەری ڕێکخستنەوەت بۆ دەنێرین.',
+    resetTitle: 'وشەی نهێنی نوێ هەڵبژێرە',
+    resetHint: 'وشەی نهێنیيەکی نوێ بۆ هەژمارەکەت بنووسە. ئەم بەستەرە تەنها جارێک کاردەکات.',
+    identifier: 'ئیمەیل یان ناوی بەکارهێنەر',
+    email: 'ئیمەیل',
+    username: 'ناوی بەکارهێنەر',
+    fullName: 'ناو',
+    password: 'وشەی نهێنی',
+    newPassword: 'وشەی نهێنی نوێ',
+    confirmPassword: 'دووپاتکردنەوەی وشەی نهێنی',
+    showPassword: 'پیشاندانی وشەی نهێنی',
+    hidePassword: 'شاردنەوەی وشەی نهێنی',
+    forgotLink: 'وشەی نهێنیت لەبیر چووە؟',
+    signInCta: 'چوونەژوورەوە',
+    signingIn: 'چاوەڕوان بە…',
+    signUpCta: 'دروستکردنی هەژمار',
+    signingUp: 'چاوەڕوان بە…',
+    sendResetCta: 'ناردنی بەستەری ڕێکخستنەوە',
+    sendingReset: 'دەنێردرێت…',
+    setPasswordCta: 'دانانی وشەی نهێنی نوێ',
+    settingPassword: 'پاشەکەوت دەکرێت…',
+    backToSignIn: 'گەڕانەوە بۆ چوونەژوورەوە',
+    noAccount: 'هەژمارت نییە؟',
+    signUpAction: 'هەژمار دروست بکە',
+    haveAccount: 'پێشتر هەژمارت هەیە؟',
+    signInAction: 'بچۆرە ژوورەوە',
+    orContinueWith: 'یان بەردەوام بە لەگەڵ',
+    googleUnavailable: 'چوونەژوورەوە بە Google لەسەر ئەم وەشانە هێشتا چالاک نەکراوە (ناسنامەی کڕیار لە بنیاتنان دانەنراوە).',
+    googleServerNotConfigured: 'چوونەژوورەوە بە Google لەسەر ڕاژەکار هێشتا ڕێکنەخراوە.',
+    googleNoCredential: 'Google زانیاری چوونەژوورەوەی نەگەڕاندەوە. دووبارە هەوڵ بدە.',
+    googleFailed: 'چوونەژوورەوە بە Google سەرکەوتوو نەبوو. دووبارە هەوڵ بدە.',
+    summaryTitle: 'تکایە ئەم خانانە چاک بکە:',
+    errRequired: 'ئەم خانەیە پێویستە',
+    errEmail: 'ئیمەیلێکی دروست بنووسە',
+    errUsernameMin: 'ناوی بەکارهێنەر دەبێت لانیکەم ٣ پیت بێت',
+    errPasswordMin: 'وشەی نهێنی دەبێت لانیکەم ٨ پیت بێت',
+    errPasswordMismatch: 'وشە نهێنیيەکان یەک ناگرنەوە',
+    forgotSent: 'ئەگەر هەژمارێک بەم ئیمەیلە هەبێت، بەستەری ڕێکخستنەوەی بۆ نێردراوە.',
+    emailNotConfigured:
+      'ناردنی ئیمەیلی ڕێکخستنەوە هێشتا بەردەست نییە چونکە خزمەتگوزاری ئیمەیل لەسەر ڕاژەکار ڕێکنەخراوە. تکایە پەیوەندی بە پشتگیری بکە.',
+    resetDoneTitle: 'وشەی نهێنی بە سەرکەوتوویی گۆڕدرا',
+    resetDoneBody: 'ئێستا دەتوانیت بە وشەی نهێنی نوێ بچیتە ژوورەوە.',
+    resetUsedTitle: 'ئەم بەستەرە پێشتر بەکارهێنراوە',
+    resetExpiredTitle: 'ماوەی ئەم بەستەرە تەواو بووە',
+    resetDeadBody: 'بەستەرەکانی ڕێکخستنەوە تەنها جارێک و بۆ ٣٠ خولەک کاردەکەن. بەستەرێکی نوێ داوا بکە.',
+    requestNewLink: 'داواکردنی بەستەری نوێ',
+    referral: (code: string) => `بانگهێشتی هاوڕێ: ${code}`,
+    genericError: 'هەڵەیەک ڕوویدا. دووبارە هەوڵ بدە.',
+  },
+};
+
+type AuthView = 'signin' | 'signup' | 'forgot';
+
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [forgotMessage, setForgotMessage] = useState('');
-  const [emailNotConfigured, setEmailNotConfigured] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { login, loginWithGoogle, register, refreshUser } = useAuth();
+  const { lang, dir } = useLanguage();
+  const s = STRINGS[lang];
+
   const resetToken = searchParams.get('reset') || '';
   // Friend-invite referral code from ?ref=CODE — kept in state so it survives
   // later URL cleanups (e.g. clearing the reset token param).
   const [referralCode] = useState(() => searchParams.get('ref') || '');
-  const { login, loginWithGoogle, register, refreshUser } = useAuth();
-  const { t, lang, dir } = useLanguage();
-  const [error, setError] = useState<string>('');
+  // ?next= return destination, captured once for the same reason.
+  const [nextFromQuery] = useState(() => searchParams.get('next') || '');
+  // ProtectedRoute redirects can pass location.state.from (string or location
+  // object). Sanitized to a same-origin relative path; falls back to "/".
+  const stateFrom = (location.state as { from?: unknown } | null)?.from;
+  const dest = sanitizeNextPath(stateFrom ?? nextFromQuery);
+
+  const [view, setView] = useState<AuthView>('signin');
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [emailNotConfigured, setEmailNotConfigured] = useState(false);
+
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
   const [resetDone, setResetDone] = useState(false);
   const [resetTokenError, setResetTokenError] = useState<'' | 'used' | 'expired'>('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Honest not-configured state: without a build-time client id the Google
+  // button could only ever fail, so we say so instead of rendering it.
+  const rawGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || '';
+  const googleConfigured = rawGoogleClientId.length > 0 && rawGoogleClientId !== 'YOUR_GOOGLE_CLIENT_ID';
+
+  const errMsg = (err: unknown): string =>
+    err instanceof Error && err.message ? err.message : s.genericError;
+
+  const finishAuth = () => {
+    navigate(dest, { replace: true });
+  };
+
+  const clearMessages = () => {
+    setServerError('');
+    setFieldErrors({});
+    setForgotMessage('');
+    setEmailNotConfigured(false);
+  };
+
+  const switchView = (next: AuthView) => {
+    clearMessages();
+    setView(next);
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
-    setIsLoading(true);
-    setError('');
+    if (submitting) return;
+    const errs: Record<string, string> = {};
+    if (!email.trim()) errs.identifier = s.errRequired;
+    if (!password) errs.password = s.errRequired;
+    setFieldErrors(errs);
+    setServerError('');
+    if (Object.keys(errs).length > 0) return;
+    setSubmitting(true);
     try {
-      if (isLogin) {
-        await login(email, password);
-        navigate('/');
-      } else {
-        if (password.length < 8) { throw new Error('Password must be at least 8 characters'); }
-        if (password !== confirmPassword) { throw new Error('Passwords do not match'); }
-        if (referralCode) {
-          // Referral-aware signup: send the invite code so the server can
-          // attribute it, then refresh the session user from /me.
-          await api.post('/api/auth/register', { username, name, email, password, referralCode });
-          await refreshUser();
-        } else {
-          await register(username, name, email, password);
-        }
-        navigate('/');
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Something went wrong');
+      await login(email.trim(), password);
+      finishAuth();
+    } catch (err) {
+      setServerError(errMsg(err));
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    const errs: Record<string, string> = {};
+    if (username.trim().length < 3) errs.username = username.trim() ? s.errUsernameMin : s.errRequired;
+    if (!name.trim()) errs.name = s.errRequired;
+    if (!email.trim()) errs.email = s.errRequired;
+    else if (!EMAIL_RE.test(email.trim())) errs.email = s.errEmail;
+    if (password.length < 8) errs.password = password ? s.errPasswordMin : s.errRequired;
+    if (confirmPassword !== password) errs.confirmPassword = s.errPasswordMismatch;
+    setFieldErrors(errs);
+    setServerError('');
+    if (Object.keys(errs).length > 0) return;
+    setSubmitting(true);
+    try {
+      if (referralCode) {
+        // Referral-aware signup: send the invite code so the server can
+        // attribute it, then refresh the session user from /me.
+        await api.post('/api/auth/register', {
+          username: username.trim(),
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          referralCode,
+        });
+        await refreshUser();
+      } else {
+        await register(username.trim(), name.trim(), email.trim(), password);
+      }
+      finishAuth();
+    } catch (err) {
+      setServerError(errMsg(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleGoogleCredential = async (credential: string | undefined) => {
-    setError('');
+    if (submitting) return;
+    clearMessages();
     if (!credential) {
-      setError('Google sign-in did not return a credential. Please try again.');
+      setServerError(s.googleNoCredential);
       return;
     }
-    setIsLoading(true);
+    setSubmitting(true);
     try {
       if (referralCode) {
         // The server attributes the referral only when this sign-in CREATES
@@ -77,52 +335,53 @@ export default function Auth() {
       } else {
         await loginWithGoogle(credential);
       }
-      navigate('/');
-    } catch (err: any) {
+      finishAuth();
+    } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {
-        setError("Google sign-in isn't configured yet");
+        setServerError(s.googleServerNotConfigured);
       } else {
-        setError(err?.message || 'Google sign-in failed');
+        setServerError(errMsg(err));
       }
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (isLoading) return;
-    setError('');
-    setForgotMessage('');
-    setEmailNotConfigured(false);
-    if (!email) { setError(dir === 'rtl' ? 'البريد الإلكتروني مطلوب' : 'Email is required'); return; }
-    setIsLoading(true);
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    clearMessages();
+    if (!email.trim()) {
+      setFieldErrors({ email: s.errRequired });
+      return;
+    }
+    setSubmitting(true);
     try {
       // lang tells the server which language to write the reset email in.
-      const data = await api.post<{ message?: string }>('/api/auth/forgot-password', { email, lang });
-      setForgotMessage(
-        dir === 'rtl'
-          ? 'إذا كان هناك حساب بهذا البريد، فقد أُرسل إليه رابط إعادة التعيين.'
-          : (data.message || 'If an account exists for that email, a reset link has been sent.')
-      );
-    } catch (err: any) {
+      await api.post<{ message?: string }>('/api/auth/forgot-password', { email: email.trim(), lang });
+      setForgotMessage(s.forgotSent);
+    } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'EMAIL_NOT_CONFIGURED')) {
         // Honest disabled state: the server has no email service configured.
         setEmailNotConfigured(true);
       } else {
-        setError(err?.message || (dir === 'rtl' ? 'تعذر إرسال رابط إعادة التعيين' : 'Failed to send reset link'));
+        setServerError(errMsg(err));
       }
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
-    setError('');
-    if (password.length < 8) { setError(dir === 'rtl' ? 'كلمة المرور يجب ألا تقل عن 8 أحرف' : 'Password must be at least 8 characters'); return; }
-    if (password !== confirmPassword) { setError(dir === 'rtl' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'); return; }
-    setIsLoading(true);
+    if (submitting) return;
+    const errs: Record<string, string> = {};
+    if (password.length < 8) errs.password = password ? s.errPasswordMin : s.errRequired;
+    if (confirmPassword !== password) errs.confirmPassword = s.errPasswordMismatch;
+    setFieldErrors(errs);
+    setServerError('');
+    if (Object.keys(errs).length > 0) return;
+    setSubmitting(true);
     try {
       // The reset token is consumed ONLY here, on explicit submit — the page
       // never verifies (and therefore never burns) the token on load.
@@ -130,16 +389,16 @@ export default function Auth() {
       setPassword('');
       setConfirmPassword('');
       setResetDone(true);
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof ApiError && err.code === 'TOKEN_USED') {
         setResetTokenError('used');
       } else if (err instanceof ApiError && err.code === 'TOKEN_EXPIRED') {
         setResetTokenError('expired');
       } else {
-        setError(err?.message || (dir === 'rtl' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
+        setServerError(errMsg(err));
       }
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -149,352 +408,453 @@ export default function Auth() {
     setSearchParams({}, { replace: true });
     setResetTokenError('');
     setResetDone(false);
-    setError('');
-    setForgotMessage('');
-    setEmailNotConfigured(false);
-    setIsLogin(true);
-    setIsForgotPassword(true);
+    clearMessages();
+    setView('forgot');
   };
 
   const backToLoginFromReset = () => {
     setSearchParams({}, { replace: true });
     setResetTokenError('');
     setResetDone(false);
-    setError('');
-    setIsForgotPassword(false);
-    setIsLogin(true);
+    clearMessages();
+    setView('signin');
   };
 
-  return (
-    <div className="w-full min-h-screen bg-[#A1B58B] font-sans flex flex-col relative overflow-hidden">
-      {/* Black Top Section with Pattern */}
-      <div className="absolute top-0 left-0 right-0 h-[45vh] bg-[#111111] z-0 overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="geomPattern" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
-                {/* Circle */}
-                <circle cx="30" cy="30" r="30" fill="#ffffff" />
-                {/* Quarter Circle */}
-                <path d="M60,0 A60,60 0 0,1 120,60 L60,60 Z" fill="#ffffff" />
-                {/* Triangle */}
-                <path d="M0,60 L60,120 L0,120 Z" fill="#ffffff" />
-                {/* Cross/Plus */}
-                <path d="M80,80 h10 v-10 h10 v10 h10 v10 h-10 v10 h-10 v-10 h-10 Z" fill="#ffffff" />
-              </pattern>
-            </defs>
-            <rect x="0" y="0" width="100%" height="100%" fill="url(#geomPattern)" />
-          </svg>
+  // ---------------------------------------------------------- shared pieces
+
+  const spinner = (
+    <span
+      aria-hidden
+      className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-black/25 border-t-black motion-reduce:animate-none"
+    />
+  );
+
+  const primaryButton = (label: string, workingLabel: string) => (
+    <button
+      type="submit"
+      disabled={submitting}
+      className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-gold text-[15px] font-bold text-black transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {submitting ? (
+        <>
+          {spinner}
+          <span>{workingLabel}</span>
+        </>
+      ) : (
+        label
+      )}
+    </button>
+  );
+
+  const backLink = (onClick: () => void) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className="-ms-2 mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
+    >
+      <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+      {s.backToSignIn}
+    </button>
+  );
+
+  const heading = (title: string, hint: string) => (
+    <div className="mb-5">
+      <h1 className="text-[22px] font-bold text-white">{title}</h1>
+      <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{hint}</p>
+    </div>
+  );
+
+  const fieldErrorList = Object.values(fieldErrors);
+  const errorSummary =
+    serverError || fieldErrorList.length > 0 ? (
+      <div
+        role="alert"
+        className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-[13px] text-red-300"
+      >
+        {serverError && <p className="font-medium">{serverError}</p>}
+        {fieldErrorList.length > 0 && (
+          <>
+            <p className="font-medium">{s.summaryTitle}</p>
+            <ul className="mt-1 list-disc space-y-0.5 ps-5">
+              {fieldErrorList.map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    ) : null;
+
+  const referralChip = referralCode ? (
+    /* Friend-invite chip: the ?ref=CODE is attributed server-side when this
+       visit ends in a NEW account. */
+    <div className="mb-4 flex justify-center">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-[12px] font-medium text-gold">
+        <Gift className="h-3.5 w-3.5" />
+        {s.referral(referralCode)}
+      </span>
+    </div>
+  ) : null;
+
+  const revealLabels = { show: s.showPassword, hide: s.hidePassword };
+
+  const providerSection = (
+    <div className="mt-6">
+      <div className="flex items-center gap-3 py-1">
+        <span aria-hidden className="h-px flex-1 bg-zinc-800" />
+        <span className="text-[12px] text-zinc-500">{s.orContinueWith}</span>
+        <span aria-hidden className="h-px flex-1 bg-zinc-800" />
+      </div>
+      <div className="mt-4 flex flex-col items-center gap-3">
+        {googleConfigured ? (
+          <GoogleLogin
+            onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
+            onError={() => setServerError(s.googleFailed)}
+            theme="filled_black"
+            text={view === 'signup' ? 'signup_with' : 'signin_with'}
+          />
+        ) : (
+          <div className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-center text-[12px] leading-relaxed text-zinc-400">
+            {s.googleUnavailable}
+          </div>
+        )}
+        {/* Continue-with-Telegram method slot (component built separately). */}
+        <div className="w-full">
+          <TelegramAuth
+            mode={view === 'signup' ? 'signup' : 'signin'}
+            onSuccess={finishAuth}
+            onSwitchMode={switchView}
+          />
         </div>
       </div>
+    </div>
+  );
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col relative z-10">
+  // ---------------------------------------------------------------- screens
 
-        {/* Top Header / Logo Area */}
-        <div className="h-[32vh] flex flex-col items-center justify-center relative">
-          {!isLogin && !resetToken && (
-            <button
-              onClick={() => setIsLogin(true)}
-              className="absolute left-6 top-10 text-gold p-2 z-20"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-          )}
+  let screenKey: string;
+  let screen: React.ReactNode;
 
-          <AnimatePresence mode="wait">
-            {isLogin || resetToken ? (
-              <motion.div
-                key="logo"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center relative z-10 mt-8"
-              >
-                {/* Reference Logo Shape: a leaf-like black shape */}
-                <div className="w-9 h-9 bg-[#111111] rounded-tl-[1.2rem] rounded-br-[1.2rem] rounded-tr-sm rounded-bl-sm transform rotate-45"></div>
-              </motion.div>
-            ) : (
-              <motion.h2
-                key="signup-title"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-gold text-[28px] font-bold relative z-10 mt-6 tracking-wide drop-shadow-md"
-              >{t('signUp')}</motion.h2>
-            )}
-          </AnimatePresence>
+  if (resetToken) {
+    if (resetDone) {
+      screenKey = 'reset-done';
+      screen = (
+        <div className="flex flex-col items-center pt-2 text-center">
+          <CheckCircle2 className="mb-4 h-12 w-12 text-gold" />
+          <h1 className="mb-1.5 text-[20px] font-bold text-white">{s.resetDoneTitle}</h1>
+          <p className="mb-7 max-w-xs text-[13px] leading-relaxed text-zinc-400">{s.resetDoneBody}</p>
+          <button
+            type="button"
+            onClick={backToLoginFromReset}
+            className="flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-gold text-[15px] font-bold text-black transition-all hover:brightness-110 active:scale-[0.99]"
+          >
+            {s.signInCta}
+          </button>
         </div>
-
-        {/* White Curved Container */}
-        <motion.div
-          layout
-          className="bg-[#A1B58B] flex-1 rounded-tl-[70px] px-8 pt-10 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col relative overflow-hidden"
+      );
+    } else if (resetTokenError) {
+      screenKey = 'reset-dead';
+      screen = (
+        /* Dead-token screen: used vs expired, each with a way forward. */
+        <div className="flex flex-col items-center pt-2 text-center">
+          <h1 className="mb-1.5 text-[20px] font-bold text-white">
+            {resetTokenError === 'used' ? s.resetUsedTitle : s.resetExpiredTitle}
+          </h1>
+          <p className="mb-7 max-w-xs text-[13px] leading-relaxed text-zinc-400">{s.resetDeadBody}</p>
+          <button
+            type="button"
+            onClick={switchToForgotForm}
+            className="flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-gold text-[15px] font-bold text-black transition-all hover:brightness-110 active:scale-[0.99]"
+          >
+            {s.requestNewLink}
+          </button>
+          <button
+            type="button"
+            onClick={backToLoginFromReset}
+            className="mt-4 inline-flex min-h-[44px] items-center justify-center gap-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
+          >
+            <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+            {s.backToSignIn}
+          </button>
+        </div>
+      );
+    } else {
+      screenKey = 'reset';
+      screen = (
+        <form onSubmit={handleReset} noValidate aria-busy={submitting}>
+          {heading(s.resetTitle, s.resetHint)}
+          {errorSummary}
+          <div className="space-y-4">
+            <AuthTextField
+              id="new-password"
+              label={s.newPassword}
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              minLength={8}
+              error={fieldErrors.password}
+              revealLabels={revealLabels}
+            />
+            <AuthTextField
+              id="confirm-password"
+              label={s.confirmPassword}
+              type="password"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              autoComplete="new-password"
+              minLength={8}
+              error={fieldErrors.confirmPassword}
+              revealLabels={revealLabels}
+            />
+          </div>
+          <div className="mt-7">{primaryButton(s.setPasswordCta, s.settingPassword)}</div>
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              onClick={backToLoginFromReset}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
+            >
+              <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+              {s.backToSignIn}
+            </button>
+          </div>
+        </form>
+      );
+    }
+  } else if (view === 'forgot') {
+    screenKey = 'forgot';
+    screen = (
+      <form onSubmit={handleForgot} noValidate aria-busy={submitting}>
+        {backLink(() => switchView('signin'))}
+        {heading(s.forgotTitle, s.forgotHint)}
+        {emailNotConfigured && (
+          /* Honest disabled state — the email service is not configured on
+             the server, so no reset link can be sent yet. */
+          <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-[13px] font-medium text-amber-300">
+            {s.emailNotConfigured}
+          </div>
+        )}
+        {forgotMessage && (
+          <div
+            role="status"
+            className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-[13px] font-medium text-emerald-300"
+          >
+            {forgotMessage}
+          </div>
+        )}
+        {errorSummary}
+        <AuthTextField
+          id="email"
+          label={s.email}
+          type="email"
+          value={email}
+          onChange={setEmail}
+          autoComplete="email"
+          inputMode="email"
+          placeholder="email@example.com"
+          valueDir="ltr"
+          autoCapitalize="none"
+          spellCheck={false}
+          error={fieldErrors.email}
+        />
+        <div className="mt-7">{primaryButton(s.sendResetCta, s.sendingReset)}</div>
+      </form>
+    );
+  } else if (view === 'signup') {
+    screenKey = 'signup';
+    // NOTE: providerSection contains TelegramAuth's own <form>; HTML forbids
+    // nested forms (the browser drops the inner tag and its submit button
+    // would submit THIS form instead), so it must sit outside the element.
+    screen = (
+      <>
+      <form onSubmit={handleSignUp} noValidate aria-busy={submitting}>
+        {backLink(() => switchView('signin'))}
+        {heading(s.signUpTitle, s.signUpHint)}
+        {referralChip}
+        {errorSummary}
+        <div className="space-y-4">
+          <AuthTextField
+            id="username"
+            label={s.username}
+            value={username}
+            onChange={setUsername}
+            autoComplete="username"
+            placeholder="username123"
+            minLength={3}
+            valueDir="ltr"
+            autoCapitalize="none"
+            spellCheck={false}
+            error={fieldErrors.username}
+          />
+          <AuthTextField
+            id="name"
+            label={s.fullName}
+            value={name}
+            onChange={setName}
+            autoComplete="name"
+            valueDir="auto"
+            error={fieldErrors.name}
+          />
+          <AuthTextField
+            id="email"
+            label={s.email}
+            type="email"
+            value={email}
+            onChange={setEmail}
+            autoComplete="email"
+            inputMode="email"
+            placeholder="email@example.com"
+            valueDir="ltr"
+            autoCapitalize="none"
+            spellCheck={false}
+            error={fieldErrors.email}
+          />
+          <AuthTextField
+            id="new-password"
+            label={s.password}
+            type="password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            minLength={8}
+            error={fieldErrors.password}
+            revealLabels={revealLabels}
+          />
+          <AuthTextField
+            id="confirm-password"
+            label={s.confirmPassword}
+            type="password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+            minLength={8}
+            error={fieldErrors.confirmPassword}
+            revealLabels={revealLabels}
+          />
+        </div>
+        <div className="mt-7">{primaryButton(s.signUpCta, s.signingUp)}</div>
+      </form>
+      {providerSection}
+      <p className="mt-6 text-center text-[13px] text-zinc-400">
+        {s.haveAccount}{' '}
+        <button
+          type="button"
+          onClick={() => switchView('signin')}
+          className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
         >
-          <AnimatePresence mode="wait">
-            {isLogin && !resetToken && (
-              <motion.h2
-                key="login-title"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-[28px] font-medium text-center mb-8 text-black tracking-wide"
-              >{t('signIn')}</motion.h2>
-            )}
-          </AnimatePresence>
-
-          {resetToken ? (
-            resetDone ? (
-              /* Reset success screen */
-              <div className="flex-1 flex flex-col items-center text-center pt-6">
-                <CheckCircle2 className="w-14 h-14 text-[#111111] mb-5" />
-                <h3 className="text-xl font-medium mb-2 text-black">
-                  {dir === 'rtl' ? 'تم تغيير كلمة المرور بنجاح' : 'Password Updated'}
-                </h3>
-                <p className="text-sm text-gray-600 mb-8 max-w-xs">
-                  {dir === 'rtl'
-                    ? 'يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.'
-                    : 'You can now sign in with your new password.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={backToLoginFromReset}
-                  className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors"
-                >
-                  {t('signIn')}
-                </button>
-              </div>
-            ) : resetTokenError ? (
-              /* Dead-token screen: used vs expired, each with a way forward */
-              <div className="flex-1 flex flex-col items-center text-center pt-6">
-                <h3 className="text-xl font-medium mb-2 text-black">
-                  {resetTokenError === 'used'
-                    ? (dir === 'rtl' ? 'استُخدم هذا الرابط سابقًا' : 'This link has already been used')
-                    : (dir === 'rtl' ? 'انتهت صلاحية الرابط' : 'This link has expired')}
-                </h3>
-                <p className="text-sm text-gray-600 mb-8 max-w-xs">
-                  {dir === 'rtl'
-                    ? 'روابط إعادة التعيين تصلح لمرة واحدة ولمدة 30 دقيقة فقط. اطلب رابطًا جديدًا للمتابعة.'
-                    : 'Reset links work once and expire after 30 minutes. Request a new link to continue.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={switchToForgotForm}
-                  className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors"
-                >
-                  {dir === 'rtl' ? 'طلب رابط جديد' : 'Request a new link'}
-                </button>
-                <button
-                  type="button"
-                  onClick={backToLoginFromReset}
-                  className="flex items-center justify-center text-sm font-medium text-gray-600 mt-6 hover:text-black"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" /> {dir === 'rtl' ? 'العودة لتسجيل الدخول' : 'Back to login'}
-                </button>
-              </div>
-            ) : (
-            <form className="flex-1 flex flex-col" onSubmit={handleResetPassword}>
-              <h3 className="text-xl font-medium mb-2 text-black">{dir === 'rtl' ? 'اختر كلمة مرور جديدة' : 'Choose a New Password'}</h3>
-              <p className="text-sm text-gray-600 mb-6">
-                {dir === 'rtl'
-                  ? 'أدخل كلمة مرور جديدة لحسابك. رابط إعادة التعيين يصلح لمرة واحدة فقط.'
-                  : 'Enter a new password for your account. The reset link can only be used once.'}
-              </p>
-
-              {error && <div className="mb-4 text-red-600 text-xs font-medium text-center">{error}</div>}
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('password')}</label>
-                  <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" minLength={8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('confirmPassword')}</label>
-                  <div className="relative">
-                    <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" minLength={8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
-                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
-                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8">
-                <button type="submit" disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
-                  {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : (dir === 'rtl' ? 'تعيين كلمة المرور الجديدة' : 'Set New Password')}
-                </button>
-              </div>
-              <button type="button" onClick={backToLoginFromReset} className="flex items-center justify-center text-sm font-medium text-gray-600 mt-6 hover:text-black">
-                <ArrowLeft className="w-4 h-4 mr-1" /> {dir === 'rtl' ? 'العودة لتسجيل الدخول' : 'Back to login'}
-              </button>
-            </form>
-            )
-          ) : (
-          <form className="flex-1 flex flex-col" onSubmit={handleSubmit}>
-
-            {isForgotPassword ? (
-              <div className="flex-1 flex flex-col">
-                <button type="button" onClick={() => { setIsForgotPassword(false); setError(''); setForgotMessage(''); setEmailNotConfigured(false); }} className="flex items-center text-sm font-medium text-gray-500 mb-6 hover:text-black">
-                  <ArrowLeft className="w-4 h-4 mr-1" /> {dir === 'rtl' ? 'العودة لتسجيل الدخول' : 'Back to login'}
-                </button>
-                <h3 className="text-xl font-medium mb-2 text-black">{dir === 'rtl' ? 'إعادة تعيين كلمة المرور' : 'Reset Password'}</h3>
-                <p className="text-sm text-gray-500 mb-6">
-                  {dir === 'rtl'
-                    ? 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.'
-                    : "Enter your email address and we'll send you a link to reset your password."}
-                </p>
-
-                {emailNotConfigured && (
-                  /* Honest disabled state — the email service is not configured
-                     on the server, so no reset link can be sent yet. */
-                  <div className="mb-4 rounded-[14px] border border-amber-400/60 bg-amber-50 px-4 py-3 text-amber-800 text-xs font-medium text-center">
-                    {dir === 'rtl'
-                      ? 'إرسال بريد إعادة التعيين غير متاح بعد لأن خدمة البريد غير مهيأة. يرجى التواصل مع الدعم.'
-                      : 'Password reset email is not available yet because no email service is configured. Please contact support.'}
-                  </div>
-                )}
-                {error && <div className="mb-4 text-red-600 text-xs font-medium text-center">{error}</div>}
-                {forgotMessage && <div className="mb-4 text-green-700 text-xs font-medium text-center">{forgotMessage}</div>}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('email')}</label>
-                    <input type="email" placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm" required />
-                  </div>
-                </div>
-
-                <div className="mt-8">
-                  <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
-                    {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : (dir === 'rtl' ? 'إرسال رابط إعادة التعيين' : 'Send Reset Link')}
-                  </button>
-                </div>
-              </div>
-            ) : (
-<>
-            {referralCode && (
-              /* Friend-invite chip: the ?ref=CODE is attributed server-side
-                 when this visit ends in a NEW account. */
-              <div className="mb-4 flex justify-center">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#111111]/10 border border-[#111111]/15 px-3 py-1 text-[11px] font-medium text-[#111111]">
-                  <Gift className="w-3.5 h-3.5" />
-                  {dir === 'rtl' ? `دعوة صديق: ${referralCode}` : `Friend invite: ${referralCode}`}
-                </span>
-              </div>
-            )}
-            <AnimatePresence>
-              {error && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 text-red-600 text-xs font-medium text-center">
-                  {error}
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <AnimatePresence mode="popLayout">
-              <div className="space-y-4">
-                {!isLogin && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-4 overflow-hidden"
-                  >
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('firstName')}</label>
-                      <input type="text" minLength={3} placeholder="username123" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm" required />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('lastName')}</label>
-                      <input type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm" required />
-                    </div>
-                  </motion.div>
-                )}
-
-                <motion.div layout>
-                  <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{isLogin ? (t('emailOrUsername') || 'Email or Username') : t('email')}</label>
-                  <input type={isLogin ? "text" : "email"} placeholder={isLogin ? "email@example.com or username" : "email@example.com"} value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm" required />
-                </motion.div>
-
-                <motion.div layout>
-                  <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('password')}</label>
-                  <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" minLength={isLogin ? undefined : 8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </motion.div>
-                {isLogin && (
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => { setIsForgotPassword(true); setError(''); setForgotMessage(''); setEmailNotConfigured(false); }}
-                      className="text-[11px] text-gray-500 hover:text-black font-medium"
-                    >
-                      {dir === 'rtl' ? 'هل نسيت كلمة المرور؟' : 'Forgot Password?'}
-                    </button>
-                  </div>
-                )}
-                {!isLogin && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
-                  >
-                    <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('confirmPassword')}</label>
-                    <div className="relative">
-                      <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" minLength={8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
-                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
-                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </AnimatePresence>
-
-            <motion.div layout className="mt-8 space-y-4">
-              <button type="submit" disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
-                {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : (isLogin ? t("signIn") : t("signUp"))}
-              </button>
-
-              <div className="relative flex items-center justify-center py-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-100"></div>
-                </div>
-                <div className="relative bg-[#A1B58B] px-4 text-[11px] text-gray-400">{t('orContinueWith')}</div>
-              </div>
-
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
-                  onError={() => setError('Google sign-in failed. Please try again.')}
-                  width="300"
-                />
-              </div>
-            </motion.div>
-
-            <motion.p layout className="text-center mt-auto pt-8 text-[12px] text-gray-500">
-              {isLogin ? t('dontHaveAccount') : t('alreadyHaveAccount')}
+          {s.signInAction}
+        </button>
+      </p>
+      </>
+    );
+  } else {
+    screenKey = 'signin';
+    // Same nested-form constraint as the signup screen above.
+    screen = (
+      <>
+      <form onSubmit={handleSignIn} noValidate aria-busy={submitting}>
+        {heading(s.signInTitle, s.signInHint)}
+        {referralChip}
+        {errorSummary}
+        <div className="space-y-4">
+          <AuthTextField
+            id="identifier"
+            label={s.identifier}
+            value={email}
+            onChange={setEmail}
+            autoComplete="username"
+            inputMode="email"
+            placeholder="email@example.com"
+            valueDir="ltr"
+            autoCapitalize="none"
+            spellCheck={false}
+            error={fieldErrors.identifier}
+          />
+          <div>
+            <AuthTextField
+              id="current-password"
+              label={s.password}
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="current-password"
+              error={fieldErrors.password}
+              revealLabels={revealLabels}
+            />
+            <div className="mt-1.5 flex justify-end">
               <button
                 type="button"
-                onClick={() => { setIsLogin(!isLogin); setError(''); }}
-                className="text-black font-medium hover:underline"
+                onClick={() => switchView('forgot')}
+                className="inline-flex min-h-[44px] items-center px-1 text-[12px] font-medium text-zinc-400 transition-colors hover:text-gold"
               >
-                {isLogin ? t('signUp') : t('signIn')}
+                {s.forgotLink}
               </button>
-            </motion.p>
-            </>
-            )}
-          </form>
-          )}
-        </motion.div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4">{primaryButton(s.signInCta, s.signingIn)}</div>
+      </form>
+      {providerSection}
+      <p className="mt-6 text-center text-[13px] text-zinc-400">
+        {s.noAccount}{' '}
+        <button
+          type="button"
+          onClick={() => switchView('signup')}
+          className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
+        >
+          {s.signUpAction}
+        </button>
+      </p>
+      </>
+    );
+  }
+
+  // ------------------------------------------------------------------ page
+
+  return (
+    <div
+      dir={dir}
+      className="lv-auth min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-black via-black to-olive-dark font-sans text-white"
+    >
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="m-auto w-full py-4">
+          {/* Brand: LEVONIS wordmark in the site's gold, calm and balanced. */}
+          <div className="mb-6 flex flex-col items-center">
+            <Link
+              to="/"
+              aria-label="LEVONIS"
+              className="flex min-h-[44px] items-center justify-center"
+            >
+              <span
+                dir="ltr"
+                className="text-[26px] font-black leading-none text-gold"
+                style={{ letterSpacing: '0.35em', paddingInlineStart: '0.35em' }}
+              >
+                LEVONIS
+              </span>
+            </Link>
+            <span
+              aria-hidden
+              className="mt-2 h-px w-24 bg-gradient-to-r from-transparent via-gold/70 to-transparent"
+            />
+            <p className="mt-2 text-[12px] text-zinc-500">{s.tagline}</p>
+          </div>
+
+          <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-7">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={screenKey}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
+              >
+                {screen}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
     </div>
   );

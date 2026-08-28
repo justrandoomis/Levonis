@@ -5,6 +5,9 @@ import { useAuth } from '../AuthContext';
 import { ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package, ChevronUp, ChevronDown, MessageSquare, Minus, Plus, Trash2, X, FileText, Image as ImageIcon, Settings2 } from 'lucide-react';
 import { api, ApiError, ApiProduct, CartItem, formatIqd } from '../lib/api';
 import ReviewSection from '../components/reviews/ReviewSection';
+import SafeImage from '../components/ui/SafeImage';
+import { ProductDetailSkeleton } from '../components/ui/Skeleton';
+import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 
 type ProductSource = 'catalog' | 'community';
 
@@ -19,6 +22,8 @@ export default function Product() {
   const [favorite, setFavorite] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   // Accordion states
   const [shippingOpen, setShippingOpen] = useState(true);
@@ -42,10 +47,25 @@ export default function Product() {
   const [actionError, setActionError] = useState('');
   const [flyingItems, setFlyingItems] = useState<{id: number, startX: number, startY: number, endX: number, endY: number, image: string}[]>([]);
 
+  // Synchronous stale-content guard (adjust-state-during-render): the load
+  // effect below is passive, so it only runs AFTER the browser paints the
+  // first render for a new slug — which would flash the PREVIOUS product for
+  // one frame under the new URL. Dropping the mismatched product during
+  // render makes React re-render immediately (skeleton) before anything is
+  // painted. Verified by scripts/e2e-ui.mjs (in-app slug-change frame scan).
+  if (product && slug && product.slug !== slug) {
+    setProduct(null);
+    setLoading(true);
+  }
+
   useEffect(() => {
+    // Stale-response guard: when the slug changes mid-flight the cleanup
+    // flips `cancelled`, so a late response for the PREVIOUS product can
+    // never flash into the new one (the loading gate hides old content too).
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setLoadError(null);
       try {
         const data = await api.get<{ product: ApiProduct; source: ProductSource; favorite: boolean }>(
           `/api/products/${slug}`
@@ -58,7 +78,12 @@ export default function Product() {
         setSelectedShippingId((data.product.shipping_methods ?? [])[0]?.id ?? '');
       } catch (err) {
         console.error(err);
-        if (!cancelled) setProduct(null);
+        if (!cancelled) {
+          setProduct(null);
+          // Keep the real error so 404 renders not-found while 5xx/network
+          // render an error with retry — a server outage is NOT "not found".
+          setLoadError(err);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,7 +92,7 @@ export default function Product() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, retryToken]);
 
   // Real cart badge: reflect the server cart for signed-in users.
   useEffect(() => {
@@ -98,8 +123,36 @@ export default function Product() {
     };
   }, [cartModalOpen]);
 
-  if (loading) return <div className="p-8 text-center text-zinc-500">Loading...</div>;
-  if (!product) return <div className="p-8 text-center text-zinc-500">Product not found.</div>;
+  if (loading || !product) {
+    // Skeleton mirrors the real detail layout (hero height reserved — no
+    // jump), and errors are distinct: 404 → not-found, 5xx/network → retry.
+    return (
+      <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
+        <div className="fixed top-0 inset-x-0 z-50 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between" dir={dir}>
+          <button
+            onClick={() => navigate(-1)}
+            aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
+            className="p-2 bg-zinc-900/50 rounded-full hover:bg-zinc-800/50 transition-colors"
+          >
+            {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
+          </button>
+        </div>
+        <div className="pt-[60px] pb-[84px]">
+          {loading ? (
+            <ProductDetailSkeleton />
+          ) : loadError ? (
+            <div className="px-4 pt-8">
+              <ErrorState error={loadError} onRetry={() => setRetryToken((n) => n + 1)} />
+            </div>
+          ) : (
+            <div className="px-4 pt-8">
+              <NotFoundState onBack={() => navigate(-1)} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const images = Array.isArray(product.images) ? product.images : [];
   const firstImage = images[0] || '';
@@ -265,12 +318,19 @@ export default function Product() {
         }`}
         dir={dir}
       >
-        <div className="w-full h-80 bg-zinc-900 relative rounded-b-3xl overflow-hidden flex items-center justify-center">
-        {firstImage ? (
-          <img src={firstImage} alt={name} className="max-w-full max-h-full object-contain p-4" />
-        ) : (
-          <Package className="w-16 h-16 text-zinc-700" />
-        )}
+        <div className="w-full h-80 relative rounded-b-3xl overflow-hidden">
+        {/* Hero is the LCP image: eager + high priority, reserved height, explicit fallback. */}
+        <SafeImage
+          src={firstImage}
+          alt={name}
+          aspect="auto"
+          fit="contain"
+          eager
+          className="w-full h-full"
+          imgClassName="p-4"
+          fallbackIconClassName="w-16 h-16"
+          fallbackClassName="text-zinc-700"
+        />
       </div>
 
       <div className="px-4 py-5">
@@ -573,9 +633,14 @@ export default function Product() {
                  {descriptionImages.length > 0 && (
                    <div className="grid grid-cols-2 gap-2 mb-3">
                       {descriptionImages.map((img, i) => (
-                        <div key={i} className="aspect-square rounded-lg overflow-hidden bg-zinc-800 border border-zinc-700/50">
-                          <img src={img} alt="" className="w-full h-full object-cover" />
-                        </div>
+                        <SafeImage
+                          key={i}
+                          src={img}
+                          alt=""
+                          aspect="square"
+                          className="rounded-lg border border-zinc-700/50"
+                          bgClassName="bg-zinc-800"
+                        />
                       ))}
                    </div>
                  )}

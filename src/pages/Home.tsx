@@ -1,15 +1,19 @@
 import AnimatedItem from '../components/AnimatedItem';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { Star, ChevronRight, ChevronLeft, Pause, Play } from 'lucide-react';
+import { Star, ChevronRight, ChevronLeft, Pause, Play, PackageSearch } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiProduct, PublicSettings, formatIqd } from '../lib/api';
+import Spinner from '../components/ui/Spinner';
+import SafeImage from '../components/ui/SafeImage';
+import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
+import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 
 export default function Home() {
   const navigate = useNavigate();
 
-  const { t, dir, lang } = useLanguage();
+  const { t, dir, lang, loc } = useLanguage();
   const { user } = useAuth();
 
   // Subscription plan comes exclusively from the server-side user record.
@@ -27,59 +31,73 @@ export default function Home() {
   const [discountedProducts, setDiscountedProducts] = useState<ApiProduct[]>([]);
   const [newProducts, setNewProducts] = useState<ApiProduct[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const [offset, setOffset] = useState(20);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<unknown>(null);
   const observerTarget = useRef<HTMLDivElement | null>(null);
+  // Monotonic request id so a retried /api/home fetch ignores stale responses.
+  const homeReqRef = useRef(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchHome() {
-      try {
-        const data = await api.get<{ settings: PublicSettings; discounted: ApiProduct[]; latest: ApiProduct[] }>(
-          '/api/home'
-        );
-        if (cancelled) return;
-        setSettings(data.settings);
-        setDiscountedProducts(data.discounted || []);
-        setNewProducts(data.latest || []);
-        setHasMore((data.latest || []).length >= 20);
-      } catch (err) {
-        console.error('Failed to fetch home products', err);
-        if (!cancelled) {
-          setDiscountedProducts([]);
-          setNewProducts([]);
-          setHasMore(false);
-        }
-      } finally {
-        if (!cancelled) setInitialLoading(false);
-      }
+  const fetchHome = useCallback(async () => {
+    const reqId = ++homeReqRef.current;
+    setInitialLoading(true);
+    setLoadError(null);
+    try {
+      const data = await api.get<{ settings: PublicSettings; discounted: ApiProduct[]; latest: ApiProduct[] }>(
+        '/api/home'
+      );
+      if (homeReqRef.current !== reqId) return;
+      setSettings(data.settings);
+      setDiscountedProducts(data.discounted || []);
+      setNewProducts(data.latest || []);
+      setHasMore((data.latest || []).length >= 20);
+    } catch (err) {
+      console.error('Failed to fetch home products', err);
+      if (homeReqRef.current !== reqId) return;
+      // A failed fetch is an ERROR with retry — never rendered as "no products".
+      setLoadError(err);
+      setHasMore(false);
+    } finally {
+      if (homeReqRef.current === reqId) setInitialLoading(false);
     }
-    fetchHome();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  const loadMore = useCallback(async () => {
-    if (isLoadingMore || !hasMore || initialLoading) return;
-    setIsLoadingMore(true);
-    try {
-      const data = await api.get<{ products: ApiProduct[] }>(`/api/products?limit=20&offset=${offset}`);
-      const fetched = data.products || [];
-      setNewProducts((prev) => {
-        const seen = new Set(prev.map((p) => p.id));
-        return [...prev, ...fetched.filter((p) => !seen.has(p.id))];
-      });
-      setOffset((o) => o + fetched.length);
-      if (fetched.length < 20) setHasMore(false);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [isLoadingMore, hasMore, initialLoading, offset]);
+  useEffect(() => {
+    fetchHome();
+    return () => {
+      homeReqRef.current += 1;
+    };
+  }, [fetchHome]);
+
+  const loadMore = useCallback(
+    async (retry = false) => {
+      if (isLoadingMore || !hasMore || initialLoading) return;
+      // After a failure, don't auto-retry in a loop from the intersection
+      // observer — the user retries explicitly via the button.
+      if (loadMoreError && !retry) return;
+      setIsLoadingMore(true);
+      setLoadMoreError(null);
+      try {
+        const data = await api.get<{ products: ApiProduct[] }>(`/api/products?limit=20&offset=${offset}`);
+        const fetched = data.products || [];
+        setNewProducts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...fetched.filter((p) => !seen.has(p.id))];
+        });
+        setOffset((o) => o + fetched.length);
+        if (fetched.length < 20) setHasMore(false);
+      } catch (e) {
+        console.error(e);
+        setLoadMoreError(e);
+      } finally {
+        setIsLoadingMore(false);
+      }
+    },
+    [isLoadingMore, hasMore, initialLoading, offset, loadMoreError]
+  );
 
   useEffect(() => {
     const target = observerTarget.current;
@@ -111,11 +129,12 @@ export default function Home() {
     return (
       <Link to={`/product/${p.slug || p.id}`} key={p.id} className={`${widthClass} shrink-0 bg-zinc-900/50/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors`}>
         <div className="relative aspect-square overflow-hidden bg-black">
-          {firstImage ? (
-            <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-          ) : (
-            <div className="w-full h-full bg-zinc-900" />
-          )}
+          <SafeImage
+            src={firstImage}
+            alt={name}
+            aspect="auto"
+            className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+          />
           {hasSale && (
             <div className="absolute top-2 right-2 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
               SALE
@@ -226,12 +245,15 @@ export default function Home() {
   };
 
   const renderBannerMedia = (banner: { id: string; image: string; link: string }) => {
+    // Banners live in a translated carousel row — lazy loading would leave
+    // blank slides mid-swipe, so they load eagerly with an explicit fallback.
     const img = (
-      <img
-        referrerPolicy="no-referrer"
+      <SafeImage
         src={banner.image}
         alt=""
-        className="w-full h-full object-cover"
+        aspect="auto"
+        eager
+        className="w-full h-full"
       />
     );
     if (banner.link && banner.link.startsWith('/')) {
@@ -253,6 +275,14 @@ export default function Home() {
 
   return (
     <div className="w-full pb-24 text-zinc-300 bg-black">
+      {/* Reserve the banner area while /api/home loads so the page doesn't
+          jump when the configured banners arrive. */}
+      {initialLoading && bannerCount === 0 && (
+        <div
+          aria-hidden="true"
+          className="w-full h-[320px] md:h-[420px] bg-zinc-900/80 animate-pulse motion-reduce:animate-none"
+        />
+      )}
       {/* Banner Carousel (hidden when no banners are configured) */}
       {bannerCount > 0 && (
         <div
@@ -300,7 +330,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className={`relative z-30 max-w-7xl mx-auto px-4 sm:px-10 py-12 bg-black ${bannerCount > 0 ? 'rounded-t-[36px] -mt-10' : ''}`}>
+      <div className={`relative z-30 max-w-7xl mx-auto px-4 sm:px-10 py-12 bg-black ${bannerCount > 0 || initialLoading ? 'rounded-t-[36px] -mt-10' : ''}`}>
 
         {/* Ads Marquee */}
         {homeAds.length > 0 && (
@@ -319,10 +349,38 @@ export default function Home() {
           </div>
         )}
 
+        {/* Skeletons mirror the real sections (horizontal row + grid) —
+            reserved dimensions, no fake names or prices. */}
         {initialLoading && (
-          <div className="w-full py-20 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
-          </div>
+          <SkeletonGroup>
+            <div className="mb-12" aria-hidden="true">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-1 h-6 bg-zinc-800 rounded-full"></div>
+                <Skeleton className="h-7 w-44" />
+              </div>
+              <div className="flex gap-4 overflow-hidden pb-4">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <ProductCardSkeleton key={i} className="w-[180px] md:w-[200px] shrink-0" />
+                ))}
+              </div>
+            </div>
+            <div className="mb-12" aria-hidden="true">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-1 h-6 bg-zinc-800 rounded-full"></div>
+                <Skeleton className="h-7 w-52" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          </SkeletonGroup>
+        )}
+
+        {/* Failed home load: an honest error with retry — not "no products". */}
+        {!initialLoading && loadError != null && (
+          <ErrorState error={loadError} onRetry={fetchHome} />
         )}
 
         {/* Discounted Products - Horizontal Scroll */}
@@ -371,16 +429,28 @@ export default function Home() {
             </div>
             {hasMore && (
               <div ref={observerTarget} className="w-full h-20 flex items-center justify-center mt-4">
-                <div className="w-6 h-6 border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
+                {loadMoreError != null ? (
+                  <button
+                    type="button"
+                    onClick={() => loadMore(true)}
+                    className="min-h-[44px] px-5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm font-bold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+                  >
+                    {loc('تعذر تحميل المزيد — إعادة المحاولة', 'Failed to load more — retry', 'زیاتر بارنەبوو — دووبارە هەوڵ بدەوە')}
+                  </button>
+                ) : (
+                  <Spinner size="md" />
+                )}
               </div>
             )}
           </div>
         )}
 
-        {!initialLoading && discountedProducts.length === 0 && newProducts.length === 0 && (
-          <div className="text-center py-16 text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-            {dir === 'rtl' ? 'لا توجد منتجات بعد' : 'No products yet.'}
-          </div>
+        {/* Genuinely empty catalog — only when the load actually succeeded. */}
+        {!initialLoading && loadError == null && discountedProducts.length === 0 && newProducts.length === 0 && (
+          <EmptyState
+            icon={<PackageSearch aria-hidden="true" className="w-6 h-6" />}
+            title={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا هیچ بەرهەمێک نییە')}
+          />
         )}
       </div>
     </div>

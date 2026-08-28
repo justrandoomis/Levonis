@@ -99,11 +99,15 @@ export default function Header() {
         <div className="flex items-center gap-2 shrink-0">
           {/* Language Toggle */}
           <div className="relative">
-            <button 
+            <button
+              type="button"
               onClick={() => setIsLangOpen(!isLangOpen)}
-              className="w-11 h-11 rounded-full bg-zinc-900/80 border border-zinc-800/60 flex items-center justify-center text-zinc-300 hover:text-white hover:border-olive/50 transition-all shadow-sm"
+              aria-label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
+              aria-expanded={isLangOpen}
+              aria-haspopup="menu"
+              className="w-11 h-11 rounded-full bg-zinc-900/80 border border-zinc-800/60 flex items-center justify-center text-zinc-300 hover:text-white hover:border-olive/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-all shadow-sm"
             >
-              <Globe className="w-5 h-5" strokeWidth={2} />
+              <Globe className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
             </button>
             
             <AnimatePresence>
@@ -129,9 +133,11 @@ export default function Header() {
             </AnimatePresence>
           </div>
 
-          {/* Subscription Button */}
-          <Link 
-            to="/subscription" 
+          {/* Subscription Button — /subscription is a member route; a guest
+              tap goes through /auth with the destination preserved (the
+              ProtectedRoute redirect would otherwise drop it). */}
+          <Link
+            to={isAuthenticated ? '/subscription' : '/auth?next=%2Fsubscription'}
             className={`relative rounded-full overflow-hidden flex items-center h-11 group ${
               subTier !== 'free' ? 'p-[1.5px]' : 'border border-zinc-800/60'
             }`}
@@ -162,27 +168,41 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className={`relative w-full max-w-4xl mx-auto pointer-events-auto transition-all duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}>
-        <Search className={`absolute top-1/2 -translate-y-1/2 text-zinc-400 transition-all duration-500 ${isScrolled ? 'start-4 w-4 h-4' : 'start-4 w-5 h-5'}`} strokeWidth={2.5} />
-        <input 
-          type="text" 
+      {/* Search Bar — a real form: submits on Enter/Go on mobile keyboards
+          AND via the (44px) icon button, and lands on the products page
+          with the query actually applied (?search=). */}
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (searchQuery.trim()) {
+            navigate('/products?search=' + encodeURIComponent(searchQuery.trim()));
+            setSearchQuery('');
+          }
+        }}
+        className={`relative w-full max-w-4xl mx-auto pointer-events-auto transition-all duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}
+      >
+        <button
+          type="submit"
+          aria-label={t('search')}
+          className="absolute top-1/2 -translate-y-1/2 start-0 w-11 h-11 flex items-center justify-center text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-full transition-colors"
+        >
+          <Search className={`transition-all duration-500 ${isScrolled ? 'w-4 h-4' : 'w-5 h-5'}`} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+        <input
+          type="search"
+          enterKeyHint="search"
           placeholder={t('search')}
+          aria-label={t('search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && searchQuery.trim()) {
-              navigate('/products?search=' + encodeURIComponent(searchQuery.trim()));
-              setSearchQuery('');
-            }
-          }} 
           className={`w-full backdrop-blur-xl border border-white/10 rounded-full pe-4 text-white placeholder-zinc-400 focus:border-olive focus:ring-1 focus:ring-olive focus:outline-none transition-all duration-500 font-medium shadow-sm ${
-            isScrolled 
-              ? 'h-[40px] ps-10 text-[14px] bg-zinc-900/60 focus:bg-zinc-800/80' 
+            isScrolled
+              ? 'h-[44px] ps-11 text-[14px] bg-zinc-900/60 focus:bg-zinc-800/80'
               : 'h-[52px] ps-12 text-[15px] bg-black/40 focus:bg-black/60'
           }`}
         />
-      </div>
+      </form>
 
       {/* Subscription-based border line when scrolled */}
       <div className={`absolute bottom-0 left-0 right-0 h-[2px] w-full overflow-hidden transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>

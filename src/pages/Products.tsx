@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
-import { ArrowRight, ArrowLeft, Star } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Star, PackageSearch } from 'lucide-react';
 import { api, ApiProduct, formatIqd } from '../lib/api';
+import Spinner from '../components/ui/Spinner';
+import SafeImage from '../components/ui/SafeImage';
+import { ProductGridSkeleton } from '../components/ui/Skeleton';
+import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 
 export default function Products() {
-  const { t, lang, dir } = useLanguage();
+  const { t, lang, dir, loc } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -21,36 +25,39 @@ export default function Products() {
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  // Monotonic request id: when the query changes mid-flight, the stale
+  // response is ignored so a previous query's results never flash in.
+  const reqIdRef = useRef(0);
+
+  const fetchProducts = useCallback(async () => {
+    const reqId = ++reqIdRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (category) params.set('category', category);
+      params.set('limit', '50');
+      const data = await api.get<{ products: ApiProduct[] }>(`/api/products?${params.toString()}`);
+      if (reqIdRef.current !== reqId) return;
+      setProducts(data.products || []);
+    } catch (err) {
+      console.error(err);
+      if (reqIdRef.current !== reqId) return;
+      setError(err);
+    } finally {
+      if (reqIdRef.current === reqId) setLoading(false);
+    }
+  }, [search, category]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchProducts() {
-      setLoading(true);
-      setError('');
-      try {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (category) params.set('category', category);
-        params.set('limit', '50');
-        const data = await api.get<{ products: ApiProduct[] }>(`/api/products?${params.toString()}`);
-        if (!cancelled) setProducts(data.products || []);
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) {
-          setProducts([]);
-          setError(err instanceof Error ? err.message : 'Failed to load products');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
     fetchProducts();
     return () => {
-      cancelled = true;
+      // Unmount: invalidate any in-flight request.
+      reqIdRef.current += 1;
     };
-  }, [search, category]);
+  }, [fetchProducts]);
 
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen">
@@ -64,20 +71,33 @@ export default function Products() {
       </div>
 
       <div className="p-4">
-        {loading ? (
-          <div className="text-center py-12 text-zinc-500">
-            <div className="w-6 h-6 mx-auto border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 text-red-400 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-            {error}
-          </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-12 text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-            {dir === 'rtl' ? 'لا توجد منتجات' : 'No products found.'}
-          </div>
+        {loading && products.length === 0 ? (
+          <ProductGridSkeleton count={8} />
+        ) : error != null ? (
+          <ErrorState error={error} onRetry={fetchProducts} />
+        ) : !loading && products.length === 0 ? (
+          <EmptyState
+            icon={<PackageSearch aria-hidden="true" className="w-6 h-6" />}
+            title={loc('لا توجد منتجات', 'No products found', 'هیچ بەرهەمێک نەدۆزرایەوە')}
+            description={
+              search || category
+                ? loc('جرّب كلمة بحث أو فئة أخرى.', 'Try a different search or category.', 'وشەیەکی تر یان هاوپۆلێکی تر تاقی بکەوە.')
+                : undefined
+            }
+          />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="relative">
+            {/* Refetch with data already on screen: keep the content visible,
+                dim it, and show a small delayed spinner — no full takeover. */}
+            {loading && (
+              <div className="absolute inset-x-0 top-8 z-10 flex justify-center pointer-events-none">
+                <Spinner size="md" className="bg-black/70 rounded-full p-2" />
+              </div>
+            )}
+          <div
+            aria-busy={loading}
+            className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+          >
             {products.map(p => {
               const firstImage = (Array.isArray(p.images) ? p.images : [])[0] || '';
               const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
@@ -91,11 +111,12 @@ export default function Products() {
               return (
                 <Link to={`/product/${p.slug || p.id}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
                   <div className="relative aspect-square overflow-hidden bg-black">
-                    {firstImage ? (
-                      <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full bg-zinc-900" />
-                    )}
+                    <SafeImage
+                      src={firstImage}
+                      alt={name}
+                      aspect="auto"
+                      className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+                    />
                     {hasSale && (
                       <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                         Sale
@@ -140,6 +161,7 @@ export default function Products() {
                 </Link>
               );
             })}
+          </div>
           </div>
         )}
       </div>

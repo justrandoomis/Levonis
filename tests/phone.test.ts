@@ -30,3 +30,9 @@ test('invalid inputs rejected', () => {
 test('masking keeps prefix and last 3 digits', () => {
   assert.equal(maskPhone('+9647701234567'), '+9647******567');
 });
+
+test('Arabic-Indic and Eastern Arabic-Indic digits normalize', () => {
+  assert.equal(normalizePhone('٠٧٧٠١٢٣٤٥٦٧'), '+9647701234567');
+  assert.equal(normalizePhone('۰۷۷۰۱۲۳۴۵۶۷'), '+9647701234567');
+  assert.ok(phonesMatch('٠٧٧٠١٢٣٤٥٦٧', '+9647701234567'));
+});

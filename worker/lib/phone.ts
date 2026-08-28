@@ -10,9 +10,17 @@
  * doesn't match Iraqi forms is treated as already-international).
  */
 
+/** Arabic-Indic (٠-٩) and Eastern Arabic-Indic (۰-۹) digits → ASCII. */
+export function toAsciiDigits(s: string): string {
+  return s.replace(/[٠-٩۰-۹]/g, (ch) => {
+    const c = ch.charCodeAt(0);
+    return String((c >= 0x06f0 ? c - 0x06f0 : c - 0x0660) % 10);
+  });
+}
+
 export function normalizePhone(raw: string): string | null {
   if (typeof raw !== 'string') return null;
-  let s = raw.trim().replace(/[\s\-().]/g, '');
+  let s = toAsciiDigits(raw).trim().replace(/[\s\-().]/g, '');
   if (!s) return null;
   if (s.startsWith('00')) s = `+${s.slice(2)}`;
 

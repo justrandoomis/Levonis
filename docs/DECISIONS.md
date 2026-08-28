@@ -34,6 +34,10 @@
 | 25 | مشروعية المسابقات/السحوبات في العراق (قبل أي ميزة سحب) | ⚪ | قرار قانوني من المالك |
 | 26 | أسرار المرحلة النهائية: ✅ أضاف المالك `TELEGRAM_WEBHOOK_SECRET` (hex) و`KYC_ENC_KEY` (base64 — الكود يقبل الصيغتين `v1:<b64>` وbase64 خام). المتبقي: `PROD_APP_ORIGIN` (https://levonis-iq.com — يُستخدم عند ربط النطاق)، و**بوت تيليغرام منفصل للـ staging** (توكن خاص به) لأن البوت الواحد يملك webhook واحدًا فقط — لن تستولي اختبارات staging على webhook الإنتاج | 🟡 | GitHub → Secrets |
 
+| 27 | **مُنفَّذ** — دخول/تسجيل تيليغرام (الهجرة 0011): تحديات الربط تدعم غرض login مع continuation_hash وotp_sent_at، وحساب تيليغرام الجديد يُنشأ ببريد نائب `tg-…@telegram.local` غير موثّق — طلب توثيق بريد لهذا الحساب يُرفض بوضوح (NO_REAL_EMAIL) حتى يُدخل المستخدم بريدًا حقيقيًا من الإعدادات. مطلوب من المالك: لا شيء — للعلم فقط | ✅ | worker/routes/auth.ts + migrations/0011 |
+| 28 | Google origin_mismatch: الحل خارج الكود — إضافة https://levonis-iq.com وعنوان staging إلى Authorized JavaScript origins في Google Cloud Console (الدليل الدقيق: docs/GOOGLE_SIGNIN_FIX.md). وهل يُضاف www.levonis-iq.com؟ فقط إن كان الدخول يبدأ منه فعلًا | 🔴 لدخول Google (خطوة المالك) | Google Cloud Console |
+| 29 | وظيفة زر QR بجانب المستخدم: لا وظيفة متفق عليها في التصميم — الحالي عرض بطاقة/رابط الملف العام فقط (بلا رموز جلسات أو هواتف). حدد المطلوب إن أردت غير ذلك | ⚪ | src/pages/Profile.tsx |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).

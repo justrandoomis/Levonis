@@ -2,84 +2,105 @@ import React from 'react';
 import { Home, Users, MessageCircle, ShoppingCart, User } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+
+/**
+ * Routes on which the floating bottom nav does not render. Exported so the
+ * app shell (App.tsx) can reserve bottom clearance for the nav only when it
+ * is actually visible — one source of truth, no duplicated route lists.
+ * Do not change the route set here without checking the shell's padding.
+ */
+export function isBottomNavHidden(pathname: string): boolean {
+  return (
+    pathname === '/admin' ||
+    pathname === '/edit-profile' ||
+    pathname.startsWith('/product/') ||
+    pathname.startsWith('/chat/')
+  );
+}
+
+/**
+ * Destinations wrapped in ProtectedRoute in App.tsx. The route guard
+ * redirects a guest to /auth WITHOUT preserving where they were going, so
+ * the nav links a signed-out user straight to /auth?next=<dest> instead —
+ * after signing in they land on the tab they tapped.
+ */
+const PROTECTED_PATHS = new Set(['/cart', '/chats']);
 
 export default function BottomNav() {
   const { t } = useLanguage();
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
 
   const navItems = [
     { icon: Users, label: t('community'), path: '/community' },
     { icon: MessageCircle, label: t('webCenter'), path: '/chats' },
     { icon: Home, label: t('home'), path: '/' },
     { icon: ShoppingCart, label: t('cart'), path: '/cart' },
-    { icon: User, label: t('profile' as any), path: '/profile' },
+    { icon: User, label: t('profile'), path: '/profile' },
   ];
 
   const leftItems = navItems.slice(0, 2);
   const homeItem = navItems[2];
   const rightItems = navItems.slice(3, 5);
 
-  if (location.pathname === '/admin' || location.pathname === '/edit-profile' || location.pathname.startsWith('/product/') || location.pathname.startsWith('/chat/')) return null;
+  if (isBottomNavHidden(location.pathname)) return null;
+
+  const linkTarget = (path: string) =>
+    !isAuthenticated && PROTECTED_PATHS.has(path)
+      ? `/auth?next=${encodeURIComponent(path)}`
+      : path;
+
+  const renderItem = (item: (typeof navItems)[number]) => {
+    const isActive = location.pathname === item.path;
+    return (
+      <Link
+        key={item.path}
+        to={linkTarget(item.path)}
+        aria-label={item.label}
+        aria-current={isActive ? 'page' : undefined}
+        className={`flex flex-col items-center justify-center flex-1 h-full rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95 ${
+          isActive ? 'bg-olive/20 text-gold shadow-sm' : 'text-zinc-500 hover:text-gold'
+        }`}
+      >
+        <item.icon
+          className={`w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mb-0.5 sm:mb-1 ${isActive ? 'text-gold' : ''}`}
+          strokeWidth={isActive ? 2.5 : 2}
+          aria-hidden="true"
+        />
+        <span className={`text-[9px] sm:text-[11px] font-medium whitespace-nowrap ${isActive ? 'text-gold font-bold' : ''}`}>{item.label}</span>
+      </Link>
+    );
+  };
 
   return (
-    <nav className="fixed bottom-4 sm:bottom-6 left-0 right-0 z-[120] flex items-center justify-center gap-1.5 sm:gap-3 px-2 sm:px-4 pointer-events-none">
+    <nav aria-label="LEVONIS" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-[120] flex items-center justify-center gap-1.5 sm:gap-3 px-2 sm:px-4 pointer-events-none">
       {/* Left Pill */}
       <div className="bg-black/20 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
-        {leftItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link 
-              key={item.path} 
-              to={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full rounded-full transition-all ${
-                isActive ? 'bg-olive/20 text-gold shadow-sm' : 'text-zinc-500 hover:text-gold'
-              }`}
-            >
-              <item.icon 
-                className={`w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mb-0.5 sm:mb-1 ${isActive ? 'text-gold' : ''}`} 
-                strokeWidth={isActive ? 2.5 : 2} 
-              />
-              <span className={`text-[9px] sm:text-[11px] font-medium whitespace-nowrap ${isActive ? 'text-gold font-bold' : ''}`}>{item.label}</span>
-            </Link>
-          );
-        })}
+        {leftItems.map(renderItem)}
       </div>
 
       {/* Center Home Circle */}
-      <Link 
+      <Link
         to={homeItem.path}
-        className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105 border border-white/10 shrink-0 pointer-events-auto ${
-          location.pathname === homeItem.path 
-            ? 'bg-olive text-gold border-olive/50 shadow-olive/20' 
+        aria-label={homeItem.label}
+        aria-current={location.pathname === homeItem.path ? 'page' : undefined}
+        className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105 active:scale-95 border border-white/10 shrink-0 pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+          location.pathname === homeItem.path
+            ? 'bg-olive text-gold border-olive/50 shadow-olive/20'
             : 'bg-black/20 backdrop-blur-2xl text-zinc-500 hover:text-gold border-white/10'
         }`}
       >
-        <homeItem.icon 
-          className="w-6 h-6 sm:w-7 sm:h-7" 
-          strokeWidth={location.pathname === homeItem.path ? 2.5 : 2} 
+        <homeItem.icon
+          className="w-6 h-6 sm:w-7 sm:h-7"
+          strokeWidth={location.pathname === homeItem.path ? 2.5 : 2}
+          aria-hidden="true"
         />
       </Link>
 
       {/* Right Pill */}
       <div className="bg-black/20 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
-        {rightItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link 
-              key={item.path} 
-              to={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full rounded-full transition-all ${
-                isActive ? 'bg-olive/20 text-gold shadow-sm' : 'text-zinc-500 hover:text-gold'
-              }`}
-            >
-              <item.icon 
-                className={`w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mb-0.5 sm:mb-1 ${isActive ? 'text-gold' : ''}`} 
-                strokeWidth={isActive ? 2.5 : 2} 
-              />
-              <span className={`text-[9px] sm:text-[11px] font-medium whitespace-nowrap ${isActive ? 'text-gold font-bold' : ''}`}>{item.label}</span>
-            </Link>
-          );
-        })}
+        {rightItems.map(renderItem)}
       </div>
     </nav>
   );

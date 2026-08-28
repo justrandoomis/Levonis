@@ -5,6 +5,10 @@ import { ArrowLeft, ArrowRight, Trash2, ChevronRight, Check, Minus, Plus, X, Sho
 import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
 import { api, CartItem, formatIqd } from '../lib/api';
+import Spinner from '../components/ui/Spinner';
+import SafeImage from '../components/ui/SafeImage';
+import { CartSkeleton } from '../components/ui/Skeleton';
+import { ErrorState } from '../components/ui/AsyncStates';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -19,7 +23,10 @@ export default function Cart() {
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Action errors (qty/variant updates) show as a dismissible banner over the
+  // existing content; a failed INITIAL load is a distinct full state below.
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
   // Selection is a client-side concern; selected item ids are handed to
   // checkout via navigate('/checkout', { state: { itemIds, usePoints } }).
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -67,12 +74,26 @@ export default function Cart() {
       const data = await api.get<{ items: CartItem[] }>('/api/cart');
       applyItems(data.items || []);
       setError('');
+      setLoadError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load cart');
+      if (firstLoadRef.current) {
+        // Nothing on screen yet: a full error state (401 → sign-in prompt,
+        // network/5xx → retry) instead of "your cart is empty" + a banner.
+        setLoadError(err);
+      } else {
+        // The page already has content — keep it visible, show a banner.
+        setError(err instanceof Error ? err.message : 'Failed to load cart');
+      }
     } finally {
       setLoading(false);
     }
   }, [applyItems]);
+
+  const retryLoadCart = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
+    loadCart();
+  }, [loadCart]);
 
   useEffect(() => {
     loadCart();
@@ -245,8 +266,12 @@ export default function Cart() {
         )}
 
         {loading ? (
-          <div className="py-16 flex justify-center">
-            <div className="w-6 h-6 border-2 border-[#ef233c] border-t-transparent rounded-full animate-spin"></div>
+          <div className="mt-3">
+            <CartSkeleton rows={3} />
+          </div>
+        ) : loadError != null ? (
+          <div className="mx-4 mt-6">
+            <ErrorState error={loadError} onRetry={retryLoadCart} next="/cart" />
           </div>
         ) : items.length === 0 ? (
           <div className="mx-4 mt-6 text-center py-16 text-zinc-500 bg-[#0a0a0a] rounded-xl border border-zinc-900/50 flex flex-col items-center gap-4">
@@ -293,14 +318,18 @@ export default function Cart() {
 
                 {/* Product Image */}
                 <div
-                  className="w-[100px] h-[100px] shrink-0 bg-white rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
+                  className="w-[100px] h-[100px] shrink-0 rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
                   onClick={() => navigate(`/product/${item.slug}`)}
                 >
-                  {item.image ? (
-                    <img referrerPolicy="no-referrer" src={item.image} alt={itemName(item)} className="w-full h-full object-cover mix-blend-multiply" />
-                  ) : (
-                    <div className="w-full h-full bg-zinc-200" />
-                  )}
+                  <SafeImage
+                    src={item.image}
+                    alt={itemName(item)}
+                    aspect="auto"
+                    className="w-full h-full"
+                    bgClassName="bg-white"
+                    imgClassName="mix-blend-multiply"
+                    fallbackClassName="text-zinc-500"
+                  />
                 </div>
 
                 {/* Product Details */}
@@ -591,8 +620,9 @@ export default function Cart() {
             <button
               onClick={confirmVariant}
               disabled={variantSaving}
-              className="w-full mt-4 bg-[#ef233c] text-white font-bold py-3 rounded-xl hover:bg-[#d90429] transition-colors disabled:opacity-50"
+              className="w-full mt-4 bg-[#ef233c] text-white font-bold py-3 rounded-xl hover:bg-[#d90429] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {variantSaving && <Spinner size="xs" delayMs={0} decorative />}
               {variantSaving ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : (dir === 'rtl' ? 'تأكيد' : 'Confirm')}
             </button>
           </div>

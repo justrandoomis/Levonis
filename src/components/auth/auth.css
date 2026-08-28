@@ -1,0 +1,32 @@
+/*
+ * Scoped styles for the /auth screen (src/pages/Auth.tsx).
+ * src/index.css is shared (and frozen for this task), so the dark-theme
+ * autofill overrides live here, scoped under .lv-auth.
+ */
+
+/*
+ * WebKit/Blink paint autofilled inputs with a light yellow/white background
+ * that makes white text unreadable on the dark theme. The inset box-shadow
+ * trick repaints the field, -webkit-text-fill-color keeps the value visible,
+ * and the huge transition delay stops the UA background from ever fading in.
+ * Password managers and paste are unaffected — this is presentation only.
+ */
+.lv-auth input:-webkit-autofill,
+.lv-auth input:-webkit-autofill:hover,
+.lv-auth input:-webkit-autofill:focus,
+.lv-auth input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0f0f11 inset !important;
+  box-shadow: 0 0 0 1000px #0f0f11 inset !important;
+  -webkit-text-fill-color: #fafafa !important;
+  caret-color: #fafafa;
+  transition: background-color 9999999s ease-out;
+}
+
+/* Firefox's :autofill highlight — best effort; keeps the value readable.
+   (Kept as a separate rule: an unknown selector in a list would invalidate
+   the whole -webkit-autofill rule above in other engines.) */
+.lv-auth input:autofill {
+  box-shadow: 0 0 0 1000px #0f0f11 inset;
+  -webkit-text-fill-color: #fafafa;
+  caret-color: #fafafa;
+}
