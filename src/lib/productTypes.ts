@@ -1,0 +1,207 @@
+/**
+ * Frontend mirror of the canonical product document (worker/lib/productModel.ts)
+ * plus the resolver result shape. Shared by the editor, storefront pages and
+ * the template import UI so every surface agrees on field names.
+ */
+
+export type Lang = 'ar' | 'en' | 'ckb';
+
+export interface PriceFieldsV2 {
+  regular_price_iqd: number | null;
+  pro_price_iqd: number | null;
+  compare_at_iqd: number | null;
+  cost_iqd: number | null; // admin-only; absent from public payloads
+}
+
+export interface OptionV2 extends PriceFieldsV2 {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  image: string;
+  order: number;
+  active: boolean;
+}
+
+export interface ColorV2 extends PriceFieldsV2 {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  hex: string;
+  image: string;
+  option_id: string | null;
+  order: number;
+  active: boolean;
+}
+
+export interface MediaV2 {
+  id: string;
+  url: string;
+  key: string;
+  role: 'gallery';
+  alt_ar: string;
+  alt_en: string;
+  alt_ckb: string;
+  order: number;
+  primary: boolean;
+  width: number | null;
+  height: number | null;
+  source_url: string;
+}
+
+export interface SpecRowV2 {
+  id: string;
+  label_ar: string; label_en: string; label_ckb: string;
+  value_ar: string; value_en: string; value_ckb: string;
+  unit: string;
+  order: number;
+}
+
+export interface SpecGroupV2 {
+  id: string;
+  title_ar: string; title_en: string; title_ckb: string;
+  order: number;
+  rows: SpecRowV2[];
+}
+
+export interface LabelV2 {
+  id: string;
+  key: string;
+  text_ar: string; text_en: string; text_ckb: string;
+  icon: string;
+  order: number;
+  visible: boolean;
+}
+
+export interface WarrantyPlanV2 {
+  id: string;
+  title_ar: string; title_en: string; title_ckb: string;
+  terms_ar: string; terms_en: string; terms_ckb: string;
+  duration_months: number;
+  duration_kind: 'total' | 'extension';
+  fee_iqd: number;
+  order: number;
+  active: boolean;
+}
+
+export interface TransportOfferV2 {
+  method: 'air' | 'sea' | 'land';
+  commission_iqd: number | null; // null = inherit admin default
+  active: boolean;
+}
+
+export interface ContentBlockV2 {
+  id: string;
+  kind: 'text' | 'image' | 'video_embed';
+  order: number;
+  body_ar: string; body_en: string; body_ckb: string;
+  caption_ar: string; caption_en: string; caption_ckb: string;
+  alt_ar: string; alt_en: string; alt_ckb: string;
+  url: string;
+  media_key: string;
+}
+
+export interface TranslationMetaV2 {
+  [field: string]: {
+    en?: { status: 'approved' | 'imported' | 'stale' | 'missing'; src_rev: number };
+    ckb?: { status: 'approved' | 'imported' | 'stale' | 'missing'; src_rev: number };
+  };
+}
+
+export interface ProductDocV2 {
+  id: string;
+  slug: string;
+  status: 'draft' | 'active' | 'hidden';
+  doc_version: number;
+  content_rev: number;
+  name_ar: string; name_en: string; name_ckb: string;
+  description_ar: string; description_en: string; description_ckb: string;
+  price_iqd: number;
+  pro_price_iqd: number | null;
+  original_price_iqd: number | null;
+  product_cost_iqd: number | null; // admin-only
+  selling_type: 'direct_sale' | 'pre_order' | 'bundle';
+  preorder_transports: TransportOfferV2[];
+  stock: number | null;
+  brand_id: string | null;
+  media: MediaV2[];
+  images?: string[]; // public projection compatibility
+  options: OptionV2[];
+  colors: ColorV2[];
+  spec_groups: SpecGroupV2[];
+  labels: LabelV2[];
+  warranty_plans: WarrantyPlanV2[];
+  content_blocks: ContentBlockV2[];
+  translation_meta?: TranslationMetaV2;
+  is_featured: boolean;
+  display_order: number;
+  payment_options: string[];
+  hashtags: string[];
+  how_to_use: string;
+  catalog_ids?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BrandV2 {
+  id: string;
+  slug: string;
+  name_ar: string; name_en: string; name_ckb: string;
+  active: boolean;
+}
+
+export interface CatalogV2 {
+  id: string;
+  parent_id: string | null;
+  slug: string;
+  name_ar: string; name_en: string; name_ckb: string;
+  sort: number;
+  is_printer_catalog: boolean;
+  active: boolean;
+}
+
+export interface ResolvedPriceV2 {
+  regular_iqd: number;
+  pro_iqd: number | null;
+  applied_iqd: number;
+  applied_tier: 'regular' | 'pro';
+  compare_at_iqd: number | null;
+  price_source: 'color' | 'option' | 'base';
+  transport: { method: string; commission_iqd: number; waived: boolean } | null;
+  warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
+  unit_subtotal_iqd: number;
+  errors: string[];
+}
+
+export interface MembershipPlanV2 {
+  id: string;
+  tier: 'plus' | 'pro';
+  duration_months: number;
+  price_iqd: number | null; // null = unpriced → not purchasable yet
+  active: boolean;
+  sort: number;
+}
+
+export interface MembershipV2 {
+  id: string;
+  plan_id: string;
+  tier: 'plus' | 'pro';
+  state: 'pending_payment' | 'prepaid_pending_launch' | 'active' | 'expired' | 'cancelled';
+  duration_months: number;
+  price_paid_iqd: number;
+  purchased_at: string;
+  starts_at: string | null;
+  expires_at: string | null;
+  source: string;
+}
+
+/** Localized field access with the honest Arabic fallback (mandate §2). */
+export function locField(obj: Record<string, unknown>, base: string, lang: Lang): string {
+  const exact = obj[`${base}_${lang}`];
+  if (typeof exact === 'string' && exact.trim()) return exact;
+  const ar = obj[`${base}_ar`];
+  if (typeof ar === 'string' && ar.trim()) return ar;
+  const en = obj[`${base}_en`];
+  return typeof en === 'string' ? en : '';
+}

@@ -56,6 +56,24 @@ export const SETTING_DEFAULTS = {
   homeBanners: {} as Record<string, Array<{ id: string; image: string; link: string }>>,
   homeSectionItems: {} as Record<string, Array<{ id: string; title: string; subtitle: string; image: string; link: string }>>,
   homeAds: [] as Array<{ id: string; text: string; animation: string }>,
+  // PRO pricing fallback when no explicit PRO price exists on a product/option/color.
+  // 'explicit_only' = no fabricated discount (default until the owner approves a rule).
+  proPricingPolicy: { mode: 'explicit_only', percent: null } as { mode: 'explicit_only' | 'global_percent'; percent: number | null },
+  // Admin defaults for preorder transport commissions (IQD), inherited by
+  // products whose offer has commission_iqd = null. Unset (null) = unconfigured.
+  preorderTransportDefaults: [
+    { method: 'air', commission_iqd: null },
+    { method: 'sea', commission_iqd: null },
+    { method: 'land', commission_iqd: null },
+  ] as Array<{ method: string; commission_iqd: number | null }>,
+  // Owner-configured launch event for memberships (mandate §8.1).
+  launchConfig: { launch_at: null, activated: false, activated_at: null } as {
+    launch_at: string | null; activated: boolean; activated_at: string | null;
+  },
+  // PLUS gift on printer purchase: owner decisions pending (duration/milestone).
+  printerGiftConfig: { enabled: false, plan_id: 'plus_1mo', milestone: 'delivered' } as {
+    enabled: boolean; plan_id: string; milestone: 'paid' | 'delivered';
+  },
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -74,6 +92,8 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   'homeBanners',
   'homeSectionItems',
   'homeAds',
+  // NOTE: proPricingPolicy, preorderTransportDefaults, launchConfig and
+  // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
 
 export async function getSettings(db: D1Database, keys?: SettingKey[]): Promise<Record<string, unknown>> {

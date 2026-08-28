@@ -17,6 +17,10 @@ import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
+import { adminProductsRoutes } from './routes/adminProducts';
+import { templateRoutes } from './routes/template';
+import { extractRoutes } from './routes/extract';
+import { membershipsRoutes } from './routes/memberships';
 
 const app = new Hono<AppContext>();
 
@@ -43,6 +47,10 @@ app.route('/api/profile', profileRoutes);
 app.route('/api/uploads', uploadRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/admin/products-v2', adminProductsRoutes);
+app.route('/api/admin/template', templateRoutes);
+app.route('/api/admin/extract-v2', extractRoutes);
+app.route('/api/memberships', membershipsRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.
