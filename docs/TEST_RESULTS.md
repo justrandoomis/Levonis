@@ -20,9 +20,9 @@ Cloudflare resources were touched.** Live integration tests are Phase 3.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Worker TypeScript (strict) | `tsc --noEmit -p worker/tsconfig.json` | PASS |
-| Frontend TypeScript | `tsc --noEmit` | TO-VERIFY (updated in §5 below) |
-| Production build | `npm run build` | TO-VERIFY (updated in §5 below) |
+| Worker TypeScript (strict) | `tsc --noEmit -p worker/tsconfig.json` | PASS (0 errors) |
+| Frontend TypeScript | `tsc --noEmit` | PASS (0 errors) |
+| Production build | `npm run build` | PASS (`vite build`, 2798 modules; main JS chunk 1.37 MB / 382 KB gzip — code-splitting noted as a future improvement) |
 
 ## 3. API / security test suite — `node scripts/api-tests.mjs`
 
@@ -76,6 +76,36 @@ Covered, with the exact assertions in `scripts/api-tests.mjs`:
 
 ## 5. Frontend verification
 
-TO-VERIFY — this section is filled in with the real command results after
-the frontend rewiring lands (tsc, vite build, and browser spot-checks
-against wrangler dev). Do not treat it as passed until it lists results.
+- `npx tsc --noEmit`: PASS, zero errors across all of `src/` after the
+  rewiring (with `@types/react`/`@types/react-dom` installed).
+- `npm run build`: PASS.
+- Static scans: zero remaining `queryDb`/`initDb` references; zero
+  references to the hardcoded admin email; no `auth_token`/entitlement
+  localStorage keys — the only remaining localStorage uses are UI
+  preferences (language, theme, invest display currency).
+- **Browser end-to-end run** (headless Chromium/Playwright at phone
+  viewport 390×844 against `wrangler dev` serving the production build) —
+  **13/13 checks passed**:
+  1. admin + product fixture created through the admin API
+  2. registration through the sign-up form redirects into the app
+  3. product page shows the real name and real IQD price
+  4. add-to-cart puts the item in the server cart
+  5. cart page lists the item
+  6. address created through the Addresses form and listed
+  7. checkout shows the saved address
+  8. checkout shows the server-priced total
+  9. Place Order returns a real order number (`ORD-…`) on the success
+     screen (screenshot evidence)
+  10. Orders page lists that order
+  11. a non-admin visiting `/admin` is bounced (and the admin API would
+      403 regardless)
+  12. the admin account reaches the admin console
+  13. the admin overview shows live database figures — the same order id,
+      totals, user counts (screenshot evidence)
+- RTL/Arabic rendering, the discounted rail, sale badges and bottom nav
+  were visually confirmed on the phone-sized screenshots during the run.
+
+Not browser-tested in this pass (implemented and API-tested, pending
+Phase 3 staging verification): Google Sign-In against real Google, wallet
+deposit UI upload on a physical device, admin home-settings drag-reorder
+on touch, Kurdish translations page-by-page.
