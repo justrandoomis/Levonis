@@ -1,0 +1,10 @@
+# Local development secrets for `wrangler dev` (copy to .dev.vars — that file
+# is gitignored). Production secrets are set in the Cloudflare dashboard or
+# with `wrangler secret put`, never committed.
+
+# Optional: enables the admin translation tool locally.
+# GEMINI_API_KEY=
+
+# Optional: enables password-reset emails locally (Resend API key + sender).
+# EMAIL_API_KEY=
+# EMAIL_FROM=Levonis <noreply@example.com>
