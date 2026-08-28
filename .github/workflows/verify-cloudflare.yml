@@ -122,6 +122,8 @@ jobs:
           [ -n "${{ secrets.EMAIL_TEST_RECIPIENT }}" ] && echo "email_test=set" >> "$GITHUB_OUTPUT" || echo "email_test=NOT SET" >> "$GITHUB_OUTPUT"
           [ -n "${{ secrets.GEMINI_API_KEY }}" ] && echo "gemini=set" >> "$GITHUB_OUTPUT" || echo "gemini=NOT SET" >> "$GITHUB_OUTPUT"
           [ -n "${{ secrets.PROD_APP_ORIGIN }}" ] && echo "prod_origin=set" >> "$GITHUB_OUTPUT" || echo "prod_origin=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.TELEGRAM_WEBHOOK_SECRET }}" ] && echo "tg_webhook=set" >> "$GITHUB_OUTPUT" || echo "tg_webhook=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.KYC_ENC_KEY }}" ] && echo "kyc_key=set" >> "$GITHUB_OUTPUT" || echo "kyc_key=NOT SET" >> "$GITHUB_OUTPUT"
 
       - name: Summary
         if: always()
@@ -145,4 +147,6 @@ jobs:
             echo "| EMAIL_TEST_RECIPIENT | ${{ steps.presence.outputs.email_test }} |"
             echo "| GEMINI_API_KEY | ${{ steps.presence.outputs.gemini }} |"
             echo "| PROD_APP_ORIGIN | ${{ steps.presence.outputs.prod_origin }} |"
+            echo "| TELEGRAM_WEBHOOK_SECRET | ${{ steps.presence.outputs.tg_webhook }} |"
+            echo "| KYC_ENC_KEY | ${{ steps.presence.outputs.kyc_key }} |"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -18,9 +18,19 @@ async function importKeys(secret: string): Promise<KeyRing> {
   const keys = new Map<string, CryptoKey>();
   let current = '';
   for (const part of secret.split(',')) {
-    const [ver, b64] = part.trim().split(':');
+    // Accept both "v1:<base64 32B>" and a bare base64 value (treated as v1)
+    // — the owner-provided secret may omit the version prefix.
+    const trimmed = part.trim();
+    const colon = trimmed.indexOf(':');
+    const ver = colon >= 0 ? trimmed.slice(0, colon) : 'v1';
+    const b64 = colon >= 0 ? trimmed.slice(colon + 1) : trimmed;
     if (!ver || !b64) continue;
-    const rawStr = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    let rawStr: string;
+    try {
+      rawStr = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    } catch {
+      continue;
+    }
     if (rawStr.length !== 32) continue;
     const raw = new Uint8Array([...rawStr].map((ch) => ch.charCodeAt(0)));
     const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
@@ -31,7 +41,7 @@ async function importKeys(secret: string): Promise<KeyRing> {
 }
 
 export function sealboxConfigured(secret: string | undefined): boolean {
-  return !!secret && secret.includes(':');
+  return !!secret && secret.trim().length > 0;
 }
 
 export async function seal(secret: string | undefined, plaintext: string): Promise<string> {

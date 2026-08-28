@@ -98,9 +98,21 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          KYC_ENC_KEY: ${{ secrets.KYC_ENC_KEY }}
         run: |
+          if [ -n "$TELEGRAM_WEBHOOK_SECRET" ]; then
+            printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | npx wrangler secret put TELEGRAM_WEBHOOK_SECRET --env staging
+          else
+            echo "TELEGRAM_WEBHOOK_SECRET not set — the Telegram webhook stays honestly disabled on staging"
+          fi
+          if [ -n "$KYC_ENC_KEY" ]; then
+            printf '%s' "$KYC_ENC_KEY" | npx wrangler secret put KYC_ENC_KEY --env staging
+          else
+            echo "KYC_ENC_KEY not set — KYC submission stays honestly disabled on staging"
+          fi
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN --env staging
           else

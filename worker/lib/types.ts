@@ -18,6 +18,12 @@ export interface Env {
    *  only sent to these addresses (other requests behave normally but skip
    *  the send). Leave unset in production. */
   EMAIL_ALLOWED_RECIPIENTS?: string;
+  /** Secret compared against Telegram's X-Telegram-Bot-Api-Secret-Token
+   *  webhook header; the webhook stays honestly disabled until set. */
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  /** KYC evidence encryption key, format "v1:<base64 32 bytes>" (see
+   *  lib/sealbox.ts). KYC submission stays disabled until set. */
+  KYC_ENC_KEY?: string;
 }
 
 export interface SessionUser {

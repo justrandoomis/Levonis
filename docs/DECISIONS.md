@@ -32,7 +32,7 @@
 | 23 | لحظة إصدار الفاتورة الرسمية: عند تأكيد الطلب أم الشحن أم التسليم؟ (الافتراضي المقترح: عند التأكيد) | 🟡 | إعداد الفواتير |
 | 24 | KYC لأعضاء PRO: مدة الاحتفاظ بالأدلة المشفّرة، والعمر الأدنى المقبول | 🔴 لتفعيل KYC في الإنتاج | إعدادات kyc |
 | 25 | مشروعية المسابقات/السحوبات في العراق (قبل أي ميزة سحب) | ⚪ | قرار قانوني من المالك |
-| 26 | أسرار إضافية (أسماء فقط — لا تُرسل قيمًا في المحادثة): `TELEGRAM_WEBHOOK_SECRET` (سر التحقق من webhook تيليغرام)، `KYC_ENC_KEY` (مفتاح تشفير أدلة KYC بصيغة `v1:<base64 32B>`)، `PROD_APP_ORIGIN` (https://levonis-iq.com — يُستخدم عند ربط النطاق) | 🔴 للمرحلة النهائية (تيليغرام/KYC) | GitHub → Secrets |
+| 26 | أسرار المرحلة النهائية: ✅ أضاف المالك `TELEGRAM_WEBHOOK_SECRET` (hex) و`KYC_ENC_KEY` (base64 — الكود يقبل الصيغتين `v1:<b64>` وbase64 خام). المتبقي: `PROD_APP_ORIGIN` (https://levonis-iq.com — يُستخدم عند ربط النطاق)، و**بوت تيليغرام منفصل للـ staging** (توكن خاص به) لأن البوت الواحد يملك webhook واحدًا فقط — لن تستولي اختبارات staging على webhook الإنتاج | 🟡 | GitHub → Secrets |
 
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in

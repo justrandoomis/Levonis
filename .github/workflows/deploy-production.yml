@@ -116,9 +116,13 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          KYC_ENC_KEY: ${{ secrets.KYC_ENC_KEY }}
         run: |
+          [ -n "$TELEGRAM_WEBHOOK_SECRET" ] && printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | npx wrangler secret put TELEGRAM_WEBHOOK_SECRET || echo "TELEGRAM_WEBHOOK_SECRET not set — Telegram webhook honestly disabled"
+          [ -n "$KYC_ENC_KEY" ] && printf '%s' "$KYC_ENC_KEY" | npx wrangler secret put KYC_ENC_KEY || echo "KYC_ENC_KEY not set — KYC submission honestly disabled"
           [ -n "$TELEGRAM_BOT_TOKEN" ] && printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN || echo "TELEGRAM_BOT_TOKEN not set"
           [ -n "$TELEGRAM_ADMIN_CHAT_ID" ] && printf '%s' "$TELEGRAM_ADMIN_CHAT_ID" | npx wrangler secret put TELEGRAM_ADMIN_CHAT_ID || echo "TELEGRAM_ADMIN_CHAT_ID not set"
           if [ -n "$EMAIL_API_KEY" ]; then
