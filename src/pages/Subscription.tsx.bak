@@ -1,0 +1,318 @@
+import React, { useState } from 'react';
+import { useLanguage } from '../LanguageContext';
+import { Check, Zap, Eye, EyeOff, Printer, Info, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+export default function Subscription() {
+  const { t, dir } = useLanguage();
+  const [showCardDetails, setShowCardDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState<'plus' | 'pro'>('pro');
+  const [selectedDuration, setSelectedDuration] = useState<string>('1yr');
+
+  const plans = {
+    plus: [
+      { id: '1mo', number: '1', unit: t('month'), pricePerUnit: '$9.99/mo', savings: null, total: '$9.99', badge: t('new') },
+      { id: '3mo', number: '3', unit: t('months'), pricePerUnit: '$8.33/mo', savings: '-16%', total: '$24.99', badge: null },
+      { id: '6mo', number: '6', unit: t('months'), pricePerUnit: '$7.49/mo', savings: '-25%', total: '$44.99', badge: t('mostPopular') },
+      { id: '1yr', number: '1', unit: t('year'), pricePerUnit: '$6.66/mo', savings: '-33%', total: '$79.99', badge: null },
+    ],
+    pro: [
+      { id: '1mo', number: '1', unit: t('month'), pricePerUnit: '$19.99/mo', savings: null, total: '$19.99', badge: t('new') },
+      { id: '3mo', number: '3', unit: t('months'), pricePerUnit: '$16.66/mo', savings: '-16%', total: '$49.99', badge: null },
+      { id: '6mo', number: '6', unit: t('months'), pricePerUnit: '$14.99/mo', savings: '-25%', total: '$89.99', badge: null },
+      { id: '1yr', number: '1', unit: t('year'), pricePerUnit: '$12.49/mo', savings: '-37%', total: '$149.99', badge: t('mostPopular') },
+    ]
+  };
+
+  const activePlans = plans[activeTab];
+  
+  // Card masked details
+  const maskedNumber = '**** **** **** 1234';
+  const fullNumber = '4521 8932 1092 1234';
+
+  return (
+    <div className="w-full text-zinc-300 pb-24 overflow-y-auto min-h-screen bg-[#0a0a0a] relative">
+      {/* Background ambient light */}
+      <div className={`fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg h-[600px] ${activeTab === 'pro' ? 'bg-[#B03142]/15' : 'bg-olive/15'} rounded-full blur-[120px] pointer-events-none z-0 transition-colors duration-700`}></div>
+
+      {/* 1. Top Section - ID Card */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="pt-8 px-4 sm:px-6 mb-10 flex flex-col items-center relative z-10"
+      >
+        <h2 className="text-xl font-bold text-white mb-6 text-center tracking-tight">{t('yourLevoCard')}</h2>
+        
+        <div className="w-full max-w-sm relative group perspective-[1000px]">
+          <motion.div 
+            whileHover={{ rotateX: 5, rotateY: -5, scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="relative bg-zinc-900/40 backdrop-blur-2xl border border-white/10 rounded-[24px] p-6 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] overflow-hidden aspect-[1.58/1] flex flex-col justify-between"
+          >
+            {/* Glass reflections */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none"></div>
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent opacity-50 rounded-t-[24px] pointer-events-none"></div>
+            
+            <div className="flex justify-between items-start z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-olive to-black flex items-center justify-center text-white font-bold text-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)]">
+                  L
+                </div>
+                <span className="font-bold text-white tracking-wide text-lg drop-shadow-sm">Levonis</span>
+              </div>
+              <button 
+                onClick={() => setShowCardDetails(!showCardDetails)}
+                className="text-zinc-400 hover:text-white transition-colors p-2 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-md"
+              >
+                {showCardDetails ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+
+            <div className="z-10 mt-6 relative h-8 flex items-center">
+              <AnimatePresence mode="wait">
+                <motion.p 
+                  key={showCardDetails ? 'full' : 'masked'}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="font-mono text-[22px] tracking-[0.12em] text-white absolute w-full drop-shadow-md"
+                >
+                  {showCardDetails ? fullNumber : maskedNumber}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+            <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 z-10">Levo ID</p>
+
+            <div className="flex justify-between items-end z-10 mt-auto">
+              <div>
+                <p className="text-white font-bold text-[15px] tracking-wide mb-1 drop-shadow-sm">3D_Maker_Pro</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-zinc-500 shadow-[0_0_8px_rgba(113,113,122,0.8)]"></span>
+                  <p className="text-xs text-zinc-400 font-medium">{showCardDetails ? t('freeTierUpgrade') : t('freeTier')}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-1.5">{t('status')}</p>
+                <p className="text-white text-xs font-bold bg-white/10 px-2.5 py-1 rounded-md backdrop-blur-md border border-white/5 shadow-sm">{t('active')}</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* 2. Middle Section - Subscription Plans */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+        className="px-4 sm:px-6 mb-12 max-w-lg mx-auto relative z-10"
+      >
+        <h3 className="text-lg font-bold text-white mb-5 text-center">{t('choosePlan')}</h3>
+        
+        {/* Tier Toggle */}
+        <div className="flex p-1 bg-zinc-900/60 backdrop-blur-xl border border-white/10 rounded-full mb-8 relative shadow-lg">
+          <motion.div 
+            className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-zinc-800 rounded-full shadow-sm border border-zinc-700/50"
+            layoutId="tierToggle"
+            initial={false}
+            animate={{ 
+              left: dir === 'rtl' 
+                ? (activeTab === 'plus' ? 'calc(50%)' : '4px')
+                : (activeTab === 'plus' ? '4px' : 'calc(50%)') 
+            }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          />
+          <button 
+            onClick={() => setActiveTab('plus')}
+            className={`flex-1 py-3 text-[15px] font-bold z-10 transition-colors ${activeTab === 'plus' ? 'text-white' : 'text-zinc-400'}`}
+          >
+            {t('plus')}
+          </button>
+          <button 
+            onClick={() => { setActiveTab('pro'); setSelectedDuration('1yr'); }}
+            className={`flex-1 py-3 text-[15px] font-bold z-10 transition-colors flex items-center justify-center gap-1.5 ${activeTab === 'pro' ? 'text-[#B03142] drop-shadow-[0_0_8px_rgba(176,49,66,0.4)]' : 'text-zinc-400'}`}
+          >
+            {t('pro')} <Sparkles className={`w-4 h-4 ${activeTab === 'pro' ? 'text-[#B03142]' : 'text-zinc-500'}`} />
+          </button>
+        </div>
+
+        {/* Carousel */}
+        <div className="flex gap-3 overflow-x-auto pt-8 pb-8 hide-scrollbar -mx-4 px-4 sm:mx-0 sm:px-4 items-end min-h-[240px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="flex gap-3 items-end w-max"
+            >
+              {activePlans.map((plan) => {
+                const isSelected = selectedDuration === plan.id;
+                const accentColor = activeTab === 'pro' ? 'from-[#B03142] to-[#8c2634]' : 'from-olive to-[#0A1F18]';
+                const badgeBg = activeTab === 'pro' ? 'bg-[#B03142]' : 'bg-olive';
+                
+                return (
+                  <motion.div 
+                    key={plan.id}
+                    layout
+                    onClick={() => setSelectedDuration(plan.id)}
+                    className={`relative flex-none w-[110px] cursor-pointer transition-all duration-300 flex flex-col origin-bottom ${
+                      isSelected 
+                        ? 'scale-[1.15] z-10 mx-2' 
+                        : 'scale-100 z-0 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    {/* Badge for unselected state */}
+                    <div className={`w-full overflow-hidden transition-all duration-300 ${!isSelected && plan.badge ? 'h-[22px] opacity-100' : 'h-0 opacity-0'}`}>
+                      <div className={`w-full h-full flex items-center justify-center ${badgeBg} rounded-t-[12px] mb-[1px]`}>
+                        <span className="text-[9px] font-bold text-white uppercase tracking-wider">{plan.badge}</span>
+                      </div>
+                    </div>
+
+                    {/* Main Card */}
+                    <div className={`w-full flex flex-col items-center justify-between transition-all duration-300 ${
+                      isSelected 
+                        ? 'bg-zinc-800/90 backdrop-blur-xl rounded-[16px] p-4 shadow-[0_0_30px_rgba(176,49,66,0.2)] min-h-[160px]' 
+                        : `bg-[#242427] p-3 min-h-[140px] ${!isSelected && plan.badge ? 'rounded-b-[16px]' : 'rounded-[16px]'}`
+                    }`}>
+                      
+                      {/* Glowing border for selected state */}
+                      <div className={`absolute -inset-[1px] bg-gradient-to-b ${accentColor} rounded-[17px] -z-10 transition-opacity duration-300 ${isSelected ? 'opacity-70' : 'opacity-0'}`}></div>
+
+                      <div className="text-center mt-1">
+                        <h4 className={`font-black transition-colors duration-300 ${isSelected ? 'text-white text-[32px]' : 'text-zinc-400 text-[24px]'}`}>
+                          {plan.number}
+                        </h4>
+                        <p className={`font-bold mt-[-4px] transition-colors duration-300 ${isSelected ? 'text-white text-[14px]' : 'text-zinc-500 text-[12px]'}`}>
+                          {plan.unit}
+                        </p>
+                      </div>
+                      
+                      <div className="text-center w-full flex flex-col items-center gap-1.5 mt-2">
+                        <span className={`text-[10px] font-medium transition-colors duration-300 ${isSelected ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                          {plan.pricePerUnit}
+                        </span>
+                        
+                        {plan.savings ? (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors duration-300 ${
+                            isSelected 
+                              ? activeTab === 'pro' ? 'bg-[#B03142] text-white' : 'bg-olive text-white'
+                              : 'bg-zinc-700 text-zinc-300'
+                          }`}>
+                            {plan.savings}
+                          </span>
+                        ) : (
+                          <span className="h-[20px]"></span>
+                        )}
+                        
+                        <span className={`font-bold mt-1 tracking-tight transition-colors duration-300 ${isSelected ? 'text-white text-[15px]' : 'text-zinc-400 text-[13px]'}`}>
+                          {plan.total}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </motion.div>
+
+      {/* 3. Bottom Section - Physical 3D Card Promo */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+        className="px-4 sm:px-6 mb-12 max-w-lg mx-auto relative z-10"
+      >
+        <motion.button 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full h-14 rounded-2xl bg-white text-black font-black text-[17px] hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)] tracking-wide mb-6"
+        >
+          {t('subscribeNow')}
+        </motion.button>
+
+        <div className="relative rounded-[24px] overflow-hidden bg-zinc-900/40 backdrop-blur-xl border border-white/10 shadow-2xl group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-olive/20 via-olive/5 to-transparent rounded-bl-full pointer-events-none mix-blend-screen transition-opacity group-hover:opacity-100 opacity-60"></div>
+          
+          <div className="p-6 flex flex-col items-center text-center relative z-10">
+            <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center mb-4 text-white shadow-xl group-hover:scale-110 group-hover:border-olive/50 transition-all duration-500 ease-out">
+              <Printer className="w-8 h-8 text-olive group-hover:text-white transition-colors" />
+            </div>
+            <h3 className="text-[20px] font-bold text-white mb-2 tracking-tight">{t('tangiblePhysicalCard')}</h3>
+            <p className="text-[14px] text-zinc-400 mb-6 max-w-[280px] leading-relaxed">
+              {t('levoIdSubtext')}
+            </p>
+            <div className="inline-flex items-center gap-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 shadow-inner">
+              <Zap className="w-4 h-4 text-[#B03142]" fill="currentColor" />
+              <span className="text-[11px] font-bold text-[#B03142] uppercase tracking-[0.1em]">{t('unlockedWithAnnual')}</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 4. Benefits Breakdown */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+        className="px-4 sm:px-6 max-w-lg mx-auto relative z-10"
+      >
+        <h3 className="text-[17px] font-bold text-white mb-6 flex items-center justify-center gap-2 px-1">
+          {t('planComparisons')} <Info className="w-4 h-4 text-zinc-500" />
+        </h3>
+        
+        <div className="space-y-4">
+          <div className="bg-zinc-900/30 backdrop-blur-xl border border-white/5 rounded-[24px] p-6 shadow-lg">
+            <h4 className="text-white font-bold mb-5 flex items-center gap-2.5 text-[16px]">
+              <div className="w-2.5 h-2.5 rounded-full bg-olive shadow-[0_0_10px_rgba(15,47,37,0.6)]"></div> {t('plusBenefits')}
+            </h4>
+            <ul className="space-y-4">
+              <li className="flex items-start gap-3 text-[14.5px] text-zinc-400">
+                <Check className="w-5 h-5 text-olive shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span>{t('benefitPlus1')}</span>
+              </li>
+              <li className="flex items-start gap-3 text-[14.5px] text-zinc-400">
+                <Check className="w-5 h-5 text-olive shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span>{t('benefitPlus2')}</span>
+              </li>
+              <li className="flex items-start gap-3 text-[14.5px] text-zinc-400">
+                <Check className="w-5 h-5 text-olive shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span>{t('benefitPlus3')}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="bg-zinc-900/60 backdrop-blur-xl border border-[#B03142]/20 rounded-[24px] p-6 relative overflow-hidden shadow-[0_10px_30px_-15px_rgba(176,49,66,0.2)]">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#B03142]/10 rounded-bl-[100px] pointer-events-none mix-blend-screen blur-xl"></div>
+            <h4 className="text-[#B03142] font-bold mb-5 flex items-center gap-2 text-[16px] drop-shadow-sm">
+              <Sparkles className="w-5 h-5" /> {t('proBenefits')}
+            </h4>
+            <ul className="space-y-4 relative z-10">
+              <li className="flex items-start gap-3 text-[14.5px] text-zinc-300">
+                <Check className="w-5 h-5 text-[#B03142] shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span>{t('benefitPro1')}</span>
+              </li>
+              <li className="flex items-start gap-3 text-[14.5px] text-zinc-300">
+                <Check className="w-5 h-5 text-[#B03142] shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span>{t('benefitPro2')}</span>
+              </li>
+              <li className="flex items-start gap-3 text-[14.5px] text-zinc-300">
+                <Check className="w-5 h-5 text-[#B03142] shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span>{t('benefitPro3')}</span>
+              </li>
+              <li className="flex items-start gap-3 text-[14.5px] text-white">
+                <Check className="w-5 h-5 text-[#B03142] shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span className="font-bold tracking-wide">{t('benefitPro4')}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
