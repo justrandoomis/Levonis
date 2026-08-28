@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, X, Save, ArrowLeft, Check, ShoppingCart, Star } from 'lucide-react';
-import { queryDb } from '../lib/db';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, X, Save, ArrowLeft, Check, ShoppingCart, Star, AlertTriangle } from 'lucide-react';
+import { api, ApiError, uploadFile, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 
@@ -14,34 +14,36 @@ const initialForm = {
   description: '',
   description_ar: '',
   description_ku: '',
-  images: [''],
-  options: [],
-  colors: [],
+  images: [] as string[],
+  options: [] as any[],
+  colors: [] as any[],
   selling_type: 'direct_sale',
-  shipping_methods: [],
-  base_price: 0,
-  original_price: 0,
-  product_cost: 0,
+  shipping_methods: [] as any[],
+  price_iqd: 0,
+  original_price_iqd: 0,
+  product_cost_iqd: 0,
   membership_prices: { plus: 0, pro: 0 },
-  payment_options: ['full'],
+  payment_options: ['full'] as string[],
   subcategory_id: '',
   display_order: 0,
   is_featured: false,
-  specifications: [],
+  specifications: [] as any[],
   brand: '',
-  labels: [],
-  hashtags: [],
-  features: [],
-  algorithm_tags: [],
-  description_images: [],
-  description_videos: [],
-  stores: [],
+  labels: [] as string[],
+  hashtags: [] as string[],
+  features: [] as string[],
+  algorithm_tags: [] as string[],
+  description_images: [] as string[],
+  description_videos: [] as string[],
+  stores: [] as any[],
   categories: '',
-  warranty_plans: [],
-  how_to_use: ''
+  warranty_plans: [] as any[],
+  how_to_use: '',
+  stock: null as number | null,
+  status: 'active' as 'active' | 'hidden' | 'draft'
 };
 
-const SectionCard = ({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) => {
+const SectionCard = ({ title, children }: { title: string, children: React.ReactNode }) => {
   return (
     <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden mb-6 shadow-lg">
       <div className="w-full p-4 bg-zinc-800/20 border-b border-zinc-800/50">
@@ -56,8 +58,8 @@ const SectionCard = ({ title, children, defaultOpen = false }: { title: string, 
 
 function ProductPreviewModal({ form, onClose, dir }: { form: any, onClose: () => void, dir: string }) {
   const mainImage = form.images?.[0] || '';
-  const price = form.original_price || form.base_price || 0;
-  
+  const price = form.price_iqd || 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
@@ -87,25 +89,20 @@ function ProductPreviewModal({ form, onClose, dir }: { form: any, onClose: () =>
               <div>
                 <div className="text-[#6B46FF] font-bold mb-2">{form.brand}</div>
                 <h1 className="text-2xl font-bold text-white mb-2">{dir === 'rtl' ? (form.name_ar || form.name) : form.name}</h1>
-                <div className="flex items-center gap-4 text-sm text-zinc-400">
-                  <div className="flex items-center gap-1 text-yellow-500"><Star className="w-4 h-4 fill-current"/> 5.0</div>
-                  <div>•</div>
-                  <div>120 Reviews</div>
-                </div>
               </div>
-              <div className="text-3xl font-bold text-white">IQD {price.toLocaleString()}</div>
-              
+              <div className="text-3xl font-bold text-white">{formatIqd(price)}</div>
+
               {form.colors?.length > 0 && (
                 <div>
                   <h3 className="text-white font-bold mb-3">{dir === 'rtl' ? 'اللون' : 'Color'}</h3>
                   <div className="flex flex-wrap gap-2">
                     {form.colors.map((c: any, i: number) => (
-                      <div key={i} className="w-10 h-10 rounded-full border-2 border-zinc-700" style={{backgroundColor: c.hex_code || '#333'}}></div>
+                      <div key={i} className="w-10 h-10 rounded-full border-2 border-zinc-700" style={{background: c.gradient ? `linear-gradient(135deg, ${c.gradient})` : (c.hex || '#333')}}></div>
                     ))}
                   </div>
                 </div>
               )}
-              
+
               {form.options?.length > 0 && (
                 <div>
                   <h3 className="text-white font-bold mb-3">{dir === 'rtl' ? 'الخيارات' : 'Options'}</h3>
@@ -116,14 +113,14 @@ function ProductPreviewModal({ form, onClose, dir }: { form: any, onClose: () =>
                   </div>
                 </div>
               )}
-              
+
               <div className="pt-6 border-t border-zinc-800">
                 <button className="w-full bg-[#6B46FF] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
                   <ShoppingCart className="w-5 h-5" />
                   {dir === 'rtl' ? 'أضف إلى السلة' : 'Add to Cart'}
                 </button>
               </div>
-              
+
               <div>
                 <h3 className="text-white font-bold mb-2">{dir === 'rtl' ? 'الوصف' : 'Description'}</h3>
                 <p className="text-zinc-400 whitespace-pre-wrap">{dir === 'rtl' ? (form.description_ar || form.description) : form.description}</p>
@@ -137,13 +134,37 @@ function ProductPreviewModal({ form, onClose, dir }: { form: any, onClose: () =>
 }
 
 export default function AdminProducts() {
-  const { language, dir } = useLanguage();
+  const { lang, dir } = useLanguage();
   const [products, setProducts] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [form, setForm] = useState(initialForm);
-  const { exchangeRate, cartShippingMethods, checkoutPaymentMethods } = useWallet();
+  const [form, setForm] = useState<any>(initialForm);
+  const { cartShippingMethods, checkoutPaymentMethods } = useWallet();
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translateUnavailable, setTranslateUnavailable] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Extract-from-URL state (React state, no direct DOM manipulation)
+  const [extractUrl, setExtractUrl] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
+  /** Translate via the admin API; returns null when it fails or is unconfigured. */
+  const translateText = async (text: string, targetLang: 'en' | 'ar' | 'ku'): Promise<string | null> => {
+    if (translateUnavailable) return null;
+    try {
+      const data = await api.post<{ translation: string }>('/api/translate', { text, targetLang });
+      return data.translation || null;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 503) {
+        setTranslateUnavailable(e.message);
+      }
+      return null;
+    }
+  };
 
   const handleAutoTranslate = async () => {
     if (!form.name_ar && !form.description_ar) {
@@ -156,57 +177,28 @@ export default function AdminProducts() {
       let newDesc = form.description;
       let newNameKu = form.name_ku;
       let newDescKu = form.description_ku;
-      
+
       if (form.name_ar) {
-        const resEn = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: form.name_ar, targetLang: 'en' })
-        });
-        const dataEn = await resEn.json();
-        if (dataEn.success && dataEn.translation) newName = dataEn.translation;
-        
-        const resKu = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: form.name_ar, targetLang: 'ku' })
-        });
-        const dataKu = await resKu.json();
-        if (dataKu.success && dataKu.translation) newNameKu = dataKu.translation;
+        newName = (await translateText(form.name_ar, 'en')) || newName;
+        newNameKu = (await translateText(form.name_ar, 'ku')) || newNameKu;
       }
-      
       if (form.description_ar) {
-        const resEn = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: form.description_ar, targetLang: 'en' })
-        });
-        const dataEn = await resEn.json();
-        if (dataEn.success && dataEn.translation) newDesc = dataEn.translation;
-        
-        const resKu = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: form.description_ar, targetLang: 'ku' })
-        });
-        const dataKu = await resKu.json();
-        if (dataKu.success && dataKu.translation) newDescKu = dataKu.translation;
+        newDesc = (await translateText(form.description_ar, 'en')) || newDesc;
+        newDescKu = (await translateText(form.description_ar, 'ku')) || newDescKu;
       }
-      setForm({ ...form, name: newName, name_ku: newNameKu, description: newDesc, description_ku: newDescKu, slug: newName.toLowerCase().replace(/[^a-z0-9]+/g, '-') });
-    } catch (e) {
-      console.error(e);
-      alert("Translation failed");
+      setForm({ ...form, name: newName, name_ku: newNameKu, description: newDesc, description_ku: newDescKu, slug: form.slug || newName.toLowerCase().replace(/[^a-z0-9]+/g, '-') });
     } finally {
       setIsTranslating(false);
     }
   };
 
   const loadProducts = async () => {
+    setLoadError(null);
     try {
-      const res = await queryDb('SELECT * FROM products ORDER BY created_at DESC');
-      setProducts(res);
+      const data = await api.get<{ products: any[] }>('/api/admin/products');
+      setProducts(data.products);
     } catch (err) {
-      console.error("Error loading products", err);
+      setLoadError(err instanceof ApiError ? err.message : 'Error loading products');
     }
   };
 
@@ -216,174 +208,198 @@ export default function AdminProducts() {
 
 
   const handleUploadImage = async (file: File, callback: (url: string) => void) => {
-    const formData = new FormData();
-    formData.append('file', file);
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.success) {
-        callback(data.url);
-      } else {
-        alert('Upload failed: ' + data.error);
-      }
+      const result = await uploadFile(file, 'product');
+      callback(result.url);
     } catch (err) {
-      alert('Upload error');
+      alert('Upload failed: ' + (err instanceof ApiError ? err.message : 'unknown error'));
+    }
+  };
+
+  const handleExtract = async () => {
+    if (!extractUrl || isExtracting) return;
+    setIsExtracting(true);
+    setExtractError(null);
+    try {
+      const data = await api.post<{ product: { name: string; description: string; images: string[] } }>('/api/extract', { url: extractUrl });
+      setForm((prev: any) => ({
+        ...prev,
+        name: data.product.name || prev.name,
+        description: data.product.description || prev.description,
+        images: data.product.images.length > 0 ? data.product.images : prev.images
+      }));
+    } catch (e) {
+      setExtractError(e instanceof ApiError ? e.message : 'Error extracting product data.');
+    } finally {
+      setIsExtracting(false);
     }
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    setSaveError(null);
+    setIsSaving(true);
     try {
       let finalName = form.name;
       let finalDesc = form.description;
       let finalNameKu = form.name_ku;
       let finalDescKu = form.description_ku;
-      
+
       // Auto-translate if English or Kurdish is empty but Arabic is present
-      if ((!finalName || !finalNameKu) && form.name_ar) {
-        setIsTranslating(true);
-        try {
-          if (!finalName) {
-            const res = await fetch('/api/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: form.name_ar, targetLang: 'en' })
-            });
-            const data = await res.json();
-            if (data.success && data.translation) finalName = data.translation;
-          }
-          if (!finalNameKu) {
-            const res = await fetch('/api/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: form.name_ar, targetLang: 'ku' })
-            });
-            const data = await res.json();
-            if (data.success && data.translation) finalNameKu = data.translation;
-          }
-        } catch(e) {}
-        setIsTranslating(false);
-      }
-      
-      if ((!finalDesc || !finalDescKu) && form.description_ar) {
-        setIsTranslating(true);
-        try {
-          if (!finalDesc) {
-            const res = await fetch('/api/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: form.description_ar, targetLang: 'en' })
-            });
-            const data = await res.json();
-            if (data.success && data.translation) finalDesc = data.translation;
-          }
-          if (!finalDescKu) {
-            const res = await fetch('/api/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: form.description_ar, targetLang: 'ku' })
-            });
-            const data = await res.json();
-            if (data.success && data.translation) finalDescKu = data.translation;
-          }
-        } catch(e) {}
-        setIsTranslating(false);
+      // (skipped honestly when the translation service is not configured).
+      if (!translateUnavailable) {
+        if ((!finalName || !finalNameKu) && form.name_ar) {
+          setIsTranslating(true);
+          if (!finalName) finalName = (await translateText(form.name_ar, 'en')) || finalName;
+          if (!finalNameKu) finalNameKu = (await translateText(form.name_ar, 'ku')) || finalNameKu;
+          setIsTranslating(false);
+        }
+        if ((!finalDesc || !finalDescKu) && form.description_ar) {
+          setIsTranslating(true);
+          if (!finalDesc) finalDesc = (await translateText(form.description_ar, 'en')) || finalDesc;
+          if (!finalDescKu) finalDescKu = (await translateText(form.description_ar, 'ku')) || finalDescKu;
+          setIsTranslating(false);
+        }
       }
 
-      const id = form.id || Math.random().toString(36).substr(2, 9);
-      const finalSlug = form.slug || finalName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      
-      const sql = `
-        INSERT INTO products (id, name, name_ar, name_ku, slug, description, description_ar, description_ku, images, options, colors, selling_type, shipping_methods, base_price, original_price, product_cost, membership_prices, payment_options, subcategory_id, display_order, is_featured, specifications, brand, labels, hashtags, algorithm_tags, features, description_images, description_videos, stores, categories, warranty_plans, how_to_use)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          name=excluded.name, name_ar=excluded.name_ar, name_ku=excluded.name_ku, slug=excluded.slug, description=excluded.description, description_ar=excluded.description_ar, description_ku=excluded.description_ku, images=excluded.images,
-          options=excluded.options, colors=excluded.colors, selling_type=excluded.selling_type, shipping_methods=excluded.shipping_methods,
-          base_price=excluded.base_price, original_price=excluded.original_price, product_cost=excluded.product_cost,
-          membership_prices=excluded.membership_prices, payment_options=excluded.payment_options, subcategory_id=excluded.subcategory_id,
-          display_order=excluded.display_order, is_featured=excluded.is_featured, specifications=excluded.specifications,
-          brand=excluded.brand, labels=excluded.labels, hashtags=excluded.hashtags, algorithm_tags=excluded.algorithm_tags, features=excluded.features, description_images=excluded.description_images, description_videos=excluded.description_videos, stores=excluded.stores, categories=excluded.categories, warranty_plans=excluded.warranty_plans, how_to_use=excluded.how_to_use
-      `;
+      const toInt = (v: any) => {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) ? n : 0;
+      };
 
-      await queryDb(sql, [
-        id, finalName, form.name_ar, finalNameKu, finalSlug, finalDesc, form.description_ar, finalDescKu, JSON.stringify(form.images), 
-        JSON.stringify(form.options.map((o: any) => ({...o, cost: o.cost/exchangeRate, price: o.price/exchangeRate, original_price: o.original_price/exchangeRate, pro_price: o.pro_price/exchangeRate, name_ar: o.name_ar}))),
-        JSON.stringify(form.colors.map((c: any) => ({...c, cost: c.cost/exchangeRate, price: c.price/exchangeRate, original_price: c.original_price/exchangeRate, pro_price: c.pro_price/exchangeRate, option_id: c.option_id, name_ar: c.name_ar}))), 
-        form.selling_type, 
-        JSON.stringify(form.shipping_methods.map((m: any) => ({...m, cost: m.cost/exchangeRate, price: m.price/exchangeRate}))),
-        form.base_price / exchangeRate, form.original_price / exchangeRate, form.product_cost / exchangeRate, 
-        JSON.stringify({
-          plus: form.membership_prices.plus / exchangeRate,
-          pro: form.membership_prices.pro / exchangeRate
-        }),
-        JSON.stringify(form.payment_options), form.subcategory_id, form.display_order, form.is_featured ? 1 : 0,
-        JSON.stringify(form.specifications),
-        form.brand, JSON.stringify(form.labels), JSON.stringify(form.hashtags), JSON.stringify(form.algorithm_tags), JSON.stringify(form.features), JSON.stringify(form.description_images), JSON.stringify(form.description_videos), JSON.stringify(form.stores), form.categories, JSON.stringify(form.warranty_plans), form.how_to_use
-      ]);
+      const body = {
+        id: form.id || undefined,
+        name: finalName || form.name_ar,
+        name_ar: form.name_ar,
+        name_ku: finalNameKu,
+        slug: form.slug || undefined,
+        description: finalDesc,
+        description_ar: form.description_ar,
+        description_ku: finalDescKu,
+        images: (form.images || []).filter(Boolean),
+        options: (form.options || []).map((o: any) => ({
+          ...o,
+          price_iqd: toInt(o.price_iqd),
+          original_price_iqd: toInt(o.original_price_iqd),
+          cost_iqd: toInt(o.cost_iqd),
+          pro_price_iqd: toInt(o.pro_price_iqd),
+        })),
+        colors: (form.colors || []).map((c: any) => ({
+          ...c,
+          price_iqd: toInt(c.price_iqd),
+          original_price_iqd: toInt(c.original_price_iqd),
+          cost_iqd: toInt(c.cost_iqd),
+          pro_price_iqd: toInt(c.pro_price_iqd),
+        })),
+        selling_type: form.selling_type,
+        shipping_methods: (form.shipping_methods || []).map((m: any) => ({
+          id: m.id,
+          method: m.method || m.id,
+          delivery_time: m.delivery_time || '',
+          price_iqd: toInt(m.price_iqd),
+        })),
+        price_iqd: toInt(form.price_iqd),
+        original_price_iqd: form.original_price_iqd ? toInt(form.original_price_iqd) : null,
+        product_cost_iqd: form.product_cost_iqd ? toInt(form.product_cost_iqd) : null,
+        membership_prices: {
+          plus: toInt(form.membership_prices?.plus),
+          pro: toInt(form.membership_prices?.pro),
+        },
+        payment_options: form.payment_options || [],
+        subcategory_id: form.subcategory_id || '',
+        categories: form.categories || '',
+        display_order: toInt(form.display_order),
+        is_featured: !!form.is_featured,
+        specifications: form.specifications || [],
+        brand: form.brand || '',
+        labels: form.labels || [],
+        hashtags: form.hashtags || [],
+        algorithm_tags: form.algorithm_tags || [],
+        features: form.features || [],
+        description_images: form.description_images || [],
+        description_videos: form.description_videos || [],
+        stores: (form.stores || []).map((s: any) => ({ name: s.name, url: s.url, price_iqd: toInt(s.price_iqd) })),
+        warranty_plans: (form.warranty_plans || []).map((w: any) => ({ name: w.name, price_iqd: toInt(w.price_iqd) })),
+        how_to_use: form.how_to_use || '',
+        stock: form.stock === null || form.stock === '' ? null : toInt(form.stock),
+        status: form.status || 'active',
+      };
 
+      await api.post('/api/admin/products', body);
       await loadProducts();
       setIsEditing(false);
     } catch (err) {
-      alert("Error saving product: " + err.message);
+      setSaveError(err instanceof ApiError ? err.message : 'Error saving product');
+    } finally {
+      setIsTranslating(false);
+      setIsSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
+  const handleDelete = async (p: any) => {
+    if (!window.confirm(`Delete product "${p.name || p.name_ar || p.id}"? This cannot be undone.`)) return;
+    setDeletingId(p.id);
     try {
-      await queryDb('DELETE FROM products WHERE id = ?', [id]);
+      await api.delete(`/api/admin/products/${p.id}`);
       await loadProducts();
     } catch (err) {
-      alert("Error deleting product");
+      alert('Error deleting product: ' + (err instanceof ApiError ? err.message : 'unknown error'));
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const openEditor = (prod?: any) => {
+    setSaveError(null);
     if (prod) {
-      let parsedMem = { plus: 0, pro: 0 };
-      try { parsedMem = JSON.parse(prod.membership_prices || '{"plus":0,"pro":0}'); } catch (e) {}
-      let parsedSM = [];
-      try { parsedSM = JSON.parse(prod.shipping_methods || '[]'); } catch (e) {}
-      let parsedOpts = [];
-      try { parsedOpts = JSON.parse(prod.options || '[]'); } catch (e) {}
-      let parsedCols = [];
-      try { parsedCols = JSON.parse(prod.colors || '[]'); } catch (e) {}
-
+      // Products arrive from the API already parsed, with IQD integer fields.
       setForm({
+        ...initialForm,
         ...prod,
         name_ar: prod.name_ar || '',
         name_ku: prod.name_ku || '',
+        description: prod.description || '',
         description_ar: prod.description_ar || '',
         description_ku: prod.description_ku || '',
-        base_price: (prod.base_price || 0) * exchangeRate,
-        original_price: (prod.original_price || 0) * exchangeRate,
-        product_cost: (prod.product_cost || 0) * exchangeRate,
+        slug: prod.slug || '',
+        price_iqd: prod.price_iqd || 0,
+        original_price_iqd: prod.original_price_iqd || 0,
+        product_cost_iqd: prod.product_cost_iqd || 0,
         membership_prices: {
-          plus: (parsedMem.plus || 0) * exchangeRate,
-          pro: (parsedMem.pro || 0) * exchangeRate
+          plus: prod.membership_prices?.plus || 0,
+          pro: prod.membership_prices?.pro || 0
         },
-        shipping_methods: parsedSM.map(m => ({...m, cost: (m.cost||0)*exchangeRate, price: (m.price||0)*exchangeRate})),
-        options: parsedOpts.map(o => ({...o, cost: (o.cost||0)*exchangeRate, price: (o.price||0)*exchangeRate, original_price: (o.original_price||0)*exchangeRate, pro_price: (o.pro_price||0)*exchangeRate, name_ar: o.name_ar||''})),
-        colors: parsedCols.map(c => ({...c, cost: (c.cost||0)*exchangeRate, price: (c.price||0)*exchangeRate, original_price: (c.original_price||0)*exchangeRate, pro_price: (c.pro_price||0)*exchangeRate, option_id: c.option_id||'', name_ar: c.name_ar||''})),
-        images: JSON.parse(prod.images || '[]'),
-        payment_options: JSON.parse(prod.payment_options || '["full"]'),
-        specifications: JSON.parse(prod.specifications || '[]'),
+        shipping_methods: (prod.shipping_methods || []).map((m: any) => ({ ...m, price_iqd: m.price_iqd || 0 })),
+        options: (prod.options || []).map((o: any) => ({
+          ...o,
+          name: o.name || '', name_ar: o.name_ar || '', image: o.image || '',
+          price_iqd: o.price_iqd || 0, original_price_iqd: o.original_price_iqd || 0,
+          cost_iqd: o.cost_iqd || 0, pro_price_iqd: o.pro_price_iqd || 0,
+        })),
+        colors: (prod.colors || []).map((c: any) => ({
+          ...c,
+          name: c.name || '', name_ar: c.name_ar || '', hex: c.hex || '', gradient: c.gradient || '',
+          image: c.image || '', option_id: c.option_id || '', linked_option_ids: c.linked_option_ids || [],
+          price_iqd: c.price_iqd || 0, original_price_iqd: c.original_price_iqd || 0,
+          cost_iqd: c.cost_iqd || 0, pro_price_iqd: c.pro_price_iqd || 0,
+        })),
+        images: prod.images || [],
+        payment_options: prod.payment_options || ['full'],
+        specifications: prod.specifications || [],
         is_featured: !!prod.is_featured,
         brand: prod.brand || '',
-        algorithm_tags: prod.algorithm_tags ? JSON.parse(prod.algorithm_tags) : [],
-        labels: JSON.parse(prod.labels || '[]'),
-        hashtags: JSON.parse(prod.hashtags || '[]'),
-        features: JSON.parse(prod.features || '[]'),
-        description_images: JSON.parse(prod.description_images || '[]'),
-        description_videos: JSON.parse(prod.description_videos || '[]'),
-        
-        stores: JSON.parse(prod.stores || '[]'),
+        algorithm_tags: prod.algorithm_tags || [],
+        labels: prod.labels || [],
+        hashtags: prod.hashtags || [],
+        features: prod.features || [],
+        description_images: prod.description_images || [],
+        description_videos: prod.description_videos || [],
+        stores: (prod.stores || []).map((s: any) => ({ name: s.name || '', url: s.url || '', price_iqd: s.price_iqd || 0 })),
         categories: prod.categories || '',
-        warranty_plans: JSON.parse(prod.warranty_plans || '[]'),
-        how_to_use: prod.how_to_use || ''
-
+        warranty_plans: (prod.warranty_plans || []).map((w: any) => ({ name: w.name || '', price_iqd: w.price_iqd || 0 })),
+        how_to_use: prod.how_to_use || '',
+        stock: prod.stock ?? null,
+        status: prod.status || 'active',
       });
     } else {
       setForm(initialForm);
@@ -395,12 +411,8 @@ export default function AdminProducts() {
     const uniqueBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean))) as string[];
     const uniqueSubcategories = Array.from(new Set(products.map(p => p.subcategory_id).filter(Boolean))) as string[];
     const uniqueCategories = Array.from(new Set(products.map(p => p.categories).filter(Boolean).flatMap((c: string) => c.split(',').map(s=>s.trim())))) as string[];
-    const uniqueLabels = Array.from(new Set(products.flatMap(p => {
-      try { return JSON.parse(p.labels || '[]'); } catch(e) { return []; }
-    }).filter(Boolean))) as string[];
-    const uniqueHashtags = Array.from(new Set(products.flatMap(p => {
-      try { return JSON.parse(p.hashtags || '[]'); } catch(e) { return []; }
-    }).filter(Boolean))) as string[];
+    const uniqueLabels = Array.from(new Set(products.flatMap(p => Array.isArray(p.labels) ? p.labels : []).filter(Boolean))) as string[];
+    const uniqueHashtags = Array.from(new Set(products.flatMap(p => Array.isArray(p.hashtags) ? p.hashtags : []).filter(Boolean))) as string[];
 
     const renderSingleChips = (options: string[], currentValue: string, onSelect: (val: string) => void) => (
       <div className="flex flex-wrap gap-2 mt-2">
@@ -456,59 +468,71 @@ export default function AdminProducts() {
             <button onClick={() => setIsPreviewOpen(true)} className="flex items-center gap-2 bg-zinc-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-zinc-700 transition-colors">
               Preview
             </button>
-            <button onClick={handleSave} disabled={isTranslating} className="flex items-center gap-2 bg-[#6B46FF] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#6B46FF]/90 transition-colors disabled:opacity-50">
-              <Save className="w-4 h-4" /> {isTranslating ? "Translating & Saving..." : "Save Product"}
+            <button
+              onClick={handleAutoTranslate}
+              disabled={isTranslating || isSaving || !!translateUnavailable}
+              title={translateUnavailable || undefined}
+              className="flex items-center gap-2 bg-zinc-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-zinc-700 transition-colors disabled:opacity-50"
+            >
+              {isTranslating ? 'Translating...' : 'Auto Translate'}
+            </button>
+            <button onClick={handleSave} disabled={isTranslating || isSaving} className="flex items-center gap-2 bg-[#6B46FF] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#6B46FF]/90 transition-colors disabled:opacity-50">
+              <Save className="w-4 h-4" /> {isSaving ? (isTranslating ? 'Translating & Saving...' : 'Saving...') : 'Save Product'}
             </button>
           </div>
         </div>
 
-        <div className="bg-zinc-900/40 border border-[#6B46FF]/30 rounded-2xl p-4 mb-6 flex items-end gap-4 shadow-lg shadow-[#6B46FF]/5">
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-[#6B46FF] uppercase tracking-wider mb-2">Auto Extract Product from URL</label>
-            <input type="text" id="extract_url" placeholder="Paste product URL here (e.g., from Amazon, Aliexpress)..." className="w-full bg-zinc-800/50 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
+        {translateUnavailable && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 rounded-2xl p-4 mb-6 flex items-start gap-3 text-sm">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <div className="font-bold">Automatic translation is unavailable</div>
+              <div className="text-yellow-300/80">{translateUnavailable} — enter translations manually.</div>
+            </div>
           </div>
-          <button type="button" onClick={async () => {
-            const urlInput = document.getElementById('extract_url') as HTMLInputElement;
-            if (!urlInput || !urlInput.value) return;
-            const btn = document.getElementById('extract_btn');
-            if (btn) btn.innerHTML = 'Extracting...';
-            try {
-              const res = await fetch('/api/extract', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: urlInput.value })
-              });
-              const data = await res.json();
-              if (data.success && data.product) {
-                setForm(prev => ({
-                  ...prev,
-                  name: data.product.name || prev.name,
-                  name_ar: '', // let user translate or type
-                  description: data.product.description || prev.description,
-                  images: data.product.images.length > 0 ? data.product.images : prev.images
-                }));
-                alert('Extraction successful! Please translate fields if needed.');
-              } else {
-                alert('Extraction failed or no data found.');
-              }
-            } catch(e) {
-              alert('Error extracting product data.');
-            }
-            if (btn) btn.innerHTML = 'Extract Data';
-          }} id="extract_btn" className="bg-[#6B46FF] hover:bg-[#5a3ae0] text-white px-6 py-3 rounded-xl font-bold transition-colors whitespace-nowrap">
-            Extract Data
-          </button>
+        )}
+
+        {saveError && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 mb-6 text-sm font-medium">
+            {saveError}
+          </div>
+        )}
+
+        <div className="bg-zinc-900/40 border border-[#6B46FF]/30 rounded-2xl p-4 mb-6 shadow-lg shadow-[#6B46FF]/5">
+          <div className="flex items-end gap-4">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-[#6B46FF] uppercase tracking-wider mb-2">Auto Extract Product from URL</label>
+              <input
+                type="text"
+                value={extractUrl}
+                onChange={e => setExtractUrl(e.target.value)}
+                placeholder="Paste product URL here (e.g., from Amazon, Aliexpress)..."
+                className="w-full bg-zinc-800/50 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleExtract}
+              disabled={isExtracting || !extractUrl}
+              className="bg-[#6B46FF] hover:bg-[#5a3ae0] text-white px-6 py-3 rounded-xl font-bold transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              {isExtracting ? 'Extracting...' : 'Extract Data'}
+            </button>
+          </div>
+          {extractError && (
+            <div className="text-red-400 text-sm mt-3">{extractError}</div>
+          )}
         </div>
 
         {/* General Info */}
-        <SectionCard title="General Information" defaultOpen>
+        <SectionCard title="General Information">
           <div className="flex justify-between items-center mb-4">
             <h4 className="text-white font-bold">Product Details</h4>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Product Name (Arabic)</label>
-              <input type="text" value={form.name_ar} onChange={e => setForm({...form, name_ar: e.target.value, name: '', name_ku: ''})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all text-right" dir="rtl" placeholder="اسم المنتج" />
+              <input type="text" value={form.name_ar} onChange={e => setForm({...form, name_ar: e.target.value})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all text-right" dir="rtl" placeholder="اسم المنتج" />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Product Name (English)</label>
@@ -524,7 +548,7 @@ export default function AdminProducts() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Description (Arabic)</label>
-              <textarea value={form.description_ar} onChange={e => setForm({...form, description_ar: e.target.value, description: '', description_ku: ''})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all h-32 text-right" dir="rtl" placeholder="وصف المنتج" />
+              <textarea value={form.description_ar} onChange={e => setForm({...form, description_ar: e.target.value})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all h-32 text-right" dir="rtl" placeholder="وصف المنتج" />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Description (English)</label>
@@ -548,6 +572,24 @@ export default function AdminProducts() {
                 <input type="checkbox" checked={form.is_featured} onChange={e => setForm({...form, is_featured: e.target.checked})} className="w-5 h-5 accent-olive" />
                 <span className="text-white font-medium">Featured Product</span>
               </label>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Visibility / الظهور</label>
+              <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:outline-none">
+                <option value="active">Active (visible in store)</option>
+                <option value="hidden">Hidden (not visible)</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Stock (empty = unlimited)</label>
+              <input
+                type="number"
+                value={form.stock === null ? '' : form.stock}
+                onChange={e => setForm({...form, stock: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0)})}
+                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:outline-none"
+                placeholder="Unlimited"
+              />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Categories (comma separated) / الأقسام</label>
@@ -586,7 +628,7 @@ export default function AdminProducts() {
           </div>
         </SectionCard>
 
-        
+
         {/* Warranty & Usage */}
         <SectionCard title="Warranty & Usage Instructions">
           <div className="mb-6">
@@ -597,15 +639,15 @@ export default function AdminProducts() {
                 <input type="text" placeholder="Plan Name (e.g. 2 Years)" value={wp.name} onChange={e => {
                   const newWP = [...form.warranty_plans]; newWP[idx].name = e.target.value; setForm({...form, warranty_plans: newWP});
                 }} className="flex-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
-                <input type="number" placeholder="Extra Cost (IQD)" value={wp.price} onChange={e => {
-                  const newWP = [...form.warranty_plans]; newWP[idx].price = parseFloat(e.target.value) || 0; setForm({...form, warranty_plans: newWP});
+                <input type="number" placeholder="Extra Cost (IQD)" value={wp.price_iqd} onChange={e => {
+                  const newWP = [...form.warranty_plans]; newWP[idx].price_iqd = parseInt(e.target.value) || 0; setForm({...form, warranty_plans: newWP});
                 }} className="flex-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
                 <button onClick={() => {
-                  const newWP = form.warranty_plans.filter((_, i) => i !== idx); setForm({...form, warranty_plans: newWP});
+                  const newWP = form.warranty_plans.filter((_: any, i: number) => i !== idx); setForm({...form, warranty_plans: newWP});
                 }} className="p-2 text-red-500 bg-zinc-900 border border-zinc-700 rounded"><Trash2 className="w-5 h-5"/></button>
               </div>
             ))}
-            <button onClick={() => setForm({...form, warranty_plans: [...(form.warranty_plans||[]), {name: '', price: 0}]})} className="text-[#6B46FF] text-sm font-bold flex items-center gap-1 mt-2">
+            <button onClick={() => setForm({...form, warranty_plans: [...(form.warranty_plans||[]), {name: '', price_iqd: 0}]})} className="text-[#6B46FF] text-sm font-bold flex items-center gap-1 mt-2">
               <Plus className="w-4 h-4" /> Add Warranty Plan
             </button>
           </div>
@@ -621,11 +663,11 @@ export default function AdminProducts() {
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Description Images</label>
               <div className="flex flex-col gap-2">
-                {(form.description_images || []).map((img, idx) => (
+                {(form.description_images || []).map((img: string, idx: number) => (
                   <div key={idx} className="flex gap-2">
                     <div className="flex-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-zinc-400 text-sm truncate">{img}</div>
                     <button onClick={() => {
-                      const newImgs = (form.description_images || []).filter((_, i) => i !== idx); setForm({...form, description_images: newImgs});
+                      const newImgs = (form.description_images || []).filter((_: string, i: number) => i !== idx); setForm({...form, description_images: newImgs});
                     }} className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-700 rounded"><X className="w-4 h-4"/></button>
                   </div>
                 ))}
@@ -633,30 +675,25 @@ export default function AdminProducts() {
                   <Plus className="w-4 h-4" /> Upload Description Image
                   <input type="file" className="hidden" accept="image/*" multiple onChange={async (e) => {
                     if (e.target.files) {
-                      const newUrls = [];
+                      const newUrls: string[] = [];
                       for (let i = 0; i < e.target.files.length; i++) {
-                        await new Promise<void>(resolve => {
-                          handleUploadImage(e.target.files![i], (url) => {
-                            newUrls.push(url);
-                            resolve();
-                          });
-                        });
+                        await handleUploadImage(e.target.files[i], (url) => { newUrls.push(url); });
                       }
-                      setForm({...form, description_images: [...(form.description_images || []), ...newUrls]});
+                      setForm((prev: any) => ({...prev, description_images: [...(prev.description_images || []), ...newUrls]}));
                     }
                   }} />
                 </label>
               </div>
             </div>
-            
+
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Description Videos</label>
               <div className="flex flex-col gap-2">
-                {(form.description_videos || []).map((vid, idx) => (
+                {(form.description_videos || []).map((vid: string, idx: number) => (
                   <div key={idx} className="flex gap-2">
                     <div className="flex-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-zinc-400 text-sm truncate">{vid}</div>
                     <button onClick={() => {
-                      const newVids = (form.description_videos || []).filter((_, i) => i !== idx); setForm({...form, description_videos: newVids});
+                      const newVids = (form.description_videos || []).filter((_: string, i: number) => i !== idx); setForm({...form, description_videos: newVids});
                     }} className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-700 rounded"><X className="w-4 h-4"/></button>
                   </div>
                 ))}
@@ -664,16 +701,11 @@ export default function AdminProducts() {
                   <Plus className="w-4 h-4" /> Upload Description Video
                   <input type="file" className="hidden" accept="video/*" multiple onChange={async (e) => {
                     if (e.target.files) {
-                      const newUrls = [];
+                      const newUrls: string[] = [];
                       for (let i = 0; i < e.target.files.length; i++) {
-                        await new Promise<void>(resolve => {
-                          handleUploadImage(e.target.files![i], (url) => {
-                            newUrls.push(url);
-                            resolve();
-                          });
-                        });
+                        await handleUploadImage(e.target.files[i], (url) => { newUrls.push(url); });
                       }
-                      setForm({...form, description_videos: [...(form.description_videos || []), ...newUrls]});
+                      setForm((prev: any) => ({...prev, description_videos: [...(prev.description_videos || []), ...newUrls]}));
                     }
                   }} />
                 </label>
@@ -693,8 +725,8 @@ export default function AdminProducts() {
               <input type="text" placeholder="Store Link (URL)" value={store.url} onChange={e => {
                 const newS = [...form.stores]; newS[idx].url = e.target.value; setForm({...form, stores: newS});
               }} className="flex-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
-              <input type="number" placeholder="Price (IQD)" value={store.price} onChange={e => {
-                const newS = [...form.stores]; newS[idx].price = parseFloat(e.target.value) || 0; setForm({...form, stores: newS});
+              <input type="number" placeholder="Price (IQD)" value={store.price_iqd} onChange={e => {
+                const newS = [...form.stores]; newS[idx].price_iqd = parseInt(e.target.value) || 0; setForm({...form, stores: newS});
               }} className="w-1/4 bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
               <button onClick={() => {
                 const newS = form.stores.filter((_: any, i: number) => i !== idx);
@@ -702,7 +734,7 @@ export default function AdminProducts() {
               }} className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-700 rounded"><X className="w-5 h-5"/></button>
             </div>
           ))}
-          <button onClick={() => setForm({...form, stores: [...(form.stores||[]), {name: '', url: '', price: 0}]})} className="text-[#6B46FF] text-sm font-bold flex items-center gap-1 mt-4">
+          <button onClick={() => setForm({...form, stores: [...(form.stores||[]), {name: '', url: '', price_iqd: 0}]})} className="text-[#6B46FF] text-sm font-bold flex items-center gap-1 mt-4">
             <Plus className="w-4 h-4" /> Add External Store
           </button>
         </SectionCard>
@@ -710,7 +742,7 @@ export default function AdminProducts() {
         {/* Images */}
         <SectionCard title="Product Images">
           <div className="flex flex-col gap-3">
-            {form.images.map((img, idx) => (
+            {form.images.map((img: string, idx: number) => (
               <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-2 bg-zinc-900 border border-zinc-700 rounded">
                 <div className="relative">
                   <img src={img || undefined} className="w-16 h-16 rounded object-cover border border-zinc-800" alt={`Product ${idx + 1}`} referrerPolicy="no-referrer" />
@@ -751,7 +783,7 @@ export default function AdminProducts() {
                     <ChevronDown className="w-4 h-4" />
                   </button>
                   <button type="button" onClick={() => {
-                    const newImgs = form.images.filter((_, i) => i !== idx);
+                    const newImgs = form.images.filter((_: string, i: number) => i !== idx);
                     setForm({...form, images: newImgs});
                   }} className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors" title="Delete">
                     <Trash2 className="w-4 h-4" />
@@ -759,14 +791,14 @@ export default function AdminProducts() {
                 </div>
               </div>
             ))}
-            
+
             <div className="flex gap-2 mt-2">
               <label className="flex-1 flex items-center justify-center gap-2 p-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl border border-dashed border-zinc-600 transition-colors cursor-pointer font-medium">
                 <Plus className="w-5 h-5" /> Upload Image
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                   if (e.target.files && e.target.files[0]) {
                     handleUploadImage(e.target.files[0], (url) => {
-                      setForm({...form, images: [...form.images, url]});
+                      setForm((prev: any) => ({...prev, images: [...prev.images, url]}));
                     });
                   }
                 }} />
@@ -780,26 +812,26 @@ export default function AdminProducts() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-6 border-b border-zinc-700">
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Base Price (IQD)</label>
-              <input type="number" value={form.base_price} onChange={e => setForm({...form, base_price: parseFloat(e.target.value) || 0})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
+              <input type="number" value={form.price_iqd} onChange={e => setForm({...form, price_iqd: parseInt(e.target.value) || 0})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Original Price (IQD)</label>
-              <input type="number" value={form.original_price} onChange={e => setForm({...form, original_price: parseFloat(e.target.value) || 0})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
+              <input type="number" value={form.original_price_iqd} onChange={e => setForm({...form, original_price_iqd: parseInt(e.target.value) || 0})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Product Cost (IQD)</label>
-              <input type="number" value={form.product_cost} onChange={e => setForm({...form, product_cost: parseFloat(e.target.value) || 0})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
+              <input type="number" value={form.product_cost_iqd} onChange={e => setForm({...form, product_cost_iqd: parseInt(e.target.value) || 0})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pb-6 border-b border-zinc-700">
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Plus Member Price (IQD)</label>
-              <input type="number" value={form.membership_prices.plus} onChange={e => setForm({...form, membership_prices: {...form.membership_prices, plus: parseFloat(e.target.value) || 0}})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
+              <input type="number" value={form.membership_prices.plus} onChange={e => setForm({...form, membership_prices: {...form.membership_prices, plus: parseInt(e.target.value) || 0}})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Pro Member Price (IQD)</label>
-              <input type="number" value={form.membership_prices.pro} onChange={e => setForm({...form, membership_prices: {...form.membership_prices, pro: parseFloat(e.target.value) || 0}})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
+              <input type="number" value={form.membership_prices.pro} onChange={e => setForm({...form, membership_prices: {...form.membership_prices, pro: parseInt(e.target.value) || 0}})} className="w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all" />
             </div>
           </div>
 
@@ -809,9 +841,9 @@ export default function AdminProducts() {
               {checkoutPaymentMethods.map(method => (
                 <label key={method.id} className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.payment_options.includes(method.id)} onChange={e => {
-                    const newOpts = e.target.checked 
-                      ? [...form.payment_options, method.id] 
-                      : form.payment_options.filter(o => o !== method.id);
+                    const newOpts = e.target.checked
+                      ? [...form.payment_options, method.id]
+                      : form.payment_options.filter((o: string) => o !== method.id);
                     setForm({...form, payment_options: newOpts});
                   }} className="w-5 h-5 accent-olive" />
                   <span className="text-white font-medium">{dir === 'rtl' ? method.titleAr : method.titleEn}</span>
@@ -837,8 +869,8 @@ export default function AdminProducts() {
           {form.selling_type === 'pre_order' && (
             <div>
               <h4 className="text-white font-bold mb-3">Pre-Order Shipping Methods</h4>
-              {form.shipping_methods.map((method: any, idx) => (
-                <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3 bg-zinc-900 p-3 rounded border border-zinc-700">
+              {form.shipping_methods.map((method: any, idx: number) => (
+                <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3 bg-zinc-900 p-3 rounded border border-zinc-700">
                   <select value={method.id || method.method} onChange={e => {
                     const newM = [...form.shipping_methods];
                     newM[idx].id = e.target.value;
@@ -857,23 +889,18 @@ export default function AdminProducts() {
                     newM[idx].delivery_time = e.target.value;
                     setForm({...form, shipping_methods: newM});
                   }} className="bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
-                  <input type="number" placeholder="Cost (IQD)" value={method.cost} onChange={e => {
+                  <input type="number" placeholder="Selling Price (IQD)" value={method.price_iqd} onChange={e => {
                     const newM = [...form.shipping_methods];
-                    newM[idx].cost = parseFloat(e.target.value) || 0;
-                    setForm({...form, shipping_methods: newM});
-                  }} className="bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
-                  <input type="number" placeholder="Selling Price (IQD)" value={method.price} onChange={e => {
-                    const newM = [...form.shipping_methods];
-                    newM[idx].price = parseFloat(e.target.value) || 0;
+                    newM[idx].price_iqd = parseInt(e.target.value) || 0;
                     setForm({...form, shipping_methods: newM});
                   }} className="bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
                   <button onClick={() => {
-                    const newM = form.shipping_methods.filter((_, i) => i !== idx);
+                    const newM = form.shipping_methods.filter((_: any, i: number) => i !== idx);
                     setForm({...form, shipping_methods: newM});
                   }} className="bg-zinc-900 text-red-500 border border-zinc-700 rounded p-2 flex justify-center"><Trash2 className="w-5 h-5"/></button>
                 </div>
               ))}
-              <button onClick={() => setForm({...form, shipping_methods: [...form.shipping_methods, {id: cartShippingMethods[0]?.id || 'direct', method: cartShippingMethods[0]?.id || 'direct', delivery_time: '', cost: 0, price: 0}]})} className="text-[#6B46FF] text-sm font-bold flex items-center gap-1 mt-2">
+              <button onClick={() => setForm({...form, shipping_methods: [...form.shipping_methods, {id: cartShippingMethods[0]?.id || 'direct', method: cartShippingMethods[0]?.id || 'direct', delivery_time: '', price_iqd: 0}]})} className="text-[#6B46FF] text-sm font-bold flex items-center gap-1 mt-2">
                 <Plus className="w-4 h-4" /> Add Shipping Method
               </button>
             </div>
@@ -882,13 +909,13 @@ export default function AdminProducts() {
 
         {/* Options */}
         <SectionCard title="Product Options (Size, Storage, etc.)">
-          {form.options.map((opt: any, idx) => (
-            <div key={idx} className="bg-zinc-900 border border-zinc-700 p-4 rounded-xl mb-4 relative">
+          {form.options.map((opt: any, idx: number) => (
+            <div key={opt.id || idx} className="bg-zinc-900 border border-zinc-700 p-4 rounded-xl mb-4 relative">
               <button onClick={() => {
-                const newO = form.options.filter((_, i) => i !== idx);
+                const newO = form.options.filter((_: any, i: number) => i !== idx);
                 setForm({...form, options: newO});
               }} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500"><X className="w-5 h-5"/></button>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pr-8">
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Option Name EN</label>
@@ -902,7 +929,7 @@ export default function AdminProducts() {
                     const newO = [...form.options]; newO[idx].name_ar = e.target.value; setForm({...form, options: newO});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" dir="rtl" />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Option Image URL (Optional)</label>
                   <div className="flex gap-2">
@@ -912,7 +939,9 @@ export default function AdminProducts() {
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           handleUploadImage(e.target.files[0], (url) => {
-                            const newO = [...form.options]; newO[idx].image = url; setForm({...form, options: newO});
+                            setForm((prev: any) => {
+                              const newO = [...prev.options]; newO[idx] = {...newO[idx], image: url}; return {...prev, options: newO};
+                            });
                           });
                         }
                       }} />
@@ -925,45 +954,45 @@ export default function AdminProducts() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Price (IQD)</label>
-                  <input type="number" value={opt.price} onChange={e => {
-                    const newO = [...form.options]; newO[idx].price = parseFloat(e.target.value) || 0; setForm({...form, options: newO});
+                  <input type="number" value={opt.price_iqd} onChange={e => {
+                    const newO = [...form.options]; newO[idx].price_iqd = parseInt(e.target.value) || 0; setForm({...form, options: newO});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Original Price (IQD)</label>
-                  <input type="number" value={opt.original_price} onChange={e => {
-                    const newO = [...form.options]; newO[idx].original_price = parseFloat(e.target.value) || 0; setForm({...form, options: newO});
+                  <input type="number" value={opt.original_price_iqd} onChange={e => {
+                    const newO = [...form.options]; newO[idx].original_price_iqd = parseInt(e.target.value) || 0; setForm({...form, options: newO});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Cost (IQD)</label>
-                  <input type="number" value={opt.cost} onChange={e => {
-                    const newO = [...form.options]; newO[idx].cost = parseFloat(e.target.value) || 0; setForm({...form, options: newO});
+                  <input type="number" value={opt.cost_iqd} onChange={e => {
+                    const newO = [...form.options]; newO[idx].cost_iqd = parseInt(e.target.value) || 0; setForm({...form, options: newO});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Pro Price (IQD)</label>
-                  <input type="number" value={opt.pro_price} onChange={e => {
-                    const newO = [...form.options]; newO[idx].pro_price = parseFloat(e.target.value) || 0; setForm({...form, options: newO});
+                  <input type="number" value={opt.pro_price_iqd} onChange={e => {
+                    const newO = [...form.options]; newO[idx].pro_price_iqd = parseInt(e.target.value) || 0; setForm({...form, options: newO});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
               </div>
             </div>
           ))}
-          <button onClick={() => setForm({...form, options: [...form.options, { id: 'opt_'+Date.now(), name: '', name_ar: '', image: '', price: 0, original_price: 0, cost: 0, pro_price: 0 }]})} className="flex items-center justify-center gap-2 p-3 w-full bg-zinc-800 hover:bg-zinc-800 text-zinc-200 rounded border border-dashed border-zinc-600 transition-colors">
+          <button onClick={() => setForm({...form, options: [...form.options, { id: 'opt_'+Date.now(), name: '', name_ar: '', image: '', price_iqd: 0, original_price_iqd: 0, cost_iqd: 0, pro_price_iqd: 0 }]})} className="flex items-center justify-center gap-2 p-3 w-full bg-zinc-800 hover:bg-zinc-800 text-zinc-200 rounded border border-dashed border-zinc-600 transition-colors">
             <Plus className="w-4 h-4" /> Add Option
           </button>
         </SectionCard>
 
         {/* Colors */}
         <SectionCard title="Product Colors">
-          {form.colors.map((col: any, idx) => (
-            <div key={idx} className="bg-zinc-900 border border-zinc-700 p-4 rounded-xl mb-4 relative">
+          {form.colors.map((col: any, idx: number) => (
+            <div key={col.id || idx} className="bg-zinc-900 border border-zinc-700 p-4 rounded-xl mb-4 relative">
               <button onClick={() => {
-                const newC = form.colors.filter((_, i) => i !== idx);
+                const newC = form.colors.filter((_: any, i: number) => i !== idx);
                 setForm({...form, colors: newC});
               }} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500"><X className="w-5 h-5"/></button>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pr-8">
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Color Name EN</label>
@@ -977,7 +1006,7 @@ export default function AdminProducts() {
                     const newC = [...form.colors]; newC[idx].name_ar = e.target.value; setForm({...form, colors: newC});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" dir="rtl" />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Color Image URL (Optional)</label>
                   <div className="flex gap-2">
@@ -987,7 +1016,9 @@ export default function AdminProducts() {
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           handleUploadImage(e.target.files[0], (url) => {
-                            const newC = [...form.colors]; newC[idx].image = url; setForm({...form, colors: newC});
+                            setForm((prev: any) => {
+                              const newC = [...prev.colors]; newC[idx] = {...newC[idx], image: url}; return {...prev, colors: newC};
+                            });
                           });
                         }
                       }} />
@@ -1001,7 +1032,7 @@ export default function AdminProducts() {
                     const newC = [...form.colors]; newC[idx].option_id = e.target.value; setForm({...form, colors: newC});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none">
                     <option value="">All Options</option>
-                    {form.options.map(o => (
+                    {form.options.map((o: any) => (
                       <option key={o.id} value={o.id}>{o.name}</option>
                     ))}
                   </select>
@@ -1046,39 +1077,39 @@ export default function AdminProducts() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Price (IQD)</label>
-                  <input type="number" value={col.price} onChange={e => {
-                    const newC = [...form.colors]; newC[idx].price = parseFloat(e.target.value) || 0; setForm({...form, colors: newC});
+                  <input type="number" value={col.price_iqd} onChange={e => {
+                    const newC = [...form.colors]; newC[idx].price_iqd = parseInt(e.target.value) || 0; setForm({...form, colors: newC});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Original Price (IQD)</label>
-                  <input type="number" value={col.original_price} onChange={e => {
-                    const newC = [...form.colors]; newC[idx].original_price = parseFloat(e.target.value) || 0; setForm({...form, colors: newC});
+                  <input type="number" value={col.original_price_iqd} onChange={e => {
+                    const newC = [...form.colors]; newC[idx].original_price_iqd = parseInt(e.target.value) || 0; setForm({...form, colors: newC});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Cost (IQD)</label>
-                  <input type="number" value={col.cost} onChange={e => {
-                    const newC = [...form.colors]; newC[idx].cost = parseFloat(e.target.value) || 0; setForm({...form, colors: newC});
+                  <input type="number" value={col.cost_iqd} onChange={e => {
+                    const newC = [...form.colors]; newC[idx].cost_iqd = parseInt(e.target.value) || 0; setForm({...form, colors: newC});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Pro Price (IQD)</label>
-                  <input type="number" value={col.pro_price} onChange={e => {
-                    const newC = [...form.colors]; newC[idx].pro_price = parseFloat(e.target.value) || 0; setForm({...form, colors: newC});
+                  <input type="number" value={col.pro_price_iqd} onChange={e => {
+                    const newC = [...form.colors]; newC[idx].pro_price_iqd = parseInt(e.target.value) || 0; setForm({...form, colors: newC});
                   }} className="w-full bg-zinc-900 border border-zinc-700 rounded p-3 text-white focus:border-[#6B46FF] focus:outline-none" />
                 </div>
               </div>
             </div>
           ))}
-          <button onClick={() => setForm({...form, colors: [...form.colors, { id: 'col_'+Date.now(), name: '', hex: '', gradient: '', image: '', linked_option_ids: [], price: 0, original_price: 0, cost: 0 }]})} className="flex items-center justify-center gap-2 p-3 w-full bg-zinc-800 hover:bg-zinc-800 text-zinc-200 rounded border border-dashed border-zinc-600 transition-colors">
+          <button onClick={() => setForm({...form, colors: [...form.colors, { id: 'col_'+Date.now(), name: '', name_ar: '', hex: '', gradient: '', image: '', option_id: '', linked_option_ids: [], price_iqd: 0, original_price_iqd: 0, cost_iqd: 0, pro_price_iqd: 0 }]})} className="flex items-center justify-center gap-2 p-3 w-full bg-zinc-800 hover:bg-zinc-800 text-zinc-200 rounded border border-dashed border-zinc-600 transition-colors">
             <Plus className="w-4 h-4" /> Add Color
           </button>
         </SectionCard>
 
         {/* Specifications */}
         <SectionCard title="Features & Specifications">
-          {form.specifications.map((spec: any, idx) => (
+          {form.specifications.map((spec: any, idx: number) => (
             <div key={idx} className="flex gap-2 mb-2">
               <input type="text" placeholder="Key (e.g. Brand)" value={spec.key} onChange={e => {
                 const newS = [...form.specifications]; newS[idx].key = e.target.value; setForm({...form, specifications: newS});
@@ -1087,7 +1118,7 @@ export default function AdminProducts() {
                 const newS = [...form.specifications]; newS[idx].value = e.target.value; setForm({...form, specifications: newS});
               }} className="flex-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-white" />
               <button onClick={() => {
-                const newS = form.specifications.filter((_, i) => i !== idx);
+                const newS = form.specifications.filter((_: any, i: number) => i !== idx);
                 setForm({...form, specifications: newS});
               }} className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-700 rounded"><X className="w-5 h-5"/></button>
             </div>
@@ -1111,40 +1142,54 @@ export default function AdminProducts() {
         </button>
       </div>
 
+      {loadError && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 mb-6 text-sm font-medium">
+          {loadError}
+        </div>
+      )}
+
       <div className="grid gap-4">
-        {products.length === 0 && (
+        {products.length === 0 && !loadError && (
           <div className="text-center py-12 text-zinc-500 bg-zinc-800/20 rounded-xl border border-zinc-800/50">
             No products found.
           </div>
         )}
         {products.map(p => {
-          const images = Array.isArray(p.images) ? p.images : (function(){ try { return JSON.parse(p.images || '[]'); } catch(e) { return [p.images].filter(Boolean); } })();
+          const images = Array.isArray(p.images) ? p.images : [];
           const firstImage = images[0] || 'https://via.placeholder.com/40';
+          const displayName = lang === 'ar' && p.name_ar ? p.name_ar : lang === 'ku' && p.name_ku ? p.name_ku : p.name;
           return (
             <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 hover:bg-zinc-800/30 rounded-xl transition-colors group">
               <div className="flex items-center gap-4 flex-1">
                 <img referrerPolicy="no-referrer" src={firstImage || undefined} className="w-16 h-16 rounded-lg object-cover border border-zinc-700 bg-zinc-900" alt="" />
                 <div className="flex flex-col">
-                  <span className="font-bold text-white text-base line-clamp-1">{language === 'ar' && p.name_ar ? p.name_ar : p.name}</span>
+                  <span className="font-bold text-white text-base line-clamp-1">{displayName}</span>
                   <span className="text-xs text-zinc-500 line-clamp-1">{p.slug}</span>
-                  {p.is_featured && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-[#6B46FF] mt-1 w-fit bg-[#6B46FF]/10 px-1.5 py-0.5 rounded border border-olive/20">
-                      <Check className="w-3 h-3" /> Featured
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    {p.is_featured && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-[#6B46FF] w-fit bg-[#6B46FF]/10 px-1.5 py-0.5 rounded border border-olive/20">
+                        <Check className="w-3 h-3" /> Featured
+                      </span>
+                    )}
+                    {p.status && p.status !== 'active' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-yellow-400 w-fit bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/20 capitalize">
+                        {p.status}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-6 sm:gap-8 lg:border-l lg:border-zinc-700 lg:pl-6">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Type</span>
-                  <span className="text-sm text-zinc-200 capitalize font-medium">{p.selling_type.replace('_', ' ')}</span>
+                  <span className="text-sm text-zinc-200 capitalize font-medium">{(p.selling_type || 'direct_sale').replace('_', ' ')}</span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Base Price</span>
                   <span className="text-white font-bold text-base whitespace-nowrap">
-                    {(p.base_price * exchangeRate).toLocaleString('en-US', { minimumFractionDigits: 0 })} <span className="text-xs text-zinc-500">IQD</span>
+                    {formatIqd(p.price_iqd || 0)}
                   </span>
                 </div>
 
@@ -1152,7 +1197,7 @@ export default function AdminProducts() {
                   <button onClick={() => openEditor(p)} className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors border border-transparent hover:border-zinc-600" title="Edit">
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(p.id)} className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20" title="Delete">
+                  <button onClick={() => handleDelete(p)} disabled={deletingId === p.id} className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 disabled:opacity-50" title="Delete">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

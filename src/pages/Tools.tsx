@@ -15,13 +15,16 @@ export default function Tools() {
         </button>
         <h1 className="text-white font-bold text-lg">Tools</h1>
       </div>
-      <div className="p-4 grid grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 text-center cursor-pointer hover:border-olive/50 transition-colors">
-            <Wrench className="w-8 h-8 text-olive mx-auto mb-2" />
-            <h3 className="text-white font-medium text-sm">Tool {i}</h3>
-          </div>
-        ))}
+      <div className="p-4">
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-8 text-center">
+          <Wrench className="w-12 h-12 text-olive mx-auto mb-4" />
+          <h2 className="text-white font-bold mb-2">قريباً / Tools are coming soon</h2>
+          <p className="text-zinc-400 text-sm">
+            {dir === 'rtl'
+              ? 'نعمل على مجموعة أدوات مفيدة — تحقق مرة أخرى لاحقاً.'
+              : 'We are working on a set of useful tools — check back later.'}
+          </p>
+        </div>
       </div>
     </div>
   );

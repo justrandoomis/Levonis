@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Edit2, Printer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit2, Printer, Store } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import MerchantDashboard from '../components/MerchantDashboard';
-import { Store } from 'lucide-react';
+import { api, uploadFile } from '../lib/api';
 
 const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -31,80 +31,87 @@ const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+function profileStr(profile: Record<string, unknown> | undefined, key: string): string {
+  const v = profile?.[key];
+  return typeof v === 'string' ? v : '';
+}
+
 export default function EditProfile() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  const [username, setUsername] = useState(user?.username || 'alex.smith');
-  const [fullName, setFullName] = useState('Alex Smith');
-  const [bio, setBio] = useState('Designing my life');
-  const [website, setWebsite] = useState('mobbin.com');
-  const [printer1, setPrinter1] = useState('Creality Ender 3 V2');
-  const [printer2, setPrinter2] = useState('Prusa i3 MK3S+');
-  const [printer3, setPrinter3] = useState('');
-  const [printer4, setPrinter4] = useState('');
-  
-  const [instagram, setInstagram] = useState('@slmobbin');
-  const [xAccount, setXAccount] = useState('@salmobbin');
-  const [tiktok, setTiktok] = useState('');
-  const [facebook, setFacebook] = useState('');
+  const { user, refreshUser } = useAuth();
 
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [username, setUsername] = useState(user?.username || '');
+  const [fullName, setFullName] = useState(user?.name || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [website, setWebsite] = useState(user?.website || '');
+  const [printer1, setPrinter1] = useState(profileStr(user?.profile, 'printer1'));
+  const [printer2, setPrinter2] = useState(profileStr(user?.profile, 'printer2'));
+  const [printer3, setPrinter3] = useState(profileStr(user?.profile, 'printer3'));
+  const [printer4, setPrinter4] = useState(profileStr(user?.profile, 'printer4'));
+
+  const [instagram, setInstagram] = useState(profileStr(user?.profile, 'instagram'));
+  const [xAccount, setXAccount] = useState(profileStr(user?.profile, 'xAccount'));
+  const [tiktok, setTiktok] = useState(profileStr(user?.profile, 'tiktok'));
+  const [facebook, setFacebook] = useState(profileStr(user?.profile, 'facebook'));
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar_key ? `/files/${user.avatar_key}` : null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [lastUsernameChangeDate, setLastUsernameChangeDate] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [merchantMode, setMerchantMode] = useState(user?.isAdmin || true); // Assuming admin or default true for demo
+  const [saveError, setSaveError] = useState('');
+  const [merchantMode, setMerchantMode] = useState(false);
+  const [canMerchant, setCanMerchant] = useState(user?.role === 'merchant' || user?.role === 'admin');
 
+  // Re-sync the form when the user loads/refreshes.
+  const loadedUserId = useRef<string | null>(user?.id ?? null);
   useEffect(() => {
-    const savedDate = localStorage.getItem('lastUsernameChangeDate');
-    if (savedDate) setLastUsernameChangeDate(new Date(savedDate));
-    
-    // Load other mock data
-    const savedData = localStorage.getItem('profileData');
-    if (savedData) {
-      try {
-        const data = JSON.parse(savedData);
-        if (data.username) setUsername(data.username);
-        if (data.fullName) setFullName(data.fullName);
-        if (data.bio) setBio(data.bio);
-        if (data.website) setWebsite(data.website);
-        if (data.printer1) setPrinter1(data.printer1);
-        if (data.printer2) setPrinter2(data.printer2);
-        if (data.printer3) setPrinter3(data.printer3);
-        if (data.printer4) setPrinter4(data.printer4);
-        if (data.instagram) setInstagram(data.instagram);
-        if (data.xAccount) setXAccount(data.xAccount);
-        if (data.tiktok) setTiktok(data.tiktok);
-        if (data.facebook) setFacebook(data.facebook);
-        if (data.profileImage) setProfileImage(data.profileImage);
-      } catch (e) {}
-    } else if (user) {
-      if (user.username) setUsername(user.username);
-      if (user.name) setFullName(user.name);
-    }
+    if (!user || loadedUserId.current === user.id) return;
+    loadedUserId.current = user.id;
+    setUsername(user.username || '');
+    setFullName(user.name || '');
+    setBio(user.bio || '');
+    setWebsite(user.website || '');
+    setPrinter1(profileStr(user.profile, 'printer1'));
+    setPrinter2(profileStr(user.profile, 'printer2'));
+    setPrinter3(profileStr(user.profile, 'printer3'));
+    setPrinter4(profileStr(user.profile, 'printer4'));
+    setInstagram(profileStr(user.profile, 'instagram'));
+    setXAccount(profileStr(user.profile, 'xAccount'));
+    setTiktok(profileStr(user.profile, 'tiktok'));
+    setFacebook(profileStr(user.profile, 'facebook'));
+    setAvatarPreview(user.avatar_key ? `/files/${user.avatar_key}` : null);
   }, [user]);
 
-  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (lastUsernameChangeDate) {
-      const daysSinceChange = (new Date().getTime() - lastUsernameChangeDate.getTime()) / (1000 * 3600 * 24);
-      if (daysSinceChange < 14) {
-        alert(`You can only change your username once every 14 days. Days remaining: ${Math.ceil(14 - daysSinceChange)}`);
-        return;
-      }
-    }
-    setUsername(e.target.value);
-  };
+  // The merchant toggle is only offered when the user actually has a
+  // community store, or a merchant/admin role.
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) { setCanMerchant(false); return; }
+    if (user.role === 'merchant' || user.role === 'admin') { setCanMerchant(true); return; }
+    api
+      .get<{ merchant: unknown }>('/api/community/my-store')
+      .then((data) => { if (!cancelled) setCanMerchant(data.merchant !== null); })
+      .catch(() => { if (!cancelled) setCanMerchant(false); });
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file || isUploadingAvatar) return;
+    setIsUploadingAvatar(true);
+    setSaveError('');
+    try {
+      const { key, url } = await uploadFile(file, 'avatar');
+      await api.patch('/api/profile', { avatarKey: key });
+      setAvatarPreview(url);
+      await refreshUser();
+    } catch (err: any) {
+      setSaveError(err?.message || 'Avatar upload failed');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -113,73 +120,82 @@ export default function EditProfile() {
   };
 
   const handleSave = async () => {
+    if (isSaving || !user) return;
     setIsSaving(true);
-    
-    if (username !== user?.username) {
-      // Only record change date if username actually changed from initial state
-      // Actually we should check if username is different from loaded. We will just set it if it changed.
-      const savedData = localStorage.getItem('profileData');
-      let oldUsername = user?.username;
-      if (savedData) {
-        try {
-          oldUsername = JSON.parse(savedData).username;
-        } catch(e) {}
-      }
-      if (username !== oldUsername) {
-        localStorage.setItem('lastUsernameChangeDate', new Date().toISOString());
-        setLastUsernameChangeDate(new Date());
-      }
+    setSaveError('');
+    try {
+      const body: Record<string, unknown> = {
+        name: fullName,
+        bio,
+        website,
+        profile: {
+          ...user.profile,
+          printer1, printer2, printer3, printer4,
+          instagram, xAccount, tiktok, facebook,
+        },
+      };
+      // The server enforces the 14-day username cooldown — just attempt it.
+      if (username !== (user.username || '')) body.username = username;
+      await api.patch('/api/profile', body);
+      await refreshUser();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: any) {
+      setSaveError(err?.message || 'Failed to save profile');
+    } finally {
+      setIsSaving(false);
     }
-
-    const dataToSave = {
-      username, fullName, bio, website,
-      printer1, printer2, printer3, printer4,
-      instagram, xAccount, tiktok, facebook,
-      profileImage
-    };
-    localStorage.setItem('profileData', JSON.stringify(dataToSave));
-
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 600));
-    
-    setIsSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
+
+  const initials = (fullName || username || '?')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white w-full font-sans pb-16">
-      {/* Header */}
-      {/* Merchant Mode Toggle (Demo) */}
-      <div className="flex justify-center pt-8 bg-[#0a0a0a]">
-        <button 
-          onClick={() => setMerchantMode(!merchantMode)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-colors ${merchantMode ? 'bg-gold/20 text-gold border border-gold/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}
-        >
-          <Store className="w-4 h-4" />
-          {merchantMode ? 'Merchant Mode: ON' : 'Merchant Mode: OFF'}
-        </button>
-      </div>
+      {/* Merchant Mode Toggle — only for users with a store or merchant/admin role */}
+      {canMerchant && (
+        <div className="flex justify-center pt-8 bg-[#0a0a0a]">
+          <button
+            onClick={() => setMerchantMode(!merchantMode)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-colors ${merchantMode ? 'bg-gold/20 text-gold border border-gold/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}
+          >
+            <Store className="w-4 h-4" />
+            {merchantMode ? 'Merchant Mode: ON' : 'Merchant Mode: OFF'}
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between p-4 pt-4 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800/50">
-        <button 
-          onClick={() => navigate(-1)} 
+        <button
+          onClick={() => navigate(-1)}
           className="w-11 h-11 bg-white/5 rounded-full flex items-center justify-center shadow-sm hover:bg-white/10 active:scale-95 transition-all border border-white/5"
         >
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>
         <h1 className="text-[18px] font-bold absolute left-1/2 -translate-x-1/2 text-gold">Edit profile</h1>
-        <button 
+        <button
           onClick={handleSave}
-          disabled={isSaving}
-          className={`px-5 py-2.5 rounded-full text-[15px] font-bold shadow-sm transition-all ${saved ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-olive/20 text-gold border border-olive/30 hover:bg-olive/30 active:scale-95'}`}
+          disabled={isSaving || !user}
+          className={`px-5 py-2.5 rounded-full text-[15px] font-bold shadow-sm transition-all ${saved ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-olive/20 text-gold border border-olive/30 hover:bg-olive/30 active:scale-95'} disabled:opacity-50`}
         >
           {isSaving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
         </button>
       </div>
 
-      {merchantMode ? (
+      {saveError && (
+        <div className="max-w-md mx-auto px-4 pt-4">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center">
+            {saveError}
+          </div>
+        </div>
+      )}
+
+      {merchantMode && canMerchant ? (
         <MerchantDashboard />
       ) : (
         <div className="px-4 pb-8 pt-4 space-y-6 max-w-md mx-auto">
@@ -187,21 +203,26 @@ export default function EditProfile() {
         <div className="flex justify-center mb-8">
           <div className="relative cursor-pointer" onClick={triggerFileInput}>
             <div className="w-[100px] h-[100px] rounded-full overflow-hidden bg-gradient-to-tr from-olive via-[#A1B58B] to-gold border border-olive/50 flex items-center justify-center">
-              {profileImage ? (
-                <img referrerPolicy="no-referrer" src={profileImage || undefined} alt="Profile" className="w-full h-full object-cover" />
+              {avatarPreview ? (
+                <img referrerPolicy="no-referrer" src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <div className="text-zinc-800 font-bold text-2xl">AS</div>
+                <div className="text-zinc-800 font-bold text-2xl">{initials}</div>
+              )}
+              {isUploadingAvatar && (
+                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                </div>
               )}
             </div>
             <button className="absolute bottom-0 right-0 w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center shadow-md active:scale-95 transition-transform border border-zinc-700 pointer-events-none">
               <Edit2 className="w-4 h-4 text-white" />
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleImageChange} 
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleImageChange}
             />
           </div>
         </div>
@@ -213,10 +234,10 @@ export default function EditProfile() {
             <span className="text-zinc-500 text-[11px] font-medium">Change once per 14 days</span>
           </div>
           <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4 flex items-center justify-between cursor-pointer active:bg-zinc-800">
-            <input 
+            <input
               type="text"
               value={username}
-              onChange={handleUsernameChange}
+              onChange={(e) => setUsername(e.target.value)}
               className="bg-transparent font-bold text-[16px] text-white w-full outline-none"
               placeholder="Username"
             />
@@ -230,7 +251,7 @@ export default function EditProfile() {
             <h3 className="text-gold text-[13px] font-bold">Full name</h3>
           </div>
           <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4">
-            <input 
+            <input
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -247,7 +268,7 @@ export default function EditProfile() {
             <span className="text-zinc-300 text-[13px] font-medium">{bio.length}/68</span>
           </div>
           <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4 min-h-[100px]">
-            <textarea 
+            <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               maxLength={68}
@@ -263,7 +284,7 @@ export default function EditProfile() {
             <h3 className="text-gold text-[13px] font-bold">Website</h3>
           </div>
           <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4">
-            <input 
+            <input
               type="text"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
@@ -282,7 +303,7 @@ export default function EditProfile() {
           <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
             <div className="flex items-center p-4 border-b border-zinc-800">
               <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0" />
-              <input 
+              <input
                 type="text"
                 value={printer1}
                 onChange={(e) => setPrinter1(e.target.value)}
@@ -292,7 +313,7 @@ export default function EditProfile() {
             </div>
             <div className="flex items-center p-4 border-b border-zinc-800">
               <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0 ml-0.5" />
-              <input 
+              <input
                 type="text"
                 value={printer2}
                 onChange={(e) => setPrinter2(e.target.value)}
@@ -302,7 +323,7 @@ export default function EditProfile() {
             </div>
             <div className="flex items-center p-4 border-b border-zinc-800">
               <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0" />
-              <input 
+              <input
                 type="text"
                 value={printer3}
                 onChange={(e) => setPrinter3(e.target.value)}
@@ -312,7 +333,7 @@ export default function EditProfile() {
             </div>
             <div className="flex items-center p-4">
               <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0" />
-              <input 
+              <input
                 type="text"
                 value={printer4}
                 onChange={(e) => setPrinter4(e.target.value)}
@@ -332,7 +353,7 @@ export default function EditProfile() {
           <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
             <div className="flex items-center p-4 border-b border-zinc-800">
               <InstagramIcon className="w-6 h-6 text-white mr-4 shrink-0" />
-              <input 
+              <input
                 type="text"
                 value={instagram}
                 onChange={(e) => setInstagram(e.target.value)}
@@ -342,7 +363,7 @@ export default function EditProfile() {
             </div>
             <div className="flex items-center p-4 border-b border-zinc-800">
               <XIcon className="w-5 h-5 text-white mr-4 shrink-0 ml-0.5" />
-              <input 
+              <input
                 type="text"
                 value={xAccount}
                 onChange={(e) => setXAccount(e.target.value)}
@@ -352,7 +373,7 @@ export default function EditProfile() {
             </div>
             <div className="flex items-center p-4 border-b border-zinc-800">
               <TikTokIcon className="w-6 h-6 text-white mr-4 shrink-0" />
-              <input 
+              <input
                 type="text"
                 value={tiktok}
                 onChange={(e) => setTiktok(e.target.value)}
@@ -362,7 +383,7 @@ export default function EditProfile() {
             </div>
             <div className="flex items-center p-4">
               <FacebookIcon className="w-6 h-6 text-white mr-4 shrink-0" />
-              <input 
+              <input
                 type="text"
                 value={facebook}
                 onChange={(e) => setFacebook(e.target.value)}

@@ -12,19 +12,17 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const { isAuthenticated, user } = useAuth();
 
-  const isAdminUser = user?.isAdmin || user?.email === 'aliamer59409@gmail.com' || true;
+  // Admin visibility comes exclusively from the server-side role.
+  const isAdminUser = !!user?.isAdmin;
 
-
-
-  const currentPlan = user?.subscription_plan && user?.subscription_plan !== 'free' ? user.subscription_plan : (localStorage.getItem('levo_subscription') || 'free');
-  const subExpirationStr = localStorage.getItem('levo_sub_expiration');
+  // Plan/expiry come from the server-side user only.
   const now = Date.now();
-  const dbExpiry = user?.subscription_expiry;
-  const subExpiration = dbExpiry || (subExpirationStr ? parseInt(subExpirationStr, 10) : 0);
-  
-  const subTier = (currentPlan !== 'free' && subExpiration > now) 
-    ? currentPlan 
-    : 'free';
+  const subTier =
+    user &&
+    user.subscription_plan !== 'free' &&
+    (user.subscription_expiry === 0 || user.subscription_expiry > now)
+      ? user.subscription_plan
+      : 'free';
 
 
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -67,7 +65,14 @@ export default function Header() {
           <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex items-center gap-2.5 bg-zinc-900/80 rounded-full p-1.5 pe-4 border border-zinc-800/60 hover:border-olive/50 transition-colors shadow-sm min-w-0 shrink">
             <div className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden">
               {isAuthenticated ? (
-                 <img referrerPolicy="no-referrer" src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || "Levonis"}&backgroundColor=e2e8f0`} alt="Avatar" className="w-full h-full object-cover" />
+                 <img
+                   referrerPolicy="no-referrer"
+                   src={user?.avatar_key
+                     ? `/files/${user.avatar_key}`
+                     : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user?.username || user?.name || 'Levonis')}`}
+                   alt="Avatar"
+                   className="w-full h-full object-cover"
+                 />
               ) : (
                  <span>SU</span>
               )}

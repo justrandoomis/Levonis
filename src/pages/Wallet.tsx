@@ -1,41 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useWallet } from '../WalletContext';
-import { 
-  ChevronLeft, 
-  ArrowUp, 
-  ArrowDown, 
-  ScanLine, 
-  DollarSign, 
-  TrendingUp, 
-  ArrowRight, 
-  Dribbble, 
+import { uploadFile, formatUsdCents, usdCentsToIqd, iqdToUsdCents } from '../lib/api';
+import {
+  ChevronLeft,
+  ArrowUp,
+  ArrowDown,
+  ScanLine,
+  DollarSign,
+  ArrowRight,
   ArrowDownLeft,
   X,
   Upload,
   CheckCircle,
   Clock,
   XCircle,
-  Camera,
-  Copy
+  Copy,
+  Receipt
 } from 'lucide-react';
 
 export default function Wallet() {
   const navigate = useNavigate();
-  const { balance, paymentMethods, transactions, addTransaction, unreadNotifications, clearNotifications, currency, setCurrency, exchangeRate } = useWallet();
+  const {
+    balanceUsdCents,
+    paymentMethods,
+    transactions,
+    currency: defaultCurrency,
+    exchangeRate,
+    submitDeposit,
+    submitWithdrawal,
+  } = useWallet();
 
-  React.useEffect(() => {
-    if (unreadNotifications > 0) {
-      alert(`You have ${unreadNotifications} updated wallet request(s)!`);
-      clearNotifications();
-    }
-  }, [unreadNotifications, clearNotifications]);
+  // Display currency is a page-local preference only; all stored amounts are USD cents.
+  const [currency, setCurrency] = useState<'IQD' | 'USD'>(defaultCurrency);
   const [viewAllActivity, setViewAllActivity] = useState(false);
-  const [modalType, setModalType] = useState<'deposit' | 'withdrawal' | 'scan' | null>(null);
-  
+  const [modalType, setModalType] = useState<'deposit' | 'withdrawal' | null>(null);
+
   const [amount, setAmount] = useState('');
-  
+  const [accountNumber, setAccountNumber] = useState('');
+  const [note, setNote] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('');
+  const [receiptKey, setReceiptKey] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/[^0-9.]/g, '');
     const parts = val.split('.');
@@ -46,88 +57,92 @@ export default function Wallet() {
     finalParts[0] = finalParts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     setAmount(finalParts.join('.'));
   };
-  const [accountNumber, setAccountNumber] = useState('');
-  const [note, setNote] = useState('');
-  const [receiptUrl, setReceiptUrl] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const formatCurrency = (val: number, showSymbol: boolean = true) => {
-    const amount = currency === 'IQD' ? val * exchangeRate : val;
-    const formatted = amount.toLocaleString('en-US', { 
-      minimumFractionDigits: currency === 'IQD' ? 0 : 2, 
-      maximumFractionDigits: currency === 'IQD' ? 0 : 2 
-    });
-    if (!showSymbol) return formatted;
-    return currency === 'IQD' ? `IQD ${formatted}` : `${formatted}`;
+  /** Format USD cents in the current display currency. */
+  const formatCents = (cents: number, showSymbol: boolean = true) => {
+    if (currency === 'IQD') {
+      const iqd = usdCentsToIqd(cents, exchangeRate);
+      const formatted = iqd.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      return showSymbol ? `IQD ${formatted}` : formatted;
+    }
+    const formatted = (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return showSymbol ? `$${formatted}` : formatted;
   };
 
   const handleOpenModal = (type: 'deposit' | 'withdrawal') => {
     setModalType(type);
     setAmount('');
     setNote('');
-    setReceiptUrl('');
-    // keep accountNumber if it was scanned
+    setReceiptKey('');
+    setSelectedMethod('');
+    setFormError('');
   };
 
-  const handleScan = () => {
-    setModalType('scan');
-    setTimeout(() => {
-      setAccountNumber('QR-' + Math.floor(100000 + Math.random() * 900000));
-      setModalType(null);
-      alert('Scanned successfully!');
-    }, 1500);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Simulate file upload with a local object URL or fake base64
-      const url = URL.createObjectURL(file);
-      setReceiptUrl(url);
+    if (!file || isUploading) return;
+    setIsUploading(true);
+    setFormError('');
+    setReceiptKey('');
+    try {
+      const { key } = await uploadFile(file, 'receipt');
+      setReceiptKey(key);
+    } catch (err: any) {
+      setFormError(err?.message || 'Receipt upload failed — please try again');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || isUploading) return;
+    setFormError('');
 
     const rawVal = amount.replace(/,/g, '');
-    let numAmount = parseFloat(rawVal);
+    const numAmount = parseFloat(rawVal);
     if (!numAmount || numAmount <= 0) {
-      alert('Enter a valid amount');
+      setFormError('Enter a valid amount');
       return;
-    }
-    
-    if (currency === 'IQD') {
-      numAmount = numAmount / exchangeRate;
     }
 
-    if (modalType === 'withdrawal' && numAmount > balance) {
-      alert('Cannot withdraw more than available balance');
-      return;
-    }
-    if (modalType === 'deposit' && !receiptUrl) {
-      alert('Receipt upload is required for deposits');
+    // Convert the display-currency input into USD cents.
+    const amountUsdCents =
+      currency === 'IQD' ? iqdToUsdCents(numAmount, exchangeRate) : Math.round(numAmount * 100);
+
+    if (modalType === 'deposit' && !receiptKey) {
+      setFormError('Receipt upload is required for deposits');
       return;
     }
 
     setIsSubmitting(true);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    await addTransaction({
-      type: modalType as 'deposit' | 'withdrawal',
-      amount: numAmount,
-      receiptUrl,
-      note,
-      accountNumber
-    });
-
-    setIsSubmitting(false);
-    setModalType(null);
-    setAccountNumber('');
-    alert('Transaction completed successfully.');
+    try {
+      if (modalType === 'deposit') {
+        await submitDeposit({
+          amount_usd_cents: amountUsdCents,
+          note: note || undefined,
+          paymentMethod: selectedMethod || undefined,
+          receiptKey,
+        });
+        setModalType(null);
+        setAccountNumber('');
+        alert('Deposit request submitted. It is pending review by our team — your balance updates once it is approved.');
+      } else {
+        await submitWithdrawal({
+          amount_usd_cents: amountUsdCents,
+          note: note || undefined,
+          accountNumber: accountNumber || undefined,
+        });
+        setModalType(null);
+        setAccountNumber('');
+        alert('Withdrawal request submitted. It is pending review by our team.');
+      }
+    } catch (err: any) {
+      setFormError(err?.message || 'Request failed — please try again');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -138,22 +153,8 @@ export default function Wallet() {
           <ChevronLeft className="w-5 h-5 text-gold" />
         </button>
 
-        <button 
-          onClick={() => {
-            if (amount) {
-              const rawVal = parseFloat(amount.replace(/,/g, ''));
-              if (!isNaN(rawVal)) {
-                if (currency === 'USD') {
-                  const newAmount = rawVal * exchangeRate;
-                  setAmount(newAmount.toLocaleString('en-US', { maximumFractionDigits: 0 }));
-                } else {
-                  const newAmount = rawVal / exchangeRate;
-                  setAmount(newAmount.toLocaleString('en-US', { maximumFractionDigits: 2 }));
-                }
-              }
-            }
-            setCurrency(currency === 'USD' ? 'IQD' : 'USD');
-          }}
+        <button
+          onClick={() => setCurrency(currency === 'USD' ? 'IQD' : 'USD')}
           className="bg-[#0F2F25]/80 hover:bg-[#184235] backdrop-blur-md px-3 py-1.5 rounded-xl flex items-center gap-1.5 mb-6 shadow-sm border border-gold/20 mt-2 transition-transform active:scale-95"
         >
            <div className="bg-gold text-[#0A1F18] rounded-[4px] p-0.5 flex items-center justify-center">
@@ -164,13 +165,12 @@ export default function Wallet() {
 
         <div className="flex items-baseline mb-5">
           {currency === 'USD' && <span className="text-[26px] font-bold text-gold/70 tracking-tight mr-1">$</span>}
-          <span className="text-[48px] md:text-[56px] font-black text-gold tracking-tighter leading-none">{formatCurrency(balance, false)}</span>
+          <span className="text-[48px] md:text-[56px] font-black text-gold tracking-tighter leading-none">
+            {currency === 'USD'
+              ? (balanceUsdCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : usdCentsToIqd(balanceUsdCents, exchangeRate).toLocaleString('en-US')}
+          </span>
           {currency === 'IQD' && <span className="text-[26px] font-bold text-gold/70 tracking-tight ml-2">IQD</span>}
-        </div>
-
-        <div className="bg-[#59A846] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[13px] font-bold shadow-md shadow-[#59A846]/20">
-          <TrendingUp className="w-3.5 h-3.5" strokeWidth={3} />
-          +2.10%
         </div>
       </div>
 
@@ -182,11 +182,16 @@ export default function Wallet() {
             <ArrowUp className="w-3 h-3" strokeWidth={3} />
           </div>
         </button>
-        
-        <button onClick={handleScan} className="w-[72px] h-[72px] bg-[#0A1F18] hover:bg-[#184235] transition-colors text-gold rounded-[24px] flex items-center justify-center shadow-lg z-10 shrink-0">
-          <ScanLine className="w-7 h-7" strokeWidth={2} />
+
+        <button
+          disabled
+          title="قريباً / Coming soon"
+          className="w-[72px] h-[72px] bg-[#0A1F18] text-gold/40 rounded-[24px] flex flex-col items-center justify-center shadow-lg z-10 shrink-0 cursor-not-allowed"
+        >
+          <ScanLine className="w-6 h-6" strokeWidth={2} />
+          <span className="text-[8px] font-bold mt-1">قريباً</span>
         </button>
-        
+
         <button onClick={() => handleOpenModal('deposit')} className="flex-1 bg-[#184235] hover:bg-[#205242] transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px] shadow-lg">
           <div className="w-5 h-5 rounded-full border-[1.5px] border-gold/30 flex items-center justify-center">
             <ArrowDown className="w-3 h-3" strokeWidth={3} />
@@ -217,22 +222,40 @@ export default function Wallet() {
             {(viewAllActivity ? transactions : transactions.slice(0, 5)).map(tx => (
               <div key={tx.id} className="bg-[#0F2F25] rounded-[24px] p-4 flex items-center justify-between shadow-sm border border-gold/10">
                 <div className="flex items-center gap-4">
-                  <div className={`w-11 h-11 rounded-[14px] flex items-center justify-center ${tx.type === 'deposit' ? 'bg-[#184235]' : 'bg-[#184235]'}`}>
+                  <div className="w-11 h-11 rounded-[14px] flex items-center justify-center bg-[#184235]">
                     {tx.type === 'deposit' ? <ArrowDownLeft className="w-5 h-5 text-gold" /> : <ArrowUp className="w-5 h-5 text-gold" />}
                   </div>
                   <div>
                     <h4 className="text-gold font-bold text-[15px] capitalize">{tx.note ? tx.note : tx.type}</h4>
-                    <span className="text-gold/60 font-medium text-[12px] capitalize flex items-center gap-1">
+                    <span className="text-gold/60 font-medium text-[12px] capitalize flex items-center gap-1.5 flex-wrap">
                       {new Date(tx.date).toLocaleDateString()}
-                      {tx.status === 'pending' && <Clock className="w-3 h-3 text-yellow-500" />}
-                      {tx.status === 'approved' && <CheckCircle className="w-3 h-3 text-[#59A846]" />}
-                      {tx.status === 'rejected' && <XCircle className="w-3 h-3 text-[#B03142]" />}
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
+                        tx.status === 'approved' ? 'bg-[#59A846]/10 text-[#59A846]' :
+                        'bg-[#B03142]/10 text-[#B03142]'
+                      }`}>
+                        {tx.status === 'pending' && <Clock className="w-3 h-3" />}
+                        {tx.status === 'approved' && <CheckCircle className="w-3 h-3" />}
+                        {tx.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                        {tx.status}
+                      </span>
+                      {tx.receiptUrl && (
+                        <a
+                          href={tx.receiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-gold/70 hover:text-gold underline text-[10px] font-bold"
+                        >
+                          <Receipt className="w-3 h-3" /> Receipt
+                        </a>
+                      )}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`font-bold text-[17px] ${tx.type === 'deposit' ? 'text-[#59A846]' : 'text-[#B03142]'}`}>
-                    {tx.type === 'deposit' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    {tx.type === 'deposit' ? '+' : '-'}{formatCents(tx.amount)}
                   </span>
                 </div>
               </div>
@@ -257,60 +280,75 @@ export default function Wallet() {
                 {modalType === 'deposit' ? 'Add Funds' : 'Withdraw'}
               </h2>
               <p className="text-gold/60 text-center text-xs mb-6">
-                {modalType === 'deposit' ? 'Top up your wallet balance' : 'Transfer funds to your account'}
+                {modalType === 'deposit'
+                  ? 'Transfer to one of the accounts below, then submit your receipt — deposits are reviewed by our team'
+                  : 'Withdrawal requests are reviewed and paid out by our team'}
               </p>
-              
+
               <form onSubmit={handleSubmit} className="space-y-4">
+                {formError && (
+                  <div className="bg-[#B03142]/10 border border-[#B03142]/40 text-[#e4899a] text-xs font-medium rounded-2xl p-3 text-center">
+                    {formError}
+                  </div>
+                )}
+
                 {modalType === 'withdrawal' && (
                   <div className="bg-white/5 border border-gold/10 rounded-2xl p-4 flex items-center justify-between">
                     <span className="text-gold/70 font-medium text-sm">Available Balance</span>
-                    <span className="text-gold font-bold text-lg">{formatCurrency(balance)}</span>
+                    <span className="text-gold font-bold text-lg">{formatCents(balanceUsdCents)}</span>
                   </div>
                 )}
-                
+
                 {modalType === 'deposit' && (
                   <div className="bg-white/5 p-4 rounded-2xl border border-gold/10">
                     <h3 className="text-gold font-bold mb-3 text-xs uppercase tracking-wider flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-gold/70" /> Payment Methods
                     </h3>
-                    <div className="space-y-2">
-                      {paymentMethods.map(m => (
-                        <div 
-                          key={m.id} 
-                          onClick={() => {
-                            navigator.clipboard.writeText(m.details).catch(() => {});
-                            setAccountNumber(m.details);
-                          }}
-                          className="flex justify-between items-center bg-black/20 hover:bg-black/40 p-3 rounded-xl border border-white/5 cursor-pointer transition-colors group"
-                          title="Click to copy & fill account number"
-                        >
-                          <span className="text-gold/90 font-medium text-sm">{m.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-gold/80 font-mono bg-black/40 group-hover:bg-black/60 px-2 py-1 rounded-md text-xs transition-colors select-all">{m.details}</span>
-                            <Copy className="w-3.5 h-3.5 text-gold/40 group-hover:text-gold/80 transition-colors" />
+                    {paymentMethods.length === 0 ? (
+                      <p className="text-gold/50 text-xs text-center py-2">
+                        No payment methods are configured yet — please contact support before depositing.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {paymentMethods.map(m => (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              navigator.clipboard.writeText(m.details).catch(() => {});
+                              setSelectedMethod(m.name);
+                              setAccountNumber(m.details);
+                            }}
+                            className={`flex justify-between items-center p-3 rounded-xl border cursor-pointer transition-colors group ${selectedMethod === m.name ? 'bg-black/40 border-gold/40' : 'bg-black/20 hover:bg-black/40 border-white/5'}`}
+                            title="Click to select this method (copies the account number)"
+                          >
+                            <span className="text-gold/90 font-medium text-sm flex items-center gap-1.5">
+                              {selectedMethod === m.name && <CheckCircle className="w-3.5 h-3.5 text-gold" />}
+                              {m.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gold/80 font-mono bg-black/40 group-hover:bg-black/60 px-2 py-1 rounded-md text-xs transition-colors select-all">{m.details}</span>
+                              <Copy className="w-3.5 h-3.5 text-gold/40 group-hover:text-gold/80 transition-colors" />
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-gold/60 text-[10px] font-bold mb-1.5 uppercase tracking-wider">Account / Wallet Number</label>
-                    <div className="flex gap-2 relative">
-                      <input 
-                        type="text" 
+                  {modalType === 'withdrawal' && (
+                    <div>
+                      <label className="block text-gold/60 text-[10px] font-bold mb-1.5 uppercase tracking-wider">Account / Wallet Number</label>
+                      <input
+                        type="text"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
-                        className="flex-1 bg-black/20 border border-gold/10 rounded-2xl px-4 py-3.5 text-gold text-sm placeholder-gold/30 focus:outline-none focus:border-gold/40 transition-colors shadow-inner"
-                        placeholder="Enter or scan number"
+                        className="w-full bg-black/20 border border-gold/10 rounded-2xl px-4 py-3.5 text-gold text-sm placeholder-gold/30 focus:outline-none focus:border-gold/40 transition-colors shadow-inner"
+                        placeholder="Where should we send the funds?"
                       />
-                      <button type="button" onClick={handleScan} className="bg-white/5 px-4 rounded-2xl flex items-center justify-center text-gold hover:bg-white/10 transition-colors shadow-sm border border-gold/10">
-                        <Camera className="w-5 h-5" />
-                      </button>
                     </div>
-                  </div>
+                  )}
 
                   <div>
                     <label className="block text-gold/60 text-[10px] font-bold mb-1.5 uppercase tracking-wider">{currency === 'IQD' ? 'Amount (IQD)' : 'Amount (USD)'}</label>
@@ -318,14 +356,12 @@ export default function Wallet() {
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         {currency === 'IQD' ? <span className="text-gold/50 font-bold text-sm ml-1">ع.د</span> : <DollarSign className="w-4 h-4 text-gold/50" />}
                       </div>
-                      <input 
+                      <input
                         type="text"
                         value={amount}
                         onChange={handleAmountChange}
                         className="w-full bg-black/20 border border-gold/10 rounded-2xl pl-10 pr-4 py-3.5 text-gold font-bold text-lg placeholder-gold/30 focus:outline-none focus:border-gold/40 transition-colors shadow-inner"
                         placeholder="0.00"
-                        min="0"
-                        step="0.01"
                         required
                       />
                     </div>
@@ -334,20 +370,26 @@ export default function Wallet() {
                   {modalType === 'deposit' && (
                   <div>
                     <label className="block text-gold/60 text-[10px] font-bold mb-1.5 uppercase tracking-wider">Receipt / Screenshot <span className="text-[#B03142]">*</span></label>
-                    <div className="relative border-2 border-dashed border-gold/20 rounded-2xl p-5 text-center hover:border-gold/40 hover:bg-white/5 transition-all cursor-pointer group bg-black/10">
-                      <input 
-                        type="file" 
+                    <div className={`relative border-2 border-dashed rounded-2xl p-5 text-center transition-all group bg-black/10 ${isUploading ? 'border-gold/40 cursor-wait' : 'border-gold/20 hover:border-gold/40 hover:bg-white/5 cursor-pointer'}`}>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
                         accept="image/*"
                         onChange={handleFileUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        required={modalType === 'deposit'}
+                        disabled={isUploading}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-wait"
                       />
-                      {receiptUrl ? (
+                      {isUploading ? (
+                        <div className="flex flex-col items-center justify-center gap-2 text-gold/70">
+                          <div className="w-8 h-8 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
+                          <span className="text-xs font-bold text-gold">Uploading…</span>
+                        </div>
+                      ) : receiptKey ? (
                         <div className="flex flex-col items-center justify-center gap-2 text-[#59A846]">
                           <div className="w-10 h-10 bg-[#59A846]/10 rounded-full flex items-center justify-center">
                             <CheckCircle className="w-5 h-5 text-[#59A846]" />
                           </div>
-                          <span className="text-xs font-bold text-gold">Receipt Attached</span>
+                          <span className="text-xs font-bold text-gold">Receipt uploaded — tap to replace</span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-1.5 text-gold/40 group-hover:text-gold/70 transition-colors">
@@ -363,7 +405,7 @@ export default function Wallet() {
 
                   <div>
                     <label className="block text-gold/60 text-[10px] font-bold mb-1.5 uppercase tracking-wider">Note (Optional)</label>
-                    <textarea 
+                    <textarea
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
                       className="w-full bg-black/20 border border-gold/10 rounded-2xl px-4 py-3.5 text-gold text-sm placeholder-gold/30 focus:outline-none focus:border-gold/40 transition-colors h-20 resize-none shadow-inner"
@@ -376,7 +418,7 @@ export default function Wallet() {
                   <button type="button" onClick={() => setModalType(null)} className="flex-1 px-4 py-3.5 rounded-xl font-bold text-gold/60 hover:text-gold hover:bg-white/5 transition-colors border border-gold/10">
                     Cancel
                   </button>
-                  <button type="submit" disabled={isSubmitting} className={`flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-[#0A1F18] font-black text-sm py-3.5 rounded-xl transition-all transform active:scale-[0.98] ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-[0_0_20px_rgba(186,163,105,0.3)]'}`}>
+                  <button type="submit" disabled={isSubmitting || isUploading} className={`flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-[#0A1F18] font-black text-sm py-3.5 rounded-xl transition-all transform active:scale-[0.98] ${(isSubmitting || isUploading) ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-[0_0_20px_rgba(186,163,105,0.3)]'}`}>
                     {isSubmitting ? (
                       <span className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 border-2 border-[#0A1F18]/30 border-t-[#0A1F18] rounded-full animate-spin" />
@@ -388,20 +430,6 @@ export default function Wallet() {
               </form>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Scan Modal */}
-      {modalType === 'scan' && (
-        <div className="fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center p-4">
-          <div className="w-64 h-64 border-2 border-gold/50 relative mb-8">
-            <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-gold -ml-1 -mt-1"></div>
-            <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-gold -mr-1 -mt-1"></div>
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-gold -ml-1 -mb-1"></div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-gold -mr-1 -mb-1"></div>
-            <div className="w-full h-1 bg-gold absolute top-1/2 -translate-y-1/2 animate-pulse shadow-[0_0_10px_#BAA369]"></div>
-          </div>
-          <p className="text-gold font-bold text-lg animate-pulse">Scanning...</p>
         </div>
       )}
     </div>

@@ -5,9 +5,24 @@ import CircularGallery from "../components/CircularGallery";
 import { motion, AnimatePresence } from 'motion/react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
+import { api } from '../lib/api';
 import ScrollReveal from '../components/ScrollReveal';
 import GooeyNav from '../components/GooeyNav';
 import PixelCard from '../components/PixelCard';
+
+/** Display-only membership number derived deterministically from the user id — cosmetic, never stored. */
+function generateConsistentNumber(seed: string): string {
+  if (!seed) return '---- ---- ---- ----';
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const num = Math.abs(hash).toString().padStart(12, '0');
+  return `4521 ${num.substring(0, 4)} ${num.substring(4, 8)} ${num.substring(8, 12)}`;
+}
+
+type ServerPlanOption = { id: string; cost_iqd: number; days: number };
+type ServerPlans = { plus: ServerPlanOption[]; pro: ServerPlanOption[] };
 
 
 const generatePlanImage = (plan: any, activeTab: string) => {
@@ -103,23 +118,28 @@ export default function Subscription() {
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'plus' | 'pro'>('pro');
   const [selectedDuration, setSelectedDuration] = useState<string>('6mo');
-  const { balance, chargeWallet, currency, exchangeRate } = useWallet();
-  const { user, updateUserSubscription } = useAuth();
+  const { currency, exchangeRate, refreshWallet } = useWallet();
+  const { user, refreshUser } = useAuth();
   const [purchaseMsg, setPurchaseMsg] = useState('');
-  const containerRef = React.useRef<HTMLDivElement>(null);
-    
+  const [serverPlans, setServerPlans] = useState<ServerPlans | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
-  const dbPlan = user?.subscription_plan;
-  const dbExpiry = user?.subscription_expiry;
-  const dbCard = user?.card_number;
+  React.useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ plans: ServerPlans }>('/api/subscription/plans')
+      .then((data) => { if (!cancelled) setServerPlans(data.plans); })
+      .catch(() => { /* keep the local display table; the server still prices the charge */ });
+    return () => { cancelled = true; };
+  }, []);
 
-  const currentPlan = dbPlan && dbPlan !== 'free' ? dbPlan : (localStorage.getItem('levo_subscription') || 'free');
-  const subExpirationStr = localStorage.getItem('levo_sub_expiration');
-  const subExpiration = dbExpiry || (subExpirationStr ? parseInt(subExpirationStr, 10) : 0);
-  const subCostStr = localStorage.getItem('levo_sub_cost');
-  const subCost = subCostStr ? parseInt(subCostStr, 10) : 0;
-  const subDurationStr = localStorage.getItem('levo_sub_duration_days');
-  const subDurationDays = subDurationStr ? parseInt(subDurationStr, 10) : 0;
+  const now = Date.now();
+  const planIsActive =
+    !!user &&
+    user.subscription_plan !== 'free' &&
+    (user.subscription_expiry === 0 || user.subscription_expiry > now);
+  const currentPlan = planIsActive ? user!.subscription_plan : 'free';
+  const subExpiration = user?.subscription_expiry || 0;
 
 
   const formatPrice = (amountIQD: number) => {
@@ -144,15 +164,22 @@ export default function Subscription() {
     ]
   };
 
-  const activePlans = plans[activeTab].map(p => ({
-    ...p,
-    pricePerUnit: `${formatPrice(p.pricePerUnitIQD)}/mo`,
-    total: formatPrice(p.cost)
-  }));
+  // Overlay the server-authoritative catalog when it has loaded; the local
+  // table mirrors it and only drives the visuals — the charge is server-side.
+  const activePlans = plans[activeTab].map(p => {
+    const sp = serverPlans?.[activeTab]?.find(s => s.id === p.id);
+    const cost = sp ? sp.cost_iqd : p.cost;
+    const days = sp ? sp.days : p.days;
+    const perMonthIqd = sp && sp.cost_iqd !== p.cost ? Math.round((cost / days) * 30) : p.pricePerUnitIQD;
+    return {
+      ...p,
+      cost,
+      days,
+      pricePerUnit: `${formatPrice(perMonthIqd)}/mo`,
+      total: formatPrice(cost)
+    };
+  });
 
-  
-
-  
   const galleryItems = React.useMemo(() => {
     return activePlans.map((plan) => {
       return {
@@ -161,103 +188,38 @@ export default function Subscription() {
       };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, serverPlans, currency]);
   
   const handleSubscribe = async () => {
-    const selectedPlan = activePlans.find(p => p.id === selectedDuration);
-    if (!selectedPlan) return;
-
-    const now = Date.now();
-    let finalCostIQD = selectedPlan.cost;
-    let refundMsg = '';
-
-    // If active plan is same as requested, can only renew if expired
-    if (currentPlan === activeTab) {
-      if (subExpiration > now) {
-        setPurchaseMsg(`You already have ${activeTab.toUpperCase()}. You can re-subscribe when it expires.`);
-        setTimeout(() => setPurchaseMsg(''), 3000);
-        return;
-      }
-    }
-
-    // Prevent downgrade
-    if (currentPlan === 'pro' && activeTab === 'plus' && subExpiration > now) {
-      setPurchaseMsg('You are already on the PRO plan. You can switch to PLUS when your current plan expires.');
-      setTimeout(() => setPurchaseMsg(''), 3000);
+    if (isSubscribing) return;
+    if (!user) {
+      setPurchaseMsg('Please sign in to subscribe.');
+      setTimeout(() => setPurchaseMsg(''), 4000);
       return;
     }
-
-    // Upgrading from Plus to Pro
-    if (currentPlan === 'plus' && activeTab === 'pro' && subExpiration > now) {
-      const remainingMs = subExpiration - now;
-      const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 3600 * 24)));
-      const costPerDay = subDurationDays > 0 ? subCost / subDurationDays : 0;
-      const unusedValue = Math.floor(remainingDays * costPerDay);
-      // Wait, user asked to deduct 50% for 15 day usage?
-      // "deduct 50% for 15 day usage of 20,000 subscription" -> meaning unused days are credited.
-      // E.g., 20000 / 30 = 666 per day. 15 days unused = 10000. 
-      // Pro is 50000. 50000 - 10000 = 40000.
-      finalCostIQD = Math.max(0, selectedPlan.cost - unusedValue);
-      refundMsg = ` (deducted ${unusedValue.toLocaleString()} IQD for remaining Plus days)`;
+    setIsSubscribing(true);
+    try {
+      // The server validates the plan, applies any upgrade credit, and
+      // charges the wallet — the client only reports the result.
+      const res = await api.post<{ plan: string; expiry: number; charged_iqd: number }>(
+        '/api/subscription/subscribe',
+        { plan: activeTab, durationId: selectedDuration }
+      );
+      await Promise.all([refreshUser(), refreshWallet()]);
+      setPurchaseMsg(`Successfully subscribed to ${activeTab.toUpperCase()} for ${formatPrice(res.charged_iqd)}!`);
+      setTimeout(() => setPurchaseMsg(''), 5000);
+    } catch (err: any) {
+      setPurchaseMsg(err?.message || 'Subscription failed — please try again');
+      setTimeout(() => setPurchaseMsg(''), 5000);
+    } finally {
+      setIsSubscribing(false);
     }
-
-    const finalCostUSD = finalCostIQD / exchangeRate;
-
-
-    // Process purchase
-    await chargeWallet(finalCostUSD, `Subscribe to ${activeTab.toUpperCase()} ${selectedDuration}`);
-    
-    const expiry = now + selectedPlan.days * 24 * 3600 * 1000;
-    
-    // Generate unique card number if not present
-    let newCardNumber = dbCard;
-    if (!newCardNumber) {
-      newCardNumber = generateConsistentNumber(user?.id || user?.username || Math.random().toString());
-    }
-
-    if (updateUserSubscription) {
-      await updateUserSubscription(activeTab, expiry, newCardNumber);
-    }
-    
-    // Save new plan
-    localStorage.setItem('levo_subscription', activeTab);
-    localStorage.setItem('levo_sub_expiration', (now + selectedPlan.days * 24 * 3600 * 1000).toString());
-    localStorage.setItem('levo_sub_cost', selectedPlan.cost.toString());
-    localStorage.setItem('levo_sub_duration_days', selectedPlan.days.toString());
-    if (activeTab === 'pro') {
-      localStorage.setItem('levo_is_pro', 'true');
-      localStorage.setItem('levo_daily_tickets', '5'); // 5 free daily tickets
-      localStorage.setItem('levo_merchant_expanded', 'true'); // Profile expansion
-      localStorage.setItem('levo_free_shipping_limit', '50000'); // Free shipping threshold
-    } else if (activeTab === 'plus') {
-      localStorage.removeItem('levo_is_pro');
-      localStorage.setItem('levo_daily_tickets', '1'); // 1 free daily ticket
-      localStorage.setItem('levo_merchant_expanded', 'false');
-      localStorage.setItem('levo_free_shipping_limit', '150000');
-    }
-
-    setPurchaseMsg(`Successfully subscribed to ${activeTab.toUpperCase()} for ${formatPrice(finalCostIQD)}${refundMsg}!`);
-    setTimeout(() => {
-      setPurchaseMsg('');
-      window.location.reload();
-    }, 2000);
   };
-  
-  // Card masked details
 
-  const generateConsistentNumber = (seed) => {
-    if (!seed) return '4521 8932 1092 1234';
-    let hash = 0;
-    const str = seed.toString();
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const num = Math.abs(hash).toString().padStart(12, '0');
-    return `4521 ${num.substring(0,4)} ${num.substring(4,8)} ${num.substring(8,12)}`;
-  };
-  
-  const fullNumber = dbCard || '---- ---- ---- ----';
-  const maskedNumber = dbCard ? `**** **** **** ${dbCard.slice(-4)}` : '---- ---- ---- ----';
+  // Cosmetic membership number derived from the user id (never stored).
+  const cardNumber = user ? generateConsistentNumber(user.id) : '---- ---- ---- ----';
+  const fullNumber = cardNumber;
+  const maskedNumber = user ? `**** **** **** ${cardNumber.slice(-4)}` : '---- ---- ---- ----';
 
 
   return (
@@ -450,13 +412,14 @@ export default function Subscription() {
             </motion.div>
           )}
         </AnimatePresence>
-        <motion.button 
+        <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleSubscribe}
-          className="w-full h-14 rounded-2xl bg-white text-black font-black text-[17px] hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)] tracking-wide mb-6"
+          disabled={isSubscribing}
+          className="w-full h-14 rounded-2xl bg-white text-black font-black text-[17px] hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)] tracking-wide mb-6 disabled:opacity-60 disabled:cursor-wait"
         >
-          {t('subscribeNow')}
+          {isSubscribing ? '…' : t('subscribeNow')}
         </motion.button>
 
         <div className="relative rounded-[24px] overflow-hidden bg-zinc-900/40 backdrop-blur-xl border border-white/10 shadow-2xl group">

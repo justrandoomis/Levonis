@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
+import { api, ApiError } from '../lib/api';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -12,7 +13,9 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const resetToken = searchParams.get('reset') || '';
+  const { login, loginWithGoogle, register } = useAuth();
   const { t } = useLanguage();
   const [error, setError] = useState<string>('');
   const [username, setUsername] = useState('');
@@ -22,45 +25,88 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetSuccessNote, setResetSuccessNote] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
     setIsLoading(true);
     setError('');
-    e.preventDefault();
-    setError('');
     try {
       if (isLogin) {
-        await login({ email, password });
-        navigate('/profile');
+        await login(email, password);
+        navigate('/');
       } else {
+        if (password.length < 8) { throw new Error('Password must be at least 8 characters'); }
         if (password !== confirmPassword) { throw new Error('Passwords do not match'); }
         await register(username, name, email, password);
-        navigate('/profile');
+        navigate('/');
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || 'Something went wrong');
     } finally {
       setIsLoading(false);
     }
   };
 
-const handleGoogleAuth = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        }).then(res => res.json());
-        
-        await login({ email: userInfo.email, name: userInfo.name });
-        navigate('/profile');
-      } catch (err: any) {
-        setError('Google login failed: ' + (err.message || 'Unknown error'));
-      } finally { setIsLoading(false); }
-    },
-    onError: (err: any) => { setError('Google Login Failed: ' + (err?.message || 'Unknown error')); setIsLoading(false); }
-  });
+  const handleGoogleCredential = async (credential: string | undefined) => {
+    setError('');
+    if (!credential) {
+      setError('Google sign-in did not return a credential. Please try again.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await loginWithGoogle(credential);
+      navigate('/');
+    } catch (err: any) {
+      if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {
+        setError("Google sign-in isn't configured yet");
+      } else {
+        setError(err?.message || 'Google sign-in failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (isLoading) return;
+    setError('');
+    setForgotMessage('');
+    if (!email) { setError('Email is required'); return; }
+    setIsLoading(true);
+    try {
+      const data = await api.post<{ message?: string }>('/api/auth/forgot-password', { email });
+      setForgotMessage(data.message || 'If an account exists for that email, a reset link has been sent.');
+    } catch (err: any) {
+      // 503 EMAIL_NOT_CONFIGURED carries an honest server message — show it as-is.
+      setError(err?.message || 'Failed to send reset link');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+    setError('');
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+    setIsLoading(true);
+    try {
+      await api.post('/api/auth/reset-password', { token: resetToken, password });
+      setPassword('');
+      setConfirmPassword('');
+      setResetSuccessNote('Your password has been reset. Please sign in with your new password.');
+      setIsLogin(true);
+      setSearchParams({}, { replace: true });
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reset password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="w-full min-h-screen bg-[#A1B58B] font-sans flex flex-col relative overflow-hidden">
@@ -87,12 +133,12 @@ const handleGoogleAuth = useGoogleLogin({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col relative z-10">
-        
+
         {/* Top Header / Logo Area */}
         <div className="h-[32vh] flex flex-col items-center justify-center relative">
-          {!isLogin && (
-            <button 
-              onClick={() => setIsLogin(true)} 
+          {!isLogin && !resetToken && (
+            <button
+              onClick={() => setIsLogin(true)}
               className="absolute left-6 top-10 text-gold p-2 z-20"
             >
               <ArrowLeft className="w-6 h-6" />
@@ -100,8 +146,8 @@ const handleGoogleAuth = useGoogleLogin({
           )}
 
           <AnimatePresence mode="wait">
-            {isLogin ? (
-              <motion.div 
+            {isLogin || resetToken ? (
+              <motion.div
                 key="logo"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -112,7 +158,7 @@ const handleGoogleAuth = useGoogleLogin({
                 <div className="w-9 h-9 bg-[#111111] rounded-tl-[1.2rem] rounded-br-[1.2rem] rounded-tr-sm rounded-bl-sm transform rotate-45"></div>
               </motion.div>
             ) : (
-              <motion.h2 
+              <motion.h2
                 key="signup-title"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -124,13 +170,13 @@ const handleGoogleAuth = useGoogleLogin({
         </div>
 
         {/* White Curved Container */}
-        <motion.div 
+        <motion.div
           layout
           className="bg-[#A1B58B] flex-1 rounded-tl-[70px] px-8 pt-10 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col relative overflow-hidden"
         >
           <AnimatePresence mode="wait">
-            {isLogin && (
-              <motion.h2 
+            {isLogin && !resetToken && (
+              <motion.h2
                 key="login-title"
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -140,67 +186,80 @@ const handleGoogleAuth = useGoogleLogin({
             )}
           </AnimatePresence>
 
-                    <form className="flex-1 flex flex-col" onSubmit={handleSubmit}>
+          {resetToken ? (
+            <form className="flex-1 flex flex-col" onSubmit={handleResetPassword}>
+              <h3 className="text-xl font-medium mb-2 text-black">Choose a New Password</h3>
+              <p className="text-sm text-gray-600 mb-6">Enter a new password for your account. The reset link can only be used once.</p>
+
+              {error && <div className="mb-4 text-red-600 text-xs font-medium text-center">{error}</div>}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('password')}</label>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" minLength={8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('confirmPassword')}</label>
+                  <div className="relative">
+                    <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" minLength={8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <button type="submit" disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
+                  {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : 'Set New Password'}
+                </button>
+              </div>
+              <button type="button" onClick={() => { setSearchParams({}, { replace: true }); setError(''); }} className="flex items-center justify-center text-sm font-medium text-gray-600 mt-6 hover:text-black">
+                <ArrowLeft className="w-4 h-4 mr-1" /> Back to login
+              </button>
+            </form>
+          ) : (
+          <form className="flex-1 flex flex-col" onSubmit={handleSubmit}>
 
             {isForgotPassword ? (
               <div className="flex-1 flex flex-col">
-                <button type="button" onClick={() => setIsForgotPassword(false)} className="flex items-center text-sm font-medium text-gray-500 mb-6 hover:text-black">
+                <button type="button" onClick={() => { setIsForgotPassword(false); setError(''); setForgotMessage(''); }} className="flex items-center text-sm font-medium text-gray-500 mb-6 hover:text-black">
                   <ArrowLeft className="w-4 h-4 mr-1" /> Back to login
                 </button>
                 <h3 className="text-xl font-medium mb-2 text-black">Reset Password</h3>
                 <p className="text-sm text-gray-500 mb-6">Enter your email address and we'll send you a link to reset your password.</p>
-                
-                {error && <div className="mb-4 text-red-500 text-xs font-medium text-center">{error}</div>}
-                {forgotMessage && <div className="mb-4 text-green-600 text-xs font-medium text-center">{forgotMessage}</div>}
-                
+
+                {error && <div className="mb-4 text-red-600 text-xs font-medium text-center">{error}</div>}
+                {forgotMessage && <div className="mb-4 text-green-700 text-xs font-medium text-center">{forgotMessage}</div>}
+
                 <div className="space-y-4">
                   <div>
                     <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('email')}</label>
                     <input type="email" placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm" required />
                   </div>
                 </div>
-                
+
                 <div className="mt-8">
-                  <button type="button" onClick={async () => {
-                    if (isLoading) return;
-                    setIsLoading(true);
-                    setError('');
-                    setForgotMessage('');
-                    if (!email) { setError('Email is required'); return; }
-                    try {
-                      const res = await fetch('/api/auth/forgot-password', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email })
-                      });
-                      const text = await res.text();
-                      let data;
-                      try {
-                        data = JSON.parse(text);
-                      } catch (e) {
-                        throw new Error(`Server error: ${text.substring(0, 100)}`);
-                      }
-                      if (!res.ok) {
-                        throw new Error(data.error || data.message || `Server error ${res.status}`);
-                      }
-                      if (data.success) {
-                        setForgotMessage('Password reset link sent to your email.');
-                      } else {
-                        setError(data.error || 'Failed to send reset link');
-                      }
-                    } catch (err: any) {
-                      setError(err.message || 'Failed to send reset link');
-                    } finally { setIsLoading(false); }
-                  }} disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors">
-                    Send Reset Link
+                  <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
+                    {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : 'Send Reset Link'}
                   </button>
                 </div>
               </div>
             ) : (
 <>
             <AnimatePresence>
+              {resetSuccessNote && !error && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 text-green-700 text-xs font-medium text-center">
+                  {resetSuccessNote}
+                </motion.div>
+              )}
               {error && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 text-red-500 text-xs font-medium text-center">
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 text-red-600 text-xs font-medium text-center">
                   {error}
                 </motion.div>
               )}
@@ -230,11 +289,11 @@ const handleGoogleAuth = useGoogleLogin({
                   <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{isLogin ? (t('emailOrUsername') || 'Email or Username') : t('email')}</label>
                   <input type={isLogin ? "text" : "email"} placeholder={isLogin ? "email@example.com or username" : "email@example.com"} value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm" required />
                 </motion.div>
-                
+
                 <motion.div layout>
                   <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('password')}</label>
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
+                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" minLength={isLogin ? undefined : 8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
@@ -242,9 +301,9 @@ const handleGoogleAuth = useGoogleLogin({
                 </motion.div>
                 {isLogin && (
                   <div className="flex justify-end">
-                    <button 
+                    <button
                       type="button"
-                      onClick={() => { setIsForgotPassword(true); setError(''); setForgotMessage(''); }}
+                      onClick={() => { setIsForgotPassword(true); setError(''); setForgotMessage(''); setResetSuccessNote(''); }}
                       className="text-[11px] text-gray-500 hover:text-black font-medium"
                     >
                       Forgot Password?
@@ -261,7 +320,7 @@ const handleGoogleAuth = useGoogleLogin({
                   >
                     <label className="text-[11px] font-medium text-gray-500 mb-1.5 block ml-1">{t('confirmPassword')}</label>
                     <div className="relative">
-                      <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
+                      <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" minLength={8} className="w-full bg-[#F8F9FA] border border-gray-100 rounded-[14px] px-5 py-3.5 text-black placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-colors text-sm pr-12" required />
                       <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
                         {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
@@ -283,22 +342,20 @@ const handleGoogleAuth = useGoogleLogin({
                 <div className="relative bg-[#A1B58B] px-4 text-[11px] text-gray-400">{t('orContinueWith')}</div>
               </div>
 
-              <button type="button" onClick={handleGoogleAuth} className="w-full bg-white border border-gray-200 text-black py-3.5 rounded-[14px] font-medium text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M22.56 12.25C22.56 11.47 22.49 10.72 22.36 10H12V14.26H17.92C17.67 15.63 16.89 16.81 15.72 17.59V20.34H19.28C21.36 18.42 22.56 15.6 22.56 12.25Z" fill="#4285F4"/>
-                  <path d="M12 23C14.97 23 17.46 22.02 19.28 20.34L15.72 17.59C14.73 18.25 13.48 18.66 12 18.66C9.14 18.66 6.71 16.73 5.84 14.15H2.18V16.99C4.01 20.61 7.7 23 12 23Z" fill="#34A853"/>
-                  <path d="M5.84 14.15C5.62 13.49 5.49 12.77 5.49 12C5.49 11.23 5.62 10.51 5.84 9.85V7.01H2.18C1.43 8.5 1 10.19 1 12C1 13.81 1.43 15.5 2.18 16.99L5.84 14.15Z" fill="#FBBC05"/>
-                  <path d="M12 5.34C13.62 5.34 15.07 5.9 16.21 6.99L19.36 3.84C17.46 2.07 14.97 1 12 1C7.7 1 4.01 3.39 2.18 7.01L5.84 9.85C6.71 7.27 9.14 5.34 12 5.34Z" fill="#EA4335"/>
-                </svg>
-                Google
-              </button>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
+                  onError={() => setError('Google sign-in failed. Please try again.')}
+                  width="300"
+                />
+              </div>
             </motion.div>
 
             <motion.p layout className="text-center mt-auto pt-8 text-[12px] text-gray-500">
               {isLogin ? t('dontHaveAccount') : t('alreadyHaveAccount')}
-              <button 
-                type="button" 
-                onClick={() => setIsLogin(!isLogin)} 
+              <button
+                type="button"
+                onClick={() => { setIsLogin(!isLogin); setError(''); setResetSuccessNote(''); }}
                 className="text-black font-medium hover:underline"
               >
                 {isLogin ? t('signUp') : t('signIn')}
@@ -307,6 +364,7 @@ const handleGoogleAuth = useGoogleLogin({
             </>
             )}
           </form>
+          )}
         </motion.div>
       </div>
     </div>
