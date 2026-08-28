@@ -131,6 +131,27 @@ Data ownership below: "owner" = the signed-in account (server-enforced),
 | Dashboard layout | notifications | fake badge "3", fake list | honest empty dropdown | ⚙️ |
 | Merchant dashboard | store setup/products | 100% mock; uncontrolled inputs; fake "$240,117" | real my-store API; controlled forms; honest empty analytics | ⚙️ |
 
+## Products platform & memberships (v2 phase)
+
+| Feature | Where | Status |
+| --- | --- | --- |
+| Canonical product model (13 editor groups, per-option/per-color price overrides, null=inherit / 0=explicit) | `worker/lib/productModel.ts`, `/api/admin/products-v2` | ✅ (API suite + unit tests) |
+| Central price resolver (regular/PRO/compare-at/cost; PRO clamped ≤ regular; transport commission; warranty fees ADDED never waived) | `worker/lib/pricing.ts` | ✅ (14 unit tests + checkout assertions) |
+| PRO pricing policy: **no fabricated discounts** — products without an explicit PRO price show the regular price (`explicit_only`) | `proPricingPolicy` setting | ✅ (default; owner decision #7 can change it) |
+| Brands & catalogs taxonomy, unique scoped ordering, atomic reorder | `/api/admin/brands`, `/api/admin/catalogs` | ✅ |
+| TXT template export → parse → apply round-trip; ZIP batches; `__NULL__`/`__CLEAR__`; imports always land as drafts | `worker/routes/template.ts`, docs/TEMPLATE_GUIDE.md | ✅ (round-trip asserted) |
+| URL extraction v2 — monetary data **excluded by design**, per-field source/status, admin-only, SSRF-guarded | `worker/routes/extract.ts` | ✅ (gates asserted) |
+| Runtime AI translation **removed** — glossary + template are the only translation paths; untranslated text stays Arabic with an honest "needs translation" state | product model `translation_meta` | ✅ (absence) |
+| i18n: Arabic default, English, Sorani Kurdish (ckb) | `src/translations.ts` | ⚙️ (page-by-page ckb review pending staging) |
+| PLUS plans (1/3/6/12 mo) — **unpriced, honestly unpurchasable** until the owner's price schedule arrives (decision #4) | `membership_plans` seed | 🔶 by design |
+| PRO 12-month membership, 499,000 IQD, wallet-paid, idempotent purchase | `/api/memberships/subscribe` | ✅ |
+| Pre-launch purchases become `prepaid_pending_launch`; owner-confirmed launch activation flips them atomically | `/api/memberships/admin/activate-launch` | ✅ (both states tested) |
+| PRO checkout entitlements: preorder commission waived, warranty fees kept, free delivery, tier snapshot frozen on the order | `worker/routes/orders.ts` | ✅ |
+| Referral programs (printer: reward eligible 7 days after delivery; new-PRO-subscriber), admin-reviewed payout | `worker/lib/membershipOps.ts` | ✅ (API) — payout manual by design (decision #11) |
+| Printer purchase gift (PLUS grant) | `printerGiftConfig` | 🔶 disabled until owner decision #5 |
+| Coupons + redemption in the checkout batch | `/api/orders` | ⚙️ (API-tested; no admin UI for creating coupons yet) |
+| Community selling gated to active PLUS/PRO | `worker/routes/community.ts` | ✅ |
+
 ## Cross-cutting fixes
 
 - i18n: language choice now persists; Kurdish included in translate targets.

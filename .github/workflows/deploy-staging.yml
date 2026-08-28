@@ -138,6 +138,19 @@ jobs:
           node scripts/api-tests.mjs | tee /tmp/tests.log
           tail -1 /tmp/tests.log
 
+      - name: Run products/memberships (v2) API test suite against staging
+        # ALLOW_LAUNCH_ACTIVATION is deliberately NOT set here: staging keeps
+        # its real launch configuration untouched for owner testing. When the
+        # launch is not yet activated, the suite activates ONLY its own test
+        # membership via direct SQL (PROMOTE_CMD) and skips the global
+        # activation-endpoint test.
+        id: tests_v2
+        run: |
+          API_BASE="${{ steps.deploy.outputs.url }}" \
+          PROMOTE_CMD='npx wrangler d1 execute levonis-db-staging --remote --command {SQL}' \
+          node scripts/api-tests-v2.mjs | tee /tmp/tests-v2.log
+          tail -1 /tmp/tests-v2.log
+
       - name: Demote test accounts (staging only)
         # The test suite promotes throwaway @test.local accounts to admin.
         # Clearing them leaves the staging DB with zero admins, so the
@@ -155,6 +168,10 @@ jobs:
             echo "- Test suite:"
             echo '```'
             tail -20 /tmp/tests.log 2>/dev/null || echo "tests did not run"
+            echo '```'
+            echo "- Products/memberships (v2) suite:"
+            echo '```'
+            tail -20 /tmp/tests-v2.log 2>/dev/null || echo "v2 tests did not run"
             echo '```'
             echo "Reminder: add the staging URL to the Google OAuth client's Authorized JavaScript origins to test Google sign-in manually."
           } >> "$GITHUB_STEP_SUMMARY"

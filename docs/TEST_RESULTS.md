@@ -1,3 +1,40 @@
+# Test results
+
+## Phase: products & memberships (v2) — 2026-08-28
+
+All checks below ran against `wrangler dev` (local D1/R2) on the current
+branch head; the same two API suites run automatically against staging in
+workflow `2 - Deploy Staging + Tests`.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Unit tests (pricing / shipping / phone) | `npm run test:unit` | **28 passed, 0 failed** |
+| TypeScript (frontend + worker strict) | `npm run check` | PASS (0 errors) |
+| Base API suite | `node scripts/api-tests.mjs` | **60 passed, 0 failed** (also re-run on a used database: 60/60) |
+| v2 API suite, fresh DB | `ALLOW_LAUNCH_ACTIVATION=1 node scripts/api-tests-v2.mjs` | **39 passed, 0 failed** (includes the global launch-activation endpoint + idempotent re-activation) |
+| v2 API suite, persistent DB (launch already active) | `node scripts/api-tests-v2.mjs` ×3 | **37 passed, 0 failed** each run — the 2 launch-endpoint tests skip by design; purchase-state assertions adapt to the live launch state |
+| v2 API suite, persistent DB (launch NOT active — staging simulation) | `node scripts/api-tests-v2.mjs` | **37 passed, 0 failed**; the suite activated only its own test membership via SQL and `launchConfig.activated` remained `false` afterwards (verified by direct query) |
+
+The v2 suite covers: brands/catalogs CRUD + scoped ordering, products-v2
+editor round-trip, the price resolver (null-inheritance, PRO clamp,
+transport commission, warranty fees), TXT template export→parse→apply
+round-trip, extraction-v2 admin/SSRF gates, membership plans (unpriced
+PLUS rejected with `PLAN_UNPRICED`), PRO purchase + idempotent replay,
+prepaid-pending-launch vs active states, referral code issuance, PRO
+checkout entitlements (commission waived, warranty fee kept, free
+delivery, tier snapshot on the order), and the community PLUS/PRO gate.
+
+Rate limiting is now keyed **per user id when authenticated** (IP only for
+anonymous endpoints) — Iraqi carrier NAT puts many customers behind one
+IP, and the old IP-only bucket also made repeated test runs interfere.
+Anonymous limits (login, register, forgot-password) still key by IP.
+
+Staging note: the workflow runs the v2 suite **without**
+`ALLOW_LAUNCH_ACTIVATION`, so the owner's staging launch configuration is
+never flipped by tests.
+
+---
+
 # Test results (Phase 1, local)
 
 Everything below ran locally against the emulated Cloudflare stack
@@ -28,6 +65,8 @@ Cloudflare resources were touched.** Live integration tests are Phase 3.
 
 58 automated checks against `wrangler dev` (migrations applied with
 `npm run db:migrate:local` first). **Result: 58 passed, 0 failed.**
+(The suite has since grown to 60 checks — current results are in the
+v2 phase section at the top of this file.)
 
 Covered, with the exact assertions in `scripts/api-tests.mjs`:
 

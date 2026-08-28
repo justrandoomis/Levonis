@@ -12,8 +12,12 @@ export async function rateLimit(
   limit: number,
   windowSeconds: number
 ): Promise<void> {
+  // Key by user id when authenticated: Iraqi carriers NAT many customers
+  // behind one IP, so an IP-only bucket would throttle unrelated users on
+  // logged-in endpoints. Anonymous endpoints still fall back to the IP.
+  const user = c.get('user');
   const ip = c.req.header('CF-Connecting-IP') || 'unknown';
-  const key = `${bucket}:${ip}`;
+  const key = user ? `${bucket}:u:${user.id}` : `${bucket}:${ip}`;
   const now = Math.floor(Date.now() / 1000);
   const windowStart = now - (now % windowSeconds);
 

@@ -43,7 +43,7 @@ async function tryAttributeReferral(env: Env, newUserId: string, code: string): 
 }
 
 authRoutes.post('/register', async (c) => {
-  await rateLimit(c, 'register', 10, 3600);
+  await rateLimit(c, 'register', 30, 3600);
   const body = await c.req.json().catch(() => ({}));
   const mail = email(body.email);
   const uname = body.username ? username(body.username) : null;
