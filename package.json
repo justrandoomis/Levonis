@@ -29,6 +29,8 @@
     "@cloudflare/workers-types": "^5.20260826.1",
     "@tailwindcss/vite": "^4.1.14",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^5.0.4",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",

@@ -1,50 +1,159 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
-import { queryDb } from '../lib/db';
-import { 
-  ArrowLeft, ArrowRight, Search, Gift, Box, Calculator, 
-  MapPin, MessageSquare, Plus, ShoppingBag, Store, UserCircle, Star,
-  BadgeCheck, Settings, MessageCircle
+import { api, ApiError, formatIqd } from '../lib/api';
+import {
+  ArrowLeft, ArrowRight, Search, Gift, Box, Calculator,
+  MessageSquare, Plus, Store,
+  BadgeCheck, X
 } from 'lucide-react';
+
+interface CommunityProduct {
+  id: string;
+  slug: string;
+  merchant_id: string;
+  name: string;
+  name_ar: string;
+  description: string;
+  images: string[];
+  price_iqd: number;
+  original_price_iqd: number | null;
+  created_at: string;
+}
+
+interface CommunityMerchant {
+  id: string;
+  name: string;
+  bio: string;
+  avatarUrl: string | null;
+  verified: boolean;
+  created_at: string;
+}
+
+interface CommunityRequest {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  customer_username: string | null;
+  created_at: string;
+}
 
 export default function Community() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t, lang, dir } = useLanguage();
+  const { lang, dir } = useLanguage();
   const { user, isAuthenticated } = useAuth();
-  
+
   const queryParams = new URLSearchParams(location.search);
   const activeTab = queryParams.get('tab') || 'products';
 
-  const [products, setProducts] = useState<any[]>([]);
-  const [merchants, setMerchants] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
+  const [products, setProducts] = useState<CommunityProduct[]>([]);
+  const [merchants, setMerchants] = useState<CommunityMerchant[]>([]);
+  const [requests, setRequests] = useState<CommunityRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  // New-request modal state
+  const [showNewRequest, setShowNewRequest] = useState(false);
+  const [reqTitle, setReqTitle] = useState('');
+  const [reqDescription, setReqDescription] = useState('');
+  const [reqSubmitting, setReqSubmitting] = useState(false);
+  const [reqError, setReqError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function loadData() {
       setLoading(true);
+      setLoadError(null);
       try {
         if (activeTab === 'products') {
-          const p = await queryDb('SELECT * FROM community_products ORDER BY created_at DESC LIMIT 20');
-          setProducts(p || []);
+          const data = await api.get<{ products: CommunityProduct[] }>('/api/community/products');
+          if (!cancelled) setProducts(data.products || []);
         } else if (activeTab === 'merchants') {
-          const m = await queryDb('SELECT * FROM community_merchants ORDER BY created_at DESC LIMIT 20');
-          setMerchants(m || []);
+          const data = await api.get<{ merchants: CommunityMerchant[] }>('/api/community/merchants');
+          if (!cancelled) setMerchants(data.merchants || []);
         } else if (activeTab === 'requests') {
-          const r = await queryDb('SELECT * FROM community_requests ORDER BY created_at DESC LIMIT 20');
-          setRequests(r || []);
+          const data = await api.get<{ requests: CommunityRequest[] }>('/api/community/requests');
+          if (!cancelled) setRequests(data.requests || []);
         }
       } catch (err) {
         console.error(err);
+        if (!cancelled) {
+          setLoadError(
+            err instanceof ApiError && err.message
+              ? err.message
+              : dir === 'rtl' ? 'تعذر التحميل. حاول مرة أخرى.' : 'Failed to load. Please try again.'
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab]);
+
+  const openNewRequest = () => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
+    setReqError(null);
+    setShowNewRequest(true);
+  };
+
+  const submitNewRequest = async () => {
+    if (reqTitle.trim().length < 3 || reqSubmitting) return;
+    setReqSubmitting(true);
+    setReqError(null);
+    try {
+      await api.post('/api/community/requests', { title: reqTitle.trim(), description: reqDescription.trim() });
+      setShowNewRequest(false);
+      setReqTitle('');
+      setReqDescription('');
+      // Refresh the requests list if it is the visible tab, otherwise take the user there.
+      if (activeTab === 'requests') {
+        try {
+          const data = await api.get<{ requests: CommunityRequest[] }>('/api/community/requests');
+          setRequests(data.requests || []);
+        } catch {
+          /* list refresh is best-effort */
+        }
+      } else {
+        navigate('/community?tab=requests');
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        navigate('/auth');
+        return;
+      }
+      setReqError(
+        err instanceof ApiError && err.message
+          ? err.message
+          : dir === 'rtl' ? 'تعذر إرسال الطلب' : 'Failed to submit request'
+      );
+    } finally {
+      setReqSubmitting(false);
+    }
+  };
+
+  const q = search.trim().toLowerCase();
+  const filteredProducts = q
+    ? products.filter(p => (p.name || '').toLowerCase().includes(q) || (p.name_ar || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q))
+    : products;
+  const filteredMerchants = q
+    ? merchants.filter(m => (m.name || '').toLowerCase().includes(q) || (m.bio || '').toLowerCase().includes(q))
+    : merchants;
+  const filteredRequests = q
+    ? requests.filter(r => (r.title || '').toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q))
+    : requests;
+
+  const comingSoon = dir === 'rtl' ? 'قريباً' : 'Coming soon';
 
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen bg-black">
@@ -53,8 +162,10 @@ export default function Community() {
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
         <div className="flex-1 relative">
-          <input 
-            type="text" 
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={dir === 'rtl' ? "بحث في المجتمع..." : "Search community..."}
             className="w-full bg-zinc-900 border border-zinc-800 rounded-full py-2 px-4 ps-10 text-sm focus:outline-none focus:border-olive/50 text-white"
           />
@@ -63,7 +174,7 @@ export default function Community() {
       </div>
 
       <div className="p-4 flex flex-col gap-6">
-        
+
         {/* Shortcuts */}
         <div className="grid grid-cols-4 gap-2">
            <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/chats')}>
@@ -72,13 +183,13 @@ export default function Community() {
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الرسائل' : 'Messages'}</span>
            </div>
-           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/community/customer/requests')}>
+           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/community?tab=requests')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
                <Box className="w-5 h-5 text-zinc-400 group-hover:text-olive transition-colors" />
              </div>
-             <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'طلباتي' : 'Requests'}</span>
+             <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الطلبات' : 'Requests'}</span>
            </div>
-           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/community/new-request')}>
+           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={openNewRequest}>
              <div className="w-12 h-12 rounded-2xl bg-olive/10 border border-olive/30 flex items-center justify-center group-hover:bg-olive/20 transition-colors">
                <Plus className="w-5 h-5 text-olive" />
              </div>
@@ -86,55 +197,55 @@ export default function Community() {
            </div>
            <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/profile')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
-               <img referrerPolicy="no-referrer" src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || "Levonis"}&backgroundColor=fde047`} alt="Avatar" className="w-full h-full object-cover" />
+               <img referrerPolicy="no-referrer" src={user?.avatar_key ? `/files/${user.avatar_key}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || "Levonis"}&backgroundColor=fde047`} alt="Avatar" className="w-full h-full object-cover" />
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'ملفي' : 'Profile'}</span>
            </div>
         </div>
 
-        {/* Banners */}
+        {/* Banners (features not launched yet — shown honestly as coming soon) */}
         <div className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
-           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border border-purple-500/20 p-4 flex flex-col justify-center snap-start relative overflow-hidden" onClick={() => navigate('/merchant-giveaways')}>
+           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border border-purple-500/20 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
              <div className="absolute right-2 bottom-0 opacity-20">
                <Gift className="w-20 h-20" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'المساعدات والهدايا' : 'Giveaways'}</h3>
-             <p className="text-xs text-purple-200/70">{dir === 'rtl' ? 'اكتشف الهدايا من التجار' : 'Discover merchant gifts'}</p>
+             <p className="text-xs text-purple-200/70">{comingSoon}</p>
            </div>
-           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden" onClick={() => navigate('/community/auto-levo')}>
+           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
              <div className="absolute right-2 bottom-0 opacity-20">
                <Calculator className="w-20 h-20" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'احسب سعر طباعتك' : 'Calculate Print Price'}</h3>
-             <p className="text-xs text-zinc-400">{dir === 'rtl' ? 'من رابط مباشر' : 'From direct link'}</p>
+             <p className="text-xs text-zinc-400">{comingSoon}</p>
            </div>
-           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/20 to-black border border-olive/30 p-4 flex flex-col justify-center snap-start relative overflow-hidden" onClick={() => navigate('/community/stl-library')}>
+           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/20 to-black border border-olive/30 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
              <div className="absolute right-2 bottom-0 opacity-20">
                <Box className="w-20 h-20 text-olive" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'مكتبة ملفات الطباعة' : '3D Models Library'}</h3>
-             <p className="text-xs text-olive/70">{dir === 'rtl' ? 'حمل مجسماتك المفضلة' : 'Download your favorite models'}</p>
+             <p className="text-xs text-olive/70">{comingSoon}</p>
            </div>
         </div>
 
         {/* Explore Tabs */}
         <div className="border-b border-zinc-800 sticky top-[60px] z-30 bg-black/80 backdrop-blur-md">
           <div className="flex justify-between">
-            <button 
+            <button
               onClick={() => navigate('/community?tab=products')}
               className={`flex-1 py-3 text-sm font-medium text-center relative ${activeTab === 'products' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               {dir === 'rtl' ? 'المنتجات' : 'Products'}
               {activeTab === 'products' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-olive rounded-t-full"></div>}
             </button>
-            <button 
+            <button
               onClick={() => navigate('/community?tab=merchants')}
               className={`flex-1 py-3 text-sm font-medium text-center relative ${activeTab === 'merchants' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               {dir === 'rtl' ? 'التجار' : 'Merchants'}
               {activeTab === 'merchants' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-olive rounded-t-full"></div>}
             </button>
-            <button 
+            <button
               onClick={() => navigate('/community?tab=requests')}
               className={`flex-1 py-3 text-sm font-medium text-center relative ${activeTab === 'requests' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
@@ -150,90 +261,161 @@ export default function Community() {
             <div className="flex items-center justify-center py-12">
               <div className="w-6 h-6 border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
             </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-zinc-500 gap-3">
+              <p className="text-sm">{loadError}</p>
+            </div>
           ) : (
             <>
               {activeTab === 'products' && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {products.map(p => {
-                    const images = Array.isArray(p.images) ? p.images : (function(){ try { return JSON.parse(p.images || '[]'); } catch(e) { return [p.images].filter(Boolean); } })();
-                    const firstImage = images[0] || p.image_url || p.image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800';
-                    const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
-                    return (
-                      <Link to={`/product/${p.slug || p.id}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
-                        <div className="relative aspect-square overflow-hidden bg-black">
-                          <img referrerPolicy="no-referrer" src={firstImage || undefined} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        </div>
-                        <div className="p-3">
-                          <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
-                          <div className="text-white font-bold text-sm">{((p.base_price) || 0).toLocaleString()} د.ع</div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                filteredProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+                    <Box className="w-12 h-12 mb-3 opacity-40" />
+                    <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا توجد منتجات بعد' : 'No products yet')}</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {filteredProducts.map(p => {
+                      const firstImage = (p.images && p.images[0]) || null;
+                      const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
+                      return (
+                        <Link to={`/product/${p.slug}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
+                          <div className="relative aspect-square overflow-hidden bg-black">
+                            {firstImage ? (
+                              <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-zinc-700">
+                                <Box className="w-10 h-10" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-3">
+                            <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
+                            <div className="text-white font-bold text-sm">{formatIqd(p.price_iqd || 0)}</div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )
               )}
 
               {activeTab === 'merchants' && (
-                <div className="flex flex-col gap-3">
-                  {merchants.map((m, i) => (
-                    <div key={i} onClick={() => navigate(`/community/store/${m.id}`)} className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 flex flex-col gap-4 cursor-pointer hover:border-olive/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-white rounded-full overflow-hidden flex items-center justify-center border border-zinc-700 shrink-0">
-                            <img referrerPolicy="no-referrer" src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=random`} alt={m.name} className="w-full h-full object-cover" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <h3 className="text-white font-bold text-sm">{m.name}</h3>
-                              <BadgeCheck className="w-4 h-4 text-gold" />
+                filteredMerchants.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+                    <Store className="w-12 h-12 mb-3 opacity-40" />
+                    <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا يوجد تجار بعد' : 'No merchants yet')}</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {filteredMerchants.map((m) => (
+                      <div key={m.id} onClick={() => navigate(`/community/store/${m.id}`)} className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 flex flex-col gap-4 cursor-pointer hover:border-olive/50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-zinc-800 rounded-full overflow-hidden flex items-center justify-center border border-zinc-700 shrink-0">
+                              {m.avatarUrl ? (
+                                <img referrerPolicy="no-referrer" src={m.avatarUrl} alt={m.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Store className="w-5 h-5 text-zinc-500" />
+                              )}
                             </div>
-                            <div className="flex items-center gap-1 text-xs text-zinc-400 mt-0.5">
-                              <span className="text-white font-medium">{m.followers || 0}</span>
-                              <span>{dir === 'rtl' ? 'متابع' : 'Followers'}</span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-white font-bold text-sm">{m.name}</h3>
+                                {m.verified && <BadgeCheck className="w-4 h-4 text-gold" />}
+                              </div>
+                              {m.bio && <div className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{m.bio}</div>}
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => navigate(`/community/store/${m.id}`)} className="w-8 h-8 rounded-full border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                            <Store className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => navigate(`/chat/${m.id}`)} className="w-8 h-8 rounded-full border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-full border border-zinc-700 flex items-center justify-center text-zinc-400">
+                              <Store className="w-4 h-4" />
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      {m.products && m.products.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2 mt-1">
-                          {m.products.map((p: string, idx: number) => (
-                            <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/50">
-                              <img referrerPolicy="no-referrer" src={p || undefined} alt="" className="w-full h-full object-cover" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )
               )}
 
               {activeTab === 'requests' && (
-                <div className="flex flex-col gap-3">
-                  {requests.map((r, i) => (
-                    <div key={i} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
-                       <h3 className="text-white font-medium mb-2">{r.title}</h3>
-                       <div className="flex justify-between items-center text-xs text-zinc-500">
-                         <span>{dir === 'rtl' ? 'بانتظار العروض' : 'Waiting for offers'}</span>
-                         <button className="text-olive hover:text-olive/80">{dir === 'rtl' ? 'تقديم عرض' : 'Make Offer'}</button>
-                       </div>
-                    </div>
-                  ))}
-                </div>
+                filteredRequests.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+                    <Box className="w-12 h-12 mb-3 opacity-40" />
+                    <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا توجد طلبات بعد' : 'No requests yet')}</p>
+                    {!q && (
+                      <button onClick={openNewRequest} className="mt-4 text-olive text-sm font-medium hover:text-olive/80">
+                        {dir === 'rtl' ? 'أنشئ أول طلب' : 'Post the first request'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {filteredRequests.map((r) => (
+                      <div key={r.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+                         <h3 className="text-white font-medium mb-1">{r.title}</h3>
+                         {r.description && <p className="text-sm text-zinc-400 mb-2 line-clamp-3">{r.description}</p>}
+                         <div className="flex justify-between items-center text-xs text-zinc-500">
+                           <span>{dir === 'rtl' ? 'بانتظار العروض' : 'Waiting for offers'}</span>
+                           {r.customer_username && <span dir="ltr">@{r.customer_username}</span>}
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )
               )}
             </>
           )}
         </div>
 
       </div>
+
+      {/* New Request Modal */}
+      {showNewRequest && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => !reqSubmitting && setShowNewRequest(false)}>
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold">{dir === 'rtl' ? 'طلب جديد' : 'New Request'}</h3>
+              <button onClick={() => !reqSubmitting && setShowNewRequest(false)} className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">{dir === 'rtl' ? 'العنوان' : 'Title'}</label>
+                <input
+                  type="text"
+                  value={reqTitle}
+                  onChange={(e) => setReqTitle(e.target.value)}
+                  maxLength={150}
+                  placeholder={dir === 'rtl' ? 'ماذا تحتاج؟' : 'What do you need?'}
+                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-olive/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">{dir === 'rtl' ? 'الوصف (اختياري)' : 'Description (optional)'}</label>
+                <textarea
+                  value={reqDescription}
+                  onChange={(e) => setReqDescription(e.target.value)}
+                  maxLength={2000}
+                  rows={4}
+                  placeholder={dir === 'rtl' ? 'تفاصيل إضافية...' : 'More details...'}
+                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-olive/50 resize-none"
+                />
+              </div>
+              {reqError && <p className="text-xs text-red-400">{reqError}</p>}
+              <button
+                onClick={submitNewRequest}
+                disabled={reqTitle.trim().length < 3 || reqSubmitting}
+                className="w-full bg-olive text-black font-bold py-3 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+              >
+                {reqSubmitting ? (dir === 'rtl' ? 'جارٍ الإرسال...' : 'Submitting...') : (dir === 'rtl' ? 'إرسال الطلب' : 'Submit Request')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

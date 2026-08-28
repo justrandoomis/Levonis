@@ -142,7 +142,7 @@ function GradualBlur(props) {
 
       const direction = getGradientDirection(config.position);
 
-      const divStyle = {
+      const divStyle: React.CSSProperties = {
         position: 'absolute',
         inset: '0',
         maskImage: `linear-gradient(${direction}, ${gradient})`,
@@ -225,10 +225,11 @@ function GradualBlur(props) {
   );
 }
 
-const GradualBlurMemo = React.memo(GradualBlur);
-GradualBlurMemo.displayName = 'GradualBlur';
-GradualBlurMemo.PRESETS = PRESETS;
-GradualBlurMemo.CURVE_FUNCTIONS = CURVE_FUNCTIONS;
+const GradualBlurMemo = Object.assign(React.memo(GradualBlur), {
+  displayName: 'GradualBlur',
+  PRESETS,
+  CURVE_FUNCTIONS
+});
 export default GradualBlurMemo;
 
 const injectStyles = () => {
