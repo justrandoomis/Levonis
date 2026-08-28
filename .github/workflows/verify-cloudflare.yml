@@ -1,0 +1,138 @@
+# Read-only verification of Cloudflare access, resources and integrations.
+# Makes NO changes: no deploys, no migrations, no writes to any database or
+# bucket. Secret values are never printed (GitHub masks them in logs).
+name: 1 - Verify Cloudflare Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: API token works (wrangler whoami)
+        id: whoami
+        continue-on-error: true
+        run: |
+          npx wrangler whoami && echo "result=ok" >> "$GITHUB_OUTPUT" || echo "result=FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: D1 — list databases and match CLOUDFLARE_DATABASE_ID (read-only)
+        id: d1
+        continue-on-error: true
+        run: |
+          set -e
+          npx wrangler d1 list --json > /tmp/d1.json
+          echo "Databases in account: $(jq length /tmp/d1.json)"
+          NAME=$(jq -r --arg id "${{ secrets.CLOUDFLARE_DATABASE_ID }}" '.[] | select(.uuid==$id) | .name' /tmp/d1.json)
+          if [ -n "$NAME" ]; then
+            echo "CLOUDFLARE_DATABASE_ID matches database name: $NAME"
+            echo "prod_db_name=$NAME" >> "$GITHUB_OUTPUT"
+            echo "result=found ($NAME)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::CLOUDFLARE_DATABASE_ID does not match any D1 database in this account"
+            echo "result=NOT FOUND" >> "$GITHUB_OUTPUT"
+          fi
+          if jq -e '.[] | select(.name=="levonis-db-staging")' /tmp/d1.json > /dev/null; then
+            echo "staging=exists" >> "$GITHUB_OUTPUT"
+          else
+            echo "staging=missing (the staging workflow creates it)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: D1 — inspect production schema and row counts (read-only)
+        id: d1data
+        if: steps.d1.outputs.prod_db_name != ''
+        continue-on-error: true
+        run: |
+          set -e
+          DB="${{ steps.d1.outputs.prod_db_name }}"
+          npx wrangler d1 execute "$DB" --remote --json \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%' ORDER BY name" \
+            > /tmp/tables.json
+          TABLES=$(jq -r '.[0].results | map(.name) | join(", ")' /tmp/tables.json)
+          COUNT=$(jq -r '.[0].results | length' /tmp/tables.json)
+          echo "Tables ($COUNT): ${TABLES:-none}"
+          echo "tables=${TABLES:-none}" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" = "0" ]; then
+            echo "verdict=EMPTY — fresh migration 0001_init.sql is applicable" >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict=HAS TABLES — do NOT run fresh migrations; an upgrade plan + backup is required first" >> "$GITHUB_OUTPUT"
+            for T in users products orders wallet_transactions; do
+              if echo "$TABLES" | grep -qw "$T"; then
+                N=$(npx wrangler d1 execute "$DB" --remote --json --command "SELECT COUNT(*) AS n FROM $T" | jq -r '.[0].results[0].n')
+                echo "rows in $T: $N"
+              fi
+            done
+          fi
+
+      - name: R2 — list buckets (read-only)
+        id: r2
+        continue-on-error: true
+        run: |
+          set -e
+          npx wrangler r2 bucket list > /tmp/r2.txt 2>&1
+          cat /tmp/r2.txt
+          if grep -q "^name: *${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}$" /tmp/r2.txt || grep -qw "${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}" /tmp/r2.txt; then
+            echo "result=production bucket found" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::CLOUDFLARE_R2_BUCKET_NAME not found in this account"
+            echo "result=production bucket NOT FOUND" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qw "levonis-files-staging" /tmp/r2.txt; then
+            echo "staging=exists" >> "$GITHUB_OUTPUT"
+          else
+            echo "staging=missing (the staging workflow creates it)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Telegram — bot token validity (read-only getMe)
+        id: telegram
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "result=token not set" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          RES=$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" | jq -r '"valid — bot @" + .result.username' || echo "INVALID")
+          echo "Telegram token: $RES"
+          echo "result=$RES" >> "$GITHUB_OUTPUT"
+          if [ -z "${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}" ]; then
+            echo "::warning::TELEGRAM_ADMIN_CHAT_ID is not set — the bot cannot know where to send notifications"
+            echo "chat=NOT SET (add repository secret TELEGRAM_ADMIN_CHAT_ID)" >> "$GITHUB_OUTPUT"
+          else
+            echo "chat=set" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Config presence (no values printed)
+        id: presence
+        run: |
+          [ -n "${{ secrets.VITE_GOOGLE_CLIENT_ID }}" ] && echo "google=set" >> "$GITHUB_OUTPUT" || echo "google=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.INITIAL_ADMIN_EMAIL }}" ] && echo "admin=set" >> "$GITHUB_OUTPUT" || echo "admin=NOT SET (add repository secret INITIAL_ADMIN_EMAIL)" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Cloudflare verification (read-only)"
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| API token (whoami) | ${{ steps.whoami.outputs.result }} |"
+            echo "| Production D1 database | ${{ steps.d1.outputs.result }} |"
+            echo "| Production D1 contents | ${{ steps.d1data.outputs.verdict || 'skipped' }} |"
+            echo "| Staging D1 | ${{ steps.d1.outputs.staging }} |"
+            echo "| Production R2 bucket | ${{ steps.r2.outputs.result }} |"
+            echo "| Staging R2 bucket | ${{ steps.r2.outputs.staging }} |"
+            echo "| Telegram bot token | ${{ steps.telegram.outputs.result }} |"
+            echo "| Telegram admin chat id | ${{ steps.telegram.outputs.chat }} |"
+            echo "| Google client ID | ${{ steps.presence.outputs.google }} |"
+            echo "| INITIAL_ADMIN_EMAIL | ${{ steps.presence.outputs.admin }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

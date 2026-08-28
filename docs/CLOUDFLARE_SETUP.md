@@ -52,7 +52,43 @@ Notes:
   URL and custom domain) to **Authorized JavaScript origins**. No redirect
   URI is needed for the Google Identity Services button.
 
-### 2.3 Build configuration (Workers Builds, no terminal)
+### 2.3-A GitHub Actions deployment (the active path)
+
+Three manually-triggered workflows exist under the repo's **Actions** tab
+(run them from an iPad: Actions → pick the workflow → Run workflow → choose
+the branch → Run):
+
+1. **`1 - Verify Cloudflare Setup`** — read-only. Checks the API token,
+   whether `CLOUDFLARE_DATABASE_ID` matches a real database (and whether it
+   already holds tables/data), the R2 buckets, the Telegram bot token
+   (`getMe`), and which optional settings are present. Changes nothing.
+2. **`2 - Deploy Staging + Tests`** — creates/reuses `levonis-db-staging` +
+   `levonis-files-staging`, applies migrations to the STAGING database only,
+   deploys the `levonis-staging` worker to workers.dev, uploads the Telegram
+   secrets to it, then runs the full 60-check API test suite against the
+   live staging URL. Never touches production data or DNS.
+3. **`3 - Deploy Production (approval required)`** — refuses to run unless
+   you type `DEPLOY-PRODUCTION` into the confirmation input. Deploys the
+   production worker to its workers.dev URL only (no custom domain, no DNS).
+   Migrations run only when the `apply_migrations` box is ticked AND the
+   production database is empty; a non-empty database aborts with an error.
+
+Repository secrets used vs. unused by the current implementation:
+
+| GitHub secret | Used? | How |
+| --- | --- | --- |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | ✅ | wrangler auth inside the workflows only — never inside the running app |
+| `CLOUDFLARE_DATABASE_ID` | ✅ | matched to the real D1 database and injected into wrangler.jsonc at production deploy time |
+| `CLOUDFLARE_R2_BUCKET_NAME` | ✅ | injected as the production R2 binding name |
+| `VITE_GOOGLE_CLIENT_ID` | ✅ | frontend build var + the worker's `GOOGLE_CLIENT_ID` audience check (public value) |
+| `TELEGRAM_BOT_TOKEN` | ✅ | uploaded as a Worker **secret**; server-side admin notifications (orders, wallet requests) + `getMe` verification |
+| `TELEGRAM_ADMIN_CHAT_ID` | ➕ needed | **add this secret** — the chat/channel ID the bot posts into; without it the bot has nowhere to send |
+| `INITIAL_ADMIN_EMAIL` | ➕ needed | **add this secret** — email promoted to admin on first verified Google sign-in while no admin exists |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, `CLOUDFLARE_R2_ENDPOINT`, `CLOUDFLARE_R2_PUBLIC_URL` | ❌ unused | the Worker uses native R2 bindings; S3 keys are never needed. If these keys were used by the old deployment, rotate them |
+| `JWT_SECRET` | ❌ unused | JWTs were removed (revocable cookie sessions); safe to delete |
+| `GOOGLE_CLIENT_SECRET` | ❌ unused | the Google Identity Services ID-token flow needs only the client ID; the secret is never uploaded anywhere |
+
+### 2.3-B Build configuration (Workers Builds — optional alternative)
 
 When importing the repository (2.1 last row):
 

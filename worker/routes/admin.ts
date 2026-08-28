@@ -8,6 +8,7 @@ import { getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/s
 import { walletTxPublic, credit } from '../lib/wallet';
 import { productPublic } from './products';
 import { orderPublic } from './orders';
+import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -66,6 +67,25 @@ adminRoutes.get('/overview', async (c) => {
     recent_orders: recentOrders.results.map((o) => ({
       id: o.id, status: o.status, total_iqd: o.total_iqd, created_at: o.created_at, user_id: o.user_id,
     })),
+  });
+});
+
+// ---------------------------------------------------------------- telegram
+
+/** Verifies the Telegram integration end-to-end and reports honestly. */
+adminRoutes.post('/telegram/test', async (c) => {
+  const me = await telegramGetMe(c.env);
+  const configured = telegramConfigured(c.env);
+  let sent = false;
+  if (configured && me.ok) {
+    sent = await notifyAdmins(c.env, '✅ Levonis: Telegram notifications are working (test message from the admin console).');
+  }
+  return c.json({
+    success: true,
+    tokenValid: me.ok,
+    botUsername: me.username ?? null,
+    chatConfigured: !!c.env.TELEGRAM_ADMIN_CHAT_ID,
+    sent,
   });
 });
 

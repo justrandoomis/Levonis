@@ -9,6 +9,8 @@ export interface Env {
   GEMINI_API_KEY?: string;
   EMAIL_API_KEY?: string; // e.g. a Resend API key, enables password-reset email
   EMAIL_FROM?: string;
+  TELEGRAM_BOT_TOKEN?: string; // admin notifications bot
+  TELEGRAM_ADMIN_CHAT_ID?: string; // chat/channel the bot posts into
 }
 
 export interface SessionUser {

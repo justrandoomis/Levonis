@@ -1,0 +1,108 @@
+# PRODUCTION deploy — gated. Requires typing DEPLOY-PRODUCTION into the
+# confirmation input. Deploys the "levonis" worker to its workers.dev URL
+# only: it does NOT attach the custom domain and does NOT change DNS
+# (domain attachment is a separate, manual dashboard step after approval).
+# Migrations run only when apply_migrations=true AND the production database
+# is empty — a database with existing tables requires a reviewed upgrade
+# plan and a backup first.
+name: 3 - Deploy Production (approval required)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-PRODUCTION to confirm'
+        required: true
+      apply_migrations:
+        description: 'Apply migrations to the production D1 (only if empty)'
+        type: boolean
+        default: false
+
+concurrency: production-deploy
+
+jobs:
+  production:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Confirmation gate
+        run: |
+          [ "${{ inputs.confirm }}" = "DEPLOY-PRODUCTION" ] \
+            || { echo "::error::confirmation text mismatch — aborting"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Resolve production database name from CLOUDFLARE_DATABASE_ID
+        id: db
+        run: |
+          set -e
+          NAME=$(npx wrangler d1 list --json | jq -r --arg id "${{ secrets.CLOUDFLARE_DATABASE_ID }}" '.[] | select(.uuid==$id) | .name')
+          [ -n "$NAME" ] || { echo "::error::CLOUDFLARE_DATABASE_ID does not match any D1 database"; exit 1; }
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Fill production identifiers into wrangler.jsonc
+        env:
+          PROD_DB_ID: ${{ secrets.CLOUDFLARE_DATABASE_ID }}
+          PROD_DB_NAME: ${{ steps.db.outputs.name }}
+          PROD_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
+        run: node scripts/set-deploy-ids.mjs
+
+      - name: Migrations (only when requested AND the database is empty)
+        if: ${{ inputs.apply_migrations }}
+        run: |
+          set -e
+          COUNT=$(npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
+            --command "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%'" \
+            | jq -r '.[0].results[0].n')
+          if [ "$COUNT" != "0" ]; then
+            echo "::error::production database already has $COUNT tables — refusing fresh migrations. Back up and design an upgrade migration instead."
+            exit 1
+          fi
+          npx wrangler d1 migrations apply "${{ steps.db.outputs.name }}" --remote
+
+      - name: Build frontend
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: npm run build
+
+      - name: Deploy production worker (workers.dev only — no domain/DNS)
+        id: deploy
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          INITIAL_ADMIN_EMAIL: ${{ secrets.INITIAL_ADMIN_EMAIL }}
+        run: |
+          set -e
+          npx wrangler deploy \
+            --var GOOGLE_CLIENT_ID:"$VITE_GOOGLE_CLIENT_ID" \
+            --var INITIAL_ADMIN_EMAIL:"$INITIAL_ADMIN_EMAIL" \
+            | tee /tmp/deploy.log
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/deploy.log | head -1)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Upload runtime secrets to the production worker
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: |
+          [ -n "$TELEGRAM_BOT_TOKEN" ] && printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN || echo "TELEGRAM_BOT_TOKEN not set"
+          [ -n "$TELEGRAM_ADMIN_CHAT_ID" ] && printf '%s' "$TELEGRAM_ADMIN_CHAT_ID" | npx wrangler secret put TELEGRAM_ADMIN_CHAT_ID || echo "TELEGRAM_ADMIN_CHAT_ID not set"
+
+      - name: Health check
+        run: curl -fsS -m 15 "${{ steps.deploy.outputs.url }}/api/health"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Production deployment (workers.dev)"
+            echo "- URL: ${{ steps.deploy.outputs.url }}"
+            echo "- Custom domain levonis-iq.com was NOT attached — that is a separate approved step"
+            echo "  (Worker → Settings → Domains & Routes → Add → Custom domain)."
+          } >> "$GITHUB_STEP_SUMMARY"

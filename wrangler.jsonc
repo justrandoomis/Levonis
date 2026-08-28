@@ -1,6 +1,10 @@
 {
   // Cloudflare Workers configuration for Levonis.
   // Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+  //
+  // The *-PLACEHOLDER values are substituted at deploy time by the GitHub
+  // Actions workflows from repository secrets (scripts/set-deploy-ids.mjs);
+  // no real IDs are committed. Local development ignores them.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "levonis",
   "main": "worker/index.ts",
@@ -16,13 +20,14 @@
     "run_worker_first": ["/api/*", "/files/*"]
   },
 
+  // Top-level names double as the LOCAL dev identifiers (wrangler dev /
+  // db:migrate:local). The production workflow swaps in the real
+  // production name/id/bucket right before deploying.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "levonis-db",
-      // database_id is filled in during Phase 2 after the D1 database is
-      // created in the Cloudflare dashboard. Local dev works without it.
-      "database_id": "PLACEHOLDER-SET-IN-PHASE-2",
+      "database_id": "PROD-DB-ID-PLACEHOLDER",
       "migrations_dir": "migrations"
     }
   ],
@@ -30,27 +35,53 @@
   "r2_buckets": [
     {
       "binding": "BUCKET",
-      // bucket_name is created in Phase 2. Local dev emulates it.
       "bucket_name": "levonis-files"
     }
   ],
 
-  // Non-secret runtime configuration. Secrets (GEMINI_API_KEY, optional
-  // email provider key) are set with `wrangler secret put` or in the
-  // dashboard under Settings > Variables and Secrets — never in this file.
+  // Non-secret runtime configuration. GOOGLE_CLIENT_ID and
+  // INITIAL_ADMIN_EMAIL are passed by the deploy workflows via --var.
+  // Secrets (TELEGRAM_BOT_TOKEN, optional GEMINI/EMAIL keys) are uploaded
+  // with `wrangler secret put` by the workflows — never committed.
   "vars": {
-    // Google OAuth client ID used server-side as the required token audience.
-    // Public value; must match the frontend VITE_GOOGLE_CLIENT_ID.
     "GOOGLE_CLIENT_ID": "",
-    // Email that is promoted to admin on first verified Google sign-in
-    // while no admin exists yet. See docs/CLOUDFLARE_SETUP.md.
     "INITIAL_ADMIN_EMAIL": "",
-    // Comma-separated additional allowed origins for CSRF checks
-    // (the deployed origin itself is always allowed).
     "EXTRA_ALLOWED_ORIGINS": ""
   },
 
-  "observability": {
-    "enabled": true
+  "observability": { "enabled": true },
+
+  "env": {
+    // Staging: fully separate Worker + D1 + R2. Deployed to workers.dev,
+    // never to the production domain.
+    "staging": {
+      "name": "levonis-staging",
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/files/*"]
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "levonis-db-staging",
+          "database_id": "STAGING-DB-ID-PLACEHOLDER",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "levonis-files-staging"
+        }
+      ],
+      "vars": {
+        "GOOGLE_CLIENT_ID": "",
+        "INITIAL_ADMIN_EMAIL": "",
+        "EXTRA_ALLOWED_ORIGINS": ""
+      },
+      "observability": { "enabled": true }
+    }
   }
 }

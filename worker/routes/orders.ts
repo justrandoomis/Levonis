@@ -9,6 +9,7 @@ import { unitPriceIqd, planIsActive } from './cart';
 import { getBalances } from '../lib/wallet';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
+import { notifyAdmins } from '../lib/telegram';
 
 export const orderRoutes = new Hono<AppContext>();
 orderRoutes.use('*', requireAuth);
@@ -298,6 +299,12 @@ orderRoutes.post('/', async (c) => {
   await audit(c.env.DB, user.id, 'order.create', orderId, {
     total_iqd: afterPoints, wallet_applied_iqd: walletApplied, points: pointsDiscount, payment: paymentMethodId,
   });
+  c.executionCtx.waitUntil(
+    notifyAdmins(
+      c.env,
+      `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${orderItems.length}\nTotal: ${afterPoints.toLocaleString()} IQD (${paymentMethodId})\nDue on delivery: ${dueOnDelivery.toLocaleString()} IQD`
+    )
+  );
   const data = (await loadOrder(c.env.DB, orderId))!;
   return c.json({ success: true, order: orderPublic(data.order, data.items) });
 });

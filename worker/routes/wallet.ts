@@ -4,6 +4,7 @@ import { requireAuth, badRequest, int, str } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { getBalances, walletTxPublic } from '../lib/wallet';
 import { rateLimit } from '../lib/ratelimit';
+import { notifyAdmins } from '../lib/telegram';
 
 export const walletRoutes = new Hono<AppContext>();
 walletRoutes.use('*', requireAuth);
@@ -52,6 +53,12 @@ walletRoutes.post('/deposits', async (c) => {
   )
     .bind(id, user.id, amount, note, paymentMethod, receiptKey)
     .run();
+  c.executionCtx.waitUntil(
+    notifyAdmins(
+      c.env,
+      `💰 New deposit request (pending review)\nUser: ${user.username || user.email}\nAmount: $${(amount / 100).toFixed(2)}${paymentMethod ? `\nMethod: ${paymentMethod}` : ''}`
+    )
+  );
   return c.json({ success: true, id, status: 'pending' });
 });
 
@@ -84,5 +91,11 @@ walletRoutes.post('/withdrawals', async (c) => {
   )
     .bind(id, user.id, amount, note, accountNumber)
     .run();
+  c.executionCtx.waitUntil(
+    notifyAdmins(
+      c.env,
+      `🏧 New withdrawal request (pending review)\nUser: ${user.username || user.email}\nAmount: $${(amount / 100).toFixed(2)}`
+    )
+  );
   return c.json({ success: true, id, status: 'pending' });
 });

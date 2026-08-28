@@ -61,11 +61,17 @@ class Client {
   del(p) { return this.req('DELETE', p); }
 }
 
-function sqlLocal(command) {
-  execSync(
-    `npx wrangler d1 execute levonis-db --local --command ${JSON.stringify(command)}`,
-    { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' }
-  );
+/**
+ * Promotes an account to admin outside the API (simulating the controlled
+ * bootstrap). Default targets the local emulated DB; set PROMOTE_CMD to a
+ * command containing {SQL} to target a remote/staging database, e.g.:
+ *   PROMOTE_CMD='npx wrangler d1 execute levonis-db-staging --remote --command {SQL}'
+ */
+function promoteAdmin(email) {
+  const sql = `UPDATE users SET role='admin' WHERE email='${email}'`;
+  const tpl = process.env.PROMOTE_CMD || 'npx wrangler d1 execute levonis-db --local --command {SQL}';
+  const cmd = tpl.replace('{SQL}', JSON.stringify(sql));
+  execSync(cmd, { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
 }
 
 // 1x1 transparent PNG
@@ -107,9 +113,26 @@ async function main() {
   check('non-admin user role change rejected (403)', (await user.patch('/api/admin/users/anything', { role: 'admin' })).status === 403);
   check('non-investor /api/invest rejected (403)', (await user.get('/api/invest')).status === 403);
 
+  // Google sign-in must never trust an unverified credential. A structurally
+  // valid but unsigned JWT exercises the verification path: expect 401 when
+  // GOOGLE_CLIENT_ID is set, or an honest 503 when it is not.
+  const fakeJwt =
+    Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'nope' })).toString('base64url') +
+    '.' + Buffer.from(JSON.stringify({ iss: 'https://accounts.google.com', aud: 'x', sub: '1', email: 'a@b.co', email_verified: true, exp: 9999999999 })).toString('base64url') +
+    '.' + Buffer.from('sig').toString('base64url');
+  r = await anon.post('/api/auth/google', { credential: fakeJwt });
+  check('google: forged credential rejected', r.status === 401 || r.status === 503, `status ${r.status}`);
+  console.log(`      (google endpoint mode: ${r.status === 503 ? 'NOT CONFIGURED — honest 503' : 'configured — signature verification active'})`);
+
   // Promote the admin account server-side (simulates the controlled bootstrap).
-  sqlLocal(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  promoteAdmin(adminEmail);
   check('admin overview after promotion', (await admin.get('/api/admin/overview')).status === 200);
+
+  // Telegram integration — honest live report (send only happens when both
+  // the bot token and the admin chat id are configured on the worker).
+  r = await admin.post('/api/admin/telegram/test');
+  check('telegram test endpoint responds', r.status === 200);
+  console.log(`      (telegram: tokenValid=${r.data?.tokenValid} chatConfigured=${r.data?.chatConfigured} sent=${r.data?.sent})`);
 
   console.log('\n— products & visibility');
   r = await admin.post('/api/admin/products', {
