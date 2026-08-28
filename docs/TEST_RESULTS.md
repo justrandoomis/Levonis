@@ -1,5 +1,35 @@
 # Test results
 
+## Phase: final phase (v3) — STAGING run 2026-08-28 (live Cloudflare)
+
+Workflow `2 - Deploy Staging + Tests` on commit `5e427d9` deployed
+migrations 0001–0010 + both new secrets to the staging worker and ran all
+three suites remotely against
+https://levonis-staging.just-randoomis.workers.dev:
+
+| Suite | Result |
+| --- | --- |
+| Base (v1) | **60 passed, 0 failed** — Telegram admin-notify sent=true, Google signature verification active |
+| Products/memberships (v2) | **37 passed, 0 failed** — incl. the CONFIRMED rule: PRO delivery NOT waived without an approved default address |
+| Final phase (v3) | **114 passed, 0 failed, 6 blocked** — two more passes than local because the REAL staging `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET` let the deep-link issuance and the live webhook forgery-rejection (403) + update_id dedupe checks run |
+
+Live-verified highlights: 5 printers + 1 AMS → 6 units with independent
+serials; registration never restarts the warranty clock; +36 months from
+2024-02-29 clamps to 2027-02-28; 75,000 charged / 75,001 free at the
+approved address only; alternate address ordinary + automatic restore;
+checkout refused while a printer fee is honestly unconfigured
+(SHIPPING_NEEDS_CONFIG); one invoice per order under replay, honest
+cod_due; consent enforced the moment terms were published; KYC gated
+behind Telegram phone verification; PRO ticket priority ranked in the
+admin queue; the full cross-user IDOR battery passed. Test admin accounts
+were demoted afterwards (changes: 3).
+
+Remaining blocked (owner action, per docs/DECISIONS.md): email end-to-end
+(row 14 — Resend secrets), price-protection payout channel (22), printer
+fee mapping + carton (3/16), BNPL rules (10/21), and the full KYC cycle
+(manual staging step needing a real Telegram-verified phone + synthetic
+documents).
+
 ## Phase: final phase (v3) — integrated, local run 2026-08-28
 
 All suites ran against `wrangler dev` (fresh D1 via migrations 0001–0010,
