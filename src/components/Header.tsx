@@ -122,7 +122,7 @@ export default function Header() {
                   >
                     <button onClick={() => { setLang('en'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'en' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>English</button>
                     <button onClick={() => { setLang('ar'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ar' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>العربية</button>
-                    <button onClick={() => { setLang('ku'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ku' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>کوردی</button>
+                    <button onClick={() => { setLang('ckb'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ckb' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>کوردی</button>
                   </motion.div>
                 </>
               )}

@@ -5,7 +5,13 @@ import { requireAuth, badRequest, notFound, str } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
-import { unitPriceIqd, planIsActive } from './cart';
+import { resolveCartLine, pricingContextFrom } from './cart';
+import { getTierStatus, benefits } from '../lib/entitlements';
+import {
+  referralFreeDeliveryApplies,
+  validateCoupon,
+  grantPrinterGiftIfEligible,
+} from '../lib/membershipOps';
 import { getBalances } from '../lib/wallet';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -20,6 +26,7 @@ function iqdToUsdCents(iqd: number, rate: number): number {
 }
 
 export function orderPublic(o: Record<string, unknown>, items: Record<string, unknown>[]) {
+  const coupon = safeParse<Record<string, unknown> | null>(o.coupon_snapshot, null);
   return {
     id: o.id,
     status: o.status,
@@ -28,10 +35,16 @@ export function orderPublic(o: Record<string, unknown>, items: Record<string, un
     payment_method_id: o.payment_method_id,
     subtotal_iqd: o.subtotal_iqd,
     shipping_iqd: o.shipping_iqd,
+    delivery_waived: !!o.delivery_waived,
+    membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
+    priority: Number(o.priority) || 0,
+    coupon, // {coupon_id, code, discount_iqd} — never includes cost data
+    coupon_discount_iqd: coupon ? Number(coupon.discount_iqd) || 0 : 0,
     points_discount_iqd: o.points_discount_iqd,
     wallet_applied_iqd: o.wallet_applied_iqd,
     total_iqd: o.total_iqd,
     due_on_delivery_iqd: o.due_on_delivery_iqd,
+    delivered_at: o.delivered_at ?? null,
     created_at: o.created_at,
     updated_at: o.updated_at,
     items: items.map((it) => ({
@@ -43,6 +56,11 @@ export function orderPublic(o: Record<string, unknown>, items: Record<string, un
       qty: it.qty,
       unit_price_iqd: it.unit_price_iqd,
       line_total_iqd: it.line_total_iqd,
+      // Resolver snapshots persisted at checkout time (cost fields stripped
+      // before persistence — safe for the buyer to see).
+      pricing: safeParse(it.pricing_snapshot, null),
+      warranty: safeParse(it.warranty_snapshot, null),
+      transport: safeParse(it.transport_snapshot, null),
     })),
   };
 }
@@ -121,15 +139,28 @@ orderRoutes.post('/', async (c) => {
     .first<Record<string, unknown>>();
   if (!address) throw badRequest('Please choose a valid delivery address');
 
-  const settings = await getSettings(c.env.DB, ['checkoutDeliveryMethods', 'checkoutPaymentMethods', 'exchangeRate']);
+  const settings = await getSettings(c.env.DB, [
+    'checkoutDeliveryMethods',
+    'checkoutPaymentMethods',
+    'exchangeRate',
+    'proPricingPolicy',
+    'preorderTransportDefaults',
+    'printerGiftConfig',
+  ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
   const payment = (settings.checkoutPaymentMethods as CheckoutPaymentMethod[]).find((m) => m.id === paymentMethodId);
   if (!payment) throw badRequest('Please choose a valid payment method');
   const exchangeRate = Number(settings.exchangeRate) || 1400;
+  const pricingCtx = pricingContextFrom(settings);
+
+  // Effective tier from the memberships ledger — never the client, never the
+  // legacy users.* cache.
+  const tierStatus = await getTierStatus(c.env.DB, user.id);
 
   // Load and price the cart lines server-side.
-  let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id, ci.shipping_method_id, p.*
+  let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id, ci.shipping_method_id,
+                    ci.transport_method, ci.warranty_plan_id, p.*
                FROM cart_items ci JOIN products p ON p.id = ci.product_id
               WHERE ci.user_id = ?`;
   const params: unknown[] = [user.id];
@@ -140,44 +171,95 @@ orderRoutes.post('/', async (c) => {
   const { results: lines } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
   if (lines.length === 0) throw badRequest('Your cart is empty');
 
-  const active = planIsActive(user.subscription_plan, user.subscription_expiry);
   let subtotal = 0;
+  const productIds: string[] = [];
   const orderItems: Array<{
     id: string; product_id: string; name: string; image: string; variant: string;
     shipping_method_id: string; qty: number; unit: number; line: number; tracked: boolean;
+    pricing_snapshot: string; warranty_snapshot: string | null; transport_snapshot: string | null;
   }> = [];
   for (const row of lines) {
-    if (row.status !== 'active') throw badRequest(`"${row.name}" is no longer available — please remove it from your cart`);
-    const priced = unitPriceIqd(
-      row as never,
-      String(row.option_id ?? ''),
-      String(row.color_id ?? ''),
-      String(row.shipping_method_id ?? ''),
-      user.subscription_plan,
-      active
+    const displayName = String(row.name_ar || row.name);
+    if (row.status !== 'active') throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
+    const { doc, resolved, variantLabel } = resolveCartLine(
+      row,
+      {
+        optionId: String(row.option_id ?? ''),
+        colorId: String(row.color_id ?? ''),
+        transportMethod: String(row.transport_method ?? ''),
+        warrantyPlanId: String(row.warranty_plan_id ?? ''),
+      },
+      tierStatus.tier,
+      tierStatus.active,
+      pricingCtx
     );
+    if (resolved.errors.length > 0) {
+      throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
+    }
     const qty = Number(row.qty);
     if (row.stock !== null && Number(row.stock) < qty) {
-      throw badRequest(`Only ${row.stock} of "${row.name}" left in stock`);
+      throw badRequest(`Only ${row.stock} of "${displayName}" left in stock`);
     }
-    const line = priced.price * qty;
+    const unit = resolved.unit_subtotal_iqd;
+    const line = unit * qty;
     subtotal += line;
+    productIds.push(String(row.id));
+    // Persisted resolver snapshot: cost fields must NEVER be stored on the
+    // order (it is served back to the buyer).
+    const { cost_iqd, ...pricingSnapshot } = resolved;
+    void cost_iqd;
     orderItems.push({
       id: newId('oi'),
       product_id: String(row.id),
       name: String(row.name),
-      image: safeParse<string[]>(row.images, [])[0] ?? '',
-      variant: priced.label,
+      image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
+      variant: variantLabel,
       shipping_method_id: String(row.shipping_method_id ?? ''),
       qty,
-      unit: priced.price,
+      unit,
       line,
       tracked: row.stock !== null,
+      pricing_snapshot: JSON.stringify(pricingSnapshot),
+      warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
+      transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
     });
   }
 
-  const shipping = Number(delivery.price_iqd) || 0;
-  const beforeDiscounts = subtotal + shipping;
+  // Last-mile delivery: chosen method price, waived to 0 for active PRO
+  // (membership benefit) or a qualifying referral free-delivery order.
+  const deliveryPrice = Number(delivery.price_iqd) || 0;
+  let shipping = deliveryPrice;
+  let deliveryWaived = 0;
+  if (deliveryPrice > 0 && benefits.freeDelivery(tierStatus)) {
+    shipping = 0;
+    deliveryWaived = 1;
+  } else if (deliveryPrice > 0 && (await referralFreeDeliveryApplies(c.env, user.id, productIds))) {
+    shipping = 0;
+    deliveryWaived = 1;
+  }
+
+  // Coupon — validated against the honest payable total (subtotal + the
+  // delivery actually charged); applied FIRST: coupon, then points, then wallet.
+  const couponCode = str(body.couponCode, 'couponCode', { max: 60, required: false });
+  let couponDiscount = 0;
+  let couponId: string | null = null;
+  let couponSnapshot: string | null = null;
+  if (couponCode) {
+    const check = await validateCoupon(c.env, user.id, couponCode, subtotal + shipping);
+    if (!check.ok || !check.coupon_id) {
+      const reason = check.reason ?? 'COUPON_INVALID';
+      throw badRequest(`Coupon could not be applied (${reason})`, reason);
+    }
+    couponId = check.coupon_id;
+    couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), subtotal + shipping));
+    couponSnapshot = JSON.stringify({
+      coupon_id: check.coupon_id,
+      code: check.code ?? couponCode.toUpperCase(),
+      discount_iqd: couponDiscount,
+    });
+  }
+
+  const beforeDiscounts = subtotal + shipping - couponDiscount;
 
   const balances = await getBalances(c.env.DB, user.id);
   const walletBalanceIqd = Math.floor((balances.usd_cents * exchangeRate) / 100);
@@ -213,26 +295,43 @@ orderRoutes.post('/', async (c) => {
   const orderId = newOrderId();
   const now = new Date().toISOString();
 
+  const priority = benefits.priorityService(tierStatus) ? 1 : 0;
+
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
          payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
-         wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key,
+         membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(address), deliveryMethodId, JSON.stringify(delivery),
       paymentMethodId, subtotal, shipping, pointsDiscount, walletApplied,
-      finalWalletUsdCents, exchangeRate, afterPoints, dueOnDelivery, idempotencyKey, now, now
+      finalWalletUsdCents, exchangeRate, afterPoints, dueOnDelivery, idempotencyKey,
+      tierStatus.active ? tierStatus.tier : 'free', deliveryWaived, priority, couponSnapshot, now, now
     ),
   ];
+
+  if (couponId) {
+    // UNIQUE(order_id) makes the redemption idempotent with the order itself.
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(newId('crd'), couponId, user.id, orderId, couponDiscount, now)
+    );
+  }
 
   for (const it of orderItems) {
     stmts.push(
       c.env.DB.prepare(
         `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
-           shipping_method_id, qty, unit_price_iqd, line_total_iqd)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(it.id, orderId, it.product_id, it.name, it.image, it.variant, it.shipping_method_id, it.qty, it.unit, it.line)
+           shipping_method_id, qty, unit_price_iqd, line_total_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        it.id, orderId, it.product_id, it.name, it.image, it.variant, it.shipping_method_id, it.qty, it.unit, it.line,
+        it.pricing_snapshot, it.warranty_snapshot, it.transport_snapshot
+      )
     );
     if (it.tracked) {
       // CHECK (stock >= 0) aborts the whole batch on oversell.
@@ -298,7 +397,14 @@ orderRoutes.post('/', async (c) => {
 
   await audit(c.env.DB, user.id, 'order.create', orderId, {
     total_iqd: afterPoints, wallet_applied_iqd: walletApplied, points: pointsDiscount, payment: paymentMethodId,
+    coupon_iqd: couponDiscount, tier: tierStatus.active ? tierStatus.tier : 'free', delivery_waived: deliveryWaived,
   });
+  // PLUS gift on printer purchase — only when the owner enabled it and set the
+  // milestone to the payment event (grant itself is idempotent per order).
+  const printerGift = settings.printerGiftConfig as { enabled: boolean; plan_id: string; milestone: 'paid' | 'delivered' };
+  if (printerGift?.enabled === true && printerGift.milestone === 'paid') {
+    c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, orderId));
+  }
   c.executionCtx.waitUntil(
     notifyAdmins(
       c.env,

@@ -193,7 +193,7 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
                </button>
                {showLangMenu && (
                  <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-32 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl py-2 z-50`}>
-                   {(['en', 'ar', 'ku'] as const).map(l => (
+                   {(['en', 'ar', 'ckb'] as const).map(l => (
                      <button key={l} onClick={() => { setLang(l); setShowLangMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-zinc-800 ${lang === l ? 'text-[#D4AF37] font-bold' : 'text-zinc-400'}`}>
                        {l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'Kurdish'}
                      </button>

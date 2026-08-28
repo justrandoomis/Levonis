@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, Gift } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
@@ -12,11 +12,15 @@ export default function Auth() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
+  const [emailNotConfigured, setEmailNotConfigured] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const resetToken = searchParams.get('reset') || '';
-  const { login, loginWithGoogle, register } = useAuth();
-  const { t } = useLanguage();
+  // Friend-invite referral code from ?ref=CODE — kept in state so it survives
+  // later URL cleanups (e.g. clearing the reset token param).
+  const [referralCode] = useState(() => searchParams.get('ref') || '');
+  const { login, loginWithGoogle, register, refreshUser } = useAuth();
+  const { t, lang, dir } = useLanguage();
   const [error, setError] = useState<string>('');
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
@@ -25,7 +29,8 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [resetSuccessNote, setResetSuccessNote] = useState('');
+  const [resetDone, setResetDone] = useState(false);
+  const [resetTokenError, setResetTokenError] = useState<'' | 'used' | 'expired'>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +44,14 @@ export default function Auth() {
       } else {
         if (password.length < 8) { throw new Error('Password must be at least 8 characters'); }
         if (password !== confirmPassword) { throw new Error('Passwords do not match'); }
-        await register(username, name, email, password);
+        if (referralCode) {
+          // Referral-aware signup: send the invite code so the server can
+          // attribute it, then refresh the session user from /me.
+          await api.post('/api/auth/register', { username, name, email, password, referralCode });
+          await refreshUser();
+        } else {
+          await register(username, name, email, password);
+        }
         navigate('/');
       }
     } catch (err: any) {
@@ -57,7 +69,14 @@ export default function Auth() {
     }
     setIsLoading(true);
     try {
-      await loginWithGoogle(credential);
+      if (referralCode) {
+        // The server attributes the referral only when this sign-in CREATES
+        // a new account; existing accounts are never re-attributed.
+        await api.post('/api/auth/google', { credential, referralCode });
+        await refreshUser();
+      } else {
+        await loginWithGoogle(credential);
+      }
       navigate('/');
     } catch (err: any) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {
@@ -74,14 +93,24 @@ export default function Auth() {
     if (isLoading) return;
     setError('');
     setForgotMessage('');
-    if (!email) { setError('Email is required'); return; }
+    setEmailNotConfigured(false);
+    if (!email) { setError(dir === 'rtl' ? 'البريد الإلكتروني مطلوب' : 'Email is required'); return; }
     setIsLoading(true);
     try {
-      const data = await api.post<{ message?: string }>('/api/auth/forgot-password', { email });
-      setForgotMessage(data.message || 'If an account exists for that email, a reset link has been sent.');
+      // lang tells the server which language to write the reset email in.
+      const data = await api.post<{ message?: string }>('/api/auth/forgot-password', { email, lang });
+      setForgotMessage(
+        dir === 'rtl'
+          ? 'إذا كان هناك حساب بهذا البريد، فقد أُرسل إليه رابط إعادة التعيين.'
+          : (data.message || 'If an account exists for that email, a reset link has been sent.')
+      );
     } catch (err: any) {
-      // 503 EMAIL_NOT_CONFIGURED carries an honest server message — show it as-is.
-      setError(err?.message || 'Failed to send reset link');
+      if (err instanceof ApiError && (err.status === 503 || err.code === 'EMAIL_NOT_CONFIGURED')) {
+        // Honest disabled state: the server has no email service configured.
+        setEmailNotConfigured(true);
+      } else {
+        setError(err?.message || (dir === 'rtl' ? 'تعذر إرسال رابط إعادة التعيين' : 'Failed to send reset link'));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -91,21 +120,49 @@ export default function Auth() {
     e.preventDefault();
     if (isLoading) return;
     setError('');
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+    if (password.length < 8) { setError(dir === 'rtl' ? 'كلمة المرور يجب ألا تقل عن 8 أحرف' : 'Password must be at least 8 characters'); return; }
+    if (password !== confirmPassword) { setError(dir === 'rtl' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'); return; }
     setIsLoading(true);
     try {
+      // The reset token is consumed ONLY here, on explicit submit — the page
+      // never verifies (and therefore never burns) the token on load.
       await api.post('/api/auth/reset-password', { token: resetToken, password });
       setPassword('');
       setConfirmPassword('');
-      setResetSuccessNote('Your password has been reset. Please sign in with your new password.');
-      setIsLogin(true);
-      setSearchParams({}, { replace: true });
+      setResetDone(true);
     } catch (err: any) {
-      setError(err?.message || 'Failed to reset password');
+      if (err instanceof ApiError && err.code === 'TOKEN_USED') {
+        setResetTokenError('used');
+      } else if (err instanceof ApiError && err.code === 'TOKEN_EXPIRED') {
+        setResetTokenError('expired');
+      } else {
+        setError(err?.message || (dir === 'rtl' ? 'تعذر إعادة تعيين كلمة المرور' : 'Failed to reset password'));
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const switchToForgotForm = () => {
+    // Leaves the dead-token screen for the forgot form: clear the token from
+    // the URL and open the "send me a new link" flow.
+    setSearchParams({}, { replace: true });
+    setResetTokenError('');
+    setResetDone(false);
+    setError('');
+    setForgotMessage('');
+    setEmailNotConfigured(false);
+    setIsLogin(true);
+    setIsForgotPassword(true);
+  };
+
+  const backToLoginFromReset = () => {
+    setSearchParams({}, { replace: true });
+    setResetTokenError('');
+    setResetDone(false);
+    setError('');
+    setIsForgotPassword(false);
+    setIsLogin(true);
   };
 
   return (
@@ -187,9 +244,62 @@ export default function Auth() {
           </AnimatePresence>
 
           {resetToken ? (
+            resetDone ? (
+              /* Reset success screen */
+              <div className="flex-1 flex flex-col items-center text-center pt-6">
+                <CheckCircle2 className="w-14 h-14 text-[#111111] mb-5" />
+                <h3 className="text-xl font-medium mb-2 text-black">
+                  {dir === 'rtl' ? 'تم تغيير كلمة المرور بنجاح' : 'Password Updated'}
+                </h3>
+                <p className="text-sm text-gray-600 mb-8 max-w-xs">
+                  {dir === 'rtl'
+                    ? 'يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.'
+                    : 'You can now sign in with your new password.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={backToLoginFromReset}
+                  className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors"
+                >
+                  {t('signIn')}
+                </button>
+              </div>
+            ) : resetTokenError ? (
+              /* Dead-token screen: used vs expired, each with a way forward */
+              <div className="flex-1 flex flex-col items-center text-center pt-6">
+                <h3 className="text-xl font-medium mb-2 text-black">
+                  {resetTokenError === 'used'
+                    ? (dir === 'rtl' ? 'استُخدم هذا الرابط سابقًا' : 'This link has already been used')
+                    : (dir === 'rtl' ? 'انتهت صلاحية الرابط' : 'This link has expired')}
+                </h3>
+                <p className="text-sm text-gray-600 mb-8 max-w-xs">
+                  {dir === 'rtl'
+                    ? 'روابط إعادة التعيين تصلح لمرة واحدة ولمدة 30 دقيقة فقط. اطلب رابطًا جديدًا للمتابعة.'
+                    : 'Reset links work once and expire after 30 minutes. Request a new link to continue.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={switchToForgotForm}
+                  className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors"
+                >
+                  {dir === 'rtl' ? 'طلب رابط جديد' : 'Request a new link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={backToLoginFromReset}
+                  className="flex items-center justify-center text-sm font-medium text-gray-600 mt-6 hover:text-black"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" /> {dir === 'rtl' ? 'العودة لتسجيل الدخول' : 'Back to login'}
+                </button>
+              </div>
+            ) : (
             <form className="flex-1 flex flex-col" onSubmit={handleResetPassword}>
-              <h3 className="text-xl font-medium mb-2 text-black">Choose a New Password</h3>
-              <p className="text-sm text-gray-600 mb-6">Enter a new password for your account. The reset link can only be used once.</p>
+              <h3 className="text-xl font-medium mb-2 text-black">{dir === 'rtl' ? 'اختر كلمة مرور جديدة' : 'Choose a New Password'}</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {dir === 'rtl'
+                  ? 'أدخل كلمة مرور جديدة لحسابك. رابط إعادة التعيين يصلح لمرة واحدة فقط.'
+                  : 'Enter a new password for your account. The reset link can only be used once.'}
+              </p>
 
               {error && <div className="mb-4 text-red-600 text-xs font-medium text-center">{error}</div>}
 
@@ -216,24 +326,38 @@ export default function Auth() {
 
               <div className="mt-8">
                 <button type="submit" disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
-                  {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : 'Set New Password'}
+                  {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : (dir === 'rtl' ? 'تعيين كلمة المرور الجديدة' : 'Set New Password')}
                 </button>
               </div>
-              <button type="button" onClick={() => { setSearchParams({}, { replace: true }); setError(''); }} className="flex items-center justify-center text-sm font-medium text-gray-600 mt-6 hover:text-black">
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back to login
+              <button type="button" onClick={backToLoginFromReset} className="flex items-center justify-center text-sm font-medium text-gray-600 mt-6 hover:text-black">
+                <ArrowLeft className="w-4 h-4 mr-1" /> {dir === 'rtl' ? 'العودة لتسجيل الدخول' : 'Back to login'}
               </button>
             </form>
+            )
           ) : (
           <form className="flex-1 flex flex-col" onSubmit={handleSubmit}>
 
             {isForgotPassword ? (
               <div className="flex-1 flex flex-col">
-                <button type="button" onClick={() => { setIsForgotPassword(false); setError(''); setForgotMessage(''); }} className="flex items-center text-sm font-medium text-gray-500 mb-6 hover:text-black">
-                  <ArrowLeft className="w-4 h-4 mr-1" /> Back to login
+                <button type="button" onClick={() => { setIsForgotPassword(false); setError(''); setForgotMessage(''); setEmailNotConfigured(false); }} className="flex items-center text-sm font-medium text-gray-500 mb-6 hover:text-black">
+                  <ArrowLeft className="w-4 h-4 mr-1" /> {dir === 'rtl' ? 'العودة لتسجيل الدخول' : 'Back to login'}
                 </button>
-                <h3 className="text-xl font-medium mb-2 text-black">Reset Password</h3>
-                <p className="text-sm text-gray-500 mb-6">Enter your email address and we'll send you a link to reset your password.</p>
+                <h3 className="text-xl font-medium mb-2 text-black">{dir === 'rtl' ? 'إعادة تعيين كلمة المرور' : 'Reset Password'}</h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  {dir === 'rtl'
+                    ? 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.'
+                    : "Enter your email address and we'll send you a link to reset your password."}
+                </p>
 
+                {emailNotConfigured && (
+                  /* Honest disabled state — the email service is not configured
+                     on the server, so no reset link can be sent yet. */
+                  <div className="mb-4 rounded-[14px] border border-amber-400/60 bg-amber-50 px-4 py-3 text-amber-800 text-xs font-medium text-center">
+                    {dir === 'rtl'
+                      ? 'إرسال بريد إعادة التعيين غير متاح بعد لأن خدمة البريد غير مهيأة. يرجى التواصل مع الدعم.'
+                      : 'Password reset email is not available yet because no email service is configured. Please contact support.'}
+                  </div>
+                )}
                 {error && <div className="mb-4 text-red-600 text-xs font-medium text-center">{error}</div>}
                 {forgotMessage && <div className="mb-4 text-green-700 text-xs font-medium text-center">{forgotMessage}</div>}
 
@@ -246,18 +370,23 @@ export default function Auth() {
 
                 <div className="mt-8">
                   <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full bg-[#111111] text-gold border border-gold/20 py-4 rounded-[14px] font-medium hover:bg-black/90 transition-colors flex justify-center items-center gap-2">
-                    {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : 'Send Reset Link'}
+                    {isLoading ? <div className="w-5 h-5 border-2 border-gold/20 border-t-white rounded-full animate-spin" /> : (dir === 'rtl' ? 'إرسال رابط إعادة التعيين' : 'Send Reset Link')}
                   </button>
                 </div>
               </div>
             ) : (
 <>
+            {referralCode && (
+              /* Friend-invite chip: the ?ref=CODE is attributed server-side
+                 when this visit ends in a NEW account. */
+              <div className="mb-4 flex justify-center">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#111111]/10 border border-[#111111]/15 px-3 py-1 text-[11px] font-medium text-[#111111]">
+                  <Gift className="w-3.5 h-3.5" />
+                  {dir === 'rtl' ? `دعوة صديق: ${referralCode}` : `Friend invite: ${referralCode}`}
+                </span>
+              </div>
+            )}
             <AnimatePresence>
-              {resetSuccessNote && !error && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 text-green-700 text-xs font-medium text-center">
-                  {resetSuccessNote}
-                </motion.div>
-              )}
               {error && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 text-red-600 text-xs font-medium text-center">
                   {error}
@@ -303,10 +432,10 @@ export default function Auth() {
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={() => { setIsForgotPassword(true); setError(''); setForgotMessage(''); setResetSuccessNote(''); }}
+                      onClick={() => { setIsForgotPassword(true); setError(''); setForgotMessage(''); setEmailNotConfigured(false); }}
                       className="text-[11px] text-gray-500 hover:text-black font-medium"
                     >
-                      Forgot Password?
+                      {dir === 'rtl' ? 'هل نسيت كلمة المرور؟' : 'Forgot Password?'}
                     </button>
                   </div>
                 )}
@@ -355,7 +484,7 @@ export default function Auth() {
               {isLogin ? t('dontHaveAccount') : t('alreadyHaveAccount')}
               <button
                 type="button"
-                onClick={() => { setIsLogin(!isLogin); setError(''); setResetSuccessNote(''); }}
+                onClick={() => { setIsLogin(!isLogin); setError(''); }}
                 className="text-black font-medium hover:underline"
               >
                 {isLogin ? t('signUp') : t('signIn')}

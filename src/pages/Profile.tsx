@@ -5,7 +5,7 @@ import {
   Headset, Settings, MapPin, QrCode, Store,
   Wallet, Package, Truck, MessageSquare, RefreshCcw,
   Star, Clock, Heart, Gamepad2, Coins, Leaf, Zap, Shield,
-  ChevronRight, ChevronLeft
+  ChevronRight, ChevronLeft, Gift, Copy, Check
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
@@ -21,6 +21,25 @@ interface FavoriteItem {
   original_price_iqd: number | null;
 }
 
+interface ReferralReward {
+  id: string;
+  campaign: 'printer' | 'pro_sub';
+  state: 'pending' | 'qualified' | 'available' | 'reserved' | 'fulfilled' | 'cancelled' | string;
+  eligible_at: string | null;
+  created_at: string;
+}
+
+interface MembershipMine {
+  status: {
+    tier: 'free' | 'plus' | 'pro';
+    active: boolean;
+    expires_at: string | null;
+    pending_launch: { tier: 'plus' | 'pro'; duration_months: number } | null;
+  };
+  referral: { code: string; rewards: ReferralReward[] };
+  launch: { launch_at: string | null; activated: boolean };
+}
+
 export default function Profile() {
   const [suggestedProducts, setSuggestedProducts] = useState<ApiProduct[]>([]);
   const [bundles, setBundles] = useState<ApiProduct[]>([]);
@@ -30,7 +49,10 @@ export default function Profile() {
   const [latestOrder, setLatestOrder] = useState<ApiOrder | null>(null);
   const [activeTab, setActiveTab] = useState('suggested');
   const [scrolled, setScrolled] = useState(false);
-  const { t, dir, lang } = useLanguage();
+  const [mine, setMine] = useState<MembershipMine | null>(null);
+  const [mineLoaded, setMineLoaded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { t, dir, lang, loc } = useLanguage();
   const navigate = useNavigate();
   const { balanceUsdCents, pointBalance, exchangeRate } = useWallet();
   const { isAuthenticated, user } = useAuth();
@@ -103,6 +125,86 @@ export default function Profile() {
       .finally(() => setFavoritesLoaded(true));
   }, [isAuthenticated, user?.id]);
 
+  // Real membership + referral state from the memberships ledger.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMine(null);
+      setMineLoaded(true);
+      return;
+    }
+    setMineLoaded(false);
+    api
+      .get<MembershipMine>('/api/memberships/mine')
+      .then((res) => setMine(res))
+      .catch(() => setMine(null))
+      .finally(() => setMineLoaded(true));
+  }, [isAuthenticated, user?.id]);
+
+  // Membership from the ledger (authoritative once loaded); the legacy
+  // users.* cache is only a fallback while /api/memberships/mine loads.
+  const memTier: 'free' | 'plus' | 'pro' = mine
+    ? (mine.status.active ? mine.status.tier : 'free')
+    : (planActive ? (user?.subscription_plan ?? 'free') : 'free');
+  const memExpiry: string | null = mine
+    ? mine.status.expires_at
+    : (planActive && user?.subscription_expiry ? new Date(user.subscription_expiry).toISOString() : null);
+  const memPendingLaunch = mine?.status.pending_launch ?? null;
+
+  const dateLocale = lang === 'ar' ? 'ar-IQ' : lang === 'ckb' ? 'ckb' : 'en-GB';
+  const fmtDate = (iso: string | null | undefined) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    try {
+      return d.toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return d.toLocaleDateString('en-GB');
+    }
+  };
+
+  const referralLink = mine?.referral?.code
+    ? `${window.location.origin}/auth?ref=${mine.referral.code}`
+    : '';
+
+  const copyReferralLink = async () => {
+    if (!referralLink) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(referralLink);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = referralLink;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const rewardStateChip = (state: string): { label: string; cls: string } => {
+    switch (state) {
+      case 'pending':
+        return { label: loc('قيد الانتظار', 'Pending', 'چاوەڕوانە'), cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
+      case 'qualified':
+        return { label: loc('مؤهلة', 'Qualified', 'شیاوە'), cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' };
+      case 'available':
+        return { label: loc('متاحة', 'Available', 'بەردەستە'), cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' };
+      case 'reserved':
+        return { label: loc('محجوزة', 'Reserved', 'حیجزکراوە'), cls: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' };
+      case 'fulfilled':
+        return { label: loc('تم التسليم', 'Fulfilled', 'گەیەنراوە'), cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
+      case 'cancelled':
+        return { label: loc('ملغاة', 'Cancelled', 'هەڵوەشێنراوەتەوە'), cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
+      default:
+        return { label: state, cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' };
+    }
+  };
+
   const balanceIqd = usdCentsToIqd(balanceUsdCents, exchangeRate);
   const avatarUrl = user?.avatar_key
     ? `/files/${user.avatar_key}`
@@ -162,13 +264,21 @@ export default function Profile() {
                 <QrCode className="w-[14px] h-[14px] text-zinc-700 dark:text-zinc-300" strokeWidth={2} />
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {planActive ? (
-                  <div className="bg-[#ebd197] text-[#5c3e03] text-[10px] px-1.5 py-0.5 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm">
-                    <span>{isPro ? (dir === 'rtl' ? 'عضو PRO' : 'PRO Member') : (dir === 'rtl' ? 'عضو PLUS' : 'PLUS Member')}</span>
+                {memTier !== 'free' ? (
+                  <div onClick={() => navigate('/subscription')} className="bg-[#ebd197] text-[#5c3e03] text-[10px] px-1.5 py-0.5 rounded-[4px] flex items-center gap-1 font-bold shadow-sm cursor-pointer hover:opacity-80 transition-opacity">
+                    <span>{memTier === 'pro' ? loc('عضو PRO', 'PRO Member', 'ئەندامی PRO') : loc('عضو PLUS', 'PLUS Member', 'ئەندامی PLUS')}</span>
+                    {memExpiry && (
+                      <span className="font-medium opacity-80">· {loc('حتى', 'until', 'تا')} {fmtDate(memExpiry)}</span>
+                    )}
                   </div>
                 ) : (
-                  <div className="bg-white/50 dark:bg-black/30 text-[10px] px-1.5 py-0.5 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm text-black dark:text-white">
-                    <span>{dir === 'rtl' ? 'عضو' : 'Member'}</span>
+                  <div onClick={() => navigate('/subscription')} className="bg-white/50 dark:bg-black/30 text-[10px] px-1.5 py-0.5 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm text-black dark:text-white cursor-pointer hover:opacity-80 transition-opacity">
+                    <span>{loc('عضو', 'Member', 'ئەندام')}</span>
+                  </div>
+                )}
+                {memPendingLaunch && (
+                  <div onClick={() => navigate('/subscription')} className="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-[10px] px-1.5 py-0.5 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm cursor-pointer hover:opacity-80 transition-opacity">
+                    <span>{(memPendingLaunch.tier === 'pro' ? 'PRO' : 'PLUS') + ' — ' + t('pendingLaunch')}</span>
                   </div>
                 )}
                 <div onClick={() => navigate('/followed-stores')} className="bg-white/50 dark:bg-black/30 backdrop-blur-sm text-[10px] px-1.5 py-0.5 rounded-[4px] flex items-center gap-1 font-medium shadow-sm text-black dark:text-white cursor-pointer hover:bg-white/70 dark:hover:bg-black/50 transition-colors">
@@ -205,8 +315,13 @@ export default function Profile() {
                 {dir === 'rtl' ? 'الخطة الحالية' : 'Current plan'}
               </span>
               <span className="font-bold text-[10px] text-black dark:text-white whitespace-nowrap uppercase">
-                {planActive ? user?.subscription_plan : (dir === 'rtl' ? 'مجاني' : 'Free')}
+                {memTier !== 'free' ? memTier : loc('مجاني', 'Free', 'بێبەرامبەر')}
               </span>
+              {memTier !== 'free' && memExpiry && (
+                <span className="text-[9px] text-zinc-500 whitespace-nowrap">
+                  {loc('حتى', 'until', 'تا')} {fmtDate(memExpiry)}
+                </span>
+              )}
               {dir === 'rtl' ? <ChevronLeft className="w-3 h-3 text-zinc-400 shrink-0" /> : <ChevronRight className="w-3 h-3 text-zinc-400 shrink-0" />}
             </div>
             <div className="flex gap-2 shrink-0">
@@ -254,6 +369,110 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {/* Referral Card */}
+        {isAuthenticated && (
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="font-bold text-[14px] flex items-center gap-1.5">
+                <Gift className="w-4 h-4 text-[#ff5000]" strokeWidth={2} />
+                {t('referralProgram')}
+              </h2>
+              {mine?.referral?.code && (
+                <span className="text-[11px] text-zinc-500">
+                  {t('referralCode')}: <span className="font-mono font-bold text-black dark:text-white">{mine.referral.code}</span>
+                </span>
+              )}
+            </div>
+
+            {!mineLoaded ? (
+              <div className="flex justify-center py-6">
+                <div className="w-6 h-6 border-2 border-[#ff5000]/20 border-t-[#ff5000] rounded-full animate-spin" />
+              </div>
+            ) : !mine ? (
+              <p className="text-[12px] text-zinc-500 text-center py-4">
+                {loc('تعذر تحميل بيانات الإحالة — حاول مرة أخرى لاحقًا', 'Could not load referral data — please try again later', 'داتای بانگهێشتکردن بار نەبوو — دواتر هەوڵ بدەرەوە')}
+              </p>
+            ) : (
+              <>
+                {/* Share link + copy */}
+                <div className="flex items-center gap-2 bg-[#f7f7f7] dark:bg-[#222] rounded-lg p-2 mb-3">
+                  <span dir="ltr" className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 truncate flex-1 min-w-0">
+                    {referralLink}
+                  </span>
+                  <button
+                    onClick={copyReferralLink}
+                    className="flex items-center gap-1 bg-gradient-to-r from-[#ff0036] to-[#ff5000] text-white text-[11px] px-3 py-1.5 rounded-full font-bold whitespace-nowrap shrink-0"
+                  >
+                    {copied ? <Check className="w-3 h-3" strokeWidth={3} /> : <Copy className="w-3 h-3" strokeWidth={2.5} />}
+                    {copied ? t('copied') : t('copyLink')}
+                  </button>
+                </div>
+
+                {/* The two programs — two lines each */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                  <div className="rounded-lg border border-black/5 dark:border-white/10 p-2.5">
+                    <p className="text-[11px] font-bold mb-1">
+                      {loc('إحالة شراء طابعة', 'Printer referral', 'بانگهێشتکردن بۆ کڕینی پرینتەر')}
+                    </p>
+                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                      {loc('صديقك يشتري طابعة عبر رابطك ← يحصل على توصيل مجاني لطلبه.', 'Your friend buys a printer through your link → they get free delivery on that order.', 'هاوڕێکەت پرینتەرێک دەکڕێت لە ڕێگەی لینکەکەتەوە ← گەیاندنی بێبەرامبەر بۆ داواکاریەکەی وەردەگرێت.')}
+                    </p>
+                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                      {loc('أنت تحصل على بكرة فيلامنت بعد 7 أيام من التوصيل.', 'You get a filament spool 7 days after delivery.', 'تۆش بۆبینێکی فیلامێنت وەردەگریت ٧ ڕۆژ دوای گەیاندن.')}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-black/5 dark:border-white/10 p-2.5">
+                    <p className="text-[11px] font-bold mb-1">
+                      {loc('إحالة اشتراك PRO', 'PRO subscription referral', 'بانگهێشتکردن بۆ ئەندامێتی PRO')}
+                    </p>
+                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                      {loc('مشترك PRO جديد يدفع عبر رابطك.', 'A new PRO member subscribes and pays via your link.', 'ئەندامێکی نوێی PRO لە ڕێگەی لینکەکەتەوە بەشداری دەکات و پارە دەدات.')}
+                    </p>
+                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                      {loc('أنت تحصل على بكرة فيلامنت عشوائية.', 'You get a random filament spool.', 'تۆش بۆبینێکی فیلامێنتی هەڕەمەکی وەردەگریت.')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* My rewards */}
+                <p className="text-[12px] font-bold mb-1.5">{t('rewards')}</p>
+                {mine.referral.rewards.length === 0 ? (
+                  <p className="text-[11px] text-zinc-500 py-2 text-center">
+                    {loc('لا توجد مكافآت بعد — شارك رابطك مع أصدقائك!', 'No rewards yet — share your link with friends!', 'هێشتا هیچ خەڵاتێک نییە — لینکەکەت لەگەڵ هاوڕێکانت بەشدار بکە!')}
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {mine.referral.rewards.map((r) => {
+                      const chip = rewardStateChip(r.state);
+                      return (
+                        <li key={r.id} className="flex items-center justify-between gap-2 bg-[#f7f7f7] dark:bg-[#222] rounded-lg px-2.5 py-2">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold truncate">
+                              {r.campaign === 'printer'
+                                ? loc('إحالة شراء طابعة', 'Printer referral', 'بانگهێشتکردنی پرینتەر')
+                                : loc('إحالة اشتراك PRO', 'PRO referral', 'بانگهێشتکردنی PRO')}
+                              {' · '}
+                              <span className="font-medium text-zinc-500">{loc('بكرة فيلامنت', 'Filament spool', 'بۆبینی فیلامێنت')}</span>
+                            </p>
+                            <p className="text-[10px] text-zinc-500">
+                              {r.state === 'pending' && r.eligible_at
+                                ? `${loc('تصبح مؤهلة في', 'Eligible on', 'شیاو دەبێت لە')} ${fmtDate(r.eligible_at)}`
+                                : fmtDate(r.created_at)}
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${chip.cls}`}>
+                            {chip.label}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Second Card: 4 Buttons */}
         <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 mb-3 shadow-sm flex justify-around items-center text-black dark:text-white">

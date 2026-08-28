@@ -70,10 +70,36 @@ jobs:
           [ -n "$URL" ] || { echo "::error::could not determine staging URL"; exit 1; }
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
+      - name: Second deploy pass — set APP_ORIGIN and email vars
+        # Why deploy twice: wrangler replaces the worker's plain-text vars
+        # WHOLESALE on every deploy, and APP_ORIGIN (the trusted origin used
+        # in password-reset email links) is only knowable AFTER the first
+        # deploy has printed the workers.dev URL. So pass 1 captures the URL,
+        # and pass 2 re-deploys with ALL vars — the previous ones MUST be
+        # repeated here or they would be wiped.
+        # EMAIL_ALLOWED_RECIPIENTS is the staging safety net: outbound email
+        # only goes to EMAIL_TEST_RECIPIENT (may be empty = no sends).
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          INITIAL_ADMIN_EMAIL: ${{ secrets.INITIAL_ADMIN_EMAIL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TEST_RECIPIENT: ${{ secrets.EMAIL_TEST_RECIPIENT }}
+        run: |
+          set -e
+          npx wrangler deploy --env staging \
+            --var GOOGLE_CLIENT_ID:"$VITE_GOOGLE_CLIENT_ID" \
+            --var INITIAL_ADMIN_EMAIL:"$INITIAL_ADMIN_EMAIL" \
+            --var APP_ORIGIN:"${{ steps.deploy.outputs.url }}" \
+            --var EMAIL_FROM:"$EMAIL_FROM" \
+            --var EMAIL_ALLOWED_RECIPIENTS:"$EMAIL_TEST_RECIPIENT" \
+            > /dev/null
+
       - name: Upload runtime secrets to the staging worker
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN --env staging
@@ -84,6 +110,16 @@ jobs:
             printf '%s' "$TELEGRAM_ADMIN_CHAT_ID" | npx wrangler secret put TELEGRAM_ADMIN_CHAT_ID --env staging
           else
             echo "TELEGRAM_ADMIN_CHAT_ID not set — the bot has no destination chat yet"
+          fi
+          if [ -n "$EMAIL_API_KEY" ]; then
+            printf '%s' "$EMAIL_API_KEY" | npx wrangler secret put EMAIL_API_KEY --env staging
+          else
+            echo "EMAIL_API_KEY not set — password-reset email stays honestly disabled on staging"
+          fi
+          if [ -n "$GEMINI_API_KEY" ]; then
+            printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --env staging
+          else
+            echo "GEMINI_API_KEY not set — AI features stay honestly disabled on staging"
           fi
 
       - name: Wait for the worker to serve

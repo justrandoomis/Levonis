@@ -5,6 +5,7 @@ import { safeParse } from '../lib/types';
 import { requireAuth, notFound, forbidden, str, int, jsonArray } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
+import { getTierStatus, benefits } from '../lib/entitlements';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -192,6 +193,14 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
       .run();
     return c.json({ success: true, id: existing.id });
   }
+  // Creating a NEW merchant profile is a PLUS/PRO benefit (mandate §8) —
+  // server-side tier check, never a client flag. Existing merchants above
+  // are grandfathered for updates and product management.
+  const status = await getTierStatus(c.env.DB, user.id);
+  if (!benefits.merchantProfile(status)) {
+    throw forbidden('يتطلب عضوية LEVO PLUS او PRO / Requires an active LEVO PLUS or PRO membership');
+  }
+
   const id = newId('cm');
   // verified stays 0 — only an admin can mark a merchant verified.
   await c.env.DB.prepare('INSERT INTO community_merchants (id, user_id, name, bio) VALUES (?, ?, ?, ?)')
@@ -248,5 +257,13 @@ communityRoutes.get('/profile-status', requireAuth, async (c) => {
   const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE user_id = ?')
     .bind(user.id)
     .first();
-  return c.json({ success: true, complete: !!(user.username && user.name), hasStore: !!merchant });
+  // merchant_allowed: existing merchants are grandfathered; new stores need
+  // an active PLUS/PRO membership (server-side check).
+  const status = await getTierStatus(c.env.DB, user.id);
+  return c.json({
+    success: true,
+    complete: !!(user.username && user.name),
+    hasStore: !!merchant,
+    merchant_allowed: !!merchant || benefits.merchantProfile(status),
+  });
 });

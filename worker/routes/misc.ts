@@ -79,7 +79,7 @@ function ipIsPrivate(host: string): boolean {
   return false;
 }
 
-function validateExtractUrl(raw: string): URL {
+export function validateExtractUrl(raw: string): URL {
   let url: URL;
   try {
     url = new URL(raw);

@@ -1,4 +1,7 @@
-export type Language = 'en' | 'ar' | 'ku';
+// Language codes: 'ar' (Arabic — the source language), 'en' (English),
+// 'ckb' (Sorani / Central Kurdish, Arabic script — ISO 639-3).
+// The legacy 'ku' localStorage value is migrated to 'ckb' in LanguageContext.
+export type Language = 'en' | 'ar' | 'ckb';
 
 export const translations = {
   en: {
@@ -145,6 +148,20 @@ export const translations = {
     // App
     levonis3d: "Levonis 3D",
 
+    // Memberships & referrals
+    membership: "Membership",
+    activeUntil: "Active until",
+    pendingLaunch: "Reserved — activates at site launch",
+    referralProgram: "Referral Program",
+    referralCode: "Referral code",
+    copyLink: "Copy link",
+    copied: "Copied!",
+    rewards: "Rewards",
+    priceTBA: "Price to be announced",
+    subscribeDisabled: "Not available for purchase yet",
+    launchNote: "Your card is reserved and activates when the site launches",
+    comingSoon: "Coming soon",
+    expired: "Expired",
   },
   ar: {
     active: "نشط",
@@ -290,8 +307,22 @@ export const translations = {
     // App
     levonis3d: "ليفونيس 3D",
 
+    // Memberships & referrals
+    membership: "العضوية",
+    activeUntil: "فعّالة حتى",
+    pendingLaunch: "محجوزة — تُفعّل عند إطلاق الموقع",
+    referralProgram: "برنامج الإحالة",
+    referralCode: "رمز الإحالة",
+    copyLink: "نسخ الرابط",
+    copied: "تم النسخ!",
+    rewards: "المكافآت",
+    priceTBA: "السعر يُعلن قريبًا",
+    subscribeDisabled: "غير متاح للشراء بعد",
+    launchNote: "بطاقتك محجوزة وتُفعّل عند إطلاق الموقع",
+    comingSoon: "قريبًا",
+    expired: "منتهية",
   },
-  ku: {
+  ckb: {
     active: "چالاکە",
     status: "دۆخ",
     freeTierUpgrade: "ئاستی بێبەرامبەر - بۆ زیاتر نوێبکەرەوە",
@@ -388,20 +419,20 @@ export const translations = {
     pro: "Pro",
     plusBenefits: "سوودەکانی Plus",
     proBenefits: "سوودەکانی Pro",
-    benefitPlus1: "Limited free shipping for orders over 150k (excluding printers)",
-    benefitPlus2: "Ability to register as a merchant in the Levo community",
-    benefitPlus3: "Access to the random fulfillment section",
-    benefitPlus4: "Access to special offers and bundles",
-    benefitPlus5: "Get one free daily ticket in the games section",
-    benefitPro1: "All Plus features, plus:",
-    benefitPro2: "Free shipping for all orders over 50k without exception",
-    benefitPro3: "Special discounts on all products",
-    benefitPro4: "5 free daily tickets instead of one in games",
-    benefitPro5: "Profile expansion and distinction for merchant or customer",
-    benefitPro6: "Special technical support and priority response",
-    benefitPro7: "Priority in delivery and orders",
-    benefitPro8: "Cash on delivery for half amount with lower commission",
-    benefitPro9: "Additional features for merchants in the Levo community",
+    benefitPlus1: "گەیاندنی بێبەرامبەری سنووردار بۆ داواکاریەکانی سەرووی ١٥٠ هەزار (پرینتەرەکان نەگرێتەوە)",
+    benefitPlus2: "توانای خۆتۆمارکردن وەک بازرگان لە کۆمەڵگەی Levo",
+    benefitPlus3: "دەستگەیشتن بە بەشی فیلامێنتی هەڕەمەکی",
+    benefitPlus4: "دەستگەیشتن بە بەشی ئۆفەرە تایبەتەکان و پاکێجەکان",
+    benefitPlus5: "وەرگرتنی یەک تکتی ڕۆژانەی بێبەرامبەر لە بەشی یارییەکان",
+    benefitPro1: "هەموو تایبەتمەندییەکانی Plus، لەگەڵ:",
+    benefitPro2: "گەیاندنی بێبەرامبەر بۆ هەموو داواکاریەکانی سەرووی ٥٠ هەزار بەبێ سنوور یان جیاکاری",
+    benefitPro3: "داشکاندنی تایبەت لە هەموو بەرهەمەکانی سایتەکە",
+    benefitPro4: "٥ تکتی بێبەرامبەری ڕۆژانە لە جیاتی یەک تکت لە بەشی یارییەکان",
+    benefitPro5: "فراوانکردن و جیاکردنەوەی پڕۆفایلی بازرگان یان کڕیار لە کۆمەڵگەی Levo",
+    benefitPro6: "پشتیوانی تەکنیکی تایبەت و پێشینە لە وەڵامدانەوە",
+    benefitPro7: "پێشینە لە گەیاندن و داواکاریەکان",
+    benefitPro8: "پارەدان لە کاتی وەرگرتن بۆ نیوەی بڕەکە بە کۆمیشنێکی کەمتر",
+    benefitPro9: "تایبەتمەندی زیاتر بۆ بازرگانان لە کۆمەڵگەی Levo",
     continue: "بەردەوام بە",
     subscriptionTerms: "پارەدانی بەردەوام. هەرکاتێک بتەوێت دەتوانیت هەڵیوەشێنیتەوە. بە کرتەکردن لەسەر بەردەوام بە، تۆ ڕازی دەبیت بە مەرجەکانی خزمەتگوزاری ئێمە",
     month: "مانگ",
@@ -435,5 +466,19 @@ export const translations = {
     // App
     levonis3d: "Levonis 3D",
 
+    // Memberships & referrals
+    membership: "ئەندامێتی",
+    activeUntil: "چالاکە تا",
+    pendingLaunch: "پارێزراوە — لەگەڵ دەستپێکردنی سایتەکە چالاک دەبێت",
+    referralProgram: "پرۆگرامی بانگهێشتکردن",
+    referralCode: "کۆدی بانگهێشتکردن",
+    copyLink: "کۆپیکردنی لینک",
+    copied: "کۆپی کرا!",
+    rewards: "خەڵاتەکان",
+    priceTBA: "نرخەکە بەم زووانە ڕادەگەیەنرێت",
+    subscribeDisabled: "هێشتا بۆ کڕین بەردەست نییە",
+    launchNote: "کارتەکەت پارێزراوە و لەگەڵ دەستپێکردنی سایتەکە چالاک دەبێت",
+    comingSoon: "بەم زووانە",
+    expired: "بەسەرچووە",
   }
 };

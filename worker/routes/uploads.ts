@@ -33,7 +33,7 @@ const MAGIC: Array<{ ext: string; mime: string; match: (b: Uint8Array) => boolea
   },
 ];
 
-function sniff(buf: Uint8Array): { ext: string; mime: string } | null {
+export function sniff(buf: Uint8Array): { ext: string; mime: string } | null {
   for (const m of MAGIC) {
     if (buf.length >= 12 && m.match(buf)) return { ext: m.ext, mime: m.mime };
   }

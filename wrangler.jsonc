@@ -46,7 +46,10 @@
   "vars": {
     "GOOGLE_CLIENT_ID": "",
     "INITIAL_ADMIN_EMAIL": "",
-    "EXTRA_ALLOWED_ORIGINS": ""
+    "EXTRA_ALLOWED_ORIGINS": "",
+    "APP_ORIGIN": "",
+    "EMAIL_ALLOWED_RECIPIENTS": "",
+    "EMAIL_FROM": ""
   },
 
   "observability": { "enabled": true },
@@ -79,7 +82,10 @@
       "vars": {
         "GOOGLE_CLIENT_ID": "",
         "INITIAL_ADMIN_EMAIL": "",
-        "EXTRA_ALLOWED_ORIGINS": ""
+        "EXTRA_ALLOWED_ORIGINS": "",
+        "APP_ORIGIN": "",
+        "EMAIL_ALLOWED_RECIPIENTS": "",
+        "EMAIL_FROM": ""
       },
       "observability": { "enabled": true }
     }

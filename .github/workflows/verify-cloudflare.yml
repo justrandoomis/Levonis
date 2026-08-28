@@ -117,6 +117,11 @@ jobs:
         run: |
           [ -n "${{ secrets.VITE_GOOGLE_CLIENT_ID }}" ] && echo "google=set" >> "$GITHUB_OUTPUT" || echo "google=NOT SET" >> "$GITHUB_OUTPUT"
           [ -n "${{ secrets.INITIAL_ADMIN_EMAIL }}" ] && echo "admin=set" >> "$GITHUB_OUTPUT" || echo "admin=NOT SET (add repository secret INITIAL_ADMIN_EMAIL)" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.EMAIL_API_KEY }}" ] && echo "email_key=set" >> "$GITHUB_OUTPUT" || echo "email_key=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.EMAIL_FROM }}" ] && echo "email_from=set" >> "$GITHUB_OUTPUT" || echo "email_from=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.EMAIL_TEST_RECIPIENT }}" ] && echo "email_test=set" >> "$GITHUB_OUTPUT" || echo "email_test=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.GEMINI_API_KEY }}" ] && echo "gemini=set" >> "$GITHUB_OUTPUT" || echo "gemini=NOT SET" >> "$GITHUB_OUTPUT"
+          [ -n "${{ secrets.PROD_APP_ORIGIN }}" ] && echo "prod_origin=set" >> "$GITHUB_OUTPUT" || echo "prod_origin=NOT SET" >> "$GITHUB_OUTPUT"
 
       - name: Summary
         if: always()
@@ -135,4 +140,9 @@ jobs:
             echo "| Telegram admin chat id | ${{ steps.telegram.outputs.chat }} |"
             echo "| Google client ID | ${{ steps.presence.outputs.google }} |"
             echo "| INITIAL_ADMIN_EMAIL | ${{ steps.presence.outputs.admin }} |"
+            echo "| EMAIL_API_KEY | ${{ steps.presence.outputs.email_key }} |"
+            echo "| EMAIL_FROM | ${{ steps.presence.outputs.email_from }} |"
+            echo "| EMAIL_TEST_RECIPIENT | ${{ steps.presence.outputs.email_test }} |"
+            echo "| GEMINI_API_KEY | ${{ steps.presence.outputs.gemini }} |"
+            echo "| PROD_APP_ORIGIN | ${{ steps.presence.outputs.prod_origin }} |"
           } >> "$GITHUB_STEP_SUMMARY"

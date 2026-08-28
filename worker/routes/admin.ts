@@ -4,7 +4,8 @@ import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { walletTxPublic, credit } from '../lib/wallet';
 import { productPublic } from './products';
 import { orderPublic } from './orders';
@@ -326,7 +327,16 @@ adminRoutes.get('/orders', async (c) => {
   const out = [];
   for (const o of results) {
     const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(o.id).all();
-    out.push({ ...orderPublic(o, items), email: o.email, username: o.username, user_id: o.user_id });
+    out.push({
+      ...orderPublic(o, items),
+      email: o.email,
+      username: o.username,
+      user_id: o.user_id,
+      priority: Number(o.priority) || 0,
+      delivery_waived: Number(o.delivery_waived) || 0,
+      membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
+      delivered_at: o.delivered_at ?? null,
+    });
   }
   return c.json({ success: true, orders: out });
 });
@@ -354,13 +364,30 @@ adminRoutes.patch('/orders/:id', async (c) => {
     throw badRequest(`Cannot move an order from "${from}" to "${next}"`);
   }
 
+  // delivered_at is stamped in the SAME conditional update as the status flip
+  // so a concurrent transition can never produce a delivered order without it.
   const flip = await c.env.DB.prepare(
-    `UPDATE orders SET status = ?, admin_note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-      WHERE id = ? AND status = ?`
+    next === 'delivered'
+      ? `UPDATE orders SET status = ?, admin_note = ?, delivered_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE id = ? AND status = ?`
+      : `UPDATE orders SET status = ?, admin_note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE id = ? AND status = ?`
   )
     .bind(next, adminNote, id, from)
     .run();
   if (flip.meta.changes === 0) throw badRequest('The order changed while you were editing — reload and retry');
+
+  if (next === 'delivered') {
+    // Referral 9.1 milestone: records delivered_at-based eligibility (idempotent).
+    c.executionCtx.waitUntil(onOrderDelivered(c.env, id));
+    // PLUS gift on printer purchase, when the owner set the milestone to
+    // delivery (grant itself is idempotent per order).
+    const printerGift = await getSetting(c.env.DB, 'printerGiftConfig');
+    if (printerGift?.enabled === true && printerGift.milestone === 'delivered') {
+      c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, id));
+    }
+  }
 
   if (next === 'cancelled') {
     const stmts = [];
@@ -391,6 +418,25 @@ adminRoutes.patch('/orders/:id', async (c) => {
       );
     }
     if (stmts.length > 0) await c.env.DB.batch(stmts);
+
+    // A cancelled order can no longer qualify referral rewards keyed on it —
+    // cancel any still-undecided ones (never touches available/reserved/
+    // fulfilled rewards, which an admin decided explicitly).
+    const rewards = await c.env.DB.prepare(
+      `UPDATE referral_rewards
+          SET state = 'cancelled',
+              decided_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+              decided_by = ?,
+              admin_note = CASE WHEN admin_note = '' THEN ? ELSE admin_note END
+        WHERE source_ref = ? AND state IN ('pending','qualified')`
+    )
+      .bind(adminUser.id, `Source order ${id} was cancelled`, id)
+      .run();
+    if (rewards.meta.changes > 0) {
+      await audit(c.env.DB, adminUser.id, 'referral.reward_cancel', id, {
+        reason: 'order_cancelled', count: rewards.meta.changes,
+      });
+    }
   }
   await audit(c.env.DB, adminUser.id, 'order.status', id, { from, to: next });
   return c.json({ success: true });
