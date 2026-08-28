@@ -74,6 +74,30 @@ export const SETTING_DEFAULTS = {
   printerGiftConfig: { enabled: false, plan_id: 'plus_1mo', milestone: 'delivered' } as {
     enabled: boolean; plan_id: string; milestone: 'paid' | 'delivered';
   },
+  // Last-mile shipping policy (final-phase brief §6.3). Confirmed values are
+  // filled; unresolved parts stay null and produce honest needs_config
+  // states instead of invented fees.
+  shippingPolicy: {
+    ordinary_iqd: 5000,
+    printer_small_iqd: null,      // 25,000 or 50,000 mapping pending owner (decision log)
+    printer_large_iqd: null,
+    pro_threshold_iqd: 75000,     // STRICTLY greater-than qualifies (75,000 does NOT)
+    threshold_basis: 'merchandise_after_coupon', // pending owner confirmation
+    pro_waiver_covers: 'all',     // 'all' | 'ordinary_only' — pending owner confirmation
+    carton_threshold_spools: null, // >10 spools MAY incur a carton fee — amount pending
+    carton_fee_iqd: null,
+    printer_advance_required: true,
+  } as {
+    ordinary_iqd: number;
+    printer_small_iqd: number | null;
+    printer_large_iqd: number | null;
+    pro_threshold_iqd: number;
+    threshold_basis: 'merchandise_after_coupon' | 'merchandise_before_coupon';
+    pro_waiver_covers: 'all' | 'ordinary_only';
+    carton_threshold_spools: number | null;
+    carton_fee_iqd: number | null;
+    printer_advance_required: boolean;
+  },
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
