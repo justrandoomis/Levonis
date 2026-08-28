@@ -1,0 +1,36 @@
+{
+  "name": "levo-studio-mobile",
+  "version": "1.2.1",
+  "private": true,
+  "author": "LEVONIS",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "sync": "npm run build && cap sync",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/ios": "8.5.0",
+    "fflate": "0.7.4",
+    "occt-import-js": "0.0.23",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "three": "0.160.1",
+    "three-slicer": "0.2.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "0.160.0",
+    "@vitejs/plugin-react": "6.0.2",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vite": "8.0.13"
+  }
+}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#101416"/>
+  <rect x="172" y="172" width="680" height="680" rx="154" fill="#a3d72f"/>
+  <text x="512" y="570" fill="#152006" font-family="Arial, sans-serif" font-size="300" font-weight="900" letter-spacing="-28" text-anchor="middle">LE</text>
+  <text x="512" y="700" fill="#152006" font-family="Arial, sans-serif" font-size="72" font-weight="800" letter-spacing="18" text-anchor="middle">STUDIO</text>
+</svg>

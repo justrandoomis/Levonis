@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LEVO Studio</string>
+    <string name="title_activity_main">LEVO Studio</string>
+    <string name="app_description">Mobile 3D plate editor and slicer by LEVONIS</string>
+    <string name="copyright_notice">Copyright © 2026 LEVONIS. All rights reserved except open-source components under their respective licenses.</string>
+    <string name="package_name">iq.levo.studio</string>
+    <string name="custom_url_scheme">iq.levo.studio</string>
+</resources>

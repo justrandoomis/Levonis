@@ -1,0 +1,54 @@
+name: Publish verified LEVO Studio v1.1.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-levo-v1.1.0.yml"
+      - "release-staging/**"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Verify and publish signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APK: /tmp/LEVO-Studio-Android-v1.1.0.apk
+      EXPECTED_SHA256: 961f2b236dbb613464bef3a32514c5cf8920116718975ab99cad0f8a68c9515c
+      EXPECTED_CERT_SHA256: 7a1e2f090ca588687070bf90334812e38c7431ba9f6118473f2b1925e81321e1
+      RELEASE_TAG: v1.1.0
+      RELEASE_TARGET: 38b5613fb390d94036f9151d18811a9750964bf8
+
+    steps:
+      - name: Checkout staged release
+        uses: actions/checkout@v5
+
+      - name: Verify bytes, archive, and permanent signer
+        run: |
+          set -euo pipefail
+          cat release-staging/chunks/part-* > "$APK"
+          test "$(sha256sum "$APK" | cut -d' ' -f1)" = "$EXPECTED_SHA256"
+          unzip -t "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          VERIFY_OUTPUT="$($BUILD_TOOLS/apksigner verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          CERT_SHA256="$(printf '%s\n' "$VERIFY_OUTPUT" | sed -n 's/^.*certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]' | head -n 1)"
+          test "$CERT_SHA256" = "$EXPECTED_CERT_SHA256"
+          printf '%s\n' "$VERIFY_OUTPUT" | grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true'
+          printf '%s\n' "$VERIFY_OUTPUT" | grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true'
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            "$APK" \
+            release-staging/LEVO-Studio-Android-v1.1.0.apk.sha256 \
+            release-staging/levo-studio-android.json \
+            --target "$RELEASE_TARGET" \
+            --title "LEVO Studio v1.1.0" \
+            --notes "Official LEVONIS Android production release. Signed with the permanent LEVONIS certificate and verified with APK Signature Scheme v2/v3."
