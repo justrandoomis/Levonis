@@ -1,5 +1,21 @@
 # Test results
 
+## Phase: auth & UI fixes — STAGING run 2026-08-28 (commit acdba80)
+
+Same workflow, all three suites against the live staging worker after the
+auth/UI overhaul (migration 0011 applied): base **60/60**, v2 **37/37**,
+v3 **117 passed, 0 failed, 7 blocked** — two MORE passes than the local
+run because staging's real TELEGRAM_BOT_TOKEN lets the sign-in deep-link
+checks execute (opaque link, masked phone, Arabic-digit input). Locally
+the same commit measured: typecheck 0, unit 138/138, 60/60, 37/37,
+115/0/9, plus the new browser suite scripts/e2e-ui.mjs **37/37**
+(pixel-sampled proof the bottom-corner glow is gone; evidence in
+docs/UI_FIX_EVIDENCE.md + docs/evidence/).
+
+Owner-external items for this phase: Google Console origins
+(docs/GOOGLE_SIGNIN_FIX.md) and a real-device Telegram sign-in pass on
+staging.
+
 ## Phase: final phase (v3) — STAGING run 2026-08-28 (live Cloudflare)
 
 Workflow `2 - Deploy Staging + Tests` on commit `5e427d9` deployed
