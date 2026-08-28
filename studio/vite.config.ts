@@ -22,6 +22,39 @@ export default defineConfig(async () => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
+  // The editor subtree (slicer-client -> engine adapter -> three /
+  // three-slicer / the 7 MiB occt WASM ?url asset) is browser-only, but
+  // vinext server-renders client components, so the rsc/ssr environments
+  // bundle ~20 MiB of engine chunks into the WORKER script — which is what
+  // pushed the deploy past Cloudflare's Workers size limit. editor-boot.tsx
+  // mounts the editor only after hydration (useEffect), so the server never
+  // executes it; this plugin makes that a BUILD-time guarantee by resolving
+  // the module to an inert stub in every server environment. The client
+  // build is untouched.
+  const EDITOR_STUB_ID = "\0levo-editor-ssr-stub";
+  const serverStubEditor: import("vite").Plugin = {
+    name: "levo-studio-ssr-editor-stub",
+    resolveId(source: string, importer: string | undefined) {
+      if (
+        this.environment?.config?.consumer === "server" &&
+        /(^|[\\/])slicer-client$/.test(source.replace(/\.tsx?$/, "")) &&
+        importer &&
+        /editor-boot/.test(importer)
+      ) {
+        return EDITOR_STUB_ID;
+      }
+      return null;
+    },
+    load(id: string) {
+      if (id === EDITOR_STUB_ID) {
+        // Never rendered: editor-boot only imports this after hydration in
+        // the browser, where the real module is served from the client build.
+        return "export default function EditorServerStub(){return null;}";
+      }
+      return null;
+    },
+  };
+
   return {
     worker: {
       // three-slicer's Emscripten worker uses top-level await and must remain
@@ -36,6 +69,7 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      serverStubEditor,
       vinext(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },

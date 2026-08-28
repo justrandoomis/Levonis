@@ -1,5 +1,5 @@
-import SlicerClient from "./slicer-client";
 import { getStudioUser } from "./studio-auth";
+import EditorBoot from "./editor-boot";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +8,5 @@ export default async function Home() {
   // Handoff identity is the minimum only (mandate §3): opaque id + display
   // name — no email, no phone. The id keys the client's draft namespace and
   // account project sync; guests stay null and keep editing locally.
-  return <SlicerClient user={user ? { id: user.id, displayName: user.displayName } : null} />;
+  return <EditorBoot user={user ? { id: user.id, displayName: user.displayName } : null} />;
 }

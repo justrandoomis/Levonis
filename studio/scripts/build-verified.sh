@@ -36,3 +36,9 @@ timeout \
   --kill-after="${STUDIO_BUILD_KILL_AFTER:-10s}" \
   "${STUDIO_BUILD_TIMEOUT:-5m}" \
   "${vinext}" build
+
+# Server bundle hygiene: wrangler uploads every dist/server *.js as a module
+# (rules glob), so orphaned browser-only engine chunks must be pruned or the
+# worker exceeds the Cloudflare size limit. Iterates to a fixpoint; only
+# removes files nothing references.
+node "${project_root}/scripts/prune-server-orphans.mjs"

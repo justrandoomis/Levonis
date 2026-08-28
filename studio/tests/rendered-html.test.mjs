@@ -37,7 +37,12 @@ test("renders the production slicer shell and security policy", async () => {
   assert.doesNotMatch(html, /codex-preview/i);
   assert.match(html, /LEVO Studio/);
   assert.match(html, /manifest\.webmanifest/);
-  assert.match(html, /LEVO Studio/);
-  assert.match(html, /X2D/);
-  assert.match(html, /مشروع جديد/);
+  // Contract change (worker-size fix): the editor subtree is client-only —
+  // SSR delivers the app shell + loading state, and the editor UI (printer
+  // grid, project actions) mounts after hydration. Rendering the editor on
+  // the server is exactly what bundled ~20 MiB of engine chunks into the
+  // worker script and broke the deploy, so the editor markup must NOT be in
+  // the SSR HTML. Browser-side mounting is covered by the Playwright smoke.
+  assert.match(html, /جارٍ تحميل LEVO Studio/);
+  assert.doesNotMatch(html, /X2D/);
 });
