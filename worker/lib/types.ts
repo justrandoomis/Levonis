@@ -11,6 +11,13 @@ export interface Env {
   EMAIL_FROM?: string;
   TELEGRAM_BOT_TOKEN?: string; // admin notifications bot
   TELEGRAM_ADMIN_CHAT_ID?: string; // chat/channel the bot posts into
+  /** Trusted absolute origin for links in emails (per environment). Never
+   *  derive email links from the request Host header. */
+  APP_ORIGIN?: string;
+  /** Staging safety: comma-separated allowlist; when set, outbound email is
+   *  only sent to these addresses (other requests behave normally but skip
+   *  the send). Leave unset in production. */
+  EMAIL_ALLOWED_RECIPIENTS?: string;
 }
 
 export interface SessionUser {
