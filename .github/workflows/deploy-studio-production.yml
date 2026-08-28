@@ -1,0 +1,193 @@
+# LEVO STUDIO PRODUCTION deploy — gated. Requires typing
+# DEPLOY-STUDIO-PRODUCTION into the confirmation input. Deploys the
+# "levonis-studio" worker to its workers.dev URL only: it does NOT attach the
+# studio.levonis-iq.com custom domain and does NOT change any DNS (domain
+# attachment is a separate, manual dashboard step after approval — the store's
+# and mail's DNS are never touched from here).
+# Migrations run only when apply_migrations=true AND the Studio production
+# database is empty — a database with existing tables requires a reviewed
+# upgrade plan and a backup first.
+#
+# Unlike the store's production workflow (which resolves its database from a
+# pre-existing secret), Studio's production D1/R2 are created here if missing:
+# there is no legacy Studio database to protect, the resource names are
+# Studio-only, and no identifiers from the old Sites hosting are ever reused.
+# The optional STUDIO_PROD_DB_NAME / STUDIO_PROD_BUCKET secrets override the
+# default names if the owner pre-creates resources.
+name: 5 - Deploy Studio Production (approval required)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-STUDIO-PRODUCTION to confirm'
+        required: true
+      apply_migrations:
+        description: 'Apply migrations to the Studio production D1 (only if empty)'
+        type: boolean
+        default: false
+
+concurrency: studio-production-deploy
+
+jobs:
+  studio-production:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - name: Confirmation gate
+        working-directory: .
+        run: |
+          [ "${{ inputs.confirm }}" = "DEPLOY-STUDIO-PRODUCTION" ] \
+            || { echo "::error::confirmation text mismatch — aborting"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Ensure Studio production D1 database exists
+        id: db
+        env:
+          STUDIO_PROD_DB_NAME: ${{ secrets.STUDIO_PROD_DB_NAME }}
+        run: |
+          set -e
+          NAME="${STUDIO_PROD_DB_NAME:-levonis-studio-db}"
+          ID=$(npx wrangler d1 list --json | jq -r --arg name "$NAME" '.[] | select(.name==$name) | .uuid')
+          if [ -z "$ID" ]; then
+            echo "Creating $NAME…"
+            npx wrangler d1 create "$NAME" > /dev/null
+            ID=$(npx wrangler d1 list --json | jq -r --arg name "$NAME" '.[] | select(.name==$name) | .uuid')
+          fi
+          [ -n "$ID" ] || { echo "::error::could not create/find the Studio production DB"; exit 1; }
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure Studio production R2 bucket exists
+        id: bucket
+        env:
+          STUDIO_PROD_BUCKET: ${{ secrets.STUDIO_PROD_BUCKET }}
+        run: |
+          set -e
+          BUCKET="${STUDIO_PROD_BUCKET:-levonis-studio-files}"
+          npx wrangler r2 bucket create "$BUCKET" 2>/dev/null || true
+          npx wrangler r2 bucket list | grep -qw "$BUCKET" \
+            || { echo "::error::could not create/find the Studio production bucket"; exit 1; }
+          echo "name=$BUCKET" >> "$GITHUB_OUTPUT"
+
+      - name: Fill production identifiers into studio/wrangler.jsonc
+        env:
+          STUDIO_PROD_DB_ID: ${{ steps.db.outputs.id }}
+          STUDIO_PROD_DB_NAME: ${{ steps.db.outputs.name }}
+          STUDIO_PROD_BUCKET: ${{ steps.bucket.outputs.name }}
+        run: node scripts/set-deploy-ids.mjs
+
+      - name: Migrations (only when requested AND the database is empty)
+        # Runs BEFORE the build on purpose: the Vite build writes a
+        # .wrangler/deploy/config.json redirect that would point wrangler at
+        # the built dist/ config, whose relative migrations_dir no longer
+        # resolves. Pre-build, wrangler reads studio/wrangler.jsonc directly.
+        if: ${{ inputs.apply_migrations }}
+        run: |
+          set -e
+          if ! ls drizzle/*.sql >/dev/null 2>&1; then
+            echo "::error::apply_migrations was requested but studio/drizzle contains no migration files — nothing to apply."
+            exit 1
+          fi
+          COUNT=$(npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
+            --command "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%'" \
+            | jq -r '.[0].results[0].n')
+          if [ "$COUNT" != "0" ]; then
+            echo "::error::Studio production database already has $COUNT tables — refusing fresh migrations. Back up and design an upgrade migration instead."
+            exit 1
+          fi
+          npx wrangler d1 migrations apply "${{ steps.db.outputs.name }}" --remote
+
+      - name: Build Studio (production target)
+        # No CLOUDFLARE_ENV: the top-level wrangler.jsonc environment is the
+        # production worker "levonis-studio".
+        run: npm run build
+
+      - name: Deploy Studio production worker (workers.dev only — no domain/DNS)
+        id: deploy
+        run: |
+          set -e
+          npx wrangler deploy | tee /tmp/studio-deploy.log
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/studio-deploy.log | head -1)
+          [ -n "$URL" ] || { echo "::error::could not determine the Studio production URL"; exit 1; }
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Second deploy pass — set APP_ORIGIN and MAIN_SITE_ORIGIN
+        # Why deploy twice: wrangler replaces the worker's plain-text vars
+        # WHOLESALE on every deploy, and the workers.dev URL is only knowable
+        # AFTER the first deploy printed it. Pass 2 re-deploys with ALL vars
+        # (any var not repeated here would be wiped).
+        # APP_ORIGIN prefers the STUDIO_PROD_APP_ORIGIN secret when set — it
+        # becomes https://studio.levonis-iq.com at the manual custom-domain
+        # attachment step — else it falls back to the captured workers.dev
+        # URL. MAIN_SITE_ORIGIN (the main-site worker origin for the
+        # server-to-server login handoff) comes from the optional
+        # STUDIO_PROD_MAIN_SITE_ORIGIN secret; empty keeps the handoff
+        # honestly disabled.
+        env:
+          STUDIO_PROD_APP_ORIGIN: ${{ secrets.STUDIO_PROD_APP_ORIGIN }}
+          STUDIO_PROD_MAIN_SITE_ORIGIN: ${{ secrets.STUDIO_PROD_MAIN_SITE_ORIGIN }}
+        run: |
+          set -e
+          APP_ORIGIN="${STUDIO_PROD_APP_ORIGIN:-${{ steps.deploy.outputs.url }}}"
+          if [ -z "$STUDIO_PROD_MAIN_SITE_ORIGIN" ]; then
+            echo "STUDIO_PROD_MAIN_SITE_ORIGIN not set — the login handoff stays honestly disabled in production"
+          fi
+          npx wrangler deploy \
+            --var APP_ORIGIN:"$APP_ORIGIN" \
+            --var MAIN_SITE_ORIGIN:"$STUDIO_PROD_MAIN_SITE_ORIGIN" \
+            > /dev/null
+
+      - name: Upload runtime secrets to the Studio production worker
+        env:
+          STUDIO_HANDOFF_SECRET: ${{ secrets.STUDIO_HANDOFF_SECRET }}
+        run: |
+          if [ -n "$STUDIO_HANDOFF_SECRET" ]; then
+            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put HANDOFF_EXCHANGE_SECRET
+          else
+            echo "STUDIO_HANDOFF_SECRET not set — the server-to-server login handoff stays honestly disabled in production"
+          fi
+
+      - name: Health check
+        run: curl -fsS -m 15 -o /dev/null "${{ steps.deploy.outputs.url }}/"
+
+      - name: Verify COOP/COEP isolation headers (T15 CI check)
+        # Header presence is the CI proxy; the browser-side
+        # `window.crossOriginIsolated === true` check remains part of T15's
+        # behavioral verification on the final HTTPS origin.
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.url }}"
+          curl -fsS -m 15 -D /tmp/studio-headers.txt -o /tmp/studio-body.html "$URL/"
+          grep -qi '^cross-origin-opener-policy: same-origin' /tmp/studio-headers.txt \
+            || { echo "::error::COOP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
+          grep -qi '^cross-origin-embedder-policy: require-corp' /tmp/studio-headers.txt \
+            || { echo "::error::COEP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
+          grep -qi '^cross-origin-resource-policy: same-origin' /tmp/studio-headers.txt \
+            || { echo "::error::CORP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
+          echo "COOP/COEP/CORP present on the worker-rendered HTML document."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Studio production deployment (workers.dev)"
+            echo "- URL: ${{ steps.deploy.outputs.url }}"
+            echo "- Custom domain studio.levonis-iq.com was NOT attached — that is a separate approved"
+            echo "  manual step (Worker → Settings → Domains & Routes → Add → Custom domain)."
+            echo "- No DNS records were changed. Store and mail DNS are untouched."
+            echo "- COOP/COEP/CORP headers verified on the HTML document (CI half of T15)."
+          } >> "$GITHUB_STEP_SUMMARY"

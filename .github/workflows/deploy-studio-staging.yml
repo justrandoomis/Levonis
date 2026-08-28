@@ -1,0 +1,163 @@
+# Deploys the LEVO STUDIO STAGING environment (worker "levonis-studio-staging"
+# on workers.dev) with its own D1 database and R2 bucket, then verifies the
+# deployed worker serves the COOP/COEP isolation headers the slicer engine
+# depends on (acceptance test T15's CI half). Completely separate from the
+# store deploys: separate worker, separate database/bucket, separate
+# concurrency group — a Studio deploy can never break or block a store deploy.
+# Never touches the production database, the production bucket, or any
+# DNS/domain.
+name: 4 - Deploy Studio Staging
+
+on:
+  workflow_dispatch:
+
+concurrency: studio-staging-deploy
+
+jobs:
+  studio-staging:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        # The Studio app is an independent npm workspace: its own lockfile,
+        # its own wrangler.jsonc, its own node_modules. Everything runs there.
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+
+      # Plain npm ci — the legacy Sites install wrappers are gone on purpose.
+      - run: npm ci --no-audit --no-fund
+
+      - name: Ensure Studio staging D1 database exists
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-studio-db-staging") | .uuid')
+          if [ -z "$ID" ]; then
+            echo "Creating levonis-studio-db-staging…"
+            npx wrangler d1 create levonis-studio-db-staging > /dev/null
+            ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-studio-db-staging") | .uuid')
+          fi
+          [ -n "$ID" ] || { echo "::error::could not create/find the Studio staging DB"; exit 1; }
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure Studio staging R2 bucket exists
+        run: |
+          npx wrangler r2 bucket create levonis-studio-files-staging 2>/dev/null || true
+          npx wrangler r2 bucket list | grep -qw "levonis-studio-files-staging" \
+            || { echo "::error::could not create/find the Studio staging bucket"; exit 1; }
+
+      - name: Fill staging database_id into studio/wrangler.jsonc
+        env:
+          STUDIO_STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs
+
+      - name: Apply migrations (Studio STAGING database only)
+        # MUST run BEFORE the build: the Vite build writes a
+        # .wrangler/deploy/config.json redirect that points every subsequent
+        # wrangler invocation at the built dist/ config, whose relative
+        # migrations_dir no longer resolves. Pre-build, wrangler reads
+        # studio/wrangler.jsonc directly. Skips honestly while the drizzle
+        # migrations have not been generated yet.
+        run: |
+          set -e
+          if ls drizzle/*.sql >/dev/null 2>&1; then
+            npx wrangler d1 migrations apply levonis-studio-db-staging --remote --env staging
+          else
+            echo "No migration files in studio/drizzle yet — skipping (the project-storage schema has not landed). The worker deploys without database tables."
+          fi
+
+      - name: Build Studio (staging target)
+        # CLOUDFLARE_ENV selects env.staging from wrangler.jsonc so the
+        # emitted dist config targets levonis-studio-staging with the staging
+        # D1/R2 names and the substituted database_id.
+        env:
+          CLOUDFLARE_ENV: staging
+        run: npm run build
+
+      - name: Deploy Studio staging worker
+        id: deploy
+        run: |
+          set -e
+          npx wrangler deploy --env staging | tee /tmp/studio-deploy.log
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/studio-deploy.log | head -1)
+          [ -n "$URL" ] || { echo "::error::could not determine the Studio staging URL"; exit 1; }
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Second deploy pass — set APP_ORIGIN and MAIN_SITE_ORIGIN
+        # Why deploy twice: wrangler replaces the worker's plain-text vars
+        # WHOLESALE on every deploy, and APP_ORIGIN (Studio's own trusted
+        # origin for return-URL validation) is only knowable AFTER the first
+        # deploy has printed the workers.dev URL. Pass 2 re-deploys with ALL
+        # vars — any var not repeated here would be wiped.
+        # MAIN_SITE_ORIGIN is the main-site worker origin used by the
+        # server-to-server login handoff; on staging it comes from the
+        # optional STUDIO_STAGING_MAIN_SITE_ORIGIN secret (the store staging
+        # workers.dev URL). Empty keeps the handoff honestly disabled.
+        env:
+          STUDIO_STAGING_MAIN_SITE_ORIGIN: ${{ secrets.STUDIO_STAGING_MAIN_SITE_ORIGIN }}
+        run: |
+          set -e
+          if [ -z "$STUDIO_STAGING_MAIN_SITE_ORIGIN" ]; then
+            echo "STUDIO_STAGING_MAIN_SITE_ORIGIN not set — the login handoff stays honestly disabled on staging"
+          fi
+          npx wrangler deploy --env staging \
+            --var APP_ORIGIN:"${{ steps.deploy.outputs.url }}" \
+            --var MAIN_SITE_ORIGIN:"$STUDIO_STAGING_MAIN_SITE_ORIGIN" \
+            > /dev/null
+
+      - name: Upload runtime secrets to the Studio staging worker
+        env:
+          STUDIO_HANDOFF_SECRET: ${{ secrets.STUDIO_HANDOFF_SECRET }}
+        run: |
+          if [ -n "$STUDIO_HANDOFF_SECRET" ]; then
+            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put HANDOFF_EXCHANGE_SECRET --env staging
+          else
+            echo "STUDIO_HANDOFF_SECRET not set — the server-to-server login handoff stays honestly disabled on staging"
+          fi
+
+      - name: Wait for the worker to serve
+        run: |
+          for i in $(seq 1 12); do
+            curl -fsS -m 10 -o /dev/null "${{ steps.deploy.outputs.url }}/" && exit 0
+            sleep 5
+          done
+          echo "::error::Studio staging did not come up"; exit 1
+
+      - name: Verify COOP/COEP isolation headers (T15 CI check)
+        # The slicer engine only selects its threaded WASM core (and real
+        # Atomics-based cancellation) under crossOriginIsolated, which
+        # requires these headers on the worker-rendered HTML document.
+        # Header presence is the CI proxy; the browser-side
+        # `window.crossOriginIsolated === true` check remains part of T15's
+        # behavioral verification on the staging URL.
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.url }}"
+          curl -fsS -m 15 -D /tmp/studio-headers.txt -o /tmp/studio-body.html "$URL/"
+          grep -qi '^cross-origin-opener-policy: same-origin' /tmp/studio-headers.txt \
+            || { echo "::error::COOP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
+          grep -qi '^cross-origin-embedder-policy: require-corp' /tmp/studio-headers.txt \
+            || { echo "::error::COEP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
+          grep -qi '^cross-origin-resource-policy: same-origin' /tmp/studio-headers.txt \
+            || { echo "::error::CORP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
+          echo "COOP/COEP/CORP present on the worker-rendered HTML document."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Studio staging deployment"
+            echo "- URL: ${{ steps.deploy.outputs.url }}"
+            echo "- COOP/COEP/CORP headers verified on the HTML document (CI half of T15)."
+            echo "- Browser-side checks (crossOriginIsolated, engine boot, login, save) are"
+            echo "  behavioral T15/T2/T4 verification against this URL — not claimed here."
+            echo "- Store staging was not touched: separate worker, DB, bucket and concurrency group."
+          } >> "$GITHUB_STEP_SUMMARY"
