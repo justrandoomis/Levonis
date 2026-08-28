@@ -102,6 +102,14 @@ jobs:
           node scripts/api-tests.mjs | tee /tmp/tests.log
           tail -1 /tmp/tests.log
 
+      - name: Demote test accounts (staging only)
+        # The test suite promotes throwaway @test.local accounts to admin.
+        # Clearing them leaves the staging DB with zero admins, so the
+        # INITIAL_ADMIN_EMAIL bootstrap can fire on a real Google sign-in.
+        run: |
+          npx wrangler d1 execute levonis-db-staging --remote \
+            --command "UPDATE users SET role='customer' WHERE role='admin' AND email LIKE '%@test.local'"
+
       - name: Summary
         if: always()
         run: |
