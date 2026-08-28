@@ -1,0 +1,56 @@
+{
+  // Cloudflare Workers configuration for Levonis.
+  // Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "levonis",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Built Vite frontend served as static assets with SPA fallback.
+  // /api/* and /files/* always hit the Worker first.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/files/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "levonis-db",
+      // database_id is filled in during Phase 2 after the D1 database is
+      // created in the Cloudflare dashboard. Local dev works without it.
+      "database_id": "PLACEHOLDER-SET-IN-PHASE-2",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      // bucket_name is created in Phase 2. Local dev emulates it.
+      "bucket_name": "levonis-files"
+    }
+  ],
+
+  // Non-secret runtime configuration. Secrets (GEMINI_API_KEY, optional
+  // email provider key) are set with `wrangler secret put` or in the
+  // dashboard under Settings > Variables and Secrets — never in this file.
+  "vars": {
+    // Google OAuth client ID used server-side as the required token audience.
+    // Public value; must match the frontend VITE_GOOGLE_CLIENT_ID.
+    "GOOGLE_CLIENT_ID": "",
+    // Email that is promoted to admin on first verified Google sign-in
+    // while no admin exists yet. See docs/CLOUDFLARE_SETUP.md.
+    "INITIAL_ADMIN_EMAIL": "",
+    // Comma-separated additional allowed origins for CSRF checks
+    // (the deployed origin itself is always allowed).
+    "EXTRA_ALLOWED_ORIGINS": ""
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

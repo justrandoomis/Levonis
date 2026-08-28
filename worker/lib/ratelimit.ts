@@ -1,0 +1,31 @@
+import type { Context } from 'hono';
+import type { AppContext } from './types';
+import { tooMany } from './http';
+
+/**
+ * Fixed-window rate limiter backed by D1 so it holds across Worker isolates
+ * (per-process memory is not a reliable limiter on Workers).
+ */
+export async function rateLimit(
+  c: Context<AppContext>,
+  bucket: string,
+  limit: number,
+  windowSeconds: number
+): Promise<void> {
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+  const key = `${bucket}:${ip}`;
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - (now % windowSeconds);
+
+  const row = await c.env.DB.prepare(
+    `INSERT INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)
+     ON CONFLICT(key) DO UPDATE SET
+       count = CASE WHEN window_start = ?2 THEN count + 1 ELSE 1 END,
+       window_start = ?2
+     RETURNING count`
+  )
+    .bind(key, windowStart)
+    .first<{ count: number }>();
+
+  if (row && row.count > limit) throw tooMany();
+}

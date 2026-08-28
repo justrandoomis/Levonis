@@ -1,0 +1,134 @@
+import type { Context, Next } from 'hono';
+import type { AppContext } from './types';
+
+export class HttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public code?: string
+  ) {
+    super(message);
+  }
+}
+
+export const badRequest = (msg: string, code?: string) => new HttpError(400, msg, code);
+export const unauthorized = (msg = 'Authentication required') => new HttpError(401, msg, 'UNAUTHORIZED');
+export const forbidden = (msg = 'Not allowed') => new HttpError(403, msg, 'FORBIDDEN');
+export const notFound = (msg = 'Not found') => new HttpError(404, msg, 'NOT_FOUND');
+export const conflict = (msg: string) => new HttpError(409, msg, 'CONFLICT');
+export const tooMany = (msg = 'Too many requests, try again later') => new HttpError(429, msg, 'RATE_LIMITED');
+export const unavailable = (msg: string, code = 'NOT_CONFIGURED') => new HttpError(503, msg, code);
+
+/** Requires a signed-in user. */
+export async function requireAuth(c: Context<AppContext>, next: Next) {
+  if (!c.get('user')) throw unauthorized();
+  await next();
+}
+
+/** Requires an admin (server-side role, never a client flag). */
+export async function requireAdmin(c: Context<AppContext>, next: Next) {
+  const user = c.get('user');
+  if (!user) throw unauthorized();
+  if (user.role !== 'admin') throw forbidden('Administrator access required');
+  await next();
+}
+
+export async function requireInvestor(c: Context<AppContext>, next: Next) {
+  const user = c.get('user');
+  if (!user) throw unauthorized();
+  if (!user.is_investor && user.role !== 'admin') throw forbidden('Investor access required');
+  await next();
+}
+
+/**
+ * CSRF / origin protection for state-changing requests: browsers always send
+ * Origin on cross-site POSTs; we reject any mutating request whose Origin is
+ * present and not in the allowed set. Session cookies are additionally
+ * SameSite=Lax.
+ */
+export function originCheck() {
+  return async (c: Context<AppContext>, next: Next) => {
+    const method = c.req.method.toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+      const origin = c.req.header('Origin');
+      if (origin) {
+        const self = new URL(c.req.url).origin;
+        const extra = (c.env.EXTRA_ALLOWED_ORIGINS || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (origin !== self && !extra.includes(origin)) {
+          throw forbidden('Cross-origin request rejected');
+        }
+      }
+    }
+    await next();
+  };
+}
+
+export function securityHeaders() {
+  return async (c: Context<AppContext>, next: Next) => {
+    await next();
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('X-Frame-Options', 'DENY');
+    c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  };
+}
+
+// Validation helpers ---------------------------------------------------------
+
+export function str(v: unknown, name: string, opts: { min?: number; max?: number; required?: boolean } = {}): string {
+  const { min = 0, max = 10_000, required = true } = opts;
+  if (v === undefined || v === null || v === '') {
+    if (required && min > 0) throw badRequest(`${name} is required`);
+    return '';
+  }
+  if (typeof v !== 'string') throw badRequest(`${name} must be a string`);
+  const t = v.trim();
+  if (t.length < min) throw badRequest(`${name} is too short`);
+  if (t.length > max) throw badRequest(`${name} is too long (max ${max} characters)`);
+  return t;
+}
+
+export function int(v: unknown, name: string, opts: { min?: number; max?: number; def?: number } = {}): number {
+  const { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, def } = opts;
+  if (v === undefined || v === null || v === '') {
+    if (def !== undefined) return def;
+    throw badRequest(`${name} is required`);
+  }
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) throw badRequest(`${name} must be an integer`);
+  if (n < min || n > max) throw badRequest(`${name} must be between ${min} and ${max}`);
+  return n;
+}
+
+export function oneOf<T extends string>(v: unknown, name: string, allowed: readonly T[]): T {
+  if (typeof v !== 'string' || !allowed.includes(v as T)) {
+    throw badRequest(`${name} must be one of: ${allowed.join(', ')}`);
+  }
+  return v as T;
+}
+
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
+export function email(v: unknown): string {
+  const s = str(v, 'email', { min: 5, max: 320 }).toLowerCase();
+  if (!EMAIL_RE.test(s)) throw badRequest('Invalid email address');
+  return s;
+}
+
+const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+export function username(v: unknown): string {
+  const s = str(v, 'username', { min: 3, max: 30 }).toLowerCase();
+  if (!USERNAME_RE.test(s)) {
+    throw badRequest('Username may only contain letters, numbers, dots, dashes and underscores (3-30 chars)');
+  }
+  return s;
+}
+
+export function jsonArray(v: unknown, name: string, maxItems = 100): string {
+  if (v === undefined || v === null) return '[]';
+  if (!Array.isArray(v)) throw badRequest(`${name} must be an array`);
+  if (v.length > maxItems) throw badRequest(`${name} has too many items (max ${maxItems})`);
+  return JSON.stringify(v);
+}
