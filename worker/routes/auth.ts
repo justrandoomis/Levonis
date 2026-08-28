@@ -9,6 +9,15 @@ import { verifyGoogleIdToken } from '../lib/google';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { attributeReferral } from '../lib/membershipOps';
+import { enqueue, processOutbox } from '../lib/outbox';
+import {
+  emailLang,
+  renderVerifyEmail,
+  renderResetPasswordEmail,
+  renderPasswordChangedEmail,
+  renderGoogleAccountNoticeEmail,
+  type EmailLang,
+} from '../lib/emailTemplates';
 
 export const authRoutes = new Hono<AppContext>();
 
@@ -68,6 +77,17 @@ authRoutes.post('/register', async (c) => {
     .run();
 
   await tryAttributeReferral(c.env, id, referralCode);
+
+  // Best-effort verification email right after signup (final-phase §3A).
+  // Skipped silently when no email service is configured — the banner offers
+  // an honest resend; a failure here never fails the registration itself.
+  if (c.env.EMAIL_API_KEY && c.env.EMAIL_FROM) {
+    try {
+      await issueEmailVerification(c, id, mail, emailLang(body.lang));
+    } catch (e) {
+      console.error('signup verification email failed for user', id, e instanceof Error ? e.message : String(e));
+    }
+  }
 
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
@@ -161,6 +181,16 @@ authRoutes.post('/google', async (c) => {
     await tryAttributeReferral(c.env, id, referralCode);
   }
 
+  // verifyGoogleIdToken only accepts identities whose email_verified claim is
+  // true, so a Google sign-in proves ownership of that address: stamp THIS
+  // account's own matching address as verified (first stamp wins; existing
+  // stamps and other accounts are never touched — no bulk verification).
+  await c.env.DB.prepare(
+    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND email = ?'
+  )
+    .bind(new Date().toISOString(), row.id, identity.email)
+    .run();
+
   // Controlled initial-admin bootstrap: promote only on a VERIFIED Google
   // identity matching INITIAL_ADMIN_EMAIL, and only while no admin exists.
   if (
@@ -216,8 +246,8 @@ authRoutes.post('/change-password', requireAuth, async (c) => {
   // Best-effort security notice to the account owner, in their own locale.
   // Never blocks or fails the response (and silently skips when no email
   // service is configured).
-  const notice = buildPasswordChangedEmail(localeToApi(user.locale));
-  c.executionCtx.waitUntil(sendEmail(c.env, user.email, notice.subject, notice.html));
+  const notice = renderPasswordChangedEmail(localeToApi(user.locale));
+  c.executionCtx.waitUntil(sendEmail(c.env, user.email, notice.subject, notice.html, notice.text));
 
   return c.json({ success: true });
 });
@@ -249,8 +279,8 @@ authRoutes.post('/forgot-password', async (c) => {
       // Google-only account: there is no password to reset, so no token is
       // created. Instead, tell the owner (by email only — the outward HTTP
       // response stays identical) to use Google sign-in.
-      const notice = buildGoogleAccountEmail(lang);
-      const sent = await sendEmail(c.env, user.email, notice.subject, notice.html);
+      const notice = renderGoogleAccountNoticeEmail(lang);
+      const sent = await sendEmail(c.env, user.email, notice.subject, notice.html, notice.text);
       if (!sent) console.warn('Google-account notice email was not sent for user', user.id);
     } else {
       const token = randomToken(32);
@@ -262,8 +292,8 @@ authRoutes.post('/forgot-password', async (c) => {
         .bind(tokenHash, user.id, expires)
         .run();
       const link = `${trustedOrigin(c)}/auth?reset=${token}`;
-      const msg = buildResetEmail(lang, link);
-      const sent = await sendEmail(c.env, user.email, msg.subject, msg.html);
+      const msg = renderResetPasswordEmail(lang, link);
+      const sent = await sendEmail(c.env, user.email, msg.subject, msg.html, msg.text);
       if (!sent) console.error('Password reset email send failed for user', user.id);
     }
   }
@@ -290,9 +320,18 @@ authRoutes.post('/reset-password', async (c) => {
   if (row.used) throw badRequest(genericMsg, 'TOKEN_USED');
   if (new Date(row.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
 
+  // Atomic single-use consumption FIRST: the conditional UPDATE lets exactly
+  // one of two concurrent correct submissions proceed — the loser gets the
+  // same generic error, so the token can never authorize two resets.
+  const consumed = await c.env.DB.prepare(
+    'UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ? AND used = 0'
+  )
+    .bind(tokenHash)
+    .run();
+  if (consumed.meta.changes === 0) throw badRequest(genericMsg, 'TOKEN_USED');
+
   const hash = await hashPassword(next);
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?').bind(tokenHash),
     c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, row.user_id),
     c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(row.user_id),
   ]);
@@ -303,11 +342,133 @@ authRoutes.post('/reset-password', async (c) => {
     .bind(row.user_id)
     .first<{ email: string; locale: string }>();
   if (owner) {
-    const notice = buildPasswordChangedEmail(localeToApi(owner.locale));
-    c.executionCtx.waitUntil(sendEmail(c.env, owner.email, notice.subject, notice.html));
+    const notice = renderPasswordChangedEmail(localeToApi(owner.locale));
+    c.executionCtx.waitUntil(sendEmail(c.env, owner.email, notice.subject, notice.html, notice.text));
   }
 
   return c.json({ success: true });
+});
+
+// Email verification (final-phase §3A) ---------------------------------------
+
+const VERIFY_TOKEN_TTL_HOURS = 24;
+
+/**
+ * Issues a fresh email-verification token for the user: any previously
+ * unused tokens are invalidated in the same batch (single-active-token
+ * policy), only the SHA-256 hash is stored, and the message goes through
+ * the durable outbox (event key = token hash, so replays cannot double-
+ * enqueue). The raw token exists only in the link inside the queued email.
+ */
+async function issueEmailVerification(
+  c: Context<AppContext>,
+  userId: string,
+  to: string,
+  lang: EmailLang
+): Promise<void> {
+  const token = randomToken(32);
+  const tokenHash = await sha256Hex(token);
+  const expires = new Date(Date.now() + VERIFY_TOKEN_TTL_HOURS * 3_600_000).toISOString();
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE email_verification_tokens SET used = 1 WHERE user_id = ? AND used = 0').bind(userId),
+    c.env.DB.prepare(
+      'INSERT INTO email_verification_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)'
+    ).bind(tokenHash, userId, expires),
+  ]);
+  // The link only OPENS a page; confirmation is a separate explicit POST, so
+  // a mail scanner following the link can never consume the token.
+  const link = `${trustedOrigin(c)}/?verify_email=${token}`;
+  const msg = renderVerifyEmail(lang, link);
+  await enqueue(c.env, `email_verify:${tokenHash}`, { kind: 'email', to, subject: msg.subject, html: msg.html, text: msg.text });
+  c.executionCtx.waitUntil(processOutbox(c.env, 3));
+}
+
+/** Verification status for the signed-in user's OWN account (drives the
+ *  banner). Fresh from the DB — the session cache may be stale. */
+authRoutes.get('/verify-email/status', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const row = await c.env.DB.prepare('SELECT email, email_verified_at FROM users WHERE id = ?')
+    .bind(user.id)
+    .first<{ email: string; email_verified_at: string | null }>();
+  c.header('Cache-Control', 'no-store');
+  return c.json({
+    success: true,
+    email: row?.email ?? user.email,
+    verified: !!row?.email_verified_at,
+    emailConfigured: !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM),
+  });
+});
+
+authRoutes.post('/verify-email/send', requireAuth, async (c) => {
+  await rateLimit(c, 'verify-email-send', 6, 3600);
+  const user = c.get('user')!;
+  if (!c.env.EMAIL_API_KEY || !c.env.EMAIL_FROM) {
+    // Honest unavailability — no email service means no message can be sent.
+    throw unavailable(
+      'Email verification is not available yet because no email service is configured.',
+      'EMAIL_NOT_CONFIGURED'
+    );
+  }
+  const row = await c.env.DB.prepare('SELECT email, email_verified_at, locale FROM users WHERE id = ?')
+    .bind(user.id)
+    .first<{ email: string; email_verified_at: string | null; locale: string }>();
+  if (!row) throw unauthorized();
+  if (row.email_verified_at) return c.json({ success: true, verified: true });
+  await issueEmailVerification(c, user.id, row.email, localeToApi(row.locale));
+  // Generic wording — the response never says whether the address exists at
+  // the provider or whether delivery succeeded.
+  return c.json({ success: true, message: 'A verification message has been sent if your email still needs verification.' });
+});
+
+authRoutes.post('/verify-email/confirm', async (c) => {
+  await rateLimit(c, 'verify-email-confirm', 20, 3600);
+  const body = await c.req.json().catch(() => ({}));
+  // Token comes in the BODY of an explicit POST only. GET landing pages just
+  // render a button — a scanner's GET can never consume a token.
+  const token = str(body.token, 'token', { min: 20, max: 128 });
+  const tokenHash = await sha256Hex(token);
+  const row = await c.env.DB.prepare(
+    'SELECT token_hash, user_id, new_email, expires_at, used FROM email_verification_tokens WHERE token_hash = ?'
+  )
+    .bind(tokenHash)
+    .first<{ token_hash: string; user_id: string; new_email: string | null; expires_at: string; used: number }>();
+  const genericMsg = 'This verification link is invalid or has expired';
+  if (!row) throw badRequest(genericMsg, 'BAD_TOKEN');
+  if (row.used) throw badRequest(genericMsg, 'TOKEN_USED');
+  if (new Date(row.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
+
+  // Atomic one-use consumption — concurrent confirms cannot both pass.
+  const consumed = await c.env.DB.prepare(
+    'UPDATE email_verification_tokens SET used = 1 WHERE token_hash = ? AND used = 0'
+  )
+    .bind(tokenHash)
+    .run();
+  if (consumed.meta.changes === 0) throw badRequest(genericMsg, 'TOKEN_USED');
+
+  const now = new Date().toISOString();
+  if (row.new_email) {
+    // Email-change verification: applying the new address and its verified
+    // stamp is one statement; UNIQUE(users.email) rejects a taken address.
+    // (No endpoint issues new_email tokens yet — consuming them is ready for
+    // the future email-change flow.)
+    try {
+      await c.env.DB.prepare(
+        "UPDATE users SET email = ?, email_verified_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
+      )
+        .bind(row.new_email, now, row.user_id)
+        .run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('UNIQUE')) throw conflict('This email is already used by another account');
+      throw e;
+    }
+  } else {
+    await c.env.DB.prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?')
+      .bind(now, row.user_id)
+      .run();
+  }
+  await audit(c.env.DB, row.user_id, 'auth.email_verified', row.user_id, row.new_email ? { email_changed: true } : {});
+  return c.json({ success: true, verified: true });
 });
 
 // Email helpers --------------------------------------------------------------
@@ -325,117 +486,16 @@ function trustedOrigin(c: Context<AppContext>): string {
   return new URL(c.req.url).origin;
 }
 
-/** API email languages: Arabic (source), English, Sorani Kurdish (ckb). */
-type EmailLang = 'ar' | 'en' | 'ckb';
-
-function emailLang(v: unknown): EmailLang {
-  return v === 'en' || v === 'ckb' ? v : 'ar';
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-const EMAIL_COPY_AR = {
-  resetSubject: 'إعادة تعيين كلمة المرور — Levonis',
-  resetIntro: 'وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في Levonis.',
-  resetCta: 'اختيار كلمة مرور جديدة',
-  resetExpiry: 'هذا الرابط صالح لمدة 30 دقيقة ويمكن استخدامه مرة واحدة فقط.',
-  resetIgnore: 'إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة بأمان.',
-  googleSubject: 'محاولة إعادة تعيين كلمة المرور — Levonis',
-  googleBody:
-    'وصلنا طلب لإعادة تعيين كلمة المرور لهذا البريد، لكن هذا الحساب يسجّل الدخول عبر Google ولا يملك كلمة مرور. للدخول استخدم زر «المتابعة عبر Google» في صفحة تسجيل الدخول.',
-  googleIgnore: 'إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة بأمان.',
-  changedSubject: 'تم تغيير كلمة المرور — Levonis',
-  changedBody: 'تم تغيير كلمة مرور حسابك في Levonis للتو، وتم تسجيل الخروج من الجلسات الأخرى.',
-  changedWarn: 'إذا لم تقم بذلك، أعد تعيين كلمة المرور فورًا وتواصل مع الدعم.',
-};
-
-const EMAIL_COPY_EN: typeof EMAIL_COPY_AR = {
-  resetSubject: 'Reset your Levonis password',
-  resetIntro: 'We received a request to reset your Levonis password.',
-  resetCta: 'Choose a new password',
-  resetExpiry: 'This link expires in 30 minutes and can be used once.',
-  resetIgnore: 'If you did not request this, you can safely ignore this email.',
-  googleSubject: 'Password reset attempt — Levonis',
-  googleBody:
-    'We received a password reset request for this email, but this account signs in with Google and has no password. Use the "Continue with Google" button on the sign-in page instead.',
-  googleIgnore: 'If you did not request this, you can safely ignore this email.',
-  changedSubject: 'Your Levonis password was changed',
-  changedBody: 'The password for your Levonis account was just changed, and your other sessions were signed out.',
-  changedWarn: 'If this was not you, reset your password immediately and contact support.',
-};
-
-// Sorani (ckb): conservative fallback — reuse the Arabic source copy verbatim
-// until reviewed native Sorani text lands. Per the mandate, translation status
-// is tracked and NOTHING is machine-translated at runtime.
-const EMAIL_COPY_CKB: typeof EMAIL_COPY_AR = { ...EMAIL_COPY_AR };
-
-const EMAIL_COPY: Record<EmailLang, typeof EMAIL_COPY_AR> = {
-  ar: EMAIL_COPY_AR,
-  en: EMAIL_COPY_EN,
-  ckb: EMAIL_COPY_CKB,
-};
-
 /**
- * Minimal, self-contained email HTML: inline styles only, no images, no
- * scripts, no third-party assets. Every dynamic value is HTML-escaped by the
- * builders below before it reaches this shell.
+ * Sends one email through the Resend API (immediate path for time-critical
+ * auth mail — reset links must not sit in a queue). Returns false (never
+ * throws) on any failure. Staging safety: when EMAIL_ALLOWED_RECIPIENTS is
+ * set (comma-separated), recipients outside the list are skipped — outward
+ * API responses never change (no enumeration signal), only a console.warn is
+ * logged for the operator. The API key is never logged. Templates come from
+ * worker/lib/emailTemplates.ts and always include a plain-text alternative.
  */
-function emailShell(lang: EmailLang, inner: string): string {
-  const dir = lang === 'en' ? 'ltr' : 'rtl';
-  return (
-    `<div dir="${dir}" style="margin:0;padding:24px;background-color:#f4f4f2;font-family:Arial,Helvetica,sans-serif;">` +
-    `<div style="max-width:480px;margin:0 auto;background-color:#ffffff;border-radius:14px;padding:28px;color:#111111;">` +
-    `<p style="margin:0 0 20px 0;font-size:20px;font-weight:bold;letter-spacing:1px;">Levonis</p>` +
-    inner +
-    `</div></div>`
-  );
-}
-
-function buildResetEmail(lang: EmailLang, link: string): { subject: string; html: string } {
-  const t = EMAIL_COPY[lang];
-  const safeLink = escapeHtml(link);
-  const inner =
-    `<p style="margin:0 0 16px 0;font-size:14px;line-height:1.7;">${escapeHtml(t.resetIntro)}</p>` +
-    `<p style="margin:24px 0;text-align:center;">` +
-    `<a href="${safeLink}" style="display:inline-block;background-color:#111111;color:#d4af37;text-decoration:none;padding:12px 28px;border-radius:12px;font-size:14px;font-weight:bold;">${escapeHtml(t.resetCta)}</a>` +
-    `</p>` +
-    `<p style="margin:0 0 8px 0;font-size:12px;color:#555555;line-height:1.7;">${escapeHtml(t.resetExpiry)}</p>` +
-    `<p style="margin:0 0 16px 0;font-size:12px;color:#555555;line-height:1.7;">${escapeHtml(t.resetIgnore)}</p>` +
-    `<p style="margin:0;font-size:11px;color:#888888;word-break:break-all;" dir="ltr">${safeLink}</p>`;
-  return { subject: t.resetSubject, html: emailShell(lang, inner) };
-}
-
-function buildGoogleAccountEmail(lang: EmailLang): { subject: string; html: string } {
-  const t = EMAIL_COPY[lang];
-  const inner =
-    `<p style="margin:0 0 16px 0;font-size:14px;line-height:1.7;">${escapeHtml(t.googleBody)}</p>` +
-    `<p style="margin:0;font-size:12px;color:#555555;line-height:1.7;">${escapeHtml(t.googleIgnore)}</p>`;
-  return { subject: t.googleSubject, html: emailShell(lang, inner) };
-}
-
-function buildPasswordChangedEmail(lang: EmailLang): { subject: string; html: string } {
-  const t = EMAIL_COPY[lang];
-  const inner =
-    `<p style="margin:0 0 16px 0;font-size:14px;line-height:1.7;">${escapeHtml(t.changedBody)}</p>` +
-    `<p style="margin:0;font-size:12px;color:#555555;line-height:1.7;">${escapeHtml(t.changedWarn)}</p>`;
-  return { subject: t.changedSubject, html: emailShell(lang, inner) };
-}
-
-/**
- * Sends one email through the Resend API. Returns false (never throws) on
- * any failure. Staging safety: when EMAIL_ALLOWED_RECIPIENTS is set
- * (comma-separated), recipients outside the list are skipped — outward API
- * responses never change (no enumeration signal), only a console.warn is
- * logged for the operator. The API key is never logged.
- */
-async function sendEmail(env: Env, to: string, subject: string, html: string): Promise<boolean> {
+async function sendEmail(env: Env, to: string, subject: string, html: string, text: string): Promise<boolean> {
   if (!env.EMAIL_API_KEY || !env.EMAIL_FROM) return false;
 
   const allowed = (env.EMAIL_ALLOWED_RECIPIENTS || '')
@@ -452,7 +512,7 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${env.EMAIL_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: env.EMAIL_FROM, to, subject, html }),
+      body: JSON.stringify({ from: env.EMAIL_FROM, to, subject, html, text }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');

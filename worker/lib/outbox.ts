@@ -26,19 +26,24 @@ export interface OutboxTelegram {
 const MAX_ATTEMPTS = 5;
 
 /** Enqueue (idempotent on eventKey). Returns the outbox id or null when the
- *  event was already enqueued. Call inside/next to the business write. */
+ *  event was already enqueued. Call inside/next to the business write.
+ *  `opts.state: 'skipped'` records the event honestly WITHOUT sending (e.g.
+ *  invoice email for an unverified recipient address) — the row documents
+ *  why in last_error and is never picked up by processOutbox. */
 export async function enqueue(
   env: Env,
   eventKey: string,
-  message: OutboxEmail | OutboxTelegram
+  message: OutboxEmail | OutboxTelegram,
+  opts: { state?: 'pending' | 'skipped'; note?: string } = {}
 ): Promise<string | null> {
   const id = newId('obx');
   const recipient = message.kind === 'email' ? message.to : String(message.chat_id);
+  const state = opts.state ?? 'pending';
   try {
     await env.DB.prepare(
-      'INSERT INTO outbox (id, kind, event_key, recipient, payload) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO outbox (id, kind, event_key, recipient, payload, state, last_error) VALUES (?, ?, ?, ?, ?, ?, ?)'
     )
-      .bind(id, message.kind, eventKey, recipient, JSON.stringify(message))
+      .bind(id, message.kind, eventKey, recipient, JSON.stringify(message), state, (opts.note ?? '').slice(0, 500))
       .run();
     return id;
   } catch (e) {
@@ -55,12 +60,20 @@ function allowedRecipient(env: Env, kind: string, recipient: string): boolean {
   return allow.split(',').map((s) => s.trim().toLowerCase()).includes(recipient.toLowerCase());
 }
 
-async function deliver(env: Env, payload: OutboxEmail | OutboxTelegram): Promise<{ ok: boolean; error?: string }> {
+async function deliver(env: Env, payload: OutboxEmail | OutboxTelegram, eventKey: string): Promise<{ ok: boolean; error?: string }> {
   if (payload.kind === 'email') {
     if (!env.EMAIL_API_KEY || !env.EMAIL_FROM) return { ok: false, error: 'EMAIL_NOT_CONFIGURED' };
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${env.EMAIL_API_KEY}`,
+      'Content-Type': 'application/json',
+    };
+    // Provider-side dedup: retries of the same business event reuse the same
+    // Idempotency-Key (the unique event_key), so an ambiguous first attempt
+    // (timeout after the provider accepted) cannot double-send.
+    if (eventKey) headers['Idempotency-Key'] = eventKey.slice(0, 256);
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${env.EMAIL_API_KEY}`, 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ from: env.EMAIL_FROM, to: payload.to, subject: payload.subject, html: payload.html, text: payload.text }),
     });
     if (!res.ok) return { ok: false, error: `resend ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}` };
@@ -83,19 +96,22 @@ async function deliver(env: Env, payload: OutboxEmail | OutboxTelegram): Promise
  */
 export async function processOutbox(env: Env, limit = 10): Promise<{ sent: number; failed: number }> {
   const { results } = await env.DB.prepare(
-    "SELECT id, kind, recipient, payload, attempts FROM outbox WHERE state IN ('pending','failed') AND attempts < ? ORDER BY created_at LIMIT ?"
+    "SELECT id, kind, event_key, recipient, payload, attempts FROM outbox WHERE state IN ('pending','failed') AND attempts < ? ORDER BY created_at LIMIT ?"
   )
     .bind(MAX_ATTEMPTS, limit)
-    .all<{ id: string; kind: string; recipient: string; payload: string; attempts: number }>();
+    .all<{ id: string; kind: string; event_key: string; recipient: string; payload: string; attempts: number }>();
 
   let sent = 0;
   let failed = 0;
   for (const row of results) {
-    // Claim: only one processor wins this row.
+    // Claim: compare-and-swap on attempts — only one processor wins this row.
+    // (The state CHECK constraint has no transient 'sending' value, so the
+    // claim is the attempts bump itself; a crash mid-send leaves the row
+    // 'pending' with the attempt consumed, retried by the next run.)
     const claim = await env.DB.prepare(
-      "UPDATE outbox SET state = 'sending', attempts = attempts + 1 WHERE id = ? AND state IN ('pending','failed')"
+      "UPDATE outbox SET attempts = attempts + 1 WHERE id = ? AND state IN ('pending','failed') AND attempts = ?"
     )
-      .bind(row.id)
+      .bind(row.id, row.attempts)
       .run()
       .catch(() => null);
     if (!claim || claim.meta.changes === 0) continue;
@@ -117,7 +133,7 @@ export async function processOutbox(env: Env, limit = 10): Promise<{ sent: numbe
       continue;
     }
 
-    const result = await deliver(env, payload);
+    const result = await deliver(env, payload, row.event_key);
     if (result.ok) {
       await env.DB.prepare("UPDATE outbox SET state = 'sent', sent_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), last_error = '' WHERE id = ?")
         .bind(row.id)
