@@ -27,5 +27,12 @@ export async function rateLimit(
     .bind(key, windowStart)
     .first<{ count: number }>();
 
+  // Opportunistically drop stale windows so the table stays small.
+  if (row && row.count === 1 && Math.random() < 0.02) {
+    await c.env.DB.prepare('DELETE FROM rate_limits WHERE window_start < ?')
+      .bind(now - 86_400)
+      .run();
+  }
+
   if (row && row.count > limit) throw tooMany();
 }

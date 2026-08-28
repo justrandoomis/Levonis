@@ -45,6 +45,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// UX-level gate only — every admin API call is separately authorized on the
+// server, so hiding the route is presentation, not the security boundary.
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, isLoaded } = useAuth();
+  if (!isLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+  if (!isAuthenticated) return <Navigate to="/auth" />;
+  if (!user?.isAdmin) return <Navigate to="/" />;
+  return <>{children}</>;
+}
+
 function AppContent() {
   const location = useLocation();
   const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/games', '/leaderboards'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
@@ -54,9 +64,9 @@ function AppContent() {
       <div className="h-[100dvh] flex flex-col font-sans overflow-hidden bg-white dark:bg-black">
         <main className="flex-1 flex overflow-hidden">
           <Routes>
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
-          <Route path="/admin/invest" element={<ProtectedRoute><InvestAdmin /></ProtectedRoute>} />
+          <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
 
             <Route path="/auth" element={<Auth />} />
             <Route path="/points" element={<ProtectedRoute><Rewards /></ProtectedRoute>} />
@@ -78,9 +88,9 @@ function AppContent() {
       <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-br from-black via-black to-[#1a210e]">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
-          <Route path="/admin/invest" element={<ProtectedRoute><InvestAdmin /></ProtectedRoute>} />
+          <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
 
           <Route path="/profile" element={<Profile />} />
             <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />

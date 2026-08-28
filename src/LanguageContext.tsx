@@ -10,8 +10,29 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const LANG_KEY = 'levo_lang';
+
+function initialLang(): Language {
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    if (stored === 'en' || stored === 'ar' || stored === 'ku') return stored;
+  } catch {
+    /* storage unavailable */
+  }
+  return 'en';
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLangState] = useState<Language>(initialLang);
+
+  const setLang = (next: Language) => {
+    setLangState(next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      /* storage unavailable */
+    }
+  };
 
   const t = (key: keyof typeof translations['en']) => {
     return translations[lang][key] || translations['en'][key];
