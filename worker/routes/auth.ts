@@ -6,6 +6,7 @@ import {
   HttpError,
   badRequest,
   unauthorized,
+  notFound,
   conflict,
   unavailable,
   requireAuth,
@@ -35,7 +36,7 @@ import {
   type TgAuthPurpose,
   type AuthChallengeRow,
 } from '../lib/telegram';
-import { attributeReferral } from '../lib/membershipOps';
+import { resolveSupportRef, type SupportRef } from '../lib/supportCode';
 import { enqueue, processOutbox } from '../lib/outbox';
 import {
   emailLang,
@@ -66,13 +67,66 @@ function referralCodeFrom(body: Record<string, unknown>): string {
 }
 
 /**
- * Best-effort referral attribution after a successful account CREATION
- * (mandate 9.1/9.2). Must never fail or slow down the signup itself.
+ * Ordered lookup candidates for a referral ref (integrated mandate §3.1):
+ * usernames are the public referral handle AND legacy codes stay working as
+ * aliases. Precedence is deterministic and matches the frozen supportCode
+ * contract (username branch first): the lowercase form is tried before the
+ * uppercase form, because usernames are stored lowercase and legacy
+ * referral codes uppercase — so a username always resolves to its CURRENT
+ * holder and can never be shadowed by a same-spelling legacy code.
+ * Pure — unit-tested in tests/authPhone.test.ts.
  */
-async function tryAttributeReferral(env: Env, newUserId: string, code: string): Promise<void> {
-  if (!code) return;
+export function referrerLookupCandidates(raw: unknown): string[] {
+  if (typeof raw !== 'string') return [];
+  const ref = raw.trim();
+  if (!ref || ref.length > 64) return [];
+  const lower = ref.toLowerCase();
+  const upper = ref.toUpperCase();
+  return lower === upper ? [lower] : [lower, upper];
+}
+
+/**
+ * Resolve a public referral ref (username of the CURRENT holder, or a
+ * legacy referral code) to its owner — always server-side; an arbitrary
+ * client-sent referrer_user_id is never accepted anywhere (§3.2). Past
+ * attributions are keyed to stable user ids, so this lookup only ever
+ * affects NEW signups: a username change never transfers old referrals.
+ */
+async function resolveReferrer(env: Env, raw: string): Promise<SupportRef | null> {
+  for (const candidate of referrerLookupCandidates(raw)) {
+    const hit = await resolveSupportRef(env, candidate);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Best-effort referral attribution after a successful account CREATION
+ * (§3.2). Binds exactly ONCE at account creation — UNIQUE(referred_id,
+ * campaign) makes the first attribution final; self-referral never binds.
+ * Accepts ref-by-username and legacy codes (see resolveReferrer). Must
+ * never fail or slow down the signup itself, and an unknown ref simply
+ * leaves the account unattributed (signup still succeeds — §2.6).
+ */
+async function tryAttributeReferral(env: Env, newUserId: string, ref: string): Promise<void> {
+  if (!ref) return;
   try {
-    await attributeReferral(env, newUserId, code);
+    const resolved = await resolveReferrer(env, ref);
+    if (!resolved) return;
+    if (resolved.userId === newUserId) return; // self-referral never binds
+    for (const campaign of ['printer', 'pro_sub'] as const) {
+      try {
+        await env.DB.prepare(
+          'INSERT INTO referral_attributions (id, referrer_id, referred_id, campaign) VALUES (?, ?, ?, ?)'
+        )
+          .bind(newId('rat'), resolved.userId, newUserId, campaign)
+          .run();
+      } catch (e) {
+        // UNIQUE(referred_id, campaign): already bound once — never rebind.
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes('UNIQUE')) throw e;
+      }
+    }
   } catch (e) {
     console.error('referral attribution failed for user', newUserId, e instanceof Error ? e.message : String(e));
   }
@@ -81,6 +135,19 @@ async function tryAttributeReferral(env: Env, newUserId: string, code: string): 
 authRoutes.post('/register', async (c) => {
   await rateLimit(c, 'register', 30, 3600);
   const body = await c.req.json().catch(() => ({}));
+  // §2.3: a phone is an identity key whose ownership must be PROVEN before
+  // the password is accepted — this email-registration endpoint has no
+  // ownership proof, so it never stores a phone. Rejecting (not silently
+  // dropping) keeps the client honest about which flow it is in: phone
+  // signup goes through /telegram/start → verified contact → OTP →
+  // /telegram/complete (which accepts the password there).
+  if (typeof body.phone === 'string' && body.phone.trim() !== '') {
+    throw badRequest(
+      'إنشاء حساب برقم الهاتف يتطلب توثيق ملكية الرقم أولًا — استخدم مسار التسجيل بالهاتف عبر تيليغرام. / ' +
+        'Registering with a phone number requires proving ownership first — use the phone sign-up flow (Telegram verification).',
+      'PHONE_REQUIRES_VERIFICATION'
+    );
+  }
   const mail = email(body.email);
   const uname = body.username ? username(body.username) : null;
   const name = str(body.name, 'name', { min: 0, max: 100, required: false });
@@ -121,21 +188,61 @@ authRoutes.post('/register', async (c) => {
   return c.json({ success: true, user: publicUser(user!) });
 });
 
+/**
+ * Classify one login identifier (§2.3): the lowercased form for
+ * email/username lookup, plus the normalized E.164 phone when (and only
+ * when) the input is a valid phone per worker/lib/phone.ts — the single
+ * source of phone validity on the server; there is no length-only
+ * acceptance here. Arabic-Indic digits are mapped first so a phone typed
+ * as ٠٧٧٠١٢٣٤٥٦٧ matches its account. Pure — unit-tested.
+ */
+export function classifyLoginIdentifier(raw: string): { identifier: string; phone: string | null } {
+  const trimmed = raw.trim();
+  return { identifier: trimmed.toLowerCase(), phone: normalizePhone(toAsciiDigits(trimmed)) };
+}
+
 authRoutes.post('/login', async (c) => {
   await rateLimit(c, 'login', 20, 900);
   const body = await c.req.json().catch(() => ({}));
-  const identifier = str(body.email, 'email or username', { min: 3, max: 320 }).toLowerCase();
+  // One identifier field accepts email OR username OR phone (§2.3).
+  // `identifier` is the preferred name; `email` stays accepted so every
+  // existing client keeps working unchanged.
+  const raw = str(body.identifier ?? body.email, 'email, username or phone', { min: 3, max: 320 });
+  const { identifier, phone } = classifyLoginIdentifier(raw);
   const password = String(body.password ?? '');
   if (!password) throw badRequest('Password is required');
 
-  const row = await c.env.DB.prepare(
-    'SELECT * FROM users WHERE email = ? OR username = ?'
-  )
-    .bind(identifier, identifier)
-    .first<SessionUser & { password_hash: string | null }>();
+  // Deterministic resolution order: a valid phone form is looked up as a
+  // phone FIRST — users.phone_e164, then a live verified Telegram link
+  // (covers accounts that linked their phone before migration 0013's
+  // column existed) — so a digits-only username can never shadow another
+  // person's phone. Anything else resolves as email/username, unchanged.
+  let row: (SessionUser & { password_hash: string | null }) | null = null;
+  if (phone) {
+    row = await c.env.DB.prepare('SELECT * FROM users WHERE phone_e164 = ?')
+      .bind(phone)
+      .first<SessionUser & { password_hash: string | null }>();
+    if (!row) {
+      const link = await c.env.DB.prepare(
+        'SELECT user_id FROM telegram_links WHERE phone_e164 = ? AND revoked_at IS NULL ORDER BY verified_at DESC LIMIT 1'
+      )
+        .bind(phone)
+        .first<{ user_id: string }>();
+      if (link) {
+        row = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?')
+          .bind(link.user_id)
+          .first<SessionUser & { password_hash: string | null }>();
+      }
+    }
+  }
+  if (!row) {
+    row = await c.env.DB.prepare('SELECT * FROM users WHERE email = ? OR username = ?')
+      .bind(identifier, identifier)
+      .first<SessionUser & { password_hash: string | null }>();
+  }
 
-  // Uniform error to avoid account enumeration.
-  const fail = () => unauthorized('Incorrect email/username or password');
+  // One uniform error for every identifier kind — no account enumeration.
+  const fail = () => unauthorized('Incorrect email/username/phone or password');
   if (!row) throw fail();
   if (!row.password_hash) {
     // Provider-only account (Google or Telegram signup) — no password exists.
@@ -236,6 +343,30 @@ authRoutes.post('/google', async (c) => {
   await createSession(c, row.id);
   const user = await getFullUser(c.env.DB, row.id);
   return c.json({ success: true, user: publicUser(user!) });
+});
+
+/**
+ * Public referrer preview for the signup referral bar (§2.6/§3.1):
+ * GET /api/auth/referrer-info?ref=<username-or-legacy-code> →
+ * { username, display_name } or 404. Intentionally public and anonymous —
+ * a visitor opening /auth?ref=<username> must see WHO invited them before
+ * creating an account — but it reveals nothing beyond what the referral
+ * link itself already displays (the handle) plus the display name, and it
+ * is rate-limited per IP. Resolution maps a username to its CURRENT
+ * holder; legacy codes keep working as aliases (same precedence as
+ * attribution, so the preview can never disagree with the signup binding).
+ */
+authRoutes.get('/referrer-info', async (c) => {
+  await rateLimit(c, 'referrer-info', 60, 300);
+  const ref = str(c.req.query('ref'), 'ref', { min: 1, max: 64 });
+  const resolved = await resolveReferrer(c.env, ref);
+  c.header('Cache-Control', 'no-store');
+  if (!resolved) throw notFound('No referrer matches this code');
+  return c.json({
+    success: true,
+    username: resolved.username || null,
+    display_name: resolved.displayName,
+  });
 });
 
 authRoutes.get('/me', async (c) => {
@@ -600,12 +731,22 @@ authRoutes.post('/telegram/complete', async (c) => {
   if (!ch.otp_sent_at) throw badRequest('No active code — request a new one', 'OTP_NOT_FOUND');
 
   // Signup inputs are validated BEFORE the OTP is consumed so a taken
-  // username doesn't burn a correct code.
+  // username or an invalid password doesn't burn a correct code.
   let uname: string | null = null;
   let name = '';
+  let rawPassword: string | null = null;
   if (ch.purpose === 'signup') {
     uname = body.username ? username(body.username) : null;
     name = str(body.name, 'name', { min: 0, max: 100, required: false });
+    // §2.1/§2.3: phone + password accounts. The password is OPTIONAL here —
+    // the pure Telegram-OTP path is never forced to set one — and it is
+    // only ever accepted AFTER phone ownership was proven (the
+    // state = 'phone_verified' guard above) and the OTP below confirms
+    // this same verified session.
+    if (body.password !== undefined && body.password !== null && body.password !== '') {
+      rawPassword = String(body.password);
+      checkPassword(rawPassword);
+    }
     if (uname) {
       const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
       if (taken) throw conflict('This username is taken');
@@ -648,6 +789,24 @@ authRoutes.post('/telegram/complete', async (c) => {
       throw badRequest('This request is no longer valid — start again', 'CHALLENGE_CONSUMED');
     }
 
+    // Best-effort self-heal (§2.3 / migration 0013): this phone was just
+    // proven owned by this account's own Telegram, so stamp
+    // users.phone_e164 when the account has none and the phone is free.
+    // The guard means it can never steal a phone already held by another
+    // account; a lost race on the UNIQUE index is swallowed (the login
+    // itself must never fail because of this stamp).
+    try {
+      await c.env.DB.prepare(
+        `UPDATE users SET phone_e164 = ?1
+          WHERE id = ?2 AND phone_e164 IS NULL
+            AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?1)`
+      )
+        .bind(ch.phone_entered, linkability.userId)
+        .run();
+    } catch (e) {
+      console.error('phone_e164 self-heal failed for user', linkability.userId, e instanceof Error ? e.message : String(e));
+    }
+
     await audit(c.env.DB, linkability.userId, 'auth.telegram_login', `user:${linkability.userId}`, {
       phone_masked: maskPhone(ch.phone_entered),
     });
@@ -664,24 +823,33 @@ authRoutes.post('/telegram/complete', async (c) => {
   // and nothing is half-written. Never an auto-merge into an existing
   // account by phone alone.
   const id = newId('usr');
-  // users.email is NOT NULL UNIQUE — Telegram accounts get a deterministic
-  // placeholder on a reserved (non-routable) domain, unique via the user id
-  // and NEVER stamped verified (email_verified_at stays NULL).
+  // users.email is NOT NULL UNIQUE — Telegram/phone accounts get a
+  // deterministic placeholder on a reserved (non-routable) domain, unique
+  // via the user id and NEVER stamped verified (email_verified_at stays
+  // NULL). The phone itself is stored ONLY in users.phone_e164 (0013) —
+  // never encoded into an email (§2.3), and the placeholder is refused by
+  // /verify-email/send (NO_REAL_EMAIL) so it can never masquerade as a
+  // real address.
   const placeholderEmail = `tg-${id}@telegram.local`;
+  // Password (optional, §2.1/§2.3): hashed only AFTER the OTP proved this
+  // verified session — a phone + password account cannot exist without
+  // ownership proof. NULL = OTP-only account (no password forced on it).
+  const passwordHash = rawPassword === null ? null : await hashPassword(rawPassword);
 
   let results: D1Result[];
   try {
     results = await c.env.DB.batch([
       c.env.DB.prepare(
-        `INSERT INTO users (id, email, username, name, password_hash)
-         SELECT ?1, ?2, ?3, ?4, NULL
+        `INSERT INTO users (id, email, username, name, password_hash, phone_e164)
+         SELECT ?1, ?2, ?3, ?4, ?9, ?7
           WHERE EXISTS (
              SELECT 1 FROM link_challenges
               WHERE id = ?5 AND consumed_at IS NULL AND state = 'phone_verified' AND expires_at > ?6
            )
            AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE phone_e164 = ?7 AND revoked_at IS NULL)
-           AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE telegram_user_id = ?8 AND revoked_at IS NULL)`
-      ).bind(id, placeholderEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id),
+           AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE telegram_user_id = ?8 AND revoked_at IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?7)`
+      ).bind(id, placeholderEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id, passwordHash),
       c.env.DB.prepare(
         `INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
          SELECT ?1, ?2, ?3, ?4, ?5
@@ -723,6 +891,9 @@ authRoutes.post('/telegram/complete', async (c) => {
   await audit(c.env.DB, id, 'auth.telegram_signup', `user:${id}`, {
     phone_masked: maskPhone(ch.phone_entered),
     telegram_user_id: ch.telegram_user_id,
+    // Whether the person chose a phone+password account (§2.3) — a boolean
+    // only; the password itself never reaches logs or audit rows.
+    password_set: passwordHash !== null,
   });
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
