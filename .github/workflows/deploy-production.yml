@@ -52,7 +52,7 @@ jobs:
           PROD_DB_ID: ${{ secrets.CLOUDFLARE_DATABASE_ID }}
           PROD_DB_NAME: ${{ steps.db.outputs.name }}
           PROD_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
-        run: node scripts/set-deploy-ids.mjs
+        run: node scripts/set-deploy-ids.mjs --env production
 
       - name: Migrations (only when requested AND the database is empty)
         if: ${{ inputs.apply_migrations }}

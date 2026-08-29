@@ -147,6 +147,78 @@ Run in this order; stop and report if any step fails.
    Worker. Verify `/api/health`, then repeat the read-only parts of the
    checklist. No destructive tests against real customers or balances.
 
+## Cloudflare Workers Builds (the dashboard-connected deploy)
+
+The repository is also connected to **Workers Builds** (Cloudflare builds and
+deploys on push, separately from the GitHub Actions workflows above). That
+path failed with:
+
+```
+binding DB of type d1 must have a valid `database_id` specified [code: 10021]
+```
+
+**Why:** `wrangler.jsonc` deliberately commits `*-PLACEHOLDER` instead of real
+database ids (so account identifiers stay out of the repo and local dev keeps
+its own database). GitHub Actions substitutes them from secrets right before
+deploying; Workers Builds ran `npx wrangler deploy` directly, so the
+placeholder reached the Cloudflare API verbatim. The same run also showed two
+further problems worth fixing at the same time:
+
+- **No target environment.** `wrangler deploy` without `--env` uses the
+  top-level (production) block — the production D1 database and bucket —
+  while Workers Builds was deploying the Worker named `levonis-staging`.
+- **All vars empty.** `wrangler deploy` replaces a Worker's plain-text vars
+  wholesale, so that deploy would have erased `GOOGLE_CLIENT_ID`,
+  `APP_ORIGIN` and `INITIAL_ADMIN_EMAIL` from the running Worker (breaking
+  Google sign-in and e-mail links). Worker **secrets** are not affected by a
+  deploy.
+
+### Fix — one dashboard change
+
+In the Cloudflare dashboard → **Workers & Pages → levonis-staging → Settings
+→ Builds**, set:
+
+| Field | Value |
+| --- | --- |
+| Build command | `npm run build` (unchanged) |
+| **Deploy command** | **`npm run deploy:staging`** |
+
+`deploy:staging` runs `scripts/set-deploy-ids.mjs --env staging` first, which:
+
+1. resolves the staging D1 id **by database name** (`levonis-db-staging`)
+   through the already-authenticated `wrangler d1 list` — nothing secret is
+   committed or printed, and
+2. fills the plain-text vars from build variables, then deploys with
+   `--env staging` so the Worker name, database and bucket all match the
+   staging environment.
+
+For the production Worker the equivalent command is `npm run deploy:production`.
+The script **refuses to run** under Workers Builds when the environment is
+ambiguous rather than guessing — guessing wrong would bind a staging Worker to
+the production database.
+
+### Build variables to add (names only, no secrets here)
+
+Add these under the same Builds settings as **environment variables** so the
+deploy keeps them instead of clearing them:
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_GOOGLE_CLIENT_ID` | baked into the frontend bundle at build time **and** reused as the Worker's `GOOGLE_CLIENT_ID` |
+| `INITIAL_ADMIN_EMAIL` | first-admin bootstrap |
+| `APP_ORIGIN` | trusted origin for links in e-mail (e.g. the live site origin) |
+| `EMAIL_FROM` | verified Resend sender |
+| `EMAIL_ALLOWED_RECIPIENTS` | staging-only outbound-email allowlist (leave unset in production) |
+| `EXTRA_ALLOWED_ORIGINS` | extra CORS origins, if any |
+
+None of these are secrets: `GOOGLE_CLIENT_ID` is public by design and the rest
+are configuration. Real secrets (`TELEGRAM_BOT_TOKEN`, `EMAIL_API_KEY`,
+`TELEGRAM_WEBHOOK_SECRET`, `KYC_ENC_KEY`, …) stay Worker secrets and survive
+deploys untouched.
+
+If a variable is missing, the script prints an explicit warning naming it
+rather than shipping a silently broken configuration.
+
 ## Local development (for completeness)
 
 ```
