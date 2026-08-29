@@ -54,3 +54,15 @@ UPDATE users
 -- merging either, the UNIQUE constraint turns collisions into honest
 -- conflicts). Partial index: multiple phone-less (NULL) accounts stay fine.
 CREATE UNIQUE INDEX idx_users_phone_e164 ON users(phone_e164) WHERE phone_e164 IS NOT NULL;
+
+-- Signup referral carried through the EXTERNAL Telegram round-trip (§3.2:
+-- "pass the signup referral through external flows with server-side
+-- verification, never trusting an arbitrary referrer_user_id"). The browser
+-- hands over a ref (username or legacy code) when the challenge is created;
+-- the server RESOLVES it there and stores only the resulting stable user id
+-- here, so the value can never be forged from the client and cannot be
+-- re-pointed later. Persistence is expiry-bounded by the challenge itself
+-- (link_challenges.expires_at, minutes) — no long-lived tracking state — and
+-- it is read exactly once, at account creation. NULL = no referral captured.
+-- ON DELETE SET NULL so a deleted referrer never blocks challenge cleanup.
+ALTER TABLE link_challenges ADD COLUMN signup_referrer_id TEXT REFERENCES users(id) ON DELETE SET NULL;

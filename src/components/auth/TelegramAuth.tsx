@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Loader2, KeyRound } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Loader2, Eye, EyeOff } from 'lucide-react';
 import { api, ApiError, isNotConfigured } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
+import OtpBoxes from './OtpBoxes';
+import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
 
 /**
  * Telegram-verified phone + OTP registration & sign-in (§4), embedded by the
@@ -59,6 +61,13 @@ const STRINGS = {
     doneSignup: 'تم إنشاء حسابك وتسجيل الدخول.',
     validFor: 'صالح لمدة 15 دقيقة',
     cancel: 'إلغاء',
+    otpHint: 'أدخل الأرقام الستة المرسلة إلى محادثتك.',
+    passwordLabel: 'كلمة مرور (اختيارية)',
+    passwordHint: '8 محارف على الأقل. تتيح لك الدخول لاحقًا بالرقم + كلمة المرور دون تيليغرام.',
+    passwordShow: 'إظهار كلمة المرور',
+    passwordHide: 'إخفاء كلمة المرور',
+    passwordTooShort: 'كلمة المرور يجب أن تكون 8 محارف على الأقل، أو اتركها فارغة.',
+    referralApplied: 'كود الإحالة المرفق:',
   },
   en: {
     introSignin: 'Sign in with your Telegram-verified phone number — no password.',
@@ -97,6 +106,13 @@ const STRINGS = {
     doneSignup: 'Your account was created and you are signed in.',
     validFor: 'Valid for 15 minutes',
     cancel: 'Cancel',
+    otpHint: 'Enter the six digits sent to your chat.',
+    passwordLabel: 'Password (optional)',
+    passwordHint: 'At least 8 characters. It lets you sign in later with phone + password, without Telegram.',
+    passwordShow: 'Show password',
+    passwordHide: 'Hide password',
+    passwordTooShort: 'The password must be at least 8 characters, or left empty.',
+    referralApplied: 'Referral code attached:',
   },
   ckb: {
     introSignin: 'بە ژمارە تەلەفۆنە پشتڕاستکراوەکەت لە ڕێگەی تەلەگرامەوە بچۆرەژوورەوە — بەبێ وشەی نهێنی.',
@@ -135,6 +151,13 @@ const STRINGS = {
     doneSignup: 'هەژمارەکەت دروستکرا و چوویتەژوورەوە.',
     validFor: 'بۆ ماوەی ١٥ خولەک کارایە',
     cancel: 'هەڵوەشاندنەوە',
+    otpHint: 'ئەو شەش ژمارەیە بنووسە کە بۆ گفتوگۆکەت نێردرا.',
+    passwordLabel: 'وشەی نهێنی (ئارەزوومەندانە)',
+    passwordHint: 'لانیکەم ٨ نووسە. ڕێگەت پێدەدات دواتر بە ژمارە + وشەی نهێنی بچیتەژوورەوە بەبێ تەلەگرام.',
+    passwordShow: 'پیشاندانی وشەی نهێنی',
+    passwordHide: 'شاردنەوەی وشەی نهێنی',
+    passwordTooShort: 'وشەی نهێنی دەبێت لانیکەم ٨ نووسە بێت، یان بەتاڵی بهێڵەرەوە.',
+    referralApplied: 'کۆدی بانگهێشتی هاوپێچ:',
   },
 } as const;
 
@@ -142,6 +165,15 @@ type Purpose = 'signup' | 'login';
 
 interface TelegramAuthProps {
   mode: 'signin' | 'signup';
+  /**
+   * §2.6 — the referral code the /auth page resolved (from ?ref= or the
+   * "have a referral code?" bar). It is forwarded to /telegram/start, which
+   * resolves it to a STABLE user id and stores it on the challenge, so an
+   * invite survives the Safari → Telegram → Safari app switch; it is sent
+   * again at /complete, where a code supplied there overrides. Never
+   * resolved or trusted in the browser.
+   */
+  referralCode?: string;
   /** Called after a confirmed successful completion (session already
    *  created and the auth context refreshed). Defaults to navigate('/'). */
   onSuccess?: () => void;
@@ -227,7 +259,7 @@ function storeFlow(v: StoredFlow | null) {
 
 type Phase = 'phone' | 'waiting' | 'otp' | 'blocked' | 'expired' | 'done';
 
-export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: TelegramAuthProps) {
+export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCode }: TelegramAuthProps) {
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
   const navigate = useNavigate();
@@ -248,6 +280,11 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [uname, setUname] = useState('');
+  // §2.1 — the OPTIONAL password that turns this into a phone + password
+  // account. Empty means the pure OTP path: the mandate forbids demanding a
+  // password this flow does not need, so the verify button never waits on it.
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
 
@@ -269,6 +306,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
     setServerState('pending');
     setHint(null);
     setCode('');
+    setPassword('');
     setOtpError(null);
     setStartError(null);
     setResendNotice(null);
@@ -379,7 +417,14 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
     }
     setStarting(true);
     try {
-      const data = await api.post<StartResp>('/api/auth/telegram/start', { phone: toAsciiDigits(phone.trim()), purpose });
+      const ref = (referralCode ?? '').trim();
+      const data = await api.post<StartResp>('/api/auth/telegram/start', {
+        phone: toAsciiDigits(phone.trim()),
+        purpose,
+        // Captured server-side at START (it survives the app switch and a
+        // tab reload); an unknown code never blocks the sign-up.
+        ...(purpose === 'signup' && ref ? { ref } : {}),
+      });
       const f: StoredFlow = {
         token: data.continuation_token,
         deep_link: data.deep_link,
@@ -416,6 +461,11 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
       if (purpose === 'signup') {
         if (name.trim()) body.name = name.trim();
         if (uname.trim()) body.username = uname.trim();
+        // Optional: only sent when the person actually typed one. The server
+        // hashes it and audits password_set; it is never stored here.
+        if (password) body.password = password;
+        const ref = (referralCode ?? '').trim();
+        if (ref) body.referralCode = ref;
       }
       await api.post('/api/auth/telegram/complete', body);
       await finish();
@@ -464,6 +514,16 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
 
   const blockedText =
     hint === 'use_login' ? s.blockedSignup : hint === 'use_signup' ? s.blockedLogin : s.blockedSupport;
+
+  // A password is optional; once the person starts typing one it must reach
+  // the server's own minimum (8) before the button may enable.
+  const passwordTouchedInvalid = purpose === 'signup' && password.length > 0 && password.length < 8;
+  const otpFill = combineFillProgress([
+    { progress: lengthProgress(code, 6), valid: code.length === 6 },
+    ...(purpose === 'signup' && password.length > 0
+      ? [{ progress: lengthProgress(password, 8), valid: password.length >= 8 }]
+      : []),
+  ]);
 
   return (
     <div className="w-full text-white" dir={lang === 'en' ? 'ltr' : 'rtl'}>
@@ -573,22 +633,22 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
             </p>
           </div>
 
-          <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-code">
+          {/* §2.4 — six linked boxes: paste, one-time-code autofill, Arabic
+              digits and Backspace navigation all handled by OtpBoxes. Six
+              digits mean READY TO SEND, never "verified": only the server's
+              answer to /telegram/complete decides that. */}
+          <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-code-0">
             {s.codeLabel}
           </label>
-          <input
-            id="tg-auth-code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9٠-٩۰-۹]*"
-            maxLength={6}
-            dir="ltr"
+          <OtpBoxes
+            idPrefix="tg-auth-code"
+            label={s.codeLabel}
             value={code}
-            onChange={(e) => setCode(toAsciiDigits(e.target.value).replace(/\D/g, '').slice(0, 6))}
-            placeholder="••••••"
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 text-[18px] tracking-[0.4em] text-center text-white placeholder-zinc-600 outline-none focus:border-gold transition-colors"
+            onChange={setCode}
+            disabled={completing}
+            autoFocus
           />
+          <p className="mt-1.5 text-center text-[12px] text-zinc-500">{s.otpHint}</p>
 
           {purpose === 'signup' && (
             <div className="mt-3 space-y-3">
@@ -624,6 +684,48 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
                 />
                 <p className="mt-1 text-[11px] text-zinc-500">{s.usernameHint}</p>
               </div>
+              {/* §2.1 — the ONLY route by which a phone + password account is
+                  created. Optional on purpose: leaving it empty keeps the pure
+                  Telegram-OTP account, and the verify button never waits on a
+                  field this path does not require. */}
+              <div>
+                <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-password">
+                  {s.passwordLabel}
+                </label>
+                <div className="relative">
+                  <input
+                    id="tg-auth-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    maxLength={200}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    aria-invalid={passwordTouchedInvalid || undefined}
+                    aria-describedby="tg-auth-password-hint"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 pe-12 text-[15px] text-white placeholder-zinc-500 outline-none focus:border-gold transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? s.passwordHide : s.passwordShow}
+                    aria-pressed={showPassword}
+                    className="absolute inset-y-0 end-0 flex min-h-[44px] w-12 items-center justify-center text-zinc-400 transition-colors hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p
+                  id="tg-auth-password-hint"
+                  className={`mt-1 text-[11px] ${passwordTouchedInvalid ? 'text-red-400' : 'text-zinc-500'}`}
+                >
+                  {passwordTouchedInvalid ? s.passwordTooShort : s.passwordHint}
+                </p>
+              </div>
+              {(referralCode ?? '').trim() && (
+                <p className="text-[12px] text-zinc-400">
+                  {s.referralApplied} <span dir="ltr" className="font-bold text-gold">{(referralCode ?? '').trim()}</span>
+                </p>
+              )}
             </div>
           )}
 
@@ -634,21 +736,21 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode }: Telegram
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={completing || code.length !== 6}
-            className="mt-3 w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
-          >
-            {completing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> {s.verifying}
-              </>
-            ) : (
-              <>
-                <KeyRound className="w-4 h-4" /> {s.verify}
-              </>
-            )}
-          </button>
+          {/* §2.2/§2.4 — the fill goes 0/6 → 6/6 as digits arrive and regresses
+              the instant one is deleted. `ready` is real validation only: six
+              digits, plus a valid password WHEN one is being typed. The
+              animation never enables the button. */}
+          <div className="mt-3">
+            <FillButton
+              id="tg-auth-verify"
+              label={s.verify}
+              workingLabel={s.verifying}
+              progress={otpFill.progress}
+              ready={otpFill.ready && !completing}
+              status={completing ? 'submitting' : otpError ? 'error' : 'idle'}
+              hint={passwordTouchedInvalid ? s.passwordTooShort : code.length === 6 ? undefined : s.otpHint}
+            />
+          </div>
 
           <div className="mt-3 flex items-center justify-between gap-3">
             <button

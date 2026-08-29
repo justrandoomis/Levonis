@@ -52,6 +52,16 @@ export const authRoutes = new Hono<AppContext>();
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 
+/**
+ * A syntactically valid but unmatchable PBKDF2 record (all-zero salt and
+ * digest, same iteration count as hashPassword). Used ONLY to spend the same
+ * verification time on logins for identifiers that have no password, so the
+ * uniform login error is uniform in latency too. It is not a credential and
+ * can never authenticate anyone: the derived digest of any password is
+ * compared against 32 zero bytes.
+ */
+export const DUMMY_PASSWORD_HASH = `pbkdf2$100000$${'A'.repeat(22)}$${'A'.repeat(43)}`;
+
 function checkPassword(pw: string): void {
   if (pw.length < PASSWORD_MIN) throw badRequest(`Password must be at least ${PASSWORD_MIN} characters`);
   if (pw.length > PASSWORD_MAX) throw badRequest('Password is too long');
@@ -61,9 +71,23 @@ async function getFullUser(db: D1Database, id: string): Promise<SessionUser | nu
   return db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first<SessionUser>();
 }
 
-/** Optional referral code from a signup body — free-form, capped, never fatal. */
-function referralCodeFrom(body: Record<string, unknown>): string {
-  return typeof body.referralCode === 'string' ? body.referralCode.trim().slice(0, 64) : '';
+/**
+ * Optional referral ref explicitly carried by a signup body — free-form,
+ * capped, never fatal (§2.6: an empty or unknown code never blocks signup).
+ * `referralCode` is the primary field name; `ref` is accepted as an alias so
+ * a client that forwards the raw `?ref=` query parameter still attributes.
+ * Pure — unit-tested in tests/authPhone.test.ts.
+ *
+ * NOTE (§3.2): only a *code/username* is ever read from the client. An
+ * arbitrary `referrer_user_id` in the body is deliberately ignored
+ * everywhere in this file — the owner is always resolved server-side.
+ */
+export function referralCodeFrom(body: Record<string, unknown>): string {
+  for (const key of ['referralCode', 'ref'] as const) {
+    const v = body[key];
+    if (typeof v === 'string' && v.trim() !== '') return v.trim().slice(0, 64);
+  }
+  return '';
 }
 
 /**
@@ -88,9 +112,20 @@ export function referrerLookupCandidates(raw: unknown): string[] {
 /**
  * Resolve a public referral ref (username of the CURRENT holder, or a
  * legacy referral code) to its owner — always server-side; an arbitrary
- * client-sent referrer_user_id is never accepted anywhere (§3.2). Past
- * attributions are keyed to stable user ids, so this lookup only ever
- * affects NEW signups: a username change never transfers old referrals.
+ * client-sent referrer_user_id is never accepted anywhere (§3.2).
+ *
+ * Username changes, honestly (§3.1): past attributions are rows keyed to
+ * stable user ids (referral_attributions.referrer_id), so renaming — or a
+ * later person taking the freed name — can never move an already-earned
+ * referral to somebody else. This lookup therefore only affects NEW
+ * signups, and for those a username always maps to whoever holds it NOW.
+ * The consequence to state plainly rather than hide: a link with an OLD
+ * username stops crediting its original owner once they rename (it credits
+ * the new holder if the name was taken, otherwise nothing). The identifier
+ * that never moves is the legacy referral code (referral_codes.code, one
+ * per user, never reassigned) — it stays a working alias for exactly that
+ * reason. A release-cooldown on freed usernames is an owner policy
+ * decision, not something this resolver may invent.
  */
 async function resolveReferrer(env: Env, raw: string): Promise<SupportRef | null> {
   for (const candidate of referrerLookupCandidates(raw)) {
@@ -113,23 +148,55 @@ async function tryAttributeReferral(env: Env, newUserId: string, ref: string): P
   try {
     const resolved = await resolveReferrer(env, ref);
     if (!resolved) return;
-    if (resolved.userId === newUserId) return; // self-referral never binds
-    for (const campaign of ['printer', 'pro_sub'] as const) {
-      try {
-        await env.DB.prepare(
-          'INSERT INTO referral_attributions (id, referrer_id, referred_id, campaign) VALUES (?, ?, ?, ?)'
-        )
-          .bind(newId('rat'), resolved.userId, newUserId, campaign)
-          .run();
-      } catch (e) {
-        // UNIQUE(referred_id, campaign): already bound once — never rebind.
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!msg.includes('UNIQUE')) throw e;
-      }
-    }
+    await bindReferral(env, newUserId, resolved.userId);
   } catch (e) {
     console.error('referral attribution failed for user', newUserId, e instanceof Error ? e.message : String(e));
   }
+}
+
+/**
+ * Write the attribution rows for an ALREADY server-resolved referrer id
+ * (never a client-supplied one — §3.2). Idempotent by construction:
+ * UNIQUE(referred_id, campaign) makes the first binding final, so a retry,
+ * a replayed request or a second signup attempt can never rebind an account
+ * to a different referrer. Self-referral never binds.
+ */
+async function bindReferral(env: Env, newUserId: string, referrerId: string): Promise<void> {
+  if (!referrerId || referrerId === newUserId) return; // self-referral never binds
+  for (const campaign of ['printer', 'pro_sub'] as const) {
+    try {
+      await env.DB.prepare(
+        'INSERT INTO referral_attributions (id, referrer_id, referred_id, campaign) VALUES (?, ?, ?, ?)'
+      )
+        .bind(newId('rat'), referrerId, newUserId, campaign)
+        .run();
+    } catch (e) {
+      // UNIQUE(referred_id, campaign): already bound once — never rebind.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes('UNIQUE')) throw e;
+    }
+  }
+}
+
+/**
+ * Which referral source wins for a signup that travelled through an
+ * external app (§3.2). The code the user typed/confirmed in THIS submission
+ * wins over the one captured when the flow started — and when an explicit
+ * code is present it is used *alone*: silently falling back to the stored
+ * one would swap a code the user can see for one they cannot. With no
+ * explicit code, the server-resolved referrer captured at flow start (bound
+ * to that challenge, expiry-limited with it) is used. Pure — unit-tested.
+ */
+export function pickSignupReferralSource(
+  explicitRef: string,
+  storedReferrerId: string | null
+): { kind: 'explicit'; ref: string } | { kind: 'stored'; referrerId: string } | { kind: 'none' } {
+  const ref = typeof explicitRef === 'string' ? explicitRef.trim() : '';
+  if (ref) return { kind: 'explicit', ref };
+  if (typeof storedReferrerId === 'string' && storedReferrerId) {
+    return { kind: 'stored', referrerId: storedReferrerId };
+  }
+  return { kind: 'none' };
 }
 
 authRoutes.post('/register', async (c) => {
@@ -241,12 +308,24 @@ authRoutes.post('/login', async (c) => {
       .first<SessionUser & { password_hash: string | null }>();
   }
 
-  // One uniform error for every identifier kind — no account enumeration.
-  const fail = () => unauthorized('Incorrect email/username/phone or password');
-  if (!row) throw fail();
-  if (!row.password_hash) {
-    // Provider-only account (Google or Telegram signup) — no password exists.
-    throw unauthorized('This account has no password. Please continue with Google or Telegram.');
+  // ONE uniform failure for every identifier kind and every cause — unknown
+  // identifier, wrong password, and provider-only account (no password at
+  // all) are indistinguishable from outside, so this endpoint cannot be used
+  // to discover which addresses/usernames/phones exist or which sign in with
+  // Google/Telegram. The Google/Telegram hint is part of the SAME message for
+  // everyone, so it stays useful without becoming a signal.
+  const fail = () =>
+    unauthorized(
+      'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره. / ' +
+        'Incorrect email/username/phone or password. If you created your account with Google or Telegram, use that button.'
+    );
+  // Uniform in TIME as well as in wording: when there is no account, or the
+  // account is provider-only, the same PBKDF2 work is still performed
+  // against a fixed dummy hash, so response latency does not reveal which
+  // identifiers exist. (Cost is bounded by the login rate limit above.)
+  if (!row || !row.password_hash) {
+    await verifyPassword(password, DUMMY_PASSWORD_HASH);
+    throw fail();
   }
   const ok = await verifyPassword(password, row.password_hash);
   if (!ok) throw fail();
@@ -285,12 +364,46 @@ authRoutes.post('/google', async (c) => {
   if (!row) {
     const byEmail = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
       .bind(identity.email)
-      .first<SessionUser & { google_sub: string | null }>();
+      .first<SessionUser & { google_sub: string | null; email_verified_at: string | null }>();
     if (byEmail) {
       if (byEmail.google_sub && byEmail.google_sub !== identity.sub) {
         throw conflict('This email is already linked to a different Google account');
       }
-      await c.env.DB.prepare('UPDATE users SET google_sub = ? WHERE id = ?').bind(identity.sub, byEmail.id).run();
+      // §2.3: NO silent merge into an account whose ownership of this address
+      // was never proven. Google proves that THIS person owns the address —
+      // it does not prove that the existing local account (created by anyone
+      // who could type that address, and holding a password only they know)
+      // belongs to the same person. Adopting it would hand the account, its
+      // orders and its wallet to whoever registered the address first — or
+      // the reverse. So linking requires the existing account to have proven
+      // the address itself (email_verified_at), and the refusal names the
+      // exact recovery path instead of merging.
+      if (!byEmail.email_verified_at) {
+        throw new HttpError(
+          409,
+          'يوجد حساب بهذا البريد لم يُوثَّق بريده بعد، ولن نربطه بحساب Google تلقائيًا. سجّل الدخول بكلمة المرور ووثّق بريدك، ثم سيُربط Google تلقائيًا. / ' +
+            'An account with this email exists but its address was never verified, so it will not be linked to Google automatically. Sign in with your password and verify your email — Google then links automatically.',
+          'EMAIL_NOT_VERIFIED'
+        );
+      }
+      // Conditional link: only claims an unclaimed google_sub, so two
+      // concurrent sign-ins can never overwrite an existing link.
+      const linked = await c.env.DB.prepare(
+        'UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL'
+      )
+        .bind(identity.sub, byEmail.id)
+        .run();
+      if (linked.meta.changes === 0) {
+        // Someone linked a Google identity to this account in between; only
+        // the same sub may proceed (a different one is the conflict above).
+        const fresh = await c.env.DB.prepare('SELECT google_sub FROM users WHERE id = ?')
+          .bind(byEmail.id)
+          .first<{ google_sub: string | null }>();
+        if (fresh?.google_sub !== identity.sub) {
+          throw conflict('This email is already linked to a different Google account');
+        }
+      }
+      await audit(c.env.DB, byEmail.id, 'auth.google_linked', byEmail.id, {});
       row = byEmail;
     }
   }
@@ -343,6 +456,78 @@ authRoutes.post('/google', async (c) => {
   await createSession(c, row.id);
   const user = await getFullUser(c.env.DB, row.id);
   return c.json({ success: true, user: publicUser(user!) });
+});
+
+/**
+ * Attach a Google identity to the account the caller is ALREADY signed into
+ * (§2.5). This is the safe counterpart to the refusal in POST /google: an
+ * unverified email is not proof that the local account and the Google
+ * identity belong to the same person, but holding the account's session AND
+ * its current password AND a valid Google credential is. Nothing is merged
+ * across two accounts here — one row gains a second sign-in method.
+ *
+ * Guards: the Google sub must not already belong to another account, the
+ * account must not already carry a different sub, and the linking UPDATE is
+ * conditional so concurrent calls cannot overwrite an existing link. The
+ * email is stamped verified only when it is the SAME address Google proved.
+ */
+authRoutes.post('/google/link', requireAuth, async (c) => {
+  await rateLimit(c, 'google-link', 10, 900);
+  const me = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const credential = str(body.credential, 'credential', { min: 20, max: 4096 });
+
+  const row = await c.env.DB.prepare('SELECT email, password_hash, google_sub FROM users WHERE id = ?')
+    .bind(me.id)
+    .first<{ email: string; password_hash: string | null; google_sub: string | null }>();
+  if (!row) throw unauthorized();
+  // Re-authentication for a sensitive credential change, matching the policy
+  // /change-password already applies: prove the current password when the
+  // account has one. Accounts without a password (Telegram-only) rely on the
+  // session, and can set a password first from the settings page.
+  if (row.password_hash) {
+    const ok = await verifyPassword(String(body.currentPassword ?? ''), row.password_hash);
+    if (!ok) throw unauthorized('Current password is incorrect');
+  }
+
+  let identity;
+  try {
+    identity = await verifyGoogleIdToken(credential, c.env.GOOGLE_CLIENT_ID);
+  } catch (e) {
+    if (!c.env.GOOGLE_CLIENT_ID) {
+      throw unavailable('Google Sign-In is not configured yet (GOOGLE_CLIENT_ID missing)', 'GOOGLE_NOT_CONFIGURED');
+    }
+    throw unauthorized(e instanceof Error ? e.message : 'Google sign-in failed');
+  }
+
+  if (row.google_sub && row.google_sub !== identity.sub) {
+    throw conflict('This account is already linked to a different Google account');
+  }
+  const linked = await c.env.DB.prepare(
+    'UPDATE users SET google_sub = ?1 WHERE id = ?2 AND (google_sub IS NULL OR google_sub = ?1)'
+  )
+    .bind(identity.sub, me.id)
+    .run()
+    .catch((e: unknown) => {
+      // UNIQUE(google_sub): that identity already signs into another account.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('UNIQUE')) {
+        throw conflict('This Google account is already linked to another LEVONIS account');
+      }
+      throw e;
+    });
+  if (linked.meta.changes === 0) throw conflict('This account is already linked to a different Google account');
+
+  // Same-address proof only — never stamp a different address as verified.
+  await c.env.DB.prepare(
+    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND email = ?'
+  )
+    .bind(new Date().toISOString(), me.id, identity.email)
+    .run();
+  await audit(c.env.DB, me.id, 'auth.google_linked', me.id, { same_email: identity.email === row.email });
+
+  const user = await getFullUser(c.env.DB, me.id);
+  return c.json({ success: true, user: publicUser(user!), same_email: identity.email === row.email });
 });
 
 /**
@@ -544,13 +729,17 @@ const TG_SIGNUP_DONE_MSG =
 
 interface TgAuthChallengeDbRow extends AuthChallengeRow {
   purpose: TgAuthPurpose;
+  /** Server-resolved referrer captured at /telegram/start (§3.2) — never a
+   *  client-supplied id. NULL when the flow started without a ref. */
+  signup_referrer_id: string | null;
 }
 
 async function findAuthChallenge(db: D1Database, continuationToken: string): Promise<TgAuthChallengeDbRow | null> {
   const hash = await sha256Hex(continuationToken);
   return db
     .prepare(
-      `SELECT id, purpose, phone_entered, state, telegram_user_id, chat_id, otp_sent_at, expires_at, consumed_at
+      `SELECT id, purpose, phone_entered, state, telegram_user_id, chat_id, otp_sent_at, expires_at, consumed_at,
+              signup_referrer_id
          FROM link_challenges
         WHERE continuation_hash = ? AND purpose IN ('signup','login')`
     )
@@ -592,6 +781,25 @@ authRoutes.post('/telegram/start', async (c) => {
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + TG_AUTH_TTL_MINUTES * 60_000).toISOString();
 
+  // §2.6/§3.2: the signup referral must survive the trip through the
+  // Telegram app (the browser may be reloaded or restored meanwhile). The
+  // ref is RESOLVED here and only the resulting stable user id is stored on
+  // the challenge — a client can never inject a referrer id, and the state
+  // expires with the challenge (minutes). An unknown ref simply resolves to
+  // NULL: it never blocks the sign-up (§2.6). The explicit code sent at
+  // /telegram/complete still wins over this captured value.
+  let signupReferrerId: string | null = null;
+  if (purpose === 'signup') {
+    const ref = referralCodeFrom(body);
+    if (ref) {
+      try {
+        signupReferrerId = (await resolveReferrer(c.env, ref))?.userId ?? null;
+      } catch (e) {
+        console.error('referral capture failed at telegram/start:', e instanceof Error ? e.message : String(e));
+      }
+    }
+  }
+
   // NOTE: deliberately NO account lookup here — the response below is
   // byte-identical whether or not the phone belongs to an account (no
   // enumeration). A login for an unlinked phone, or a signup for a linked
@@ -605,9 +813,9 @@ authRoutes.post('/telegram/start', async (c) => {
         WHERE purpose IN ('signup','login') AND phone_entered = ? AND consumed_at IS NULL`
     ).bind(now, phone),
     c.env.DB.prepare(
-      `INSERT INTO link_challenges (id, purpose, user_id, session_ref, phone_entered, state, continuation_hash, expires_at)
-       VALUES (?, ?, NULL, '', ?, 'pending', ?, ?)`
-    ).bind(challengeId, purpose, phone, continuationHash, expiresAt),
+      `INSERT INTO link_challenges (id, purpose, user_id, session_ref, phone_entered, state, continuation_hash, expires_at, signup_referrer_id)
+       VALUES (?, ?, NULL, '', ?, 'pending', ?, ?, ?)`
+    ).bind(challengeId, purpose, phone, continuationHash, expiresAt, signupReferrerId),
   ]);
 
   return c.json({
@@ -618,6 +826,11 @@ authRoutes.post('/telegram/start', async (c) => {
     expires_at: expiresAt,
     phone_masked: maskPhone(phone),
     purpose,
+    // Honest echo for the referral bar: whether the ref sent with this
+    // request actually resolved to a referrer and is now held for the
+    // account this flow will create. Says nothing about the phone, so the
+    // no-enumeration property of this response is unaffected.
+    referral_captured: signupReferrerId !== null,
   });
 });
 
@@ -735,9 +948,25 @@ authRoutes.post('/telegram/complete', async (c) => {
   let uname: string | null = null;
   let name = '';
   let rawPassword: string | null = null;
+  let realEmail: string | null = null;
   if (ch.purpose === 'signup') {
     uname = body.username ? username(body.username) : null;
     name = str(body.name, 'name', { min: 0, max: 100, required: false });
+    // §2.3: a phone account is NOT a fabricated email address. When the
+    // person also gives a real address it is stored as-is and stays
+    // UNVERIFIED (email_verified_at NULL) until they confirm it from that
+    // inbox — no placeholder is invented for them. Without one, the account
+    // keeps the honest non-routable placeholder (decision row 27).
+    if (typeof body.email === 'string' && body.email.trim() !== '') {
+      realEmail = email(body.email);
+      if (realEmail.endsWith('@telegram.local')) {
+        // Reserved, non-routable placeholder domain — never accepted as a
+        // real address, so a placeholder can never be claimed by hand.
+        throw badRequest('Invalid email address');
+      }
+      const mailTaken = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(realEmail).first();
+      if (mailTaken) throw conflict('An account with this email already exists');
+    }
     // §2.1/§2.3: phone + password accounts. The password is OPTIONAL here —
     // the pure Telegram-OTP path is never forced to set one — and it is
     // only ever accepted AFTER phone ownership was proven (the
@@ -830,7 +1059,8 @@ authRoutes.post('/telegram/complete', async (c) => {
   // never encoded into an email (§2.3), and the placeholder is refused by
   // /verify-email/send (NO_REAL_EMAIL) so it can never masquerade as a
   // real address.
-  const placeholderEmail = `tg-${id}@telegram.local`;
+  // A real address supplied above replaces it entirely (still unverified).
+  const accountEmail = realEmail ?? `tg-${id}@telegram.local`;
   // Password (optional, §2.1/§2.3): hashed only AFTER the OTP proved this
   // verified session — a phone + password account cannot exist without
   // ownership proof. NULL = OTP-only account (no password forced on it).
@@ -849,7 +1079,7 @@ authRoutes.post('/telegram/complete', async (c) => {
            AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE phone_e164 = ?7 AND revoked_at IS NULL)
            AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE telegram_user_id = ?8 AND revoked_at IS NULL)
            AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?7)`
-      ).bind(id, placeholderEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id, passwordHash),
+      ).bind(id, accountEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id, passwordHash),
       c.env.DB.prepare(
         `INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
          SELECT ?1, ?2, ?3, ?4, ?5
@@ -864,6 +1094,11 @@ authRoutes.post('/telegram/complete', async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('UNIQUE') && msg.includes('username')) throw conflict('This username is taken');
+    if (msg.includes('UNIQUE') && msg.includes('users.email')) {
+      // A real address supplied here was taken between the pre-check and the
+      // insert — name the actual cause instead of blaming the phone.
+      throw conflict('An account with this email already exists');
+    }
     if (msg.includes('UNIQUE')) {
       // telegram_user_id (possibly on a revoked row) or email collision —
       // the person already has account history: guide to login/support.
@@ -887,10 +1122,27 @@ authRoutes.post('/telegram/complete', async (c) => {
     );
   }
 
-  await tryAttributeReferral(c.env, id, referralCodeFrom(body));
+  // Referral binds ONCE, here, at account creation (§3.2) — never on a link
+  // visit and never on a later sign-in. An explicit code in THIS request
+  // wins over the one captured when the flow started; with none, the
+  // server-resolved referrer stored on the challenge is used, which is what
+  // carries the attribution across the Telegram round-trip.
+  const referralSource = pickSignupReferralSource(referralCodeFrom(body), ch.signup_referrer_id);
+  if (referralSource.kind === 'explicit') {
+    await tryAttributeReferral(c.env, id, referralSource.ref);
+  } else if (referralSource.kind === 'stored') {
+    try {
+      await bindReferral(c.env, id, referralSource.referrerId);
+    } catch (e) {
+      console.error('referral attribution failed for user', id, e instanceof Error ? e.message : String(e));
+    }
+  }
   await audit(c.env.DB, id, 'auth.telegram_signup', `user:${id}`, {
     phone_masked: maskPhone(ch.phone_entered),
     telegram_user_id: ch.telegram_user_id,
+    // Honest signal for the operator: whether the account carries a real
+    // address or the non-routable placeholder (decision row 27).
+    email_placeholder: realEmail === null,
     // Whether the person chose a phone+password account (§2.3) — a boolean
     // only; the password itself never reaches logs or audit rows.
     password_set: passwordHash !== null,
@@ -900,7 +1152,12 @@ authRoutes.post('/telegram/complete', async (c) => {
   c.executionCtx.waitUntil(sendToChat(c.env, ch.chat_id, TG_SIGNUP_DONE_MSG).then(() => undefined));
   // email_placeholder tells the UI the account has no real email yet, so it
   // can honestly invite the user to add one — never pretending otherwise.
-  return c.json({ success: true, user: publicUser(user!), created: true, email_placeholder: true });
+  return c.json({
+    success: true,
+    user: publicUser(user!),
+    created: true,
+    email_placeholder: realEmail === null,
+  });
 });
 
 // Email verification (final-phase §3A) ---------------------------------------

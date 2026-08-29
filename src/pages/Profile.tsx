@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Headset, Settings, MapPin, QrCode, Store,
   Wallet, Package, Truck, MessageSquare, RefreshCcw,
-  Star, Clock, Heart, Gamepad2, Coins, Leaf, Zap, Shield,
-  ChevronRight, ChevronLeft, Gift, Copy, Check, UserRound
+  Star, Clock, Heart, Gamepad2, Coins, Zap, Shield,
+  ChevronRight, ChevronLeft, Gift, Copy, Check, UserRound, UserPlus
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
@@ -469,11 +469,25 @@ export default function Profile() {
                 <Gift className="w-4 h-4 text-[#ff5000]" strokeWidth={2} aria-hidden="true" />
                 {t('referralProgram')}
               </h2>
-              {mine?.referral?.code && (
-                <span className="text-[11px] text-zinc-500">
-                  {t('referralCode')}: <span className="font-mono font-bold text-black dark:text-white">{mine.referral.code}</span>
-                </span>
-              )}
+              {/* §3.1: referral MANAGEMENT lives on its own page now. The
+                  summary card stays (nothing working was removed) and links
+                  to the full page, where the username handle, the support-code
+                  explanation and the gift states live. */}
+              <div className="flex items-center gap-2 min-w-0">
+                {mine?.referral?.code && (
+                  <span className="text-[11px] text-zinc-500 truncate">
+                    {t('referralCode')}: <span className="font-mono font-bold text-black dark:text-white">{mine.referral.code}</span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/referrals')}
+                  className="flex items-center gap-0.5 shrink-0 text-[11px] text-zinc-500 min-h-[44px] px-2 -me-2 rounded-lg hover:text-zinc-700 dark:hover:text-zinc-300 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                >
+                  {loc('الصفحة الكاملة', 'Full page', 'پەڕەی تەواو')}
+                  {dir === 'rtl' ? <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
+                </button>
+              </div>
             </div>
 
             {!mineLoaded ? (
@@ -639,7 +653,11 @@ export default function Profile() {
         <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 mb-3 shadow-sm overflow-hidden relative">
           <div className="flex overflow-x-auto gap-5 hide-scrollbar">
             {[
-              { icon: Leaf, label: loc('المزرعة', 'Farm', 'کێڵگە'), color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30', to: null },
+              /* §3.1: the referrals page gets ONE of the five slots under
+                 "My Orders" — it replaces a "coming soon" placeholder, so no
+                 working button was removed and the five-cell grid keeps its
+                 sizes, spacing and alignment exactly as before. */
+              { icon: UserPlus, label: loc('الإحالات', 'Referrals', 'بانگهێشتکردن'), color: 'text-sky-500', bg: 'bg-sky-100 dark:bg-sky-900/30', to: '/referrals' },
               { icon: Coins, label: loc('جمع العملات', 'Collect Coins', 'کۆکردنەوەی دراو'), color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', to: null },
               { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30', to: '/points' },
               { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30', to: '/games' },

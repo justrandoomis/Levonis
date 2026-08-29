@@ -29,6 +29,8 @@ interface CheckoutQuoteDto {
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
   coupon: { code?: string; discount_iqd?: number } | null;
+  /** §3.3 attribution — always `discount_iqd: 0`; it is not a discount. */
+  support: { referrer_username: string; ref: string; discount_iqd: number } | null;
   points: { balance: number; applied_iqd: number };
   wallet: { balance_iqd: number; applied_iqd: number; required_advance_iqd: number };
   total_iqd: number;
@@ -57,6 +59,8 @@ const STRINGS = {
     version: 'نسخة',
     invoiceNo: 'رقم الفاتورة',
     implicitNote: 'لا توجد سياسات منشورة تتطلب الموافقة حالياً.',
+    supportLine: (name: string) => `كود دعم: ${name}`,
+    supportZero: 'لا يغيّر سعر طلبك (0 د.ع)',
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -73,6 +77,8 @@ const STRINGS = {
     version: 'v',
     invoiceNo: 'Invoice number',
     implicitNote: 'No published policies currently require acceptance.',
+    supportLine: (name: string) => `Support code: ${name}`,
+    supportZero: 'does not change your price (0 IQD)',
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -89,6 +95,8 @@ const STRINGS = {
     version: 'وەشان',
     invoiceNo: 'ژمارەی پسوولە',
     implicitNote: 'لە ئێستادا هیچ سیاسەتێکی بڵاوکراوە پێویستی بە ڕەزامەندی نییە.',
+    supportLine: (name: string) => `کۆدی پاڵپشتی: ${name}`,
+    supportZero: 'نرخەکەت ناگۆڕێت (0 د.ع)',
   },
 };
 
@@ -108,9 +116,15 @@ export default function Checkout() {
 
   // Selected cart line ids and points choice arrive from the Cart page via
   // router state; with no state we fall back to the whole cart.
-  const routeState = (location.state ?? {}) as { itemIds?: string[]; usePoints?: boolean };
+  const routeState = (location.state ?? {}) as { itemIds?: string[]; usePoints?: boolean; supportRef?: string };
   const requestedItemIds = Array.isArray(routeState.itemIds) ? routeState.itemIds : null;
   const usePoints = routeState.usePoints === true;
+  // §3.3 — the support code the cart resolved and the buyer kept. It is an
+  // ATTRIBUTION, never a price input: it rides along to the quote and to the
+  // order, the server re-resolves it and freezes it into
+  // orders.support_snapshot, and it is worth exactly 0 IQD here. Nothing on
+  // this page subtracts anything for it.
+  const supportRef = typeof routeState.supportRef === 'string' ? routeState.supportRef.trim().slice(0, 60) : '';
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
@@ -207,6 +221,7 @@ export default function Checkout() {
         itemIds: items.map((i) => i.id),
         usePoints,
         useWallet: useWalletBalance,
+        supportCode: supportRef || undefined,
       })
       .then((data) => {
         if (seq !== quoteSeqRef.current) return;
@@ -235,7 +250,7 @@ export default function Checkout() {
         if (seq === quoteSeqRef.current) setQuoteLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, itemIdsKey]);
+  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, itemIdsKey, supportRef]);
 
   const walletBalanceIQD = usdCentsToIqd(balanceUsdCents, exchangeRate);
 
@@ -304,6 +319,9 @@ export default function Checkout() {
         usePoints,
         itemIds: items.map((i) => i.id),
         idempotencyKey: idempotencyKeyRef.current,
+        // §3.3: attribution only — the server answers with the frozen
+        // support snapshot and an unchanged total.
+        supportCode: supportRef || undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
         policyAcceptance: policyAccepted
@@ -721,6 +739,20 @@ export default function Checkout() {
               <div className="flex justify-between items-center text-emerald-400">
                 <span className="font-light">{dir === 'rtl' ? 'خصم النقاط' : 'Points Discount'}</span>
                 <span className="font-normal">-{formatIqd(pointsDiscount)}</span>
+              </div>
+            )}
+
+            {/* §3.3/§5 — the support code appears in the money view with an
+                explicit ZERO. The server echoes it from the resolved snapshot,
+                so this line can never claim an attribution the order will not
+                actually carry. */}
+            {quote?.support && (
+              <div
+                data-testid="checkout-support-line"
+                className="flex justify-between items-center gap-3 text-[13px] text-sky-300"
+              >
+                <span className="font-light truncate">{S.supportLine(quote.support.referrer_username || quote.support.ref)}</span>
+                <span className="font-normal shrink-0 text-zinc-400">{S.supportZero}</span>
               </div>
             )}
 

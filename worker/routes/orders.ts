@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, str } from '../lib/http';
+import { requireAuth, badRequest, notFound, str, int } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
@@ -14,7 +14,23 @@ import {
   validateCoupon,
   grantPrinterGiftIfEligible,
 } from '../lib/membershipOps';
-import { getBalances } from '../lib/wallet';
+import { getAvailableBalances } from '../lib/walletOps';
+import { buildSupportSnapshot } from '../lib/supportCode';
+import {
+  eligibleMerchandiseIqd,
+  netEligibleIqd,
+  pointsForEligibleIqd,
+  capRedeemablePoints,
+  resolvePointsRule,
+  getPointsRuleConfig,
+  buildPurchaseAccrualStatements,
+  buildSettlementStatements,
+  cancelPendingAccrualStatement,
+  recordOrderSettlement,
+  releaseAccrualForOrder,
+  getOrderPointsSnapshots,
+} from '../lib/pointsOps';
+import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { notifyAdmins } from '../lib/telegram';
@@ -33,7 +49,106 @@ function iqdToUsdCents(iqd: number, rate: number): number {
   return Math.ceil((iqd * 100) / rate);
 }
 
-export function orderPublic(o: Record<string, unknown>, items: Record<string, unknown>[]) {
+/**
+ * §5 unified financial snapshot: ONE server-computed money view every cart,
+ * checkout, order-detail, admin-prep and invoice screen reads — no screen
+ * recomputes totals on its own.
+ *
+ * Honesty rules encoded here:
+ *  - merchandise is separated from fees; shipping/transport/warranty never
+ *    earn points and are never covered by them.
+ *  - the wallet is a PAYMENT MEANS, not a discount: wallet_applied never
+ *    reduces the merchandise price, it settles part of the total.
+ *  - a COD balance is never "paid" at creation. payment_state is derived from
+ *    RECORDED collections when they were loaded, otherwise from what was
+ *    actually prepaid — never from the order merely existing.
+ *  - the support code is attribution only: it appears with an explicit
+ *    zero monetary effect, never as a discount line.
+ *
+ * `points` and `settlement` require the accrual/settlement snapshot; callers
+ * that do not load it (e.g. the admin order list) receive null there rather
+ * than a fabricated zero.
+ */
+function financialSnapshot(
+  o: Record<string, unknown>,
+  items: Record<string, unknown>[],
+  snap?: OrderPointsSnapshot
+) {
+  const coupon = safeParse<{ discount_iqd?: number } | null>(o.coupon_snapshot, null);
+  const couponDiscount = coupon ? Number(coupon.discount_iqd) || 0 : 0;
+  const subtotal = Number(o.subtotal_iqd) || 0;
+  // Legacy orders (pre-0014) have no stored merchandise column — recompute it
+  // from the per-line pricing snapshots instead of pretending 0 is real.
+  const merchandise =
+    o.merchandise_iqd === null || o.merchandise_iqd === undefined
+      ? eligibleMerchandiseIqd(
+          items.map((it) => ({
+            qty: Number(it.qty) || 0,
+            unit_price_iqd: Number(it.unit_price_iqd) || 0,
+            pricing_snapshot: (it.pricing_snapshot as string | null) ?? null,
+            warranty_snapshot: (it.warranty_snapshot as string | null) ?? null,
+            transport_snapshot: (it.transport_snapshot as string | null) ?? null,
+          }))
+        )
+      : Number(o.merchandise_iqd) || 0;
+  const pointsUsed = Number(o.points_discount_iqd) || 0;
+  const walletIqd = Number(o.wallet_applied_iqd) || 0;
+  const total = Number(o.total_iqd) || 0;
+  const due = Number(o.due_on_delivery_iqd) || 0;
+  const collected = snap ? snap.collected_iqd : null;
+  const paid = collected === null ? walletIqd : collected;
+  const outstanding = Math.max(0, total - paid);
+  const support = safeParse<Record<string, unknown> | null>(o.support_snapshot, null);
+
+  return {
+    // Goods vs fees — the points-eligible basis is merchandise only.
+    merchandise_iqd: merchandise,
+    fees_iqd: Math.max(0, subtotal - merchandise), // transport commissions + warranty fees
+    subtotal_iqd: subtotal,
+    coupon_discount_iqd: couponDiscount,
+    // 1 point = exactly 1 IQD, applied to merchandise only.
+    points_used: pointsUsed,
+    points_value_iqd: pointsUsed,
+    shipping_iqd: Number(o.shipping_iqd) || 0,
+    delivery_waived: !!o.delivery_waived,
+    total_iqd: total,
+    // Payment means, with its ledger reference.
+    wallet_applied_iqd: walletIqd,
+    wallet_tx_id: walletIqd > 0 ? `wtx_ord_${String(o.id)}_usd` : null,
+    points_tx_id: pointsUsed > 0 ? `wtx_ord_${String(o.id)}_pts` : null,
+    due_on_delivery_iqd: due,
+    collected_iqd: collected,
+    outstanding_iqd: collected === null ? due : outstanding,
+    payment_state: outstanding <= 0 && (collected !== null || due <= 0) ? 'paid' : paid > 0 ? 'partial' : 'cod_due',
+    settlement: snap
+      ? { collected_iqd: snap.collected_iqd, settled_at: snap.settled_at, fully_settled: snap.settled_at !== null }
+      : null,
+    // Earned points: pending amount and the date it becomes releasable.
+    points: snap
+      ? {
+          state: snap.state,
+          pending: snap.pending,
+          released: snap.released,
+          available_at: snap.available_at,
+          eligible_iqd: snap.eligible_iqd,
+          iqd_per_point: snap.iqd_per_point,
+          rule_version: snap.rule_version,
+          redeemed: snap.redeemed,
+          redemption_state: snap.redemption_state,
+        }
+      : null,
+    // Attribution only — explicitly zero money for the buyer (§3.3).
+    support: support
+      ? { referrer_username: support.referrer_username ?? '', ref: support.ref ?? '', discount_iqd: 0 }
+      : null,
+  };
+}
+
+export function orderPublic(
+  o: Record<string, unknown>,
+  items: Record<string, unknown>[],
+  snap?: OrderPointsSnapshot
+) {
   const coupon = safeParse<Record<string, unknown> | null>(o.coupon_snapshot, null);
   return {
     id: o.id,
@@ -55,6 +170,8 @@ export function orderPublic(o: Record<string, unknown>, items: Record<string, un
     delivered_at: o.delivered_at ?? null,
     created_at: o.created_at,
     updated_at: o.updated_at,
+    /** §5: the single money view — every screen reads this, none recomputes. */
+    financial: financialSnapshot(o, items, snap),
     items: items.map((it) => ({
       id: it.id,
       product_id: it.product_id,
@@ -173,6 +290,8 @@ interface CheckoutInput {
   couponCode: string;
   usePoints: boolean;
   useWallet: boolean;
+  /** §3.3 support code — attribution only, never a discount. */
+  supportRef: string;
 }
 
 interface ComputedLine {
@@ -217,6 +336,14 @@ interface CheckoutComputation {
   couponSnapshot: string | null;
   pointsBalance: number;
   pointsDiscount: number;
+  /** Eligible official-store merchandise AFTER coupon — the redemption cap. */
+  eligibleMerchandise: number;
+  /** Net eligible base the pending accrual is computed from (§4.2). */
+  netEligible: number;
+  pointsRule: PointsRule;
+  /** Points this order will accrue as PENDING at purchase. */
+  pointsEarnPending: number;
+  supportSnapshot: { referrer_user_id: string; referrer_username: string; ref: string } | null;
   walletBalanceIqd: number;
   walletApplied: number;
   walletUsdCents: number;
@@ -429,15 +556,34 @@ async function computeCheckout(
 
   const beforeDiscounts = Math.max(0, subtotal + shipping.total_iqd - couponDiscount);
 
-  const balances = await getBalances(c.env.DB, user.id);
-  const walletBalanceIqd = Math.floor((balances.usd_cents * exchangeRate) / 100);
+  // Spendable balances only (mandate §11.1/§4.4: pending deposits and pending
+  // points are NEVER spendable). getAvailableBalances is the wallet slice's
+  // frozen contract — settled minus active holds/reservations.
+  const available = await getAvailableBalances(c.env, user.id);
+  const walletBalanceIqd = Math.floor((available.usd_cents_available * exchangeRate) / 100);
 
-  // Points: 1 point = 1 IQD, applied before the wallet.
+  // §4.4 redemption: "use my points" applies ALL available points, capped at
+  // the ELIGIBLE MERCHANDISE value after product/membership/coupon discounts —
+  // never delivery, never transport commissions or warranty fees, never
+  // community-store lines (community_products have no checkout path here; all
+  // cart lines come from the official `products` catalogue). The amount is
+  // EXACT: 739 available against a 75,000 basis redeems 739 IQD.
+  const eligibleMerchandise = Math.max(0, merchandise - Math.min(couponDiscount, merchandise));
   let pointsDiscount = 0;
-  if (input.usePoints && balances.points > 0) {
-    pointsDiscount = Math.min(balances.points, beforeDiscounts);
+  if (input.usePoints && available.points_available > 0) {
+    pointsDiscount = capRedeemablePoints(available.points_available, eligibleMerchandise);
   }
   const afterPoints = beforeDiscounts - pointsDiscount;
+
+  // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one
+  // floor at the end) at the rate in force for THIS purchase instant.
+  const ruleConfig = await getPointsRuleConfig(c.env);
+  const pointsRule = resolvePointsRule(ruleConfig, new Date().toISOString());
+  const netEligible = netEligibleIqd(merchandise, couponDiscount, pointsDiscount);
+  const pointsEarnPending = pointsForEligibleIqd(netEligible, pointsRule.iqd_per_point);
+
+  // §3.3 support attribution — resolved server-side, zero monetary effect.
+  const supportSnapshot = await buildSupportSnapshot(c.env, user.id, input.supportRef || null);
 
   // Advance-payment requirements are paid from the wallet. Printer delivery
   // fees are payable in advance (§6.3) on top of the payment method's rule.
@@ -454,13 +600,13 @@ async function computeCheckout(
     throw badRequest('Insufficient wallet balance for the required advance payment', 'INSUFFICIENT_BALANCE');
   }
   const walletUsdCents = walletApplied > 0 ? iqdToUsdCents(walletApplied, exchangeRate) : 0;
-  if (walletUsdCents > balances.usd_cents) {
+  if (walletUsdCents > available.usd_cents_available) {
     // Rounding pushed us past the balance; scale back to what the balance covers.
-    walletApplied = Math.floor((balances.usd_cents * exchangeRate) / 100);
+    walletApplied = Math.floor((available.usd_cents_available * exchangeRate) / 100);
     if (walletApplied < requiredAdvance) throw badRequest('Insufficient wallet balance', 'INSUFFICIENT_BALANCE');
   }
   const finalWalletUsdCents =
-    walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), balances.usd_cents) : 0;
+    walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
   const dueOnDelivery = afterPoints - walletApplied;
 
   const policies = await getRequiredCheckoutPolicies(c.env);
@@ -483,8 +629,13 @@ async function computeCheckout(
     couponId,
     couponDiscount,
     couponSnapshot,
-    pointsBalance: balances.points,
+    pointsBalance: available.points_available,
     pointsDiscount,
+    eligibleMerchandise,
+    netEligible,
+    pointsRule,
+    pointsEarnPending,
+    supportSnapshot,
     walletBalanceIqd,
     walletApplied,
     walletUsdCents: finalWalletUsdCents,
@@ -507,6 +658,9 @@ function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolea
     couponCode: str(body.couponCode, 'couponCode', { max: 60, required: false }),
     usePoints: body.usePoints === true,
     useWallet: body.useWallet === true,
+    // Accepted from either field name; resolved server-side and worth exactly
+    // 0 IQD to the buyer — it only attributes the order to a supporter.
+    supportRef: str(body.supportCode ?? body.supportRef, 'supportCode', { max: 60, required: false }),
   };
 }
 
@@ -523,12 +677,15 @@ orderRoutes.get('/', async (c) => {
   }
   sql += ' ORDER BY created_at DESC LIMIT 100';
   const { results: orders } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
+  // One snapshot query for the whole page — the §5 money view is never
+  // recomputed per row, and never in the browser.
+  const snaps = await getOrderPointsSnapshots(c.env, orders.map((o) => String(o.id)));
   const out = [];
   for (const o of orders) {
     const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?')
       .bind(o.id)
       .all();
-    out.push(orderPublic(o, items));
+    out.push(orderPublic(o, items, snaps.get(String(o.id))));
   }
   return c.json({ success: true, orders: out });
 });
@@ -581,12 +738,33 @@ orderRoutes.post('/quote', async (c) => {
       shipping: comp.shipping,
       is_pickup: comp.isPickup,
       coupon: comp.couponSnapshot ? safeParse(comp.couponSnapshot, null) : null,
-      points: { balance: comp.pointsBalance, applied_iqd: comp.pointsDiscount },
+      // §5 unified snapshot, preview edition: the eligible basis the cap and
+      // the accrual both come from is shown, so the customer sees WHY the
+      // discount is what it is before committing.
+      points: {
+        balance: comp.pointsBalance,          // spendable only — pending is excluded
+        applied_iqd: comp.pointsDiscount,     // 1 point = exactly 1 IQD
+        eligible_merchandise_iqd: comp.eligibleMerchandise, // the redemption cap
+        earn_eligible_iqd: comp.netEligible,  // accrual basis after discounts + points
+        earn_pending: comp.pointsEarnPending, // pending at purchase, released after 7 days + settlement
+        iqd_per_point: comp.pointsRule.iqd_per_point,
+        rule_version: comp.pointsRule.version,
+        hold_days: 7,
+      },
+      // Attribution only: this code supports a user and changes no price.
+      support: comp.supportSnapshot
+        ? {
+            referrer_username: comp.supportSnapshot.referrer_username,
+            ref: comp.supportSnapshot.ref,
+            discount_iqd: 0,
+          }
+        : null,
       wallet: {
         balance_iqd: comp.walletBalanceIqd,
         applied_iqd: comp.walletApplied,
         required_advance_iqd: comp.requiredAdvance,
       },
+      merchandise_after_coupon_iqd: comp.eligibleMerchandise,
       total_iqd: comp.totalIqd,
       due_on_delivery_iqd: comp.dueOnDelivery,
       tier: {
@@ -619,7 +797,13 @@ orderRoutes.post('/', async (c) => {
     const inv = await c.env.DB.prepare('SELECT invoice_no FROM invoices WHERE order_id = ? AND revision = 1')
       .bind(existing.id)
       .first<{ invoice_no: string }>();
-    return c.json({ success: true, order: orderPublic(data.order, data.items), invoice_no: inv?.invoice_no ?? null, replay: true });
+    const snaps = await getOrderPointsSnapshots(c.env, [existing.id]);
+    return c.json({
+      success: true,
+      order: orderPublic(data.order, data.items, snaps.get(existing.id)),
+      invoice_no: inv?.invoice_no ?? null,
+      replay: true,
+    });
   }
 
   const comp = await computeCheckout(c, user, input);
@@ -665,13 +849,18 @@ orderRoutes.post('/', async (c) => {
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
          payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key,
-         membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
+         support_snapshot, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.pointsDiscount, comp.walletApplied,
       comp.walletUsdCents, comp.exchangeRate, comp.totalIqd, comp.dueOnDelivery, idempotencyKey,
-      comp.tierStatus.active ? comp.tierStatus.tier : 'free', deliveryWaived, priority, comp.couponSnapshot, now, now
+      comp.tierStatus.active ? comp.tierStatus.tier : 'free', deliveryWaived, priority, comp.couponSnapshot,
+      // §5: merchandise is stored apart from fees so every screen and the
+      // invoice read ONE basis. Support attribution is frozen here and can
+      // never be re-pointed after purchase (§3.3) — worth 0 IQD to the buyer.
+      comp.merchandise, comp.supportSnapshot ? JSON.stringify(comp.supportSnapshot) : null, now, now
     ),
   ];
 
@@ -706,7 +895,24 @@ orderRoutes.post('/', async (c) => {
     }
   }
 
+  // §4.4 points redemption: RESERVE and COMMIT inside this one batch. There is
+  // no window in which the order exists without its spend and none in which
+  // points are held without an order — a failed checkout rolls both back
+  // together, which IS the release-on-failure path (no orphan reservation can
+  // survive). Two concurrent orders cannot double-spend: the ledger amount
+  // below is computed against the live balance INSIDE the statement, so the
+  // loser's amount goes negative, violates CHECK (amount > 0) and aborts its
+  // whole batch — order, stock, wallet and points together.
   if (comp.pointsDiscount > 0) {
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO points_reservations (id, order_id, user_id, points, eligible_basis_iqd, state, wallet_tx_id, created_at)
+         VALUES (?, ?, ?, ?, ?, 'committed', ?, ?)`
+      ).bind(
+        newId('prs'), orderId, user.id, comp.pointsDiscount, comp.eligibleMerchandise,
+        `wtx_ord_${orderId}_pts`, now
+      )
+    );
     // Conditional amount: goes negative (violating CHECK amount > 0) when the
     // live balance no longer covers it, aborting the batch atomically.
     stmts.push(
@@ -717,7 +923,7 @@ orderRoutes.post('/', async (c) => {
                         FROM wallet_transactions WHERE user_id = ?2 AND currency='POINT' AND status='approved') >= ?3
                 THEN ?3 ELSE -1 END,
            'approved', ?4, ?5, 'system', ?6`
-      ).bind(newId('wtx'), user.id, comp.pointsDiscount, `Points used on order ${orderId}`, orderId, now)
+      ).bind(`wtx_ord_${orderId}_pts`, user.id, comp.pointsDiscount, `Points used on order ${orderId}`, orderId, now)
     );
   }
   if (comp.walletUsdCents > 0) {
@@ -729,9 +935,39 @@ orderRoutes.post('/', async (c) => {
                         FROM wallet_transactions WHERE user_id = ?2 AND currency='USD' AND status='approved') >= ?3
                 THEN ?3 ELSE -1 END,
            'approved', ?4, ?5, 'system', ?6`
-      ).bind(newId('wtx'), user.id, comp.walletUsdCents, `Wallet payment on order ${orderId}`, orderId, now)
+      ).bind(`wtx_ord_${orderId}_usd`, user.id, comp.walletUsdCents, `Wallet payment on order ${orderId}`, orderId, now)
     );
   }
+
+  // §4.3 purchase-points accrual, created PENDING in the SAME transaction that
+  // confirms the purchase. purchase_at = `now` — the server instant this batch
+  // commits the order (stock reserved, money and points debited). A failed
+  // attempt writes nothing, so a cart or an aborted checkout can never start
+  // the clock. available_at = purchase_at + 7×24h and never moves afterwards.
+  const settledAtPurchase = comp.dueOnDelivery <= 0;
+  const { statements: accrualStmts, accrual } = buildPurchaseAccrualStatements(c.env, {
+    orderId,
+    userId: user.id,
+    purchaseAt: now,
+    netEligibleIqd: comp.netEligible,
+    rule: comp.pointsRule,
+    settledAtPurchase,
+  });
+  stmts.push(...accrualStmts);
+
+  // §11.5 settlement ledger: what was actually PREPAID at purchase. A COD
+  // balance is recorded as outstanding, never as collected — the order is
+  // "paid" only when a collection is recorded later.
+  stmts.push(
+    ...buildSettlementStatements(c.env, orderId, {
+      kind: 'prepaid_at_purchase',
+      amountIqd: comp.walletApplied,
+      eventKey: 'purchase',
+      note: settledAtPurchase ? 'Paid in full at purchase' : 'Advance paid at purchase; balance due on delivery',
+      recordedBy: 'system',
+      settledAt: now,
+    })
+  );
 
   // Remove the purchased lines from the cart.
   for (const it of comp.lines) {
@@ -748,7 +984,8 @@ orderRoutes.post('/', async (c) => {
         .first<{ id: string }>();
       if (replay) {
         const d = (await loadOrder(c.env.DB, replay.id))!;
-        return c.json({ success: true, order: orderPublic(d.order, d.items), replay: true });
+        const snaps = await getOrderPointsSnapshots(c.env, [replay.id]);
+        return c.json({ success: true, order: orderPublic(d.order, d.items, snaps.get(replay.id)), replay: true });
       }
     }
     if (msg.includes('CHECK')) {
@@ -764,6 +1001,10 @@ orderRoutes.post('/', async (c) => {
     tier: comp.tierStatus.active ? comp.tierStatus.tier : 'free',
     pro_context: comp.proContext, at_approved_default: comp.atApprovedDefault,
     shipping_iqd: shippingTotal, delivery_waived: deliveryWaived,
+    merchandise_iqd: comp.merchandise, points_eligible_iqd: comp.netEligible,
+    points_pending: accrual.points, points_rule: comp.pointsRule.version,
+    points_available_at: accrual.available_at, settled_at_purchase: settledAtPurchase,
+    support_referrer: comp.supportSnapshot?.referrer_user_id ?? null,
   });
 
   // Invoice (§3D): created after the order stands; createInvoiceForOrder
@@ -784,9 +1025,10 @@ orderRoutes.post('/', async (c) => {
     )
   );
   const data = (await loadOrder(c.env.DB, orderId))!;
+  const snaps = await getOrderPointsSnapshots(c.env, [orderId]);
   return c.json({
     success: true,
-    order: orderPublic(data.order, data.items),
+    order: orderPublic(data.order, data.items, snaps.get(orderId)),
     invoice_no: invoice?.invoiceNo ?? null,
     shipping_quote: comp.shipping,
   });
@@ -794,9 +1036,11 @@ orderRoutes.post('/', async (c) => {
 
 orderRoutes.get('/:id', async (c) => {
   const user = c.get('user')!;
-  const data = await loadOrder(c.env.DB, c.req.param('id'));
+  const id = c.req.param('id');
+  const data = await loadOrder(c.env.DB, id);
   if (!data || (data.order.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
-  return c.json({ success: true, order: orderPublic(data.order, data.items) });
+  const snaps = await getOrderPointsSnapshots(c.env, [id]);
+  return c.json({ success: true, order: orderPublic(data.order, data.items, snaps.get(id)) });
 });
 
 orderRoutes.post('/:id/cancel', async (c) => {
@@ -818,6 +1062,7 @@ orderRoutes.post('/:id/cancel', async (c) => {
     .run();
   if (flip.meta.changes === 0) throw badRequest('This order was already cancelled or has progressed');
 
+  const now = new Date().toISOString();
   const stmts = [];
   // Restore tracked stock.
   for (const it of data.items) {
@@ -838,6 +1083,9 @@ orderRoutes.post('/:id/cancel', async (c) => {
       ).bind(`wtx_refund_${id}_usd`, user.id, walletCents, `Refund for cancelled order ${id}`, id)
     );
   }
+  // §4.4: a refund returns POINTS AS POINTS (never as cash) and cash by its
+  // own channel. The deterministic id makes a re-run idempotent; the
+  // reservation flip records that the redemption was given back.
   const points = Number(data.order.points_discount_iqd) || 0;
   if (points > 0) {
     stmts.push(
@@ -846,9 +1094,93 @@ orderRoutes.post('/:id/cancel', async (c) => {
          VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'system', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
       ).bind(`wtx_refund_${id}_pts`, user.id, points, `Points refund for cancelled order ${id}`, id)
     );
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE points_reservations
+            SET state = 'refunded', refunded_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE order_id = ? AND state = 'committed'`
+      ).bind(id)
+    );
   }
+  // §4.3: the pending accrual of a cancelled order is cancelled, never
+  // released. Conditional on state='pending', so an accrual that somehow
+  // already released is left to the reversal path instead of vanishing.
+  stmts.push(cancelPendingAccrualStatement(c.env, id, 'order_cancelled', now));
+
   if (stmts.length > 0) await c.env.DB.batch(stmts);
   await audit(c.env.DB, user.id, 'order.cancel', id, { refund_usd_cents: walletCents, refund_points: points });
   const after = (await loadOrder(c.env.DB, id))!;
-  return c.json({ success: true, order: orderPublic(after.order, after.items) });
+  const snaps = await getOrderPointsSnapshots(c.env, [id]);
+  return c.json({ success: true, order: orderPublic(after.order, after.items, snaps.get(id)) });
+});
+
+/**
+ * Record a payment collection against an order (mandate §11.5 / §4.3).
+ *
+ * ADMIN ONLY — the route group is auth-gated, so the role is re-checked here
+ * server-side; a customer can never mark their own COD as collected.
+ *
+ * Delivery is NOT collection: this endpoint is the only thing that can settle
+ * a COD order, and it is what makes a pending points accrual releasable. A
+ * collection recorded on day 9 releases the accrual on day 9 — the seven-day
+ * clock started at purchase and is never restarted. Idempotent per
+ * (order_id, event_key): a replayed callback or a double-clicked button
+ * records exactly one row and moves no money twice.
+ */
+orderRoutes.post('/:id/settlement', async (c) => {
+  const user = c.get('user')!;
+  if (user.role !== 'admin') throw notFound('Order not found');
+  await rateLimit(c, 'order_settlement', 60, 300);
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+
+  const amountIqd = int(body.amountIqd, 'amountIqd', { min: 0, max: 1_000_000_000 });
+  const reference = str(body.reference, 'reference', { max: 200, required: false });
+  const note = str(body.note, 'note', { max: 300, required: false });
+  const kind = body.kind === 'adjustment' ? 'adjustment' : 'cod_collection';
+  // The business event key: an explicit reference when the courier supplied
+  // one (so the same receipt can never be booked twice), otherwise an
+  // explicit client-supplied key. No key = no idempotency, so we require one.
+  const eventKey = str(body.eventKey ?? (reference ? `${kind}:${reference}` : ''), 'eventKey', {
+    min: 3,
+    max: 120,
+  });
+
+  const result = await recordOrderSettlement(c.env, id, {
+    kind,
+    amountIqd,
+    eventKey,
+    reference,
+    note,
+    recordedBy: 'admin',
+    actorId: user.id,
+  });
+  if (result.reason === 'order_not_found') throw notFound('Order not found');
+  if (result.reason === 'order_cancelled') throw badRequest('A cancelled order cannot record a collection');
+
+  await audit(c.env.DB, user.id, 'order.settlement', id, {
+    kind, amount_iqd: amountIqd, event_key: eventKey, reference,
+    duplicate: result.duplicate, collected_iqd: result.collected_iqd, fully_settled: result.fully_settled,
+  });
+
+  // Opportunistic release on the settlement EVENT (a server event, never a
+  // page open). Fully idempotent and identical to what the durable job does,
+  // so a day-9 collection does not wait for the next cron tick.
+  const release = result.fully_settled ? await releaseAccrualForOrder(c.env, id) : null;
+
+  const data = (await loadOrder(c.env.DB, id))!;
+  const snaps = await getOrderPointsSnapshots(c.env, [id]);
+  return c.json({
+    success: true,
+    settlement: {
+      recorded: result.recorded,
+      duplicate: result.duplicate,
+      collected_iqd: result.collected_iqd,
+      total_iqd: result.total_iqd,
+      outstanding_iqd: Math.max(0, result.total_iqd - result.collected_iqd),
+      fully_settled: result.fully_settled,
+    },
+    points_released: release ? { released: release.awarded, points: release.points, reason: release.reason ?? null } : null,
+    order: orderPublic(data.order, data.items, snaps.get(id)),
+  });
 });

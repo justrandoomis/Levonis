@@ -5,9 +5,11 @@
  * an EMPTY input is null (inherit), an explicit 0 stays 0.
  */
 
-import React, { useState, ReactNode } from 'react';
-import { ChevronDown, ChevronUp, Trash2, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronUp, Trash2, X, AlertTriangle } from 'lucide-react';
 import { ApiError, uploadFile } from '../../lib/api';
+import { useLanguage } from '../../LanguageContext';
 import type { TransStatus } from './types';
 
 export const ACCENT = '#6B46FF';
@@ -15,10 +17,12 @@ export const ACCENT = '#6B46FF';
 export const inputCls =
   'w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all';
 
+// Admin density (§6.2): one consistent scale — a 44px minimum touch target
+// kept for iPad, without page-wide transform:scale or arbitrary font shrinking.
 export const btnPrimary =
-  'inline-flex items-center justify-center gap-2 bg-[#6B46FF] hover:bg-[#5a3ae0] text-white px-5 py-2.5 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-2 min-h-11 bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-sm px-4 py-2.5 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 export const btnSecondary =
-  'inline-flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2.5 rounded-xl font-bold transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-2 min-h-11 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm px-4 py-2.5 rounded-xl font-bold transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed';
 export const btnGhostDanger =
   'p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors';
 
@@ -50,13 +54,14 @@ export function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden mb-4 shadow-lg">
+    <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden mb-3 shadow-lg">
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="w-full p-4 bg-zinc-800/20 border-b border-zinc-800/50 flex items-center justify-between gap-3 text-start min-h-[56px]"
+        className="w-full px-3 sm:px-4 py-3 bg-zinc-800/20 border-b border-zinc-800/50 flex items-center justify-between gap-3 text-start min-h-11"
       >
-        <span className="font-bold text-white">
+        <span className="font-bold text-white text-sm min-w-0">
           {ar} <span className="text-xs font-medium text-zinc-500 mx-1">{en}</span>
         </span>
         <span className="flex items-center gap-2 shrink-0">
@@ -64,7 +69,7 @@ export function Section({
           {open ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
         </span>
       </button>
-      {open && <div className="p-4">{children}</div>}
+      {open && <div className="p-3 sm:p-4">{children}</div>}
     </div>
   );
 }
@@ -250,27 +255,262 @@ export function ActiveToggle({ value, onChange, arOn = 'مفعّل', arOff = 'م
   );
 }
 
-/** Simple modal shell. */
+// ---------------------------------------------------------------- modal
+
+/**
+ * Open-dialog stack. Dialogs nest (the import dialog hosts the template
+ * preview dialog), and both would otherwise answer the same Escape keypress
+ * — closing the parent too. Only the TOP dialog reacts to Escape and traps
+ * Tab; the ones underneath stay inert until they are on top again.
+ */
+const modalStack: symbol[] = [];
+
+const FOCUSABLE =
+  'a[href],area[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),' +
+  'button:not([disabled]),iframe,object,embed,[tabindex]:not([tabindex="-1"]),[contenteditable]';
+
+/**
+ * Live geometry of the VISUAL viewport.
+ *
+ * `visualViewport` is what shrinks and shifts when the iPad/iPhone software
+ * keyboard opens — `100dvh` does neither. Pinning the overlay to
+ * `{ top: offsetTop, height }` instead of `inset-0` is what keeps the
+ * preview/confirm footer on screen while a field is focused, and what stops
+ * the dialog from sliding under the keyboard (mandate §6.2). Falls back to
+ * the layout viewport where `visualViewport` is unavailable.
+ */
+function useVisualViewport(): { height: number; offsetTop: number } {
+  const read = () => {
+    if (typeof window === 'undefined') return { height: 800, offsetTop: 0 };
+    const vv = window.visualViewport;
+    return vv ? { height: vv.height, offsetTop: vv.offsetTop } : { height: window.innerHeight, offsetTop: 0 };
+  };
+  const [box, setBox] = useState(read);
+  useEffect(() => {
+    const onChange = () => setBox(read());
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', onChange);
+    vv?.addEventListener('scroll', onChange);
+    window.addEventListener('resize', onChange);
+    window.addEventListener('orientationchange', onChange);
+    onChange();
+    return () => {
+      vv?.removeEventListener('resize', onChange);
+      vv?.removeEventListener('scroll', onChange);
+      window.removeEventListener('resize', onChange);
+      window.removeEventListener('orientationchange', onChange);
+    };
+  }, []);
+  return box;
+}
+
+const MODAL_STRINGS = {
+  ar: {
+    close: 'إغلاق',
+    dialog: 'نافذة',
+    unsavedTitle: 'لديك نص قالب غير مطبَّق',
+    unsavedBody: 'إغلاق النافذة الآن يفقد ما كتبته أو لصقته. هل تريد المتابعة؟',
+    discard: 'تجاهل وإغلاق',
+    keep: 'متابعة التحرير',
+  },
+  en: {
+    close: 'Close',
+    dialog: 'Dialog',
+    unsavedTitle: 'Unapplied template text',
+    unsavedBody: 'Closing now discards what you typed or pasted. Continue?',
+    discard: 'Discard & close',
+    keep: 'Keep editing',
+  },
+  ckb: {
+    close: 'داخستن',
+    dialog: 'پەنجەرە',
+    unsavedTitle: 'دەقی قاڵبی جێبەجێنەکراو',
+    unsavedBody: 'داخستن ئێستا ئەوەی نووسیوتە دەفەوتێنێت. بەردەوام بم؟',
+    discard: 'پشتگوێخستن و داخستن',
+    keep: 'بەردەوامبوون لە دەستکاری',
+  },
+} as const;
+
+/**
+ * Admin dialog shell (mandate §6.2).
+ *
+ * ROOT CAUSE this fixes: the dashboard used to render dialogs inside its
+ * scrolling content column, which carries `position:relative; z-index:0`.
+ * A z-index other than `auto` opens a STACKING CONTEXT, so a `fixed z-50`
+ * child was painted *inside* that context and therefore under the sidebar
+ * (z-20) and the topbar (z-10). Bumping z-index in the dialog could never
+ * fix that. The dialog is now rendered through a portal into `document.body`,
+ * outside every clipping/transform/stacking ancestor, and DashboardLayout no
+ * longer opens a stacking context around page content.
+ *
+ * Also: focus is trapped and returned to the opener, Escape closes, the panel
+ * height is bound to the VISUAL viewport (keyboard-aware), the body scroll is
+ * locked, the footer is sticky and safe-area padded, and `dirty` turns a
+ * backdrop click / Escape into an explicit discard confirmation instead of
+ * silently throwing template text away.
+ */
 export function Modal({
-  titleAr, titleEn, onClose, children, wide,
+  titleAr, titleEn, onClose, children, wide, footer, dirty = false,
 }: {
-  titleAr: string; titleEn: string; onClose: () => void; children: ReactNode; wide?: boolean;
+  titleAr: string;
+  titleEn: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+  /** Sticky action bar; stays visible while the body scrolls. */
+  footer?: ReactNode;
+  /** Unsaved work — dismissing asks before discarding. */
+  dirty?: boolean;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className={`bg-zinc-900 border border-zinc-800 rounded-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] overflow-hidden flex flex-col shadow-2xl`}>
-        <div className="p-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
-          <h3 className="text-white font-bold">
+  const { lang, dir } = useLanguage();
+  const t = MODAL_STRINGS[lang] ?? MODAL_STRINGS.ar;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<Element | null>(null);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const viewport = useVisualViewport();
+  const titleId = useRef(`dlg-${Math.random().toString(36).slice(2, 9)}`).current;
+  const stackId = useRef(Symbol('modal')).current;
+  const isTop = useCallback(() => modalStack[modalStack.length - 1] === stackId, [stackId]);
+
+  useEffect(() => {
+    modalStack.push(stackId);
+    return () => {
+      const i = modalStack.indexOf(stackId);
+      if (i >= 0) modalStack.splice(i, 1);
+    };
+  }, [stackId]);
+
+  const requestClose = useCallback(() => {
+    if (dirty) { setConfirmingClose(true); return; }
+    onClose();
+  }, [dirty, onClose]);
+
+  // Remember the opener and restore focus to it on unmount (§6.2).
+  useEffect(() => {
+    openerRef.current = document.activeElement;
+    const panel = panelRef.current;
+    const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
+    (first ?? panel)?.focus({ preventScroll: true });
+    return () => {
+      const opener = openerRef.current as HTMLElement | null;
+      if (opener && typeof opener.focus === 'function' && document.contains(opener)) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, []);
+
+  // Body scroll lock: the page behind must not scroll under the dialog.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Escape + Tab trap.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isTop()) return; // a dialog opened on top of this one owns the key
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        requestClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement
+      );
+      if (items.length === 0) { e.preventDefault(); panel.focus(); return; }
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === firstEl || active === panel)) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && active === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [requestClose, isTop]);
+
+  const body = (
+    <div
+      dir={dir}
+      // z-[1000] is meaningful here ONLY because the portal target is
+      // document.body — no ancestor stacking context can trap it.
+      // Bound to the VISUAL viewport, not inset-0, so the on-screen keyboard
+      // shrinks the dialog instead of hiding its footer.
+      className="fixed inset-x-0 z-[1000] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4"
+      style={{ top: viewport.offsetTop, height: viewport.height }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose(); }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        // Height follows the VISUAL viewport so the sticky footer survives the
+        // on-screen keyboard; min-w-0 keeps wide tables from pushing the panel.
+        style={{ maxHeight: Math.max(240, viewport.height - 24) }}
+        className={`bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full min-w-0 ${
+          wide ? 'sm:max-w-5xl' : 'sm:max-w-2xl'
+        } overflow-hidden flex flex-col shadow-2xl outline-none`}
+      >
+        <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0 bg-zinc-900">
+          <h3 id={titleId} className="text-white font-bold text-sm sm:text-base min-w-0 truncate">
             {titleAr} <span className="text-xs font-medium text-zinc-500 mx-1">{titleEn}</span>
           </h3>
-          <button onClick={onClose} className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800">
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label={t.close}
+            className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 shrink-0"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">{children}</div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">{children}</div>
+
+        {confirmingClose && (
+          <div className="shrink-0 border-t border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-200 min-w-0">
+                <span className="font-bold block">{t.unsavedTitle}</span>
+                {t.unsavedBody}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={btnSecondary} onClick={() => setConfirmingClose(false)}>
+                {t.keep}
+              </button>
+              <button type="button" className={btnPrimary} onClick={onClose}>
+                {t.discard}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {footer && (
+          <div
+            className="shrink-0 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur px-3 sm:px-4 py-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(body, document.body);
 }
 
 /** Inline error banner. */

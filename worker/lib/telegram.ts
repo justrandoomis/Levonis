@@ -584,3 +584,202 @@ export async function maybeSendAuthChallengeOtp(env: Env, ch: AuthChallengeRow):
   ch.otp_sent_at = new Date().toISOString();
   return { status: 'sent' };
 }
+
+// ------------------------------------------- admin-group transport (§12.1)
+//
+// Everything below is pure TRANSPORT for the wallet approval flow. It knows
+// nothing about money: the caption arrives already built and sanitized from
+// worker/lib/walletNotify.ts, and no function here ever writes to the
+// ledger. Messages are sent WITHOUT parse_mode, so user-supplied text is
+// data and can never become Telegram markup (the same rule the OTP and
+// linking messages above follow).
+
+/** Outcome of one send attempt. `retryable` separates "try again later"
+ *  (network, 5xx, 429) from "this will never work" (bad chat, bot removed,
+ *  file rejected) so the outbox can dead-letter honestly instead of burning
+ *  attempts forever. */
+export type TgSendResult =
+  | { ok: true; chat_id: number; message_id: number }
+  | { ok: false; error: string; retryable: boolean; retry_after_seconds?: number };
+
+interface TgApiEnvelope {
+  ok?: boolean;
+  description?: string;
+  error_code?: number;
+  parameters?: { retry_after?: number };
+  result?: { message_id?: number; chat?: { id?: number } };
+}
+
+/** Redacts the bot token from anything about to be logged or persisted. */
+function scrub(env: Env, s: string): string {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  return (token ? s.split(token).join('***') : s).slice(0, 300);
+}
+
+async function readEnvelope(env: Env, res: Response): Promise<TgSendResult> {
+  let data: TgApiEnvelope = {};
+  try {
+    data = (await res.json()) as TgApiEnvelope;
+  } catch {
+    /* non-JSON body (proxy/edge error) — handled by the status check below */
+  }
+  if (res.ok && data.ok === true && typeof data.result?.message_id === 'number' && typeof data.result.chat?.id === 'number') {
+    return { ok: true, chat_id: data.result.chat.id, message_id: data.result.message_id };
+  }
+  const status = res.status;
+  // 429 and 5xx are transient; 4xx (except 429) means the request itself is
+  // wrong and retrying it would only repeat the same rejection.
+  const retryable = status === 429 || status >= 500 || status === 0;
+  const result: TgSendResult = {
+    ok: false,
+    error: scrub(env, `telegram ${status}: ${data.description ?? 'unexpected response'}`),
+    retryable,
+  };
+  if (typeof data.parameters?.retry_after === 'number') {
+    result.retry_after_seconds = data.parameters.retry_after;
+  }
+  return result;
+}
+
+async function callApi(env: Env, method: string, body: BodyInit, headers?: Record<string, string>): Promise<TgSendResult> {
+  if (!env.TELEGRAM_BOT_TOKEN) {
+    return { ok: false, error: 'TELEGRAM_NOT_CONFIGURED', retryable: false };
+  }
+  try {
+    const res = await fetch(`${API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, { method: 'POST', body, headers });
+    return await readEnvelope(env, res);
+  } catch (e) {
+    // Network failure: the send may or may not have reached Telegram. The
+    // caller treats this as retryable and its dedup key is what keeps a
+    // duplicate message from becoming a duplicate financial record.
+    return { ok: false, error: scrub(env, `telegram unreachable: ${e instanceof Error ? e.message : String(e)}`), retryable: true };
+  }
+}
+
+/**
+ * Uploads REAL IMAGE BYTES as a multipart `sendPhoto` (§12.1: "the payment
+ * proof image genuinely attached — not a publicly exposed link and not the
+ * phrase 'a proof exists'"). The bytes come from the private R2 object; no
+ * URL of any kind is handed to Telegram, so the object stays unreachable to
+ * anyone who is not an authorized reviewer on the site.
+ *
+ * `caption` must already be sanitized plain text (max 1024 chars per the
+ * Telegram API); `extra` carries reply_markup and similar send fields.
+ */
+export async function sendPhotoToChat(
+  env: Env,
+  chatId: number | string,
+  bytes: ArrayBuffer | Uint8Array,
+  caption: string,
+  extra: Record<string, unknown> = {}
+): Promise<TgSendResult> {
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const form = new FormData();
+  form.append('chat_id', String(chatId));
+  if (caption) form.append('caption', caption.slice(0, 1024));
+  for (const [k, v] of Object.entries(extra)) {
+    form.append(k, typeof v === 'string' ? v : JSON.stringify(v));
+  }
+  // The blob is deliberately generic: the filename is ours, never the
+  // customer's, so an uploaded name can neither leak nor spoof anything.
+  const copy = new Uint8Array(view.byteLength);
+  copy.set(view);
+  form.append('photo', new Blob([copy]), 'proof.jpg');
+  return callApi(env, 'sendPhoto', form);
+}
+
+/** Plain-text send that returns the message reference (the boolean-returning
+ *  `sendToChat` above stays as-is for OTP/private flows). */
+export async function sendMessageToChat(
+  env: Env,
+  chatId: number | string,
+  text: string,
+  extra: Record<string, unknown> = {}
+): Promise<TgSendResult> {
+  return callApi(
+    env,
+    'sendMessage',
+    JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000), disable_web_page_preview: true, ...extra }),
+    { 'Content-Type': 'application/json' }
+  );
+}
+
+/**
+ * Fast acknowledgement of a button press (§12.2: "acknowledge the callback
+ * quickly, without showing 'balance added' before the actual commit"). The
+ * text passed here must describe only what has ALREADY been committed.
+ */
+export async function answerCallbackQuery(
+  env: Env,
+  callbackQueryId: string,
+  text: string,
+  showAlert = false
+): Promise<boolean> {
+  if (!env.TELEGRAM_BOT_TOKEN) return false;
+  try {
+    const res = await fetch(`${API}/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text: text.slice(0, 200), show_alert: showAlert }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('answerCallbackQuery failed', e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+/** Rewrites a photo message's caption (used to stamp the final decision and
+ *  drop the consumed buttons). */
+export async function editMessageCaption(
+  env: Env,
+  chatId: number | string,
+  messageId: number,
+  caption: string,
+  replyMarkup?: Record<string, unknown>
+): Promise<TgSendResult> {
+  return callApi(
+    env,
+    'editMessageCaption',
+    JSON.stringify({ chat_id: chatId, message_id: messageId, caption: caption.slice(0, 1024), reply_markup: replyMarkup ?? { inline_keyboard: [] } }),
+    { 'Content-Type': 'application/json' }
+  );
+}
+
+/** Rewrites a text message (the no-photo fallback path). */
+export async function editMessageText(
+  env: Env,
+  chatId: number | string,
+  messageId: number,
+  text: string,
+  replyMarkup?: Record<string, unknown>
+): Promise<TgSendResult> {
+  return callApi(
+    env,
+    'editMessageText',
+    JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text: text.slice(0, 4000),
+      disable_web_page_preview: true,
+      reply_markup: replyMarkup ?? { inline_keyboard: [] },
+    }),
+    { 'Content-Type': 'application/json' }
+  );
+}
+
+/** Swaps just the inline keyboard (used to open/close the rejection-reason
+ *  picker without rewriting the reviewed caption). */
+export async function editMessageReplyMarkup(
+  env: Env,
+  chatId: number | string,
+  messageId: number,
+  replyMarkup: Record<string, unknown>
+): Promise<TgSendResult> {
+  return callApi(
+    env,
+    'editMessageReplyMarkup',
+    JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: replyMarkup }),
+    { 'Content-Type': 'application/json' }
+  );
+}

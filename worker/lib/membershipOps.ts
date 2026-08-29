@@ -13,6 +13,8 @@ import type { Env } from './types';
 import { getSetting } from './settings';
 import { getLaunchConfig, getTierStatus } from './entitlements';
 import { newId } from './crypto';
+import { audit } from './audit';
+import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
 
 /**
  * Calendar-month addition with month-end clamping: the day-of-month is
@@ -111,8 +113,24 @@ export async function grantPrinterGiftIfEligible(env: Env, orderId: string): Pro
  * Referral program 9.1 hook — call when an order transitions to DELIVERED.
  * Records delivered_at-based eligibility (delivered_at + 7 days) for a
  * pending printer-referral reward. Idempotent per (campaign, order id).
+ *
+ * SEPARATION OF THE TWO PROGRAMS (mandate §3.4): this legacy campaign keys
+ * on the SIGNUP attribution (referral_attributions) and keeps its own
+ * seven-day eligibility clock, exactly as before. The support-code gift
+ * added below keys on the ORDER's support snapshot instead, has no PRO
+ * requirement and no seven-day wait, and is evaluated first so a failure in
+ * either program can never swallow the other. The double-payout guard for
+ * the shared business event lives in evaluateSupportGiftForOrder.
  */
 export async function onOrderDelivered(env: Env, orderId: string): Promise<void> {
+  try {
+    await evaluateSupportGiftForOrder(env, orderId, { trigger: 'order_delivered' });
+  } catch (e) {
+    // The legacy milestone below must still be recorded — a support-gift
+    // failure is logged, never allowed to drop the other program's row.
+    console.error('support gift evaluation failed for order', orderId, e instanceof Error ? e.message : String(e));
+  }
+
   const order = await env.DB.prepare('SELECT id, user_id, delivered_at FROM orders WHERE id = ?')
     .bind(orderId)
     .first<{ id: string; user_id: string; delivered_at: string | null }>();
@@ -308,4 +326,490 @@ export async function onProSubscriptionPurchased(env: Env, membershipId: string,
   } catch (e) {
     if (!isUniqueViolation(e)) throw e; // UNIQUE(campaign, source_ref) = already recorded
   }
+}
+
+// ===========================================================================
+// SUPPORT-CODE GIFT ENGINE (integrated mandate §3.3 / §3.4)
+// ===========================================================================
+//
+// The required path, stated in the mandate and implemented literally here:
+//   an eligible PRINTER product is bought using a support code / share link
+//   → the order is DELIVERED → its payment is SETTLED
+//   → the REFERRER earns one filament-gift entitlement.
+//
+// What this engine deliberately does NOT require (§3.4 forbids importing
+// them from the old program): no PRO membership for the referrer, no "the
+// buyer must be a new account", and no seven-day wait. The seven-day clock
+// belongs to POINTS (points_accruals.available_at, migration 0014) and is a
+// different mechanism for a different purpose; conflating the two is exactly
+// the mistake the mandate calls out. Any additional commercial hold-back has
+// to be an announced, approved setting — never a silent default added here.
+//
+// Everything below is idempotent under replays (UNIQUE(order_id) from
+// migration 0016) and never uses check-then-write: each state change is one
+// conditional UPDATE whose WHERE clause carries the precondition, and a
+// statement that touches zero rows is reported, not assumed to have worked.
+
+export const SUPPORT_GIFT_STATES = ['pending_eligibility', 'due', 'reserved', 'paid', 'cancelled'] as const;
+export type SupportGiftState = (typeof SUPPORT_GIFT_STATES)[number];
+
+/** Forward-only chain; any live state may be cancelled. Pure — unit-tested. */
+const SUPPORT_GIFT_CHAIN: SupportGiftState[] = ['pending_eligibility', 'due', 'reserved', 'paid'];
+
+export function supportGiftTransitionAllowed(from: string, to: string): boolean {
+  if (from === to) return false;
+  if (from === 'paid') return false; // a handed-over gift is history, not a draft
+  if (to === 'cancelled') return from !== 'cancelled';
+  if (from === 'cancelled') return false; // reopening is a new business decision, not an edit
+  const i = SUPPORT_GIFT_CHAIN.indexOf(from as SupportGiftState);
+  const j = SUPPORT_GIFT_CHAIN.indexOf(to as SupportGiftState);
+  return i >= 0 && j === i + 1; // strictly one step forward
+}
+
+/** Facts a qualification decision is made from — no I/O, so it is testable. */
+export interface SupportGiftFacts {
+  hasSnapshot: boolean;
+  selfSupport: boolean;
+  hasEligibleLine: boolean;
+  orderCancelled: boolean;
+  delivered: boolean;
+  collectedIqd: number;
+  totalIqd: number;
+}
+
+export type SupportGiftBlocker =
+  | 'no_support_snapshot'
+  | 'self_support'
+  | 'no_eligible_line'
+  | 'order_cancelled'
+  | 'not_delivered'
+  | 'payment_not_settled';
+
+export interface SupportGiftDecision {
+  /** An attribution worth recording exists (even if it cannot pay out yet). */
+  attributable: boolean;
+  /** Delivered AND settled AND eligible: the claim is due. */
+  qualifies: boolean;
+  blocker: SupportGiftBlocker | null;
+}
+
+/**
+ * The whole §3.4 rule in one pure function.
+ *
+ * "Delivery is not collection" (§11.5): a delivered COD order whose cash was
+ * never handed over does NOT qualify, and collecting it later qualifies it
+ * then — without restarting any clock. Partial payment stays pending: the
+ * comparison is against the order total, never against "something arrived".
+ */
+export function decideSupportGift(f: SupportGiftFacts): SupportGiftDecision {
+  if (!f.hasSnapshot) return { attributable: false, qualifies: false, blocker: 'no_support_snapshot' };
+  if (f.selfSupport) return { attributable: false, qualifies: false, blocker: 'self_support' };
+  if (!f.hasEligibleLine) return { attributable: false, qualifies: false, blocker: 'no_eligible_line' };
+  if (f.orderCancelled) return { attributable: false, qualifies: false, blocker: 'order_cancelled' };
+  if (!f.delivered) return { attributable: true, qualifies: false, blocker: 'not_delivered' };
+  if (f.totalIqd > 0 && f.collectedIqd < f.totalIqd) {
+    return { attributable: true, qualifies: false, blocker: 'payment_not_settled' };
+  }
+  return { attributable: true, qualifies: true, blocker: null };
+}
+
+/**
+ * True when the order contains at least one line flagged eligible for the
+ * support gift, resolved from EXPLICIT admin fields only (§3.4):
+ *   products.support_gift_eligible  (1 = eligible, 0 = excluded, NULL = inherit)
+ *   catalogs.is_printer_catalog     (the inherited catalog flag)
+ * There is no name matching anywhere, and an accessory sitting in a printer
+ * catalog can be excluded per product without touching the catalog.
+ */
+export async function orderHasSupportEligibleLine(db: D1Database, orderId: string): Promise<boolean> {
+  const hit = await db
+    .prepare(
+      `SELECT 1 AS x
+         FROM order_items oi
+         JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = ?1
+          AND COALESCE(
+                p.support_gift_eligible,
+                CASE WHEN EXISTS (SELECT 1
+                                    FROM product_catalogs pc
+                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                                   WHERE pc.product_id = p.id)
+                     THEN 1 ELSE 0 END) = 1
+        LIMIT 1`
+    )
+    .bind(orderId)
+    .first();
+  return !!hit;
+}
+
+/** Product ids (from the given set) that carry the eligibility flag. */
+export async function supportEligibleProductIds(db: D1Database, productIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(productIds.filter((p) => typeof p === 'string' && p !== ''))].slice(0, 200);
+  if (ids.length === 0) return new Set();
+  const placeholders = ids.map(() => '?').join(',');
+  const { results } = await db
+    .prepare(
+      `SELECT p.id AS id
+         FROM products p
+        WHERE p.id IN (${placeholders})
+          AND COALESCE(
+                p.support_gift_eligible,
+                CASE WHEN EXISTS (SELECT 1
+                                    FROM product_catalogs pc
+                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                                   WHERE pc.product_id = p.id)
+                     THEN 1 ELSE 0 END) = 1`
+    )
+    .bind(...ids)
+    .all<{ id: string }>();
+  return new Set(results.map((r) => r.id));
+}
+
+interface SupportOrderRow {
+  id: string;
+  user_id: string;
+  status: string;
+  total_iqd: number;
+  delivered_at: string | null;
+  support_snapshot: string | null;
+}
+
+/**
+ * Guards that must NOT silently deny a referrer and must NOT silently pay
+ * twice — they park the claim in review instead (§3.4 "suspicion signals go
+ * to review", §13 item 2 "no hidden new conditions"):
+ *
+ *  - legacy_printer_reward: the OLD printer campaign already recorded a
+ *    reward keyed on this very order (referral_rewards.source_ref). Same
+ *    business event, two programs → a human approves or cancels one.
+ *  - return_open: a return case exists on an eligible line of this order and
+ *    is not rejected, so the printer may be going back.
+ */
+async function supportGiftGuard(db: D1Database, orderId: string): Promise<{ needsReview: boolean; reason: string }> {
+  const legacy = await db
+    .prepare(
+      `SELECT id FROM referral_rewards
+        WHERE source_ref = ?1 AND campaign = 'printer' AND state <> 'cancelled' LIMIT 1`
+    )
+    .bind(orderId)
+    .first<{ id: string }>();
+  if (legacy) return { needsReview: true, reason: `legacy_printer_reward:${legacy.id}` };
+
+  const openReturn = await db
+    .prepare(
+      `SELECT rc.id AS id
+         FROM return_cases rc
+         JOIN order_items oi ON oi.id = rc.order_item_id
+         JOIN products p ON p.id = oi.product_id
+        WHERE rc.order_id = ?1
+          AND rc.state <> 'rejected'
+          AND COALESCE(
+                p.support_gift_eligible,
+                CASE WHEN EXISTS (SELECT 1
+                                    FROM product_catalogs pc
+                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                                   WHERE pc.product_id = p.id)
+                     THEN 1 ELSE 0 END) = 1
+        LIMIT 1`
+    )
+    .bind(orderId)
+    .first<{ id: string }>();
+  if (openReturn) return { needsReview: true, reason: `return_case_open:${openReturn.id}` };
+
+  return { needsReview: false, reason: '' };
+}
+
+export interface SupportGiftEvaluation {
+  order_id: string;
+  /** A row exists for this order after the call (created now or before). */
+  entitlement: boolean;
+  created: boolean;
+  /** The pending → due transition happened in THIS call. */
+  became_due: boolean;
+  state: SupportGiftState | null;
+  needs_review: boolean;
+  review_reason: string;
+  blocker: SupportGiftBlocker | null;
+  reason: string;
+}
+
+/**
+ * Evaluate (and, when warranted, create or advance) the support-gift
+ * entitlement for one order. Safe to call from any trigger — the delivered
+ * transition, a settlement recording, an admin re-check, a cron sweep — and
+ * safe to call repeatedly: UNIQUE(order_id) makes a second create a no-op
+ * and the advance is a conditional UPDATE.
+ */
+export async function evaluateSupportGiftForOrder(
+  env: Env,
+  orderId: string,
+  opts: { trigger?: string; actorId?: string | null } = {}
+): Promise<SupportGiftEvaluation> {
+  const db = env.DB;
+  const trigger = opts.trigger || 'manual';
+  const base: SupportGiftEvaluation = {
+    order_id: orderId,
+    entitlement: false,
+    created: false,
+    became_due: false,
+    state: null,
+    needs_review: false,
+    review_reason: '',
+    blocker: null,
+    reason: '',
+  };
+
+  const order = await db
+    .prepare('SELECT id, user_id, status, total_iqd, delivered_at, support_snapshot FROM orders WHERE id = ?')
+    .bind(orderId)
+    .first<SupportOrderRow>();
+  if (!order) return { ...base, reason: 'order_not_found' };
+
+  const existing = await db
+    .prepare('SELECT id, state, needs_review FROM support_gift_entitlements WHERE order_id = ?')
+    .bind(orderId)
+    .first<{ id: string; state: SupportGiftState; needs_review: number }>();
+
+  const snapshot: SupportSnapshot | null = parseSupportSnapshot(order.support_snapshot);
+  const selfSupport = !!snapshot && snapshot.referrer_user_id === order.user_id;
+
+  const [eligibleLine, collectedRow] = await Promise.all([
+    orderHasSupportEligibleLine(db, orderId),
+    db
+      .prepare('SELECT COALESCE(SUM(amount_iqd), 0) AS collected FROM order_payment_settlements WHERE order_id = ?')
+      .bind(orderId)
+      .first<{ collected: number }>(),
+  ]);
+
+  const decision = decideSupportGift({
+    hasSnapshot: !!snapshot,
+    selfSupport,
+    hasEligibleLine: eligibleLine,
+    orderCancelled: order.status === 'cancelled',
+    delivered: order.status === 'delivered' && !!order.delivered_at,
+    collectedIqd: Number(collectedRow?.collected) || 0,
+    totalIqd: Number(order.total_iqd) || 0,
+  });
+
+  // A claim that can no longer stand is cancelled rather than left dangling
+  // (§3.4: cancel an unfulfilled entitlement on return/cancellation).
+  if (!decision.attributable) {
+    if (existing) {
+      const cancelled = await cancelSupportGiftsForOrder(env, orderId, decision.blocker || 'not_attributable', opts.actorId ?? null);
+      return {
+        ...base,
+        entitlement: true,
+        state: cancelled > 0 ? 'cancelled' : existing.state,
+        blocker: decision.blocker,
+        reason: cancelled > 0 ? 'cancelled' : 'unchanged',
+      };
+    }
+    return { ...base, blocker: decision.blocker, reason: decision.blocker || 'not_attributable' };
+  }
+
+  // snapshot is non-null here (attributable implies it).
+  const snap = snapshot as SupportSnapshot;
+  const referrer = await db
+    .prepare('SELECT id FROM users WHERE id = ?')
+    .bind(snap.referrer_user_id)
+    .first<{ id: string }>();
+  if (!referrer) return { ...base, reason: 'referrer_not_found' };
+
+  const guard = await supportGiftGuard(db, orderId);
+  const nowIso = new Date().toISOString();
+
+  if (!existing) {
+    const startDue = decision.qualifies && !guard.needsReview;
+    const id = newId('sge');
+    try {
+      await db
+        .prepare(
+          `INSERT INTO support_gift_entitlements
+             (id, order_id, referrer_id, buyer_id, support_ref, state, needs_review, review_reason,
+              delivered_at, settled_at, qualified_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          id,
+          orderId,
+          snap.referrer_user_id,
+          order.user_id,
+          snap.ref || snap.referrer_username || '',
+          startDue ? 'due' : 'pending_eligibility',
+          guard.needsReview ? 1 : 0,
+          guard.reason,
+          order.delivered_at,
+          decision.qualifies ? nowIso : null,
+          startDue ? nowIso : null,
+          nowIso,
+          nowIso
+        )
+        .run();
+      await audit(db, opts.actorId ?? null, 'support_gift.create', id, {
+        order_id: orderId,
+        referrer_id: snap.referrer_user_id,
+        state: startDue ? 'due' : 'pending_eligibility',
+        needs_review: guard.needsReview,
+        review_reason: guard.reason,
+        blocker: decision.blocker,
+        trigger,
+      });
+      return {
+        ...base,
+        entitlement: true,
+        created: true,
+        became_due: startDue,
+        state: startDue ? 'due' : 'pending_eligibility',
+        needs_review: guard.needsReview,
+        review_reason: guard.reason,
+        blocker: decision.blocker,
+        reason: 'created',
+      };
+    } catch (e) {
+      // UNIQUE(order_id): a concurrent trigger created it first — fall
+      // through to the advance path instead of writing a second claim.
+      if (!isUniqueViolation(e)) throw e;
+    }
+  }
+
+  // A guard that fired after the row was created must be recorded on it, so
+  // the claim stops auto-advancing and shows up in the admin review queue.
+  if (guard.needsReview) {
+    const flagged = await db
+      .prepare(
+        `UPDATE support_gift_entitlements
+            SET needs_review = 1, review_reason = ?2, updated_at = ?3
+          WHERE order_id = ?1 AND needs_review = 0 AND state IN ('pending_eligibility','due')`
+      )
+      .bind(orderId, guard.reason, nowIso)
+      .run();
+    if ((flagged.meta.changes || 0) > 0) {
+      await audit(db, opts.actorId ?? null, 'support_gift.review_flag', orderId, { reason: guard.reason, trigger });
+    }
+  }
+
+  // Advance pending → due. The preconditions (delivered, fully collected, no
+  // open guard) are all inside the WHERE clause, so two concurrent triggers
+  // cannot both "see" a pending row and both promote it, and a partially
+  // collected order can never slip through between a read and a write.
+  let becameDue = false;
+  if (decision.qualifies && !guard.needsReview) {
+    const advanced = await db
+      .prepare(
+        `UPDATE support_gift_entitlements
+            SET state = 'due',
+                qualified_at = ?2,
+                settled_at = COALESCE(settled_at, ?2),
+                delivered_at = COALESCE(delivered_at, ?3),
+                updated_at = ?2
+          WHERE order_id = ?1
+            AND state = 'pending_eligibility'
+            AND needs_review = 0
+            AND EXISTS (SELECT 1 FROM orders o WHERE o.id = ?1 AND o.status = 'delivered')
+            AND (SELECT COALESCE(SUM(s.amount_iqd), 0) FROM order_payment_settlements s WHERE s.order_id = ?1)
+                >= (SELECT o.total_iqd FROM orders o WHERE o.id = ?1)`
+      )
+      .bind(orderId, nowIso, order.delivered_at)
+      .run();
+    becameDue = (advanced.meta.changes || 0) > 0;
+    if (becameDue) {
+      await audit(db, opts.actorId ?? null, 'support_gift.due', orderId, {
+        referrer_id: snap.referrer_user_id,
+        trigger,
+      });
+    }
+  }
+
+  const after = await db
+    .prepare('SELECT state, needs_review, review_reason FROM support_gift_entitlements WHERE order_id = ?')
+    .bind(orderId)
+    .first<{ state: SupportGiftState; needs_review: number; review_reason: string }>();
+
+  return {
+    ...base,
+    entitlement: !!after,
+    became_due: becameDue,
+    state: after?.state ?? null,
+    needs_review: !!after?.needs_review,
+    review_reason: after?.review_reason ?? '',
+    blocker: decision.blocker,
+    reason: becameDue ? 'became_due' : 'unchanged',
+  };
+}
+
+/**
+ * Cancel every UNCOMMITTED entitlement of an order (§3.4: "cancel the
+ * incomplete entitlement when the product is returned before the gift is
+ * handed over"). Reserved and paid claims are deliberately untouched: stock
+ * is already committed or the spool already left, and reversing that is an
+ * announced settlement decision made by a human, never an automatic
+ * clawback. Returns how many rows actually changed.
+ */
+export async function cancelSupportGiftsForOrder(
+  env: Env,
+  orderId: string,
+  reason: string,
+  actorId: string | null = null
+): Promise<number> {
+  const nowIso = new Date().toISOString();
+  const res = await env.DB.prepare(
+    `UPDATE support_gift_entitlements
+        SET state = 'cancelled',
+            outcome_reason = ?2,
+            decided_by = COALESCE(?3, decided_by),
+            decided_at = ?4,
+            updated_at = ?4
+      WHERE order_id = ?1 AND state IN ('pending_eligibility','due')`
+  )
+    .bind(orderId, String(reason || 'cancelled').slice(0, 200), actorId, nowIso)
+    .run();
+  const changed = res.meta.changes || 0;
+  if (changed > 0) {
+    await audit(env.DB, actorId, 'support_gift.cancel', orderId, { reason, count: changed });
+  }
+  return changed;
+}
+
+export interface SupportGiftReconciliation {
+  scanned: number;
+  cancelled: number;
+  became_due: number;
+  flagged: number;
+}
+
+/**
+ * Sweep of live claims — the safety net for the events that do not call the
+ * engine directly (an order cancelled through a path that predates this
+ * feature, a COD collected by a job, a return opened after the gift became
+ * due). It only re-runs the same idempotent evaluation, so running it twice
+ * changes nothing the first run did not already settle.
+ */
+export async function reconcileSupportGifts(env: Env, limit = 200): Promise<SupportGiftReconciliation> {
+  const cap = Math.max(1, Math.min(500, Math.trunc(limit) || 200));
+  const { results } = await env.DB.prepare(
+    `SELECT order_id FROM support_gift_entitlements
+      WHERE state IN ('pending_eligibility','due')
+      ORDER BY updated_at ASC LIMIT ?`
+  )
+    .bind(cap)
+    .all<{ order_id: string }>();
+
+  const report: SupportGiftReconciliation = { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 };
+  for (const row of results) {
+    report.scanned++;
+    try {
+      const before = await env.DB.prepare(
+        'SELECT state, needs_review FROM support_gift_entitlements WHERE order_id = ?'
+      )
+        .bind(row.order_id)
+        .first<{ state: string; needs_review: number }>();
+      const res = await evaluateSupportGiftForOrder(env, row.order_id, { trigger: 'reconcile' });
+      if (res.state === 'cancelled' && before?.state !== 'cancelled') report.cancelled++;
+      if (res.became_due) report.became_due++;
+      if (res.needs_review && !before?.needs_review) report.flagged++;
+    } catch (e) {
+      console.error('support gift reconcile failed for order', row.order_id, e instanceof Error ? e.message : String(e));
+    }
+  }
+  return report;
 }

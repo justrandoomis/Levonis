@@ -217,13 +217,26 @@ async function main() {
     const labelCount = await page.locator('.lv-auth label').count();
     check('real <label> elements above inputs', labelCount >= 2, `labels=${labelCount}`);
     check('LEVONIS wordmark rendered', (await page.getByText('LEVONIS', { exact: true }).count()) >= 1);
+    // The integrated mandate (§2.1) reorganised /auth: the four methods are a
+    // TAB ROW, and only the selected method's form is mounted — the old long
+    // column that showed every method at once is exactly what it forbids. The
+    // slots below are therefore SELECTED first; the assertions themselves are
+    // unchanged (a real control or an honest state, never a dead fake button).
+    const selectMethod = async (label) => {
+      await page.locator(`[role="tab"]:has-text("${label}")`).first().click({ force: true });
+      await page.waitForTimeout(250);
+    };
+    check('the four methods are one tab row, not four stacked forms',
+      (await page.locator('[role="tab"]').count()) === 4 && (await page.locator('[role="tabpanel"]').count()) === 1);
     // Google slot: either the real GSI button (configured) or the honest
     // unavailable notice (unconfigured build) — never a dead fake button.
+    await selectMethod('Google');
     const googleIframe = await page.locator('iframe[src*="accounts.google.com"]').count();
     const googleHonest = await page.getByText('معرّف العميل غير مضبوط', { exact: false }).count();
     check('google method slot present (real button OR honest state)', googleIframe > 0 || googleHonest > 0,
       `iframe=${googleIframe} honest=${googleHonest}`);
     // Telegram slot: phone entry with a real label.
+    await selectMethod('تيليغرام');
     const tgPhone = page.locator('#tg-auth-phone');
     check('telegram method slot with labeled phone input', (await tgPhone.count()) === 1);
     // Regression guard: TelegramAuth's <form> must NOT be nested inside the

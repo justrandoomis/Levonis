@@ -5,7 +5,7 @@ import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { api, ApiError, formatIqd } from '../lib/api';
 import {
-  ArrowLeft, ArrowRight, Search, Gift, Box, Calculator,
+  ArrowLeft, ArrowRight, Search, Box, Calculator,
   MessageSquare, Plus, Store,
   BadgeCheck, X
 } from 'lucide-react';
@@ -204,15 +204,25 @@ export default function Community() {
            </div>
         </div>
 
-        {/* Banners. First card = LEVO Studio, a real ACTIVE entry: a plain
-            full-page navigation to the standalone subdomain (STUDIO_URL) —
-            no iframe, no prefetch/preload, no slicer code in this bundle
-            (tests/store-isolation.test.ts pins this). The rest are features
-            not launched yet, shown honestly as coming soon. */}
+        {/* Banners (mandate §9). The «المساعدات والهدايا» / Giveaways card is
+            GONE and its slot belongs to LEVO Studio — the one real ACTIVE
+            entry here: a plain full-page navigation to the standalone
+            subdomain (STUDIO_URL, the single configurable constant in
+            src/translations.ts). No iframe, no prefetch/preload, no slicer or
+            3D code in this bundle (tests/store-isolation.test.ts pins all of
+            that). The target stays the user's choice — the anchor does not
+            force a new tab — and rel="noopener noreferrer" protects the
+            opener if the user opens one themselves. A working href is NOT a
+            claim that the Studio is deployed; publishing the Studio subdomain
+            is a separate owner step (docs/DECISIONS.md row 30 covers that domain). The remaining
+            cards are features not launched yet, shown honestly as coming soon. */}
         <div className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
            <a
              href={STUDIO_URL}
-             className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/25 to-black border border-olive/50 p-4 flex flex-col justify-center snap-start relative overflow-hidden hover:border-olive transition-colors"
+             data-testid="community-studio-link"
+             rel="noopener noreferrer"
+             aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
+             className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/25 to-black border border-olive/50 p-4 flex flex-col justify-center snap-start relative overflow-hidden hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
            >
              <div className="absolute right-2 bottom-0 opacity-20">
                <Box aria-hidden="true" className="w-20 h-20 text-olive" />
@@ -220,13 +230,6 @@ export default function Community() {
              <h3 className="text-white font-bold text-sm mb-1">{t('studioCardTitle')}</h3>
              <p className="text-xs text-olive font-medium">{t('studioOpen')}</p>
            </a>
-           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border border-purple-500/20 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
-             <div className="absolute right-2 bottom-0 opacity-20">
-               <Gift className="w-20 h-20" />
-             </div>
-             <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'المساعدات والهدايا' : 'Giveaways'}</h3>
-             <p className="text-xs text-purple-200/70">{comingSoon}</p>
-           </div>
            <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
              <div className="absolute right-2 bottom-0 opacity-20">
                <Calculator className="w-20 h-20" />

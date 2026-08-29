@@ -3,6 +3,7 @@
  * /api/admin/template. Deterministic parse/export only; NO AI anywhere.
  *
  *   GET  /blank              blank template download (text/plain attachment)
+ *   GET  /example            filled, valid EXAMPLE template (draft only)
  *   GET  /export/:productId  full product export (all languages, attachment)
  *   POST /parse              dry-run: preview + diff + errors — NO writes
  *   POST /apply              re-parses server-side and persists (create=draft)
@@ -11,15 +12,31 @@
  * Apply never trusts a client-prebuilt document: the template text is parsed
  * and validated server-side on every call. Unknown brand/catalog references
  * block the write with needs_review — never silent creation or drop.
+ *
+ * §6.1 download contract (iPad Safari): the two GET downloads answer with
+ * `text/plain; charset=utf-8`, an explicit `Content-Disposition: attachment`
+ * carrying BOTH a sanitized ASCII `filename=` and an RFC 5987 `filename*=`,
+ * a real `Content-Length`, and `X-Content-Type-Options: nosniff`, so WebKit
+ * saves a file instead of rendering the text inline. Errors on these routes
+ * stay JSON (worker/index.ts onError) so the client can tell a failed
+ * download from a successful one instead of saving an error page as .txt.
+ *
+ * §6.1 round-trip contract: whatever /blank and /example serve must parse
+ * with ZERO errors — `buildBlankTemplate()` proves it before serving (see
+ * `templateDownloadDiagnostics()` and tests/templateDownload.test.ts).
+ *
+ * §6.1 confirm-once contract: /apply claims a content fingerprint immediately
+ * before the write, so a double-submitted batch (double click, retry after a
+ * timed-out response, the same file twice in one ZIP) resolves to ONE write.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, oneOf, str, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
-import { newId } from '../lib/crypto';
+import { newId, sha256Hex } from '../lib/crypto';
 import {
   parseTemplate,
   exportProduct,
@@ -29,6 +46,7 @@ import {
   translationBookkeeping,
   deriveSlug,
   NULL_TOKEN,
+  TEMPLATE_VERSION,
   type ParsedTemplate,
   type ResolvedRefs,
   type ToDocResult,
@@ -48,18 +66,290 @@ const MAX_TEMPLATE_CHARS = 1_500_000;
 const MAX_ZIP_BYTES = 15 * 1024 * 1024;
 const MAX_ZIP_FILES = 100;
 
-// ---------------------------------------------------------------- helpers
+// ------------------------------------------------------- download helpers
 
+/**
+ * `Content-Disposition: attachment` with an ASCII-sanitized `filename=` AND
+ * an RFC 5987 `filename*=`. iOS/iPadOS Safari picks the ASCII form; keeping
+ * both means a non-ASCII product name can never produce a header the browser
+ * silently ignores (which is how a download turns into an inline render).
+ * The sanitizer also strips CR/LF and quotes, so a product id can never
+ * inject a response header.
+ */
+export function contentDisposition(filename: string): string {
+  const ascii = (filename.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'template').slice(0, 120);
+  const safeAscii = ascii.toLowerCase().endsWith('.txt') ? ascii : `${ascii}.txt`;
+  return `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+/**
+ * Text attachment response. Encodes to bytes first so `Content-Length` is the
+ * real UTF-8 byte length (Arabic content is multi-byte): Safari uses it to
+ * commit the transfer to a file instead of streaming it into a tab.
+ */
 function attachment(text: string, filename: string): Response {
-  return new Response(text, {
+  const bytes = new TextEncoder().encode(text);
+  return new Response(bytes, {
     status: 200,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': contentDisposition(filename),
+      'Content-Length': String(bytes.byteLength),
       'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Template-Version': String(TEMPLATE_VERSION),
     },
   });
 }
+
+// --------------------------------------------- blank / example templates
+
+interface DisabledLine {
+  line: number;
+  content: string;
+  reason: string;
+}
+
+/**
+ * Comments out any line the parser rejects, so the file we hand an admin
+ * always parses with zero errors (mandate §6.1: the importer must accept
+ * exactly what the download serves). Nothing is deleted — the key, its type
+ * comment and its notes stay in the file, only the `key=` line is disabled
+ * and annotated with the parser's own reason.
+ *
+ * Line-based and idempotent: re-parsing after each pass catches lines whose
+ * error only appears once an earlier line is gone.
+ */
+function disableUnparsableLines(text: string): { text: string; disabled: DisabledLine[] } {
+  let current = text;
+  const disabled: DisabledLine[] = [];
+  for (let pass = 0; pass < 6; pass++) {
+    const parsed = parseTemplate(current);
+    if (parsed.errors.length === 0) break;
+    const lines = current.split('\n');
+    let changed = false;
+    for (const e of parsed.errors) {
+      const idx = e.line - 1;
+      if (idx < 0 || idx >= lines.length) continue;
+      const content = lines[idx].trim();
+      if (content === '' || content.startsWith('#')) continue;
+      lines[idx] = `# ${content}   ⟵ املأ قيمة صالحة ثم احذف # / fill a valid value, then uncomment — ${e.message}`;
+      disabled.push({ line: e.line, content, reason: e.message });
+      changed = true;
+    }
+    if (!changed) break;
+    current = lines.join('\n');
+  }
+  return { text: current, disabled };
+}
+
+const GROUP_ITEM_LINE_RE = /^([a-z_]+)\.(\d+)\./;
+
+/**
+ * The rich blank template, made importable.
+ *
+ * Two problems are fixed here without touching the field registry:
+ *  1. Repeated-group sample items (`options.1.*`, `images.1.*`, …) ship
+ *     COMMENTED. Every key, type note and required marker stays in the file,
+ *     but an untouched blank no longer carries an empty option / image /
+ *     warranty item that blocks the import with "name_ar is required".
+ *     Uncomment only the items you actually fill in.
+ *  2. Required scalars whose blank value is not parseable (`price_iqd=`,
+ *     `display_order=`) are commented with the parser's own reason instead of
+ *     being served as four guaranteed parse errors.
+ */
+export function buildBlankTemplate(): { text: string; disabled: DisabledLine[]; groupsDisabled: string[] } {
+  const out: string[] = [];
+  const groupsDisabled: string[] = [];
+  let currentGroup = '';
+  for (const raw of generateBlankTemplate().split('\n')) {
+    const trimmed = raw.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      out.push(raw);
+      continue;
+    }
+    const gm = GROUP_ITEM_LINE_RE.exec(trimmed);
+    if (!gm) {
+      out.push(raw);
+      continue;
+    }
+    if (gm[1] !== currentGroup) {
+      currentGroup = gm[1];
+      groupsDisabled.push(currentGroup);
+      out.push(
+        `# ▼ المجموعة المتكررة "${currentGroup}" معطّلة افتراضياً — احذف علامة # من أسطر العنصر الذي تملؤه فقط.`,
+        `#   Repeated group "${currentGroup}" ships DISABLED: uncomment only the lines of an item you actually fill.`,
+        `#   عنصر مفعّل بحقول مطلوبة فارغة يوقف الاستيراد كله؛ اترك ما لا تحتاجه معطّلاً.`
+      );
+    }
+    out.push(`# ${trimmed}`);
+  }
+  const healed = disableUnparsableLines(out.join('\n'));
+  return { text: healed.text, disabled: healed.disabled, groupsDisabled };
+}
+
+/**
+ * A filled, valid example (mandate §6.1: "مثال صالح واضح لا يُنشر كمنتج
+ * حقيقي تلقائيًا"). It demonstrates heredocs, per-field null inheritance,
+ * option/colour linking (`option_id` and the import-only `option_index`),
+ * spec rows, labels, a warranty plan and a content block.
+ *
+ * It carries NO brand/catalog reference (nothing to resolve) and NO image
+ * URL — an example must never create a product with a broken image. Applying
+ * it creates a DRAFT: `POST /apply` forces `status=draft` on every create,
+ * and the name says so in three languages.
+ */
+const EXAMPLE_TEMPLATE = `# ============================================================
+# مثال قالب ليفونيس — منتج نموذجي صالح للمعاينة
+# Levonis product template — filled EXAMPLE (valid, ready to preview)
+# ============================================================
+# تطبيق هذا الملف يُنشئ **مسودة** فقط ولا يُنشر أبداً كمنتج حقيقي تلقائياً.
+# Applying this file creates a DRAFT only; template creation never publishes.
+# استبدل كل القيم بقيمك الحقيقية قبل النشر، أو احذف المسودة بعد التجربة.
+
+template_version=${TEMPLATE_VERSION}
+# لا يوجد product_id: هذا إنشاء جديد. أضف product_id لتحديث منتج قائم.
+slug=levonis-template-example
+
+# ------------------------------ الهوية / identity
+name_ar=منتج مثال للقالب — لا تنشره
+name_en=Levonis template example — do not publish
+name_ckb=نموونەی قاڵب — بڵاوی مەکەوە
+status=draft
+
+# ------------------------------ الوصف / description
+description_ar=<<<END
+هذا وصف عربي متعدد الأسطر مكتوب داخل كتلة heredoc.
+كل سطر يُحفظ حرفياً كما هو، بما في ذلك الأسطر الفارغة.
+END
+description_en=A multi-line English description written with a heredoc block.
+description_ckb=
+how_to_use=مثال مختصر على طريقة الاستخدام.
+
+# ------------------------------ التسعير / pricing (أعداد صحيحة بالدينار)
+price_iqd=100000
+# __NULL__ = لا سعر PRO صريح (سياسة المتجر تطبق؛ الافتراضي: لا خصم مُختلق)
+pro_price_iqd=__NULL__
+original_price_iqd=125000
+# الكلفة داخلية ولا تُنشر أبداً للزبون
+product_cost_iqd=__NULL__
+
+# ------------------------------ التصنيف / classification
+# لا علامة ولا كتالوج في المثال: أي قيمة غير موجودة توقف الاستيراد للمراجعة
+brand=__NULL__
+catalogs=
+hashtags=مثال,example
+is_featured=false
+display_order=0
+
+# ------------------------------ البيع والمخزون / selling & stock
+selling_type=direct_sale
+stock=5
+payment_options=
+
+# ------------------------------ الوسائط / media
+# معطّلة عمداً: ضع رابطاً حقيقياً (/files/<key> أو https://…) قبل التفعيل،
+# فالمثال يجب ألا يُنشئ منتجاً بصورة مكسورة.
+# images.1.id=img_example_1
+# images.1.url=
+# images.1.primary=true
+# images.1.alt_ar=صورة المنتج
+
+# ------------------------------ الخيارات / options
+options.1.id=opt_example_small
+options.1.name_ar=المقاس الصغير
+options.1.name_en=Small
+options.1.active=true
+# __NULL__ = يرث السعر الأساسي (لا يساوي صفراً)
+options.1.regular_price_iqd=__NULL__
+options.2.id=opt_example_large
+options.2.name_ar=المقاس الكبير
+options.2.name_en=Large
+options.2.active=true
+# سعر الخيار يستبدل السعر الأساسي
+options.2.regular_price_iqd=120000
+
+# ------------------------------ الألوان / colors
+# الوراثة لكل حقل: لون ← خيار ← أساسي
+colors.1.id=col_example_black
+colors.1.name_ar=أسود
+colors.1.name_en=Black
+colors.1.hex=#111111
+# __NULL__ = متاح لكل الخيارات
+colors.1.option_id=__NULL__
+colors.1.active=true
+colors.2.id=col_example_gold
+colors.2.name_ar=ذهبي
+colors.2.name_en=Gold
+colors.2.hex=#D4AF37
+# option_index بديل استيراد فقط: يربط اللون بالخيار options.2
+colors.2.option_index=2
+colors.2.regular_price_iqd=135000
+colors.2.active=true
+
+# ------------------------------ المواصفات / specifications
+spec_groups.1.id=sg_example_general
+spec_groups.1.title_ar=عام
+spec_groups.1.title_en=General
+spec_groups.1.rows.1.id=sr_example_weight
+spec_groups.1.rows.1.label_ar=الوزن
+spec_groups.1.rows.1.label_en=Weight
+spec_groups.1.rows.1.value_ar=1.2
+spec_groups.1.rows.1.value_en=1.2
+spec_groups.1.rows.1.unit=kg
+
+# ------------------------------ الشارات / labels
+labels.1.id=lbl_example_warranty
+labels.1.key=warranty_included
+labels.1.text_ar=ضمان سنة
+labels.1.text_en=1-year warranty
+labels.1.visible=true
+
+# ------------------------------ خطط الضمان / warranty plans
+warranty_plans.1.id=wp_example_base
+warranty_plans.1.title_ar=ضمان أساسي
+warranty_plans.1.title_en=Base warranty
+warranty_plans.1.duration_months=12
+warranty_plans.1.duration_kind=total
+# 0 = مجاني صراحةً (وليس "غير محدد")
+warranty_plans.1.fee_iqd=0
+warranty_plans.1.active=true
+
+# ------------------------------ كتل المحتوى / content blocks
+content_blocks.1.id=cb_example_text
+content_blocks.1.kind=text
+content_blocks.1.body_ar=<<<END
+كتلة محتوى نصية تظهر أسفل صفحة المنتج.
+END
+content_blocks.1.caption_ar=مثال
+`;
+
+export function buildExampleTemplate(): string {
+  return EXAMPLE_TEMPLATE;
+}
+
+/** Parse-level diagnostics for both downloads — pinned by
+ *  tests/templateDownload.test.ts so a registry change can never quietly
+ *  reintroduce a template the importer rejects. */
+export function templateDownloadDiagnostics(): {
+  blank: { errors: number; unknown_keys: string[]; disabled: DisabledLine[]; groupsDisabled: string[] };
+  example: { errors: number; unknown_keys: string[] };
+} {
+  const blank = buildBlankTemplate();
+  const blankParsed = parseTemplate(blank.text);
+  const exampleParsed = parseTemplate(buildExampleTemplate());
+  return {
+    blank: {
+      errors: blankParsed.errors.length,
+      unknown_keys: blankParsed.unknown_keys,
+      disabled: blank.disabled,
+      groupsDisabled: blank.groupsDisabled,
+    },
+    example: { errors: exampleParsed.errors.length, unknown_keys: exampleParsed.unknown_keys },
+  };
+}
+
+// ---------------------------------------------------------------- helpers
 
 async function loadProductDoc(db: D1Database, id: string): Promise<ProductDoc | null> {
   const row = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
@@ -258,10 +548,158 @@ async function uniqueSlug(db: D1Database, base: string): Promise<string> {
   return `${base}-${newId('').slice(0, 12)}`.slice(0, 130);
 }
 
-// ---------------------------------------------------------------- GET /blank
+// ------------------------------------------------- apply idempotency guard
+
+/**
+ * §6.1: "التأكيد عملية آمنة تمنع استيراد الدفعة نفسها مرتين بالخطأ".
+ *
+ * The guard is a content fingerprint claimed atomically immediately before
+ * the write. Everything that can reject a template (parse errors, needs
+ * review, duplicate choice, stale check) runs BEFORE the claim, so a rejected
+ * submission never burns the fingerprint and can be retried after a fix.
+ *
+ * Storage is the existing `rate_limits` table: `key` is its PRIMARY KEY, so
+ * `INSERT … ON CONFLICT(key) DO UPDATE … RETURNING count` is a single atomic
+ * statement — a check-then-write race is impossible. No new table (and no new
+ * migration) is introduced for it; rows expire with the window and are swept
+ * by the limiter's own cleanup.
+ */
+const APPLY_FINGERPRINT_WINDOW_SECONDS = 900; // 15 minutes
+
+/** Same bytes, same batch — CRLF/CR and trailing whitespace are normalized so
+ *  the same file re-uploaded from Windows/macOS fingerprints identically. */
+export async function applyFingerprint(
+  adminUserId: string,
+  mode: string,
+  duplicateChoice: string | null,
+  text: string
+): Promise<string> {
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const hash = await sha256Hex(`${adminUserId}|${mode}|${duplicateChoice ?? ''}|${normalized}`);
+  return hash.slice(0, 32);
+}
+
+/** Atomic claim. Returns true only for the FIRST caller inside the window. */
+export async function claimApplyFingerprint(db: D1Database, fingerprint: string): Promise<boolean> {
+  const now = Math.floor(Date.now() / 1000);
+  const cutoff = now - APPLY_FINGERPRINT_WINDOW_SECONDS;
+  const row = await db
+    .prepare(
+      `INSERT INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE WHEN window_start > ?3 THEN count + 1 ELSE 1 END,
+         window_start = CASE WHEN window_start > ?3 THEN window_start ELSE ?2 END
+       RETURNING count`
+    )
+    .bind(`tplfp:${fingerprint}`, now, cutoff)
+    .first<{ count: number }>();
+  return (row?.count ?? 0) <= 1;
+}
+
+/** Releases a claim whose write did not happen, so the admin can retry. */
+export async function releaseApplyFingerprint(db: D1Database, fingerprint: string): Promise<void> {
+  try {
+    await db.prepare('DELETE FROM rate_limits WHERE key = ? AND count <= 1').bind(`tplfp:${fingerprint}`).run();
+  } catch (e) {
+    console.error('template apply fingerprint release failed', e);
+  }
+}
+
+/** The product a previous apply of this exact fingerprint produced, read back
+ *  from the audit trail (written in the same request as the write). */
+async function previousApply(
+  db: D1Database,
+  adminUserId: string,
+  fingerprint: string
+): Promise<{ product_id: string; created: boolean } | null> {
+  const row = await db
+    .prepare(
+      `SELECT target, detail FROM audit_log
+        WHERE action = 'template.apply' AND actor_id = ? AND detail LIKE ?
+        ORDER BY id DESC LIMIT 1`
+    )
+    .bind(adminUserId, `%"fingerprint":"${fingerprint}"%`)
+    .first<{ target: string; detail: string }>();
+  if (!row?.target) return null;
+  let created = false;
+  try {
+    created = JSON.parse(row.detail)?.created === true;
+  } catch {
+    /* detail is advisory only — the product id is what matters */
+  }
+  return { product_id: row.target, created };
+}
+
+/**
+ * A second submission of an already-claimed batch. Nothing is written. When
+ * the first submission's audit row is readable we answer 200 with the SAME
+ * product and `already_applied: true` (so a client that lost the first
+ * response converges instead of creating a twin); when it is not yet readable
+ * — the first write is still in flight — we answer 409 honestly rather than
+ * inventing a result.
+ */
+async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fingerprint: string) {
+  const prior = await previousApply(c.env.DB, adminUserId, fingerprint);
+  if (!prior) {
+    return c.json(
+      {
+        success: false,
+        code: 'APPLY_IN_PROGRESS',
+        error:
+          'هذه الدفعة نفسها قيد التطبيق الآن — لم يُكتب شيء إضافي. انتظر النتيجة ثم حدّث القائمة / this exact batch is already being applied; nothing extra was written',
+        fingerprint,
+      },
+      409
+    );
+  }
+  const fresh = await loadProductDoc(c.env.DB, prior.product_id);
+  return c.json({
+    success: true,
+    already_applied: true,
+    created: prior.created,
+    fingerprint,
+    product_id: prior.product_id,
+    product: fresh ? projectAdmin(fresh) : null,
+    applied_fields: [],
+    cleared_fields: [],
+    preserved_fields: [],
+    warnings: [
+      'هذه الدفعة طُبِّقت مسبقاً بالمحتوى نفسه — لم يُنشأ منتج ثانٍ / this exact batch was already applied; no second product was created',
+    ],
+  });
+}
+
+/** Honest money warnings — §6.1 forbids a dropped zero/empty field silently
+ *  changing the price. A zero base price with no option/colour price is legal
+ *  but almost never intended, so it is surfaced instead of assumed. */
+function priceWarnings(doc: ProductDoc): string[] {
+  const out: string[] = [];
+  const anyVariantPrice =
+    doc.options.some((o) => o.regular_price_iqd !== null) ||
+    doc.colors.some((cl) => cl.regular_price_iqd !== null);
+  if (doc.price_iqd === 0 && !anyVariantPrice) {
+    out.push(
+      'price_iqd = 0 ولا يوجد سعر خيار/لون يستبدله — تأكد أن هذا مقصود قبل تفعيل المنتج / base price is an explicit zero and no option/colour price replaces it'
+    );
+  }
+  if (doc.original_price_iqd !== null && doc.original_price_iqd <= doc.price_iqd) {
+    out.push(
+      'original_price_iqd ليس أعلى من السعر — لن يظهر كسعر مقارنة / compare-at price is not above the selling price, so it will not be shown'
+    );
+  }
+  return out;
+}
+
+// ------------------------------------------------------- GET /blank, /example
 
 templateRoutes.get('/blank', (c) => {
-  return attachment(generateBlankTemplate(), 'levonis-product-template.txt');
+  return attachment(buildBlankTemplate().text, 'levonis-product-template.txt');
+});
+
+/** A filled, valid example. Creating from it yields a DRAFT — never a live
+ *  product (see the create branch of /apply). */
+templateRoutes.get('/example', (c) => {
+  return attachment(buildExampleTemplate(), 'levonis-product-template-example.txt');
 });
 
 // ------------------------------------------------------ GET /export/:productId
@@ -283,12 +721,15 @@ templateRoutes.post('/parse', async (c) => {
 
   const a = await analyzeTemplate(c.env.DB, text);
   const needsReview = [...(a.merge?.needs_review ?? a.refs.needs_review ?? [])];
+  // Every error / warning / needs-review entry is returned in full — the UI
+  // must be able to show ALL rejected rows with their reason (§6.1), never a
+  // truncated "first five".
   return c.json({
     success: true,
     product_id: a.parsed.header.product_id,
     is_create: !a.parsed.header.product_id,
     errors: a.parsed.errors,
-    warnings: a.merge?.warnings ?? a.parsed.warnings,
+    warnings: [...(a.merge?.warnings ?? a.parsed.warnings), ...(a.doc ? priceWarnings(a.doc) : [])],
     unknown_keys: a.parsed.unknown_keys,
     needs_review: needsReview,
     validation_error: a.validation_error,
@@ -319,6 +760,11 @@ templateRoutes.post('/apply', async (c) => {
     body.duplicate_choice === undefined || body.duplicate_choice === null || body.duplicate_choice === ''
       ? null
       : oneOf(body.duplicate_choice, 'duplicate_choice', DUPLICATE_CHOICES);
+
+  // Content fingerprint for the confirm-once guard. Computed here, CLAIMED
+  // only immediately before the write so that a rejected template (errors /
+  // needs review / duplicate question / stale) can be fixed and resubmitted.
+  const fingerprint = await applyFingerprint(adminUser.id, mode, duplicateChoice, text);
 
   // Always re-parse server-side — client-prebuilt documents are never trusted.
   // Update mode follows the template's product_id; draft mode forces a create
@@ -388,6 +834,7 @@ templateRoutes.post('/apply', async (c) => {
   if (a.validation_error) throw new HttpError(400, a.validation_error.message, a.validation_error.code);
   const doc = a.doc!;
   warnings.push(...(a.merge?.warnings ?? []));
+  warnings.push(...priceWarnings(doc));
 
   if (isUpdate) {
     const existing = a.existing!;
@@ -409,6 +856,9 @@ templateRoutes.post('/apply', async (c) => {
     doc.id = existing.id;
     if (!doc.slug) doc.slug = existing.slug; // slug stability (toDocBody enforces allow_slug_change)
 
+    const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
+    if (!claimed) return repeatSubmission(c, adminUser.id, fingerprint);
+
     const serialized = serializeDoc(doc);
     delete (serialized as Record<string, unknown>).id;
     const cols = Object.keys(serialized);
@@ -420,6 +870,9 @@ templateRoutes.post('/apply', async (c) => {
     try {
       await c.env.DB.prepare(sql).bind(...cols.map((k) => (serialized as Record<string, unknown>)[k]), doc.id).run();
     } catch (e) {
+      // The write did not happen — free the fingerprint so a corrected retry
+      // is not mistaken for a double submission.
+      await releaseApplyFingerprint(c.env.DB, fingerprint);
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes('UNIQUE') && msg.includes('slug')) throw badRequest('A product with this slug already exists');
       throw e;
@@ -439,13 +892,20 @@ templateRoutes.post('/apply', async (c) => {
     }
     doc.slug = baseSlug;
 
+    const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
+    if (!claimed) return repeatSubmission(c, adminUser.id, fingerprint);
+
     const serialized = serializeDoc(doc);
     const cols = Object.keys(serialized);
     const sql = `INSERT INTO products (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
     try {
       await c.env.DB.prepare(sql).bind(...cols.map((k) => (serialized as Record<string, unknown>)[k])).run();
     } catch (e) {
+      // Nothing was inserted — release the claim before reporting.
+      await releaseApplyFingerprint(c.env.DB, fingerprint);
       const msg = e instanceof Error ? e.message : String(e);
+      // UNIQUE(slug) is the last-resort backstop for two concurrent creates
+      // that both passed duplicate detection; the loser writes nothing.
       if (msg.includes('UNIQUE') && msg.includes('slug')) {
         return c.json(
           {
@@ -462,14 +922,28 @@ templateRoutes.post('/apply', async (c) => {
     }
   }
 
+  // The product row is written at this point. A catalog-association failure
+  // is reported as a warning and never aborts the audit that follows: the
+  // audit row is what a repeat submission of this batch reads back, so losing
+  // it would strand the fingerprint and turn an honest retry into a 409.
   if (a.refs.catalog_ids !== undefined) {
-    await applyCatalogs(c.env.DB, doc.id, a.refs.catalog_ids);
+    try {
+      await applyCatalogs(c.env.DB, doc.id, a.refs.catalog_ids);
+    } catch (e) {
+      console.error('template apply: catalog association failed', doc.id, e);
+      warnings.push(
+        'حُفظ المنتج لكن ربط الكتالوجات فشل — راجع تصنيفات المنتج يدوياً / the product was saved but its catalog links failed; check them manually'
+      );
+    }
   }
 
+  // The fingerprint is part of the audit detail: it is how a repeat
+  // submission finds the product the first submission produced.
   await audit(c.env.DB, adminUser.id, 'template.apply', doc.id, {
     mode,
     created: !isUpdate,
     duplicate_choice: duplicateChoice,
+    fingerprint,
     applied: a.merge?.applied_fields ?? [],
     cleared: a.merge?.cleared_fields ?? [],
   });
@@ -478,6 +952,8 @@ templateRoutes.post('/apply', async (c) => {
   return c.json({
     success: true,
     created: !isUpdate,
+    already_applied: false,
+    fingerprint,
     product_id: doc.id,
     product: fresh ? projectAdmin(fresh) : null,
     applied_fields: a.merge?.applied_fields ?? [],
@@ -530,7 +1006,7 @@ templateRoutes.post('/parse-zip', async (c) => {
         product_id: a.parsed.header.product_id,
         is_create: !a.parsed.header.product_id,
         errors: a.parsed.errors,
-        warnings: a.merge?.warnings ?? a.parsed.warnings,
+        warnings: [...(a.merge?.warnings ?? a.parsed.warnings), ...(a.doc ? priceWarnings(a.doc) : [])],
         unknown_keys: a.parsed.unknown_keys,
         needs_review: needsReview,
         validation_error: a.validation_error,
@@ -550,10 +1026,22 @@ templateRoutes.post('/parse-zip', async (c) => {
     }
   }
 
+  // Counts cover EVERY entry of the archive — files parsed, files not ready,
+  // non-.txt entries and entries past the per-archive limit — so the admin UI
+  // can report all accepted/rejected rows with a reason (§6.1), never a
+  // truncated list.
   return c.json({
     success: true,
     files,
     skipped_entries: skipped,
     skipped_over_limit: overflow,
+    counts: {
+      parsed: files.length,
+      ready: files.filter((f) => f.ready_to_apply === true).length,
+      not_ready: files.filter((f) => f.ready_to_apply !== true).length,
+      skipped_not_txt: skipped.length,
+      skipped_over_limit: overflow.length,
+      limit: MAX_ZIP_FILES,
+    },
   });
 });

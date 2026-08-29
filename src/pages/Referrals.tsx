@@ -1,0 +1,769 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, ArrowRight, Copy, Check, Share2, Gift, UserPlus, Link2, ShieldCheck, Info,
+} from 'lucide-react';
+import { useLanguage } from '../LanguageContext';
+import { useAuth } from '../AuthContext';
+import { api } from '../lib/api';
+import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
+import { ErrorState, EmptyState, UnauthorizedState } from '../components/ui/AsyncStates';
+
+/**
+ * /referrals — the standalone referrals & support-code page (integrated
+ * mandate §3.1). It shows the unique username handle, the invite link, how a
+ * SIGNUP INVITE differs from a PURCHASE SUPPORT CODE, and the state of every
+ * gift claim — without ever exposing who bought what.
+ *
+ * This module also owns the browser-side pending support ref used by the
+ * cart (§3.3). Those helpers are exported below and are storage-injectable
+ * so they can be unit-tested without a DOM (tests/supportCode.test.ts).
+ */
+
+// ===========================================================================
+// Browser-side pending support ref (§3.3)
+// ===========================================================================
+//
+// WHY sessionStorage AND WHY IT EXPIRES: §3.2 requires the carry-over to be
+// "limited in validity, announced and manageable — no unlimited retention or
+// hidden tracking". sessionStorage dies with the tab, and every entry also
+// carries its own capture time so a tab left open for days cannot silently
+// attribute tomorrow's order to a link opened last week.
+//
+// WHY A DISMISSED LIST: §3.3 — "removing the support code is respected; do
+// not re-add it from a cookie on every render. The user may add it again by
+// their own decision." A removal is therefore recorded, and an automatic
+// (link) capture never resurrects a ref the user removed. A MANUAL entry
+// does, because that is the user's own decision.
+
+export const SUPPORT_REF_KEY = 'levo_support_ref_v1';
+/** Announced bound: a captured link stops applying after 12 hours. */
+export const SUPPORT_REF_TTL_MS = 12 * 60 * 60 * 1000;
+export const SUPPORT_REF_MAX = 60;
+
+export type SupportRefSource = 'link' | 'manual';
+
+export interface SupportRefEntry {
+  ref: string;
+  /** Capture instant (epoch ms) — the TTL is measured from here. */
+  at: number;
+  source: SupportRefSource;
+  /** The product path the link came from, when it came from one. */
+  product?: string;
+}
+
+export interface SupportRefState {
+  /** The ref the cart will actually send at checkout (at most one). */
+  current: SupportRefEntry | null;
+  /**
+   * A SECOND, different ref arrived while `current` stood. §3.3 forbids a
+   * silent replacement: both are kept and the cart asks the user to choose.
+   */
+  conflict: SupportRefEntry | null;
+  /** Refs the user removed — never auto-re-added. */
+  dismissed: string[];
+}
+
+export interface RefStore {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+const EMPTY_STATE: SupportRefState = { current: null, conflict: null, dismissed: [] };
+
+/**
+ * Mirrors worker/lib/supportCode.ts normalizeSupportRef. The SERVER remains
+ * the authority — the cart always resolves a ref through the API before it
+ * shows a name — this only stops obviously unusable input from being stored.
+ */
+export function normalizeSupportRef(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  let s = raw.trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const url = new URL(s);
+      const q = url.searchParams.get('ref');
+      const seg = url.pathname.split('/').filter(Boolean).pop() ?? '';
+      s = (q || seg || '').trim();
+    } catch {
+      return '';
+    }
+  }
+  s = s.replace(/^@+/, '').trim();
+  if (!s || s.length > SUPPORT_REF_MAX) return '';
+  if (!/^[A-Za-z0-9._-]+$/.test(s)) return '';
+  return s;
+}
+
+const sameRef = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+/** sessionStorage when it is usable (private mode / SSR / blocked → null). */
+export function sessionStore(): RefStore | null {
+  try {
+    if (typeof window === 'undefined' || !window.sessionStorage) return null;
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function persist(state: SupportRefState, store: RefStore | null): SupportRefState {
+  if (!store) return state;
+  try {
+    if (!state.current && !state.conflict && state.dismissed.length === 0) store.removeItem(SUPPORT_REF_KEY);
+    else store.setItem(SUPPORT_REF_KEY, JSON.stringify(state));
+  } catch {
+    /* storage full or blocked — the feature degrades to "no pending ref" */
+  }
+  return state;
+}
+
+function entryFrom(value: unknown, now: number): SupportRefEntry | null {
+  if (!value || typeof value !== 'object') return null;
+  const o = value as Record<string, unknown>;
+  const ref = normalizeSupportRef(o.ref);
+  const at = typeof o.at === 'number' && Number.isFinite(o.at) ? o.at : 0;
+  if (!ref || at <= 0) return null;
+  if (now - at > SUPPORT_REF_TTL_MS) return null; // expiry-bounded, always
+  return {
+    ref,
+    at,
+    source: o.source === 'manual' ? 'manual' : 'link',
+    ...(typeof o.product === 'string' && o.product ? { product: o.product } : {}),
+  };
+}
+
+/** Reads the stored state, dropping anything expired or malformed. */
+export function readSupportRefState(now: number = Date.now(), store: RefStore | null = sessionStore()): SupportRefState {
+  if (!store) return { ...EMPTY_STATE };
+  let raw: string | null = null;
+  try {
+    raw = store.getItem(SUPPORT_REF_KEY);
+  } catch {
+    return { ...EMPTY_STATE };
+  }
+  if (!raw) return { ...EMPTY_STATE };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ...EMPTY_STATE };
+  }
+  const o = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>;
+  const dismissed = Array.isArray(o.dismissed)
+    ? o.dismissed.map((d) => normalizeSupportRef(d)).filter(Boolean).slice(0, 20)
+    : [];
+  return {
+    current: entryFrom(o.current, now),
+    conflict: entryFrom(o.conflict, now),
+    dismissed,
+  };
+}
+
+export interface CaptureOptions {
+  source?: SupportRefSource;
+  product?: string;
+  now?: number;
+  store?: RefStore | null;
+}
+
+/**
+ * Record a support ref seen by the browser.
+ *
+ * - An automatic capture (a `?ref=` on a product link) NEVER overrides a ref
+ *   the user already has, and never resurrects one they removed.
+ * - A second, different automatic ref becomes a `conflict`: the cart asks
+ *   which creator to support instead of swapping the beneficiary silently.
+ * - A manual entry is the user's explicit decision, so it wins and clears
+ *   both the conflict and any earlier removal of that same ref.
+ */
+export function captureSupportRef(rawRef: unknown, opts: CaptureOptions = {}): SupportRefState {
+  const store = opts.store === undefined ? sessionStore() : opts.store;
+  const now = opts.now ?? Date.now();
+  const source: SupportRefSource = opts.source ?? 'link';
+  const ref = normalizeSupportRef(rawRef);
+  const state = readSupportRefState(now, store);
+  if (!ref) return state;
+
+  const entry: SupportRefEntry = {
+    ref,
+    at: now,
+    source,
+    ...(opts.product ? { product: opts.product } : {}),
+  };
+
+  if (source === 'manual') {
+    const next: SupportRefState = {
+      current: entry,
+      conflict: null,
+      dismissed: state.dismissed.filter((d) => !sameRef(d, ref)),
+    };
+    return persist(next, store);
+  }
+
+  if (state.dismissed.some((d) => sameRef(d, ref))) return state; // removal is respected
+  if (!state.current) return persist({ ...state, current: entry, conflict: null }, store);
+  if (sameRef(state.current.ref, ref)) {
+    // Same creator, opened again: refresh the capture time, keep everything
+    // else — this is not a new attribution.
+    return persist({ ...state, current: { ...state.current, at: now, product: entry.product ?? state.current.product } }, store);
+  }
+  if (state.conflict && sameRef(state.conflict.ref, ref)) return state;
+  return persist({ ...state, conflict: entry }, store);
+}
+
+/** Reads `?ref=` out of a location search string and captures it. */
+export function captureSupportRefFromSearch(search: string, opts: CaptureOptions = {}): SupportRefState {
+  let value = '';
+  try {
+    value = new URLSearchParams(search || '').get('ref') || '';
+  } catch {
+    value = '';
+  }
+  if (!value) return readSupportRefState(opts.now ?? Date.now(), opts.store === undefined ? sessionStore() : opts.store);
+  return captureSupportRef(value, { ...opts, source: opts.source ?? 'link' });
+}
+
+/** Resolve a conflict by picking one of the two refs (§3.3: explicit choice). */
+export function chooseSupportRef(rawRef: unknown, opts: CaptureOptions = {}): SupportRefState {
+  const store = opts.store === undefined ? sessionStore() : opts.store;
+  const now = opts.now ?? Date.now();
+  const ref = normalizeSupportRef(rawRef);
+  const state = readSupportRefState(now, store);
+  if (!ref) return state;
+  const picked =
+    (state.current && sameRef(state.current.ref, ref) && state.current) ||
+    (state.conflict && sameRef(state.conflict.ref, ref) && state.conflict) ||
+    null;
+  if (!picked) return state;
+  return persist({ ...state, current: { ...picked, at: now }, conflict: null }, store);
+}
+
+/**
+ * Remove the support code. The removal is REMEMBERED: the same ref arriving
+ * again from a link is ignored, so no re-render, refresh or back-navigation
+ * can push it back in.
+ */
+export function removeSupportRef(opts: { now?: number; store?: RefStore | null } = {}): SupportRefState {
+  const store = opts.store === undefined ? sessionStore() : opts.store;
+  const now = opts.now ?? Date.now();
+  const state = readSupportRefState(now, store);
+  const removed = [state.current?.ref, state.conflict?.ref].filter((r): r is string => !!r);
+  const dismissed = [...state.dismissed];
+  for (const r of removed) if (!dismissed.some((d) => sameRef(d, r))) dismissed.push(r);
+  return persist({ current: null, conflict: null, dismissed: dismissed.slice(-20) }, store);
+}
+
+/**
+ * Clear everything — including the dismissed list. For AFTER an order is
+ * placed (the ref is frozen on the order server-side by then), never as a
+ * way to get around a removal.
+ */
+export function clearSupportRef(opts: { store?: RefStore | null } = {}): void {
+  const store = opts.store === undefined ? sessionStore() : opts.store;
+  if (!store) return;
+  try {
+    store.removeItem(SUPPORT_REF_KEY);
+  } catch {
+    /* nothing to do */
+  }
+}
+
+/** The invite link for a handle. Origin is the live one, never hardcoded. */
+export function inviteLinkFor(username: string, origin: string): string {
+  const clean = normalizeSupportRef(username);
+  if (!clean) return '';
+  return `${origin.replace(/\/+$/, '')}/auth?ref=${encodeURIComponent(clean.toLowerCase())}`;
+}
+
+/** Appends the support ref to a REAL product path (never a guessed one). */
+export function productShareLink(productPath: string, username: string, origin: string): string {
+  const path = String(productPath || '').trim();
+  if (!path.startsWith('/')) return '';
+  const base = `${origin.replace(/\/+$/, '')}${path}`;
+  const clean = normalizeSupportRef(username);
+  if (!clean) return base;
+  const [withoutHash, hash = ''] = base.split('#');
+  const sep = withoutHash.includes('?') ? '&' : '?';
+  return `${withoutHash}${sep}ref=${encodeURIComponent(clean.toLowerCase())}${hash ? `#${hash}` : ''}`;
+}
+
+// ===========================================================================
+// Page
+// ===========================================================================
+
+type GiftState = 'pending_eligibility' | 'due' | 'reserved' | 'paid' | 'cancelled';
+
+interface SupportGift {
+  id: string;
+  order_ref: string;
+  state: GiftState;
+  needs_review: boolean;
+  review_reason: string;
+  outcome_reason: string;
+  created_at: string;
+  qualified_at: string | null;
+  decided_at: string | null;
+}
+
+interface SignupReward {
+  id: string;
+  campaign: 'printer' | 'pro_sub' | string;
+  state: string;
+  eligible_at: string | null;
+  created_at: string;
+}
+
+interface ReferralsMe {
+  username: string | null;
+  legacy_code: string | null;
+  invite_path: string;
+  product_ref_param: string;
+  signup_invites: number;
+  support_gifts: SupportGift[];
+  support_gift_counts: Record<GiftState, number>;
+  signup_rewards: SignupReward[];
+}
+
+const STRINGS = {
+  ar: {
+    title: 'الإحالات وكود الدعم',
+    back: 'رجوع',
+    handle: 'اسم المستخدم الخاص بك',
+    noHandle: 'لا يوجد اسم مستخدم بعد',
+    noHandleDesc: 'اختر اسم مستخدم فريدًا من تعديل الملف الشخصي لتحصل على رابط دعوة وكود دعم.',
+    setHandle: 'اختيار اسم مستخدم',
+    inviteLink: 'رابط الدعوة للتسجيل',
+    copy: 'نسخ',
+    copied: 'تم النسخ',
+    share: 'مشاركة',
+    legacyCode: 'الكود القديم (يبقى صالحًا)',
+    diffTitle: 'ما الفرق؟',
+    inviteTitle: 'دعوة التسجيل',
+    inviteDesc: 'رابطك أعلاه ينشئ حسابًا جديدًا مرتبطًا بك. الارتباط يحدث مرة واحدة عند إنشاء الحساب، ولا يتغير لاحقًا. إنشاء الحساب وحده لا يمنح هدية.',
+    supportTitle: 'كود دعم الشراء',
+    supportDesc: 'عند مشاركة منتج من حسابك يضاف كودك إلى الرابط. من يفتحه ويشتري يمكنه دعمك — الكود لا يغيّر سعر طلبه إطلاقًا، ولا يمنحه أو يمنعه أي خصم.',
+    shareProduct: 'مشاركة منتج بكودك',
+    shareProductDesc: 'من صفحة أي منتج اضغط مشاركة وأنت مسجّل الدخول: يُضاف {param} إلى رابط المنتج نفسه.',
+    giftsTitle: 'هدايا الدعم',
+    giftsDesc: 'تُنشأ الهدية للمُحيل بعد تسليم الطلب وتحصيل دفعه فعليًا، ولمرة واحدة لكل طلب مؤهل. لا تُشترط عضوية PRO ولا توجد مهلة سبعة أيام هنا — تلك مهلة النقاط ونظام مختلف.',
+    giftsEmpty: 'لا توجد هدايا دعم بعد',
+    giftsEmptyDesc: 'شارك رابط منتج مؤهل بكودك؛ تظهر الهدية هنا بعد التسليم والتحصيل.',
+    rewardsTitle: 'برنامج الإحالة السابق (منفصل)',
+    rewardsDesc: 'مكافآت دعوات التسجيل واشتراكات PRO تبقى كما هي في برنامجها الخاص، ولا تُدمج مع هدايا كود الدعم.',
+    rewardsEmpty: 'لا توجد مكافآت في البرنامج السابق',
+    invites: 'حسابات انضمت بدعوتك',
+    stateLabels: {
+      pending_eligibility: 'بانتظار الأهلية',
+      due: 'مستحقة',
+      reserved: 'محجوزة',
+      paid: 'مصروفة',
+      cancelled: 'ملغاة',
+    } as Record<GiftState, string>,
+    review: 'قيد المراجعة الإدارية',
+    orderRef: 'طلب',
+    created: 'أُنشئت',
+    qualified: 'استحقت',
+    printer: 'إحالة شراء طابعة',
+    proSub: 'إحالة اشتراك PRO',
+    noPii: 'لا تُعرض بيانات المشتري هنا — فقط حالة استحقاقك.',
+    signIn: 'سجّل الدخول لعرض إحالاتك',
+  },
+  en: {
+    title: 'Referrals & support code',
+    back: 'Back',
+    handle: 'Your username',
+    noHandle: 'No username yet',
+    noHandleDesc: 'Pick a unique username in Edit profile to get an invite link and a support code.',
+    setHandle: 'Choose a username',
+    inviteLink: 'Sign-up invite link',
+    copy: 'Copy',
+    copied: 'Copied',
+    share: 'Share',
+    legacyCode: 'Legacy code (still valid)',
+    diffTitle: 'What is the difference?',
+    inviteTitle: 'Sign-up invite',
+    inviteDesc: 'The link above creates a new account linked to you. The link is bound once, at account creation, and never moves afterwards. Creating an account alone grants no gift.',
+    supportTitle: 'Purchase support code',
+    supportDesc: 'Sharing a product while signed in adds your code to the link. Whoever opens it can support you when they buy — the code never changes their price, and it neither adds nor blocks any discount.',
+    shareProduct: 'Share a product with your code',
+    shareProductDesc: 'On any product page, tap Share while signed in: {param} is added to that product’s own link.',
+    giftsTitle: 'Support gifts',
+    giftsDesc: 'A gift is created for the referrer after the order is delivered AND its payment is actually collected — once per qualifying order. No PRO membership is required and there is no seven-day wait here; that clock belongs to points, a different system.',
+    giftsEmpty: 'No support gifts yet',
+    giftsEmptyDesc: 'Share an eligible product link with your code; the gift appears here after delivery and collection.',
+    rewardsTitle: 'Earlier referral program (separate)',
+    rewardsDesc: 'Sign-up invite and PRO subscription rewards stay in their own program and are never merged with support-code gifts.',
+    rewardsEmpty: 'No rewards in the earlier program',
+    invites: 'Accounts joined with your invite',
+    stateLabels: {
+      pending_eligibility: 'Awaiting eligibility',
+      due: 'Due',
+      reserved: 'Reserved',
+      paid: 'Fulfilled',
+      cancelled: 'Cancelled',
+    } as Record<GiftState, string>,
+    review: 'Held for admin review',
+    orderRef: 'Order',
+    created: 'Created',
+    qualified: 'Qualified',
+    printer: 'Printer purchase referral',
+    proSub: 'PRO subscription referral',
+    noPii: 'No buyer details are shown here — only the state of your claim.',
+    signIn: 'Sign in to see your referrals',
+  },
+  ckb: {
+    title: 'بانگهێشتکردن و کۆدی پاڵپشتی',
+    back: 'گەڕانەوە',
+    handle: 'ناوی بەکارهێنەری تۆ',
+    noHandle: 'هێشتا ناوی بەکارهێنەر نییە',
+    noHandleDesc: 'لە دەستکاری پرۆفایل ناوێکی بەکارهێنەری تایبەت هەڵبژێرە بۆ وەرگرتنی لینکی بانگهێشت و کۆدی پاڵپشتی.',
+    setHandle: 'هەڵبژاردنی ناوی بەکارهێنەر',
+    inviteLink: 'لینکی بانگهێشتی خۆتۆمارکردن',
+    copy: 'لەبەرگرتنەوە',
+    copied: 'لەبەرگیرایەوە',
+    share: 'هاوبەشکردن',
+    legacyCode: 'کۆدی کۆن (هێشتا کاردەکات)',
+    diffTitle: 'جیاوازییەکە چییە؟',
+    inviteTitle: 'بانگهێشتی خۆتۆمارکردن',
+    inviteDesc: 'لینکەکەی سەرەوە هەژمارێکی نوێ دروست دەکات کە بە تۆوە بەستراوە. بەستنەکە تەنها یەک جار لە کاتی دروستکردنی هەژماردا ڕوودەدات و دواتر ناگۆڕێت. دروستکردنی هەژمار بە تەنها هیچ دیارییەک نادات.',
+    supportTitle: 'کۆدی پاڵپشتی کڕین',
+    supportDesc: 'کاتێک بەرهەمێک هاوبەش دەکەیت و چووبیتە ژوورەوە، کۆدەکەت بۆ لینکەکە زیاد دەکرێت. ئەوەی دەیکاتەوە و دەکڕێت دەتوانێت پاڵپشتیت بکات — کۆدەکە هەرگیز نرخی داواکاریەکەی ناگۆڕێت.',
+    shareProduct: 'هاوبەشکردنی بەرهەم بە کۆدەکەت',
+    shareProductDesc: 'لە پەڕەی هەر بەرهەمێک، لە کاتی چوونەژوورەوە دوگمەی هاوبەشکردن دابگرە: {param} بۆ لینکی هەمان بەرهەم زیاد دەکرێت.',
+    giftsTitle: 'دیاری پاڵپشتی',
+    giftsDesc: 'دیاری بۆ بانگهێشتکار دروست دەبێت دوای گەیاندنی داواکاری و کۆکردنەوەی پارەکەی بە ڕاستی، یەک جار بۆ هەر داواکارییەکی شیاو. ئەندامێتی PRO پێویست نییە و لێرەدا چاوەڕوانی حەوت ڕۆژ نییە.',
+    giftsEmpty: 'هێشتا هیچ دیارییەکی پاڵپشتی نییە',
+    giftsEmptyDesc: 'لینکی بەرهەمێکی شیاو بە کۆدەکەت هاوبەش بکە؛ دیارییەکە دوای گەیاندن و کۆکردنەوە لێرە دەردەکەوێت.',
+    rewardsTitle: 'پرۆگرامی پێشووی بانگهێشتکردن (جیاواز)',
+    rewardsDesc: 'خەڵاتەکانی بانگهێشتی خۆتۆمارکردن و ئەندامێتی PRO لە پرۆگرامی خۆیاندا دەمێننەوە و لەگەڵ دیاری کۆدی پاڵپشتی تێکەڵ ناکرێن.',
+    rewardsEmpty: 'هیچ خەڵاتێک لە پرۆگرامی پێشوودا نییە',
+    invites: 'هەژمارەکانی بە بانگهێشتی تۆ هاتوون',
+    stateLabels: {
+      pending_eligibility: 'چاوەڕێی شیاوبوون',
+      due: 'شیاوە',
+      reserved: 'حیجزکراوە',
+      paid: 'گەیەنراوە',
+      cancelled: 'هەڵوەشێنراوەتەوە',
+    } as Record<GiftState, string>,
+    review: 'لە پێداچوونەوەی بەڕێوەبەریدایە',
+    orderRef: 'داواکاری',
+    created: 'دروستکراوە',
+    qualified: 'شیاو بووە',
+    printer: 'بانگهێشتکردنی کڕینی پرینتەر',
+    proSub: 'بانگهێشتکردنی ئەندامێتی PRO',
+    noPii: 'هیچ زانیاریەکی کڕیار لێرە پیشان نادرێت — تەنها دۆخی مافەکەت.',
+    signIn: 'بچۆ ژوورەوە بۆ بینینی بانگهێشتەکانت',
+  },
+} as const;
+
+const STATE_CLASS: Record<GiftState, string> = {
+  pending_eligibility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+  due: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+  reserved: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
+  paid: 'bg-green-500/10 text-green-400 border-green-500/30',
+  cancelled: 'bg-red-500/10 text-red-400 border-red-500/30',
+};
+
+export default function Referrals() {
+  const navigate = useNavigate();
+  const { lang, dir } = useLanguage();
+  const { isAuthenticated, isLoaded } = useAuth();
+  const s = STRINGS[lang] ?? STRINGS.ar;
+
+  const [data, setData] = useState<ReferralsMe | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const [copied, setCopied] = useState(false);
+  const [shareNote, setShareNote] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<ReferralsMe>('/api/referrals/me');
+      setData(res);
+      setError(null);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+    load();
+  }, [isLoaded, isAuthenticated, load]);
+
+  // The origin is the one the page is actually served from — never a
+  // hardcoded host, so staging never hands out production links.
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const handle = data?.username || '';
+  const inviteLink = handle ? inviteLinkFor(handle, origin) : '';
+
+  const copy = async (text: string) => {
+    if (!text) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setShareNote(lang === 'en' ? 'Copying is blocked by the browser — select the link manually.' : 'النسخ محجوب من المتصفح — حدد الرابط يدويًا.');
+    }
+  };
+
+  const share = async () => {
+    if (!inviteLink) return;
+    try {
+      if (navigator.share) await navigator.share({ title: 'LEVONIS', url: inviteLink });
+      else await copy(inviteLink);
+    } catch {
+      /* the user dismissed the share sheet — not an error */
+    }
+  };
+
+  const fmtDate = (iso: string | null | undefined) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    try {
+      return d.toLocaleDateString(lang === 'ar' ? 'ar-IQ' : lang === 'ckb' ? 'ckb' : 'en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return d.toLocaleDateString('en-GB');
+    }
+  };
+
+  const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
+
+  return (
+    <div className="w-full min-h-screen bg-black text-zinc-200 font-sans pb-24">
+      <div className="sticky top-0 z-30 bg-black/95 backdrop-blur border-b border-zinc-900 px-4 py-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label={s.back}
+          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+        >
+          <Back className="w-5 h-5" aria-hidden="true" />
+        </button>
+        <h1 className="text-white font-bold text-[17px]">{s.title}</h1>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 pt-4 flex flex-col gap-4">
+        {!isLoaded || loading ? (
+          <SkeletonGroup className="flex flex-col gap-4">
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-40 rounded-2xl" />
+            <Skeleton className="h-40 rounded-2xl" />
+          </SkeletonGroup>
+        ) : !isAuthenticated ? (
+          <UnauthorizedState next="/referrals" />
+        ) : error ? (
+          <ErrorState error={error} onRetry={load} next="/referrals" />
+        ) : !data ? (
+          <ErrorState onRetry={load} next="/referrals" />
+        ) : (
+          <>
+            {/* ---------------------------------------------- handle + link */}
+            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+              <p className="text-[12px] text-zinc-500 mb-1">{s.handle}</p>
+              {handle ? (
+                <>
+                  <p dir="ltr" className="text-white font-bold text-[20px] font-mono text-start break-all">@{handle}</p>
+                  <p className="text-[12px] text-zinc-500 mt-3 mb-1">{s.inviteLink}</p>
+                  <div className="flex flex-wrap items-center gap-2 bg-zinc-900/70 border border-zinc-800 rounded-xl p-2">
+                    <span dir="ltr" className="flex-1 min-w-0 text-[12px] font-mono text-zinc-300 break-all text-start">
+                      {inviteLink}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => copy(inviteLink)}
+                        className="min-h-[44px] px-3 rounded-lg bg-[#ef233c] text-white text-[13px] font-bold flex items-center gap-1.5 hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                      >
+                        {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
+                        {copied ? s.copied : s.copy}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={share}
+                        className="min-h-[44px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[13px] font-bold flex items-center gap-1.5 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                      >
+                        <Share2 className="w-4 h-4" aria-hidden="true" />
+                        {s.share}
+                      </button>
+                    </div>
+                  </div>
+                  {shareNote && <p className="text-[12px] text-amber-400 mt-2">{shareNote}</p>}
+                  {data.legacy_code && (
+                    <p className="text-[12px] text-zinc-500 mt-3">
+                      {s.legacyCode}: <span dir="ltr" className="font-mono text-zinc-300">{data.legacy_code}</span>
+                    </p>
+                  )}
+                  <p className="text-[12px] text-zinc-500 mt-3 flex items-center gap-1.5">
+                    <UserPlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    {s.invites}: <span className="font-bold text-zinc-300">{data.signup_invites}</span>
+                  </p>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 items-start">
+                  <p className="text-white font-bold text-[15px]">{s.noHandle}</p>
+                  <p className="text-[13px] text-zinc-400 leading-relaxed">{s.noHandleDesc}</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/edit-profile')}
+                    className="min-h-[44px] px-4 rounded-lg bg-[#ef233c] text-white text-[13px] font-bold hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  >
+                    {s.setHandle}
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* ------------------------------------- invite vs support code */}
+            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+              <h2 className="text-white font-bold text-[15px] mb-3 flex items-center gap-2">
+                <Info className="w-4 h-4 text-[#BAA369]" aria-hidden="true" />
+                {s.diffTitle}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+                  <p className="text-[13px] font-bold text-white mb-1 flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                    {s.inviteTitle}
+                  </p>
+                  <p className="text-[12.5px] text-zinc-400 leading-relaxed">{s.inviteDesc}</p>
+                </div>
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+                  <p className="text-[13px] font-bold text-white mb-1 flex items-center gap-1.5">
+                    <Link2 className="w-4 h-4 text-sky-400" aria-hidden="true" />
+                    {s.supportTitle}
+                  </p>
+                  <p className="text-[12.5px] text-zinc-400 leading-relaxed">{s.supportDesc}</p>
+                </div>
+              </div>
+              {handle && (
+                <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+                  <p className="text-[13px] font-bold text-white mb-1">{s.shareProduct}</p>
+                  <p className="text-[12.5px] text-zinc-400 leading-relaxed">
+                    {s.shareProductDesc.split('{param}')[0]}
+                    <code dir="ltr" className="mx-1 px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200 font-mono text-[12px]">
+                      {data.product_ref_param}
+                    </code>
+                    {s.shareProductDesc.split('{param}')[1]}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* ------------------------------------------------- gift claims */}
+            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+              <h2 className="text-white font-bold text-[15px] mb-1 flex items-center gap-2">
+                <Gift className="w-4 h-4 text-[#ef233c]" aria-hidden="true" />
+                {s.giftsTitle}
+              </h2>
+              <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3">{s.giftsDesc}</p>
+
+              {data.support_gifts.length === 0 ? (
+                <EmptyState
+                  icon={<Gift aria-hidden="true" className="w-6 h-6" />}
+                  title={s.giftsEmpty}
+                  description={s.giftsEmptyDesc}
+                  compact
+                />
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {data.support_gifts.map((g) => (
+                    <li
+                      key={g.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[13px] text-zinc-200 font-bold">
+                          {s.orderRef} <span dir="ltr" className="font-mono text-zinc-400">{g.order_ref}</span>
+                        </p>
+                        <p className="text-[11px] text-zinc-500">
+                          {s.created} {fmtDate(g.created_at)}
+                          {g.qualified_at ? ` · ${s.qualified} ${fmtDate(g.qualified_at)}` : ''}
+                        </p>
+                        {g.state === 'cancelled' && g.outcome_reason && (
+                          <p dir="ltr" className="text-[11px] text-red-400/80 font-mono break-all text-start">{g.outcome_reason}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {g.needs_review && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                            {s.review}
+                          </span>
+                        )}
+                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATE_CLASS[g.state]}`}>
+                          {s.stateLabels[g.state] ?? g.state}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[11.5px] text-zinc-500 mt-3 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                {s.noPii}
+              </p>
+            </section>
+
+            {/* --------------------------------- the separate legacy program */}
+            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+              <h2 className="text-white font-bold text-[15px] mb-1">{s.rewardsTitle}</h2>
+              <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3">{s.rewardsDesc}</p>
+              {data.signup_rewards.length === 0 ? (
+                <p className="text-[12.5px] text-zinc-500 py-2">{s.rewardsEmpty}</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {data.signup_rewards.map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[13px] text-zinc-200 font-bold truncate">
+                          {r.campaign === 'printer' ? s.printer : s.proSub}
+                        </p>
+                        <p className="text-[11px] text-zinc-500">
+                          {r.state === 'pending' && r.eligible_at ? fmtDate(r.eligible_at) : fmtDate(r.created_at)}
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border border-zinc-700 bg-zinc-800/60 text-zinc-300">
+                        {r.state}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

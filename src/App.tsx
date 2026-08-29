@@ -32,6 +32,7 @@ import Subscription from './pages/Subscription';
 import Wallet from './pages/Wallet';
 import Auth from './pages/Auth';
 import Rewards from './pages/Rewards';
+import Referrals from './pages/Referrals';
 import Games from './pages/Games';
 import Leaderboards from './pages/Leaderboards';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
@@ -124,7 +125,12 @@ function AppContent() {
           <Route path="/community" element={<RequireCommunityProfile><Community /></RequireCommunityProfile>} />
           <Route path="/community/store/:id" element={<MerchantStore />} />
           <Route path="/followed-stores" element={<ProtectedRoute><FollowedStores /></ProtectedRoute>} />
-          <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
+          {/* §8 — /chats is NOT gated: the two permanent support entries (the
+              automated assistant and the real ticket flow) must be reachable
+              before signing in. The page itself renders an honest signed-out
+              state for the private conversation list, and every /api/chats
+              read is still authorised server-side. */}
+          <Route path="/chats" element={<Chats />} />
           <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
@@ -134,6 +140,9 @@ function AppContent() {
           <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/:key" element={<Policies />} />
+          {/* §3.1 — referrals live on their own page, reached from the icon
+              group under "My orders" in the profile (never the bottom nav). */}
+          <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
           <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>

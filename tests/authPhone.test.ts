@@ -8,13 +8,27 @@
  *    never accepts an arbitrary 10-digit string,
  *  - referral-ref lookup candidates put the username form (lowercase,
  *    CURRENT holder) before the legacy uppercase code alias,
- *    deterministically.
+ *    deterministically,
+ *  - only a code/username is ever read from a signup body — an arbitrary
+ *    referrer_user_id is ignored (§3.2),
+ *  - the explicitly entered code wins over the one captured when an
+ *    external (Telegram) sign-up flow started, and never silently falls
+ *    back to it,
+ *  - the dummy password record used to keep login failures uniform in
+ *    latency can never authenticate anyone.
  * Run: npm run test:unit
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyLoginIdentifier, referrerLookupCandidates } from '../worker/routes/auth';
+import {
+  classifyLoginIdentifier,
+  referrerLookupCandidates,
+  referralCodeFrom,
+  pickSignupReferralSource,
+  DUMMY_PASSWORD_HASH,
+} from '../worker/routes/auth';
 import { normalizePhone, toAsciiDigits } from '../worker/lib/phone';
+import { verifyPassword } from '../worker/lib/crypto';
 
 // ---------------------------------------------- login identifier: phones
 
@@ -94,4 +108,78 @@ test('candidate order is deterministic — the preview endpoint and signup attri
   const b = referrerLookupCandidates('MixedCase1');
   assert.deepEqual(a, b);
   assert.deepEqual(a, ['mixedcase1', 'MIXEDCASE1']);
+});
+
+// ------------------------------- what a signup body may contribute (§3.2)
+
+test('referralCode is read from the body; ref is accepted as an alias', () => {
+  assert.equal(referralCodeFrom({ referralCode: 'levo_maker' }), 'levo_maker');
+  assert.equal(referralCodeFrom({ ref: 'levo_maker' }), 'levo_maker');
+  // referralCode wins when both are present (it is the explicit field).
+  assert.equal(referralCodeFrom({ referralCode: 'chosen', ref: 'other' }), 'chosen');
+  // An empty referralCode falls through to ref instead of masking it.
+  assert.equal(referralCodeFrom({ referralCode: '   ', ref: 'fallback' }), 'fallback');
+});
+
+test('refs are trimmed and capped; non-strings and absence yield no code', () => {
+  assert.equal(referralCodeFrom({ referralCode: '  spaced  ' }), 'spaced');
+  assert.equal(referralCodeFrom({ referralCode: 'x'.repeat(200) }).length, 64);
+  assert.equal(referralCodeFrom({}), '');
+  assert.equal(referralCodeFrom({ referralCode: 12345 }), '');
+  assert.equal(referralCodeFrom({ referralCode: null }), '');
+});
+
+test('an arbitrary referrer id in the body is NEVER read as a referral source', () => {
+  // §3.2: the referrer is resolved server-side from a code/username only.
+  assert.equal(referralCodeFrom({ referrer_user_id: 'usr_attacker' }), '');
+  assert.equal(referralCodeFrom({ referrerId: 'usr_attacker', referrer_id: 'usr_attacker' }), '');
+});
+
+// ------------------ referral precedence across an external signup flow §3.2
+
+test('an explicitly entered code wins over the referrer captured at flow start', () => {
+  assert.deepEqual(pickSignupReferralSource('typed_code', 'usr_captured'), {
+    kind: 'explicit',
+    ref: 'typed_code',
+  });
+});
+
+test('an explicit code is used ALONE — no silent fallback to the captured referrer', () => {
+  // The user can see the code they typed; swapping in a hidden one would be
+  // a silent substitution even if theirs turns out to be unknown.
+  const picked = pickSignupReferralSource('  unknown_code  ', 'usr_captured');
+  assert.deepEqual(picked, { kind: 'explicit', ref: 'unknown_code' });
+});
+
+test('without an explicit code the server-resolved referrer from flow start is used', () => {
+  assert.deepEqual(pickSignupReferralSource('', 'usr_captured'), {
+    kind: 'stored',
+    referrerId: 'usr_captured',
+  });
+  assert.deepEqual(pickSignupReferralSource('   ', 'usr_captured'), {
+    kind: 'stored',
+    referrerId: 'usr_captured',
+  });
+});
+
+test('no code and no captured referrer means no attribution at all', () => {
+  assert.deepEqual(pickSignupReferralSource('', null), { kind: 'none' });
+  assert.deepEqual(pickSignupReferralSource('', ''), { kind: 'none' });
+});
+
+// ------------------------------------ uniform login failure, uniform timing
+
+test('the dummy password record can never authenticate anyone', async () => {
+  for (const attempt of ['', 'password', 'A'.repeat(43), DUMMY_PASSWORD_HASH]) {
+    assert.equal(await verifyPassword(attempt, DUMMY_PASSWORD_HASH), false, attempt.slice(0, 12));
+  }
+});
+
+test('the dummy record is a real PBKDF2 record, so the work is actually done', () => {
+  // Same shape hashPassword produces: pbkdf2$<iterations>$<salt>$<digest>.
+  const parts = DUMMY_PASSWORD_HASH.split('$');
+  assert.equal(parts.length, 4);
+  assert.equal(parts[0], 'pbkdf2');
+  assert.ok(Number(parts[1]) >= 100_000);
+  assert.ok(parts[2].length > 0 && parts[3].length > 0);
 });

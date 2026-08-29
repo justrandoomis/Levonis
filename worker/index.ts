@@ -30,6 +30,7 @@ import { returnRoutes, priceProtectionRoutes } from './routes/returns';
 import { policiesRoutes } from './routes/policies';
 import { kycRoutes } from './routes/kyc';
 import { supportRoutes } from './routes/support';
+import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
 
 const app = new Hono<AppContext>();
@@ -70,6 +71,10 @@ app.route('/api/price-protection', priceProtectionRoutes);
 app.route('/api/policies', policiesRoutes);
 app.route('/api/kyc', kycRoutes);
 app.route('/api/support', supportRoutes);
+// Referrals & support codes (integrated mandate §3). Signup invites and
+// purchase support codes live behind /api/referrals; the module itself keeps
+// them separate and never lets a support code touch pricing.
+app.route('/api/referrals', referralRoutes);
 app.route('/api/studio', studioRoutes);
 app.route('/files', fileRoutes);
 

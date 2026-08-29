@@ -460,28 +460,71 @@ async function main() {
   const foreignRedeem = await buyerB.post(`/api/reviews/gifts/${entId}/redeem`, { level: 1 });
   check('IDOR: user B cannot redeem A\'s gift (404)', foreignRedeem.status === 404, `status=${foreignRedeem.status}`);
 
-  // ======================================================== points (§6.6)
-  console.log('\n— purchase points: 999/1000/1999 → 0/1/1, exactly once (§6.6)');
+  // ============================================ points (INTEGRATED §4.2/§4.3)
+  //
+  // SUPERSEDED RULE: this section used to assert the final-phase rule
+  // (1,000 IQD = 1 point, awarded at the `delivered` event). The integrated
+  // mandate replaces it and explicitly overrides earlier phases:
+  //   * 100 IQD of NET ELIGIBLE MERCHANDISE = 1 point (floor once, on the
+  //     order total — delivery fees never earn),
+  //   * the accrual is created PENDING at purchase, and releases only when
+  //     BOTH the payment is settled AND seven days have passed.
+  // These orders are COD and nothing has been collected, so `delivered`
+  // must release NOTHING — the exactly-once guarantee is asserted on the
+  // settlement path instead, which is where the release now happens.
+  // The full new-rule matrix (99/100/199, the §5 arithmetic, the day-9
+  // collection, the legacy-rate row) lives in scripts/api-tests-v4.mjs.
+  console.log('\n— purchase points: 100 IQD = 1 point, pending until settled + 7 days');
   const pointsOrders = [];
-  for (const [prod, key] of [[prodP999, 'a'], [prodP1000, 'b'], [prodP1999, 'c']]) {
+  for (const [prod, key, label, expected] of [
+    [prodP999, 'a', '999', 9],
+    [prodP1000, 'b', '1,000', 10],
+    [prodP1999, 'c', '1,999', 19],
+  ]) {
     await pointsBuyer.post('/api/cart/items', { productId: prod.id, qty: 1 });
     const o = await pointsBuyer.post('/api/orders', { addressId: addrP, deliveryMethodId: 'standard', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], policyAcceptance: ACC, idempotencyKey: `v3pt-${key}-${rnd}` });
-    pointsOrders.push(o.data?.order?.id);
+    pointsOrders.push({ id: o.data?.order?.id, due: o.data?.order?.financial?.due_on_delivery_iqd });
+    const pts = o.data?.order?.financial?.points ?? {};
+    check(`${label} IQD of merchandise accrues exactly ${expected} PENDING points (100:1, floor)`,
+      pts.pending === expected && pts.state === 'pending' && pts.iqd_per_point === 100,
+      JSON.stringify(pts).slice(0, 160));
   }
-  check('three point-test orders created', pointsOrders.every(Boolean), JSON.stringify(pointsOrders));
-  const balances = [];
-  for (const oid of pointsOrders) {
-    const d = await deliverOrder(admin, oid);
-    check(`delivery of ${oid} succeeded`, d.status === 200, JSON.stringify(d.data).slice(0, 120));
-    const b = await pointsBuyer.get('/api/rewards');
-    balances.push(b.data?.point_balance);
+  check('three point-test orders created', pointsOrders.every((o) => !!o.id), JSON.stringify(pointsOrders.map((o) => o.id)));
+  const beforeDelivery = (await pointsBuyer.get('/api/rewards')).data?.point_balance;
+  for (const o of pointsOrders) {
+    const d = await deliverOrder(admin, o.id);
+    check(`delivery of ${o.id} succeeded`, d.status === 200, JSON.stringify(d.data).slice(0, 120));
   }
-  check('999 IQD merchandise awards 0 points', balances[0] === 0, `balance=${balances[0]}`);
-  check('1,000 IQD merchandise awards exactly 1 point', balances[1] === 1, `balance=${balances[1]}`);
-  check('1,999 IQD merchandise awards exactly 1 more point (integer floor)', balances[2] === 2, `balance=${balances[2]}`);
-  const replayPts = await admin.patch(`/api/admin/orders/${pointsOrders[1]}`, { status: 'delivered' });
+  const afterDelivery = (await pointsBuyer.get('/api/rewards')).data?.point_balance;
+  check('delivery alone releases NOTHING while the COD cash is uncollected',
+    afterDelivery === beforeDelivery, `balance ${beforeDelivery}→${afterDelivery}`);
+  const replayPts = await admin.patch(`/api/admin/orders/${pointsOrders[1].id}`, { status: 'delivered' });
   const afterReplay = await pointsBuyer.get('/api/rewards');
-  check('replayed delivered transition awards nothing twice', replayPts.status === 400 && afterReplay.data?.point_balance === 2, `status=${replayPts.status} balance=${afterReplay.data?.point_balance}`);
+  check('replayed delivered transition is refused and awards nothing',
+    replayPts.status === 400 && afterReplay.data?.point_balance === beforeDelivery,
+    `status=${replayPts.status} balance=${afterReplay.data?.point_balance}`);
+  // Settlement past the seven-day mark: the clock started at PURCHASE, so
+  // backdating the accrual is the only thing needed — then a recorded
+  // collection releases exactly the pending amount, exactly once.
+  sqlExec(
+    `UPDATE points_accruals SET purchase_at='${iso(NOW - 9 * 86400_000)}', available_at='${iso(NOW - 2 * 86400_000)}' ` +
+    `WHERE order_id='${pointsOrders[1].id}' AND kind='purchase'`
+  );
+  const collect = await admin.post(`/api/orders/${pointsOrders[1].id}/settlement`, {
+    amountIqd: pointsOrders[1].due, eventKey: `v3pts-collect-${rnd}`, reference: `V3PTS${rnd}`,
+  });
+  const afterCollect = (await pointsBuyer.get('/api/rewards')).data?.point_balance;
+  check('a recorded collection past seven days releases exactly the 10 pending points',
+    collect.status === 200 && collect.data?.points_released?.released === true &&
+    collect.data?.points_released?.points === 10 && afterCollect === beforeDelivery + 10,
+    `${JSON.stringify(collect.data?.points_released ?? {}).slice(0, 140)} balance=${afterCollect}`);
+  const collectReplay = await admin.post(`/api/orders/${pointsOrders[1].id}/settlement`, {
+    amountIqd: pointsOrders[1].due, eventKey: `v3pts-collect-${rnd}`, reference: `V3PTS${rnd}`,
+  });
+  check('a replayed collection records once and never releases twice',
+    collectReplay.data?.settlement?.duplicate === true &&
+    (await pointsBuyer.get('/api/rewards')).data?.point_balance === afterCollect,
+    `duplicate=${collectReplay.data?.settlement?.duplicate}`);
 
   // ========================================================= returns (§6.2)
   console.log('\n— returns: 7-day window from actual delivery (§6.2)');

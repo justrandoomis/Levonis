@@ -1,18 +1,111 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { ArrowLeft, ArrowRight, Trash2, ChevronRight, Check, Minus, Plus, X, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Trash2, ChevronRight, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
-import { api, CartItem, formatIqd } from '../lib/api';
+import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import { CartSkeleton } from '../components/ui/Skeleton';
 import { ErrorState } from '../components/ui/AsyncStates';
+import {
+  readSupportRefState,
+  captureSupportRefFromSearch,
+  captureSupportRef,
+  chooseSupportRef,
+  removeSupportRef,
+  normalizeSupportRef,
+  type SupportRefState,
+} from './Referrals';
+
+/**
+ * Component-local trilingual strings for the support-code block (§3.3).
+ * Arabic is the source language; Sorani never falls back to a machine
+ * translation — every line here is written, not generated.
+ */
+const SUPPORT_STRINGS = {
+  ar: {
+    title: 'كود الدعم',
+    explain: 'كود الدعم ليس خصمًا: قيمته على طلبك صفر، ويمكن استخدامه مع كوبون الخصم والنقاط في الوقت نفسه. استخدامه اختياري تمامًا.',
+    supportsPrefix: 'هذا الكود يدعم',
+    supportsSuffix: 'ولا يغيّر سعر طلبك.',
+    noPriceEffect: 'لا يغيّر السعر ولا رسوم التوصيل (0 د.ع)',
+    eligibleLine: 'يحتوي طلبك على بند مؤهل لهدية المُحيل — تُدرس بعد التسليم وتحصيل الدفع، ولا تغيّر ما تدفعه.',
+    fromProduct: 'جاء هذا الكود من:',
+    remove: 'إزالة',
+    none: 'لا يوجد كود دعم على هذا الطلب.',
+    removedNote: 'أزلت كود الدعم — لن يُضاف تلقائيًا مرة أخرى. يمكنك إدخاله يدويًا متى شئت.',
+    manualLabel: 'إدخال كود دعم يدويًا',
+    manualPlaceholder: 'اسم المستخدم أو الكود',
+    apply: 'تطبيق',
+    resolving: 'جارٍ التحقق من الكود…',
+    retry: 'إعادة المحاولة',
+    chooseBadge: 'اختر',
+    chooseTitle: 'وصلك رابطان بمُحيلين مختلفين — اختر من تريد دعمه في هذا الطلب:',
+    errors: {
+      invalid: 'صيغة الكود غير صالحة — استخدم اسم المستخدم أو الكود فقط.',
+      unknown: 'لا يوجد مستخدم بهذا الكود:',
+      self: 'لا يمكنك دعم نفسك:',
+      network: 'تعذر التحقق من الكود الآن:',
+    } as Record<string, string>,
+  },
+  en: {
+    title: 'Support code',
+    explain: 'A support code is not a discount: it is worth 0 on your order, and it works alongside a discount coupon and points at the same time. Using one is entirely optional.',
+    supportsPrefix: 'This code supports',
+    supportsSuffix: 'and does not change your order price.',
+    noPriceEffect: 'No effect on price or delivery (0 IQD)',
+    eligibleLine: 'Your order contains a line eligible for the referrer’s gift — assessed after delivery and payment collection, and it changes nothing you pay.',
+    fromProduct: 'This code came from:',
+    remove: 'Remove',
+    none: 'No support code on this order.',
+    removedNote: 'You removed the support code — it will not be added back automatically. You can enter it by hand whenever you want.',
+    manualLabel: 'Enter a support code',
+    manualPlaceholder: 'username or code',
+    apply: 'Apply',
+    resolving: 'Checking the code…',
+    retry: 'Retry',
+    chooseBadge: 'Choose',
+    chooseTitle: 'Two links from different creators arrived — choose who to support on this order:',
+    errors: {
+      invalid: 'That code format is not valid — use the username or the code only.',
+      unknown: 'No user matches this code:',
+      self: 'You cannot support your own account:',
+      network: 'The code could not be checked right now:',
+    } as Record<string, string>,
+  },
+  ckb: {
+    title: 'کۆدی پاڵپشتی',
+    explain: 'کۆدی پاڵپشتی داشکاندن نییە: بەهاکەی لەسەر داواکاریەکەت سفرە، و لە هەمان کاتدا لەگەڵ کۆبۆنی داشکاندن و خاڵەکان کاردەکات. بەکارهێنانی بە تەواوی ئارەزوومەندانەیە.',
+    supportsPrefix: 'ئەم کۆدە پاڵپشتی',
+    supportsSuffix: 'دەکات و نرخی داواکاریەکەت ناگۆڕێت.',
+    noPriceEffect: 'هیچ کاریگەرییەکی لەسەر نرخ و گەیاندن نییە (٠ د.ع)',
+    eligibleLine: 'داواکاریەکەت بڕگەیەکی تێدایە کە شیاوی دیاری بانگهێشتکارە — دوای گەیاندن و کۆکردنەوەی پارە هەڵدەسەنگێنرێت و هیچ لە پارەدانەکەت ناگۆڕێت.',
+    fromProduct: 'ئەم کۆدە لێرەوە هات:',
+    remove: 'لابردن',
+    none: 'هیچ کۆدێکی پاڵپشتی لەسەر ئەم داواکارییە نییە.',
+    removedNote: 'کۆدی پاڵپشتیت لابرد — بەخۆکارانە زیاد ناکرێتەوە. هەر کاتێک بتەوێت بە دەست دەیتوانیت بینوسیت.',
+    manualLabel: 'نووسینی کۆدی پاڵپشتی',
+    manualPlaceholder: 'ناوی بەکارهێنەر یان کۆد',
+    apply: 'جێبەجێکردن',
+    resolving: 'پشکنینی کۆدەکە…',
+    retry: 'دووبارە هەوڵ بدەوە',
+    chooseBadge: 'هەڵبژێرە',
+    chooseTitle: 'دوو لینک لە دوو کەسی جیاوازەوە هاتن — هەڵبژێرە کێ پاڵپشتی دەکەیت لەم داواکارییەدا:',
+    errors: {
+      invalid: 'شێوازی کۆدەکە دروست نییە — تەنها ناوی بەکارهێنەر یان کۆد بەکاربهێنە.',
+      unknown: 'هیچ بەکارهێنەرێک بەم کۆدە نییە:',
+      self: 'ناتوانیت پاڵپشتی هەژماری خۆت بکەیت:',
+      network: 'ئێستا نەتوانرا کۆدەکە بپشکنرێت:',
+    } as Record<string, string>,
+  },
+} as const;
 
 export default function Cart() {
   const navigate = useNavigate();
   const { t, lang, dir } = useLanguage();
+  const sc = SUPPORT_STRINGS[lang] ?? SUPPORT_STRINGS.ar;
   const { user } = useAuth();
   const { cartShippingMethods, checkoutDeliveryMethods, pointBalance } = useWallet();
 
@@ -48,6 +141,29 @@ export default function Cart() {
 
   const [dealsExpanded, setDealsExpanded] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
+
+  // ---------------------------------------------------------- support code
+  //
+  // §3.3 — a support code is NOT a discount. Nothing in this block feeds the
+  // subtotal, the discount lines, the shipping preview or the total; it only
+  // decides which handle rides along to checkout. A code the server cannot
+  // resolve (or a self-support attempt) is shown as unusable and is never
+  // sent, so the order can never carry an attribution that points nowhere.
+  const location = useLocation();
+  const [supportState, setSupportState] = useState<SupportRefState>(() => readSupportRefState());
+  const [supportNames, setSupportNames] = useState<Record<string, { username: string | null; display_name: string }>>({});
+  const [supportRefErrors, setSupportRefErrors] = useState<Record<string, string>>({});
+  const [supportResolving, setSupportResolving] = useState(false);
+  const [manualRef, setManualRef] = useState('');
+  const [manualError, setManualError] = useState('');
+  // §3.3: when a share link brought a code, the block opens on its own —
+  // "add the support code automatically and VISIBLY, with the referrer's
+  // name and a remove button". It is never forced on the order, only shown.
+  const [supportOpen, setSupportOpen] = useState(() => {
+    const initial = readSupportRefState();
+    return !!(initial.current || initial.conflict);
+  });
+  const [supportRetry, setSupportRetry] = useState(0);
 
   const applyItems = useCallback((next: CartItem[]) => {
     setItems(next);
@@ -98,6 +214,62 @@ export default function Cart() {
   useEffect(() => {
     loadCart();
   }, [loadCart]);
+
+  // A ?ref= that lands on the cart URL itself is captured here; a product
+  // link captures its own on the product page. Neither one ever REPLACES an
+  // existing code — a second, different ref becomes an explicit choice.
+  useEffect(() => {
+    if (!location.search || location.search.indexOf('ref=') === -1) return;
+    setSupportState(captureSupportRefFromSearch(location.search, { product: location.pathname }));
+  }, [location.search, location.pathname]);
+
+  const supportKey = `${supportState.current?.ref ?? ''}|${supportState.conflict?.ref ?? ''}`;
+
+  useEffect(() => {
+    if (supportState.current || supportState.conflict) setSupportOpen(true);
+  }, [supportKey]);
+
+  // Resolve every pending ref through the server — the browser never decides
+  // who a code belongs to, and an unresolvable or self-support code is shown
+  // as unusable instead of being quietly attached to the order.
+  useEffect(() => {
+    const refs = [supportState.current?.ref, supportState.conflict?.ref].filter((r): r is string => !!r);
+    if (refs.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const ref of refs) {
+        const key = ref.toLowerCase();
+        if (supportNames[key] || supportRefErrors[key]) continue;
+        setSupportResolving(true);
+        try {
+          const res = await api.get<{ ref: string; username: string | null; display_name: string }>(
+            `/api/referrals/support/resolve?ref=${encodeURIComponent(ref)}`
+          );
+          if (cancelled) return;
+          setSupportNames((prev) => ({ ...prev, [key]: { username: res.username, display_name: res.display_name } }));
+        } catch (err) {
+          if (cancelled) return;
+          const kind =
+            err instanceof ApiError && err.code === 'SELF_SUPPORT'
+              ? 'self'
+              : err instanceof ApiError && err.status === 404
+                ? 'unknown'
+                : err instanceof ApiError && (err.status === 0 || err.status >= 500)
+                  ? 'network'
+                  : 'unknown';
+          setSupportRefErrors((prev) => ({ ...prev, [key]: kind }));
+        } finally {
+          if (!cancelled) setSupportResolving(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // supportNames / supportRefErrors are read through the closure on purpose:
+    // re-running on every resolution would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportKey, supportRetry]);
 
   const clampQty = (item: CartItem, q: number) => Math.max(1, Math.min(99, Math.min(q, item.stock ?? 99)));
 
@@ -206,7 +378,64 @@ export default function Cart() {
     return dir === 'rtl' ? 'شحن مباشر' : 'Direct';
   };
 
+  // ------------------------------------------------- support-code handlers
+  const supportInfoFor = (ref: string | undefined) => (ref ? supportNames[ref.toLowerCase()] : undefined);
+  const supportErrorFor = (ref: string | undefined) => (ref ? supportRefErrors[ref.toLowerCase()] : undefined);
+
+  const currentRef = supportState.current?.ref ?? '';
+  const conflictRef = supportState.conflict?.ref ?? '';
+  const currentInfo = supportInfoFor(currentRef);
+  const currentError = supportErrorFor(currentRef);
+  /** ONLY a server-resolved code travels to checkout. */
+  const activeSupportRef = currentInfo ? currentRef : '';
+
+  const applyManualRef = () => {
+    const clean = normalizeSupportRef(manualRef);
+    if (!clean) {
+      setManualError('invalid');
+      return;
+    }
+    setManualError('');
+    // A manual entry is the user's explicit decision: it overrides a link
+    // capture and undoes an earlier removal of that same code.
+    setSupportRefErrors((prev) => {
+      const next = { ...prev };
+      delete next[clean.toLowerCase()];
+      return next;
+    });
+    setSupportState(captureSupportRef(clean, { source: 'manual' }));
+    setManualRef('');
+    setSupportOpen(true);
+  };
+
+  const pickSupportRef = (ref: string) => setSupportState(chooseSupportRef(ref));
+
+  const dropSupportRef = () => {
+    setManualError('');
+    setSupportState(removeSupportRef());
+  };
+
+  const retrySupportRef = (ref: string) => {
+    setSupportRefErrors((prev) => {
+      const next = { ...prev };
+      delete next[ref.toLowerCase()];
+      return next;
+    });
+    // The stored ref itself is unchanged, so the resolver is re-armed by an
+    // explicit tick rather than by pretending the code changed.
+    setSupportRetry((n) => n + 1);
+  };
+
   const selectedItems = items.filter((i) => selectedIds.has(i.id));
+  /**
+   * Honest, non-promissory fact: whether a SELECTED line carries the explicit
+   * support-gift eligibility flag (resolved server-side from admin fields).
+   * It is about the REFERRER's later claim — the buyer is promised nothing
+   * and pays nothing different either way.
+   */
+  const hasEligibleSelectedLine = selectedItems.some(
+    (i) => (i as CartItem & { support_gift_eligible?: boolean }).support_gift_eligible === true
+  );
   const subtotal = selectedItems.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
   const totalOriginalPrice = selectedItems.reduce(
     (sum, item) => sum + (item.original_price_iqd ?? item.unit_price_iqd) * item.qty,
@@ -454,6 +683,168 @@ export default function Cart() {
           )}
         </div>
 
+        {/* ------------------------------------------------- Support code
+            §3.3: separate from the discount coupon and from points, shown
+            automatically when a share link brought one, removable for good,
+            enterable by hand, and with ZERO effect on any amount below. */}
+        <div className="mt-2 bg-[#0a0a0a] border-y border-zinc-900/50 flex flex-col">
+          <button
+            type="button"
+            onClick={() => setSupportOpen((v) => !v)}
+            aria-expanded={supportOpen}
+            aria-controls="support-code-panel"
+            className="px-4 py-3 flex items-center justify-between text-start hover:bg-zinc-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <HeartHandshake className="w-5 h-5 text-zinc-400 shrink-0" aria-hidden="true" />
+              <span className="text-zinc-200 text-[15px] font-bold">{sc.title}</span>
+              {activeSupportRef && currentInfo && (
+                <span className="bg-emerald-500/10 text-emerald-400 text-[11px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+                  @{currentInfo.username || activeSupportRef}
+                </span>
+              )}
+              {conflictRef && (
+                <span className="bg-amber-500/10 text-amber-400 text-[11px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+                  {sc.chooseBadge}
+                </span>
+              )}
+            </div>
+            <ChevronRight className={`w-4 h-4 text-zinc-500 transition-transform shrink-0 ${supportOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+          </button>
+
+          <div id="support-code-panel" hidden={!supportOpen} className="px-4 pb-4 pt-1">
+            <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3 flex items-start gap-1.5">
+              <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{sc.explain}</span>
+            </p>
+
+            {/* Two different links arrived — the user picks, nothing is swapped. */}
+            {conflictRef && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 mb-3">
+                <p className="text-[13px] font-bold text-amber-300 mb-2">{sc.chooseTitle}</p>
+                <div className="flex flex-col gap-2">
+                  {[currentRef, conflictRef].filter(Boolean).map((ref) => {
+                    const info = supportInfoFor(ref);
+                    const err = supportErrorFor(ref);
+                    return (
+                      <button
+                        key={ref}
+                        type="button"
+                        onClick={() => pickSupportRef(ref)}
+                        disabled={!!err}
+                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-zinc-700 bg-zinc-900/60 text-start text-zinc-200 hover:border-zinc-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                      >
+                        <span dir="ltr" className="font-mono text-[13px] truncate">@{info?.username || ref}</span>
+                        <span className="text-[11px] text-zinc-500 truncate">
+                          {err ? sc.errors[err] ?? sc.errors.unknown : info?.display_name || ''}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* The active code. */}
+            {currentRef ? (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 mb-3">
+                {currentInfo ? (
+                  <>
+                    <p className="text-[13px] text-zinc-200 leading-relaxed">
+                      {sc.supportsPrefix}
+                      <span dir="ltr" className="font-mono font-bold text-white mx-1">@{currentInfo.username || currentRef}</span>
+                      {sc.supportsSuffix}
+                    </p>
+                    {currentInfo.display_name && (
+                      <p className="text-[11.5px] text-zinc-500 mt-0.5">{currentInfo.display_name}</p>
+                    )}
+                  </>
+                ) : currentError ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[13px] text-amber-400 flex-1 min-w-0">
+                      {sc.errors[currentError] ?? sc.errors.unknown}
+                      <span dir="ltr" className="font-mono text-zinc-400 ms-1">@{currentRef}</span>
+                    </p>
+                    {currentError === 'network' && (
+                      <button
+                        type="button"
+                        onClick={() => retrySupportRef(currentRef)}
+                        className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                      >
+                        {sc.retry}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-zinc-400 flex items-center gap-2">
+                    <Spinner size="xs" delayMs={0} decorative />
+                    {sc.resolving}
+                  </p>
+                )}
+                {/* §3.3: the product the share came from is REMEMBERED, so a
+                    multi-product cart is never re-attributed wholesale to the
+                    last link the buyer happened to open. */}
+                {supportState.current?.product && (
+                  <p className="text-[11.5px] text-zinc-500 mt-1.5">
+                    {sc.fromProduct} <span dir="ltr" className="font-mono">{supportState.current.product}</span>
+                  </p>
+                )}
+                {currentInfo && hasEligibleSelectedLine && (
+                  <p className="text-[11.5px] text-zinc-500 mt-1.5">{sc.eligibleLine}</p>
+                )}
+                <div className="flex items-center justify-between gap-2 mt-2">
+                  <span className="text-[11.5px] text-emerald-400">{sc.noPriceEffect}</span>
+                  <button
+                    type="button"
+                    onClick={dropSupportRef}
+                    className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  >
+                    {sc.remove}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[12.5px] text-zinc-500 mb-3">
+                {supportState.dismissed.length > 0 ? sc.removedNote : sc.none}
+              </p>
+            )}
+
+            {/* Manual entry — always available (§3.3: never mandatory). */}
+            <label htmlFor="support-code-input" className="block text-[12.5px] text-zinc-300 font-bold mb-1.5">
+              {sc.manualLabel}
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="support-code-input"
+                type="text"
+                dir="ltr"
+                inputMode="text"
+                autoComplete="off"
+                value={manualRef}
+                onChange={(e) => { setManualRef(e.target.value); if (manualError) setManualError(''); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyManualRef(); } }}
+                placeholder={sc.manualPlaceholder}
+                aria-invalid={!!manualError}
+                aria-describedby={manualError ? 'support-code-error' : undefined}
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg px-3 min-h-[44px] text-white outline-none focus:border-[#BAA369] transition-colors text-sm font-mono text-start"
+              />
+              <button
+                type="button"
+                onClick={applyManualRef}
+                disabled={supportResolving}
+                className="bg-zinc-800 border border-zinc-700 text-zinc-100 font-bold px-4 min-h-[44px] rounded-lg text-sm hover:bg-zinc-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              >
+                {sc.apply}
+              </button>
+            </div>
+            {manualError && (
+              <p id="support-code-error" role="alert" className="text-[12px] text-red-400 mt-1.5">
+                {sc.errors.invalid}
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Summary Details */}
         <div className="mt-2 bg-[#0a0a0a] border-y border-zinc-900/50 p-4 mb-20 flex flex-col gap-3">
           <h3 className="text-white font-bold text-[16px] mb-1">{dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}</h3>
@@ -533,7 +924,16 @@ export default function Cart() {
           </div>
 
           <button
-            onClick={() => navigate('/checkout', { state: { itemIds: [...selectedIds], usePoints } })}
+            data-testid="cart-checkout"
+            onClick={() =>
+              navigate('/checkout', {
+                // supportRef is an ATTRIBUTION, not a price input: checkout
+                // forwards it as `supportCode`, the server resolves it and
+                // freezes it into orders.support_snapshot. Only a code the
+                // server already resolved for this buyer is carried.
+                state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
+              })
+            }
             className="bg-[#ef233c] hover:bg-[#d90429] text-white font-bold py-2 sm:py-2.5 px-3 sm:px-5 rounded-lg text-[13px] sm:text-[15px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
             disabled={selectedCount === 0}
           >

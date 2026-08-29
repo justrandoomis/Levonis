@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, CheckCircle2, Mail, Phone as PhoneIcon, Send, Chrome } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
@@ -10,6 +10,7 @@ import AuthTextField from '../components/auth/AuthTextField';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
 import FillButton, {
+  type FillButtonStatus,
   clamp01,
   isValidEmailAddress,
   emailFieldProgress,
@@ -44,8 +45,10 @@ import '../components/auth/auth.css';
  * - POST /api/auth/login    { identifier (email|username|phone), password }
  *   (the legacy `email` field carries the same value for the current server)
  * - POST /api/auth/register { username, name, email, password, referralCode? }
- *   and — once the auth-server slice enables it — { phone, ... }; until then
- *   the server's rejection is shown honestly, never faked around.
+ *   — and { phone, ... } once the auth-server slice accepts it. Today that
+ *   slice answers PHONE_REQUIRES_VERIFICATION, because a phone may only be
+ *   stored after ownership is PROVEN (§2.3): the page surfaces that answer
+ *   verbatim and offers the Telegram verification path. Nothing is faked.
  * - POST /api/auth/google   { credential, referralCode? }  (GIS credential)
  * - GET  /api/auth/referrer-info?ref=…  (ReferralBar, §2.6 — 404 = honest
  *   "code not found", continuing without a code is always allowed)
@@ -83,17 +86,21 @@ const STRINGS = {
     forgotLink: 'هل نسيت كلمة المرور؟',
     phoneLabel: 'رقم الهاتف',
     countryLabel: 'الدولة',
-    phoneOwnershipNote: 'إثبات ملكية الرقم مطلوب لإكمال تسجيل الهاتف.',
+    phoneOwnershipNote: 'إثبات ملكية الرقم عبر تيليغرام مطلوب لإكمال التسجيل بالهاتف.',
     phoneRegisterUnavailable:
-      'التسجيل برقم الهاتف وكلمة مرور غير مفعّل على الخادم بعد. يمكنك التسجيل بالبريد أو عبر تيليغرام.',
+      'لإنشاء حساب برقم الهاتف يجب إثبات ملكية الرقم أولًا عبر تيليغرام، وتُعيَّن كلمة المرور في نهاية تلك الخطوة.',
+    continueWithTelegram: 'المتابعة عبر تيليغرام',
     errPhone: 'أدخل رقم هاتف صحيحًا (لموبايل عراقي: يبدأ بـ 7 وطوله 10 أرقام بعد +964)',
     errPasswordMismatch: 'كلمتا المرور غير متطابقتين',
     signInCta: 'تسجيل الدخول',
     signingIn: 'جارٍ تسجيل الدخول…',
+    signedIn: 'تم تسجيل الدخول',
     signUpCta: 'إنشاء الحساب',
     signingUp: 'جارٍ إنشاء الحساب…',
+    signedUp: 'تم إنشاء الحساب',
     sendResetCta: 'إرسال رابط إعادة التعيين',
     sendingReset: 'جارٍ الإرسال…',
+    resetSent: 'تم إرسال الطلب',
     setPasswordCta: 'تعيين كلمة المرور الجديدة',
     settingPassword: 'جارٍ الحفظ…',
     hintIdentifier: 'أدخل بريدك الإلكتروني أو اسم المستخدم (3 أحرف على الأقل)',
@@ -153,17 +160,21 @@ const STRINGS = {
     forgotLink: 'Forgot password?',
     phoneLabel: 'Phone number',
     countryLabel: 'Country',
-    phoneOwnershipNote: 'Proving you own the number is required to complete phone sign-up.',
+    phoneOwnershipNote: 'Proving you own the number (via Telegram) is required to complete phone sign-up.',
     phoneRegisterUnavailable:
-      'Phone + password registration is not enabled on the server yet. You can sign up with email or via Telegram.',
+      'Creating a phone account requires proving you own the number first, via Telegram; the password is set at the end of that step.',
+    continueWithTelegram: 'Continue with Telegram',
     errPhone: 'Enter a valid phone number (Iraqi mobile: starts with 7, 10 digits after +964)',
     errPasswordMismatch: 'Passwords do not match',
     signInCta: 'Sign in',
     signingIn: 'Signing in…',
+    signedIn: 'Signed in',
     signUpCta: 'Create account',
     signingUp: 'Creating account…',
+    signedUp: 'Account created',
     sendResetCta: 'Send reset link',
     sendingReset: 'Sending…',
+    resetSent: 'Request sent',
     setPasswordCta: 'Set new password',
     settingPassword: 'Saving…',
     hintIdentifier: 'Enter your email or username (at least 3 characters)',
@@ -223,17 +234,21 @@ const STRINGS = {
     forgotLink: 'وشەی نهێنیت لەبیر چووە؟',
     phoneLabel: 'ژمارەی مۆبایل',
     countryLabel: 'وڵات',
-    phoneOwnershipNote: 'بۆ تەواوکردنی تۆمارکردن بە مۆبایل، سەلماندنی خاوەندارێتی ژمارەکە پێویستە.',
+    phoneOwnershipNote: 'بۆ تەواوکردنی تۆمارکردن بە مۆبایل، سەلماندنی خاوەندارێتی ژمارەکە لە ڕێگەی تێلێگرامەوە پێویستە.',
     phoneRegisterUnavailable:
-      'تۆمارکردن بە ژمارەی مۆبایل و وشەی نهێنی هێشتا لەسەر ڕاژەکار چالاک نەکراوە. دەتوانیت بە ئیمەیل یان تێلێگرام تۆمار بیت.',
+      'بۆ دروستکردنی هەژمار بە ژمارەی مۆبایل، سەرەتا دەبێت خاوەندارێتی ژمارەکە لە ڕێگەی تێلێگرامەوە بسەلمێنرێت؛ وشەی نهێنیش لە کۆتایی ئەو هەنگاوەدا دادەنرێت.',
+    continueWithTelegram: 'بەردەوامبوون بە تێلێگرام',
     errPhone: 'ژمارەیەکی دروست بنووسە (مۆبایلی عێراقی: بە 7 دەست پێدەکات و 10 ژمارەیە دوای +964)',
     errPasswordMismatch: 'وشە نهێنیيەکان یەک ناگرنەوە',
     signInCta: 'چوونەژوورەوە',
     signingIn: 'چاوەڕوان بە…',
+    signedIn: 'چوویتە ژوورەوە',
     signUpCta: 'دروستکردنی هەژمار',
     signingUp: 'چاوەڕوان بە…',
+    signedUp: 'هەژمار دروستکرا',
     sendResetCta: 'ناردنی بەستەری ڕێکخستنەوە',
     sendingReset: 'دەنێردرێت…',
+    resetSent: 'داواکارییەکە نێردرا',
     setPasswordCta: 'دانانی وشەی نهێنی نوێ',
     settingPassword: 'پاشەکەوت دەکرێت…',
     hintIdentifier: 'ئیمەیل یان ناوی بەکارهێنەرت بنووسە (لانیکەم ٣ پیت)',
@@ -282,6 +297,11 @@ export default function Auth() {
   const { loginWithGoogle, refreshUser } = useAuth();
   const { lang, dir } = useLanguage();
   const s = STRINGS[lang];
+  // §2.2: respect the OS "reduce motion" setting everywhere on this screen,
+  // not only in the button's CSS — the step/method transitions become plain
+  // cross-fades (offset 0) instead of sliding.
+  const reduceMotion = useReducedMotion();
+  const slide = reduceMotion ? 0 : 6;
 
   const resetToken = searchParams.get('reset') || '';
   // Friend-invite referral code from ?ref=CODE — user-editable in the
@@ -296,10 +316,19 @@ export default function Auth() {
   const stateFrom = (location.state as { from?: unknown } | null)?.from;
   const dest = sanitizeNextPath(stateFrom ?? nextFromQuery);
 
-  const [view, setView] = useState<AuthView>('signin');
+  // §2.6: someone who followed an invite link is here to CREATE an account,
+  // so the sign-up step (the only one that carries the referral bar) opens
+  // first and the inviter's name is resolved before they finish registering.
+  const [view, setView] = useState<AuthView>(() => (searchParams.get('ref') ? 'signup' : 'signin'));
   const [method, setMethod] = useState<AuthMethod>('email');
   const [submitting, setSubmitting] = useState(false);
+  // A REAL success (the server answered 2xx), never assumed: it is set only
+  // after a resolved request and drives the FillButton's success state.
+  const [succeeded, setSucceeded] = useState(false);
   const [serverError, setServerError] = useState('');
+  // Set only when the SERVER says phone sign-up needs ownership proof — the
+  // page then offers the Telegram verification path instead of pretending.
+  const [phoneNeedsTelegram, setPhoneNeedsTelegram] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [emailNotConfigured, setEmailNotConfigured] = useState(false);
 
@@ -339,6 +368,8 @@ export default function Auth() {
 
   const clearMessages = () => {
     setServerError('');
+    setPhoneNeedsTelegram(false);
+    setSucceeded(false);
     setForgotMessage('');
     setEmailNotConfigured(false);
   };
@@ -346,6 +377,37 @@ export default function Auth() {
   const switchView = (next: AuthView) => {
     clearMessages();
     setView(next);
+  };
+
+  // Editing ANY field leaves a previous success state behind: the meter and
+  // the button must always describe the CURRENT input, so a sent request can
+  // never leave the button stuck in a stale success (§2.2).
+  const clearSuccessOnEdit = () => {
+    if (succeeded) setSucceeded(false);
+  };
+  const onEmailChange = (v: string) => {
+    clearSuccessOnEdit();
+    setEmail(v);
+  };
+  const onUsernameChange = (v: string) => {
+    clearSuccessOnEdit();
+    setUsername(v);
+  };
+  const onNameChange = (v: string) => {
+    clearSuccessOnEdit();
+    setName(v);
+  };
+  const onPasswordChange = (v: string) => {
+    clearSuccessOnEdit();
+    setPassword(v);
+  };
+  const onConfirmChange = (v: string) => {
+    clearSuccessOnEdit();
+    setConfirmPassword(v);
+  };
+  const onPhoneChange = (v: PhoneValue) => {
+    clearSuccessOnEdit();
+    setPhone(v);
   };
 
   const switchMethod = (next: AuthMethod) => {
@@ -465,6 +527,7 @@ export default function Auth() {
       // keeps working until that slice lands.
       await api.post('/api/auth/login', { identifier, email: identifier, password });
       await refreshUser();
+      setSucceeded(true); // the server answered — this is not an assumption
       finishAuth();
     } catch (err) {
       setServerError(errMsg(err));
@@ -502,16 +565,21 @@ export default function Auth() {
         });
       }
       await refreshUser();
+      setSucceeded(true);
       finishAuth();
     } catch (err) {
       if (
         method === 'phone' &&
         err instanceof ApiError &&
-        (err.code === 'PHONE_REGISTER_DISABLED' || (err.status === 400 && /email/i.test(err.message)))
+        (err.code === 'PHONE_REQUIRES_VERIFICATION' ||
+          err.code === 'PHONE_REGISTER_DISABLED' ||
+          (err.status === 400 && /email/i.test(err.message)))
       ) {
-        // The server (still) requires an email — phone+password registration
-        // isn't enabled there yet. Say so honestly.
+        // §2.3: a phone is an identity key, so the server refuses to store
+        // one without ownership proof. Say exactly that and offer the real
+        // path (Telegram verification) instead of faking a success.
         setServerError(s.phoneRegisterUnavailable);
+        setPhoneNeedsTelegram(true);
       } else {
         setServerError(errMsg(err));
       }
@@ -538,6 +606,7 @@ export default function Auth() {
       } else {
         await loginWithGoogle(credential);
       }
+      setSucceeded(true);
       finishAuth();
     } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {
@@ -560,6 +629,7 @@ export default function Auth() {
       // lang tells the server which language to write the reset email in.
       await api.post<{ message?: string }>('/api/auth/forgot-password', { email: trimmedEmail, lang });
       setForgotMessage(s.forgotSent);
+      setSucceeded(true);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'EMAIL_NOT_CONFIGURED')) {
         // Honest disabled state: the server has no email service configured.
@@ -641,13 +711,32 @@ export default function Auth() {
       role="alert"
       className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-[13px] font-medium text-red-300"
     >
-      {serverError}
+      <p className="leading-relaxed">{serverError}</p>
+      {phoneNeedsTelegram && (
+        /* The server refused to create a phone account without ownership
+           proof — hand the user the real path instead of a dead end. */
+        <button
+          type="button"
+          onClick={() => switchMethod('telegram')}
+          className="mt-2.5 inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-3.5 text-[13px] font-bold text-gold transition-colors hover:bg-gold/20"
+        >
+          <Send className="h-4 w-4" aria-hidden />
+          {s.continueWithTelegram}
+        </button>
+      )}
     </div>
   ) : null;
 
   const revealLabels = { show: s.showPassword, hide: s.hidePassword };
 
-  const buttonStatus = submitting ? 'submitting' : serverError ? 'error' : 'idle';
+  // incomplete/ready → idle, then submitting → success | error (§2.2).
+  const buttonStatus: FillButtonStatus = submitting
+    ? 'submitting'
+    : succeeded
+      ? 'success'
+      : serverError
+        ? 'error'
+        : 'idle';
 
   const methodOptions = [
     { id: 'email' as const, label: s.methodEmail, icon: <Mail className="h-5 w-5" /> },
@@ -684,10 +773,10 @@ export default function Auth() {
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={method}
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: slide }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.15 }}
+        exit={{ opacity: 0, y: -slide }}
+        transition={{ duration: reduceMotion ? 0 : 0.15 }}
       >
         {children}
       </motion.div>
@@ -703,7 +792,7 @@ export default function Auth() {
       label={label}
       type="password"
       value={password}
-      onChange={setPassword}
+      onChange={onPasswordChange}
       autoComplete={autoComplete}
       minLength={autoComplete === 'new-password' ? 8 : undefined}
       revealLabels={revealLabels}
@@ -716,7 +805,7 @@ export default function Auth() {
       label={s.confirmPassword}
       type="password"
       value={confirmPassword}
-      onChange={setConfirmPassword}
+      onChange={onConfirmChange}
       autoComplete="new-password"
       minLength={8}
       error={confirmMismatchError}
@@ -845,7 +934,7 @@ export default function Auth() {
           label={s.email}
           type="email"
           value={email}
-          onChange={setEmail}
+          onChange={onEmailChange}
           autoComplete="email"
           inputMode="email"
           placeholder="email@example.com"
@@ -858,6 +947,7 @@ export default function Auth() {
             id="forgot-submit"
             label={s.sendResetCta}
             workingLabel={s.sendingReset}
+            successLabel={s.resetSent}
             progress={forgotFill.progress}
             ready={forgotFill.ready}
             status={buttonStatus}
@@ -903,7 +993,7 @@ export default function Auth() {
                       id="username"
                       label={s.username}
                       value={username}
-                      onChange={setUsername}
+                      onChange={onUsernameChange}
                       autoComplete="username"
                       placeholder="username123"
                       minLength={3}
@@ -915,7 +1005,7 @@ export default function Auth() {
                       id="name"
                       label={s.fullName}
                       value={name}
-                      onChange={setName}
+                      onChange={onNameChange}
                       autoComplete="name"
                       valueDir="auto"
                     />
@@ -924,7 +1014,7 @@ export default function Auth() {
                       label={s.email}
                       type="email"
                       value={email}
-                      onChange={setEmail}
+                      onChange={onEmailChange}
                       autoComplete="email"
                       inputMode="email"
                       placeholder="email@example.com"
@@ -940,6 +1030,7 @@ export default function Auth() {
                       id="signup-submit"
                       label={s.signUpCta}
                       workingLabel={s.signingUp}
+                      successLabel={s.signedUp}
                       progress={signupEmailFill.progress}
                       ready={signupEmailFill.ready}
                       status={buttonStatus}
@@ -958,7 +1049,7 @@ export default function Auth() {
                       label={s.phoneLabel}
                       countryLabel={s.countryLabel}
                       value={phone}
-                      onChange={setPhone}
+                      onChange={onPhoneChange}
                       lang={lang}
                       error={phoneInlineError}
                       hint={s.phoneOwnershipNote}
@@ -968,7 +1059,7 @@ export default function Auth() {
                       id="username"
                       label={`${s.username}${s.optionalSuffix}`}
                       value={username}
-                      onChange={setUsername}
+                      onChange={onUsernameChange}
                       autoComplete="username"
                       placeholder="username123"
                       valueDir="ltr"
@@ -979,7 +1070,7 @@ export default function Auth() {
                       id="name"
                       label={`${s.fullName}${s.optionalSuffix}`}
                       value={name}
-                      onChange={setName}
+                      onChange={onNameChange}
                       autoComplete="name"
                       valueDir="auto"
                     />
@@ -991,6 +1082,7 @@ export default function Auth() {
                       id="signup-phone-submit"
                       label={s.signUpCta}
                       workingLabel={s.signingUp}
+                      successLabel={s.signedUp}
                       progress={signupPhoneFill.progress}
                       ready={signupPhoneFill.ready}
                       status={buttonStatus}
@@ -1006,7 +1098,7 @@ export default function Auth() {
                 'telegram',
                 /* TelegramAuth owns its own <form>; rendering it as its own
                    panel keeps the no-nested-forms rule trivially true. */
-                <TelegramAuth mode="signup" onSuccess={finishAuth} onSwitchMode={switchView} />
+                <TelegramAuth mode="signup" onSuccess={finishAuth} onSwitchMode={switchView} referralCode={referralCode} />
               )
             )
           )}
@@ -1054,7 +1146,7 @@ export default function Auth() {
                       id="identifier"
                       label={s.identifier}
                       value={email}
-                      onChange={setEmail}
+                      onChange={onEmailChange}
                       autoComplete="username"
                       inputMode="email"
                       placeholder="email@example.com"
@@ -1072,6 +1164,7 @@ export default function Auth() {
                       id="signin-submit"
                       label={s.signInCta}
                       workingLabel={s.signingIn}
+                      successLabel={s.signedIn}
                       progress={signinEmailFill.progress}
                       ready={signinEmailFill.ready}
                       status={buttonStatus}
@@ -1090,7 +1183,7 @@ export default function Auth() {
                       label={s.phoneLabel}
                       countryLabel={s.countryLabel}
                       value={phone}
-                      onChange={setPhone}
+                      onChange={onPhoneChange}
                       lang={lang}
                       error={phoneInlineError}
                       disabled={submitting}
@@ -1105,6 +1198,7 @@ export default function Auth() {
                       id="signin-phone-submit"
                       label={s.signInCta}
                       workingLabel={s.signingIn}
+                      successLabel={s.signedIn}
                       progress={signinPhoneFill.progress}
                       ready={signinPhoneFill.ready}
                       status={buttonStatus}
@@ -1147,7 +1241,7 @@ export default function Auth() {
       {/* Balanced card: full width minus padding on phones, a fixed
           comfortable max on iPad/desktop — the form never stretches across
           a large screen (§2.1). */}
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-0">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-0 md:max-w-[30rem]">
         <div className="m-auto w-full py-4">
           {/* Brand: LEVONIS wordmark in the site's gold, calm and balanced. */}
           <div className="mb-6 flex flex-col items-center">
@@ -1171,14 +1265,14 @@ export default function Auth() {
             <p className="mt-2 text-[12px] text-zinc-500">{s.tagline}</p>
           </div>
 
-          <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-7">
+          <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-7 md:p-8">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={screenKey}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
+                exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
+                transition={{ duration: reduceMotion ? 0 : 0.18 }}
               >
                 {screen}
               </motion.div>

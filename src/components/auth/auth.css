@@ -118,6 +118,16 @@
 .lv-fillbtn.is-error {
   border-color: rgba(239, 68, 68, 0.6);
 }
+/* Success is a REAL server answer, not an assumption: the fill is complete
+   and the state reads differently from a merely "ready" button. */
+.lv-fillbtn[data-status='success'] {
+  border-color: rgba(16, 185, 129, 0.7);
+  box-shadow: 0 8px 28px -10px rgba(16, 185, 129, 0.45);
+}
+/* NOTE: the not-ready button is NOT dimmed. §2.2 forbids lowering the
+   label's contrast, so the incomplete state is signalled by the missing
+   gold border/glow (.is-ready) and by the visible requirement hint —
+   never by washing the text out. */
 
 .lv-fillbtn__hint {
   margin-top: 0.5rem;

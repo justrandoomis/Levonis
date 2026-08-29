@@ -54,6 +54,217 @@ interface PricingCtx {
   transportDefaults: Array<{ method: string; commission_iqd: number }>;
 }
 
+// ------------------------------------------------- sale mode / availability
+/**
+ * SELLABLE-STOCK AND SALE-MODE SEMANTICS (integrated mandate §7.2).
+ *
+ * What the storefront is allowed to claim about a product is derived here,
+ * server-side, from the REAL stock model — never guessed in the browser:
+ *
+ *  - Stock is tracked on `products.stock` ONLY (INTEGER, NULL = untracked;
+ *    migrations/0001_init.sql). There is no per-option/per-color stock column
+ *    and no stock-reservation table anywhere in the schema, so `scope` is
+ *    reported honestly as 'product' and `reserved` is 0 with a documented
+ *    basis: a confirmed order decrements the row inside the same D1 batch
+ *    that creates it (worker/routes/orders.ts), guarded by CHECK (stock >= 0),
+ *    and a cancellation adds it back. Nothing is held between those points,
+ *    so on-hand IS sellable. The UI must therefore NOT present the product
+ *    number as a per-variant figure — `scope` is what it may say.
+ *  - Zero is never "unlimited": untracked (NULL) and 0 are different states.
+ *  - Pre-order is NOT invented for every out-of-stock product. It exists only
+ *    where an admin marked the product `selling_type = 'pre_order'` AND at
+ *    least one active transport offer resolves to a real integer commission
+ *    (own value, else the admin default). Otherwise the honest answer is
+ *    "unavailable" plus the machine reason.
+ *  - A required option/color must be chosen before any price or stock claim:
+ *    every active option REPLACES the base price (worker/lib/pricing.ts), so
+ *    an unchosen option means the page has no authoritative unit price yet.
+ *
+ * These are display/validation facts. Cart and checkout re-derive price,
+ * transport and stock server-side from the same DB row and reject anything
+ * that disagrees — the client's `is_preorder`/`price` are never trusted.
+ */
+
+export type SaleMode = 'direct_sale' | 'preorder' | 'unavailable';
+
+export interface TransportOptionView {
+  method: string;
+  commission_iqd: number | null; // resolved (own value, else admin default)
+  configured: boolean; // false = no integer commission anywhere → unusable
+}
+
+export interface SaleAvailability {
+  mode: SaleMode;
+  /** Machine reason when mode = 'unavailable' (null otherwise). */
+  reason: string | null;
+  selling_type: string;
+  stock: {
+    tracked: boolean;
+    scope: 'product'; // the schema tracks stock at product level only
+    on_hand: number | null; // null = untracked
+    reserved: number; // no reservation ledger exists → always 0
+    available: number | null; // sellable now; null = untracked
+    max_qty: number; // 0 when nothing is sellable
+  };
+  selection: {
+    option_required: boolean;
+    color_required: boolean;
+    option_id: string | null;
+    color_id: string | null;
+    complete: boolean;
+    errors: string[];
+  };
+  preorder: {
+    enabled: boolean;
+    usable: boolean;
+    reason: string | null;
+    transports: TransportOptionView[];
+  };
+  /** Requested qty (when supplied) fits inside max_qty. */
+  qty_ok: boolean;
+}
+
+type AvailabilityDoc = Pick<
+  ProductDoc,
+  'selling_type' | 'stock' | 'options' | 'colors' | 'preorder_transports'
+>;
+
+const QTY_CEILING = 99; // matches the cart/checkout per-line cap
+
+export function saleAvailability(
+  doc: AvailabilityDoc,
+  input: {
+    optionId?: string | null;
+    colorId?: string | null;
+    qty?: number;
+    transportDefaults?: Array<{ method: string; commission_iqd: number }>;
+  } = {}
+): SaleAvailability {
+  const defaults = input.transportDefaults ?? [];
+  const optionId = input.optionId || '';
+  const colorId = input.colorId || '';
+
+  // ---- selection (a hidden option/color is not selectable)
+  const activeOptions = doc.options.filter((o) => o.active !== false);
+  const activeColors = doc.colors.filter((c) => c.active !== false);
+  const errors: string[] = [];
+
+  const option = optionId ? activeOptions.find((o) => o.id === optionId) ?? null : null;
+  if (optionId && !option) {
+    errors.push(doc.options.some((o) => o.id === optionId) ? 'OPTION_INACTIVE' : 'OPTION_NOT_FOUND');
+  }
+
+  const color = colorId ? activeColors.find((c) => c.id === colorId) ?? null : null;
+  if (colorId && !color) {
+    errors.push(doc.colors.some((c) => c.id === colorId) ? 'COLOR_INACTIVE' : 'COLOR_NOT_FOUND');
+  }
+  if (color && color.option_id && color.option_id !== (option?.id ?? null)) {
+    errors.push('COLOR_OPTION_MISMATCH');
+  }
+
+  // Colors linked to an option only count once that option is the chosen one;
+  // with no option chosen yet the whole active set is still on the table.
+  const selectableColors = option
+    ? activeColors.filter((c) => !c.option_id || c.option_id === option.id)
+    : activeColors;
+
+  const optionRequired = activeOptions.length > 0;
+  const colorRequired = selectableColors.length > 0;
+  if (optionRequired && !option) errors.push('OPTION_REQUIRED');
+  if (colorRequired && !color) errors.push('COLOR_REQUIRED');
+
+  // ---- stock (product-level; no reservations exist in the schema)
+  const tracked = doc.stock !== null && doc.stock !== undefined;
+  const onHand = tracked ? Math.trunc(doc.stock as number) : null;
+  const reserved = 0;
+  const available = onHand === null ? null : Math.max(0, onHand - reserved);
+
+  // ---- pre-order policy (admin-enabled + a usable transport)
+  const enabled = doc.selling_type === 'pre_order';
+  const transports: TransportOptionView[] = doc.preorder_transports
+    .filter((t) => t.active !== false)
+    .map((t) => {
+      const own = Number.isInteger(t.commission_iqd) ? (t.commission_iqd as number) : null;
+      const fallback = defaults.find((d) => d.method === t.method);
+      const commission = own !== null ? own : fallback ? fallback.commission_iqd : null;
+      return { method: t.method, commission_iqd: commission, configured: commission !== null };
+    });
+  const usable = enabled && transports.some((t) => t.configured);
+  const preorderReason = enabled
+    ? usable
+      ? null
+      : transports.length === 0
+        ? 'NO_TRANSPORT_OFFERED'
+        : 'TRANSPORT_COMMISSION_UNCONFIGURED'
+    : 'PREORDER_NOT_ENABLED';
+
+  // ---- mode
+  let mode: SaleMode;
+  let reason: string | null = null;
+  if (enabled) {
+    if (usable) {
+      mode = 'preorder';
+    } else {
+      mode = 'unavailable';
+      reason = preorderReason;
+    }
+  } else if (available === null || available > 0) {
+    mode = 'direct_sale';
+  } else {
+    mode = 'unavailable';
+    reason = 'OUT_OF_STOCK';
+  }
+
+  const maxQty =
+    mode === 'unavailable'
+      ? 0
+      : mode === 'preorder' || available === null
+        ? QTY_CEILING
+        : Math.min(QTY_CEILING, available);
+
+  return {
+    mode,
+    reason,
+    selling_type: doc.selling_type,
+    stock: { tracked, scope: 'product', on_hand: onHand, reserved, available, max_qty: maxQty },
+    selection: {
+      option_required: optionRequired,
+      color_required: colorRequired,
+      option_id: option ? option.id : null,
+      color_id: color ? color.id : null,
+      complete: errors.length === 0,
+      errors,
+    },
+    preorder: { enabled, usable, reason: preorderReason, transports },
+    qty_ok: input.qty === undefined ? true : input.qty >= 1 && input.qty <= maxQty,
+  };
+}
+
+/**
+ * Community listings live in `community_products` — a table with no stock,
+ * no options and no cart path (POST /api/cart/items resolves `products`
+ * only). Saying anything else on the product page would be a fake buy button,
+ * so the shape is returned with an explicit reason instead.
+ */
+export function communityAvailability(): SaleAvailability {
+  return {
+    mode: 'unavailable',
+    reason: 'COMMUNITY_LISTING_NOT_SELLABLE',
+    selling_type: 'direct_sale',
+    stock: { tracked: false, scope: 'product', on_hand: null, reserved: 0, available: null, max_qty: 0 },
+    selection: {
+      option_required: false,
+      color_required: false,
+      option_id: null,
+      color_id: null,
+      complete: true,
+      errors: [],
+    },
+    preorder: { enabled: false, usable: false, reason: 'PREORDER_NOT_ENABLED', transports: [] },
+    qty_ok: false,
+  };
+}
+
 /** Viewer tier comes ONLY from the server-side session/memberships ledger. */
 async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
   const user = c.get('user');
@@ -228,6 +439,9 @@ productRoutes.get('/:slug', async (c) => {
       favorite: !!favRow,
       brand: brandRow ?? null,
       pricing: publicQuote(resolved), // base-selection resolver result, cost-free
+      // §7.2 — the sale mode the page may DEFAULT to, derived from the real
+      // stock model and the admin pre-order policy (never from the browser).
+      availability: saleAvailability(doc, { transportDefaults: ctx.transportDefaults }),
       viewer_tier: { tier: ctx.tier, active: ctx.tierActive },
     });
   }
@@ -245,6 +459,7 @@ productRoutes.get('/:slug', async (c) => {
     success: true,
     source: 'community',
     favorite: false,
+    availability: communityAvailability(),
     product: {
       id: cp.id,
       slug: cp.slug,
@@ -286,10 +501,13 @@ productRoutes.post('/:slug/quote', async (c) => {
   const doc = parseProductRow(row);
   const ctx = await pricingCtx(c); // tier ONLY from the session, never the body
 
+  const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
+  const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
+
   const resolved = resolveUnitPrice({
     product: doc,
-    optionId: typeof body.optionId === 'string' && body.optionId ? body.optionId : null,
-    colorId: typeof body.colorId === 'string' && body.colorId ? body.colorId : null,
+    optionId,
+    colorId,
     transportMethod: typeof body.transportMethod === 'string' ? body.transportMethod : null,
     warrantyPlanId: typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null,
     tier: ctx.tier,
@@ -305,6 +523,13 @@ productRoutes.post('/:slug/quote', async (c) => {
       qty,
       line_total_iqd: resolved.unit_subtotal_iqd * qty,
     },
+    // Availability for THIS selection — changing option/color re-checks it.
+    availability: saleAvailability(doc, {
+      optionId,
+      colorId,
+      qty,
+      transportDefaults: ctx.transportDefaults,
+    }),
     viewer_tier: { tier: ctx.tier, active: ctx.tierActive },
   });
 });

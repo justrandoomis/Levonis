@@ -1,11 +1,19 @@
 /**
  * Admin products (v2) — listing + editor on /api/admin/products-v2.
  * The heavy editor body and the template import tools are code-split via
- * React.lazy. Arabic-first labels with small English secondaries, honest
- * states throughout (archive vs delete, stale edits, disabled previews).
+ * React.lazy. Trilingual component-local STRINGS (ar default, en, ckb),
+ * honest states throughout (archive vs delete, stale edits, disabled
+ * previews).
+ *
+ * §6.2 density: one consistent scale — smaller headings/paddings/cards, real
+ * min-w-0 / minmax(0,1fr) columns and CSS logical properties, so the list
+ * fits an iPad beside the dashboard sidebar WITHOUT a page-wide
+ * transform:scale or arbitrary font shrinking. The import dialog renders
+ * through the portal in adminProducts/ui.tsx, and unapplied template text
+ * warns before the dialog is dismissed.
  */
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, Search, RefreshCw, Upload, Star } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
@@ -17,16 +25,90 @@ const TemplateTools = React.lazy(() => import('./adminProducts/TemplateImport'))
 
 const PAGE = 30;
 
-function LazyFallback() {
+const STRINGS = {
+  ar: {
+    title: 'إدارة المنتجات',
+    unit: 'منتج',
+    import: 'استيراد (قالب / ZIP)',
+    importTitle: 'استيراد المنتجات (قالب TXT / ZIP)',
+    newProduct: 'منتج جديد',
+    searchPlaceholder: 'بحث بالاسم أو الرابط…',
+    search: 'بحث',
+    empty: 'لا منتجات.',
+    loading: 'جارٍ التحميل…',
+    price: 'السعر',
+    stock: 'المخزون',
+    untracked: 'غير محدود',
+    updated: 'آخر تحديث',
+    edit: 'تعديل',
+    del: 'حذف / أرشفة',
+    featured: 'مميز',
+    loadMore: 'تحميل المزيد ({n}/{total})',
+    loadFailed: 'تعذّر تحميل المنتجات',
+    deleteFailed: 'فشل الحذف: ',
+    v1Hint: 'بيانات قديمة تُرقّى عند الحفظ / v1 data, upgraded on save',
+  },
+  en: {
+    title: 'Manage Products',
+    unit: 'products',
+    import: 'Import (template / ZIP)',
+    importTitle: 'Import products (TXT template / ZIP)',
+    newProduct: 'New product',
+    searchPlaceholder: 'Search name or slug…',
+    search: 'Search',
+    empty: 'No products found.',
+    loading: 'Loading…',
+    price: 'Price',
+    stock: 'Stock',
+    untracked: 'untracked',
+    updated: 'Updated',
+    edit: 'Edit',
+    del: 'Delete / archive',
+    featured: 'Featured',
+    loadMore: 'Load more ({n}/{total})',
+    loadFailed: 'Failed to load products',
+    deleteFailed: 'Delete failed: ',
+    v1Hint: 'v1 data — upgraded on save',
+  },
+  ckb: {
+    title: 'بەڕێوەبردنی بەرهەمەکان',
+    unit: 'بەرهەم',
+    import: 'هاوردە (قاڵب / ZIP)',
+    importTitle: 'هاوردەی بەرهەم (قاڵبی TXT / ZIP)',
+    newProduct: 'بەرهەمی نوێ',
+    searchPlaceholder: 'گەڕان بە ناو یان بەستەر…',
+    search: 'گەڕان',
+    empty: 'هیچ بەرهەمێک نەدۆزرایەوە.',
+    loading: 'بارکردن…',
+    price: 'نرخ',
+    stock: 'کۆگا',
+    untracked: 'بێ سنوور',
+    updated: 'دوا نوێکردنەوە',
+    edit: 'دەستکاری',
+    del: 'سڕینەوە / ئەرشیف',
+    featured: 'تایبەت',
+    loadMore: 'زیاتر ({n}/{total})',
+    loadFailed: 'نەتوانرا بەرهەمەکان باربکرێن',
+    deleteFailed: 'سڕینەوە شکستی هێنا: ',
+    v1Hint: 'داتای کۆن — بەرزدەکرێتەوە لە کاتی پاشەکەوت',
+  },
+} as const;
+
+function fill(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k) => String(vars[k] ?? m));
+}
+
+function LazyFallback({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 text-zinc-400 py-16">
-      <RefreshCw className="w-5 h-5 animate-spin" /> جارٍ التحميل… / loading…
+    <div className="flex items-center justify-center gap-2 text-zinc-400 py-12" role="status">
+      <RefreshCw className="w-5 h-5 animate-spin" /> {label}
     </div>
   );
 }
 
 export default function AdminProducts() {
-  const { dir } = useLanguage();
+  const { dir, lang } = useLanguage();
+  const t = STRINGS[lang] ?? STRINGS.ar;
 
   const [items, setItems] = useState<ListingItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -37,6 +119,7 @@ export default function AdminProducts() {
 
   const [editing, setEditing] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [importOpen, setImportOpen] = useState(false);
+  const [importDirty, setImportDirty] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -54,7 +137,7 @@ export default function AdminProducts() {
       setTotal(data.total);
       setItems((prev) => (opts.append ? [...prev, ...data.products] : data.products));
     } catch (e) {
-      setLoadErr(e instanceof ApiError ? e.message : 'تعذّر تحميل المنتجات / failed to load products');
+      setLoadErr(e instanceof ApiError ? e.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -66,6 +149,19 @@ export default function AdminProducts() {
   }, [query]);
 
   const runSearch = () => setQuery(search.trim());
+
+  // Stable identity: TemplateTools reports dirtiness from an effect, so a new
+  // function every render would loop.
+  const handleImportDirty = useCallback((d: boolean) => setImportDirty(d), []);
+  const handleImportApplied = useCallback(() => {
+    load({ q: query, offset: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const closeImport = useCallback(() => {
+    setImportOpen(false);
+    setImportDirty(false);
+  }, []);
 
   const handleDelete = async (p: ListingItem) => {
     const name = p.name_ar || p.name_en || p.id;
@@ -86,7 +182,7 @@ export default function AdminProducts() {
       );
       load({ q: query, offset: 0 });
     } catch (e) {
-      setNotice((dir === 'rtl' ? 'فشل الحذف: ' : 'Delete failed: ') + (e instanceof ApiError ? e.message : 'unknown error'));
+      setNotice(t.deleteFailed + (e instanceof ApiError ? e.message : 'unknown error'));
     } finally {
       setDeletingId(null);
     }
@@ -96,7 +192,7 @@ export default function AdminProducts() {
 
   if (editing.open) {
     return (
-      <Suspense fallback={<LazyFallback />}>
+      <Suspense fallback={<LazyFallback label={t.loading} />}>
         <ProductEditor
           productId={editing.id}
           onBack={() => setEditing({ open: false, id: null })}
@@ -109,85 +205,84 @@ export default function AdminProducts() {
   // ------------------------------------------------------------ list mode
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h2 className="text-xl font-bold text-white">
-          {dir === 'rtl' ? 'إدارة المنتجات' : 'Manage Products'}
-          <span className="text-xs font-medium text-zinc-500 mx-2">
-            {total} {dir === 'rtl' ? 'منتج' : 'products'}
-          </span>
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 className="text-lg font-bold text-white min-w-0">
+          {t.title}
+          <span className="text-xs font-medium text-zinc-500 mx-2">{total} {t.unit}</span>
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setImportOpen(true)} className={btnSecondary}>
-            <Upload className="w-4 h-4" /> {dir === 'rtl' ? 'استيراد (قالب / ZIP)' : 'Import (template / ZIP)'}
+          <button data-testid="admin-import-open" onClick={() => setImportOpen(true)} className={btnSecondary}>
+            <Upload className="w-4 h-4" /> {t.import}
           </button>
           <button onClick={() => setEditing({ open: true, id: null })} className={btnPrimary}>
-            <Plus className="w-4 h-4" /> {dir === 'rtl' ? 'منتج جديد' : 'New product'}
+            <Plus className="w-4 h-4" /> {t.newProduct}
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-5">
-        <div className="relative flex-1 max-w-md">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
-            placeholder={dir === 'rtl' ? 'بحث بالاسم أو الرابط…' : 'Search name or slug…'}
-            className={inputCls}
-          />
-        </div>
+      <div className="flex gap-2 mb-4">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
+          placeholder={t.searchPlaceholder}
+          aria-label={t.search}
+          className={inputCls + ' flex-1 min-w-0 max-w-md !py-2.5'}
+        />
         <button onClick={runSearch} className={btnSecondary}>
-          <Search className="w-4 h-4" /> {dir === 'rtl' ? 'بحث' : 'Search'}
+          <Search className="w-4 h-4" /> <span className="hidden sm:inline">{t.search}</span>
         </button>
       </div>
 
       <ErrorBanner text={loadErr} />
       {notice && (
-        <div className="bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-2xl p-3 mb-4 text-sm">
+        <div className="bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-xl p-3 mb-3 text-sm">
           {notice}
         </div>
       )}
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {items.length === 0 && !loading && !loadErr && (
-          <div className="text-center py-12 text-zinc-500 bg-zinc-800/20 rounded-xl border border-zinc-800/50">
-            {dir === 'rtl' ? 'لا منتجات.' : 'No products found.'}
+          <div className="text-center py-10 text-zinc-500 bg-zinc-800/20 rounded-xl border border-zinc-800/50">
+            {t.empty}
           </div>
         )}
 
         {items.map((p) => (
           <div
             key={p.id}
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-zinc-900/30 hover:bg-zinc-800/40 rounded-xl border border-zinc-800/40 transition-colors"
+            // minmax(0,1fr) for the identity column: a long Arabic name must
+            // wrap/truncate instead of pushing the price column off-screen.
+            className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3 bg-zinc-900/30 hover:bg-zinc-800/40 rounded-xl border border-zinc-800/40 transition-colors"
           >
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               {p.image ? (
                 <img
                   referrerPolicy="no-referrer"
                   src={p.image}
-                  className="w-16 h-16 rounded-lg object-cover border border-zinc-700 bg-zinc-900 shrink-0"
+                  className="w-12 h-12 rounded-lg object-cover border border-zinc-700 bg-zinc-900 shrink-0"
                   alt=""
                 />
               ) : (
-                <div className="w-16 h-16 rounded-lg border border-zinc-800 bg-zinc-900 shrink-0" />
+                <div className="w-12 h-12 rounded-lg border border-zinc-800 bg-zinc-900 shrink-0" />
               )}
               <div className="flex flex-col min-w-0">
-                <span className="font-bold text-white text-base truncate" dir="auto">
+                <span className="font-bold text-white text-sm truncate" dir="auto">
                   {p.name_ar || p.name_en || p.slug}
                 </span>
                 {p.name_ar && p.name_en && (
-                  <span className="text-xs text-zinc-500 truncate" dir="ltr">{p.name_en}</span>
+                  <span className="text-[11px] text-zinc-500 truncate" dir="ltr">{p.name_en}</span>
                 )}
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <StatusChip status={p.status} />
                   {p.is_featured && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-[#6B46FF] bg-[#6B46FF]/10 px-1.5 py-0.5 rounded border border-[#6B46FF]/20">
-                      <Star className="w-3 h-3" /> {dir === 'rtl' ? 'مميز' : 'Featured'}
+                      <Star className="w-3 h-3" /> {t.featured}
                     </span>
                   )}
                   {p.doc_version < 2 && (
-                    <span className="text-[10px] font-bold text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700" title="v1 data — upgraded on save / بيانات قديمة تُرقّى عند الحفظ">
+                    <span className="text-[10px] font-bold text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700" title={t.v1Hint}>
                       v1
                     </span>
                   )}
@@ -195,40 +290,36 @@ export default function AdminProducts() {
               </div>
             </div>
 
-            <div className="flex items-center gap-5 sm:gap-7 flex-wrap">
+            <div className="flex items-center gap-4 sm:gap-5 flex-wrap justify-end">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-                  {dir === 'rtl' ? 'السعر' : 'Price'}
-                </span>
-                <span className="text-white font-bold whitespace-nowrap" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t.price}</span>
+                <span className="text-white text-sm font-bold whitespace-nowrap" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-                  {dir === 'rtl' ? 'المخزون' : 'Stock'}
-                </span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t.stock}</span>
                 <span className="text-zinc-200 text-sm whitespace-nowrap">
-                  {p.stock === null ? (dir === 'rtl' ? 'غير محدود' : 'untracked') : p.stock}
+                  {p.stock === null ? t.untracked : p.stock}
                 </span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-                  {dir === 'rtl' ? 'آخر تحديث' : 'Updated'}
-                </span>
+              <div className="hidden sm:flex flex-col">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t.updated}</span>
                 <span className="text-zinc-400 text-sm whitespace-nowrap" dir="ltr">{fmtDate(p.updated_at)}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setEditing({ open: true, id: p.id })}
-                  className="p-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors border border-transparent hover:border-zinc-600"
-                  title={dir === 'rtl' ? 'تعديل' : 'Edit'}
+                  className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors border border-transparent hover:border-zinc-600"
+                  title={t.edit}
+                  aria-label={t.edit}
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(p)}
                   disabled={deletingId === p.id}
-                  className="p-2.5 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 disabled:opacity-50"
-                  title={dir === 'rtl' ? 'حذف / أرشفة' : 'Delete / archive'}
+                  className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 disabled:opacity-50"
+                  title={t.del}
+                  aria-label={t.del}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -238,12 +329,12 @@ export default function AdminProducts() {
         ))}
       </div>
 
-      {loading && <LazyFallback />}
+      {loading && <LazyFallback label={t.loading} />}
 
       {!loading && items.length < total && (
-        <div className="flex justify-center mt-5">
+        <div className="flex justify-center mt-4">
           <button onClick={() => load({ append: true, offset: items.length })} className={btnSecondary}>
-            {dir === 'rtl' ? `تحميل المزيد (${items.length}/${total})` : `Load more (${items.length}/${total})`}
+            {fill(t.loadMore, { n: items.length, total })}
           </button>
         </div>
       )}
@@ -251,14 +342,16 @@ export default function AdminProducts() {
       {importOpen && (
         <Modal
           wide
-          titleAr="استيراد المنتجات (قالب TXT / ZIP)"
-          titleEn="Import products (TXT template / ZIP)"
-          onClose={() => setImportOpen(false)}
+          titleAr={STRINGS.ar.importTitle}
+          titleEn={STRINGS.en.importTitle}
+          onClose={closeImport}
+          dirty={importDirty}
         >
-          <Suspense fallback={<LazyFallback />}>
+          <Suspense fallback={<LazyFallback label={t.loading} />}>
             <TemplateTools
               insideSection={false}
-              onApplied={() => load({ q: query, offset: 0 })}
+              onApplied={handleImportApplied}
+              onDirtyChange={handleImportDirty}
             />
           </Suspense>
         </Modal>

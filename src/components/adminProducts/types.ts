@@ -158,6 +158,11 @@ export interface ParseResponse {
 
 export interface ApplyResponse {
   created: boolean;
+  /** true when the confirm-once guard recognised this exact batch and
+   *  returned the product the FIRST confirm produced (nothing was written). */
+  already_applied?: boolean;
+  /** content fingerprint of the batch, shown in the import report. */
+  fingerprint?: string;
   product_id: string;
   product: ProductDocV2 | null;
   applied_fields: string[];
@@ -185,6 +190,16 @@ export interface ZipParseResponse {
   files: ZipFileResult[];
   skipped_entries: string[];
   skipped_over_limit: string[];
+  /** Whole-archive tally so the report can account for EVERY entry, not just
+   *  the ones that parsed. */
+  counts?: {
+    parsed: number;
+    ready: number;
+    not_ready: number;
+    skipped_not_txt: number;
+    skipped_over_limit: number;
+    limit: number;
+  };
 }
 
 export type DuplicateChoice = 'update_existing' | 'create_hidden_draft_new_identity';

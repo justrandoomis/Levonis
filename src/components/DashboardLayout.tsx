@@ -1,5 +1,30 @@
-import React, { ReactNode, useState, useRef, useEffect } from 'react';
-import { Bell, Menu, User, ArrowLeft, ArrowRight, Globe, LogOut, Settings as SettingsIcon } from 'lucide-react';
+/**
+ * Admin / merchant dashboard shell (mandate §6.2).
+ *
+ * Three things this file is responsible for and used to get wrong:
+ *
+ * 1. STACKING. The scrolling content column used to carry `relative z-0`.
+ *    A z-index other than `auto` opens a stacking context, so ANY
+ *    `position:fixed` overlay rendered inside page content (the product
+ *    import dialog, editor dialogs, dropdowns) was painted *inside* that
+ *    context — i.e. under the sidebar (z-20) and the topbar. No amount of
+ *    z-index inside the dialog could escape it. The column is now a plain
+ *    `relative` (no z-index) and dialogs portal to document.body; the only
+ *    z-indexes left here are the shell's own three layers.
+ * 2. GRID. Content is a `min-w-0 flex-1` column beside a real, measured
+ *    sidebar width — the sidebar never pushes content off-screen, and it
+ *    collapses to an icon rail (≥lg) or a drawer (<lg) on iPad/phone.
+ * 3. DENSITY + RTL. One consistent scale (no page-wide transform:scale, no
+ *    arbitrary font shrinking) and CSS logical properties (border-e, ps/pe,
+ *    ms/me, start/end) so Arabic and English lay out from the same classes.
+ */
+
+import React, { ReactNode, useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  Bell, Menu, User, ArrowLeft, ArrowRight, Globe, LogOut, X,
+  Settings as SettingsIcon, ChevronsLeft, ChevronsRight,
+} from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -19,25 +44,92 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTab, onTabChange, children }: DashboardLayoutProps) {
+const STRINGS = {
+  ar: {
+    mainMenu: 'القائمة الرئيسية',
+    community: 'مجتمع ليفو',
+    dashboard: 'لوحة التحكم',
+    notifications: 'الإشعارات',
+    noNotifications: 'لا توجد إشعارات',
+    myStore: 'متجري',
+    settings: 'الإعدادات',
+    logout: 'تسجيل الخروج',
+    viewPage: 'عرض صفحتي في ليفو',
+    setupPage: 'إعداد صفحتي في ليفو',
+    openMenu: 'فتح القائمة',
+    closeMenu: 'إغلاق القائمة',
+    collapse: 'طيّ الشريط الجانبي',
+    expand: 'توسيع الشريط الجانبي',
+    language: 'اللغة',
+  },
+  en: {
+    mainMenu: 'MAIN MENU',
+    community: 'Levo Community',
+    dashboard: 'Dashboard',
+    notifications: 'Notifications',
+    noNotifications: 'No notifications',
+    myStore: 'My Store',
+    settings: 'Settings',
+    logout: 'Logout',
+    viewPage: 'View My Levo Page',
+    setupPage: 'Set Up My Levo Page',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    language: 'Language',
+  },
+  ckb: {
+    mainMenu: 'لیستی سەرەکی',
+    community: 'کۆمەڵگای لێڤۆ',
+    dashboard: 'داشبۆرد',
+    notifications: 'ئاگادارکردنەوەکان',
+    noNotifications: 'هیچ ئاگادارکردنەوەیەک نییە',
+    myStore: 'فرۆشگاکەم',
+    settings: 'ڕێکخستنەکان',
+    logout: 'دەرچوون',
+    viewPage: 'بینینی پەڕەکەم لە لێڤۆ',
+    setupPage: 'ڕێکخستنی پەڕەکەم لە لێڤۆ',
+    openMenu: 'کردنەوەی لیست',
+    closeMenu: 'داخستنی لیست',
+    collapse: 'نوقاندنی لای لیست',
+    expand: 'فراوانکردنی لای لیست',
+    language: 'زمان',
+  },
+} as const;
+
+const COLLAPSE_KEY = 'levo_dash_sidebar_collapsed';
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTab, onTabChange, children }: DashboardLayoutProps) {
   const { dir, lang, setLang } = useLanguage();
+  const t = STRINGS[lang] ?? STRINGS.ar;
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const [myStoreId, setMyStoreId] = useState<string | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+  const drawerButtonRef = useRef<HTMLButtonElement>(null);
 
   // The user-menu "Settings" entry only makes sense when this shell actually
   // has a settings tab; the admin shell calls it 'store_settings'.
   const settingsTabId =
-    sidebarItems.find(i => i.id === 'settings')?.id ??
-    sidebarItems.find(i => i.id === 'store_settings')?.id ??
+    sidebarItems.find((i) => i.id === 'settings')?.id ??
+    sidebarItems.find((i) => i.id === 'store_settings')?.id ??
     null;
 
   useEffect(() => {
@@ -55,6 +147,41 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Escape closes whichever menu is open (dialogs handle their own Escape).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setShowUserMenu(false);
+      setShowNotifications(false);
+      setShowLangMenu(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Rotating an iPad to landscape crosses the lg breakpoint and hides the
+  // drawer by CSS — without this the drawer would stay "open" in state and
+  // leave the body scroll locked behind an invisible dialog.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const sync = () => { if (mq.matches) setShowMobileSidebar(false); };
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0');
+      } catch {
+        /* storage unavailable — the choice just does not persist */
+      }
+      return next;
+    });
+  };
 
   // Resolve the signed-in user's real community store id (if any) so the
   // "My Store" links can point at the actual page.
@@ -86,167 +213,312 @@ export default function DashboardLayout({ title = "LEVO", sidebarItems, activeTa
     }
   };
 
+  const closeDrawer = useCallback(() => {
+    setShowMobileSidebar(false);
+    drawerButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const CollapseIcon = collapsed
+    ? (dir === 'rtl' ? ChevronsLeft : ChevronsRight)
+    : (dir === 'rtl' ? ChevronsRight : ChevronsLeft);
+
   return (
-    <div className="flex h-screen w-full bg-[#18181b] overflow-hidden font-sans" dir={dir}>
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex flex-col w-[260px] bg-[#09090b] text-zinc-300 shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-20 border-r border-zinc-800">
-        <div className="p-8 flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-lg text-white shadow-lg">
-            L
+    // h-dvh (not h-screen): on iPad Safari the browser chrome makes 100vh
+    // taller than the visible area, which is what pushed the bottom of the
+    // content column — and any footer inside it — off screen.
+    <div className="flex h-dvh w-full bg-[#18181b] overflow-hidden font-sans" dir={dir}>
+      {/* ------------------------------------------------ desktop sidebar */}
+      <aside
+        className={`hidden lg:flex flex-col shrink-0 bg-[#09090b] text-zinc-300 shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-20 border-e border-zinc-800 transition-[width] duration-200 ${
+          collapsed ? 'w-[4.5rem]' : 'w-[13.5rem] xl:w-[15.5rem]'
+        }`}
+      >
+        <div className="px-3 py-4 flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity text-start"
+          >
+            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-white shadow-lg">
+              L
+            </span>
+            {!collapsed && (
+              <span className="font-bold text-xs tracking-widest uppercase border border-zinc-700 px-2 py-1 rounded-lg text-white truncate">
+                {title}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={collapsed ? t.expand : t.collapse}
+            aria-label={collapsed ? t.expand : t.collapse}
+            className="shrink-0 p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+          >
+            <CollapseIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!collapsed && (
+          <div className="px-4 pb-1 text-[10px] font-bold text-zinc-500 tracking-widest uppercase">
+            {t.mainMenu}
           </div>
-          <span className="font-bold text-sm tracking-widest uppercase border border-zinc-700 px-3 py-1 rounded-lg text-white">{title}</span>
-        </div>
+        )}
 
-        <div className="px-8 py-2 text-[10px] font-bold text-zinc-500 tracking-widest uppercase mb-2">
-          {dir === 'rtl' ? 'القائمة الرئيسية' : 'MAIN MENU'}
-        </div>
-
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
-          {sidebarItems.map(item => (
+        <nav className="flex-1 min-h-0 px-2 py-2 space-y-1 overflow-y-auto">
+          {sidebarItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all duration-300 font-medium ${
+              title={collapsed ? item.label : undefined}
+              aria-current={activeTab === item.id ? 'page' : undefined}
+              className={`w-full flex items-center gap-3 min-h-11 rounded-xl transition-colors font-medium text-start ${
+                collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+              } ${
                 activeTab === item.id
                   ? 'bg-[#708238] text-white shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
                   : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-              } ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}
+              }`}
             >
               <item.icon className="w-5 h-5 shrink-0" />
-              <span className={`text-[13px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{item.label}</span>
+              {!collapsed && <span className="text-[13px] truncate min-w-0">{item.label}</span>}
             </button>
           ))}
         </nav>
 
-        <div className="p-6 mt-auto">
-           <div onClick={goToMyStore} className="cursor-pointer w-full aspect-square rounded-[24px] bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center p-6 relative overflow-hidden group hover:border-[#D4AF37] transition-all">
-             <User className="w-12 h-12 text-[#D4AF37] mb-3 group-hover:scale-110 transition-transform" />
-             <div className="text-[11px] font-bold text-white text-center">
-               {myStoreId
-                 ? (dir === 'rtl' ? 'عرض صفحتي في ليفو' : 'View My Levo Page')
-                 : (dir === 'rtl' ? 'إعداد صفحتي في ليفو' : 'Set Up My Levo Page')}
-             </div>
-           </div>
+        <div className="p-3 mt-auto shrink-0">
+          <button
+            type="button"
+            onClick={goToMyStore}
+            title={myStoreId ? t.viewPage : t.setupPage}
+            className={`w-full rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center group hover:border-[#D4AF37] transition-all ${
+              collapsed ? 'p-2.5' : 'p-4'
+            }`}
+          >
+            <User className={`text-[#D4AF37] group-hover:scale-110 transition-transform ${collapsed ? 'w-5 h-5' : 'w-8 h-8 mb-2'}`} />
+            {!collapsed && (
+              <span className="text-[11px] font-bold text-white text-center leading-snug">
+                {myStoreId ? t.viewPage : t.setupPage}
+              </span>
+            )}
+          </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Mobile Drawer Overlay */}
+      {/* --------------------------------------------------- mobile drawer */}
       {showMobileSidebar && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowMobileSidebar(false)}></div>
-          <div className="relative w-72 max-w-[80%] bg-[#09090b] text-zinc-300 h-full flex flex-col z-10 p-6 border-r border-zinc-800 shadow-2xl">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3" onClick={() => navigate('/')}>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-lg text-white">
-                  L
-                </div>
-                <span className="font-bold text-sm uppercase text-white">{title}</span>
-              </div>
-              <button onClick={() => setShowMobileSidebar(false)} className="p-2 text-zinc-400 hover:text-white">✕</button>
-            </div>
-
-            <nav className="flex-1 space-y-2 overflow-y-auto">
-              {sidebarItems.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => { onTabChange(item.id); setShowMobileSidebar(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
-                    activeTab === item.id ? 'bg-[#708238] text-white' : 'text-zinc-400 hover:bg-zinc-800'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5 shrink-0" />
-                  <span className="text-sm">{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+        <MobileDrawer
+          title={title}
+          items={sidebarItems}
+          activeTab={activeTab}
+          dir={dir}
+          closeLabel={t.closeMenu}
+          menuLabel={t.mainMenu}
+          onSelect={(id) => { onTabChange(id); closeDrawer(); }}
+          onClose={closeDrawer}
+        />
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#18181b]">
-        {/* Topbar */}
-        <div className="h-[70px] sm:h-[90px] flex items-center justify-between px-4 sm:px-10 shrink-0 z-10 w-full bg-[#18181b]/90 backdrop-blur-md border-b border-zinc-800/50">
-           <div className="lg:hidden">
-              <button onClick={() => setShowMobileSidebar(true)} className="p-2.5 bg-zinc-800 rounded-xl shadow-sm text-zinc-300 hover:text-white transition-colors">
-                <Menu className="w-5 h-5" />
+      {/* ---------------------------------------------------- content column */}
+      {/* `relative` with NO z-index: a z-index here would open a stacking
+          context and trap every dialog rendered inside the page. */}
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative bg-[#18181b]">
+        {/* Topbar — above the sidebar so its dropdowns are never clipped by it. */}
+        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-[#18181b]/95 backdrop-blur-md border-b border-zinc-800/50">
+          <button
+            ref={drawerButtonRef}
+            onClick={() => setShowMobileSidebar(true)}
+            aria-label={t.openMenu}
+            aria-expanded={showMobileSidebar}
+            className="lg:hidden p-2 min-h-11 min-w-11 flex items-center justify-center bg-zinc-800 rounded-xl text-zinc-300 hover:text-white transition-colors shrink-0"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          <div className="hidden lg:flex items-center gap-6 text-[13px] font-semibold text-zinc-400 min-w-0">
+            <button
+              onClick={() => navigate('/community')}
+              className="hover:text-white transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              {dir === 'rtl' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+              {t.community}
+            </button>
+            <span className="text-white font-bold border-b-2 border-[#D4AF37] py-1 whitespace-nowrap">
+              {t.dashboard}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4 ms-auto text-zinc-400 shrink-0">
+            {/* Language */}
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setShowLangMenu(!showLangMenu)}
+                aria-label={t.language}
+                aria-expanded={showLangMenu}
+                className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5 min-h-11 px-1"
+              >
+                <Globe className="w-5 h-5 stroke-[2]" />
+                <span className="text-xs font-bold uppercase hidden sm:block">{lang}</span>
               </button>
-           </div>
+              {showLangMenu && (
+                <div className="absolute top-11 end-0 w-32 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl py-1.5 z-50">
+                  {(['en', 'ar', 'ckb'] as const).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => { setLang(l); setShowLangMenu(false); }}
+                      className={`w-full text-start px-3 py-2 text-sm hover:bg-zinc-800 ${lang === l ? 'text-[#D4AF37] font-bold' : 'text-zinc-400'}`}
+                    >
+                      {l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'کوردی'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-           <div className="hidden lg:flex gap-14 text-[13px] font-semibold text-zinc-400 pl-4">
-             <button onClick={() => navigate('/community')} className="cursor-pointer hover:text-white transition-colors flex items-center gap-2">
-               {dir === 'rtl' ? <ArrowRight className="w-4 h-4"/> : <ArrowLeft className="w-4 h-4"/>}
-               {dir === 'rtl' ? 'مجتمع ليفو' : 'Levo Community'}
-             </button>
-             <div className="relative">
-               <span className="cursor-pointer text-white font-bold">{dir === 'rtl' ? 'لوحة التحكم' : 'Dashboard'}</span>
-               <div className="absolute -bottom-[33px] left-0 right-0 h-0.5 bg-[#D4AF37]"></div>
-             </div>
-           </div>
+            {/* Notifications — no notification backend exists, so no fake badge */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                aria-label={t.notifications}
+                aria-expanded={showNotifications}
+                className="hover:text-[#D4AF37] transition-colors min-h-11 px-1 flex items-center"
+              >
+                <Bell className="w-5 h-5 stroke-[2]" />
+              </button>
+              {showNotifications && (
+                <div className="absolute top-11 end-0 w-64 max-w-[80vw] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-1.5 z-50">
+                  <div className="px-3 py-2 border-b border-zinc-800 font-bold text-white text-sm">{t.notifications}</div>
+                  <div className="px-3 py-5 text-center text-sm text-zinc-500">{t.noNotifications}</div>
+                </div>
+              )}
+            </div>
 
-           <div className="flex items-center gap-6 ml-auto text-zinc-400">
-             {/* Language Dropdown */}
-             <div className="relative" ref={langRef}>
-               <button onClick={() => setShowLangMenu(!showLangMenu)} className="hover:text-[#D4AF37] transition-colors flex items-center gap-2">
-                 <Globe className="w-5 h-5 stroke-[2]" />
-                 <span className="text-xs font-bold uppercase hidden sm:block">{lang}</span>
-               </button>
-               {showLangMenu && (
-                 <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-32 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl py-2 z-50`}>
-                   {(['en', 'ar', 'ckb'] as const).map(l => (
-                     <button key={l} onClick={() => { setLang(l); setShowLangMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-zinc-800 ${lang === l ? 'text-[#D4AF37] font-bold' : 'text-zinc-400'}`}>
-                       {l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'Kurdish'}
-                     </button>
-                   ))}
-                 </div>
-               )}
-             </div>
+            {/* User menu */}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                aria-label={t.myStore}
+                aria-expanded={showUserMenu}
+                className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden shadow-sm border border-zinc-600 hover:border-[#D4AF37] transition-colors"
+              >
+                <User className="w-5 h-5 text-zinc-400" />
+              </button>
+              {showUserMenu && (
+                <div className="absolute top-11 end-0 w-48 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-1.5 z-50">
+                  <button onClick={() => { setShowUserMenu(false); goToMyStore(); }} className="w-full text-start px-3 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
+                    <User className="w-4 h-4" /> {t.myStore}
+                  </button>
+                  {settingsTabId && (
+                    <button onClick={() => { setShowUserMenu(false); onTabChange(settingsTabId); }} className="w-full text-start px-3 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
+                      <SettingsIcon className="w-4 h-4" /> {t.settings}
+                    </button>
+                  )}
+                  <div className="h-px bg-zinc-800 my-1" />
+                  <button onClick={handleLogout} className="w-full text-start px-3 py-2.5 text-sm hover:bg-zinc-800 text-red-400 flex items-center gap-2">
+                    <LogOut className="w-4 h-4" /> {t.logout}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
 
-             {/* Notifications — no notification backend exists, so no fake badge */}
-             <div className="relative" ref={notifRef}>
-               <button onClick={() => setShowNotifications(!showNotifications)} className="hover:text-[#D4AF37] transition-colors relative">
-                 <Bell className="w-5 h-5 stroke-[2]" />
-               </button>
-               {showNotifications && (
-                 <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-72 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-2 z-50`}>
-                   <div className="px-4 py-3 border-b border-zinc-800 font-bold text-white text-sm">{dir === 'rtl' ? 'الإشعارات' : 'Notifications'}</div>
-                   <div className="px-4 py-6 text-center text-sm text-zinc-500">
-                     {dir === 'rtl' ? 'لا توجد إشعارات' : 'No notifications'}
-                   </div>
-                 </div>
-               )}
-             </div>
-
-             {/* User Menu */}
-             <div className="relative" ref={userMenuRef}>
-               <div onClick={() => setShowUserMenu(!showUserMenu)} className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center cursor-pointer overflow-hidden ml-2 shadow-sm border border-zinc-600 hover:border-[#D4AF37] transition-colors">
-                 <User className="w-5 h-5 text-zinc-400" />
-               </div>
-               {showUserMenu && (
-                 <div className={`absolute top-12 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-48 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-2 z-50`}>
-                   <button onClick={() => { setShowUserMenu(false); goToMyStore(); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
-                     <User className="w-4 h-4" /> {dir === 'rtl' ? 'متجري' : 'My Store'}
-                   </button>
-                   {settingsTabId && (
-                     <button onClick={() => { setShowUserMenu(false); onTabChange(settingsTabId); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
-                       <SettingsIcon className="w-4 h-4" /> {dir === 'rtl' ? 'الإعدادات' : 'Settings'}
-                     </button>
-                   )}
-                   <div className="h-px bg-zinc-800 my-1"></div>
-                   <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 text-red-400 flex items-center gap-2">
-                     <LogOut className="w-4 h-4" /> {dir === 'rtl' ? 'تسجيل الخروج' : 'Logout'}
-                   </button>
-                 </div>
-               )}
-             </div>
-           </div>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 custom-scrollbar relative z-0">
+        {/* Scrollable content. min-w-0/min-h-0 stop wide tables and long
+            columns from forcing horizontal page scroll or clipping. */}
+        <main
+          className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-3 sm:px-5 xl:px-8 py-4 sm:py-6 custom-scrollbar relative"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
           {children}
-        </div>
+        </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Sidebar drawer for iPad/phone. Portaled to document.body for the same
+ * reason dialogs are: no ancestor can clip it or trap it in a stacking
+ * context. Escape closes it, focus starts inside and returns to the opener.
+ */
+function MobileDrawer({
+  title, items, activeTab, dir, closeLabel, menuLabel, onSelect, onClose,
+}: {
+  title: string;
+  items: SidebarItem[];
+  activeTab: string;
+  dir: 'ltr' | 'rtl';
+  closeLabel: string;
+  menuLabel: string;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    panelRef.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      dir={dir}
+      className="fixed inset-0 z-[900] lg:hidden"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={menuLabel}
+        className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-[#09090b] text-zinc-300 flex flex-col border-e border-zinc-800 shadow-2xl p-4"
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-white">
+              L
+            </span>
+            <span className="font-bold text-sm uppercase text-white truncate">{title}</span>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label={closeLabel}
+            className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 shrink-0"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onSelect(item.id)}
+              aria-current={activeTab === item.id ? 'page' : undefined}
+              className={`w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-xl font-medium transition-colors text-start ${
+                activeTab === item.id ? 'bg-[#708238] text-white' : 'text-zinc-400 hover:bg-zinc-800'
+              }`}
+            >
+              <item.icon className="w-5 h-5 shrink-0" />
+              <span className="text-sm truncate min-w-0">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+    </div>,
+    document.body
   );
 }

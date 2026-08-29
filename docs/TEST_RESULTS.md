@@ -1,5 +1,62 @@
 # Test results
 
+Newest phase first. A section is filled in **only from a real run**: no number
+here is ever copied from a projection, an older report, or a suite that was not
+executed. `skipped` is never counted as a pass.
+
+## Phase: integrated mandate (accounts · referrals · points · wallet) — LOCAL run 2026-08-29
+
+**Executed.** Environment: local `wrangler dev` on `http://127.0.0.1:8787`
+serving the built `dist/`, local D1 wiped and migrated `0001 → 0017`, Chromium
+via playwright-core 1.62.1. Base commit `4e91d71` **plus the uncommitted
+integration working tree** (the integrator's wiring pass — see
+`docs/INTEGRATED_VERIFY.md` §1 for exactly what changed). Not a staging run and
+not the production domain: nothing here says anything about
+`https://levonis-iq.com`.
+
+```
+rm -rf .wrangler/state && npx wrangler d1 migrations apply levonis-db --local
+npm run check
+npm run test:unit
+npx wrangler dev --ip 127.0.0.1 --port 8787
+node scripts/api-tests.mjs
+node scripts/api-tests-v2.mjs
+node scripts/api-tests-v3.mjs
+node scripts/api-tests-v4.mjs
+node scripts/e2e-integrated.mjs   # this mandate's browser pass
+node scripts/e2e-ui.mjs           # previous-phase regression
+```
+
+| Suite | Passed | Failed | Not executed | Blocked | Environment | Commit |
+| --- | --- | --- | --- | --- | --- | --- |
+| `npm run check` (typecheck) | 0 errors | 0 | — | — | local | 4e91d71 + working tree |
+| `npm run test:unit` | 325 | 0 | — | — | local | 4e91d71 + working tree |
+| Base (v1) | 60 | 0 | — | — | local dev + D1 | 4e91d71 + working tree |
+| Products / memberships (v2) | 37 | 0 | — | — | local dev + D1 | 4e91d71 + working tree |
+| Final phase (v3) | 118 | 0 | 0 | 9 | local dev + D1 | 4e91d71 + working tree |
+| **Integrated mandate (v4)** | 147 | 0 | 5 | 7 | local dev + D1 | 4e91d71 + working tree |
+| Browser (`e2e-integrated`) | 43 | 0 | 1 | 1 | Chromium 390×844 / 1024×768 / 1280×800 | 4e91d71 + working tree |
+| Browser (`e2e-ui`, regression) | 38 | 0 | 0 | 0 | Chromium 390×844 | 4e91d71 + working tree |
+
+Totals: **768 passed, 0 failed, 6 not executed, 17 blocked.**
+
+Re-run caveat: v3 reports 117/10 instead of 118/9 on a database that already
+holds a published policy — its "policy list is honestly empty before
+publishing" check blocks itself rather than pretending. The 118/9 line above is
+the wiped-database run.
+
+The per-scenario detail required by mandate §14 (scenario · expected · actual ·
+environment · evidence), the screenshot inventory, and the full BLOCKED /
+NOT-EXECUTED lists with their reasons live in **`docs/INTEGRATED_VERIFY.md`** —
+they are not duplicated here so the two can never drift apart.
+
+Still blocked after this run (unchanged by it, and never counted as passes):
+live OTP delivery and the Telegram group approval buttons (`docs/DECISIONS.md`
+row 26), live e-mail verification and reset (row 14), Google Console origins
+(row 28), the withdrawal payout channel (§13.1 — **no register row yet**), COD
+eligibility (§13.3 — **no register row yet**), the support-gift repeat policy
+(row 11) and the points rule's commercial effective date (row 20).
+
 ## Phase: auth & UI fixes — STAGING run 2026-08-28 (commit acdba80)
 
 Same workflow, all three suites against the live staging worker after the

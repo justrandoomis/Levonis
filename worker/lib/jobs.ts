@@ -1,5 +1,12 @@
 import type { Env } from './types';
 import { processOutbox } from './outbox';
+import { releaseDueAccruals } from './pointsOps';
+import type { ReleaseSweepReport } from './pointsOps';
+import { processWalletNotifications } from './walletNotify';
+import type { ProcessReport } from './walletNotify';
+import { reconcileWallets } from './walletOps';
+import { reconcileSupportGifts } from './membershipOps';
+import type { SupportGiftReconciliation } from './membershipOps';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -17,6 +24,14 @@ export interface DurableJobsReport {
   pruned_email_tokens: number;
   pruned_reset_tokens: number;
   pruned_sessions: number;
+  /** Purchase-points accruals released this run (mandate §4.3). */
+  points_accruals: ReleaseSweepReport;
+  /** Admin-group wallet notifications delivered/retried (§12.1). */
+  wallet_notifications: ProcessReport;
+  /** Wallet invariant check (§11.4) — reports, never repairs. */
+  wallet_reconciliation: { anomalies: number; sums_match: boolean };
+  /** Support-gift entitlement re-evaluation (§3.4). */
+  support_gifts: SupportGiftReconciliation;
   /** BNPL overdue enforcement is intentionally disabled — see below. */
   bnpl_overdue: 'disabled';
   errors: string[];
@@ -36,6 +51,10 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     pruned_email_tokens: 0,
     pruned_reset_tokens: 0,
     pruned_sessions: 0,
+    points_accruals: { scanned: 0, released: 0, points: 0, skipped: 0 },
+    wallet_notifications: { sent: 0, failed: 0, dead: 0 },
+    wallet_reconciliation: { anomalies: 0, sums_match: true },
+    support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
     bnpl_overdue: 'disabled',
     errors: [],
   };
@@ -102,7 +121,50 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     report.pruned_sessions = res.meta.changes ?? 0;
   });
 
-  // 7. BNPL overdue checks — DELIBERATELY DISABLED STUB.
+  // 7. Release due purchase-points accruals (mandate §4.3). The ONLY place
+  //    pending points become spendable: never a page open, never a client
+  //    call. An accrual is released solely when BOTH its available_at
+  //    (purchase + 7×24h, fixed at purchase) has passed AND a payment
+  //    settlement was recorded — so an uncollected COD order keeps waiting,
+  //    and a day-9 collection releases on day 9 without a new seven-day
+  //    clock. Every release is idempotent and single-winner (conditional
+  //    UPDATE + token-guarded ledger insert in one D1 batch), so a retried
+  //    cron, an overlapping run or a concurrent settlement-triggered release
+  //    can never credit the same points twice.
+  await step('points_accruals', async () => {
+    report.points_accruals = await releaseDueAccruals(env, 200);
+  });
+
+  // 8. Deliver (and retry) the admin-group wallet notifications (§12.1). Each
+  //    row is claimed with a compare-and-swap on `attempts`, so an overlapping
+  //    run never sends the same operation twice, and a permanently failing row
+  //    is parked as `dead` instead of looping forever. This step moves NO
+  //    money — the decision buttons it carries call the same guarded service
+  //    the site route calls.
+  await step('wallet_notifications', async () => {
+    report.wallet_notifications = await processWalletNotifications(env, 10);
+  });
+
+  // 9. Wallet reconciliation (§11.4). It READS the ledger, the holds and the
+  //    withdrawal rows and writes at most ONE audit row when an invariant is
+  //    broken. It never releases a hold, never posts a ledger row and never
+  //    "fixes" a balance — an anomaly is escalated to a human, not repaired
+  //    by a cron job.
+  await step('wallet_reconciliation', async () => {
+    const rec = await reconcileWallets(env);
+    report.wallet_reconciliation = { anomalies: rec.anomalies.length, sums_match: rec.sums_match };
+  });
+
+  // 10. Support-gift entitlements (§3.4): re-evaluate the claims still waiting
+  //     on delivery + collection, so a gift becomes due (or is cancelled after
+  //     a refund/return) without anyone opening a page. Each order is
+  //     re-evaluated through the same idempotent evaluator the delivered
+  //     transition uses — UNIQUE(order_id) means a second claim cannot exist.
+  await step('support_gifts', async () => {
+    report.support_gifts = await reconcileSupportGifts(env, 200);
+  });
+
+  // 11. BNPL overdue checks — DELIBERATELY DISABLED STUB.
   await step('bnpl_overdue', async () => {
     report.bnpl_overdue = await bnplOverdueCheckStub();
   });

@@ -6,7 +6,9 @@ import {
   badRequest,
   forbidden,
   conflict,
+  notFound,
   unavailable,
+  int,
   str,
   oneOf,
 } from '../lib/http';
@@ -22,6 +24,11 @@ import {
   OTP_PURPOSES,
   type OtpPurpose,
 } from '../lib/telegram';
+import {
+  handleAdminActionCallback,
+  processWalletNotifications,
+  type CallbackQueryInput,
+} from '../lib/walletNotify';
 
 /**
  * Telegram phone-ownership linking, OTP verification and the secured
@@ -360,9 +367,16 @@ interface TgMessage {
   forward_date?: number;
   forward_origin?: unknown;
 }
+interface TgCallbackQuery {
+  id?: string;
+  from?: { id?: number };
+  data?: string;
+  message?: { message_id?: number; chat?: { id?: number; type?: string } };
+}
 interface TgUpdate {
   update_id?: number;
   message?: TgMessage;
+  callback_query?: TgCallbackQuery;
 }
 
 telegramRoutes.post('/webhook', async (c) => {
@@ -403,6 +417,17 @@ telegramRoutes.post('/webhook', async (c) => {
 });
 
 async function handleUpdate(env: Env, update: TgUpdate): Promise<void> {
+  // Inline-button presses on the wallet approval message (§12.2). They come
+  // from the admin GROUP, so they are handled BEFORE the private-chat guard
+  // below. Authority, message binding and single-use token consumption are
+  // all enforced in worker/lib/walletNotify.ts — this route only routes.
+  const cb = update.callback_query;
+  if (cb) {
+    if (typeof cb.id !== 'string' || !cb.id) return;
+    await handleAdminActionCallback(env, cb as CallbackQueryInput);
+    return;
+  }
+
   const msg = update.message;
   if (!msg?.chat || typeof msg.chat.id !== 'number') return;
   // Linking and OTP conversations are PRIVATE-chat only; group/channel
@@ -564,7 +589,10 @@ telegramRoutes.post('/admin/set-webhook', requireAdmin, async (c) => {
       body: JSON.stringify({
         url,
         secret_token: c.env.TELEGRAM_WEBHOOK_SECRET,
-        allowed_updates: ['message'],
+        // 'callback_query' is required for the wallet approval buttons
+        // (§12.2). Telegram only delivers the update types listed here, so
+        // an existing webhook must be re-registered once after this change.
+        allowed_updates: ['message', 'callback_query'],
         // NEVER drop pending updates — that needs explicit owner approval.
         drop_pending_updates: false,
       }),
@@ -625,3 +653,187 @@ function maskBotToken(env: Env, s: string): string {
   if (!env.TELEGRAM_BOT_TOKEN) return s;
   return s.split(env.TELEGRAM_BOT_TOKEN).join('***');
 }
+
+// ------------------------------------------- wallet approval authority (§12.2)
+//
+// "Verify callback_query.from.id and match it to a KNOWN administrative user
+//  with real approval authority. Being in the group, being a Telegram admin
+//  or having a matching name does not automatically grant financial authority
+//  on the site."
+//
+// That mapping is created here and nowhere else: never by /start, never by
+// joining the group, never by the bot. Every seed and revocation is audited.
+
+/** Live identity rows (never exposes anything but the mapping itself). */
+telegramRoutes.get('/admin/tg-identities', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-identities-list', 60, 3600);
+  const { results } = await c.env.DB.prepare(
+    `SELECT i.telegram_user_id, i.user_id, i.label, i.created_at, i.created_by,
+            i.revoked_at, i.revoke_reason, u.name, u.username, u.role
+       FROM admin_tg_identities i JOIN users u ON u.id = i.user_id
+      ORDER BY i.revoked_at IS NOT NULL, i.created_at DESC LIMIT 200`
+  ).all<{
+    telegram_user_id: number;
+    user_id: string;
+    label: string;
+    created_at: string;
+    created_by: string | null;
+    revoked_at: string | null;
+    revoke_reason: string;
+    name: string;
+    username: string | null;
+    role: string;
+  }>();
+  return c.json({
+    success: true,
+    identities: (results ?? []).map((r) => ({
+      telegram_user_id: r.telegram_user_id,
+      user_id: r.user_id,
+      name: r.name,
+      username: r.username,
+      // An identity whose site account is no longer an admin authorizes
+      // nothing — surfaced so it is visible, not silently ignored.
+      active: r.revoked_at === null && r.role === 'admin',
+      site_role: r.role,
+      label: r.label,
+      created_at: r.created_at,
+      created_by: r.created_by,
+      revoked_at: r.revoked_at,
+      revoke_reason: r.revoke_reason,
+    })),
+  });
+});
+
+/**
+ * Seeds (or revives a previously revoked) Telegram identity for a site admin.
+ * The admin-role requirement lives inside the WHERE of both writes, so the
+ * mapping cannot be created for a non-admin even under a concurrent role
+ * change, and an existing LIVE mapping is never silently retargeted.
+ */
+telegramRoutes.post('/admin/tg-identities', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-identity-seed', 20, 3600);
+  const admin = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const userId = str(body.userId, 'userId', { min: 3, max: 60 });
+  const telegramUserId = int(body.telegramUserId, 'telegramUserId', { min: 1, max: Number.MAX_SAFE_INTEGER });
+  const label = str(body.label, 'label', { max: 80, required: false });
+
+  let res: D1Result[];
+  try {
+    res = await c.env.DB.batch([
+      // Revive: only a REVOKED row may be reused for this Telegram account.
+      c.env.DB.prepare(
+        `UPDATE admin_tg_identities
+            SET user_id = ?2, label = ?3, created_by = ?4,
+                created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                revoked_at = NULL, revoked_by = NULL, revoke_reason = ''
+          WHERE telegram_user_id = ?1 AND revoked_at IS NOT NULL
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = ?2 AND u.role = 'admin')`
+      ).bind(telegramUserId, userId, label, admin.id),
+      // Fresh mapping: only when this Telegram account is unknown.
+      c.env.DB.prepare(
+        `INSERT INTO admin_tg_identities (telegram_user_id, user_id, label, created_by)
+         SELECT ?1, ?2, ?3, ?4
+          WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = ?2 AND u.role = 'admin')
+            AND NOT EXISTS (SELECT 1 FROM admin_tg_identities a WHERE a.telegram_user_id = ?1)`
+      ).bind(telegramUserId, userId, label, admin.id),
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE')) {
+      throw conflict('This administrator already has a live Telegram identity — revoke it before linking another account');
+    }
+    throw e;
+  }
+
+  const changed = (res[0]?.meta.changes ?? 0) + (res[1]?.meta.changes ?? 0);
+  if (changed === 0) {
+    const target = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?')
+      .bind(userId)
+      .first<{ role: string }>();
+    if (!target) throw notFound('No such user');
+    if (target.role !== 'admin') throw badRequest('Only a site administrator can be given Telegram approval authority', 'NOT_ADMIN');
+    throw conflict('This Telegram account is already mapped to an administrator — revoke that mapping first');
+  }
+
+  await audit(c.env.DB, admin.id, 'telegram.admin_identity.seeded', `user:${userId}`, {
+    telegram_user_id: telegramUserId,
+    label,
+  });
+  return c.json({ success: true, telegram_user_id: telegramUserId, user_id: userId });
+});
+
+/** Revokes approval authority. The reason is mandatory (schema CHECK): a
+ *  silent de-authorization would leave an unauditable hole in a financial
+ *  approval path. */
+telegramRoutes.post('/admin/tg-identities/:telegramUserId/revoke', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-identity-revoke', 20, 3600);
+  const admin = c.get('user')!;
+  const telegramUserId = int(c.req.param('telegramUserId'), 'telegramUserId', { min: 1, max: Number.MAX_SAFE_INTEGER });
+  const body = await c.req.json().catch(() => ({}));
+  const reason = str(body.reason, 'reason', { min: 3, max: 200 });
+
+  const res = await c.env.DB.prepare(
+    `UPDATE admin_tg_identities
+        SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), revoked_by = ?2, revoke_reason = substr(?3, 1, 200)
+      WHERE telegram_user_id = ?1 AND revoked_at IS NULL`
+  )
+    .bind(telegramUserId, admin.id, reason)
+    .run();
+  if ((res.meta.changes ?? 0) === 0) throw notFound('No live Telegram identity for this account');
+
+  await audit(c.env.DB, admin.id, 'telegram.admin_identity.revoked', `tg:${telegramUserId}`, { reason });
+  return c.json({ success: true });
+});
+
+// ------------------------------------ notification delivery log / retry (§12.3)
+//
+// "Administration gets a failed-send list and a retry — NOT a button that
+//  duplicates the balance." Retrying re-sends a MESSAGE; it can never credit,
+//  debit or re-decide anything.
+
+telegramRoutes.get('/admin/wallet-notifications', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-notify-list', 60, 3600);
+  const state = str(c.req.query('state'), 'state', { max: 20, required: false });
+  const allowed = ['pending', 'sent', 'failed', 'dead', 'skipped'];
+  const filter = allowed.includes(state) ? state : '';
+  const stmt = filter
+    ? c.env.DB.prepare(
+        `SELECT id, request_kind, request_id, state, sent_as, attempts, last_error,
+                closed_state, closed_at, created_at, sent_at, message_id
+           FROM tg_admin_notifications WHERE state = ? ORDER BY created_at DESC LIMIT 100`
+      ).bind(filter)
+    : c.env.DB.prepare(
+        `SELECT id, request_kind, request_id, state, sent_as, attempts, last_error,
+                closed_state, closed_at, created_at, sent_at, message_id
+           FROM tg_admin_notifications ORDER BY created_at DESC LIMIT 100`
+      );
+  const { results } = await stmt.all<Record<string, unknown>>();
+  // The caption, the R2 key and the chat id stay server-side: this list is an
+  // operational view, not a second copy of the customer's data.
+  return c.json({ success: true, notifications: results ?? [] });
+});
+
+telegramRoutes.post('/admin/wallet-notifications/:id/retry', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-notify-retry', 30, 3600);
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 3, max: 60 });
+
+  // Only a failed/dead, still-open notification is re-armed. A message whose
+  // request was already decided is not re-sent — its buttons are dead and a
+  // fresh copy would only invite a second click.
+  const res = await c.env.DB.prepare(
+    `UPDATE tg_admin_notifications
+        SET state = 'pending', attempts = 0, last_error = '',
+            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE id = ? AND state IN ('failed','dead') AND closed_state = ''`
+  )
+    .bind(id)
+    .run();
+  if ((res.meta.changes ?? 0) === 0) {
+    throw conflict('This notification is not in a retryable state (only failed/dead and still-open messages can be re-sent)');
+  }
+  await audit(c.env.DB, admin.id, 'telegram.notification.retry', id, {});
+  c.executionCtx.waitUntil(processWalletNotifications(c.env, 5).then(() => undefined));
+  return c.json({ success: true, state: 'pending' });
+});

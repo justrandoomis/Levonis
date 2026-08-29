@@ -14,9 +14,24 @@ import {
   type Tier,
 } from '../lib/pricing';
 import { effectiveTier } from '../lib/entitlements';
+import { supportEligibleProductIds } from '../lib/membershipOps';
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
+
+/**
+ * SUPPORT CODES AND THIS FILE (integrated mandate §3.3).
+ *
+ * A support code has ZERO monetary effect, so nothing in the cart's pricing
+ * path knows about one: no line, subtotal, discount or delivery figure below
+ * reads a support ref, and the cart stores none. The ref lives in the
+ * browser until checkout, where it rides the order body (`supportCode`) and
+ * is resolved + frozen server-side into orders.support_snapshot
+ * (worker/lib/supportCode.ts). The only thing added here is a per-line
+ * DISPLAY flag — `support_gift_eligible` — so the cart can say truthfully
+ * which line is the one the gift program looks at, resolved from explicit
+ * admin flags (never a name match) exactly like the gift engine does.
+ */
 
 /**
  * @deprecated Legacy check against the users.* subscription cache. New code
@@ -153,6 +168,14 @@ async function loadCart(c: Context<AppContext>) {
     .bind(user.id)
     .all<Record<string, unknown>>();
 
+  // Display-only: which lines carry the explicit support-gift eligibility
+  // flag. One extra query for the whole cart, never per line, and it feeds
+  // no price anywhere.
+  const eligibleIds = await supportEligibleProductIds(
+    c.env.DB,
+    results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''))
+  );
+
   const items = [];
   for (const row of results) {
     if (row.status !== 'active') continue; // hidden products drop out of the cart view
@@ -172,6 +195,10 @@ async function loadCart(c: Context<AppContext>) {
       shipping_method_id: row.shipping_method_id, // legacy column, no longer priced
       selling_type: doc.selling_type,
       variantLabel,
+      // §3.3/§3.4 display flag — NOT a price, NOT a promise of a gift to the
+      // buyer: it marks the line the support-gift program evaluates for the
+      // REFERRER after delivery and payment settlement.
+      support_gift_eligible: eligibleIds.has(String(row.id ?? '')),
       // Legacy field kept for existing UI: the full per-unit amount.
       unit_price_iqd: resolved.unit_subtotal_iqd,
       original_price_iqd: resolved.compare_at_iqd,

@@ -195,7 +195,7 @@ export default function ProductEditor({
   const savedId = savedDoc?.id ?? '';
 
   return (
-    <div className="pb-28">
+    <div className="min-w-0">
       {/* header */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         <button onClick={back} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors font-bold">
@@ -547,9 +547,17 @@ export default function ProductEditor({
       {/* 13. استخراج من رابط */}
       <ExtractPanel setDoc={setDoc as React.Dispatch<React.SetStateAction<EditorDoc>>} />
 
-      {/* sticky save bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800">
-        <div className="max-w-[1280px] mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+      {/* Sticky save bar — sticky INSIDE the scrolling content column, not
+          `fixed` to the viewport. A viewport-fixed bar spans the whole window
+          and, now that the dashboard content column no longer opens a
+          stacking context (§6.2), would paint over the sidebar; sticky keeps
+          it inside the real content grid, above the safe area, in RTL and
+          LTR alike. */}
+      <div
+        className="sticky bottom-0 z-30 mt-4 bg-zinc-950/95 backdrop-blur border-t border-zinc-800 rounded-t-xl"
+        style={{ paddingBottom: 'max(0px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="px-3 sm:px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 text-xs min-w-0">
             {saveErr ? (
               <span className="text-red-400 font-medium truncate">{saveErr}</span>
