@@ -173,29 +173,37 @@ further problems worth fixing at the same time:
   Google sign-in and e-mail links). Worker **secrets** are not affected by a
   deploy.
 
-### Fix — one dashboard change
+### Fix — automatic, no dashboard change required
 
-In the Cloudflare dashboard → **Workers & Pages → levonis-staging → Settings
-→ Builds**, set:
+The deploy command (`npx wrangler deploy`) is fixed by the dashboard, but the
+build command (`npm run build`) is ours — so the build now leaves behind a
+config that a bare deploy can use correctly. `npm run build` runs
+`scripts/prepare-deploy-config.mjs` first, which does nothing at all unless it
+detects the Workers Builds container (GitHub Actions and local builds are
+untouched, verified). Inside Workers Builds it:
 
-| Field | Value |
-| --- | --- |
-| Build command | `npm run build` (unchanged) |
-| **Deploy command** | **`npm run deploy:staging`** |
+1. picks the target environment from the Worker name the CI system provides
+   (`levonis-staging` → the `staging` block). With no such variable it
+   defaults to `staging` and says so in the log; `LEVONIS_CI_ENV=production`
+   overrides it. A name that matches no environment aborts the build rather
+   than guessing which database to bind;
+2. folds that environment's name, D1 and R2 into the top-level block, because
+   a bare `wrangler deploy` reads the top level — this also removes the
+   "Failed to match Worker name" warning;
+3. resolves the D1 id **by database name** through the already-authenticated
+   `wrangler d1 list`, so no identifier is committed or printed;
+4. **preserves the plain-text vars already live on that Worker** by reading its
+   settings through the API, then lets build variables override them. Without
+   this, the first dashboard deploy would erase `GOOGLE_CLIENT_ID`,
+   `APP_ORIGIN` and `INITIAL_ADMIN_EMAIL` from the running site, because
+   wrangler replaces vars wholesale. Worker **secrets** are never affected.
 
-`deploy:staging` runs `scripts/set-deploy-ids.mjs --env staging` first, which:
+Every step is printed in the build log, including a warning naming any var
+that would be deployed empty.
 
-1. resolves the staging D1 id **by database name** (`levonis-db-staging`)
-   through the already-authenticated `wrangler d1 list` — nothing secret is
-   committed or printed, and
-2. fills the plain-text vars from build variables, then deploys with
-   `--env staging` so the Worker name, database and bucket all match the
-   staging environment.
-
-For the production Worker the equivalent command is `npm run deploy:production`.
-The script **refuses to run** under Workers Builds when the environment is
-ambiguous rather than guessing — guessing wrong would bind a staging Worker to
-the production database.
+`npm run deploy:staging` / `npm run deploy:production` remain available for
+manual or scripted deploys; they use `scripts/set-deploy-ids.mjs` with an
+explicit `--env`.
 
 ### Build variables to add (names only, no secrets here)
 

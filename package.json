@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:web": "vite",
-    "build": "vite build",
+    "build": "node scripts/prepare-deploy-config.mjs && vite build",
     "check": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json",
     "deploy": "npm run build && wrangler deploy",
     "deploy:staging": "node scripts/set-deploy-ids.mjs --env staging && wrangler deploy --env staging",
