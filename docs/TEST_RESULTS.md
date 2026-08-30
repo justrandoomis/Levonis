@@ -4,6 +4,53 @@ Newest phase first. A section is filled in **only from a real run**: no number
 here is ever copied from a projection, an older report, or a suite that was not
 executed. `skipped` is never counted as a pass.
 
+## Phase: §12 acceptance matrix (batch 6) — LOCAL run 2026-08-30
+
+**Executed.** Environment: local `wrangler dev` on `http://127.0.0.1:8787`
+serving the freshly built `dist/`, local D1 migrated through `0025`, Chromium
+at `/opt/pw-browsers/chromium`. Commit `bb20b46` on
+`claude/new-session-2hq4ci`. This is a LOCAL run: it says nothing about what
+`https://levonis-iq.com` was serving at the time.
+
+```
+npx wrangler d1 migrations apply levonis-db --local
+npm run check
+npm run test:unit
+npm run build
+node scripts/migrate-check.mjs --twice
+node scripts/migrate-check.mjs --from <copy of the local db> --twice
+npx wrangler dev --port 8787
+node scripts/e2e-permissions.mjs
+node scripts/e2e-images.mjs
+node scripts/e2e-import.mjs
+node scripts/e2e-import-ui.mjs
+node scripts/e2e-product-form.mjs
+node scripts/e2e-subscription.mjs
+```
+
+| Suite | Passed | Failed | Notes |
+|---|---:|---:|---|
+| `npm run check` | — | 0 errors | 119 pre-existing `no-explicit-any` warnings, unchanged |
+| `npm run test:unit` | 504 | 0 | was 473 at the start of this batch |
+| `migrate-check --twice` (fresh) | — | 0 | 94 tables · `foreign_key_check` 0 · orphan catalogs 0 · second pass applied 0 files · `0025` re-ran its 2 statements with no row added and no value changed |
+| `migrate-check --from <copy> --twice` | — | 0 | 95 tables · `foreign_key_check` 0 |
+| `scripts/e2e-permissions.mjs` | 46 | 0 | **new** — §11 over real HTTP, raw response bytes |
+| `scripts/e2e-images.mjs` | 78 | 0 | **new** — the gallery at 390 / 768 / 1024 |
+| `scripts/e2e-import.mjs` | 61 | 0 | |
+| `scripts/e2e-import-ui.mjs` | 44 | 0 | |
+| `scripts/e2e-product-form.mjs` | 67 | 0 | |
+| `scripts/e2e-subscription.mjs` | 73 | 0 | |
+| **browser + API total** | **369** | **0** | |
+
+Three defects were found by writing these suites and fixed in the same batch —
+an assistant admin could not save any product carrying a cost, §5's two
+write-time price rules were never enforced anywhere, and six controls in the
+image panel were 36px against §1's 44–48px. The row-by-row mapping from each
+§12 requirement to the file that proves it is in `docs/ACCEPTANCE.md`.
+
+Still reported as open, not as passes: `plus_12mo` has no price (so PLUS is not
+purchasable), and migration 0022's image backfill moved zero rows.
+
 ## Phase: integrated mandate (accounts · referrals · points · wallet) — LOCAL run 2026-08-29
 
 **Executed.** Environment: local `wrangler dev` on `http://127.0.0.1:8787`
