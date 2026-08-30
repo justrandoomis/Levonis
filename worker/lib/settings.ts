@@ -120,6 +120,18 @@ export const SETTING_DEFAULTS = {
   // (DEFAULT_STAGE_DURATIONS) and this stays {} until an owner overrides
   // something — an empty object means "use the defaults", not "wait zero".
   orderStageDurations: {} as Record<string, number>,
+  /**
+   * The local courier's wire format — endpoint paths and the map from our
+   * field names to theirs. NOT credentials: those are Worker secrets
+   * (ALWASEET_*) and never a settings row, because a settings row is
+   * readable by every admin screen and the owner's rule is that no token or
+   * login ever reaches the frontend.
+   *
+   * Empty until someone reads the Merchant API documentation — see the long
+   * note at the top of worker/lib/delivery/alwaseet.ts. Until then the
+   * integration reports itself as unconfigured rather than sending guesses.
+   */
+  deliveryConfig: {} as Record<string, unknown>,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

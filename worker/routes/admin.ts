@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray } from '../lib/http';
+import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewFinancials, normalizeAdminScope } from '../lib/adminScope';
@@ -27,6 +27,10 @@ import {
   type OrderStage,
 } from '../lib/orderStages';
 import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
+import { ALWASEET, alwaseetDriver, resolveWire } from '../lib/delivery/alwaseet';
+import { listStatusMap, setStatusMapping, upsertRemoteStatuses } from '../lib/delivery/statusMap';
+import { syncOrderDelivery, sweepDeliveryStatuses } from '../lib/delivery/sync';
+import type { DeliveryDriver } from '../lib/delivery/types';
 import { typeForTransport } from '../lib/shippingType';
 import type { ShippingType } from '../lib/shippingType';
 
@@ -751,6 +755,181 @@ adminRoutes.get('/orders/:id/stages', async (c) => {
  * it take effect. It is the same function the cron calls — not a second
  * implementation — so what this promotes is exactly what the cron would have.
  */
+// ------------------------------------------------------------ local delivery
+
+/**
+ * Builds the courier driver, or throws the honest 503 that says why not.
+ *
+ * A missing credential is not a server error and must not read like one. The
+ * message names the SETTING, never a value — the owner's rule is that no
+ * token or login ever leaves the Worker, and that includes leaving it inside
+ * an error message.
+ */
+async function deliveryDriverOrFail(c: Context<AppContext>): Promise<DeliveryDriver> {
+  const wire = await getSetting(c.env.DB, 'deliveryConfig');
+  const driver = alwaseetDriver(c.env, wire);
+  if ('configured' in driver) {
+    throw new HttpError(
+      503,
+      `${driver.reason} Missing: ${driver.missing.join(', ')}.`,
+      'DELIVERY_NOT_CONFIGURED',
+      { missing: driver.missing }
+    );
+  }
+  return driver;
+}
+
+/** What is and is not set up, for the admin screen. Names only, no values. */
+adminRoutes.get('/delivery/config', async (c) => {
+  const wire = (await getSetting(c.env.DB, 'deliveryConfig')) as Record<string, unknown>;
+  const driver = alwaseetDriver(c.env, wire);
+  const mappings = await listStatusMap(c.env.DB, ALWASEET).catch(() => []);
+  return c.json({
+    success: true,
+    provider: ALWASEET,
+    credentials_configured: !('configured' in driver),
+    missing_credentials: 'configured' in driver ? driver.missing : [],
+    // The wire config is not secret — it is endpoint paths and field names —
+    // so it is safe to show and to edit from the panel.
+    wire: wire ?? {},
+    statuses_known: mappings.length,
+    statuses_mapped: mappings.filter((m) => m.internal_stage !== '').length,
+  });
+});
+
+/**
+ * Refreshes the courier's OFFICIAL status list — "اجلب قائمة الحالات الرسمية
+ * من GET /v1/merchant/statuses ولا تعتمد على نصوص hardcoded".
+ *
+ * Never touches mappings the owner already made: a refresh that silently
+ * unmapped a status would break every order using it.
+ */
+adminRoutes.post('/delivery/statuses/refresh', async (c) => {
+  const adminUser = c.get('user')!;
+  const driver = await deliveryDriverOrFail(c);
+  const res = await driver.listStatuses();
+  if (!res.ok) throw badRequest(res.error, 'DELIVERY_API_ERROR', { retryable: res.retryable });
+  const now = new Date().toISOString();
+  const out = await upsertRemoteStatuses(c.env.DB, driver.provider, res.value, now);
+  await audit(c.env.DB, adminUser.id, 'delivery.statuses_refresh', driver.provider, out);
+  return c.json({ success: true, ...out, statuses: await listStatusMap(c.env.DB, driver.provider) });
+});
+
+adminRoutes.get('/delivery/statuses', async (c) => {
+  return c.json({ success: true, statuses: await listStatusMap(c.env.DB, ALWASEET) });
+});
+
+/** The owner's alwaseet_status_id -> internal stage mapping, one row at a time. */
+adminRoutes.put('/delivery/statuses/:remoteId', async (c) => {
+  const adminUser = c.get('user')!;
+  const remoteId = c.req.param('remoteId');
+  const body = await c.req.json().catch(() => ({}));
+  const stage = str(body.stage, 'stage', { max: 40, required: false });
+  // '' clears a mapping, which is how an owner says "I do not know what this
+  // means yet" — and an unmapped status leaves orders alone.
+  if (stage && !(stage in STAGE_SOURCE)) throw badRequest(`Unknown stage "${stage}"`);
+  await setStatusMapping(c.env.DB, ALWASEET, remoteId, stage, new Date().toISOString());
+  await audit(c.env.DB, adminUser.id, 'delivery.status_map', remoteId, { stage });
+  return c.json({ success: true, statuses: await listStatusMap(c.env.DB, ALWASEET) });
+});
+
+/**
+ * Creates the courier shipment for one order — the admin's action at
+ * "جارٍ تجهيز التوصيل المحلي".
+ *
+ * Refuses to create a SECOND shipment for an order that already has one:
+ * a double-tap would put two drivers on the same parcel and leave us syncing
+ * the wrong id.
+ */
+adminRoutes.post('/orders/:id/delivery', async (c) => {
+  const adminUser = c.get('user')!;
+  const id = c.req.param('id');
+  const driver = await deliveryDriverOrFail(c);
+
+  const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!order) throw notFound('Order not found');
+  if (order.delivery_remote_id) {
+    throw badRequest('This order already has a delivery shipment.', 'SHIPMENT_EXISTS', {
+      remote_id: order.delivery_remote_id,
+      tracking_no: order.delivery_tracking_no ?? '',
+    });
+  }
+  const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
+  const { results: items } = await c.env.DB.prepare(
+    'SELECT name_snapshot, qty FROM order_items WHERE order_id = ?'
+  ).bind(id).all<{ name_snapshot: string; qty: number }>();
+
+  const res = await driver.createShipment({
+    orderId: String(order.id),
+    customerName: String(address.name ?? ''),
+    phone: String(address.phone ?? ''),
+    governorate: String(address.governorate ?? ''),
+    area: String(address.area ?? ''),
+    address: String(address.address ?? ''),
+    landmark: String(address.landmark ?? ''),
+    notes: String(address.notes ?? ''),
+    // Cash on delivery collects the total; anything already paid collects
+    // nothing. Getting this wrong takes money off a customer twice, so it is
+    // read from the order rather than assumed.
+    amountIqd: String(order.payment_method_id) === 'cash' ? Number(order.total_iqd) || 0 : 0,
+    itemCount: (items ?? []).reduce((n, i) => n + Number(i.qty || 0), 0),
+    itemsSummary: (items ?? []).map((i) => `${i.name_snapshot} x${i.qty}`).join(', ').slice(0, 500),
+  });
+
+  if (!res.ok) {
+    // The order is NOT moved and NOT marked as shipped. The error is stored
+    // so the admin sees it on the order rather than only in a toast.
+    await c.env.DB.prepare('UPDATE orders SET delivery_error = ? WHERE id = ?')
+      .bind(res.error.slice(0, 500), id).run();
+    throw badRequest(res.error, 'DELIVERY_API_ERROR', { retryable: res.retryable });
+  }
+
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(
+    `UPDATE orders SET delivery_provider = ?, delivery_remote_id = ?, delivery_tracking_no = ?,
+            delivery_status_id = ?, delivery_status_text = ?, delivery_synced_at = ?, delivery_error = ''
+      WHERE id = ?`
+  )
+    .bind(driver.provider, res.value.remoteId, res.value.trackingNo, res.value.statusId, res.value.statusText, now, id)
+    .run();
+  await audit(c.env.DB, adminUser.id, 'delivery.shipment_create', id, {
+    provider: driver.provider, remote_id: res.value.remoteId, tracking_no: res.value.trackingNo,
+  });
+
+  // The stage is NOT advanced here. "لا تستخدم Timer للانتقال إلى في الطريق
+  // إليك" — creating a shipment is not the courier picking it up, and only
+  // the courier's own status may say that.
+  return c.json({
+    success: true,
+    provider: driver.provider,
+    remote_id: res.value.remoteId,
+    tracking_no: res.value.trackingNo,
+  });
+});
+
+/** The owner's "مزامنة حالة الوسيط" button, for one order. */
+adminRoutes.post('/orders/:id/delivery/sync', async (c) => {
+  const adminUser = c.get('user')!;
+  const id = c.req.param('id');
+  const driver = await deliveryDriverOrFail(c);
+  const res = await syncOrderDelivery(c.env, driver, id);
+  await audit(c.env.DB, adminUser.id, 'delivery.sync', id, { outcome: res.outcome });
+  // An error is reported as an error, but with 200: the sync ran, it just
+  // could not reach the courier, and the admin needs to see WHICH it was.
+  return c.json({ success: true, ...res });
+});
+
+/** The same sync the cron runs, on demand. */
+adminRoutes.post('/delivery/sync', async (c) => {
+  const adminUser = c.get('user')!;
+  const driver = await deliveryDriverOrFail(c);
+  const report = await sweepDeliveryStatuses(c.env, driver, 100);
+  await audit(c.env.DB, adminUser.id, 'delivery.sync_all', driver.provider, {
+    scanned: report.scanned, moved: report.moved, errors: report.errors,
+  });
+  return c.json({ success: true, ...report });
+});
+
 adminRoutes.post('/orders/sweep-stages', async (c) => {
   const adminUser = c.get('user')!;
   const report = await sweepDueStages(c.env, 200);
@@ -1014,6 +1193,17 @@ adminRoutes.put('/settings/:key', async (c) => {
     // filtered on every read. It also accepts the pre-hero `{id,image,link}`
     // shape unchanged, so existing banners survive the upgrade.
     value = key === 'homeBanners' ? normalizeHomeBanners(value) : normalizeSectionItems(value);
+  } else if (key === 'deliveryConfig') {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw badRequest('deliveryConfig must be an object');
+    }
+    if (JSON.stringify(value).length > 20_000) throw badRequest('deliveryConfig is too large');
+    // Normalized by the same function the driver reads with, so what survives
+    // here is exactly what will go on the wire. A credential accidentally
+    // pasted into this object is DROPPED rather than stored: the shape only
+    // admits endpoint paths and field-name maps, and secrets belong in Worker
+    // secrets where no admin screen can read them back.
+    value = resolveWire(value);
   } else if (key === 'orderStageDurations') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       throw badRequest('orderStageDurations must be an object of minute values');

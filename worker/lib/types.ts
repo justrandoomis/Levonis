@@ -31,6 +31,13 @@ export interface Env {
   /** Comma-separated exact origins allowed as Studio handoff destinations,
    *  e.g. "https://studio.levonis-iq.com". Empty = handoff disabled. */
   STUDIO_ALLOWED_DESTINATIONS?: string;
+  /** Al-Waseet Merchant API credentials. SECRETS, never settings rows and
+   *  never serialized: the owner's rule is "لا تكشف بيانات الدخول أو الـtoken
+   *  في Frontend", and a settings row is readable by every admin screen.
+   *  Delivery integration stays honestly disabled until all three are set. */
+  ALWASEET_BASE_URL?: string;
+  ALWASEET_USERNAME?: string;
+  ALWASEET_PASSWORD?: string;
 }
 
 export interface SessionUser {

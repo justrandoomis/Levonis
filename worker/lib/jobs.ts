@@ -8,6 +8,9 @@ import { reconcileWallets } from './walletOps';
 import { reconcileSupportGifts } from './membershipOps';
 import { sweepDueStages } from './orderStageOps';
 import type { SweepReport } from './orderStageOps';
+import { alwaseetDriver } from './delivery/alwaseet';
+import { sweepDeliveryStatuses } from './delivery/sync';
+import { getSetting } from './settings';
 import type { SupportGiftReconciliation } from './membershipOps';
 
 /**
@@ -40,6 +43,13 @@ export interface DurableJobsReport {
    * only thing that ever advances an order on the clock is this sweep.
    */
   order_stages: SweepReport;
+  /**
+   * Local-courier status sync. Separate from order_stages because it is the
+   * only thing allowed to move an order to "في الطريق إليك" or "تم التوصيل":
+   * the clock never may, and this only does when the courier says so AND the
+   * owner has mapped that status.
+   */
+  delivery_sync: { configured: boolean; scanned: number; moved: number; unmapped: number; errors: number };
   /** BNPL overdue enforcement is intentionally disabled — see below. */
   bnpl_overdue: 'disabled';
   errors: string[];
@@ -64,6 +74,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     wallet_reconciliation: { anomalies: 0, sums_match: true },
     support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
+    delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     bnpl_overdue: 'disabled',
     errors: [],
   };
@@ -183,7 +194,20 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     report.order_stages = await sweepDueStages(env, 200, nowIso);
   });
 
-  // 12. BNPL overdue checks — DELIBERATELY DISABLED STUB.
+  // 12. Ask the local courier what happened to the shipments we handed them.
+  //     Skipped entirely, and reported as unconfigured rather than as an
+  //     error, when the credentials are not set — an unconfigured courier is
+  //     a setting nobody has filled in, not a failure worth alerting on.
+  await step('delivery_sync', async () => {
+    const driver = alwaseetDriver(env, await getSetting(env.DB, 'deliveryConfig'));
+    if ('configured' in driver) return;
+    const r = await sweepDeliveryStatuses(env, driver, 100, nowIso);
+    report.delivery_sync = {
+      configured: true, scanned: r.scanned, moved: r.moved, unmapped: r.unmapped, errors: r.errors,
+    };
+  });
+
+  // 13. BNPL overdue checks — DELIBERATELY DISABLED STUB.
   await step('bnpl_overdue', async () => {
     report.bnpl_overdue = await bnplOverdueCheckStub();
   });
