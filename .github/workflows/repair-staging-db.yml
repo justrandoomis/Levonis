@@ -68,6 +68,25 @@ jobs:
       - name: Dry run against a fresh database first
         run: node scripts/migrate-check.mjs --twice
 
+      # wrangler.jsonc ships `STAGING-DB-ID-PLACEHOLDER`; the real uuid is never
+      # committed. `migrations apply --env staging` reads that binding, so the
+      # id has to be substituted first exactly as the deploy workflow does it,
+      # otherwise the call goes out with the placeholder and the API answers
+      # "Invalid property: databaseId => Invalid uuid".
+      - name: Resolve the staging database id into wrangler.jsonc
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found in this account"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs --env staging
+
       - name: Record a Time Travel bookmark (restore point)
         id: bookmark
         run: |
