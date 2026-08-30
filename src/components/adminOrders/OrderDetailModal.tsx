@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ShieldCheck, Tag } from 'lucide-react';
+import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ShieldCheck, Tag, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, formatIqd, type AdminOrderDetail } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
@@ -8,6 +8,7 @@ import Spinner from '../ui/Spinner';
 import { ErrorState } from '../ui/AsyncStates';
 import CopyField from './CopyField';
 import OrderChatPanel from './OrderChatPanel';
+import OrderStagePanel from './OrderStagePanel';
 
 /**
  * The order fulfilment screen.
@@ -24,7 +25,7 @@ import OrderChatPanel from './OrderChatPanel';
  */
 export default function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const { loc, lang, dir } = useLanguage();
-  const [tab, setTab] = useState<'order' | 'chat'>('order');
+  const [tab, setTab] = useState<'order' | 'stages' | 'chat'>('order');
   const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -109,6 +110,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           <div className="flex px-4 gap-1" role="tablist">
             {([
               ['order', ClipboardList, loc('معلومات الطلب', 'Order', 'زانیاری داواکاری')],
+              ['stages', Truck, loc('المراحل', 'Stages', 'قۆناغەکان')],
               ['chat', MessageSquare, loc('المحادثة', 'Chat', 'گفتوگۆ')],
             ] as const).map(([id, Icon, label]) => (
               <button
@@ -141,6 +143,22 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           </div>
         ) : !detail ? null : tab === 'chat' ? (
           <OrderChatPanel orderId={orderId} active />
+        ) : tab === 'stages' ? (
+          <div className="flex-1 overflow-y-auto p-4 min-h-0">
+            {detail.tracking ? (
+              // Moving a stage reloads the whole detail, because the move
+              // changes the available list, the history and the legacy
+              // status underneath — refreshing only the panel would leave
+              // the rest of the modal describing the previous state.
+              <OrderStagePanel orderId={orderId} tracking={detail.tracking} dir={dir} onMoved={load} />
+            ) : (
+              // The tracking block is an enrichment and degrades like the
+              // others: an honest note beats a 500 on the whole screen.
+              <p className="text-zinc-400 text-sm">
+                {loc('تعذّر تحميل مراحل هذا الطلب.', 'Stages could not be loaded for this order.', 'قۆناغەکان بار نەکران.')}
+              </p>
+            )}
+          </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
             {/* ------------------------------------------- what to write down */}

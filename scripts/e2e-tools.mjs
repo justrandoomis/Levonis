@@ -254,6 +254,31 @@ async function main() {
     await shopPage.waitForURL(/\/chat\//, { timeout: 10_000 });
     check('opening it twice reuses the same thread, it does not fork', shopPage.url() === firstUrl,
       `${firstUrl} vs ${shopPage.url()}`);
+
+    // ------------------------------------------- the chat attachment menu
+    console.log('\n4. the chat attachments that were real code problems');
+    // The "+" carries a data hook rather than being hunted for among every
+    // icon button on the screen — an icon-only control is not findable by
+    // text, and guessing at it is how a passing test starts lying.
+    await shopPage.waitForSelector('[data-chat-plus]', { timeout: 10_000 });
+    await shopPage.locator('[data-chat-plus]').click();
+    const opened = await shopPage
+      .locator('text=/^الموقع$|^Location$/')
+      .first()
+      .waitFor({ timeout: 5_000 })
+      .then(() => true, () => false);
+    check('the attachment menu opens', opened);
+    if (opened) {
+      const menu = await shopPage.locator('text=/الموقع|Location|المتجر|Store|بطاقة شخصية|Profile Card/').allInnerTexts();
+      check('«الموقع» is no longer marked قريباً', menu.some((t) => /^الموقع$|^Location$/.test(t.trim())), JSON.stringify(menu));
+      check('«المتجر» is no longer marked قريباً', menu.some((t) => /^المتجر$|^Store$/.test(t.trim())), JSON.stringify(menu));
+      check('«بطاقة شخصية» is no longer marked قريباً',
+        menu.some((t) => /^بطاقة شخصية$|^Profile Card$/.test(t.trim())), JSON.stringify(menu));
+      // These two move money between users and stay visibly off until the
+      // owner sets a policy — that is the honest state, not a missed button.
+      const stillOff = await shopPage.locator('text=/مغلف أحمر|Red Envelope/').count();
+      check('«مغلف أحمر» is still marked قريباً, deliberately', stillOff > 0, String(stillOff));
+    }
     check('no runtime errors anywhere', errs.length === 0, errs.join(' | ').slice(0, 300));
   } finally {
     await browser.close();

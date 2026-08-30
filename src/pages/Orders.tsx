@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { ArrowLeft, ArrowRight, Package, RefreshCw, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Package, RefreshCw, Info, Truck } from 'lucide-react';
 import { api, ApiOrder, formatIqd } from '../lib/api';
 import ReturnsSection from '../components/returns/ReturnsSection';
+import OrderTracker from '../components/OrderTracker';
 
 /**
  * Orders list with a WORKING status filter. The filter is driven by the
@@ -60,6 +61,7 @@ const SERVER_STATUS: Record<Filter, string | null> = {
 
 const STRINGS = {
   ar: {
+    track: 'تتبع الشحنة',
     title: 'طلباتي',
     back: 'رجوع',
     filters: {
@@ -92,6 +94,7 @@ const STRINGS = {
     filterLabel: 'تصفية الطلبات',
   },
   en: {
+    track: 'Track shipment',
     title: 'My Orders',
     back: 'Back',
     filters: {
@@ -124,6 +127,7 @@ const STRINGS = {
     filterLabel: 'Filter orders',
   },
   ckb: {
+    track: 'بەدواداچوونی بار',
     title: 'داواکارییەکانم',
     back: 'گەڕانەوە',
     filters: {
@@ -184,6 +188,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [trackingFor, setTrackingFor] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -394,6 +399,24 @@ export default function Orders() {
                     </span>
                   </div>
                 </div>
+                {/* Where the parcel actually is, on the path this order
+                    walks — five stages direct, fourteen for a pre-order.
+                    Opened on demand: the list is already the slowest query on
+                    this screen, and fourteen history rows per order would
+                    make every other card slower for one that is expanded. */}
+                {trackingFor === order.id ? (
+                  <OrderTracker orderId={order.id} lang={lang} />
+                ) : (
+                  <button
+                    type="button"
+                    data-track-order={order.id}
+                    onClick={() => setTrackingFor(order.id)}
+                    className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-zinc-300 hover:text-white border border-zinc-700 rounded-lg px-3 py-2 hover:bg-zinc-800 transition-colors"
+                  >
+                    <Truck className="w-3.5 h-3.5" aria-hidden />
+                    {s.track}
+                  </button>
+                )}
                 <ReturnsSection order={order} />
               </div>
             ))}

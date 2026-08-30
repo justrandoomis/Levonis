@@ -55,6 +55,9 @@ export default function Chat() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // Attachment feedback (a denied location prompt, a lookup in progress).
+  // Separate from sendError: that one is about a message the server refused.
+  const [actionNotice, setActionNotice] = useState('');
   const [otherName, setOtherName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -196,6 +199,65 @@ export default function Chat() {
     "Thanks 🙏", "Sounds good 👍", "How much is it?", "When will it be ready?"
   ];
 
+  /**
+   * Shares where the sender is, as a maps link.
+   *
+   * Geolocation needs the browser's permission and a secure origin, and it
+   * fails for perfectly ordinary reasons — a denied prompt, no GPS indoors,
+   * a timeout. Every one of those gets its own message rather than a silent
+   * no-op: a button that appears to do nothing is worse than one that says
+   * why it could not.
+   */
+  const shareLocation = async () => {
+    if (!navigator.geolocation) {
+      setActionNotice(dir === 'rtl' ? 'المتصفح لا يدعم تحديد الموقع' : 'This browser cannot share a location');
+      return;
+    }
+    setActionNotice(dir === 'rtl' ? 'جارٍ تحديد الموقع…' : 'Finding your location…');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setActionNotice('');
+        // Coordinates, not an address: a reverse-geocoded street name would
+        // be a guess, and a driver needs the pin.
+        void sendText(`https://maps.google.com/?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+      },
+      (err) => {
+        setActionNotice(
+          err.code === err.PERMISSION_DENIED
+            ? dir === 'rtl' ? 'رُفض إذن الموقع' : 'Location permission was denied'
+            : dir === 'rtl' ? 'تعذّر تحديد الموقع' : 'Your location could not be determined'
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  };
+
+  /**
+   * Sends the sender's card.
+   *
+   * ONLY A LINK THAT EXISTS. There is no public `/u/:username` route in this
+   * app, so linking to one would put a 404 in someone's conversation — the
+   * exact kind of thing that looks finished and is not. A merchant gets their
+   * real store link; everyone else gets their name and handle as plain text,
+   * which is what a card is when there is no page behind it.
+   */
+  const sendProfileCard = async () => {
+    const name = (user?.name || user?.username || '').trim();
+    let link = '';
+    try {
+      // The endpoint answers { merchant: null } for someone with no store,
+      // which is not an error — it is the common case.
+      const mine = await api.get<{ merchant: { id?: string } | null }>('/api/community/my-store');
+      const storeId = mine?.merchant?.id ?? '';
+      if (storeId) link = `${window.location.origin}/community/store/${storeId}`;
+    } catch {
+      /* no store, or not reachable — the card is still worth sending */
+    }
+    const handle = user?.username ? ` (@${user.username})` : '';
+    await sendText(link ? `${name}${handle}\n${link}` : `${name}${handle}`.trim() || (dir === 'rtl' ? 'بطاقتي' : 'My card'));
+  };
+
   const plusMenuOptions: Array<{ icon: any; label: string; onClick?: () => void; disabled?: boolean }> = [
     {
       icon: ImageIcon,
@@ -207,10 +269,30 @@ export default function Chat() {
       label: dir === 'rtl' ? 'تصوير' : 'Camera',
       onClick: () => cameraInputRef.current?.click(),
     },
-    { icon: StoreIcon, label: dir === 'rtl' ? `المتجر (${comingSoon})` : `Store (${comingSoon})`, disabled: true },
+    // Three of these were disabled with "قريباً" on them and did not need to
+    // be: each is a message with a link in it, which the existing pipeline
+    // already sends. They are sent as ordinary text so the other side reads
+    // them on any client, including a notification.
+    {
+      icon: StoreIcon,
+      label: dir === 'rtl' ? 'المتجر' : 'Store',
+      onClick: () => void sendText(`${window.location.origin}/products`),
+    },
+    {
+      icon: MapPin,
+      label: dir === 'rtl' ? 'الموقع' : 'Location',
+      onClick: () => void shareLocation(),
+    },
+    {
+      icon: UserCircle,
+      label: dir === 'rtl' ? 'بطاقة شخصية' : 'Profile Card',
+      onClick: () => void sendProfileCard(),
+    },
+    // These two MOVE MONEY between users. That is not a missing button, it is
+    // a policy the owner has not set — eligibility, limits, reversal, and
+    // what happens when a transfer is disputed. Left visibly off rather than
+    // built on assumptions about someone else's money.
     { icon: Gift, label: dir === 'rtl' ? `مغلف أحمر (${comingSoon})` : `Red Envelope (${comingSoon})`, disabled: true },
-    { icon: MapPin, label: dir === 'rtl' ? `الموقع (${comingSoon})` : `Location (${comingSoon})`, disabled: true },
-    { icon: UserCircle, label: dir === 'rtl' ? `بطاقة شخصية (${comingSoon})` : `Profile Card (${comingSoon})`, disabled: true },
     { icon: Wallet, label: dir === 'rtl' ? `إرسال أموال (${comingSoon})` : `Send Money (${comingSoon})`, disabled: true },
   ];
 
@@ -320,6 +402,9 @@ export default function Chat() {
         {sendError && (
           <div className="text-center text-[11px] text-red-500 font-medium">{sendError}</div>
         )}
+        {actionNotice && (
+          <div role="status" className="text-center text-[11px] text-[#999] font-medium">{actionNotice}</div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -392,6 +477,9 @@ export default function Chat() {
              </button>
           ) : (
             <button
+              data-chat-plus
+              aria-label={dir === 'rtl' ? 'إرفاق' : 'Attach'}
+              aria-expanded={isPlusMenuOpen}
               className="text-black dark:text-white hover:opacity-70 transition-transform duration-300 relative"
               onClick={() => {
                 setIsPlusMenuOpen(!isPlusMenuOpen);

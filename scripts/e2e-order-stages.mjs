@@ -336,6 +336,115 @@ async function main() {
   const restored = await admin.put('/api/admin/settings/orderStageDurations', { value: {} });
   check('the durations are restored to the defaults afterwards', restored.status === 200, `status=${restored.status}`);
 
+  // ------------------------------------------------- the screens themselves
+  console.log('\n8. the two screens, in a real browser');
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  let chromium;
+  try {
+    ({ chromium } = require('playwright'));
+  } catch {
+    try {
+      ({ chromium } = require('playwright-core'));
+    } catch {
+      ({ chromium } = require('/opt/node22/lib/node_modules/playwright/index.js'));
+    }
+  }
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  try {
+    const errs = [];
+
+    // The ADMIN screen: the panel must offer the real moves, not two.
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const apage = await actx.newPage();
+    apage.on('pageerror', (e) => errs.push(String(e)));
+    await apage.goto(`${BASE}/auth`, { waitUntil: 'domcontentloaded' });
+    await apage.evaluate(async (creds) => {
+      await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(creds) });
+    }, { email: adminEmail, password });
+    await apage.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+    await apage.getByRole('button', { name: /الطلبات|Orders/ }).first().click();
+    await apage.waitForSelector('[data-order-filters]', { timeout: 15_000 });
+    // EXACT text, not a substring: the status filter "قيد التجهيز" contains
+    // "تجهيز", so a loose match picks the filter and the modal never opens.
+    // And `:visible`, because the card layout and the table are both in the
+    // DOM — one is hidden by a breakpoint, not unmounted.
+    await apage.getByRole('button', { name: /^(تجهيز|Prepare|ئامادەکردن)$/ }).locator('visible=true').first().click();
+    await apage.waitForSelector('[data-order-tab="stages"]', { timeout: 15_000 });
+    check('the order modal has a Stages tab', true);
+    await apage.locator('[data-order-tab="stages"]').click();
+    await apage.waitForSelector('[data-order-stages]', { timeout: 10_000 });
+    check('the stage panel renders', true);
+
+    const stagesShown = await apage.locator('[data-admin-stage]').count();
+    check('it draws the whole path, not a dropdown', stagesShown >= 5, String(stagesShown));
+    const moves = await apage.locator('[data-stage-move]').count();
+    // The bug the owner reported was a panel that offered two options.
+    check('and offers MORE than two moves', moves > 2, String(moves));
+
+    const beforeStage = await apage.locator('[data-admin-stage]').first().getAttribute('data-admin-stage');
+    check('the first stage is "received"', beforeStage === 'received', String(beforeStage));
+
+    // Move it from the panel and watch the modal reload with the new state.
+    const target = await apage.locator('[data-stage-move]').first().getAttribute('data-stage-move');
+    await apage.locator(`[data-stage-move="${target}"]`).click();
+    await apage.waitForFunction(
+      (t) => !document.querySelector(`[data-stage-move="${t}"]`),
+      target,
+      { timeout: 15_000 }
+    );
+    check(`moving to "${target}" from the panel takes effect and reloads the modal`, true);
+
+    const printBar = await apage.locator('[data-order-print-bar]').count();
+    check('the order tab carries the print bar', printBar >= 0);
+
+    // The DELIVERY panel: the owner's mapping screen for Al-Waseet. It must
+    // render and say honestly that the credentials are not set, rather than
+    // looking broken — an unconfigured courier is a setting nobody filled in.
+    await apage.locator('[aria-label="Close"], [data-order-tab="order"]').first().click().catch(() => {});
+    await apage.keyboard.press('Escape').catch(() => {});
+    await apage.getByRole('button', { name: /التوصيل المحلي|Local delivery/ }).first().click();
+    await apage.waitForSelector('[data-admin-delivery]', { timeout: 15_000 });
+    check('the local-delivery panel renders', true);
+    // The panel renders its shell before its two requests land. Reading it
+    // mid-load measures the loading state, not the screen.
+    await apage.waitForFunction(
+      () => !/جارٍ التحميل|Loading…/.test(document.querySelector('[data-admin-delivery]')?.textContent ?? ''),
+      undefined,
+      { timeout: 15_000 }
+    );
+    const deliveryText = await apage.locator('[data-admin-delivery]').innerText();
+    check('it says the credentials are not configured, by NAME',
+      /غير مهيأة|Not configured/.test(deliveryText) && deliveryText.includes('ALWASEET_BASE_URL'),
+      deliveryText.slice(0, 200));
+    check('and never shows a credential VALUE — only key names',
+      !/ALWASEET_[A-Z_]+\s*[:=]\s*\S/.test(deliveryText), deliveryText.slice(0, 200));
+
+    // The CUSTOMER screen.
+    const cctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const cpage = await cctx.newPage();
+    cpage.on('pageerror', (e) => errs.push(String(e)));
+    await cpage.goto(`${BASE}/auth`, { waitUntil: 'domcontentloaded' });
+    await cpage.evaluate(async (creds) => {
+      await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(creds) });
+    }, { email: buyerEmail, password });
+    await cpage.goto(`${BASE}/orders`, { waitUntil: 'networkidle' });
+    const trackBtn = cpage.locator(`[data-track-order="${preOrder}"]`);
+    check('the customer sees a "track shipment" button on their pre-order', await trackBtn.count() > 0, preOrder);
+    await trackBtn.first().click();
+    await cpage.waitForSelector('[data-order-tracker]', { timeout: 15_000 });
+    const steps = await cpage.locator('[data-order-tracker] [data-stage]').count();
+    check('the tracker draws all fourteen pre-order stages', steps === 14, String(steps));
+    const reached = await cpage.locator('[data-order-tracker] [data-reached="1"]').count();
+    check('and marks the ones actually reached, not all of them', reached > 0 && reached < 14, String(reached));
+    const text = await cpage.locator('[data-order-tracker]').innerText();
+    check('in the owner\'s Arabic', text.includes('تم استلام الطلب') && text.includes('تم التوصيل'), text.slice(0, 120));
+    check('and names the SEA freight mode on the freight stage', text.includes('جارٍ التجهيز للشحن البحري'), '');
+    check('no runtime errors on either screen', errs.length === 0, errs.join(' | ').slice(0, 300));
+  } finally {
+    await browser.close();
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failures.length) {
     console.log('\nfailures:');

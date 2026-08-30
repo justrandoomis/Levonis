@@ -261,6 +261,54 @@ export interface AdminOrderDetail extends ApiOrder {
   units: OrderUnit[];
   invoice: { id: string; invoice_no: string; revision: number; payment_status: string } | null;
   chat_id: string | null;
+  /**
+   * The tracking path, computed server-side. The panel holds no copy of the
+   * stage list, its labels or which moves are legal — the owner already
+   * reported the cost of a panel deciding that for itself ("عند تحديث الطلب
+   * يظهر خيارين فقط"). Absent when the enrichment failed, which the modal
+   * degrades on rather than 500ing.
+   */
+  tracking?: AdminOrderTracking;
+}
+
+export interface AdminOrderTracking {
+  shipping_type: string;
+  stage: string;
+  stage_source: string;
+  stage_changed_at: string;
+  next_stage: string | null;
+  next_stage_at: string | null;
+  delivery: {
+    provider: string;
+    remote_id: string;
+    tracking_no: string;
+    status_text: string;
+    synced_at: string | null;
+    error: string;
+  };
+  steps: Array<{
+    stage: string;
+    source: 'manual' | 'automatic' | 'delivery_api';
+    reached: boolean;
+    current: boolean;
+    at: string | null;
+    label_ar: string;
+    label_en: string;
+  }>;
+  available: Array<{
+    stage: string;
+    source: 'manual' | 'automatic' | 'delivery_api';
+    label_ar: string;
+    label_en: string;
+  }>;
+  history: Array<{
+    stage: string;
+    status: string;
+    source: string;
+    changed_at: string;
+    changed_by: string;
+    note: string;
+  }>;
 }
 
 export interface WalletTx {
