@@ -167,6 +167,46 @@ jobs:
           q "SELECT id, slug FROM products WHERE json_valid(images)=0 OR json_valid(options)=0 OR json_valid(colors)=0 OR json_valid(specifications)=0 LIMIT 20" \
             | jq -r '.[0].results[] | "\(.id)  \(.slug)"' || true
 
+      # LEVO Studio: the slicer reports "Worker terminated (likely out of
+      # memory): worker error". That message is the engine's own worker.onerror
+      # fallback, used whenever ErrorEvent.message is EMPTY — which happens both
+      # on a real OOM kill and when the worker SCRIPT FAILS TO LOAD. The two are
+      # told apart by whether the chunk is actually served, with a JavaScript
+      # content type, under headers that a cross-origin-isolated page will
+      # accept. All read-only GETs.
+      - name: LEVO Studio — worker chunk and isolation headers
+        continue-on-error: true
+        run: |
+          S=https://studio.levonis-iq.com
+          echo "── document headers (COOP/COEP decide whether a worker may load at all)"
+          curl -s -o /tmp/studio.html -D /tmp/studio.hdr --max-time 25 "$S/"
+          grep -iE '^(HTTP|content-type|cross-origin|cf-ray)' /tmp/studio.hdr || true
+
+          echo "── asset chunks referenced by the document"
+          grep -oE '/assets/[A-Za-z0-9_.-]+\.js' /tmp/studio.html | sort -u | head -20 > /tmp/chunks.txt
+          cat /tmp/chunks.txt
+
+          echo "── hunting the worker chunk through the referenced chunks"
+          : > /tmp/workers.txt
+          while read -r c; do
+            [ -n "$c" ] || continue
+            curl -s --max-time 25 "$S$c" \
+              | grep -oE '[A-Za-z0-9_./-]*(slicer|parse_3mf|sla_slice|sla_reconstruct|sl1_encode)\.worker[A-Za-z0-9_.-]*\.js' \
+              >> /tmp/workers.txt || true
+          done < /tmp/chunks.txt
+          sort -u /tmp/workers.txt | head -10 | tee /tmp/w.txt
+
+          echo "── does each worker chunk actually serve?"
+          while read -r w; do
+            [ -n "$w" ] || continue
+            url="$S/assets/$(basename "$w")"
+            code=$(curl -s -o /tmp/wb.js -D /tmp/wh.txt -w '%{http_code}' --max-time 25 "$url")
+            ct=$(grep -i '^content-type' /tmp/wh.txt | tr -d '\r')
+            corp=$(grep -i '^cross-origin-resource-policy' /tmp/wh.txt | tr -d '\r')
+            echo "$url -> $code | $ct | ${corp:-no CORP header}"
+            echo "   first bytes: $(head -c 80 /tmp/wb.js | tr -d '\n')"
+          done < /tmp/w.txt
+
       - name: Summary
         if: always()
         run: echo "Read the step logs above — nothing was changed." >> "$GITHUB_STEP_SUMMARY"
