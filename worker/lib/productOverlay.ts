@@ -84,6 +84,46 @@ export const EMPTY_RELATIONS: ProductRelationsView = {
   images: [],
 };
 
+/**
+ * THE OVERLAY MUST NEVER TAKE THE CATALOGUE DOWN.
+ *
+ * These tables ENRICH a product with its options, colours and images; the
+ * product itself is complete without them, in its own row. So a read that
+ * fails here degrades to "no relations" and the storefront renders from the
+ * legacy JSON columns, rather than turning one failed query into a 500 for
+ * every product on the site.
+ *
+ * This is not theoretical. On 2026-08-30 the live worker was running code
+ * that reads these tables against a database still migrated to 0012, and
+ * every product listing answered 500 with
+ * `D1_ERROR: no such table: product_option_groups` while the product rows
+ * themselves were perfectly fine. A deploy will always be able to land before
+ * its migration — the window may be seconds or, as here, days — and the
+ * storefront has to survive it.
+ *
+ * The error is logged, once per read, so the gap is visible in the worker log
+ * instead of silently pretending the products have no options.
+ */
+async function softAll<T>(
+  label: string,
+  run: () => Promise<{ results: T[] }>
+): Promise<T[]> {
+  try {
+    return (await run()).results;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`product relations unavailable (${label}): ${msg}`);
+    return [];
+  }
+}
+
+/** True when the failure is specifically "the relational tables are not there
+ *  yet" — worth distinguishing in a log from a genuine query bug. */
+export function isMissingRelationTable(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /no such table/i.test(msg);
+}
+
 /** Loads everything relational for one product in four batched reads. */
 export async function loadRelationsView(
   db: D1Database,
@@ -91,18 +131,27 @@ export async function loadRelationsView(
   inventoryMode: unknown
 ): Promise<ProductRelationsView> {
   const [rel, variants, images] = await Promise.all([
-    loadProductRelations(db, productId),
-    db
-      .prepare('SELECT * FROM product_variants WHERE product_id = ? ORDER BY combo_key')
-      .bind(productId)
-      .all<VariantRow>(),
-    db
-      .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order, id')
-      .bind(productId)
-      .all<ImageRow>(),
+    loadProductRelations(db, productId).catch((e) => {
+      console.error(
+        `product relations unavailable (one product ${productId}): ${e instanceof Error ? e.message : String(e)}`
+      );
+      return { groups: [], values: [], colors: [], links: [] };
+    }),
+    softAll<VariantRow>('variants', () =>
+      db
+        .prepare('SELECT * FROM product_variants WHERE product_id = ? ORDER BY combo_key')
+        .bind(productId)
+        .all<VariantRow>()
+    ),
+    softAll<ImageRow>('images', () =>
+      db
+        .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order, id')
+        .bind(productId)
+        .all<ImageRow>()
+    ),
   ]);
   const has =
-    rel.groups.length > 0 || rel.values.length > 0 || rel.colors.length > 0 || images.results.length > 0;
+    rel.groups.length > 0 || rel.values.length > 0 || rel.colors.length > 0 || images.length > 0;
   return {
     has_relations: has,
     inventory_mode: isInventoryMode(inventoryMode) ? inventoryMode : 'BASE',
@@ -110,8 +159,8 @@ export async function loadRelationsView(
     values: rel.values,
     colors: rel.colors,
     links: rel.links,
-    variants: variants.results,
-    images: images.results,
+    variants,
+    images,
   };
 }
 
@@ -126,20 +175,32 @@ export async function loadRelationsViews(
   const ph = ids.map(() => '?').join(', ');
 
   const [groups, values, colors, links, variants, images] = await Promise.all([
-    db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionGroupRow>(),
-    db.prepare(`SELECT * FROM product_option_values WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionValueRow>(),
-    db.prepare(`SELECT * FROM product_colors WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<ColorRow>(),
-    db
-      .prepare(
-        `SELECT c.product_id, l.color_id, l.option_value_id, l.group_id
-           FROM product_color_option_links l
-           JOIN product_colors c ON c.id = l.color_id
-          WHERE c.product_id IN (${ph})`
-      )
-      .bind(...ids)
-      .all<ColorLinkRow & { product_id: string }>(),
-    db.prepare(`SELECT * FROM product_variants WHERE product_id IN (${ph}) ORDER BY combo_key`).bind(...ids).all<VariantRow>(),
-    db.prepare(`SELECT * FROM product_images WHERE product_id IN (${ph}) ORDER BY sort_order, id`).bind(...ids).all<ImageRow>(),
+    softAll<OptionGroupRow>('groups', () =>
+      db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionGroupRow>()
+    ),
+    softAll<OptionValueRow>('values', () =>
+      db.prepare(`SELECT * FROM product_option_values WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionValueRow>()
+    ),
+    softAll<ColorRow>('colors', () =>
+      db.prepare(`SELECT * FROM product_colors WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<ColorRow>()
+    ),
+    softAll<ColorLinkRow & { product_id: string }>('links', () =>
+      db
+        .prepare(
+          `SELECT c.product_id, l.color_id, l.option_value_id, l.group_id
+             FROM product_color_option_links l
+             JOIN product_colors c ON c.id = l.color_id
+            WHERE c.product_id IN (${ph})`
+        )
+        .bind(...ids)
+        .all<ColorLinkRow & { product_id: string }>()
+    ),
+    softAll<VariantRow>('variants', () =>
+      db.prepare(`SELECT * FROM product_variants WHERE product_id IN (${ph}) ORDER BY combo_key`).bind(...ids).all<VariantRow>()
+    ),
+    softAll<ImageRow>('images', () =>
+      db.prepare(`SELECT * FROM product_images WHERE product_id IN (${ph}) ORDER BY sort_order, id`).bind(...ids).all<ImageRow>()
+    ),
   ]);
 
   const bucket = <T extends { product_id: string }>(list: T[]) => {
@@ -151,12 +212,12 @@ export async function loadRelationsViews(
     }
     return m;
   };
-  const g = bucket(groups.results);
-  const v = bucket(values.results);
-  const c = bucket(colors.results);
-  const l = bucket(links.results);
-  const vr = bucket(variants.results);
-  const im = bucket(images.results);
+  const g = bucket(groups);
+  const v = bucket(values);
+  const c = bucket(colors);
+  const l = bucket(links);
+  const vr = bucket(variants);
+  const im = bucket(images);
 
   for (const row of rows) {
     const gs = g.get(row.id) ?? [];

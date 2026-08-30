@@ -1,0 +1,143 @@
+# Applies the PENDING migrations to levonis-db-staging — the database behind
+# levonis-iq.com — and nothing else.
+#
+# WHY THIS IS SEPARATE FROM "2 - Deploy Staging + Tests":
+#
+#   * That workflow also DEPLOYS. The worker currently serving the domain is
+#     already running the newer code — that is precisely the problem — so a
+#     deploy is not the fix, and wrangler replaces a worker's plain-text vars
+#     wholesale on every deploy, which would silently reset APP_ORIGIN and the
+#     email vars this worker is already running with.
+#   * That workflow also runs the API test suites, which CREATE users and
+#     orders. Those suites are for a throwaway database, not for the one
+#     holding 49 real users and 42 real orders.
+#
+# So this does one thing: migrate. No deploy, no vars, no secrets, no DNS, no
+# test data.
+#
+# THE FAULT IT REPAIRS. The live worker answered 500 on every product listing:
+#
+#   D1_ERROR: no such table: product_option_groups: SQLITE_ERROR
+#       at async loadRelationsViews (index.js:10147:61)
+#
+# The deployed code reads the relational product tables introduced by
+# migration 0018, while d1_migrations stopped at 0012_studio_handoff.sql. The
+# product rows were never damaged — 44 of them, foreign_key_check clean; they
+# were simply unreachable because an enrichment query threw.
+#
+# BEFORE MIGRATING it records a D1 Time Travel bookmark. D1 keeps 30 days of
+# point-in-time restore, so the exact pre-migration state stays recoverable
+# with `wrangler d1 time-travel restore levonis-db-staging --bookmark <id>`.
+# The bookmark is printed in the job summary.
+name: 6 - Repair Staging Database (migrations only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MIGRATE-STAGING to confirm'
+        required: true
+        default: ''
+
+concurrency: staging-deploy
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "MIGRATE-STAGING" ] \
+            || { echo "::error::type MIGRATE-STAGING to confirm"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # The migrations must apply to a copy of THIS schema before they touch
+      # the real one. scripts/migrate-check.mjs is the same harness the batches
+      # were developed against; running it here means a broken migration fails
+      # on a throwaway SQLite file, in this job, before the live database is
+      # opened at all.
+      - name: Dry run against a fresh database first
+        run: node scripts/migrate-check.mjs --twice
+
+      - name: Record a Time Travel bookmark (restore point)
+        id: bookmark
+        run: |
+          set -e
+          npx wrangler d1 time-travel info levonis-db-staging 2>&1 | tee /tmp/tt.txt
+          BM=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}' /tmp/tt.txt | head -1 || true)
+          echo "bookmark=${BM:-see-log}" >> "$GITHUB_OUTPUT"
+
+      - name: What is pending, before
+        id: before
+        run: |
+          npx wrangler d1 execute levonis-db-staging --remote --json \
+            --command "SELECT name FROM d1_migrations ORDER BY name" \
+            | jq -r '.[0].results[].name' | tee /tmp/before.txt
+          echo "count=$(wc -l < /tmp/before.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Apply the pending migrations
+        run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+
+      - name: Verify — schema, integrity and the exact table that was missing
+        id: after
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+
+          echo "── applied migrations now"
+          q "SELECT name FROM d1_migrations ORDER BY name" | jq -r '.[0].results[].name' | tee /tmp/after.txt
+          echo "count=$(wc -l < /tmp/after.txt)" >> "$GITHUB_OUTPUT"
+
+          echo "── the table the live worker was looking for"
+          q "SELECT COUNT(*) AS n FROM product_option_groups" | jq -r '"product_option_groups rows: \(.[0].results[0].n)"'
+
+          echo "── data still there"
+          for t in users products orders memberships; do
+            echo "$t: $(q "SELECT COUNT(*) AS n FROM $t" | jq -r '.[0].results[0].n')"
+          done
+
+          echo "── integrity"
+          q "PRAGMA foreign_key_check" | jq -r '.[0].results | length | "foreign_key_check rows: \(.)"'
+
+          echo "── what 0022 backfilled from the existing JSON columns"
+          for t in product_option_values product_colors product_images product_color_option_links; do
+            echo "$t: $(q "SELECT COUNT(*) AS n FROM $t" | jq -r '.[0].results[0].n')"
+          done
+
+      - name: The live site, after
+        id: probe
+        run: |
+          for p in /api/health /api/home '/api/products?limit=3'; do
+            code=$(curl -s -o /tmp/b.txt -w '%{http_code}' --max-time 25 "https://levonis-iq.com$p")
+            echo "$p -> $code"
+            [ "$p" = "/api/products?limit=3" ] && echo "products returned: $(jq '.products | length' /tmp/b.txt 2>/dev/null || echo '?')"
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "https://levonis-iq.com/api/products?limit=3")
+          echo "products_status=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" = "200" ] || { echo "::error::/api/products is still not 200"; exit 1; }
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Staging database repair"
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Restore bookmark (30-day Time Travel) | \`${{ steps.bookmark.outputs.bookmark }}\` |"
+            echo "| Migrations applied before | ${{ steps.before.outputs.count }} |"
+            echo "| Migrations applied after | ${{ steps.after.outputs.count }} |"
+            echo "| /api/products | ${{ steps.probe.outputs.products_status }} |"
+            echo ""
+            echo "Restore command if ever needed:"
+            echo '```'
+            echo "wrangler d1 time-travel restore levonis-db-staging --bookmark ${{ steps.bookmark.outputs.bookmark }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
