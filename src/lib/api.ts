@@ -65,6 +65,10 @@ export interface ApiUser {
   subscription_plan: 'free' | 'plus' | 'pro';
   /** Effective membership tier resolved from the memberships ledger. */
   membership_tier: 'free' | 'plus' | 'pro' | 'prime';
+  /** NULL for a non-admin. 'assistant' = no financial data (mandate §11). */
+  admin_scope?: 'full' | 'assistant' | null;
+  /** UI hint only — the SERVER decides and strips cost either way. */
+  can_view_financials?: boolean;
   subscription_expiry: number;
   locale: 'en' | 'ar' | 'ku';
   avatar_key: string | null;

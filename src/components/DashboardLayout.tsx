@@ -269,6 +269,9 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           {sidebarItems.map((item) => (
             <button
               key={item.id}
+              // Stable hook: the tab is local state, not a URL, so browser
+              // verification needs a way to reach a known panel.
+              data-tab={item.id}
               onClick={() => onTabChange(item.id)}
               title={collapsed ? item.label : undefined}
               aria-current={activeTab === item.id ? 'page' : undefined}
@@ -327,6 +330,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
         <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-[#18181b]/95 backdrop-blur-md border-b border-zinc-800/50">
           <button
             ref={drawerButtonRef}
+            data-action="open-sidebar"
             onClick={() => setShowMobileSidebar(true)}
             aria-label={t.openMenu}
             aria-expanded={showMobileSidebar}
@@ -506,6 +510,9 @@ function MobileDrawer({
           {items.map((item) => (
             <button
               key={item.id}
+              // Same hook as the desktop sidebar, so verification can reach a
+              // panel at any viewport width.
+              data-tab={item.id}
               onClick={() => onSelect(item.id)}
               aria-current={activeTab === item.id ? 'page' : undefined}
               className={`w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-xl font-medium transition-colors text-start ${

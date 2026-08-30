@@ -3,6 +3,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
 import { newId, } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { FAMILIES, fieldsFor, isTemplateFamily } from '../lib/templateFamilies';
 
 /**
  * Database-managed category tree, facets and brands — mandate §4 and §9:
@@ -90,6 +91,54 @@ export function resolveTemplateFamilies(rows: CatalogRow[]): Map<string, Templat
   for (const r of rows) resolve(r.id, new Set());
   return out;
 }
+
+/**
+ * §10: the field definitions the product form renders and the import template
+ * turns into columns. Served rather than duplicated in the frontend bundle, so
+ * a form field and an import column can never drift apart.
+ *
+ * With ?category=<catalog id> the response is narrowed to that section's
+ * resolved family and its add-on group — which is exactly "الأعمدة تتغير حسب
+ * القسم والقالب، ولا تظهر أعمدة لا تخص المنتج".
+ */
+adminTaxonomyRoutes.get('/templates', async (c) => {
+  const categoryId = str(c.req.query('category'), 'category', { max: 60, required: false });
+  if (!categoryId) {
+    return c.json({
+      success: true,
+      families: Object.values(FAMILIES).map((f) => ({
+        id: f.id,
+        label_ar: f.label_ar,
+        label_en: f.label_en,
+        groups: [f.common, ...Object.values(f.sections)],
+      })),
+    });
+  }
+
+  const { results } = await c.env.DB.prepare('SELECT * FROM catalogs').all<CatalogRow>();
+  const node = results.find((r) => r.id === categoryId);
+  if (!node) throw notFound('Section not found');
+  const families = resolveTemplateFamilies(results);
+  const family = families.get(categoryId) ?? null;
+
+  // Slugs from this node up to the root, so a sub-section inherits its
+  // parent's add-on fields as well as contributing its own.
+  const byId = new Map(results.map((r) => [r.id, r]));
+  const slugs: string[] = [];
+  let cursor: CatalogRow | undefined = node;
+  for (let i = 0; i < 20 && cursor; i++) {
+    slugs.push(cursor.slug);
+    cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
+  }
+
+  return c.json({
+    success: true,
+    category_id: categoryId,
+    template_family: family,
+    groups: family && isTemplateFamily(family) ? fieldsFor(family, slugs) : [],
+    section_slugs: slugs,
+  });
+});
 
 // ------------------------------------------------------------------ catalogs
 

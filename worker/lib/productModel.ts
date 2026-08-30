@@ -129,7 +129,18 @@ export interface ProductDoc {
   sale_types: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   preorder_transports: TransportOffer[];
   stock: number | null;
+  /** Warn level for the BASE stock row; null = no warning configured. */
+  low_stock_threshold: number | null;
   brand_id: string | null;
+  /** §4: the main section and its sub-section, as real catalogs rows. */
+  category_id: string | null;
+  sub_category_id: string | null;
+  /** 'devices' | 'materials' | null = inherit from the section (§10). */
+  template_family: string | null;
+  /** §4: optional, or generated at save time. */
+  sku: string | null;
+  /** §10: values for the spec fields the section's template declares. */
+  spec_fields: Record<string, string>;
   media: MediaV2[];
   options: OptionV2[];
   colors: ColorV2[];
@@ -236,6 +247,20 @@ function upgradePriceFields(o: Record<string, unknown>): PriceFields {
     pro_price_iqd: legacyPrice(o.pro_price_iqd),
     cost_iqd: legacyPrice(o.cost_iqd),
   };
+}
+
+/** §10: a flat {field_id: value} map of template-declared spec values. Values
+ *  are trimmed strings; anything else is dropped rather than coerced. */
+function readSpecFields(raw: unknown): Record<string, string> {
+  const src = typeof raw === 'string' ? safeParse<Record<string, unknown>>(raw, {}) : raw;
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
+    if (typeof k !== 'string' || k.length > 80) continue;
+    if (typeof v === 'string') out[k] = v.slice(0, 2000);
+    else if (typeof v === 'number' && Number.isFinite(v)) out[k] = String(v);
+  }
+  return out;
 }
 
 /** §6: normalizes the multi-select sale types, always yielding at least one. */
@@ -440,7 +465,14 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     sale_types: normalizeSaleTypes(row.sale_types, String(row.selling_type ?? 'direct_sale')),
     preorder_transports: upgradeTransports(row.preorder_transports),
     stock: num(row.stock),
+    low_stock_threshold: num(row.low_stock_threshold),
     brand_id: typeof row.brand_id === 'string' && row.brand_id ? row.brand_id : null,
+    category_id: typeof row.category_id === 'string' && row.category_id ? row.category_id : null,
+    sub_category_id: typeof row.sub_category_id === 'string' && row.sub_category_id ? row.sub_category_id : null,
+    template_family:
+      row.template_family === 'devices' || row.template_family === 'materials' ? row.template_family : null,
+    sku: typeof row.sku === 'string' && row.sku ? row.sku : null,
+    spec_fields: safeParse<Record<string, string>>(String(row.spec_fields ?? '{}'), {}),
     media: upgradeMedia(row.images),
     options: upgradeOptions(row.options),
     colors: upgradeColors(row.colors),
@@ -574,7 +606,15 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     sale_types: normalizeSaleTypes(body.sale_types, sellingType as string),
     preorder_transports: transports,
     stock: stock as number | null,
+    low_stock_threshold: optionalPrice(body.low_stock_threshold, 'low_stock_threshold'),
     brand_id: typeof body.brand_id === 'string' && body.brand_id ? (body.brand_id as string) : null,
+    category_id: typeof body.category_id === 'string' && body.category_id ? (body.category_id as string) : null,
+    sub_category_id:
+      typeof body.sub_category_id === 'string' && body.sub_category_id ? (body.sub_category_id as string) : null,
+    template_family:
+      body.template_family === 'devices' || body.template_family === 'materials' ? body.template_family : null,
+    sku: s(body.sku, 60).trim() || null,
+    spec_fields: readSpecFields(body.spec_fields),
     media,
     options,
     colors,
@@ -627,7 +667,13 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     sale_types: JSON.stringify(doc.sale_types),
     preorder_transports: JSON.stringify(doc.preorder_transports),
     stock: doc.stock,
+    low_stock_threshold: doc.low_stock_threshold,
     brand_id: doc.brand_id,
+    category_id: doc.category_id,
+    sub_category_id: doc.sub_category_id,
+    template_family: doc.template_family,
+    sku: doc.sku,
+    spec_fields: JSON.stringify(doc.spec_fields),
     images: JSON.stringify(doc.media),
     options: JSON.stringify(doc.options),
     colors: JSON.stringify(doc.colors),
@@ -679,7 +725,13 @@ export function projectPublic(doc: ProductDoc) {
     sale_types: doc.sale_types,
     preorder_transports: doc.preorder_transports.filter((t) => t.active),
     stock: doc.stock,
+    low_stock_threshold: doc.low_stock_threshold,
     brand_id: doc.brand_id,
+    category_id: doc.category_id,
+    sub_category_id: doc.sub_category_id,
+    template_family: doc.template_family,
+    sku: doc.sku,
+    spec_fields: doc.spec_fields,
     media: doc.media,
     images: doc.media.map((m) => m.url), // legacy string[] compatibility
     options: doc.options.filter((o) => o.active).map(stripCostFields),
@@ -701,7 +753,8 @@ export const PRODUCT_COLUMNS = [
   'id','slug','status','doc_version','content_rev','name','name_ar','name_ku',
   'description','description_ar','description_ku','price_iqd','pro_price_iqd',
   'prime_price_iqd','product_cost_iqd','selling_type','sale_types','preorder_transports',
-  'stock','brand_id','images','options','colors','specifications','labels',
+  'stock','low_stock_threshold','brand_id','category_id','sub_category_id',
+  'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','content_blocks','translation_meta','is_featured',
   'display_order','payment_options','hashtags','how_to_use',
 ] as const;

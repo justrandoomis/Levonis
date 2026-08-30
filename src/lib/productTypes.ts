@@ -129,7 +129,16 @@ export interface ProductDocV2 {
   sale_types: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   preorder_transports: TransportOfferV2[];
   stock: number | null;
+  low_stock_threshold: number | null;
   brand_id: string | null;
+  /** §4: the main section and its sub-section (catalogs rows). */
+  category_id: string | null;
+  sub_category_id: string | null;
+  /** 'devices' | 'materials' | null = inherit from the section. */
+  template_family: string | null;
+  sku: string | null;
+  /** §10: values for the spec fields the section's template declares. */
+  spec_fields: Record<string, string>;
   media: MediaV2[];
   images?: string[]; // public projection compatibility
   options: OptionV2[];

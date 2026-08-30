@@ -182,6 +182,95 @@ npm run build      built in 6.86s
 
 ---
 
+## Batches 3–4 — the model, the API and the rebuilt form
+
+### The form (§1–§8)
+
+`src/components/adminProducts/ProductForm.tsx` replaces `ProductEditor.tsx`,
+which is deleted along with `editorSections.tsx`. Eight numbered accordion
+sections in the mandate's order, each showing a one-line summary and an item
+count when collapsed, only one open at a time.
+
+* **§1 sizing** — 44px controls, 13–14px text, a textarea that starts at 96px
+  and stops at 240px, one 880px content column, every grid track
+  `minmax(0,1fr)`, every text-bearing flex child `min-w-0`. The only element
+  that scrolls sideways is the combinations table, inside its own container.
+* **§1 save bar** — sticky at the bottom of the CONTENT column, not fixed to
+  the viewport, so it can cover neither the sidebar nor the app's bottom nav.
+  It carries save-draft, publish, the dirty/saved state and the first error.
+* **§3 English only** — no ar/ckb input exists anywhere in the form; every
+  input is `dir="ltr"`. Fields the local translator could not cover come back
+  in `translation_review_needed` and are named on screen after saving instead
+  of being hidden behind a green tick.
+* **§4** — brand from the database with a search box, main section required,
+  sub-section limited to that section's children, facets as a separate axis.
+* **§5** — Regular / PRIME / PRO / Cost, with the ladder validated live and
+  again on the server; cost is rendered only for a financial admin.
+* **§6** — sale types as multi-select cards.
+* **§7** — unlimited option groups and values, colours with a small checkbox
+  matrix per group, and the rule stated on screen: OR inside a group, AND
+  across groups, unlinked = shown with everything. The inventory-source picker
+  disables a level that cannot answer yet, and combination rows are generated
+  honouring the colour links so an impossible pairing is never offered.
+* **§8** — many files at once with per-file progress, error and retry; drag or
+  keyboard reordering; exactly one primary (choosing one clears the rest in the
+  same update, and a partial unique index enforces it in the database);
+  per-option/colour binding; `object-contain` so the stored original is never
+  cropped. Direct image-file URLs are accepted and verified by magic bytes —
+  an HTML page is rejected, which is what keeps §2 enforced.
+
+`worker/lib/templateFamilies.ts` defines the Devices and Materials field sets
+once and serves them; the form renders them and the importer will generate its
+columns from the same definition, so a field and a column cannot drift apart.
+
+### Verification (real browser, real server)
+
+`scripts/e2e-product-form.mjs` drives the built app under `wrangler dev` with
+the real API and D1. **67 checks, 0 failures.**
+
+Three findings came out of writing it, and all three were fixed:
+
+1. The first version of the script measured the admin LIST page, not the form —
+   every responsive assertion would have passed without the form ever being
+   rendered. It now asserts the form is on screen (8 sections + the save bar)
+   before measuring anything.
+2. `PUT /:id/relations` accepted a payload naming ANOTHER product's group,
+   colour or image id. The upserts key on id, so it would have silently
+   re-parented those rows, and two products sharing an id collided on the link
+   table's primary key and surfaced as a 500. Foreign ids are now refused by
+   name.
+3. `json_each`'s `value` column unquotes JSON strings, so `json_type(value)` on
+   a plain URL raises "malformed JSON" — the kind comes from `json_each`'s own
+   `type` column. Found by the backfill tests, fixed in migration 0022.
+
+```
+360 / 390 / 768 / 1024 / 1440 px, each:
+  the fixture product is listed
+  the product form is actually rendered
+  no horizontal page overflow
+  no element pushes past the viewport
+  every control is at least 40px tall
+  English inputs are LTR
+  no ar/ckb fields in the form
+  no URL-extraction panel
+  the save bar sits inside the viewport
+  the save bar does not cover the content beneath it
+  the save bar stays inside the content column
+
+API: taxonomy seeded · section resolves devices template · product saved ·
+     translation review list returned · relations saved and round-tripped ·
+     a colour with no links stores no rows ·
+     /api/admin/extract-v2 → 404 · /api/extract → 404
+```
+
+Screenshots: `docs/evidence/product-form/` — `form-<width>-top.png` for each of
+the five widths and `links-<width>.png` showing the colour↔option matrix with
+Black linked to A1 and EU. Playwright's `fullPage` is one viewport here because
+the dashboard scrolls an inner column rather than the document, so the link
+matrix is scrolled into view before its shot rather than cropped out of one.
+
+---
+
 ## Still open
 
 Batches 3–6 (product API for options/colours/variants/images/inventory, the

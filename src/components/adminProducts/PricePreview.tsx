@@ -41,7 +41,7 @@ export default function PricePreview({
   const [colorId, setColorId] = useState('');
   const [transport, setTransport] = useState('');
   const [warrantyId, setWarrantyId] = useState('');
-  const [tier, setTier] = useState<'free' | 'pro'>('free');
+  const [tier, setTier] = useState<'free' | 'prime' | 'pro'>('free');
   const [quote, setQuote] = useState<QuoteResponse['quote'] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function PricePreview({
           colorId: colorId || undefined,
           transportMethod: transport || undefined,
           warrantyPlanId: warrantyId || undefined,
-          tier: tier === 'pro' ? 'pro' : undefined,
+          tier: tier === 'free' ? undefined : tier,
         });
         if (!cancelled) setQuote(data.quote);
       } catch (e) {
@@ -133,7 +133,7 @@ export default function PricePreview({
         <div>
           <L ar="الفئة" en="Tier" />
           <div className="flex rounded-xl overflow-hidden border border-zinc-700">
-            {(['free', 'pro'] as const).map((t) => (
+            {(['free', 'prime', 'pro'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -142,7 +142,7 @@ export default function PricePreview({
                   tier === t ? 'bg-[#6B46FF] text-white' : 'bg-zinc-800/40 text-zinc-400 hover:text-white'
                 }`}
               >
-                {t === 'free' ? 'عادي' : 'PRO'}
+                {t === 'free' ? 'عادي' : t === 'prime' ? 'PRIME' : 'PRO'}
               </button>
             ))}
           </div>

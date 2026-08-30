@@ -20,7 +20,10 @@ import { useLanguage } from '../LanguageContext';
 import type { ListingItem, ListingResponse, DeleteResponse } from './adminProducts/types';
 import { StatusChip, Modal, ErrorBanner, btnPrimary, btnSecondary, inputCls, fmtDate } from './adminProducts/ui';
 
-const ProductEditor = React.lazy(() => import('./adminProducts/ProductEditor'));
+// The rebuilt eight-section form (product-form mandate §1). The previous
+// ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
+// compare-at price §4 retires and the URL-extraction panel §2 deletes.
+const ProductForm = React.lazy(() => import('./adminProducts/ProductForm'));
 const TemplateTools = React.lazy(() => import('./adminProducts/TemplateImport'));
 
 const PAGE = 30;
@@ -193,7 +196,7 @@ export default function AdminProducts() {
   if (editing.open) {
     return (
       <Suspense fallback={<LazyFallback label={t.loading} />}>
-        <ProductEditor
+        <ProductForm
           productId={editing.id}
           onBack={() => setEditing({ open: false, id: null })}
           onListChanged={() => load({ q: query, offset: 0 })}
@@ -252,6 +255,9 @@ export default function AdminProducts() {
         {items.map((p) => (
           <div
             key={p.id}
+            // Stable hooks so the browser verification can open a KNOWN
+            // product's form rather than guessing at a row.
+            data-product-id={p.id}
             // minmax(0,1fr) for the identity column: a long Arabic name must
             // wrap/truncate instead of pushing the price column off-screen.
             className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3 bg-zinc-900/30 hover:bg-zinc-800/40 rounded-xl border border-zinc-800/40 transition-colors"
@@ -307,6 +313,7 @@ export default function AdminProducts() {
               </div>
               <div className="flex items-center gap-1">
                 <button
+                  data-action="edit"
                   onClick={() => setEditing({ open: true, id: p.id })}
                   className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors border border-transparent hover:border-zinc-600"
                   title={t.edit}

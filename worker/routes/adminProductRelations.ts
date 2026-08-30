@@ -444,6 +444,31 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
     }
   }
 
+  // ---- an id must not belong to a DIFFERENT product ----------------------
+  //
+  // The upserts below key on id, so a payload naming another product's group,
+  // colour or image would silently re-parent it — and, when two products
+  // reuse an id, collide on product_color_option_links' primary key and
+  // surface as a 500 instead of a message. Both are refused here by name.
+  const claimed: Array<{ table: string; ids: string[]; label: string }> = [
+    { table: 'product_option_groups', ids: [...groupIds], label: 'option group' },
+    { table: 'product_option_values', ids: [...valueIds], label: 'option value' },
+    { table: 'product_colors', ids: [...colorIds], label: 'colour' },
+    { table: 'product_variants', ids: variantInputs.map((v) => v.id), label: 'variant' },
+    { table: 'product_images', ids: imageInputs.map((i) => i.id), label: 'image' },
+  ];
+  for (const { table, ids, label } of claimed) {
+    if (ids.length === 0) continue;
+    const ph = ids.map(() => '?').join(', ');
+    const { results: foreign } = await c.env.DB
+      .prepare(`SELECT id FROM ${table} WHERE id IN (${ph}) AND product_id <> ?`)
+      .bind(...ids, productId)
+      .all<{ id: string }>();
+    for (const row of foreign) {
+      errors.push(`${label} id "${row.id}" already belongs to another product`);
+    }
+  }
+
   if (errors.length) {
     return c.json({ success: false, code: 'VALIDATION', errors: [...new Set(errors)] }, 400);
   }
@@ -539,7 +564,9 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
       stmts.push(
         db
           .prepare(
-            'INSERT INTO product_color_option_links (color_id, option_value_id, group_id) VALUES (?, ?, ?)'
+            // OR IGNORE: the same value listed twice in one payload is a
+            // harmless client slip, not a reason to fail the whole save.
+            'INSERT OR IGNORE INTO product_color_option_links (color_id, option_value_id, group_id) VALUES (?, ?, ?)'
           )
           .bind(col.id, valueId, groupId)
       );

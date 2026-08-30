@@ -822,7 +822,8 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
   const doc = parseProductRow(row);
-  const tier: Tier = body.tier === 'plus' || body.tier === 'pro' ? body.tier : 'free';
+  const tier: Tier =
+    body.tier === 'plus' || body.tier === 'pro' || body.tier === 'prime' ? body.tier : 'free';
 
   const settings = await getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults', 'exchangeRate']);
   const resolved = resolveUnitPrice({
