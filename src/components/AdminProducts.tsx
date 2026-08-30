@@ -24,6 +24,11 @@ import { StatusChip, Modal, ErrorBanner, btnPrimary, btnSecondary, inputCls, fmt
 // ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
 // compare-at price §4 retires and the URL-extraction panel §2 deletes.
 const ProductForm = React.lazy(() => import('./adminProducts/ProductForm'));
+// The §10 replacement for the single giant template: per-section Devices /
+// Materials sheets with preview, idempotent confirm and a round-trip export.
+const ImportPanel = React.lazy(() => import('./adminProducts/ImportPanel'));
+// The older TXT pipeline. Kept because it is genuinely used, demoted to a
+// second tab because §10 forbids it being the only option.
 const TemplateTools = React.lazy(() => import('./adminProducts/TemplateImport'));
 
 const PAGE = 30;
@@ -32,8 +37,10 @@ const STRINGS = {
   ar: {
     title: 'إدارة المنتجات',
     unit: 'منتج',
-    import: 'استيراد (قالب / ZIP)',
-    importTitle: 'استيراد المنتجات (قالب TXT / ZIP)',
+    import: 'استيراد المنتجات',
+    importTitle: 'استيراد المنتجات',
+    tabNew: 'قوالب الأقسام (CSV / ZIP)',
+    tabLegacy: 'القالب النصي القديم (TXT)',
     newProduct: 'منتج جديد',
     searchPlaceholder: 'بحث بالاسم أو الرابط…',
     search: 'بحث',
@@ -54,8 +61,10 @@ const STRINGS = {
   en: {
     title: 'Manage Products',
     unit: 'products',
-    import: 'Import (template / ZIP)',
-    importTitle: 'Import products (TXT template / ZIP)',
+    import: 'Import products',
+    importTitle: 'Import products',
+    tabNew: 'Section templates (CSV / ZIP)',
+    tabLegacy: 'Legacy TXT template',
     newProduct: 'New product',
     searchPlaceholder: 'Search name or slug…',
     search: 'Search',
@@ -76,8 +85,10 @@ const STRINGS = {
   ckb: {
     title: 'بەڕێوەبردنی بەرهەمەکان',
     unit: 'بەرهەم',
-    import: 'هاوردە (قاڵب / ZIP)',
-    importTitle: 'هاوردەی بەرهەم (قاڵبی TXT / ZIP)',
+    import: 'هاوردەی بەرهەمەکان',
+    importTitle: 'هاوردەی بەرهەمەکان',
+    tabNew: 'قاڵبی بەشەکان (CSV / ZIP)',
+    tabLegacy: 'قاڵبی کۆنی TXT',
     newProduct: 'بەرهەمی نوێ',
     searchPlaceholder: 'گەڕان بە ناو یان بەستەر…',
     search: 'گەڕان',
@@ -123,6 +134,8 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [importOpen, setImportOpen] = useState(false);
   const [importDirty, setImportDirty] = useState(false);
+  // The §10 flow is the default tab; the TXT tools are one click away.
+  const [importTab, setImportTab] = useState<'new' | 'legacy'>('new');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -352,14 +365,36 @@ export default function AdminProducts() {
           titleAr={STRINGS.ar.importTitle}
           titleEn={STRINGS.en.importTitle}
           onClose={closeImport}
-          dirty={importDirty}
+          dirty={importTab === 'legacy' && importDirty}
         >
+          <div className="flex gap-2 mb-4 border-b border-zinc-800 pb-2">
+            {(['new', 'legacy'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                data-import-tab={tab}
+                onClick={() => setImportTab(tab)}
+                className={
+                  'px-3 min-h-11 rounded-lg text-xs font-bold transition-colors ' +
+                  (importTab === tab
+                    ? 'bg-zinc-800 text-white border border-zinc-700'
+                    : 'text-zinc-400 hover:text-white border border-transparent')
+                }
+              >
+                {tab === 'new' ? t.tabNew : t.tabLegacy}
+              </button>
+            ))}
+          </div>
           <Suspense fallback={<LazyFallback label={t.loading} />}>
-            <TemplateTools
-              insideSection={false}
-              onApplied={handleImportApplied}
-              onDirtyChange={handleImportDirty}
-            />
+            {importTab === 'new' ? (
+              <ImportPanel onApplied={handleImportApplied} />
+            ) : (
+              <TemplateTools
+                insideSection={false}
+                onApplied={handleImportApplied}
+                onDirtyChange={handleImportDirty}
+              />
+            )}
           </Suspense>
         </Modal>
       )}

@@ -509,14 +509,16 @@ adminProductsRoutes.get('/', async (c) => {
   let where = '';
   const params: unknown[] = [];
   if (search) {
-    where = ' WHERE (name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR slug LIKE ?)';
+    // SKU is searchable too: §4 made it a real identifier, and an admin who
+    // has a packing slip in hand has the SKU, not the Arabic name.
+    where = ' WHERE (name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR slug LIKE ? OR sku LIKE ?)';
     const like = `%${search}%`;
-    params.push(like, like, like, like);
+    params.push(like, like, like, like, like);
   }
 
   const [list, count] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT id, slug, status, name, name_ar, price_iqd, pro_price_iqd, stock,
+      `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd, stock,
               is_featured, brand_id, images, updated_at, doc_version
          FROM products${where}
         ORDER BY updated_at DESC LIMIT ? OFFSET ?`
@@ -539,6 +541,7 @@ adminProductsRoutes.get('/', async (c) => {
       return {
         id: r.id,
         slug: r.slug,
+        sku: (r.sku as string | null) ?? null,
         status: r.status,
         name_ar: r.name_ar,
         name_en: r.name,

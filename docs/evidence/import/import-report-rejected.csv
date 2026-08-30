@@ -1,0 +1,3 @@
+key,line,action,name,product_id,reason
+المفتاح,السطر,النتيجة,الاسم,معرّف المنتج,السبب
+E2E-BAD-03f1df,2,skipped,Bad Ladder,,"سطر 3: hex: ""not-a-hex"" ليس #RGB أو #RRGGBB | سطر 2: المنتج: يجب PRO ≤ PRIME ≤ الاعتيادي"

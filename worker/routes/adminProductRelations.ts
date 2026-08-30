@@ -235,24 +235,59 @@ adminProductRelationsRoutes.get('/:id/stock', async (c) => {
 
 // ------------------------------------------------------------------- writing
 
-adminProductRelationsRoutes.put('/:id/relations', async (c) => {
-  const admin = c.get('user')!;
-  const productId = c.req.param('id');
-  const money = canViewFinancials(c.env, admin);
+/**
+ * The whole-structure write, as a function rather than a handler.
+ *
+ * WHY IT LIVES HERE AND NOT INSIDE THE ROUTE BODY: the CSV/ZIP importer (§10)
+ * writes exactly the same structure from a spreadsheet that the form writes
+ * from the browser. Two implementations would drift, and the one nobody looks
+ * at would be the one that stops rejecting a colour linked to a deleted
+ * option. So both callers go through this, and the route below is a thin
+ * wrapper that supplies the request body.
+ *
+ * It PLANS and does not execute: on success it returns the statements for the
+ * caller to run. The importer needs them combined with its own product write
+ * in ONE batch, so a product and its options can never half-land.
+ */
+export async function planRelationsWrite(
+  db: D1Database,
+  productId: string,
+  body: Record<string, unknown>,
+  opts: { money: boolean }
+): Promise<
+  | { errors: string[]; stmts?: undefined }
+  | {
+      errors: never[];
+      stmts: D1PreparedStatement[];
+      mode: InventoryMode;
+      summary: {
+        inventory_mode: InventoryMode;
+        groups: number;
+        values: number;
+        colors: number;
+        links: number;
+        variants: number;
+        images: number;
+        primary_image: string | null;
+        facets: number;
+        cost_written: boolean;
+      };
+    }
+> {
+  const money = opts.money;
 
-  const product = await c.env.DB
+  const product = await db
     .prepare('SELECT id, inventory_mode FROM products WHERE id = ?')
     .bind(productId)
     .first<{ id: string; inventory_mode: string }>();
   if (!product) throw notFound('Product not found');
 
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const existing = await loadProductRelations(c.env.DB, productId);
-  const existingVariants = await c.env.DB
+  const existing = await loadProductRelations(db, productId);
+  const existingVariants = await db
     .prepare('SELECT * FROM product_variants WHERE product_id = ?')
     .bind(productId)
     .all<{ id: string; combo_key: string; reserved: number; stock: number | null }>();
-  const existingImages = await c.env.DB
+  const existingImages = await db
     .prepare('SELECT * FROM product_images WHERE product_id = ?')
     .bind(productId)
     .all<{ id: string }>();
@@ -460,7 +495,7 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
   for (const { table, ids, label } of claimed) {
     if (ids.length === 0) continue;
     const ph = ids.map(() => '?').join(', ');
-    const { results: foreign } = await c.env.DB
+    const { results: foreign } = await db
       .prepare(`SELECT id FROM ${table} WHERE id IN (${ph}) AND product_id <> ?`)
       .bind(...ids, productId)
       .all<{ id: string }>();
@@ -469,13 +504,10 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
     }
   }
 
-  if (errors.length) {
-    return c.json({ success: false, code: 'VALIDATION', errors: [...new Set(errors)] }, 400);
-  }
+  if (errors.length) return { errors: [...new Set(errors)] };
 
-  // ---- apply, all-or-nothing ---------------------------------------------
+  // ---- the statements, run as ONE batch by the caller ---------------------
   const stmts: D1PreparedStatement[] = [];
-  const db = c.env.DB;
 
   stmts.push(db.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(mode, productId));
 
@@ -630,23 +662,42 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
     );
   }
 
-  await db.batch(stmts);
+  return {
+    errors: [] as never[],
+    stmts,
+    mode,
+    summary: {
+      inventory_mode: mode,
+      groups: groupInputs.length,
+      values: valueInputs.length,
+      colors: colorInputs.length,
+      links: colorInputs.reduce((n, x) => n + x.linked.length, 0),
+      variants: variantInputs.length,
+      images: imageInputs.length,
+      primary_image: imageInputs.find((i) => i.is_primary === 1)?.id ?? null,
+      facets: facetIds.length,
+      cost_written: money,
+    },
+  };
+}
 
-  await audit(c.env.DB, admin.id, 'product.relations.save', productId, {
-    inventory_mode: mode,
-    groups: groupInputs.length,
-    values: valueInputs.length,
-    colors: colorInputs.length,
-    links: colorInputs.reduce((n, x) => n + x.linked.length, 0),
-    variants: variantInputs.length,
-    images: imageInputs.length,
-    primary_image: imageInputs.find((i) => i.is_primary === 1)?.id ?? null,
-    facets: facetIds.length,
-    cost_written: money,
+adminProductRelationsRoutes.put('/:id/relations', async (c) => {
+  const admin = c.get('user')!;
+  const productId = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const plan = await planRelationsWrite(c.env.DB, productId, body, {
+    money: canViewFinancials(c.env, admin),
   });
+  if (!plan.stmts) {
+    return c.json({ success: false, code: 'VALIDATION', errors: plan.errors }, 400);
+  }
+
+  await c.env.DB.batch(plan.stmts);
+  await audit(c.env.DB, admin.id, 'product.relations.save', productId, plan.summary);
 
   const rel = await loadProductRelations(c.env.DB, productId);
-  return c.json(projectForAdmin(c.env, admin, { success: true, ...rel, inventory_mode: mode }));
+  return c.json(projectForAdmin(c.env, admin, { success: true, ...rel, inventory_mode: plan.mode }));
 });
 
 /**

@@ -1,0 +1,8 @@
+row_type,key,name,description,status,display_order,brand,category,sub_category,sale_types,inventory_mode,price_iqd,prime_price_iqd,pro_price_iqd,cost_iqd,stock,low_stock_threshold,facets,group,value,hex,sku_part,links,image,alt,primary,active,spec.technology,spec.model,spec.build_volume,spec.print_speed,spec.resolution,spec.nozzle,spec.supported_materials,spec.power,spec.dimensions,spec.weight,spec.connectivity,spec.compatibility,spec.warranty,spec.in_the_box,spec.nozzle_temp_max,spec.bed_temp_max,spec.extruders,spec.enclosed,spec.auto_leveling,spec.multi_color
+product,E2E-03f1df,E2E Printer 03f1df,Nozzle diameter: 0.4 mm,active,5,E2E Brand 03f1df,FDM Printers,,direct_sale|pre_order,COLOR,900000,870000,850000,600000,9,2,,,,,,,,,,,FDM,,256x256x256,,,,,,,,,,,,,,,,,
+option,E2E-03f1df,,,,,,,,,,,,,,,,,Printer,A1,,A1,,,,,yes,,,,,,,,,,,,,,,,,,,,
+option,E2E-03f1df,,,,,,,,,,,,,,,,,Plug,EU,,EU,,,,,yes,,,,,,,,,,,,,,,,,,,,
+color,E2E-03f1df,,,,,,,,,,,,,,4,,,,Black,#101010,,Printer:A1|Plug:EU,,,,yes,,,,,,,,,,,,,,,,,,,,
+color,E2E-03f1df,,,,,,,,,,,,,,5,,,,White,#fafafa,,,,,,yes,,,,,,,,,,,,,,,,,,,,
+image,E2E-03f1df,,,,,,,,,,,,,,,,,,,,,,images/front.png,front,yes,,,,,,,,,,,,,,,,,,,,,
+image,E2E-03f1df,,,,,,,,,,,,,,,,,,,,,color:Black,images/black.png,black,,,,,,,,,,,,,,,,,,,,,,

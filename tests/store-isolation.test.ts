@@ -34,10 +34,19 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** Module names whose appearance in any store import is a T1 violation. */
 const FORBIDDEN_MODULES = ['three-slicer', 'occt-import-js', 'three', 'vinext', '@react-three/fiber', '@react-three/drei'];
 
-/** fflate is allowed ONLY in the pre-existing template-import feature. */
+/** fflate is allowed ONLY in the admin template/import features.
+ *
+ *  worker/routes/adminImport.ts is the §10 Devices/Materials pipeline: it
+ *  zips a template (data.csv + README.txt + images/) for download and unzips
+ *  an uploaded one to read data.csv and the product photographs beside it.
+ *  That is product-catalogue packaging, not slicer payload — no mesh, no 3MF,
+ *  no G-code passes through it — so it is the same justification the two
+ *  entries below already carry, for the file that replaces them as the
+ *  primary flow. */
 const FFLATE_ALLOWLIST = new Set([
   join('src', 'components', 'adminProducts', 'TemplateImport.tsx'),
   join('worker', 'routes', 'template.ts'),
+  join('worker', 'routes', 'adminImport.ts'),
 ]);
 
 const SCAN_DIRS = ['src', 'worker'];

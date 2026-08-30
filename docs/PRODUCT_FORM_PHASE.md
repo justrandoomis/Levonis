@@ -271,9 +271,107 @@ matrix is scrolled into view before its shot rather than cropped out of one.
 
 ---
 
+## Batch 5 — the Devices/Materials import templates (§10)
+
+The single giant TXT template is no longer the bulk path. Columns are now
+generated per section from the same `worker/lib/templateFamilies.ts` the form
+renders, so a Materials sheet has no `spec.nozzle` and a Devices sheet has no
+filament diameter.
+
+### The file format
+
+One product spans several rows, told apart by a `row_type` column and joined
+by `key` (the product's SKU, or its slug when it has none):
+
+| row_type | what it carries |
+|---|---|
+| `product` | the product, its four prices, stock, sale types, section, facets and the spec columns its section declares |
+| `option` | one value of one option group, with its own stock and price overrides |
+| `color` | one colour, its HEX, and its links written `Group:Value|Group:Value` |
+| `image` | one image, its order, its primary flag and its `color:Name` / `option:Group:Value` binding |
+
+Packing all of that into encoded strings inside one row would be unreadable in
+Excel and impossible to point an error at. With row types, *"row 14: colour hex
+is not #RRGGBB"* names a line the admin can actually see.
+
+### Endpoints (`/api/admin/import`)
+
+| route | behaviour |
+|---|---|
+| `GET /template?category=&format=csv\|zip` | a real download — header, an Arabic `#labels` row skipped by its marker rather than by position, and a worked example. The ZIP adds `README.txt` and an `images/` folder. |
+| `GET /export?category=\|ids=&format=csv\|zip` | the same shape, filled with real products — the bulk-edit path |
+| `POST /preview` | parses, resolves every name to an id, reports per row. **Writes no product, catalog, stock or order row.** |
+| `POST /confirm` | applies a previewed import, idempotent on `import_id` |
+| `GET /:id/report?format=csv` | the downloadable result report — created / updated / skipped / failed with a reason each |
+| `GET /history` | the last 30 imports |
+
+### The decisions this batch made, stated rather than hidden
+
+* **The preview writes nothing to the database**, but it *does* upload image
+  bytes from an uploaded ZIP to content-addressed R2 keys. That makes confirm a
+  pure database operation that cannot fail halfway on a slow download; an
+  unconfirmed import leaves an orphan blob and never a half-made product.
+* **The importer is not a second writer.** `resolveProduct` produces exactly
+  the two payloads the admin form produces, and both go through
+  `validateProductDoc` and `planRelationsWrite` — which was extracted out of
+  the relations route for this. A rule added to the form is enforced on an
+  import for free.
+* **Ids are reused, never regenerated.** An update matches an option group by
+  name, a value by (group, name), a colour by name and an image by URL. Stock
+  and reserved units live on those rows; a fresh id would silently reset both.
+* **`VARIANT_COMBINATION` cannot be created from a sheet.** A row cannot name a
+  combination unambiguously, so existing ones are carried through and a new
+  product asking for that mode is refused by name.
+* **Spec fields merge, they do not replace** — a value with no column in this
+  section's sheet survives the import.
+* **The TXT tools were demoted, not deleted.** They are the second tab of the
+  import dialog; §10 allows keeping TXT as long as it is not the only option.
+
+### Verification — real numbers
+
+```
+npm run check      0 errors, 119 warnings
+npm run build      clean
+npm run test:unit  467 / 467   (32 of them tests/importCsv.test.ts)
+migrate-check      0024 applies to a fresh DB and twice, 0 FK violations
+
+node scripts/e2e-import.mjs        61 / 61   (API, against wrangler dev)
+node scripts/e2e-import-ui.mjs     44 / 44   (Chromium at 390/768/1024)
+```
+
+What the API script proves, in its own words: the Devices and Materials
+templates download as non-empty attachments with different column lists; the
+preview creates NO product; confirm creates one and a second confirm creates
+none; the written structure really holds 2 groups, 2 values, 2 colours, 2 links
+and 2 stored images with exactly one primary; export → preview → confirm comes
+back as an **update** that preserves every id, order, stock and link; a bad file
+reports its price-ladder violation, its bad hex and its orphan row instead of
+500ing; and an image cell pointing at a product page is refused rather than
+scraped (§2).
+
+The browser script proves the panel is reachable and correct: the dialog opens
+on the section-templates tab, downloads stay disabled until a section is chosen,
+nothing spills past the viewport at 390px, every control is ≥40px, and a file
+chosen **through the UI** previews, confirms and produces a product that a
+follow-up query finds.
+
+Evidence in `docs/evidence/import/`:
+
+| file | what it is |
+|---|---|
+| `template-devices.csv`, `template-materials.csv` | the real downloads, different column lists |
+| `template-devices.zip` | data.csv + README.txt + images/ |
+| `import-file-devices.csv` | the file that was actually imported |
+| `export-devices.csv` | the round-trip export of what it produced |
+| `import-report-applied.csv` | the result report for the successful import |
+| `import-report-rejected.csv` | the report naming why a row was refused |
+| `import-390.png`, `import-768.png`, `import-1024.png` | the dialog at three widths |
+| `import-preview-1024.png`, `import-result-1024.png` | preview and result, driven through the UI |
+
+---
+
 ## Still open
 
-Batches 3–6 (product API for options/colours/variants/images/inventory, the
-form rebuild, the Devices/Materials import templates, and the §12 acceptance
-suite with staging evidence) are not done yet and are **not** claimed as
-working. Nothing so far has been deployed to staging or production.
+Batch 6 — the §12 acceptance matrix end to end and the staging deploy with its
+evidence — is not done yet and is **not** claimed as working. Nothing so far
+has been deployed to staging or production.

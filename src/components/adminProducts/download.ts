@@ -59,8 +59,10 @@ const MSG = {
   empty: 'الملف الذي أعاده الخادم فارغ — لم يُحفظ شيء / the server returned an empty file',
 };
 
-/** RFC 5987 `filename*` wins over the ASCII `filename`; both are sanitized. */
-export function filenameFromDisposition(header: string | null, fallback: string): string {
+/** RFC 5987 `filename*` wins over the ASCII `filename`; both are sanitized.
+ *  `ext` is the extension the saved file is forced to carry — iOS refuses to
+ *  open a file it cannot type, so a CSV must land as .csv and a ZIP as .zip. */
+export function filenameFromDisposition(header: string | null, fallback: string, ext = 'txt'): string {
   let name = '';
   if (header) {
     const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
@@ -82,7 +84,7 @@ export function filenameFromDisposition(header: string | null, fallback: string)
   const base = (name || fallback).split(/[\\/]/).pop() ?? fallback;
   // eslint-disable-next-line no-control-regex -- stripping control characters IS the point here
   const safe = base.replace(/[\u0000-\u001f\\/:*?"<>|]/g, '').replace(/^\.+/, '').trim() || fallback;
-  return safe.toLowerCase().endsWith('.txt') ? safe : `${safe}.txt`;
+  return safe.toLowerCase().endsWith(`.${ext}`) ? safe : `${safe}.${ext}`;
 }
 
 function supportsDownloadAttribute(): boolean {
@@ -108,16 +110,25 @@ async function errorMessageFor(res: Response): Promise<string> {
 }
 
 /**
- * Downloads a same-origin admin text attachment. Throws `DownloadError` with
- * a specific, honest message when nothing was saved.
+ * Downloads a same-origin admin attachment of ANY type — TXT, CSV or ZIP.
+ *
+ * The verification is identical for all three because the failure mode is:
+ * an admin-gated endpoint answering an error as JSON or as the SPA shell,
+ * saved to the device as though it were the file. Reading the body as bytes
+ * rather than text is what lets the same code path serve a ZIP.
  */
-export async function downloadAdminTextFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
+export async function downloadAdminFile(
+  path: string,
+  fallbackName: string,
+  opts: { accept?: string; ext?: string; type?: string } = {}
+): Promise<DownloadOutcome> {
+  const ext = opts.ext ?? 'txt';
   let res: Response;
   try {
     res = await fetch(path, {
       method: 'GET',
       credentials: 'same-origin',
-      headers: { Accept: 'text/plain' },
+      headers: { Accept: opts.accept ?? 'text/plain' },
       cache: 'no-store',
     });
   } catch {
@@ -132,11 +143,16 @@ export async function downloadAdminTextFile(path: string, fallbackName: string):
     throw new DownloadError(MSG.notFile, res.status);
   }
 
-  const text = await res.text();
-  if (!text.trim()) throw new DownloadError(MSG.empty, res.status);
+  const buffer = await res.arrayBuffer();
+  if (buffer.byteLength === 0) throw new DownloadError(MSG.empty, res.status);
+  // A text file of nothing but whitespace is empty too; a ZIP is never text.
+  const isText = contentType.startsWith('text/');
+  if (isText && !new TextDecoder().decode(buffer).trim()) {
+    throw new DownloadError(MSG.empty, res.status);
+  }
 
-  const filename = filenameFromDisposition(res.headers.get('content-disposition'), fallbackName);
-  const bytes = new TextEncoder().encode(text).byteLength;
+  const filename = filenameFromDisposition(res.headers.get('content-disposition'), fallbackName, ext);
+  const bytes = buffer.byteLength;
 
   if (!supportsDownloadAttribute()) {
     // Direct authenticated navigation: the cookie is SameSite=Lax so it rides
@@ -145,7 +161,7 @@ export async function downloadAdminTextFile(path: string, fallbackName: string):
     return { filename, bytes, method: 'navigation' };
   }
 
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([buffer], { type: opts.type ?? 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -163,4 +179,13 @@ export async function downloadAdminTextFile(path: string, fallbackName: string):
   window.setTimeout(() => { URL.revokeObjectURL(url); }, 60_000);
 
   return { filename, bytes, method: 'blob' };
+}
+
+/** The TXT case, unchanged for the legacy template tools. */
+export function downloadAdminTextFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
+  return downloadAdminFile(path, fallbackName, {
+    accept: 'text/plain',
+    ext: 'txt',
+    type: 'text/plain;charset=utf-8',
+  });
 }
