@@ -230,6 +230,30 @@ jobs:
           curl -s --max-time 25 "https://$HOST/api/memberships/plans" \
             | jq -c '[.plans[] | {id, tier, months: .duration_months, price: .price_iqd}]'
 
+      # Does the DEPLOYED css actually carry the palette? The owner reported
+      # the colour unchanged twice, both times because nothing had shipped.
+      - name: The olive the live sites actually serve
+        continue-on-error: true
+        run: |
+          check_site() {
+            echo "── $1"
+            curl -s --max-time 25 "$1/" -o /tmp/doc.html
+            css=$(grep -oE '/assets/[A-Za-z0-9_.-]+\.css' /tmp/doc.html | head -1)
+            if [ -z "$css" ]; then echo "   (no css link found)"; return; fi
+            echo "   css: $css"
+            body=$(curl -s --max-time 25 "$1$css")
+            for hex in 1b2010 0f1208 2b3318; do
+              n=$(printf '%s' "$body" | grep -oic "#$hex" || true)
+              echo "   #$hex occurrences: ${n:-0}"
+            done
+            for old in 0f2f25 0a1f18 184235 0b2519; do
+              n=$(printf '%s' "$body" | grep -oic "#$old" || true)
+              [ "${n:-0}" = "0" ] || echo "   !! stale #$old still present: $n"
+            done
+          }
+          check_site "https://$HOST"
+          check_site "https://studio.levonis-iq.com"
+
       - name: Summary
         if: always()
         run: echo "Read the step logs above — nothing was changed." >> "$GITHUB_STEP_SUMMARY"
