@@ -34,7 +34,12 @@ import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
 import { transportDefaultsFrom } from './products';
 import { localizeProductDoc } from '../lib/translate/localizeProduct';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import {
+  attemptedFinancialWrites,
+  canViewFinancials,
+  carryStoredCostForward,
+  projectForAdmin,
+} from '../lib/adminScope';
 import { syncProductTranslations } from '../lib/translate/store';
 
 export const adminProductsRoutes = new Hono<AppContext>();
@@ -604,30 +609,13 @@ adminProductsRoutes.post('/', async (c) => {
   // (which would let a stale panel wipe a real cost), the request is refused
   // when it actually tries to change one.
   if (!canViewFinancials(c.env, admin)) {
-    const attempted: string[] = [];
-    if (doc.product_cost_iqd !== (prev?.product_cost_iqd ?? null)) attempted.push('product_cost_iqd');
-    const costOf = (list: Array<{ id: string; cost_iqd: number | null }>) =>
-      new Map(list.map((x) => [x.id, x.cost_iqd]));
-    for (const [kind, next, before] of [
-      ['option', costOf(doc.options), costOf(prev?.options ?? [])],
-      ['color', costOf(doc.colors), costOf(prev?.colors ?? [])],
-    ] as const) {
-      for (const [id, cost] of next) {
-        if ((before.get(id) ?? null) !== (cost ?? null)) attempted.push(`${kind}:${id}.cost_iqd`);
-      }
-    }
+    const attempted = attemptedFinancialWrites(body, doc, prev);
     if (attempted.length) {
-      throw forbidden(
-        `You do not have access to product cost. Fields refused: ${attempted.join(', ')}`
-      );
+      throw forbidden(`You do not have access to product cost. Fields refused: ${attempted.join(', ')}`);
     }
     // Carry the stored cost forward untouched so an assistant's save cannot
     // blank a value they were never shown.
-    doc.product_cost_iqd = prev?.product_cost_iqd ?? null;
-    const prevOptionCost = new Map((prev?.options ?? []).map((o) => [o.id, o.cost_iqd]));
-    for (const o of doc.options) o.cost_iqd = prevOptionCost.get(o.id) ?? null;
-    const prevColorCost = new Map((prev?.colors ?? []).map((x) => [x.id, x.cost_iqd]));
-    for (const col of doc.colors) col.cost_iqd = prevColorCost.get(col.id) ?? null;
+    carryStoredCostForward(doc, prev);
   }
 
   // Stale-edit protection: the editor echoes the updated_at it loaded.
