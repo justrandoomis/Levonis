@@ -83,6 +83,16 @@ const lower = rnd.toLowerCase();
 const password = 'coupon-pass-1';
 
 async function main() {
+  // Registration and sign-in are rate limited per IP, and a suite that has
+  // been run a few times in a row while it was being written will trip that
+  // limit — every later check then fails with "Authentication required" and
+  // reads like a permissions bug rather than a spent budget. Local only.
+  try {
+    sql('DELETE FROM rate_limits');
+  } catch {
+    /* the table may not exist on a very old local database */
+  }
+
   console.log(`\nLEVONIS promo codes — admin to order — ${BASE}\n`);
 
   console.log('0. an admin, a customer and something to buy');

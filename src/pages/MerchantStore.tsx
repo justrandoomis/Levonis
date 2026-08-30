@@ -8,6 +8,8 @@ import {
 
 interface StoreMerchant {
   id: string;
+  /** The account behind the store — the only thing /api/chats/open accepts. */
+  user_id: string;
   name: string;
   bio: string;
   avatarUrl: string | null;
@@ -38,8 +40,7 @@ export default function MerchantStore() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [followBusy, setFollowBusy] = useState(false);
-
-  const comingSoon = dir === 'rtl' ? 'قريباً' : 'Coming soon';
+  const [messageBusy, setMessageBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +72,31 @@ export default function MerchantStore() {
       cancelled = true;
     };
   }, [id]);
+
+  /**
+   * Opens (or re-opens) the direct conversation with this merchant.
+   *
+   * The endpoint is idempotent for a pair — it returns the existing GENERAL
+   * thread rather than creating a second one, and it will not hand back an
+   * order thread as if it were a direct message — so tapping twice cannot
+   * fork the conversation.
+   */
+  const openChat = async () => {
+    if (messageBusy || !merchant?.user_id) return;
+    setMessageBusy(true);
+    try {
+      const { chatId } = await api.post<{ chatId: string }>('/api/chats/open', { userId: merchant.user_id });
+      navigate(`/chat/${chatId}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        navigate(`/auth?next=${encodeURIComponent(`/community/store/${merchant.id}`)}`);
+        return;
+      }
+      console.error(err);
+    } finally {
+      setMessageBusy(false);
+    }
+  };
 
   const toggleFollow = async () => {
     if (followBusy || !merchant) return;
@@ -167,12 +193,15 @@ export default function MerchantStore() {
           >
             {isFollowing ? (dir === 'rtl' ? 'تمت المتابعة' : 'Following') : (dir === 'rtl' ? 'متابعة' : 'Follow')}
           </button>
+          {/* Was disabled with "قريباً" on it. Direct chats have existed
+              since the first migration; nothing was wired to open one. */}
           <button
-            disabled
-            title={comingSoon}
-            className="flex-1 border border-zinc-800 bg-zinc-900/60 text-zinc-500 rounded-full py-3 font-bold cursor-not-allowed"
+            type="button"
+            onClick={() => void openChat()}
+            disabled={messageBusy || !merchant.user_id}
+            className="flex-1 border border-zinc-700 bg-zinc-900 text-white rounded-full py-3 font-bold hover:bg-zinc-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {dir === 'rtl' ? 'مراسلة (قريباً)' : 'Message (Coming soon)'}
+            {messageBusy ? (dir === 'rtl' ? 'جارٍ الفتح…' : 'Opening…') : dir === 'rtl' ? 'مراسلة' : 'Message'}
           </button>
         </div>
 

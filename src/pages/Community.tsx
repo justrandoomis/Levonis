@@ -230,13 +230,19 @@ export default function Community() {
              <h3 className="text-white font-bold text-sm mb-1">{t('studioCardTitle')}</h3>
              <p className="text-xs text-olive font-medium">{t('studioOpen')}</p>
            </a>
-           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
+           {/* Was a dead card. The calculator is real now — it prices from
+               the shop's own filament, not from invented numbers. */}
+           <button
+             type="button"
+             onClick={() => navigate('/tools')}
+             className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden text-start hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+           >
              <div className="absolute right-2 bottom-0 opacity-20">
                <Calculator className="w-20 h-20" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'احسب سعر طباعتك' : 'Calculate Print Price'}</h3>
-             <p className="text-xs text-zinc-400">{comingSoon}</p>
-           </div>
+             <p className="text-xs text-zinc-300">{dir === 'rtl' ? 'افتح الحاسبة' : 'Open the calculator'}</p>
+           </button>
            <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/20 to-black border border-olive/30 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
              <div className="absolute right-2 bottom-0 opacity-20">
                <Box className="w-20 h-20 text-olive" />

@@ -15,7 +15,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { notFound, int, str } from '../lib/http';
-import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
+import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
 import type { ProductDoc } from '../lib/productModel';
@@ -468,6 +468,71 @@ function publicWithDisplayPrice(
 }
 
 // ---------------------------------------------------------------- routes
+
+/**
+ * What the print-price calculator needs: the shop's REAL filaments, with a
+ * real price per gram, and the owner's service rates.
+ *
+ * WHY THE PRICE PER GRAM IS DERIVED AND NOT TYPED IN. A calculator seeded
+ * with made-up material prices is worse than no calculator: a customer plans
+ * around the number and then meets a different one at checkout. Every figure
+ * here comes from a product the shop actually sells — its price, divided by
+ * the net weight on its own spec sheet. A filament with no net weight, or no
+ * price, is simply not offered rather than guessed at.
+ *
+ * The service rates are the owner's decision and start unset. The calculator
+ * shows the material cost either way and says plainly that the rest is not
+ * published yet, rather than quietly quoting material-only as a total.
+ */
+productRoutes.get('/print-calculator', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, slug, name, name_ar, name_ku, price_iqd, spec_fields, images, template_family
+       FROM products
+      WHERE status = 'active' AND template_family = 'materials' AND price_iqd > 0
+      ORDER BY price_iqd
+      LIMIT 200`
+  ).all<Record<string, unknown>>();
+
+  const filaments: Array<Record<string, unknown>> = [];
+  for (const row of results ?? []) {
+    const specs = safeParse<Record<string, string>>(String(row.spec_fields ?? '{}'), {});
+    // The materials template stores net weight in grams (templateFamilies.ts).
+    // Accepts "1000", "1000 g", "1,000g" — and refuses anything else rather
+    // than coercing a stray value into a price.
+    const raw = String(specs.net_weight ?? '').replace(/[,\s]/g, '');
+    const grams = Number(raw.replace(/[^0-9.]/g, ''));
+    if (!Number.isFinite(grams) || grams <= 0) continue;
+    const price = Number(row.price_iqd) || 0;
+    if (price <= 0) continue;
+    filaments.push({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      name_ar: row.name_ar,
+      name_ku: row.name_ku,
+      price_iqd: price,
+      net_weight_g: grams,
+      // Rounded to the dinar because that is the smallest unit anyone pays in.
+      iqd_per_gram: Math.round((price / grams) * 100) / 100,
+      material_type: specs.material_type ?? specs.material ?? '',
+    });
+  }
+
+  const rates = await getSetting(c.env.DB, 'printServicePricing');
+  return c.json({
+    success: true,
+    filaments,
+    // Honest nulls, echoed as they are stored. `configured` exists so a screen
+    // does not have to decide what "0" means.
+    rates: {
+      machine_iqd_per_hour: rates?.machine_iqd_per_hour ?? null,
+      setup_fee_iqd: rates?.setup_fee_iqd ?? null,
+      margin_percent: rates?.margin_percent ?? null,
+      configured:
+        rates?.machine_iqd_per_hour !== null && rates?.machine_iqd_per_hour !== undefined,
+    },
+  });
+});
 
 productRoutes.get('/', async (c) => {
   const q = c.req.query();

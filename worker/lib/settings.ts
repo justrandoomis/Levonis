@@ -132,6 +132,21 @@ export const SETTING_DEFAULTS = {
    * integration reports itself as unconfigured rather than sending guesses.
    */
   deliveryConfig: {} as Record<string, unknown>,
+  /**
+   * The print-service rates the price calculator adds on top of material.
+   *
+   * NOT SEEDED WITH GUESSES. Material cost the calculator can work out
+   * honestly — it divides a real spool's real price by its real net weight —
+   * but what LEVONIS charges for machine time, setup and margin is the
+   * owner's business decision, and inventing a number would produce a quote
+   * a customer might act on. Null means "not configured", and the calculator
+   * says so instead of filling the gap.
+   */
+  printServicePricing: {
+    machine_iqd_per_hour: null,
+    setup_fee_iqd: null,
+    margin_percent: null,
+  } as { machine_iqd_per_hour: number | null; setup_fee_iqd: number | null; margin_percent: number | null },
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -150,6 +165,9 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   'homeBanners',
   'homeSectionItems',
   'homeAds',
+  // The calculator is a public tool; the rates on it are a published price
+  // list, not internal policy.
+  'printServicePricing',
   // NOTE: proPricingPolicy, preorderTransportDefaults, launchConfig and
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];

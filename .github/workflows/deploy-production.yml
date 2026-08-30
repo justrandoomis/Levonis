@@ -102,14 +102,24 @@ jobs:
           INITIAL_ADMIN_EMAIL: ${{ secrets.INITIAL_ADMIN_EMAIL }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           PROD_APP_ORIGIN: ${{ secrets.PROD_APP_ORIGIN }}
+          # Which origins may be handed a Studio sign-in code. The Studio side
+          # of this handoff has been deployed with its half of the
+          # configuration since the Studio went up; the STORE side was never
+          # passed anything, so the exchange could not have worked even with
+          # the secret set. Empty keeps the handoff honestly disabled.
+          STUDIO_ALLOWED_DESTINATIONS: ${{ secrets.STUDIO_ALLOWED_DESTINATIONS }}
         run: |
           set -e
           APP_ORIGIN="${PROD_APP_ORIGIN:-${{ steps.deploy.outputs.url }}}"
+          if [ -z "$STUDIO_ALLOWED_DESTINATIONS" ]; then
+            echo "STUDIO_ALLOWED_DESTINATIONS not set — Studio sign-in handoff stays honestly disabled"
+          fi
           npx wrangler deploy \
             --var GOOGLE_CLIENT_ID:"$VITE_GOOGLE_CLIENT_ID" \
             --var INITIAL_ADMIN_EMAIL:"$INITIAL_ADMIN_EMAIL" \
             --var APP_ORIGIN:"$APP_ORIGIN" \
             --var EMAIL_FROM:"$EMAIL_FROM" \
+            --var STUDIO_ALLOWED_DESTINATIONS:"$STUDIO_ALLOWED_DESTINATIONS" \
             > /dev/null
 
       - name: Upload runtime secrets to the production worker
@@ -120,7 +130,17 @@ jobs:
           EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           KYC_ENC_KEY: ${{ secrets.KYC_ENC_KEY }}
+          # The SAME secret the Studio worker gets. Both halves must hold it
+          # or the server-to-server code exchange cannot be authenticated —
+          # which is exactly why studio.levonis-iq.com answers
+          # AUTH_NOT_CONFIGURED today.
+          STUDIO_HANDOFF_SECRET: ${{ secrets.STUDIO_HANDOFF_SECRET }}
         run: |
+          if [ -n "$STUDIO_HANDOFF_SECRET" ]; then
+            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put STUDIO_HANDOFF_SECRET
+          else
+            echo "STUDIO_HANDOFF_SECRET not set — Studio sign-in handoff stays honestly disabled in production"
+          fi
           [ -n "$TELEGRAM_WEBHOOK_SECRET" ] && printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | npx wrangler secret put TELEGRAM_WEBHOOK_SECRET || echo "TELEGRAM_WEBHOOK_SECRET not set — Telegram webhook honestly disabled"
           [ -n "$KYC_ENC_KEY" ] && printf '%s' "$KYC_ENC_KEY" | npx wrangler secret put KYC_ENC_KEY || echo "KYC_ENC_KEY not set — KYC submission honestly disabled"
           [ -n "$TELEGRAM_BOT_TOKEN" ] && printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN || echo "TELEGRAM_BOT_TOKEN not set"

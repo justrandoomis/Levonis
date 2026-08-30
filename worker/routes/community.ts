@@ -12,6 +12,11 @@ export const communityRoutes = new Hono<AppContext>();
 function merchantPublic(m: Record<string, unknown>) {
   return {
     id: m.id,
+    // The account behind the store, so a customer can open a conversation
+    // with them. It is an opaque id — no email, no phone, nothing that
+    // identifies the person beyond what the store page already shows — and
+    // POST /api/chats/open is the only thing that accepts it.
+    user_id: m.user_id,
     name: m.name,
     bio: m.bio,
     avatarUrl: m.avatar_key ? `/files/${m.avatar_key}` : null,
