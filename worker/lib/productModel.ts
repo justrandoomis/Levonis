@@ -586,6 +586,82 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
 
   const status = body.status === 'draft' || body.status === 'hidden' ? body.status : 'active';
 
+  // ---------------------------------------------------------------- §5 prices
+  //
+  //   "لا تنسخ تكلفة المنتج إلى سعر البيع أو العكس."
+  //   "يجب أن يختلف سعر البيع عن التكلفة. امنع الحفظ مع رسالة واضحة إذا تساويا."
+  //   "عند إدخال أسعار العضويات يجب أن يكون: PRO <= PRIME <= Regular"
+  //
+  // Both rules are enforced HERE, at write time, and at every level that can
+  // carry its own price — product, option and colour — because §5 says the
+  // same price fields apply to a variant/option/colour that has its own.
+  // lib/pricing.ts clamps the ladder again when RESOLVING a price, but that is
+  // a safety net for rows written before this rule existed; a clamp is not a
+  // refusal, and a cost accidentally typed into the price field would sail
+  // straight through it and sell the product at cost.
+  const priceRules = (
+    label: string,
+    regular: number | null,
+    prime: number | null,
+    pro: number | null,
+    cost: number | null
+  ) => {
+    if (regular !== null && cost !== null && regular === cost) {
+      fail(
+        label ? `${label}.price_iqd` : 'price_iqd',
+        'the selling price must not equal the cost — set a selling price above the cost, or clear the cost'
+      );
+    }
+    // The membership prices are compared against the price actually in force
+    // at this level: an option with no regular price of its own sells at the
+    // product's.
+    const effectiveRegular = regular ?? (price as number | null);
+    if (prime !== null && effectiveRegular !== null && prime > effectiveRegular) {
+      fail(
+        label ? `${label}.prime_price_iqd` : 'prime_price_iqd',
+        `PRIME (${prime}) must not be above the regular price (${effectiveRegular}) — the ladder is PRO <= PRIME <= Regular`
+      );
+    }
+    if (pro !== null && effectiveRegular !== null && pro > effectiveRegular) {
+      fail(
+        label ? `${label}.pro_price_iqd` : 'pro_price_iqd',
+        `PRO (${pro}) must not be above the regular price (${effectiveRegular}) — the ladder is PRO <= PRIME <= Regular`
+      );
+    }
+    if (pro !== null && prime !== null && pro > prime) {
+      fail(
+        label ? `${label}.pro_price_iqd` : 'pro_price_iqd',
+        `PRO (${pro}) must not be above PRIME (${prime}) — the PRIME discount is the smaller one`
+      );
+    }
+    if (prime !== null && cost !== null && prime === cost) {
+      fail(
+        label ? `${label}.prime_price_iqd` : 'prime_price_iqd',
+        'the PRIME price must not equal the cost'
+      );
+    }
+    if (pro !== null && cost !== null && pro === cost) {
+      fail(
+        label ? `${label}.pro_price_iqd` : 'pro_price_iqd',
+        'the PRO price must not equal the cost'
+      );
+    }
+  };
+
+  priceRules(
+    '',
+    price as number | null,
+    optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
+    optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
+    optionalPrice(body.product_cost_iqd, 'product_cost_iqd')
+  );
+  for (const o of options) {
+    priceRules(`options.${o.id}`, o.regular_price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd);
+  }
+  for (const col of colors) {
+    priceRules(`colors.${col.id}`, col.regular_price_iqd, col.prime_price_iqd, col.pro_price_iqd, col.cost_iqd);
+  }
+
   return {
     id: typeof body.id === 'string' && body.id ? (body.id as string) : newId('prd'),
     slug: s(body.slug, 200), // final slug decided by the persistence layer (stability rules)

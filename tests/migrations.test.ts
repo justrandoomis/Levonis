@@ -23,7 +23,11 @@ const run = (args: string[]) =>
 test('migrations apply to a fresh database and survive a second pass', () => {
   const out = run(['--twice']);
   assert.match(out, /second full pass applied 0 files/);
-  assert.match(out, /idempotent statements re-ran with no row change/);
+  assert.match(out, /idempotent statement\(s\) re-ran — no row added, no value changed/);
+  // Not just 'the line printed': the harness must have had something to
+  // re-run. A migration it cannot re-run is untested, not proven.
+  const n = Number(/(\d+) idempotent statement\(s\)/.exec(out)?.[1] ?? 0);
+  assert.ok(n > 0, `the newest migration had no re-runnable statement (${n})`);
   assert.match(out, /foreign_key_check violations: 0/);
   assert.match(out, /orphan catalogs: 0/);
 });

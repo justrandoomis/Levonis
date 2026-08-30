@@ -73,7 +73,24 @@ const isIdempotent = (s) =>
   /^CREATE (TABLE|INDEX|UNIQUE INDEX)\s+IF NOT EXISTS/i.test(s) ||
   /^CREATE UNIQUE INDEX IF NOT EXISTS/i.test(s) ||
   /^INSERT OR IGNORE\s+INTO/i.test(s) ||
-  (/^INSERT\s+INTO/i.test(s) && /WHERE NOT EXISTS/i.test(s));
+  (/^INSERT\s+INTO/i.test(s) && /WHERE NOT EXISTS/i.test(s)) ||
+  // An UPDATE that only assigns LITERALS is idempotent by construction:
+  // running it again writes the same constants over the same rows. One that
+  // assigns an expression (`SET n = n + 1`) is not, and is excluded — that is
+  // what the negative lookahead on the value is for. Migration 0025 is two
+  // such UPDATEs, and before this every one of them was silently skipped, so
+  // "0 idempotent statements re-ran with no row change" printed green while
+  // testing nothing at all.
+  (/^UPDATE\s+\w+\s+SET\s/i.test(s) && isLiteralAssignment(s));
+
+/** true when every `col = value` in the SET clause assigns a literal. */
+function isLiteralAssignment(stmt) {
+  const m = /\bSET\s+([\s\S]*?)(?:\bWHERE\b|$)/i.exec(stmt);
+  if (!m) return false;
+  return m[1]
+    .split(',')
+    .every((pair) => /^\s*\w+\s*=\s*(-?\d+(\.\d+)?|'[^']*'|NULL)\s*$/i.test(pair));
+}
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -97,21 +114,50 @@ if (twice) {
   const files = readdirSync('migrations').filter((f) => f.endsWith('.sql')).sort();
   const newest = files[files.length - 1];
   const stmts = splitStatements(readFileSync(join('migrations', newest), 'utf8')).filter(isIdempotent);
+  // A migration made only of statements this harness cannot re-run is not
+  // "proven idempotent", it is UNTESTED — and printing a green line for it is
+  // exactly the fake success the mandate forbids. Say so and fail.
+  if (stmts.length === 0) {
+    console.error(
+      `✘ ${newest}: no statement in it is re-runnable by this harness, so the ` +
+        'second-pass check proves nothing. Either the migration is not idempotent, ' +
+        'or isIdempotent() needs to learn its shape.'
+    );
+    process.exit(1);
+  }
+
+  // §12 asks for "دون تكرار أو تلف" — no DUPLICATION and no CORRUPTION. Row
+  // counts only answer the first. So the whole contents of each table are
+  // snapshotted and compared, which also catches an UPDATE that rewrites a
+  // value on the second pass without changing how many rows there are.
   const countable = ['catalogs', 'facets', 'membership_plans', 'product_option_groups', 'product_images'];
-  const before = Object.fromEntries(
-    countable.map((t) => [t, db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n])
-  );
+  const snapshot = () =>
+    Object.fromEntries(
+      countable.map((t) => [t, JSON.stringify(db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all())])
+    );
+  const counts = () =>
+    Object.fromEntries(countable.map((t) => [t, db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n]));
+
+  const before = snapshot();
+  const beforeCounts = counts();
   db.exec('BEGIN');
   for (const s of stmts) db.exec(s);
   db.exec('COMMIT');
+  const after = snapshot();
+  const afterCounts = counts();
   for (const t of countable) {
-    const after = db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
-    if (after !== before[t]) {
-      console.error(`✘ re-running ${newest} changed ${t}: ${before[t]} → ${after}`);
+    if (afterCounts[t] !== beforeCounts[t]) {
+      console.error(`✘ re-running ${newest} DUPLICATED rows in ${t}: ${beforeCounts[t]} → ${afterCounts[t]}`);
+      process.exit(1);
+    }
+    if (after[t] !== before[t]) {
+      console.error(`✘ re-running ${newest} CHANGED the contents of ${t} without changing its row count`);
       process.exit(1);
     }
   }
-  console.log(`✔ ${newest}: ${stmts.length} idempotent statements re-ran with no row change`);
+  console.log(
+    `✔ ${newest}: ${stmts.length} idempotent statement(s) re-ran — no row added, no value changed`
+  );
 }
 
 const tables = db.prepare(

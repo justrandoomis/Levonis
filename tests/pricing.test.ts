@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveUnitPrice, DEFAULT_PRO_POLICY } from '../worker/lib/pricing';
+import { validateProductDoc } from '../worker/lib/productModel';
 import type { PricingProduct, OptionV2, ColorV2 } from '../worker/lib/pricing';
 
 const baseOption = (over: Partial<OptionV2> = {}): OptionV2 => ({
@@ -222,4 +223,127 @@ test('inactive option/color rejected server-side', () => {
   const p = product({ options: [baseOption({ active: false })] });
   const r = resolveUnitPrice({ product: p, optionId: 'opt1', ...free });
   assert.ok(r.errors.includes('OPTION_INACTIVE'));
+});
+
+// ===================================================================
+// §5 WRITE-TIME RULES — the resolver above clamps; the validator REFUSES.
+//
+//   "لا تنسخ تكلفة المنتج إلى سعر البيع أو العكس."
+//   "يجب أن يختلف سعر البيع عن التكلفة. امنع الحفظ مع رسالة واضحة إذا تساويا."
+//   "عند إدخال أسعار العضويات يجب أن يكون: PRO <= PRIME <= Regular"
+//
+// A clamp is not a refusal. resolveUnitPrice() will happily sell a product
+// whose price field holds its cost, because at read time it has no way to
+// know the two were meant to differ. The block has to happen on save, with a
+// message the admin can act on — which is what §5 asks for in as many words.
+
+const doc = (over: Record<string, unknown> = {}) => ({
+  name_en: 'Rule Fixture',
+  price_iqd: 100_000,
+  ...over,
+});
+/** The thrown message, or '' when the call was accepted. */
+const refusal = (body: Record<string, unknown>): string => {
+  try {
+    validateProductDoc(body);
+    return '';
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+};
+
+test('a selling price equal to the cost is REFUSED, not silently accepted', () => {
+  const why = refusal(doc({ price_iqd: 100_000, product_cost_iqd: 100_000 }));
+  assert.match(why, /price_iqd/);
+  assert.match(why, /must not equal the cost/);
+});
+
+test('the refusal says what to do about it', () => {
+  // "امنع الحفظ مع رسالة واضحة" — a clear message, not just a code.
+  const why = refusal(doc({ price_iqd: 100_000, product_cost_iqd: 100_000 }));
+  assert.match(why, /set a selling price above the cost, or clear the cost/);
+});
+
+test('a price merely CLOSE to the cost is fine — only equality is the tell', () => {
+  assert.equal(refusal(doc({ price_iqd: 100_001, product_cost_iqd: 100_000 })), '');
+  assert.equal(refusal(doc({ price_iqd: 99_999, product_cost_iqd: 100_000 })), '');
+});
+
+test('no cost at all is not a violation', () => {
+  assert.equal(refusal(doc({ price_iqd: 100_000, product_cost_iqd: null })), '');
+  assert.equal(refusal(doc({ price_iqd: 100_000 })), '');
+});
+
+test('an OPTION that sells at its own cost is refused, and named', () => {
+  const why = refusal(
+    doc({
+      options: [{ id: 'o1', name_en: 'Bundle', regular_price_iqd: 50_000, cost_iqd: 50_000 }],
+    })
+  );
+  assert.match(why, /options\.o1\.price_iqd/);
+  assert.match(why, /must not equal the cost/);
+});
+
+test('a COLOUR that sells at its own cost is refused, and named', () => {
+  const why = refusal(
+    doc({
+      colors: [{ id: 'c1', name_en: 'Black', hex: '#000000', regular_price_iqd: 50_000, cost_iqd: 50_000 }],
+    })
+  );
+  assert.match(why, /colors\.c1\.price_iqd/);
+});
+
+test('PRIME above the regular price is refused at write time', () => {
+  const why = refusal(doc({ price_iqd: 100_000, prime_price_iqd: 120_000 }));
+  assert.match(why, /prime_price_iqd/);
+  assert.match(why, /PRO <= PRIME <= Regular/);
+});
+
+test('PRO above PRIME is refused — the PRIME discount is the smaller one', () => {
+  const why = refusal(doc({ price_iqd: 100_000, prime_price_iqd: 90_000, pro_price_iqd: 95_000 }));
+  assert.match(why, /pro_price_iqd/);
+  assert.match(why, /must not be above PRIME/);
+});
+
+test('the legal ladder PRO <= PRIME <= Regular saves', () => {
+  assert.equal(refusal(doc({ price_iqd: 100_000, prime_price_iqd: 95_000, pro_price_iqd: 90_000 })), '');
+  // Equal rungs are legal: a product may simply not discount for a tier.
+  assert.equal(refusal(doc({ price_iqd: 100_000, prime_price_iqd: 100_000, pro_price_iqd: 100_000 })), '');
+});
+
+test("an option's ladder is checked against the price actually in force", () => {
+  // The option has no regular price of its own, so it sells at the product's
+  // 100,000 — a 120,000 PRIME on it is still above what the customer pays.
+  const why = refusal(doc({ price_iqd: 100_000, options: [{ id: 'o1', name_en: 'X', prime_price_iqd: 120_000 }] }));
+  assert.match(why, /options\.o1\.prime_price_iqd/);
+  // With its own higher regular price it is perfectly legal.
+  assert.equal(
+    refusal(doc({ price_iqd: 100_000, options: [{ id: 'o1', name_en: 'X', regular_price_iqd: 130_000, prime_price_iqd: 120_000 }] })),
+    ''
+  );
+});
+
+test('a membership price equal to the cost is refused too', () => {
+  assert.match(refusal(doc({ price_iqd: 100_000, prime_price_iqd: 60_000, product_cost_iqd: 60_000 })), /prime_price_iqd/);
+  assert.match(refusal(doc({ price_iqd: 100_000, pro_price_iqd: 60_000, product_cost_iqd: 60_000 })), /pro_price_iqd/);
+});
+
+test('the rule survives the resolver: a saved doc always prices above its cost', () => {
+  // End to end — validate, then resolve, and assert the sale price and the
+  // cost the resolver reports are genuinely different numbers.
+  const body = doc({ price_iqd: 100_000, prime_price_iqd: 95_000, pro_price_iqd: 90_000, product_cost_iqd: 60_000 });
+  const validated = validateProductDoc(body);
+  const p = product({
+    price_iqd: validated.price_iqd,
+    prime_price_iqd: validated.prime_price_iqd,
+    pro_price_iqd: validated.pro_price_iqd,
+    product_cost_iqd: validated.product_cost_iqd,
+  });
+  // Every tier, not just one: the rule is that NO customer buys at cost.
+  // 'free' is the ordinary signed-in customer — the regular price.
+  for (const tier of ['free', 'plus', 'prime', 'pro'] as const) {
+    const r = resolveUnitPrice({ product: p, tier, tierActive: tier !== 'free' });
+    assert.notEqual(r.applied_iqd, r.cost_iqd, `${tier} sells at exactly the cost`);
+    assert.ok((r.cost_iqd ?? 0) < r.applied_iqd, `${tier}: ${r.cost_iqd} !< ${r.applied_iqd}`);
+  }
 });
