@@ -21,6 +21,8 @@ import { adminRoutes } from './routes/admin';
 import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
+import { adminTaxonomyRoutes } from './routes/adminTaxonomy';
+import { adminProductRelationsRoutes } from './routes/adminProductRelations';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
@@ -61,6 +63,10 @@ app.route('/api/admin', adminRoutes);
 app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);
+app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
+// Mounted on the same prefix as adminProductsRoutes; the paths are distinct
+// (/:id/relations, /:id/stock) so neither router shadows the other.
+app.route('/api/admin/products', adminProductRelationsRoutes);
 app.route('/api/memberships', membershipsRoutes);
 app.route('/api/telegram', telegramRoutes);
 app.route('/api/invoices', invoiceRoutes);

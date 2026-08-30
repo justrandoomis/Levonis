@@ -8,7 +8,7 @@
     "dev:web": "vite",
     "build": "node scripts/prepare-deploy-config.mjs && vite build",
     "lint": "eslint .",
-    "check": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json && eslint .",
+    "check": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json && tsc --noEmit -p tests/tsconfig.json && eslint .",
     "deploy": "npm run build && wrangler deploy",
     "deploy:staging": "node scripts/set-deploy-ids.mjs --env staging && wrangler deploy --env staging",
     "deploy:production": "node scripts/set-deploy-ids.mjs --env production && wrangler deploy --env=\"\"",

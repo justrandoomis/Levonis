@@ -1,0 +1,20 @@
+{
+  // The unit tests were excluded from BOTH typechecks, so a fixture could keep
+  // referencing a field the model no longer has and nothing would notice —
+  // tsx strips types instead of checking them. This config closes that gap and
+  // is wired into `npm run check`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM"],
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types", "node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["./**/*.ts", "../worker/**/*.ts"]
+}

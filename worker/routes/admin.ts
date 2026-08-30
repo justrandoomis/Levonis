@@ -3,6 +3,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { canViewFinancials, normalizeAdminScope } from '../lib/adminScope';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
@@ -50,25 +51,39 @@ adminRoutes.get('/overview', async (c) => {
     db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all<Record<string, unknown>>(),
   ]);
 
+  // §11: revenue and wallet flow are financial data. An assistant admin sees
+  // the operational counts and nothing about money.
+  const money = canViewFinancials(c.env, c.get('user'));
   return c.json({
     success: true,
+    can_view_financials: money,
     stats: {
       orders_total: orders?.total ?? 0,
       orders_pending: orders?.pending ?? 0,
       orders_delivered: orders?.delivered ?? 0,
-      revenue_iqd: orders?.revenue_iqd ?? 0,
+      ...(money ? { revenue_iqd: orders?.revenue_iqd ?? 0 } : {}),
       users_total: users?.total ?? 0,
       pro_subscribers: users?.pro ?? 0,
       plus_subscribers: users?.plus ?? 0,
       investors: users?.investors ?? 0,
-      incoming_usd_cents: wallet?.incoming_usd_cents ?? 0,
-      outgoing_usd_cents: wallet?.outgoing_usd_cents ?? 0,
+      ...(money
+        ? {
+            incoming_usd_cents: wallet?.incoming_usd_cents ?? 0,
+            outgoing_usd_cents: wallet?.outgoing_usd_cents ?? 0,
+          }
+        : {}),
       pending_wallet_requests: pendingWallet.results.length,
       open_community_requests: pendingCommunity?.n ?? 0,
     },
-    pending_wallet_requests: pendingWallet.results.map((t) => ({ ...walletTxPublic(t), email: t.email, username: t.username })),
+    pending_wallet_requests: money
+      ? pendingWallet.results.map((t) => ({ ...walletTxPublic(t), email: t.email, username: t.username }))
+      : [],
     recent_orders: recentOrders.results.map((o) => ({
-      id: o.id, status: o.status, total_iqd: o.total_iqd, created_at: o.created_at, user_id: o.user_id,
+      id: o.id,
+      status: o.status,
+      ...(money ? { total_iqd: o.total_iqd } : {}),
+      created_at: o.created_at,
+      user_id: o.user_id,
     })),
   });
 });
@@ -100,7 +115,7 @@ adminRoutes.get('/users', async (c) => {
   const limit = int(q.limit, 'limit', { min: 1, max: 100, def: 50 });
   const offset = int(q.offset, 'offset', { min: 0, max: 100_000, def: 0 });
   let sql = `SELECT id, email, username, name, role, is_investor, membership_tier,
-                    subscription_plan, subscription_expiry, created_at
+                    admin_scope, subscription_plan, subscription_expiry, created_at
                FROM users`;
   const params: unknown[] = [];
   if (search) {
@@ -119,7 +134,10 @@ adminRoutes.patch('/users/:id', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const target = await c.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(id).first<{ id: string; role: string }>();
+  const target = await c.env.DB
+    .prepare('SELECT id, role, email FROM users WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; role: string; email: string }>();
   if (!target) throw notFound('User not found');
 
   const updates: string[] = [];
@@ -147,6 +165,21 @@ adminRoutes.patch('/users/:id', async (c) => {
     params.push(tier);
     updates.push('subscription_plan = ?');
     params.push(tier === 'prime' ? 'free' : tier);
+  }
+  // §11: only a financial admin may hand out (or take away) financial access,
+  // and the site owner can never be demoted — otherwise a compromised
+  // assistant could lock the owner out of their own numbers.
+  if (body.admin_scope !== undefined) {
+    if (!canViewFinancials(c.env, admin)) {
+      throw forbidden('Only a financial administrator can change financial access');
+    }
+    const scope = normalizeAdminScope(body.admin_scope);
+    const ownerEmail = (c.env.INITIAL_ADMIN_EMAIL ?? '').trim().toLowerCase();
+    if (scope === 'assistant' && ownerEmail && target.email.trim().toLowerCase() === ownerEmail) {
+      throw forbidden('The owner account cannot be restricted');
+    }
+    updates.push('admin_scope = ?');
+    params.push(scope);
   }
   if (body.is_investor !== undefined) {
     updates.push('is_investor = ?');

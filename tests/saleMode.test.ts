@@ -20,13 +20,13 @@ type Doc = Parameters<typeof saleAvailability>[0];
 
 const option = (over: Partial<OptionV2> = {}): OptionV2 => ({
   id: 'opt1', name_ar: 'خيار', name_en: 'Option', name_ckb: '', image: '', order: 0, active: true,
-  regular_price_iqd: null, pro_price_iqd: null, compare_at_iqd: null, cost_iqd: null, ...over,
+  regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, ...over,
 });
 
 const color = (over: Partial<ColorV2> = {}): ColorV2 => ({
   id: 'col1', name_ar: 'أسود', name_en: 'Black', name_ckb: '', hex: '#000000', image: '',
   option_id: null, order: 0, active: true,
-  regular_price_iqd: null, pro_price_iqd: null, compare_at_iqd: null, cost_iqd: null, ...over,
+  regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, ...over,
 });
 
 const transport = (over: Partial<TransportOffer> = {}): TransportOffer => ({

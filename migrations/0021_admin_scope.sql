@@ -1,0 +1,16 @@
+-- Levonis migration 0021 — a financial scope for admin accounts (product-form
+-- mandate §11: "cost وجميع تفاصيل الربح متاحة فقط للمالك/الدور المالي. مساعد
+-- الأدمن العادي لا يراها في API ولا في HTML ولا في export").
+--
+-- Before this, `role='admin'` was a single undivided level, so there was no
+-- way to express "assistant admin" at all and the acceptance test could not
+-- even be written.
+--
+-- NULL means UNRESTRICTED. Every existing admin therefore keeps exactly the
+-- access they have today — a migration must never silently take privileges
+-- away from a live account, and it must never silently grant them either. The
+-- owner assigns 'assistant' explicitly from the admin panel.
+--
+-- No CHECK constraint: the value is validated by the write path, and adding
+-- one here would mean rebuilding `users`, which 60 foreign keys point at.
+ALTER TABLE users ADD COLUMN admin_scope TEXT;

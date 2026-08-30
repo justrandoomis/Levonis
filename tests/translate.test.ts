@@ -22,8 +22,8 @@ import {
 test('translating never performs a network call', () => {
   const realFetch = globalThis.fetch;
   let calls = 0;
-  // @ts-expect-error deliberately replacing the global for the duration
-  globalThis.fetch = (...args: unknown[]) => {
+  // Deliberately replacing the global for the duration of the test.
+  globalThis.fetch =  (...args: unknown[]) => {
     calls += 1;
     throw new Error(`translation attempted a network call: ${String(args[0])}`);
   };

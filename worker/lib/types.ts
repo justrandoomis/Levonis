@@ -46,6 +46,9 @@ export interface SessionUser {
   /** Effective tier cache written by getTierStatus from the memberships
    *  ledger. Unconstrained column, so it can carry 'prime'. */
   membership_tier: 'free' | 'plus' | 'pro' | 'prime';
+  /** NULL/'full' = unrestricted admin; 'assistant' = no financial data
+   *  anywhere (migration 0021, mandate §11). */
+  admin_scope: string | null;
   subscription_expiry: number;
   subscription_cost_iqd: number;
   subscription_days: number;
@@ -92,6 +95,10 @@ export function publicUser(u: SessionUser) {
     // reads. A PRIME member is 'free' in the legacy field and 'prime' here.
     subscription_plan: u.subscription_plan,
     membership_tier: u.membership_tier ?? u.subscription_plan ?? 'free',
+    // Sent so the admin UI can hide financial panels it would not be allowed
+    // to fill anyway. The SERVER is what actually enforces the rule.
+    admin_scope: u.role === 'admin' ? (u.admin_scope ?? 'full') : null,
+    can_view_financials: u.role === 'admin' && u.admin_scope !== 'assistant',
     subscription_expiry: u.subscription_expiry,
     locale: localeToApi(u.locale),
     avatar_key: u.avatar_key,

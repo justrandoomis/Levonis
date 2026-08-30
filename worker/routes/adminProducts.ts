@@ -17,7 +17,7 @@
 
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, int, str } from '../lib/http';
+import { requireAdmin, badRequest, notFound, int, str, forbidden } from '../lib/http';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import {
@@ -34,6 +34,7 @@ import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
 import { transportDefaultsFrom } from './products';
 import { localizeProductDoc } from '../lib/translate/localizeProduct';
+import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { syncProductTranslations } from '../lib/translate/store';
 
 export const adminProductsRoutes = new Hono<AppContext>();
@@ -562,7 +563,12 @@ adminProductsRoutes.get('/:id', async (c) => {
   const doc = parseProductRow(row);
   return c.json({
     success: true,
-    product: { ...projectAdmin(doc), catalog_ids: await catalogIdsFor(c.env.DB, id) },
+    // §11: an assistant admin gets the same document with every financial
+    // field removed on the SERVER — reading the raw response reveals nothing.
+    product: projectForAdmin(c.env, c.get('user'), {
+      ...projectAdmin(doc),
+      catalog_ids: await catalogIdsFor(c.env.DB, id),
+    }),
   });
 });
 
@@ -590,6 +596,37 @@ adminProductsRoutes.post('/', async (c) => {
 
   const doc = validateProductDoc(body);
 
+  // §11 is an authorization rule in BOTH directions: an assistant admin can
+  // neither read cost nor write it. Rather than silently dropping the field
+  // (which would let a stale panel wipe a real cost), the request is refused
+  // when it actually tries to change one.
+  if (!canViewFinancials(c.env, admin)) {
+    const attempted: string[] = [];
+    if (doc.product_cost_iqd !== (prev?.product_cost_iqd ?? null)) attempted.push('product_cost_iqd');
+    const costOf = (list: Array<{ id: string; cost_iqd: number | null }>) =>
+      new Map(list.map((x) => [x.id, x.cost_iqd]));
+    for (const [kind, next, before] of [
+      ['option', costOf(doc.options), costOf(prev?.options ?? [])],
+      ['color', costOf(doc.colors), costOf(prev?.colors ?? [])],
+    ] as const) {
+      for (const [id, cost] of next) {
+        if ((before.get(id) ?? null) !== (cost ?? null)) attempted.push(`${kind}:${id}.cost_iqd`);
+      }
+    }
+    if (attempted.length) {
+      throw forbidden(
+        `You do not have access to product cost. Fields refused: ${attempted.join(', ')}`
+      );
+    }
+    // Carry the stored cost forward untouched so an assistant's save cannot
+    // blank a value they were never shown.
+    doc.product_cost_iqd = prev?.product_cost_iqd ?? null;
+    const prevOptionCost = new Map((prev?.options ?? []).map((o) => [o.id, o.cost_iqd]));
+    for (const o of doc.options) o.cost_iqd = prevOptionCost.get(o.id) ?? null;
+    const prevColorCost = new Map((prev?.colors ?? []).map((x) => [x.id, x.cost_iqd]));
+    for (const col of doc.colors) col.cost_iqd = prevColorCost.get(col.id) ?? null;
+  }
+
   // Stale-edit protection: the editor echoes the updated_at it loaded.
   if (prev && typeof body.expected_updated_at === 'string' && body.expected_updated_at) {
     const currentUpdated = existingRow?.updated_at ? String(existingRow.updated_at) : '';
@@ -599,7 +636,7 @@ adminProductsRoutes.post('/', async (c) => {
           success: false,
           code: 'STALE_EDIT',
           error: 'This product was modified by someone else since you opened it. Review the current version below.',
-          current: { ...projectAdmin(prev), catalog_ids: await catalogIdsFor(c.env.DB, prev.id) },
+          current: projectForAdmin(c.env, admin, { ...projectAdmin(prev), catalog_ids: await catalogIdsFor(c.env.DB, prev.id) }),
         },
         409
       );
@@ -705,7 +742,7 @@ adminProductsRoutes.post('/', async (c) => {
   return c.json({
     success: true,
     created: !prev,
-    product: { ...projectAdmin(parseProductRow(fresh!)), catalog_ids: await catalogIdsFor(c.env.DB, doc.id) },
+    product: projectForAdmin(c.env, admin, { ...projectAdmin(parseProductRow(fresh!)), catalog_ids: await catalogIdsFor(c.env.DB, doc.id) }),
     // Named honestly rather than hidden behind a green tick: these fields kept
     // their English text because the local engine could not translate them
     // safely (§3). The product is saved and live either way.
@@ -806,10 +843,15 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
       : 1400;
   const toUsd = (iqd: number) => Math.round((iqd / rate) * 100) / 100;
 
+  // §11: cost is financial data. An assistant admin gets the same quote with
+  // it removed — the check is here, on the server, not in the panel.
+  const quoteResolved = canViewFinancials(c.env, c.get('user'))
+    ? resolved
+    : { ...resolved, cost_iqd: undefined };
   return c.json({
     success: true,
     quote: {
-      ...resolved, // includes cost_iqd — this endpoint is admin-only
+      ...quoteResolved,
       usd_preview: {
         exchange_rate_iqd_per_usd: rate,
         applied_usd: toUsd(resolved.applied_iqd),
