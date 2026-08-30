@@ -52,19 +52,64 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  // three-slicer selects its threaded WASM core only in a cross-origin-isolated
-  // context. All runtime assets are same-origin, so these headers safely unlock
-  // SharedArrayBuffer and remove the largest source of slow slices on the web.
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Embedder-Policy": "require-corp",
   "Cross-Origin-Resource-Policy": "same-origin",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
 };
 
-function withSecurityHeaders(response: Response): Response {
+/**
+ * Cross-origin isolation, withheld from iOS and iPadOS.
+ *
+ * WHY. three-slicer picks its WASM core on ONE signal, and nothing else:
+ *
+ *     if (crossOriginIsolated) { try { …slicer_core.mt… } catch { …st… } }
+ *
+ * `mt` is the threaded core: a SharedArrayBuffer heap plus a pthread pool.
+ * That is the right choice on a desktop and the reason these headers were
+ * added in the first place. On an iPad it is not — WebKit's per-tab memory
+ * budget is a fraction of a desktop's, and the pool is sized from
+ * hardwareConcurrency, so the worker gets KILLED by the OS shortly after it
+ * boots. The engine's `catch` cannot save it: a kill is not a thrown error,
+ * it arrives on the parent as an ErrorEvent with an empty message, which the
+ * engine then reports with its stock guess — "Worker terminated (likely out
+ * of memory): worker error", the exact message the owner photographed on a
+ * project with nothing loaded.
+ *
+ * The engine already ships a single-threaded core and treats it as a
+ * first-class path. So rather than patching a vendored bundle, we stop
+ * advertising isolation on the platform where the threaded core cannot
+ * survive, and the engine's own branch takes `st`. Slower, and it finishes.
+ *
+ * Everything else is unaffected: no other Studio feature needs
+ * SharedArrayBuffer, and every other platform keeps threads.
+ */
+const ISOLATION_HEADERS: Record<string, string> = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+};
+
+/** iOS and iPadOS, including iPadOS Safari's desktop-class UA — which claims
+ *  Macintosh and is only told apart by having touch points. */
+export function isMemoryConstrainedApple(userAgent: string): boolean {
+  const ua = userAgent || "";
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  // iPadOS 13+ requesting the desktop site: "Macintosh … Version/x Safari".
+  // Real Macs match this too; sending them the single-threaded core costs
+  // some speed and costs no correctness, and there is no server-side signal
+  // that separates the two. Chrome/Firefox on macOS do not match, because
+  // WebKit is the engine with the tab budget that kills the worker.
+  if (/Macintosh/i.test(ua) && /Version\/\d+.*Safari/i.test(ua) && !/Chrome|Chromium|Firefox/i.test(ua)) {
+    return true;
+  }
+  return false;
+}
+
+function withSecurityHeaders(response: Response, request?: Request): Response {
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
+  if (!isMemoryConstrainedApple(request?.headers.get("User-Agent") ?? "")) {
+    for (const [name, value] of Object.entries(ISOLATION_HEADERS)) headers.set(name, value);
+  }
   // HTML always flows through the worker and is never cached: identity is
   // per-request and a cached page would dodge future header/policy changes.
   const contentType = headers.get("Content-Type") || "";
@@ -101,7 +146,7 @@ const worker = {
 
     // Same-origin auth endpoints (login/callback/logout/me + legacy paths).
     if (isAuthRoute(url.pathname)) {
-      return withSecurityHeaders(await handleAuthRoute(request, env));
+      return withSecurityHeaders(await handleAuthRoute(request, env), request);
     }
 
     // Storage API (owned by worker/api/*): receives the validated session so
@@ -109,7 +154,7 @@ const worker = {
     // an account keeps working — only account features need sign-in).
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
       const session = await loadStudioSession(request, env);
-      return withSecurityHeaders(await apiRouter(request, env, ctx, session));
+      return withSecurityHeaders(await apiRouter(request, env, ctx, session), request);
     }
 
     if (url.pathname === "/_vinext/image") {
@@ -121,7 +166,7 @@ const worker = {
           return result.response();
         },
       }, allowedWidths);
-      return withSecurityHeaders(response);
+      return withSecurityHeaders(response, request);
     }
 
     // SSR/assets. Only document navigations pay for the session lookup; the
@@ -131,7 +176,7 @@ const worker = {
       const session = await loadStudioSession(request, env);
       if (session) forwarded = withUserHeader(request, session.user);
     }
-    return withSecurityHeaders(await handler.fetch(forwarded, env, ctx));
+    return withSecurityHeaders(await handler.fetch(forwarded, env, ctx), request);
   },
 
   // Storage cleanup cron (STUDIO_PLAN decision 4, step CLEANUP): expired

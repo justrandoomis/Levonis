@@ -23,12 +23,11 @@
 
 /** Store-derived identity tokens (values copied from src/index.css). */
 export const LEVONIS_TOKENS = {
-  /** The store green family. Named `olive` for history only: the value was
-   *  deepened to a darker, less yellow green, and ~100 call sites across both
-   *  apps reference the token by this name. */
-  olive: "#0B2519",
-  oliveDark: "#061710",
-  oliveLight: "#123726",
+  /** The store's very dark olive family. ~100 call sites across both apps
+   *  reference these by token name, so the names stay and the values move. */
+  olive: "#1B2010",
+  oliveDark: "#0F1208",
+  oliveLight: "#2B3318",
   /** Store gold family. */
   gold: "#BAA369",
   goldLight: "#FFE55C",
@@ -38,16 +37,16 @@ export const LEVONIS_TOKENS = {
 
 /** Studio dark surfaces, derived from the green family above. */
 export const STUDIO_SURFACES = {
-  shell: "#050C09",
-  header: "#071410",
-  panel: "#091B13",
-  surface: "#0D2417",
-  surfaceStrong: "#12301F",
-  canvas: "#04100C",
-  line: "#1A3A2B",
-  lineSoft: "#122A1F",
+  shell: "#0A0C05",
+  header: "#10130A",
+  panel: "#14180C",
+  surface: "#1B2010",
+  surfaceStrong: "#232A14",
+  canvas: "#070903",
+  line: "#2E3719",
+  lineSoft: "#1F2611",
   text: "#EEF4EF",
-  muted: "#8FA598",
+  muted: "#A0A48C",
   accent: LEVONIS_TOKENS.gold,
   accentStrong: "#9C8752",
   accentSoft: "#2A2A16",

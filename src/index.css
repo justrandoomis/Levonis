@@ -15,13 +15,15 @@ html, body, #root {
      sites across the store and the Studio name it, and renaming them all to
      re-point one colour would be churn with real regression risk for no
      visual gain — the NAME is the identity slot, the VALUE is the colour.
-     Deepened from the original olive (#0F2F25 / #0A1F18 / #184235) to a
-     darker, less yellow green at the owner's request. Studio mirrors these
+     The current values are a VERY DARK OLIVE (#1B2010 / #0F1208 / #2B3318):
+     the hue is back in the olive family (~78deg) and the lightness is well
+     below the original #0F2F25, which was a cool blue-green despite the
+     token's name. Studio mirrors these
      three in studio/app/editor-theme.ts and studio/app/globals.css; keep the
      three files in step. */
-  --color-olive: #0B2519;
-  --color-olive-dark: #061710;
-  --color-olive-light: #123726;
+  --color-olive: #1B2010;
+  --color-olive-dark: #0F1208;
+  --color-olive-light: #2B3318;
   --color-gold: #BAA369;
   --color-gold-light: #ffe55c;
   --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
