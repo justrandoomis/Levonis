@@ -94,10 +94,14 @@ function AppContent() {
   // occupies (its bottom offset + its height + a small visual gap), instead of
   // an oversized fixed spacer. On routes where BottomNav does not render,
   // no artificial gap is reserved. Safe-area inset mirrors BottomNav's offset.
+  //
+  // A REAL ELEMENT, NOT PADDING. This used to be a padding-bottom on the
+  // scroll container, and a scrolling FLEX container does not honour its own
+  // padding-bottom at the end of the scroll — the last content ran straight
+  // under the floating nav. Measured overlap was 7-35px across /profile,
+  // /referrals, /wallet and the home page. A spacer is content, and content is
+  // always scrolled to.
   const navHidden = isBottomNavHidden(location.pathname);
-  const navClearance = navHidden
-    ? ''
-    : ' pb-[calc(72px_+_max(1rem,env(safe-area-inset-bottom)))] sm:pb-[calc(84px_+_max(1.5rem,env(safe-area-inset-bottom)))]';
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
@@ -106,7 +110,7 @@ function AppContent() {
           html/body/#root in index.css). The previous diagonal gradient into
           olive-green (hex 1a210e) painted an unintended glow in the bottom
           corner near the nav — removed at the source, not covered up. */}
-      <main id="main-scroll-container" className={`flex-1 flex flex-col overflow-y-auto bg-black${navClearance}`}>
+      <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-black">
         <EmailVerifyBanner />
         <Routes>
           <Route path="/" element={<Home />} />
@@ -153,6 +157,18 @@ function AppContent() {
           <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>
+
+        {/* Clearance for the floating BottomNav: its bottom offset plus its
+            height plus a small visual gap. `shrink-0` so a flex column cannot
+            collapse it away. Nothing is reserved on routes where the nav does
+            not render. */}
+        {!navHidden && (
+          <div
+            aria-hidden="true"
+            data-nav-clearance
+            className="nav-clearance"
+          />
+        )}
       </main>
 
       <BottomNav />

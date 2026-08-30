@@ -68,6 +68,16 @@ export const EDITOR_SHADOW_CSS = `
   :host { color-scheme: dark; background: ${T.shell} !important; color: ${T.text} !important; font-family: ${LEVONIS_TOKENS.fontSans}; }
   .app-shell { direction: ltr; background: ${T.shell}; color: ${T.text}; }
   .topbar, .left-rail { background: ${T.header}; border-color: ${T.lineSoft}; }
+  /* THE ENGINE'S OWN BRAND IS NOT OUR BRAND. The vendored slicer paints a
+     "ThreeSlicer RE" wordmark in its top bar, linking to its own root. Inside
+     LEVO Studio that is a foreign product name on the owner's page and a link
+     that navigates away from the editor. Hidden here, in the CSS the adapter
+     already injects into every engine shadow root, rather than by patching
+     node_modules — a patch would vanish on the next install and take the fix
+     with it. The engine's attribution stays where it belongs: LICENSE.txt and
+     THIRD-PARTY-NOTICES.md ship untouched, and the G-code it writes still
+     carries its own `application` tag. */
+  .tb-logo { display: none !important; }
   .tb-btn, .tb-icon, .tb-tabs, .tb-tabs button { background: ${T.surface}; border-color: ${T.line}; border-radius: 6px; color: ${T.text}; }
   .tb-tabs button.on, .left-rail button.on { background: ${T.accent}; color: ${T.accentInk}; }
   .viewport-col { background: ${T.canvas}; }

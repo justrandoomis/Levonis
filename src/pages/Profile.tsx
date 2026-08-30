@@ -5,7 +5,7 @@ import {
   Headset, Settings, MapPin, QrCode, Store,
   Wallet, Package, Truck, MessageSquare, RefreshCcw,
   Star, Clock, Heart, Gamepad2, Coins, Zap, Shield,
-  ChevronRight, ChevronLeft, Gift, Copy, Check, UserRound, UserPlus
+  ChevronRight, ChevronLeft, Gift, UserRound, UserPlus
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
@@ -53,8 +53,6 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState('suggested');
   const [scrolled, setScrolled] = useState(false);
   const [mine, setMine] = useState<MembershipMine | null>(null);
-  const [mineLoaded, setMineLoaded] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const { t, dir, lang, loc } = useLanguage();
@@ -144,15 +142,13 @@ export default function Profile() {
   useEffect(() => {
     if (!isAuthenticated) {
       setMine(null);
-      setMineLoaded(true);
       return;
     }
-    setMineLoaded(false);
     api
       .get<MembershipMine>('/api/memberships/mine')
       .then((res) => setMine(res))
       .catch(() => setMine(null))
-      .finally(() => setMineLoaded(true));
+      .catch(() => {});
   }, [isAuthenticated, user?.id]);
 
   // Membership from the ledger (authoritative once loaded); the legacy
@@ -180,45 +176,6 @@ export default function Profile() {
   const referralLink = mine?.referral?.code
     ? `${window.location.origin}/auth?ref=${mine.referral.code}`
     : '';
-
-  const copyReferralLink = async () => {
-    if (!referralLink) return;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(referralLink);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = referralLink;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard unavailable */
-    }
-  };
-
-  const rewardStateChip = (state: string): { label: string; cls: string } => {
-    switch (state) {
-      case 'pending':
-        return { label: loc('قيد الانتظار', 'Pending', 'چاوەڕوانە'), cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
-      case 'qualified':
-        return { label: loc('مؤهلة', 'Qualified', 'شیاوە'), cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' };
-      case 'available':
-        return { label: loc('متاحة', 'Available', 'بەردەستە'), cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' };
-      case 'reserved':
-        return { label: loc('محجوزة', 'Reserved', 'حیجزکراوە'), cls: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' };
-      case 'fulfilled':
-        return { label: loc('تم التسليم', 'Fulfilled', 'گەیەنراوە'), cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
-      case 'cancelled':
-        return { label: loc('ملغاة', 'Cancelled', 'هەڵوەشێنراوەتەوە'), cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
-      default:
-        return { label: state, cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' };
-    }
-  };
 
   const balanceIqd = usdCentsToIqd(balanceUsdCents, exchangeRate);
   // Fabricating an avatar for a guest would suggest a signed-in identity —
@@ -460,123 +417,34 @@ export default function Profile() {
         </div>
         )}
 
-        {/* Referral Card */}
+        {/* The referral programme lives on /referrals, and ONLY there.
+            It used to be duplicated here as a full card — the link, both
+            campaigns explained, and the reward list — which is a whole second
+            place to maintain the same thing and a long block between the
+            member card and the actions people actually come to this page for.
+            The single row below is a signpost, not a copy. */}
         {isAuthenticated && (
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="font-bold text-[14px] flex items-center gap-1.5">
-                <Gift className="w-4 h-4 text-[#ff5000]" strokeWidth={2} aria-hidden="true" />
-                {t('referralProgram')}
-              </h2>
-              {/* §3.1: referral MANAGEMENT lives on its own page now. The
-                  summary card stays (nothing working was removed) and links
-                  to the full page, where the username handle, the support-code
-                  explanation and the gift states live. */}
-              <div className="flex items-center gap-2 min-w-0">
-                {mine?.referral?.code && (
-                  <span className="text-[11px] text-zinc-500 truncate">
-                    {t('referralCode')}: <span className="font-mono font-bold text-black dark:text-white">{mine.referral.code}</span>
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => navigate('/referrals')}
-                  className="flex items-center gap-0.5 shrink-0 text-[11px] text-zinc-500 min-h-[44px] px-2 -me-2 rounded-lg hover:text-zinc-700 dark:hover:text-zinc-300 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-                >
-                  {loc('الصفحة الكاملة', 'Full page', 'پەڕەی تەواو')}
-                  {dir === 'rtl' ? <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
-                </button>
-              </div>
-            </div>
-
-            {!mineLoaded ? (
-              <div className="flex justify-center py-6" role="status" aria-busy="true">
-                <div className="w-6 h-6 border-2 border-[#ff5000]/20 border-t-[#ff5000] rounded-full animate-spin" />
-              </div>
-            ) : !mine ? (
-              <p className="text-[12px] text-zinc-500 text-center py-4">
-                {loc('تعذر تحميل بيانات الإحالة — حاول مرة أخرى لاحقًا', 'Could not load referral data — please try again later', 'داتای بانگهێشتکردن بار نەبوو — دواتر هەوڵ بدەرەوە')}
-              </p>
+          <button
+            type="button"
+            data-profile-referrals
+            onClick={() => navigate('/referrals')}
+            className="w-full bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white flex items-center gap-3 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            <Gift className="w-5 h-5 text-[#ff5000] shrink-0" strokeWidth={2} aria-hidden="true" />
+            <span className="flex-1 min-w-0">
+              <span className="block font-bold text-[14px]">{t('referralProgram')}</span>
+              <span className="block text-[11px] text-zinc-500 truncate">
+                {mine?.referral?.code
+                  ? `${t('referralCode')}: ${mine.referral.code}`
+                  : loc('شارك رابطك واكسب مكافآت', 'Share your link and earn rewards', 'لینکەکەت بەشدار بکە و خەڵات وەربگرە')}
+              </span>
+            </span>
+            {dir === 'rtl' ? (
+              <ChevronLeft className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
             ) : (
-              <>
-                {/* Share link + copy */}
-                <div className="flex items-center gap-2 bg-[#f7f7f7] dark:bg-[#222] rounded-lg p-2 mb-3">
-                  <span dir="ltr" className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 truncate flex-1 min-w-0">
-                    {referralLink}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyReferralLink}
-                    className="flex items-center gap-1 bg-gradient-to-r from-[#ff0036] to-[#ff5000] text-white text-[11px] px-3 min-h-[36px] py-1.5 rounded-full font-bold whitespace-nowrap shrink-0 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-                  >
-                    {copied ? <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" /> : <Copy className="w-3 h-3" strokeWidth={2.5} aria-hidden="true" />}
-                    {copied ? t('copied') : t('copyLink')}
-                  </button>
-                </div>
-
-                {/* The two programs — two lines each */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 p-2.5">
-                    <p className="text-[11px] font-bold mb-1">
-                      {loc('إحالة شراء طابعة', 'Printer referral', 'بانگهێشتکردن بۆ کڕینی پرینتەر')}
-                    </p>
-                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                      {loc('صديقك يشتري طابعة عبر رابطك ← يحصل على توصيل مجاني لطلبه.', 'Your friend buys a printer through your link → they get free delivery on that order.', 'هاوڕێکەت پرینتەرێک دەکڕێت لە ڕێگەی لینکەکەتەوە ← گەیاندنی بێبەرامبەر بۆ داواکاریەکەی وەردەگرێت.')}
-                    </p>
-                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                      {loc('أنت تحصل على بكرة فيلامنت بعد 7 أيام من التوصيل.', 'You get a filament spool 7 days after delivery.', 'تۆش بۆبینێکی فیلامێنت وەردەگریت ٧ ڕۆژ دوای گەیاندن.')}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 p-2.5">
-                    <p className="text-[11px] font-bold mb-1">
-                      {loc('إحالة اشتراك PRO', 'PRO subscription referral', 'بانگهێشتکردن بۆ ئەندامێتی PRO')}
-                    </p>
-                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                      {loc('مشترك PRO جديد يدفع عبر رابطك.', 'A new PRO member subscribes and pays via your link.', 'ئەندامێکی نوێی PRO لە ڕێگەی لینکەکەتەوە بەشداری دەکات و پارە دەدات.')}
-                    </p>
-                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                      {loc('أنت تحصل على بكرة فيلامنت عشوائية.', 'You get a random filament spool.', 'تۆش بۆبینێکی فیلامێنتی هەڕەمەکی وەردەگریت.')}
-                    </p>
-                  </div>
-                </div>
-
-                {/* My rewards */}
-                <p className="text-[12px] font-bold mb-1.5">{t('rewards')}</p>
-                {mine.referral.rewards.length === 0 ? (
-                  <p className="text-[11px] text-zinc-500 py-2 text-center">
-                    {loc('لا توجد مكافآت بعد — شارك رابطك مع أصدقائك!', 'No rewards yet — share your link with friends!', 'هێشتا هیچ خەڵاتێک نییە — لینکەکەت لەگەڵ هاوڕێکانت بەشدار بکە!')}
-                  </p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {mine.referral.rewards.map((r) => {
-                      const chip = rewardStateChip(r.state);
-                      return (
-                        <li key={r.id} className="flex items-center justify-between gap-2 bg-[#f7f7f7] dark:bg-[#222] rounded-lg px-2.5 py-2">
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-bold truncate">
-                              {r.campaign === 'printer'
-                                ? loc('إحالة شراء طابعة', 'Printer referral', 'بانگهێشتکردنی پرینتەر')
-                                : loc('إحالة اشتراك PRO', 'PRO referral', 'بانگهێشتکردنی PRO')}
-                              {' · '}
-                              <span className="font-medium text-zinc-500">{loc('بكرة فيلامنت', 'Filament spool', 'بۆبینی فیلامێنت')}</span>
-                            </p>
-                            <p className="text-[10px] text-zinc-500">
-                              {r.state === 'pending' && r.eligible_at
-                                ? `${loc('تصبح مؤهلة في', 'Eligible on', 'شیاو دەبێت لە')} ${fmtDate(r.eligible_at)}`
-                                : fmtDate(r.created_at)}
-                            </p>
-                          </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${chip.cls}`}>
-                            {chip.label}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </>
+              <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
             )}
-          </div>
+          </button>
         )}
 
         {/* Second Card: quick actions. Real destinations; guests are routed

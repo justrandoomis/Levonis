@@ -104,3 +104,50 @@ html, body, #root {
   0% { background-position: 0% 50%; }
   100% { background-position: 100% 50%; }
 }
+
+/* ---------------------------------------------------------------------------
+   BOTTOM-NAV CLEARANCE
+   
+   The floating BottomNav is `position: fixed`, and #main-scroll-container
+   reserves exactly the space it occupies with a padding-bottom. That works —
+   until a page inside it declares `min-h-screen`.
+   
+   `min-height: 100vh` forces the page to the FULL viewport height, which is
+   taller than the scroll container's content box (viewport minus that
+   padding). The page then overflows the padding it was supposed to sit above,
+   its last line lands at the very bottom of the screen, and the nav covers it.
+   Six pages did this, and the overlap was 7–35px depending on the page.
+   
+   Inside the scroll container "full height" means the CONTAINER's height, not
+   the viewport's — the container is already exactly as tall as it should be.
+   So `100vh` becomes `100%` there, and the reserved space works again. Pages
+   outside the container (the Studio shell, standalone routes) are untouched.
+   --------------------------------------------------------------------------- */
+#main-scroll-container .min-h-screen {
+  min-height: 100%;
+}
+
+/* AND THEY MUST NOT BE SHRUNK. The scroll container is a flex column, so every
+   routed page is a flex ITEM — and flex items shrink by default. A page whose
+   content is 1180px tall was being squashed to the container's 844px while its
+   content overflowed the box, so the clearance below it sat ABOVE the overflow
+   and the last 300px ran under the nav. This is the actual cause of the
+   overlap; `min-height: 100%` above only stops a page forcing itself taller
+   than the container. */
+#main-scroll-container > * {
+  flex-shrink: 0;
+}
+
+/* The spacer itself. Written as plain CSS rather than a Tailwind arbitrary
+   value because `h-[calc(76px_+_max(1rem,env(...)))]` contains a comma inside
+   max(), which Tailwind's arbitrary-value parser does not emit — the class
+   silently never existed and the spacer had zero height. */
+.nav-clearance {
+  flex: 0 0 auto;
+  height: calc(76px + max(1rem, env(safe-area-inset-bottom)));
+}
+@media (min-width: 640px) {
+  .nav-clearance {
+    height: calc(88px + max(1.5rem, env(safe-area-inset-bottom)));
+  }
+}

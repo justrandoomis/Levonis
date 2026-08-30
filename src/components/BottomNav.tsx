@@ -75,8 +75,19 @@ export default function BottomNav() {
 
   return (
     <nav aria-label="LEVONIS" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-[120] flex items-center justify-center gap-1.5 sm:gap-3 px-2 sm:px-4 pointer-events-none">
+      {/* A scrim under the whole bar. The page scrolls UNDER a floating nav by
+          design, and at 20% black the text passing behind it stayed perfectly
+          legible — so a price or a heading appeared sliced in half by the bar
+          and the screen read as broken. This fades the page out beneath the
+          nav instead of letting it collide with it. It sits behind the pills,
+          takes no pointer events, and is decorative. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-[calc(-1*max(1rem,env(safe-area-inset-bottom)))] sm:bottom-[calc(-1*max(1.5rem,env(safe-area-inset-bottom)))] h-[calc(100%+max(1rem,env(safe-area-inset-bottom))+28px)] -z-10 bg-gradient-to-t from-black via-black/95 to-transparent"
+      />
+
       {/* Left Pill */}
-      <div className="bg-black/20 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
+      <div className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
         {leftItems.map(renderItem)}
       </div>
 
@@ -88,7 +99,7 @@ export default function BottomNav() {
         className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105 active:scale-95 border border-white/10 shrink-0 pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
           location.pathname === homeItem.path
             ? 'bg-olive text-gold border-olive/50 shadow-olive/20'
-            : 'bg-black/20 backdrop-blur-2xl text-zinc-500 hover:text-gold border-white/10'
+            : 'bg-zinc-950/95 backdrop-blur-2xl text-zinc-500 hover:text-gold border-white/10'
         }`}
       >
         <homeItem.icon
@@ -99,7 +110,7 @@ export default function BottomNav() {
       </Link>
 
       {/* Right Pill */}
-      <div className="bg-black/20 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
+      <div className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
         {rightItems.map(renderItem)}
       </div>
     </nav>
