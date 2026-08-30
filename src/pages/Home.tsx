@@ -18,7 +18,7 @@ export default function Home() {
   const { user } = useAuth();
 
   // Subscription plan comes exclusively from the server-side user record.
-  const plan = user?.subscription_plan ?? 'free';
+  const plan = user?.membership_tier ?? 'free';
   const planActive =
     !!user && plan !== 'free' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
 
@@ -124,7 +124,12 @@ export default function Home() {
 
     const proPrice = p.membership_prices?.pro ?? null;
     const planPrice = planActive && (plan === 'plus' || plan === 'pro') ? p.membership_prices?.[plan] ?? null : null;
-    const hasSale = p.original_price_iqd !== null && p.original_price_iqd > p.price_iqd;
+    // §4: compare-at is gone. A strikethrough is shown ONLY when the viewer's
+    // own membership actually lowers the price — a real, server-resolved
+    // comparison instead of a decorative one.
+    const displayPrice = p.display_price_iqd ?? p.price_iqd;
+    const regularPrice = p.display_regular_iqd ?? p.price_iqd;
+    const hasSale = displayPrice < regularPrice;
     const showPlanPrice = !!planPrice && planPrice > 0 && planPrice < p.price_iqd;
 
     return (
@@ -160,7 +165,7 @@ export default function Home() {
                 <>
                    <div className="flex flex-col">
                      {hasSale && (
-                       <span className="text-zinc-500 text-[10px] line-through">{formatIqd(p.original_price_iqd!)}</span>
+                       <span className="text-zinc-500 text-[10px] line-through">{formatIqd(regularPrice)}</span>
                      )}
                      <span className="text-white font-bold text-sm">{formatIqd(p.price_iqd)}</span>
                    </div>

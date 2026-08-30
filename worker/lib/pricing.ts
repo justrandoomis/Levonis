@@ -4,15 +4,24 @@
  * tests, so every surface agrees.
  *
  * Model (mandate §5):
- *  - Four nullable price fields exist at product, option and color level:
- *    regular, PRO, compare-at, cost. NULL means "inherit" down the chain
- *    color → option → product base, PER FIELD independently. Zero is an
- *    explicit value, never treated as blank (no truthiness checks).
+ *  - Four nullable price fields exist at product, option, color and variant
+ *    level: regular, PRIME, PRO, cost. NULL means "inherit" down the chain
+ *    variant → color → option → product base, PER FIELD independently. Zero
+ *    is an explicit value, never treated as blank (no truthiness checks).
  *  - Option/color prices REPLACE the applicable base price (not surcharges).
  *  - PRO members pay the resolved PRO price when one exists; otherwise the
  *    configured store-wide PRO policy applies; if no policy is configured,
  *    the regular price applies (no fabricated discount).
- *  - A PRO member never pays more than the regular price.
+ *  - PRIME members pay the resolved PRIME price when one exists; PRIME has no
+ *    store-wide policy fallback, so an unpriced product simply costs the
+ *    regular price — a PRIME discount is never invented (product-form
+ *    mandate §5).
+ *  - Precedence is fixed: active PRO, then active PRIME, then regular. A
+ *    member never pays more than the regular price.
+ *  - Compare-at is GONE from the resolver (mandate §4: "احذف ... خانة
+ *    Compare-at price من الواجهة ومن منطق العرض"). products.original_price_iqd
+ *    still exists in the schema but nothing reads it any more; a later
+ *    migration drops the column.
  *  - Fees: preorder transport commission (added; waived for PRO) and the
  *    selected warranty fee (added; NEVER waived by membership) compose the
  *    unit subtotal. Last-mile delivery is order-level (waived for PRO).
@@ -20,12 +29,17 @@
 
 import { safeParse } from './types';
 
-export type Tier = 'free' | 'plus' | 'pro';
+export type Tier = 'free' | 'plus' | 'pro' | 'prime';
+
+/** Ranking used wherever "the better membership wins" (mandate §5:
+ *  "ترتيب تحديد السعر والميزة: PRO الفعّال أولًا، ثم PRIME الفعّال، ثم
+ *  المستخدم الاعتيادي"). Higher = stronger. */
+export const TIER_RANK: Record<Tier, number> = { free: 0, plus: 1, prime: 2, pro: 3 };
 
 export interface PriceFields {
   regular_price_iqd: number | null;
+  prime_price_iqd: number | null;
   pro_price_iqd: number | null;
-  compare_at_iqd: number | null;
   cost_iqd: number | null;
 }
 
@@ -81,10 +95,14 @@ export const DEFAULT_PRO_POLICY: ProPricingPolicy = { mode: 'explicit_only', per
 
 export interface PricingProduct {
   price_iqd: number; // base regular (required, canonical)
+  prime_price_iqd: number | null;
   pro_price_iqd: number | null;
-  original_price_iqd: number | null; // base compare-at
   product_cost_iqd: number | null;
-  selling_type: string; // 'direct_sale' | 'pre_order' | 'bundle'
+  /** Legacy scalar, kept in sync with sale_types[0]; `sale_types` is the
+   *  authority when present (mandate §6). */
+  selling_type: string;
+  /** Multi-select sale types: 'direct_sale' | 'pre_order' | 'bundle'. */
+  sale_types?: string[];
   options: OptionV2[];
   colors: ColorV2[];
   preorder_transports: TransportOffer[];
@@ -94,9 +112,9 @@ export interface PricingProduct {
 export interface ResolvedPrice {
   regular_iqd: number;
   pro_iqd: number | null; // resolved explicit-or-policy PRO price (null = none applies)
+  prime_iqd: number | null; // resolved explicit PRIME price (null = none applies)
   applied_iqd: number; // what this buyer pays for the item itself
-  applied_tier: 'regular' | 'pro';
-  compare_at_iqd: number | null; // validated: only present when > applied
+  applied_tier: 'regular' | 'pro' | 'prime';
   cost_iqd: number | null; // admin only — strip before public serialization
   price_source: 'color' | 'option' | 'base';
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
@@ -145,7 +163,7 @@ export function resolveUnitPrice(input: {
   // Per-field independent inheritance.
   const regular = pick('regular_price_iqd', color, option, product.price_iqd);
   const proExplicit = pick('pro_price_iqd', color, option, product.pro_price_iqd);
-  const compareAt = pick('compare_at_iqd', color, option, product.original_price_iqd);
+  const primeExplicit = pick('prime_price_iqd', color, option, product.prime_price_iqd);
   const cost = pick('cost_iqd', color, option, product.product_cost_iqd);
 
   const regularIqd = regular.value ?? product.price_iqd;
@@ -159,21 +177,36 @@ export function resolveUnitPrice(input: {
     proIqd = Math.max(0, regularIqd - Math.floor((regularIqd * proPolicy.percent) / 100));
   }
 
-  const isPro = input.tier === 'pro' && input.tierActive;
-  const appliedIqd = isPro && proIqd !== null ? proIqd : regularIqd;
-  const appliedTier: 'regular' | 'pro' = isPro && proIqd !== null ? 'pro' : 'regular';
+  // PRIME resolution: explicit price only — no store-wide percentage policy,
+  // because §5 defines the PRIME discount as a per-product/per-variant price.
+  // Never above regular, and never below the PRO price (PRO <= PRIME <=
+  // Regular): a PRIME row cheaper than PRO would be rejected at write time,
+  // and clamping here keeps a legacy row from inverting the ladder at
+  // checkout.
+  let primeIqd: number | null = null;
+  if (primeExplicit.value !== null && primeExplicit.value !== undefined) {
+    primeIqd = Math.min(primeExplicit.value, regularIqd);
+    if (proIqd !== null) primeIqd = Math.max(primeIqd, proIqd);
+  }
 
-  // Compare-at is a reference only; shown only when genuinely above the
-  // applicable selling price (no misleading strikethroughs).
-  const compareAtIqd =
-    compareAt.value !== null && compareAt.value !== undefined && compareAt.value > appliedIqd
-      ? compareAt.value
-      : null;
+  // §5 precedence: active PRO first, then active PRIME, then regular.
+  const isPro = input.tier === 'pro' && input.tierActive;
+  const isPrime = input.tier === 'prime' && input.tierActive;
+  let appliedIqd = regularIqd;
+  let appliedTier: 'regular' | 'pro' | 'prime' = 'regular';
+  if (isPro && proIqd !== null) {
+    appliedIqd = proIqd;
+    appliedTier = 'pro';
+  } else if (isPrime && primeIqd !== null) {
+    appliedIqd = primeIqd;
+    appliedTier = 'prime';
+  }
 
   // Preorder transport commission — added on top; waived for active PRO.
   let transport: ResolvedPrice['transport'] = null;
   const method = (input.transportMethod ?? '').trim();
-  if (product.selling_type === 'pre_order') {
+  const saleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
+  if (saleTypes.includes('pre_order') && (saleTypes.length === 1 || method)) {
     if (!method) {
       errors.push('TRANSPORT_REQUIRED');
     } else {
@@ -189,6 +222,8 @@ export function resolveUnitPrice(input: {
         if (commission === null || commission === undefined) {
           errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
         } else {
+          // §5: "لا تمنح PRIME أي ميزة PRO أخرى تلقائيًا" — the preorder
+          // commission waiver stays PRO-only.
           transport = { method, commission_iqd: commission, waived: isPro };
         }
       }
@@ -222,9 +257,9 @@ export function resolveUnitPrice(input: {
   return {
     regular_iqd: regularIqd,
     pro_iqd: proIqd,
+    prime_iqd: primeIqd,
     applied_iqd: appliedIqd,
     applied_tier: appliedTier,
-    compare_at_iqd: compareAtIqd,
     cost_iqd: cost.value ?? null,
     price_source: regular.source,
     transport,

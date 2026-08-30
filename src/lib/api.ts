@@ -61,7 +61,10 @@ export interface ApiUser {
   role: 'customer' | 'merchant' | 'admin';
   isAdmin: boolean;
   is_investor: boolean;
+  /** Legacy column, no longer authoritative — see membership_tier. */
   subscription_plan: 'free' | 'plus' | 'pro';
+  /** Effective membership tier resolved from the memberships ledger. */
+  membership_tier: 'free' | 'plus' | 'pro' | 'prime';
   subscription_expiry: number;
   locale: 'en' | 'ar' | 'ku';
   avatar_key: string | null;
@@ -84,12 +87,19 @@ export interface ApiProduct {
   description_ar: string;
   description_ku?: string;
   images: string[];
-  options: Array<{ id: string; name?: string; name_ar?: string; image?: string; price_iqd?: number; original_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
-  colors: Array<{ id: string; name?: string; name_ar?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; original_price_iqd?: number; cost_iqd?: number }>;
+  options: Array<{ id: string; name?: string; name_ar?: string; image?: string; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
+  colors: Array<{ id: string; name?: string; name_ar?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
+  sale_types?: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   shipping_methods: Array<{ id: string; method?: string; delivery_time?: string; price_iqd?: number }>;
   price_iqd: number;
-  original_price_iqd: number | null;
+  prime_price_iqd?: number | null;
+  pro_price_iqd?: number | null;
+  /** What this viewer actually pays, and the regular price it is compared
+   *  against. Compare-at (§4) no longer exists. */
+  display_price_iqd?: number;
+  display_applied_tier?: 'regular' | 'pro' | 'prime';
+  display_regular_iqd?: number;
   product_cost_iqd?: number | null;
   membership_prices: { plus?: number; pro?: number };
   payment_options: string[];
@@ -126,7 +136,18 @@ export interface CartItem {
   shipping_method_id: string;
   variantLabel: string;
   unit_price_iqd: number;
-  original_price_iqd: number | null;
+  /** Server-resolved price breakdown for this line. `regular_iqd` vs
+   *  `applied_iqd` is the only honest saving to display (§4 retired
+   *  compare-at). */
+  breakdown?: {
+    applied_iqd: number;
+    applied_tier: 'regular' | 'pro' | 'prime';
+    regular_iqd: number;
+    prime_iqd: number | null;
+    unit_subtotal_iqd: number;
+    price_source: string;
+    errors: string[];
+  };
   stock: number | null;
   options: ApiProduct['options'];
   colors: ApiProduct['colors'];

@@ -127,7 +127,10 @@ export function publicBreakdown(r: ResolvedPrice) {
   return {
     applied_iqd: r.applied_iqd,
     applied_tier: r.applied_tier,
-    compare_at_iqd: r.compare_at_iqd,
+    // Compare-at is gone (mandate §4): no strikethrough price is derived from
+    // the retired original_price_iqd column anywhere.
+    regular_iqd: r.regular_iqd,
+    prime_iqd: r.prime_iqd,
     transport: r.transport,
     warranty: r.warranty,
     unit_subtotal_iqd: r.unit_subtotal_iqd,
@@ -201,7 +204,6 @@ async function loadCart(c: Context<AppContext>) {
       support_gift_eligible: eligibleIds.has(String(row.id ?? '')),
       // Legacy field kept for existing UI: the full per-unit amount.
       unit_price_iqd: resolved.unit_subtotal_iqd,
-      original_price_iqd: resolved.compare_at_iqd,
       breakdown: publicBreakdown(resolved),
       stock: row.stock,
       options: doc.options.filter((o) => o.active).map(stripCost),

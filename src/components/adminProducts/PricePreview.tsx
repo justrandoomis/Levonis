@@ -186,8 +186,8 @@ export default function PricePreview({
             <Row ar="مصدر السعر" en="source" v={
               quote.price_source === 'color' ? 'اللون / color' : quote.price_source === 'option' ? 'الخيار / option' : 'الأساسي / base'
             } />
-            {quote.compare_at_iqd !== null && (
-              <Row ar="سعر المقارنة" en="compare-at" v={formatIqd(quote.compare_at_iqd)} />
+            {quote.prime_iqd !== null && (
+              <Row ar="سعر PRIME" en="PRIME price" v={formatIqd(quote.prime_iqd)} />
             )}
             {quote.transport && (
               <Row

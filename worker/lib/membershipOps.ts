@@ -73,7 +73,7 @@ export async function grantPrinterGiftIfEligible(env: Env, orderId: string): Pro
 
   const plan = await env.DB.prepare('SELECT id, tier, duration_months FROM membership_plans WHERE id = ?')
     .bind(cfg.plan_id)
-    .first<{ id: string; tier: 'plus' | 'pro'; duration_months: number }>();
+    .first<{ id: string; tier: 'plus' | 'pro' | 'prime'; duration_months: number }>();
   if (!plan) {
     console.error('printerGiftConfig.plan_id points at a missing plan', cfg.plan_id);
     return null; // misconfigured — no fabricated grant

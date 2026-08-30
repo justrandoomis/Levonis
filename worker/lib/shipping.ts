@@ -16,6 +16,12 @@
  *    actual mapping is owner configuration; never invented, never both.
  *  - More than N filament spools MAY add a carton fee — amount/threshold
  *    are owner configuration; no fee is charged while unconfigured.
+ *  - LEVO PRIME (product-form mandate §5) gets free delivery ONLY when the
+ *    eligible merchandise total — after product discounts, coupons AND points,
+ *    before delivery — is STRICTLY greater than 150,000 IQD. 150,000 itself is
+ *    not free; 150,001 is. PRIME is deliberately NOT given any other PRO
+ *    benefit, so by default the waiver covers the ordinary delivery fee only
+ *    and never the printer or carton surcharges.
  *
  * UNRESOLVED (decision log; configurable knobs, defaults flagged in the
  * quote's `assumptions`): threshold basis, whether the PRO waiver covers
@@ -29,6 +35,9 @@ export interface ShippingConfig {
   pro_threshold_iqd: number;
   threshold_basis: 'merchandise_after_coupon' | 'merchandise_before_coupon';
   pro_waiver_covers: 'all' | 'ordinary_only';
+  /** §5, owner-stated: strictly greater than this qualifies. */
+  prime_threshold_iqd: number;
+  prime_waiver_covers: 'all' | 'ordinary_only';
   carton_threshold_spools: number | null;
   carton_fee_iqd: number | null;
   printer_advance_required: boolean;
@@ -57,6 +66,11 @@ export interface ShippingQuote {
   total_before_waiver_iqd: number;
   advance_due_iqd: number;      // printer fees payable in advance (post-waiver)
   pro_waiver_applied: boolean;
+  prime_waiver_applied: boolean;
+  /** Auditable record of which membership rule produced a free delivery and
+   *  what number it was tested against (§5: "مع مصدر السعر والإعفاء من
+   *  التوصيل بصورة قابلة للتدقيق"). */
+  waiver_source: 'none' | 'pro' | 'prime' | 'promotion';
   waiver_basis_iqd: number;     // the value compared against the threshold
   needs_config: string[];       // honest blockers (e.g. printer fee mapping)
   assumptions: string[];        // defaulted unresolved rules, surfaced
@@ -67,9 +81,14 @@ export function quoteShipping(input: {
   items: ShippingItem[];
   /** merchandise value per the configured basis (integer IQD) */
   merchandiseIqd: number;
-  tier: 'free' | 'plus' | 'pro';
+  tier: 'free' | 'plus' | 'pro' | 'prime';
   tierActive: boolean;
   atApprovedDefaultAddress: boolean;
+  /** PRIME basis (§5): merchandise AFTER product discounts, coupons and
+   *  points, BEFORE delivery. It is a distinct number from `merchandiseIqd`,
+   *  whose basis is the PRO rule's configurable `threshold_basis`. Falls back
+   *  to merchandiseIqd only when the caller has no separate figure. */
+  primeMerchandiseIqd?: number;
   /** independent promo/referral free-delivery (kept distinct from the PRO rule) */
   independentFreeDelivery?: boolean;
   config: ShippingConfig;
@@ -105,10 +124,28 @@ export function quoteShipping(input: {
     reasons.push('Alternate delivery address selected — ordinary pricing applies for this order (PRO benefits restore automatically at your approved address).');
   }
 
-  const waiverAll = proEligible && config.pro_waiver_covers === 'all';
-  const waiverOrdinary = proEligible; // ordinary component always covered when eligible
+  // PRIME waiver — §5. One condition only: STRICTLY above the threshold on
+  // the after-discount/coupon/points merchandise total. No approved-address
+  // requirement is imposed: the owner stated that rule for PRO alone, and
+  // inventing an extra condition would silently deny a paid benefit.
+  const primeBasis = input.primeMerchandiseIqd ?? input.merchandiseIqd;
+  const primeEligible =
+    input.tier === 'prime' && input.tierActive && primeBasis > config.prime_threshold_iqd;
+  if (input.tier === 'prime' && input.tierActive && !primeEligible) {
+    reasons.push(
+      `LEVO PRIME free delivery needs an order above ${config.prime_threshold_iqd.toLocaleString()} IQD (strictly greater; ${config.prime_threshold_iqd.toLocaleString()} itself does not qualify).`
+    );
+  }
+
+  const waiverAll =
+    (proEligible && config.pro_waiver_covers === 'all') ||
+    (primeEligible && config.prime_waiver_covers === 'all');
+  const waiverOrdinary = proEligible || primeEligible; // ordinary component always covered when eligible
   if (proEligible && config.pro_waiver_covers === 'all') {
     assumptions.push('pro_waiver_covers=all (mixed-cart precedence pending owner confirmation)');
+  }
+  if (primeEligible && config.prime_waiver_covers === 'all') {
+    assumptions.push('prime_waiver_covers=all (owner has not extended PRIME beyond ordinary delivery)');
   }
   const independent = input.independentFreeDelivery === true;
 
@@ -154,6 +191,16 @@ export function quoteShipping(input: {
   );
 
   if (proEligible) reasons.push('LEVO PRO free delivery applied (approved address, order above threshold).');
+  if (primeEligible) reasons.push('LEVO PRIME free delivery applied (order above the PRIME threshold).');
+
+  // PRO wins when a member somehow satisfies both (§5 precedence).
+  const waiverSource: ShippingQuote['waiver_source'] = proEligible
+    ? 'pro'
+    : primeEligible
+      ? 'prime'
+      : independent
+        ? 'promotion'
+        : 'none';
 
   return {
     components,
@@ -161,7 +208,9 @@ export function quoteShipping(input: {
     total_before_waiver_iqd: before,
     advance_due_iqd: advance,
     pro_waiver_applied: proEligible,
-    waiver_basis_iqd: input.merchandiseIqd,
+    prime_waiver_applied: primeEligible,
+    waiver_source: waiverSource,
+    waiver_basis_iqd: proEligible ? input.merchandiseIqd : primeEligible ? primeBasis : input.merchandiseIqd,
     needs_config: needs,
     assumptions,
     reasons,

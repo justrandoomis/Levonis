@@ -14,7 +14,7 @@ export const membershipsRoutes = new Hono<AppContext>();
 
 interface PlanRow {
   id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   duration_months: number;
   price_iqd: number | null; // NULL = unpriced (NOT purchasable) — never truthiness
   active: number;
@@ -25,7 +25,7 @@ interface MembershipDbRow extends Record<string, unknown> {
   id: string;
   user_id: string;
   plan_id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   state: string;
   duration_months: number;
   price_paid_iqd: number;

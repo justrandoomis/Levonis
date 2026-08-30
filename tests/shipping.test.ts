@@ -15,6 +15,8 @@ const cfg = (over: Partial<ShippingConfig> = {}): ShippingConfig => ({
   pro_threshold_iqd: 75000,
   threshold_basis: 'merchandise_after_coupon',
   pro_waiver_covers: 'all',
+  prime_threshold_iqd: 150000,
+  prime_waiver_covers: 'ordinary_only',
   carton_threshold_spools: 10,
   carton_fee_iqd: 3000,
   printer_advance_required: true,
@@ -27,6 +29,7 @@ const printerS = (qty = 1): ShippingItem => ({ product_id: 'pr', qty, size_class
 
 const asFree = { tier: 'free' as const, tierActive: false };
 const asPro = { tier: 'pro' as const, tierActive: true };
+const asPrime = { tier: 'prime' as const, tierActive: true };
 
 test('ordinary product ships at 5,000 IQD everywhere', () => {
   const q = quoteShipping({ items: [ordinary()], merchandiseIqd: 30000, ...asFree, atApprovedDefaultAddress: false, config: cfg() });
@@ -97,4 +100,75 @@ test('independent promo free delivery is distinct from the PRO rule', () => {
   });
   assert.equal(q.total_iqd, 0);
   assert.equal(q.pro_waiver_applied, false);
+});
+
+// ------------------------------------------------- LEVO PRIME delivery (§5)
+
+test('PRIME: exactly 150,000 does NOT qualify; 150,001 does', () => {
+  const at = quoteShipping({
+    items: [ordinary()], merchandiseIqd: 150000, primeMerchandiseIqd: 150000,
+    ...asPrime, atApprovedDefaultAddress: true, config: cfg(),
+  });
+  assert.equal(at.prime_waiver_applied, false);
+  assert.equal(at.total_iqd, 5000);
+  assert.equal(at.waiver_source, 'none');
+
+  const above = quoteShipping({
+    items: [ordinary()], merchandiseIqd: 150001, primeMerchandiseIqd: 150001,
+    ...asPrime, atApprovedDefaultAddress: true, config: cfg(),
+  });
+  assert.equal(above.prime_waiver_applied, true);
+  assert.equal(above.total_iqd, 0);
+  assert.equal(above.waiver_source, 'prime');
+  assert.equal(above.waiver_basis_iqd, 150001);
+});
+
+test('PRIME is tested on the AFTER coupon-and-points basis, not the gross total', () => {
+  // 160,000 of goods, 20,000 of coupon+points → 140,000 → below the threshold.
+  const q = quoteShipping({
+    items: [ordinary()], merchandiseIqd: 160000, primeMerchandiseIqd: 140000,
+    ...asPrime, atApprovedDefaultAddress: true, config: cfg(),
+  });
+  assert.equal(q.prime_waiver_applied, false);
+  assert.equal(q.total_iqd, 5000);
+});
+
+test('PRIME does not require the PRO approved-address rule', () => {
+  const q = quoteShipping({
+    items: [ordinary()], merchandiseIqd: 200000, primeMerchandiseIqd: 200000,
+    ...asPrime, atApprovedDefaultAddress: false, config: cfg(),
+  });
+  assert.equal(q.prime_waiver_applied, true);
+  assert.equal(q.total_iqd, 0);
+});
+
+test('PRIME does NOT waive printer or carton surcharges by default', () => {
+  const q = quoteShipping({
+    items: [ordinary(), printerS(1), spool(12)],
+    merchandiseIqd: 500000, primeMerchandiseIqd: 500000,
+    ...asPrime, atApprovedDefaultAddress: true, config: cfg(),
+  });
+  assert.equal(q.prime_waiver_applied, true);
+  // ordinary 5,000 waived; printer 25,000 and carton 3,000 still due.
+  assert.equal(q.total_iqd, 28000);
+  assert.equal(q.advance_due_iqd, 25000);
+});
+
+test('an inactive PRIME membership never qualifies', () => {
+  const q = quoteShipping({
+    items: [ordinary()], merchandiseIqd: 500000, primeMerchandiseIqd: 500000,
+    tier: 'prime', tierActive: false, atApprovedDefaultAddress: true, config: cfg(),
+  });
+  assert.equal(q.prime_waiver_applied, false);
+  assert.equal(q.total_iqd, 5000);
+});
+
+test('PRO keeps its own 75,000 threshold and full waiver — PRIME does not change it', () => {
+  const q = quoteShipping({
+    items: [ordinary(), printerS(1)], merchandiseIqd: 80000,
+    ...asPro, atApprovedDefaultAddress: true, config: cfg(),
+  });
+  assert.equal(q.pro_waiver_applied, true);
+  assert.equal(q.waiver_source, 'pro');
+  assert.equal(q.total_iqd, 0);
 });

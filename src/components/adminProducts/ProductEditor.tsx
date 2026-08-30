@@ -25,7 +25,6 @@ import {
   OptionsSection, ColorsSection, MediaSection, SpecsSection, LabelsSection, WarrantySection, ContentBlocksSection,
 } from './editorSections';
 import PricePreview from './PricePreview';
-import ExtractPanel from './ExtractPanel';
 import TemplateTools from './TemplateImport';
 
 const METHODS: Array<{ m: TransportOfferV2['method']; ar: string; en: string }> = [
@@ -320,13 +319,13 @@ export default function ProductEditor({
             {usd(doc.pro_price_iqd) && <div className="text-[11px] text-zinc-500 mt-1" dir="ltr">{usd(doc.pro_price_iqd)}</div>}
           </div>
           <div>
-            <L ar="سعر المقارنة" en="Compare-at (IQD)" />
+            <L ar="سعر LEVO PRIME" en="LEVO PRIME (IQD)" />
             <NullableIqd
-              value={doc.original_price_iqd}
-              onChange={(v) => setDoc((d) => d && { ...d, original_price_iqd: v })}
-              placeholder="بدون / none"
+              value={doc.prime_price_iqd}
+              onChange={(v) => setDoc((d) => d && { ...d, prime_price_iqd: v })}
+              placeholder="بدون — يعود للسعر الاعتيادي"
             />
-            {usd(doc.original_price_iqd) && <div className="text-[11px] text-zinc-500 mt-1" dir="ltr">{usd(doc.original_price_iqd)}</div>}
+            {usd(doc.prime_price_iqd) && <div className="text-[11px] text-zinc-500 mt-1" dir="ltr">{usd(doc.prime_price_iqd)}</div>}
           </div>
           <div>
             <L ar="الكلفة (إداري فقط)" en="Cost (IQD, admin-only)" />
@@ -545,7 +544,6 @@ export default function ProductEditor({
       />
 
       {/* 13. استخراج من رابط */}
-      <ExtractPanel setDoc={setDoc as React.Dispatch<React.SetStateAction<EditorDoc>>} />
 
       {/* Sticky save bar — sticky INSIDE the scrolling content column, not
           `fixed` to the viewport. A viewport-fixed bar spans the whole window

@@ -59,7 +59,7 @@ const STRINGS = {
     imageOf: 'صورة {n} من {total}', zoom: 'تكبير الصورة', close: 'إغلاق',
     officialStore: 'المتجر الرسمي', communityStore: 'متجر مجتمع', visitStore: 'زيارة المتجر',
     price: 'السعر', from: 'يبدأ من', regularPrice: 'السعر العادي', proPrice: 'سعر أعضاء PRO',
-    proApplied: 'سعر عضويتك PRO مطبّق', subscribe: 'اشترك الآن', updatingPrice: 'يجري تحديث السعر…',
+    proApplied: 'سعر عضويتك PRO مطبّق', primeApplied: 'سعر عضويتك PRIME مطبّق', subscribe: 'اشترك الآن', updatingPrice: 'يجري تحديث السعر…',
     priceUnavailable: 'أكمل الاختيار لعرض السعر النهائي',
     options: 'الخيارات المتاحة', colors: 'الألوان المتاحة', chooseOption: 'اختر خيارًا',
     chooseColor: 'اختر لونًا', transport: 'وسيلة النقل للطلب المسبق', chooseTransport: 'اختر وسيلة النقل',
@@ -100,7 +100,7 @@ const STRINGS = {
     imageOf: 'Image {n} of {total}', zoom: 'Zoom image', close: 'Close',
     officialStore: 'Official store', communityStore: 'Community store', visitStore: 'Visit store',
     price: 'Price', from: 'From', regularPrice: 'Regular price', proPrice: 'PRO member price',
-    proApplied: 'Your PRO price is applied', subscribe: 'Subscribe', updatingPrice: 'Updating price…',
+    proApplied: 'Your PRO price is applied', primeApplied: 'Your PRIME price is applied', subscribe: 'Subscribe', updatingPrice: 'Updating price…',
     priceUnavailable: 'Complete your selection to see the final price',
     options: 'Options', colors: 'Colours', chooseOption: 'Choose an option',
     chooseColor: 'Choose a colour', transport: 'Pre-order transport', chooseTransport: 'Choose transport',
@@ -140,7 +140,7 @@ const STRINGS = {
     imageOf: 'وێنەی {n} لە {total}', zoom: 'گەورەکردنی وێنە', close: 'داخستن',
     officialStore: 'فرۆشگای فەرمی', communityStore: 'فرۆشگای کۆمەڵگا', visitStore: 'سەردانی فرۆشگا',
     price: 'نرخ', from: 'دەست پێدەکات لە', regularPrice: 'نرخی ئاسایی', proPrice: 'نرخی ئەندامانی PRO',
-    proApplied: 'نرخی PRO جێبەجێ کراوە', subscribe: 'بەشداربە', updatingPrice: 'نرخ نوێ دەکرێتەوە…',
+    proApplied: 'نرخی PRO جێبەجێ کراوە', primeApplied: 'نرخی PRIME جێبەجێ کراوە', subscribe: 'بەشداربە', updatingPrice: 'نرخ نوێ دەکرێتەوە…',
     priceUnavailable: 'هەڵبژاردنەکەت تەواو بکە بۆ بینینی نرخی کۆتایی',
     options: 'هەڵبژاردەکان', colors: 'ڕەنگەکان', chooseOption: 'هەڵبژاردەیەک هەڵبژێرە',
     chooseColor: 'ڕەنگێک هەڵبژێرە', transport: 'گواستنەوەی پێشداواکاری', chooseTransport: 'شێوازی گواستنەوە هەڵبژێرە',
@@ -209,7 +209,7 @@ interface ProductDetail {
   id: string; slug: string;
   name?: string; name_ar?: string; name_en?: string; name_ckb?: string;
   description?: string; description_ar?: string; description_en?: string; description_ckb?: string;
-  price_iqd: number; pro_price_iqd?: number | null; original_price_iqd?: number | null;
+  price_iqd: number; pro_price_iqd?: number | null; prime_price_iqd?: number | null;
   selling_type?: string;
   media?: MediaItem[]; images?: string[];
   options?: OptionItem[]; colors?: ColorItem[];
@@ -241,8 +241,8 @@ interface Availability {
 }
 
 interface Quote {
-  regular_iqd: number; pro_iqd: number | null; applied_iqd: number;
-  applied_tier: 'regular' | 'pro'; compare_at_iqd: number | null; price_source: string;
+  regular_iqd: number; pro_iqd: number | null; prime_iqd: number | null; applied_iqd: number;
+  applied_tier: 'regular' | 'pro' | 'prime'; price_source: string;
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
   warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
   unit_subtotal_iqd: number; errors: string[]; qty: number; line_total_iqd: number;
@@ -721,17 +721,19 @@ export default function Product() {
         <>
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <span className="text-white font-black text-2xl sm:text-3xl tabular-nums">{formatIqd(unitPrice!)}</span>
-            {quote!.applied_tier === 'pro' ? (
+            {quote!.applied_tier === 'pro' || quote!.applied_tier === 'prime' ? (
               <span className="inline-flex items-center gap-1.5 bg-gold text-black px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide">
                 <Star aria-hidden="true" className="w-3 h-3 fill-black" />
-                {s.proApplied}
+                {quote!.applied_tier === 'pro' ? s.proApplied : s.primeApplied}
               </span>
             ) : (
               <span className="text-zinc-400 text-[12px] font-bold">{s.regularPrice}</span>
             )}
           </div>
-          {quote!.compare_at_iqd ? (
-            <div className="text-zinc-500 text-sm line-through mt-1 tabular-nums">{formatIqd(quote!.compare_at_iqd)}</div>
+          {/* §4: no compare-at. The regular price is struck through only when
+              the member's own resolved price is genuinely lower. */}
+          {quote!.applied_iqd < quote!.regular_iqd ? (
+            <div className="text-zinc-500 text-sm line-through mt-1 tabular-nums">{formatIqd(quote!.regular_iqd)}</div>
           ) : null}
           {qty > 1 ? (
             <div className="text-zinc-400 text-[13px] mt-2">

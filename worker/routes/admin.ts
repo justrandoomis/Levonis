@@ -30,8 +30,9 @@ adminRoutes.get('/overview', async (c) => {
     ).first<Record<string, number>>(),
     db.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN subscription_plan = 'pro' THEN 1 ELSE 0 END) AS pro,
-              SUM(CASE WHEN subscription_plan = 'plus' THEN 1 ELSE 0 END) AS plus,
+              SUM(CASE WHEN membership_tier = 'pro' THEN 1 ELSE 0 END) AS pro,
+              SUM(CASE WHEN membership_tier = 'prime' THEN 1 ELSE 0 END) AS prime,
+              SUM(CASE WHEN membership_tier = 'plus' THEN 1 ELSE 0 END) AS plus,
               SUM(CASE WHEN is_investor = 1 THEN 1 ELSE 0 END) AS investors
          FROM users`
     ).first<Record<string, number>>(),
@@ -99,7 +100,8 @@ adminRoutes.get('/users', async (c) => {
   const search = str(q.search, 'search', { max: 100, required: false });
   const limit = int(q.limit, 'limit', { min: 1, max: 100, def: 50 });
   const offset = int(q.offset, 'offset', { min: 0, max: 100_000, def: 0 });
-  let sql = `SELECT id, email, username, name, role, is_investor, subscription_plan, subscription_expiry, created_at
+  let sql = `SELECT id, email, username, name, role, is_investor, membership_tier,
+                    subscription_plan, subscription_expiry, created_at
                FROM users`;
   const params: unknown[] = [];
   if (search) {
@@ -131,9 +133,21 @@ adminRoutes.patch('/users/:id', async (c) => {
     updates.push('role = ?');
     params.push(role);
   }
-  if (body.subscription_plan !== undefined) {
+  // Admins set the tier through membership_tier; subscription_plan is kept in
+  // sync for its legal domain only (a PRIME member is 'free' there — see
+  // migration 0018). getTierStatus overwrites both from the memberships
+  // ledger on the member's next request, so this is an override, not a
+  // substitute for issuing a membership.
+  if (body.membership_tier !== undefined || body.subscription_plan !== undefined) {
+    const tier = oneOf(
+      body.membership_tier ?? body.subscription_plan,
+      'membership_tier',
+      ['free', 'plus', 'pro', 'prime'] as const
+    );
+    updates.push('membership_tier = ?');
+    params.push(tier);
     updates.push('subscription_plan = ?');
-    params.push(oneOf(body.subscription_plan, 'subscription_plan', ['free', 'plus', 'pro'] as const));
+    params.push(tier === 'prime' ? 'free' : tier);
   }
   if (body.is_investor !== undefined) {
     updates.push('is_investor = ?');

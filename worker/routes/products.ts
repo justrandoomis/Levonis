@@ -358,7 +358,9 @@ function publicWithDisplayPrice(row: Record<string, unknown>, ctx: PricingCtx): 
   });
   out.display_price_iqd = resolved.applied_iqd;
   out.display_applied_tier = resolved.applied_tier;
-  out.display_compare_at_iqd = resolved.compare_at_iqd;
+  // §4: no compare-at. The regular price is exposed so a member can see what
+  // their membership saved — a real comparison, not a fabricated one.
+  out.display_regular_iqd = resolved.regular_iqd;
   return out;
 }
 
@@ -430,7 +432,7 @@ productRoutes.get('/:slug', async (c) => {
     const out = publicShape(doc);
     out.display_price_iqd = resolved.applied_iqd;
     out.display_applied_tier = resolved.applied_tier;
-    out.display_compare_at_iqd = resolved.compare_at_iqd;
+    out.display_regular_iqd = resolved.regular_iqd;
 
     return c.json({
       success: true,

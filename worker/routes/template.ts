@@ -682,9 +682,16 @@ function priceWarnings(doc: ProductDoc): string[] {
       'price_iqd = 0 ولا يوجد سعر خيار/لون يستبدله — تأكد أن هذا مقصود قبل تفعيل المنتج / base price is an explicit zero and no option/colour price replaces it'
     );
   }
-  if (doc.original_price_iqd !== null && doc.original_price_iqd <= doc.price_iqd) {
+  // §5 price ladder: PRO <= PRIME <= Regular. A PRIME price above the
+  // regular price would be an increase, not a member discount.
+  if (doc.prime_price_iqd !== null && doc.prime_price_iqd > doc.price_iqd) {
     out.push(
-      'original_price_iqd ليس أعلى من السعر — لن يظهر كسعر مقارنة / compare-at price is not above the selling price, so it will not be shown'
+      'prime_price_iqd أعلى من السعر الاعتيادي — خصم PRIME يجب أن يكون أقل أو مساويًا / PRIME price is above the regular price'
+    );
+  }
+  if (doc.prime_price_iqd !== null && doc.pro_price_iqd !== null && doc.pro_price_iqd > doc.prime_price_iqd) {
+    out.push(
+      'pro_price_iqd أعلى من prime_price_iqd — يجب أن يكون PRO <= PRIME <= Regular / PRO price must not exceed the PRIME price'
     );
   }
   return out;

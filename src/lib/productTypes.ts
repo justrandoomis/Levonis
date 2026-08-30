@@ -8,8 +8,10 @@ export type Lang = 'ar' | 'en' | 'ckb';
 
 export interface PriceFieldsV2 {
   regular_price_iqd: number | null;
+  /** LEVO PRIME price (mandate §5). Compare-at was removed in the same
+   *  mandate (§4) — no strikethrough price is derived anywhere. */
+  prime_price_iqd: number | null;
   pro_price_iqd: number | null;
-  compare_at_iqd: number | null;
   cost_iqd: number | null; // admin-only; absent from public payloads
 }
 
@@ -119,9 +121,12 @@ export interface ProductDocV2 {
   description_ar: string; description_en: string; description_ckb: string;
   price_iqd: number;
   pro_price_iqd: number | null;
-  original_price_iqd: number | null;
+  prime_price_iqd: number | null;
   product_cost_iqd: number | null; // admin-only
+  /** Legacy scalar kept in sync with sale_types[0]. */
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
+  /** §6: multi-select sale types. */
+  sale_types: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   preorder_transports: TransportOfferV2[];
   stock: number | null;
   brand_id: string | null;
@@ -164,9 +169,9 @@ export interface CatalogV2 {
 export interface ResolvedPriceV2 {
   regular_iqd: number;
   pro_iqd: number | null;
+  prime_iqd: number | null;
   applied_iqd: number;
-  applied_tier: 'regular' | 'pro';
-  compare_at_iqd: number | null;
+  applied_tier: 'regular' | 'pro' | 'prime';
   price_source: 'color' | 'option' | 'base';
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
   warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
@@ -176,7 +181,7 @@ export interface ResolvedPriceV2 {
 
 export interface MembershipPlanV2 {
   id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   duration_months: number;
   price_iqd: number | null; // null = unpriced → not purchasable yet
   active: boolean;
@@ -186,7 +191,7 @@ export interface MembershipPlanV2 {
 export interface MembershipV2 {
   id: string;
   plan_id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   state: 'pending_payment' | 'prepaid_pending_launch' | 'active' | 'expired' | 'cancelled';
   duration_months: number;
   price_paid_iqd: number;

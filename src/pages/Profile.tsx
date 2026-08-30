@@ -22,7 +22,6 @@ interface FavoriteItem {
   name_ar: string;
   image: string;
   price_iqd: number;
-  original_price_iqd: number | null;
 }
 
 interface ReferralReward {
@@ -35,7 +34,7 @@ interface ReferralReward {
 
 interface MembershipMine {
   status: {
-    tier: 'free' | 'plus' | 'pro';
+    tier: 'free' | 'plus' | 'pro' | 'prime';
     active: boolean;
     expires_at: string | null;
     pending_launch: { tier: 'plus' | 'pro'; duration_months: number } | null;
@@ -66,9 +65,9 @@ export default function Profile() {
   const now = Date.now();
   const planActive =
     !!user &&
-    user.subscription_plan !== 'free' &&
+    user.membership_tier !== 'free' &&
     (user.subscription_expiry === 0 || user.subscription_expiry > now);
-  const isPro = planActive && user?.subscription_plan === 'pro';
+  const isPro = planActive && user?.membership_tier === 'pro';
 
   /**
    * Auth-aware navigation: a signed-out tap on a member-only destination
@@ -158,9 +157,9 @@ export default function Profile() {
 
   // Membership from the ledger (authoritative once loaded); the legacy
   // users.* cache is only a fallback while /api/memberships/mine loads.
-  const memTier: 'free' | 'plus' | 'pro' = mine
+  const memTier: 'free' | 'plus' | 'pro' | 'prime' = mine
     ? (mine.status.active ? mine.status.tier : 'free')
-    : (planActive ? (user?.subscription_plan ?? 'free') : 'free');
+    : (planActive ? (user?.membership_tier ?? 'free') : 'free');
   const memExpiry: string | null = mine
     ? mine.status.expires_at
     : (planActive && user?.subscription_expiry ? new Date(user.subscription_expiry).toISOString() : null);
@@ -761,8 +760,8 @@ export default function Profile() {
                        <span className="text-[#ff5000] font-bold text-[15px] flex items-baseline gap-0.5">
                          {formatIqd(p.price_iqd || 0)}
                        </span>
-                       {p.original_price_iqd != null && p.original_price_iqd > p.price_iqd && (
-                         <span className="text-[11px] text-zinc-500 line-through">{formatIqd(p.original_price_iqd)}</span>
+                       {p.display_regular_iqd != null && p.display_regular_iqd > (p.display_price_iqd ?? p.price_iqd) && (
+                         <span className="text-[11px] text-zinc-500 line-through">{formatIqd(p.display_regular_iqd)}</span>
                        )}
                     </div>
                   </div>
@@ -812,9 +811,6 @@ export default function Profile() {
 
                          <div className="flex items-baseline gap-1.5 text-[#ff0036] font-bold mb-1.5 mt-auto">
                            <span className="text-[15px] leading-none">{formatIqd(item.price_iqd || 0)}</span>
-                           {item.original_price_iqd != null && item.original_price_iqd > item.price_iqd && (
-                             <span className="text-[11px] text-zinc-500 line-through font-medium">{formatIqd(item.original_price_iqd)}</span>
-                           )}
                          </div>
 
                          <div className="text-zinc-500 text-[11px] flex items-center gap-0.5">

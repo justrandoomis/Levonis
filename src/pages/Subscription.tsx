@@ -26,7 +26,7 @@ function generateConsistentNumber(seed: string): string {
 
 interface ApiPlan {
   id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   duration_months: number;
   price_iqd: number | null; // null = unpriced — honest "not purchasable yet"
   purchasable: boolean;
@@ -38,7 +38,7 @@ interface LaunchInfo { launch_at: string | null; activated: boolean }
 interface ApiMembership {
   id: string;
   plan_id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   state: 'pending_payment' | 'prepaid_pending_launch' | 'active' | 'expired' | 'cancelled' | string;
   duration_months: number;
   price_paid_iqd: number;
@@ -49,7 +49,7 @@ interface ApiMembership {
 }
 
 interface TierStatus {
-  tier: 'free' | 'plus' | 'pro';
+  tier: 'free' | 'plus' | 'pro' | 'prime';
   active: boolean;
   expires_at: string | null;
   pending_launch: { tier: 'plus' | 'pro'; duration_months: number } | null;
@@ -221,11 +221,11 @@ export default function Subscription() {
   const now = Date.now();
   const legacyActive =
     !!user &&
-    user.subscription_plan !== 'free' &&
+    user.membership_tier !== 'free' &&
     (user.subscription_expiry === 0 || user.subscription_expiry > now);
-  const currentPlan: 'free' | 'plus' | 'pro' = mine
+  const currentPlan: 'free' | 'plus' | 'pro' | 'prime' = mine
     ? (mine.status.active ? mine.status.tier : 'free')
-    : (legacyActive ? user!.subscription_plan : 'free');
+    : (legacyActive ? user!.membership_tier : 'free');
   const currentExpiry = mine
     ? mine.status.expires_at
     : (legacyActive && user?.subscription_expiry ? new Date(user.subscription_expiry).toISOString() : null);

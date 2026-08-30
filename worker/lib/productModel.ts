@@ -108,9 +108,14 @@ export interface ProductDoc {
   description_ckb: string;
   price_iqd: number; // regular base — required
   pro_price_iqd: number | null;
-  original_price_iqd: number | null; // compare-at base
+  /** LEVO PRIME base price (mandate §5). NULL = falls back to regular; a
+   *  PRIME discount is never invented. */
+  prime_price_iqd: number | null;
   product_cost_iqd: number | null; // internal, admin-only
+  /** Legacy scalar, kept as sale_types[0] so pre-0018 readers keep working. */
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
+  /** §6: a product may offer several sale types at once. Never empty. */
+  sale_types: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   preorder_transports: TransportOffer[];
   stock: number | null;
   brand_id: string | null;
@@ -201,22 +206,35 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
   return out;
 }
 
+// Compare-at is gone (mandate §4). A stored v2 option/color may still carry
+// compare_at_iqd from before 0018 — it is simply not read, and prime_price_iqd
+// takes its place in the four-price ladder.
 function upgradePriceFields(o: Record<string, unknown>): PriceFields {
-  const isV2 = 'regular_price_iqd' in o || 'compare_at_iqd' in o;
+  const isV2 = 'regular_price_iqd' in o || 'compare_at_iqd' in o || 'prime_price_iqd' in o;
   if (isV2) {
     return {
       regular_price_iqd: num(o.regular_price_iqd),
+      prime_price_iqd: num(o.prime_price_iqd),
       pro_price_iqd: num(o.pro_price_iqd),
-      compare_at_iqd: num(o.compare_at_iqd),
       cost_iqd: num(o.cost_iqd),
     };
   }
   return {
     regular_price_iqd: legacyPrice(o.price_iqd),
+    prime_price_iqd: legacyPrice(o.prime_price_iqd),
     pro_price_iqd: legacyPrice(o.pro_price_iqd),
-    compare_at_iqd: legacyPrice(o.original_price_iqd),
     cost_iqd: legacyPrice(o.cost_iqd),
   };
+}
+
+/** §6: normalizes the multi-select sale types, always yielding at least one. */
+export function normalizeSaleTypes(raw: unknown, fallback: string): ProductDoc['sale_types'] {
+  const allowed = ['direct_sale', 'pre_order', 'bundle'] as const;
+  const list = Array.isArray(raw) ? raw : safeParseArr(raw);
+  const out = allowed.filter((t) => list.includes(t));
+  if (out.length) return [...out];
+  const single = allowed.find((t) => t === fallback);
+  return [single ?? 'direct_sale'];
 }
 
 export function upgradeOptions(raw: unknown): OptionV2[] {
@@ -405,9 +423,10 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     description_ckb: s(row.description_ku, 50000),
     price_iqd: num(row.price_iqd) ?? 0,
     pro_price_iqd: num(row.pro_price_iqd),
-    original_price_iqd: num(row.original_price_iqd),
+    prime_price_iqd: num(row.prime_price_iqd),
     product_cost_iqd: num(row.product_cost_iqd),
     selling_type: row.selling_type === 'pre_order' || row.selling_type === 'bundle' ? row.selling_type : 'direct_sale',
+    sale_types: normalizeSaleTypes(row.sale_types, String(row.selling_type ?? 'direct_sale')),
     preorder_transports: upgradeTransports(row.preorder_transports),
     stock: num(row.stock),
     brand_id: typeof row.brand_id === 'string' && row.brand_id ? row.brand_id : null,
@@ -538,9 +557,10 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     description_ckb: s(body.description_ckb, 50000),
     price_iqd: price as number,
     pro_price_iqd: optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
-    original_price_iqd: optionalPrice(body.original_price_iqd, 'original_price_iqd'),
+    prime_price_iqd: optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
     product_cost_iqd: optionalPrice(body.product_cost_iqd, 'product_cost_iqd'),
     selling_type: sellingType as ProductDoc['selling_type'],
+    sale_types: normalizeSaleTypes(body.sale_types, sellingType as string),
     preorder_transports: transports,
     stock: stock as number | null,
     brand_id: typeof body.brand_id === 'string' && body.brand_id ? (body.brand_id as string) : null,
@@ -588,9 +608,12 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     description_ku: doc.description_ckb,
     price_iqd: doc.price_iqd,
     pro_price_iqd: doc.pro_price_iqd,
-    original_price_iqd: doc.original_price_iqd,
+    prime_price_iqd: doc.prime_price_iqd,
     product_cost_iqd: doc.product_cost_iqd,
-    selling_type: doc.selling_type,
+    // Kept in sync with sale_types[0] so every pre-0018 reader still sees a
+    // valid scalar; sale_types is the authority.
+    selling_type: doc.sale_types[0] ?? doc.selling_type,
+    sale_types: JSON.stringify(doc.sale_types),
     preorder_transports: JSON.stringify(doc.preorder_transports),
     stock: doc.stock,
     brand_id: doc.brand_id,
@@ -640,8 +663,9 @@ export function projectPublic(doc: ProductDoc) {
     description_ckb: doc.description_ckb,
     price_iqd: doc.price_iqd,
     pro_price_iqd: doc.pro_price_iqd,
-    original_price_iqd: doc.original_price_iqd,
+    prime_price_iqd: doc.prime_price_iqd,
     selling_type: doc.selling_type,
+    sale_types: doc.sale_types,
     preorder_transports: doc.preorder_transports.filter((t) => t.active),
     stock: doc.stock,
     brand_id: doc.brand_id,
@@ -665,7 +689,7 @@ export function projectPublic(doc: ProductDoc) {
 export const PRODUCT_COLUMNS = [
   'id','slug','status','doc_version','content_rev','name','name_ar','name_ku',
   'description','description_ar','description_ku','price_iqd','pro_price_iqd',
-  'original_price_iqd','product_cost_iqd','selling_type','preorder_transports',
+  'prime_price_iqd','product_cost_iqd','selling_type','sale_types','preorder_transports',
   'stock','brand_id','images','options','colors','specifications','labels',
   'warranty_plans','content_blocks','translation_meta','is_featured',
   'display_order','payment_options','hashtags','how_to_use',

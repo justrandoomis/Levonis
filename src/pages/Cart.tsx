@@ -110,7 +110,7 @@ export default function Cart() {
   const { cartShippingMethods, checkoutDeliveryMethods, pointBalance } = useWallet();
 
   // Subscription plan comes exclusively from the server-side user record.
-  const plan = user?.subscription_plan ?? 'free';
+  const plan = user?.membership_tier ?? 'free';
   const planActive =
     !!user && plan !== 'free' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
 
@@ -437,11 +437,14 @@ export default function Cart() {
     (i) => (i as CartItem & { support_gift_eligible?: boolean }).support_gift_eligible === true
   );
   const subtotal = selectedItems.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
-  const totalOriginalPrice = selectedItems.reduce(
-    (sum, item) => sum + (item.original_price_iqd ?? item.unit_price_iqd) * item.qty,
-    0
-  );
-  const discounts = totalOriginalPrice - subtotal;
+  // §4: savings come from the server-resolved membership price (regular vs
+  // applied), never from the retired compare-at column.
+  const discounts = selectedItems.reduce((sum, item) => {
+    const b = item.breakdown;
+    if (!b) return sum;
+    return sum + Math.max(0, b.regular_iqd - b.applied_iqd) * item.qty;
+  }, 0);
+  const totalOriginalPrice = subtotal + discounts;
   const selectedCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
   // Shipping preview only — the final shipping cost is the delivery method
@@ -527,9 +530,11 @@ export default function Cart() {
           {items.map((item) => {
             const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
             const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
-            const hasSale = item.original_price_iqd !== null && item.original_price_iqd > item.unit_price_iqd;
+            const regularUnit = item.breakdown?.regular_iqd ?? null;
+            const appliedUnit = item.breakdown?.applied_iqd ?? null;
+            const hasSale = regularUnit !== null && appliedUnit !== null && appliedUnit < regularUnit;
             const discountPct = hasSale
-              ? Math.round((1 - item.unit_price_iqd / item.original_price_iqd!) * 100)
+              ? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
               : 0;
             const selected = selectedIds.has(item.id);
             return (
@@ -595,7 +600,7 @@ export default function Cart() {
                     <span className="text-[#ef233c] font-bold text-[17px]">{formatIqd(item.unit_price_iqd)}</span>
                     {hasSale && (
                       <>
-                        <span className="text-zinc-500 text-[12px] line-through">{item.original_price_iqd!.toLocaleString()}</span>
+                        <span className="text-zinc-500 text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
                         <span className="text-[#ef233c] text-[12px]">-{discountPct}%</span>
                       </>
                     )}

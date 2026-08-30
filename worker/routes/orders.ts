@@ -206,6 +206,8 @@ const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
   pro_threshold_iqd: 75000,
   threshold_basis: 'merchandise_after_coupon',
   pro_waiver_covers: 'all',
+  prime_threshold_iqd: 150000,
+  prime_waiver_covers: 'ordinary_only',
   carton_threshold_spools: null,
   carton_fee_iqd: null,
   printer_advance_required: true,
@@ -224,6 +226,8 @@ export function shippingConfigFrom(raw: unknown): ShippingConfig {
     threshold_basis:
       o.threshold_basis === 'merchandise_before_coupon' ? 'merchandise_before_coupon' : 'merchandise_after_coupon',
     pro_waiver_covers: o.pro_waiver_covers === 'ordinary_only' ? 'ordinary_only' : 'all',
+    prime_threshold_iqd: intOrNull(o.prime_threshold_iqd) ?? DEFAULT_SHIPPING_CONFIG.prime_threshold_iqd,
+    prime_waiver_covers: o.prime_waiver_covers === 'all' ? 'all' : 'ordinary_only',
     carton_threshold_spools: intOrNull(o.carton_threshold_spools),
     carton_fee_iqd: intOrNull(o.carton_fee_iqd),
     printer_advance_required: o.printer_advance_required !== false,
@@ -497,12 +501,21 @@ async function computeCheckout(
     : shippingConfig.ordinary_iqd;
   const configForOrder: ShippingConfig = { ...shippingConfig, ordinary_iqd: methodOrdinary };
 
-  const runQuote = (basisIqd: number): ShippingQuote =>
+  // The delivery benefit can be gated per tier by an active restriction case:
+  // PRO's waiver hangs off 'freeDelivery', PRIME's off 'primeDeliveryEligible'.
+  const deliveryGate =
+    tierStatus.tier === 'prime' ? 'primeDeliveryEligible' : 'freeDelivery';
+
+  /** `primeBasisIqd` is the §5 basis — merchandise after product discounts,
+   *  coupons AND points, before delivery — which is a different number from
+   *  the PRO rule's configurable basis. */
+  const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
     quoteShipping({
       items: shippingItems,
       merchandiseIqd: basisIqd,
+      primeMerchandiseIqd: primeBasisIqd,
       tier: tierStatus.tier,
-      tierActive: tierStatus.active && !gatedBenefits.has('freeDelivery'),
+      tierActive: tierStatus.active && !gatedBenefits.has(deliveryGate),
       atApprovedDefaultAddress: atApprovedDefault,
       independentFreeDelivery,
       config: configForOrder,
@@ -514,6 +527,8 @@ async function computeCheckout(
     total_before_waiver_iqd: 0,
     advance_due_iqd: 0,
     pro_waiver_applied: false,
+    prime_waiver_applied: false,
+    waiver_source: 'none',
     waiver_basis_iqd: merchandise,
     needs_config: [],
     assumptions: [],
@@ -544,18 +559,6 @@ async function computeCheckout(
     });
   }
 
-  // Final quote with the configured threshold basis (decision row 17 default:
-  // merchandise AFTER coupon discounts, before shipping).
-  if (!isPickup) {
-    const basis =
-      configForOrder.threshold_basis === 'merchandise_after_coupon'
-        ? Math.max(0, merchandise - Math.min(couponDiscount, merchandise))
-        : merchandise;
-    shipping = runQuote(basis);
-  }
-
-  const beforeDiscounts = Math.max(0, subtotal + shipping.total_iqd - couponDiscount);
-
   // Spendable balances only (mandate §11.1/§4.4: pending deposits and pending
   // points are NEVER spendable). getAvailableBalances is the wallet slice's
   // frozen contract — settled minus active holds/reservations.
@@ -568,11 +571,29 @@ async function computeCheckout(
   // community-store lines (community_products have no checkout path here; all
   // cart lines come from the official `products` catalogue). The amount is
   // EXACT: 739 available against a 75,000 basis redeems 739 IQD.
+  //
+  // Computed BEFORE the final shipping quote because the LEVO PRIME waiver is
+  // tested against merchandise after coupons AND points (product-form §5).
+  // There is no circularity: neither the coupon cap nor the points cap depends
+  // on the delivery fee.
   const eligibleMerchandise = Math.max(0, merchandise - Math.min(couponDiscount, merchandise));
   let pointsDiscount = 0;
   if (input.usePoints && available.points_available > 0) {
     pointsDiscount = capRedeemablePoints(available.points_available, eligibleMerchandise);
   }
+
+  // Final quote with the configured threshold basis (decision row 17 default:
+  // merchandise AFTER coupon discounts, before shipping) for the PRO rule, and
+  // the after-coupon-and-points basis for the PRIME rule.
+  if (!isPickup) {
+    const basis =
+      configForOrder.threshold_basis === 'merchandise_after_coupon'
+        ? eligibleMerchandise
+        : merchandise;
+    shipping = runQuote(basis, Math.max(0, eligibleMerchandise - pointsDiscount));
+  }
+
+  const beforeDiscounts = Math.max(0, subtotal + shipping.total_iqd - couponDiscount);
   const afterPoints = beforeDiscounts - pointsDiscount;
 
   // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one

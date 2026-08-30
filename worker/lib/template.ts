@@ -622,7 +622,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   // pricing
   push('price_iqd', String(doc.price_iqd));
   push('pro_price_iqd', numStr(doc.pro_price_iqd));
-  push('original_price_iqd', numStr(doc.original_price_iqd));
+  push('prime_price_iqd', numStr(doc.prime_price_iqd));
   push('product_cost_iqd', numStr(doc.product_cost_iqd));
   // classification
   if (opts.brand !== undefined) push('brand', opts.brand);
@@ -668,7 +668,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.active`, boolStr(o.active));
     push(`${p}.regular_price_iqd`, numStr(o.regular_price_iqd));
     push(`${p}.pro_price_iqd`, numStr(o.pro_price_iqd));
-    push(`${p}.compare_at_iqd`, numStr(o.compare_at_iqd));
+    push(`${p}.prime_price_iqd`, numStr(o.prime_price_iqd));
     push(`${p}.cost_iqd`, numStr(o.cost_iqd));
   });
 
@@ -684,7 +684,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.active`, boolStr(cItem.active));
     push(`${p}.regular_price_iqd`, numStr(cItem.regular_price_iqd));
     push(`${p}.pro_price_iqd`, numStr(cItem.pro_price_iqd));
-    push(`${p}.compare_at_iqd`, numStr(cItem.compare_at_iqd));
+    push(`${p}.prime_price_iqd`, numStr(cItem.prime_price_iqd));
     push(`${p}.cost_iqd`, numStr(cItem.cost_iqd));
   });
 
@@ -1085,7 +1085,7 @@ export function toDocBody(
         how_to_use: existing.how_to_use,
         price_iqd: existing.price_iqd,
         pro_price_iqd: existing.pro_price_iqd,
-        original_price_iqd: existing.original_price_iqd,
+        prime_price_iqd: existing.prime_price_iqd,
         product_cost_iqd: existing.product_cost_iqd,
         selling_type: existing.selling_type,
         stock: existing.stock,

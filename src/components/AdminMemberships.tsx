@@ -26,7 +26,7 @@ interface MemberRow {
   username: string | null;
   name: string;
   created_at: string;
-  tier: 'free' | 'plus' | 'pro';
+  tier: 'free' | 'plus' | 'pro' | 'prime';
   membership_state: string;
   expires_at: string | null;
   kyc_state: string | null;

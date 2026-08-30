@@ -31,7 +31,7 @@ export interface MembershipRow {
   id: string;
   user_id: string;
   plan_id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   state: string;
   duration_months: number;
   starts_at: string | null;
@@ -43,7 +43,7 @@ export interface TierStatus {
   tier: Tier;
   active: boolean;
   expires_at: string | null;
-  pending_launch: { tier: 'plus' | 'pro'; duration_months: number } | null;
+  pending_launch: { tier: 'plus' | 'pro' | 'prime'; duration_months: number } | null;
   /** Benefit names gated by ACTIVE restriction cases (admin decisions,
    *  final phase §10). Gates benefit computation only — never data access,
    *  support, warranty, repayment or login. */
@@ -58,7 +58,9 @@ export async function getLaunchConfig(db: D1Database): Promise<LaunchConfig> {
 
 /**
  * Resolves the user's effective tier from the memberships ledger.
- * PRO takes precedence over PLUS when both are active. Also lazily marks
+ * Precedence is PRO > PRIME > PLUS when several are active (product-form
+ * mandate §5: "PRO الفعّال أولًا، ثم PRIME الفعّال، ثم المستخدم الاعتيادي").
+ * Also lazily marks
  * overdue rows expired (idempotent, safe under concurrency: conditional
  * UPDATE on state+expiry).
  */
@@ -75,7 +77,7 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
     .prepare(
       `SELECT * FROM memberships
         WHERE user_id = ? AND state IN ('active','prepaid_pending_launch')
-        ORDER BY CASE tier WHEN 'pro' THEN 0 ELSE 1 END, expires_at DESC`
+        ORDER BY CASE tier WHEN 'pro' THEN 0 WHEN 'prime' THEN 1 ELSE 2 END, expires_at DESC`
     )
     .bind(userId)
     .all<MembershipRow>();
@@ -106,19 +108,25 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
     gated_benefits: [...gated],
   };
 
-  // Keep the legacy users.* cache in sync (many read paths still use it).
+  // Cache the resolved tier on the user row. `membership_tier` (migration
+  // 0018) is the column every reader uses; it is unconstrained, so it can
+  // carry 'prime'.
+  //
+  // `subscription_plan` is the pre-0018 column and its CHECK only admits
+  // free/plus/pro. Rebuilding `users` to widen that CHECK would mean dropping
+  // and re-creating a table that 60 foreign keys point at, which is not a
+  // proportionate risk for a column nothing reads any more — so it keeps
+  // being maintained for its legal domain and a PRIME member reads 'free'
+  // there. Do not reintroduce a reader; the column is dropped in a later
+  // migration.
+  const legacyPlan = status.tier === 'prime' ? 'free' : status.tier;
+  const expiryMs = status.expires_at ? new Date(status.expires_at).getTime() : 0;
   await db
     .prepare(
-      `UPDATE users SET subscription_plan = ?, subscription_expiry = ?
-        WHERE id = ? AND (subscription_plan <> ? OR subscription_expiry <> ?)`
+      `UPDATE users SET membership_tier = ?, subscription_plan = ?, subscription_expiry = ?
+        WHERE id = ? AND (membership_tier <> ? OR subscription_plan <> ? OR subscription_expiry <> ?)`
     )
-    .bind(
-      status.tier,
-      status.expires_at ? new Date(status.expires_at).getTime() : 0,
-      userId,
-      status.tier,
-      status.expires_at ? new Date(status.expires_at).getTime() : 0
-    )
+    .bind(status.tier, legacyPlan, expiryMs, userId, status.tier, legacyPlan, expiryMs)
     .run();
 
   return status;
@@ -151,4 +159,12 @@ export const benefits = {
   priorityService: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'priorityService'),
   /** PRO: PRO-only products/offers/coupons eligibility. */
   proExclusive: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proExclusive'),
+  /** PRIME: CONDITIONAL free last-mile delivery. Unlike PRO's unconditional
+   *  waiver this only says the member is eligible to be TESTED against the
+   *  150,000 IQD threshold — worker/lib/shipping.ts applies the comparison,
+   *  and 150,000 itself does not qualify (mandate §5). PRIME grants no other
+   *  PRO benefit: no preorder-commission waiver, no priority service, no
+   *  PRO-exclusive catalog. */
+  primeDeliveryEligible: (t: TierStatus) =>
+    t.active && t.tier === 'prime' && notGated(t, 'primeDeliveryEligible'),
 };

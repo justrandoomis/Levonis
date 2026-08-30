@@ -192,7 +192,10 @@ function applyTranslationTracking(doc: ProductDoc, prev: ProductDoc | null): voi
 
 // ---------------------------------------------------------------- price history
 
-type HistoryField = 'regular' | 'pro' | 'compare_at';
+// 'compare_at' is retired from the product form (mandate §4) but stays a
+// legal value in the table so historic rows remain readable; new rows only
+// ever use these four.
+type HistoryField = 'regular' | 'prime' | 'pro' | 'cost';
 
 interface PriceDelta {
   variant_key: string; // '' | option:<id> | color:<id>
@@ -208,6 +211,14 @@ interface PriceDelta {
  * again. Costs are internal and deliberately NOT recorded here (the table
  * is scoped to selling prices by its CHECK constraint).
  */
+interface PriceFields2 {
+  id: string;
+  regular_price_iqd: number | null;
+  prime_price_iqd: number | null;
+  pro_price_iqd: number | null;
+  cost_iqd: number | null;
+}
+
 export function priceHistoryDeltas(prev: ProductDoc, next: ProductDoc): PriceDelta[] {
   const out: PriceDelta[] = [];
   const push = (variantKey: string, field: HistoryField, oldV: number | null, newV: number | null) => {
@@ -215,13 +226,14 @@ export function priceHistoryDeltas(prev: ProductDoc, next: ProductDoc): PriceDel
   };
 
   push('', 'regular', prev.price_iqd, next.price_iqd);
+  push('', 'prime', prev.prime_price_iqd, next.prime_price_iqd);
   push('', 'pro', prev.pro_price_iqd, next.pro_price_iqd);
-  push('', 'compare_at', prev.original_price_iqd, next.original_price_iqd);
+  push('', 'cost', prev.product_cost_iqd, next.product_cost_iqd);
 
   const diffGroup = (
     kind: 'option' | 'color',
-    prevItems: Array<{ id: string; regular_price_iqd: number | null; pro_price_iqd: number | null; compare_at_iqd: number | null }>,
-    nextItems: Array<{ id: string; regular_price_iqd: number | null; pro_price_iqd: number | null; compare_at_iqd: number | null }>
+    prevItems: PriceFields2[],
+    nextItems: PriceFields2[]
   ) => {
     const prevById = new Map(prevItems.map((x) => [x.id, x]));
     const nextById = new Map(nextItems.map((x) => [x.id, x]));
@@ -229,8 +241,9 @@ export function priceHistoryDeltas(prev: ProductDoc, next: ProductDoc): PriceDel
       const p = prevById.get(id) ?? null;
       const n = nextById.get(id) ?? null;
       push(`${kind}:${id}`, 'regular', p?.regular_price_iqd ?? null, n?.regular_price_iqd ?? null);
+      push(`${kind}:${id}`, 'prime', p?.prime_price_iqd ?? null, n?.prime_price_iqd ?? null);
       push(`${kind}:${id}`, 'pro', p?.pro_price_iqd ?? null, n?.pro_price_iqd ?? null);
-      push(`${kind}:${id}`, 'compare_at', p?.compare_at_iqd ?? null, n?.compare_at_iqd ?? null);
+      push(`${kind}:${id}`, 'cost', p?.cost_iqd ?? null, n?.cost_iqd ?? null);
     }
   };
   diffGroup('option', prev.options, next.options);

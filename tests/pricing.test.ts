@@ -11,23 +11,31 @@ import type { PricingProduct, OptionV2, ColorV2 } from '../worker/lib/pricing';
 
 const baseOption = (over: Partial<OptionV2> = {}): OptionV2 => ({
   id: 'opt1', name_ar: 'خيار', name_en: 'Option', name_ckb: '', image: '', order: 0, active: true,
-  regular_price_iqd: null, pro_price_iqd: null, compare_at_iqd: null, cost_iqd: null, ...over,
+  regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, ...over,
 });
 
 const baseColor = (over: Partial<ColorV2> = {}): ColorV2 => ({
   id: 'col1', name_ar: 'أسود', name_en: 'Black', name_ckb: '', hex: '#000000', image: '',
   option_id: null, order: 0, active: true,
-  regular_price_iqd: null, pro_price_iqd: null, compare_at_iqd: null, cost_iqd: null, ...over,
+  regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, ...over,
 });
 
-const product = (over: Partial<PricingProduct> = {}): PricingProduct => ({
-  price_iqd: 100_000, pro_price_iqd: null, original_price_iqd: null, product_cost_iqd: 60_000,
-  selling_type: 'direct_sale', options: [], colors: [], preorder_transports: [], warranty_plans: [],
-  ...over,
-});
+const product = (over: Partial<PricingProduct> = {}): PricingProduct => {
+  const selling_type = over.selling_type ?? 'direct_sale';
+  return {
+    price_iqd: 100_000, pro_price_iqd: null, prime_price_iqd: null, product_cost_iqd: 60_000,
+    options: [], colors: [], preorder_transports: [], warranty_plans: [],
+    ...over,
+    selling_type,
+    // Mirrors the model default: sale_types follows the scalar unless the
+    // test sets it explicitly.
+    sale_types: over.sale_types ?? [selling_type as 'direct_sale' | 'pre_order' | 'bundle'],
+  };
+};
 
 const free = { tier: 'free' as const, tierActive: false };
 const pro = { tier: 'pro' as const, tierActive: true };
+const prime = { tier: 'prime' as const, tierActive: true };
 
 test('base price applies with no selections', () => {
   const r = resolveUnitPrice({ product: product(), ...free });
@@ -45,13 +53,13 @@ test('option regular price REPLACES base', () => {
 
 test('color overrides option overrides base — per field', () => {
   const p = product({
-    options: [baseOption({ regular_price_iqd: 120_000, compare_at_iqd: 150_000 })],
-    colors: [baseColor({ regular_price_iqd: 130_000 })], // compare_at null → inherits option's 150k
+    options: [baseOption({ regular_price_iqd: 120_000, prime_price_iqd: 115_000 })],
+    colors: [baseColor({ regular_price_iqd: 130_000 })], // prime null → inherits the option's 115k
   });
   const r = resolveUnitPrice({ product: p, optionId: 'opt1', colorId: 'col1', ...free });
   assert.equal(r.applied_iqd, 130_000);
   assert.equal(r.price_source, 'color');
-  assert.equal(r.compare_at_iqd, 150_000); // per-field inheritance, not whole-object replacement
+  assert.equal(r.prime_iqd, 115_000); // per-field inheritance, not whole-object replacement
 });
 
 test('zero is an explicit price, not inherit', () => {
@@ -83,11 +91,76 @@ test('global_percent policy applies when configured', () => {
   assert.equal(r.applied_tier, 'pro');
 });
 
-test('compare-at shown only when above the applied price', () => {
-  const p = product({ original_price_iqd: 100_000 }); // equal → hidden
-  assert.equal(resolveUnitPrice({ product: p, ...free }).compare_at_iqd, null);
-  const p2 = product({ original_price_iqd: 130_000 });
-  assert.equal(resolveUnitPrice({ product: p2, ...free }).compare_at_iqd, 130_000);
+// --------------------------------------------------------- LEVO PRIME (§5)
+
+test('PRIME pays the explicit PRIME price', () => {
+  const p = product({ prime_price_iqd: 95_000 });
+  const r = resolveUnitPrice({ product: p, ...prime });
+  assert.equal(r.applied_iqd, 95_000);
+  assert.equal(r.applied_tier, 'prime');
+});
+
+test('no explicit PRIME price = regular, never a fabricated discount', () => {
+  const r = resolveUnitPrice({ product: product(), ...prime });
+  assert.equal(r.applied_iqd, 100_000);
+  assert.equal(r.applied_tier, 'regular');
+  assert.equal(r.prime_iqd, null);
+});
+
+test('PRIME has no store-wide percent policy — the PRO policy never leaks to it', () => {
+  const r = resolveUnitPrice({ product: product(), ...prime, proPolicy: { mode: 'global_percent', percent: 10 } });
+  assert.equal(r.applied_iqd, 100_000);
+  assert.equal(r.applied_tier, 'regular');
+});
+
+test('price ladder PRO <= PRIME <= Regular is enforced at resolve time', () => {
+  // PRIME above regular clamps down to regular.
+  assert.equal(resolveUnitPrice({ product: product({ prime_price_iqd: 120_000 }), ...prime }).prime_iqd, 100_000);
+  // PRIME below PRO would invert the ladder — it clamps UP to the PRO price.
+  const inverted = product({ pro_price_iqd: 90_000, prime_price_iqd: 80_000 });
+  assert.equal(resolveUnitPrice({ product: inverted, ...prime }).prime_iqd, 90_000);
+  assert.equal(resolveUnitPrice({ product: inverted, ...prime }).applied_iqd, 90_000);
+});
+
+test('precedence: an active PRO member takes the PRO price even when PRIME is cheaper on paper', () => {
+  const p = product({ pro_price_iqd: 85_000, prime_price_iqd: 92_000 });
+  const r = resolveUnitPrice({ product: p, ...pro });
+  assert.equal(r.applied_tier, 'pro');
+  assert.equal(r.applied_iqd, 85_000);
+});
+
+test('an inactive PRIME membership pays the regular price', () => {
+  const p = product({ prime_price_iqd: 95_000 });
+  const r = resolveUnitPrice({ product: p, tier: 'prime', tierActive: false });
+  assert.equal(r.applied_iqd, 100_000);
+  assert.equal(r.applied_tier, 'regular');
+});
+
+test('PRIME does NOT inherit the PRO preorder-commission waiver', () => {
+  const p = product({
+    selling_type: 'pre_order',
+    sale_types: ['pre_order'],
+    preorder_transports: [{ method: 'sea', commission_iqd: 15_000, active: true }],
+  });
+  const r = resolveUnitPrice({ product: p, transportMethod: 'sea', ...prime });
+  assert.equal(r.transport?.waived, false);
+  assert.equal(r.unit_subtotal_iqd, 115_000);
+});
+
+test('a product offering both direct sale and pre-order does not force a transport choice', () => {
+  const p = product({
+    selling_type: 'direct_sale',
+    sale_types: ['direct_sale', 'pre_order'],
+    preorder_transports: [{ method: 'sea', commission_iqd: 15_000, active: true }],
+  });
+  // Buying it directly: no transport required, none charged.
+  const direct = resolveUnitPrice({ product: p, ...free });
+  assert.deepEqual(direct.errors, []);
+  assert.equal(direct.unit_subtotal_iqd, 100_000);
+  // Choosing pre-order: the commission applies.
+  const pre = resolveUnitPrice({ product: p, transportMethod: 'sea', ...free });
+  assert.deepEqual(pre.errors, []);
+  assert.equal(pre.unit_subtotal_iqd, 115_000);
 });
 
 test('linked color rejected with the wrong option', () => {

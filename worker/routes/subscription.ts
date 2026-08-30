@@ -17,7 +17,7 @@ export const subscriptionRoutes = new Hono<AppContext>();
 
 interface PlanRow {
   id: string;
-  tier: 'plus' | 'pro';
+  tier: 'plus' | 'pro' | 'prime';
   duration_months: number;
   price_iqd: number | null; // NULL = unpriced: NOT purchasable (never truthiness)
   sort: number;
@@ -50,6 +50,9 @@ subscriptionRoutes.get('/plans', async (c) => {
   };
   for (const p of results) {
     if (p.price_iqd === null) continue;
+    // LEVO PRIME has no slot in this legacy two-tier shape, and inventing one
+    // would crash old clients. PRIME is sold through /api/memberships/plans.
+    if (p.tier !== 'plus' && p.tier !== 'pro') continue;
     legacy[p.tier].push({
       id: legacyDurationId(p.duration_months),
       cost_iqd: p.price_iqd,

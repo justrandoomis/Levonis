@@ -34,9 +34,10 @@ export function blankDoc(): EditorDoc {
     description_ar: '', description_en: '', description_ckb: '',
     price_iqd: 0,
     pro_price_iqd: null,
-    original_price_iqd: null,
+    prime_price_iqd: null,
     product_cost_iqd: null,
     selling_type: 'direct_sale',
+    sale_types: ['direct_sale'],
     preorder_transports: [],
     stock: null,
     brand_id: null,
@@ -203,49 +204,6 @@ export interface ZipParseResponse {
 }
 
 export type DuplicateChoice = 'update_existing' | 'create_hidden_draft_new_identity';
-
-// ---------------------------------------------------------------- extraction
-
-export type ExtractSource = 'json-ld' | 'og' | 'meta' | 'title';
-
-export interface ExtractSpecEntry { name: string; value: string; unit: string }
-
-export interface ExtractCandidate { value: string | string[]; source: ExtractSource }
-
-export interface ExtractField {
-  field: string;
-  value: string | string[] | ExtractSpecEntry[] | null;
-  source: ExtractSource | null;
-  status: 'extracted' | 'missing' | 'conflicting';
-  candidates?: ExtractCandidate[];
-}
-
-export interface ExtractWarning {
-  kind: 'possible_price_text' | 'media_fetch_failed';
-  field?: string;
-  snippet?: string;
-  source_url?: string;
-  reason?: string;
-}
-
-export interface ExtractMediaResult {
-  source_url: string;
-  key?: string;
-  url?: string;
-  status: 'stored' | 'failed';
-  reason?: string;
-}
-
-export interface ExtractResponse {
-  source_url: string;
-  fields: ExtractField[];
-  proposed_options: Array<{ name: string }>;
-  proposed_colors: Array<{ name: string; hex: string }>;
-  media: ExtractMediaResult[];
-  warnings: ExtractWarning[];
-  unsupported: boolean;
-  message?: string;
-}
 
 // ---------------------------------------------------------------- misc
 

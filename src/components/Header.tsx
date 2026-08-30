@@ -19,9 +19,9 @@ export default function Header() {
   const now = Date.now();
   const subTier =
     user &&
-    user.subscription_plan !== 'free' &&
+    user.membership_tier !== 'free' &&
     (user.subscription_expiry === 0 || user.subscription_expiry > now)
-      ? user.subscription_plan
+      ? user.membership_tier
       : 'free';
 
 

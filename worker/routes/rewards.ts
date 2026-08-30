@@ -88,7 +88,7 @@ rewardRoutes.get('/', async (c) => {
         progress_seconds: browse && browse.day === today ? browse.seconds : 0,
       },
     },
-    is_pro: planIsActive(user.subscription_plan, user.subscription_expiry) && user.subscription_plan === 'pro',
+    is_pro: planIsActive(user.membership_tier, user.subscription_expiry) && user.membership_tier === 'pro',
   });
 });
 
@@ -98,7 +98,7 @@ rewardRoutes.post('/checkin', async (c) => {
   const today = baghdadDay();
   if (user.last_checkin_day === today) throw conflict('You have already checked in today');
   const streak = user.last_checkin_day === baghdadDay(-1) ? user.checkin_streak + 1 : 1;
-  const pro = planIsActive(user.subscription_plan, user.subscription_expiry) && user.subscription_plan === 'pro';
+  const pro = planIsActive(user.membership_tier, user.subscription_expiry) && user.membership_tier === 'pro';
   const points = checkinPoints(streak, pro);
   await claim(c, 'checkin', today, points, `Daily Check-in (Day ${streak})`, [
     c.env.DB.prepare('UPDATE users SET checkin_streak = ?, last_checkin_day = ? WHERE id = ? AND (last_checkin_day IS NULL OR last_checkin_day <> ?)').bind(

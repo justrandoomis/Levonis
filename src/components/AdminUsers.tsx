@@ -10,7 +10,7 @@ interface AdminUserRow {
   name: string;
   role: 'customer' | 'merchant' | 'admin';
   is_investor: number;
-  subscription_plan: 'free' | 'plus' | 'pro';
+  membership_tier: 'free' | 'plus' | 'pro' | 'prime';
   subscription_expiry: number;
   created_at: string;
 }
@@ -77,7 +77,7 @@ export default function AdminUsers() {
     try {
       await api.patch(`/api/admin/users/${updatedUser.id}`, {
         role: updatedUser.role,
-        subscription_plan: updatedUser.subscription_plan,
+        membership_tier: updatedUser.membership_tier,
         is_investor: !!updatedUser.is_investor,
       });
       setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
@@ -151,7 +151,7 @@ export default function AdminUsers() {
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-4 h-4 text-zinc-500" />
-                      <span className="text-sm font-bold text-zinc-300 capitalize">{u.subscription_plan || 'free'}</span>
+                      <span className="text-sm font-bold text-zinc-300 capitalize">{u.membership_tier || 'free'}</span>
                     </div>
                   </td>
                   <td className="py-4 px-6">
@@ -236,12 +236,13 @@ export default function AdminUsers() {
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Subscription Plan</label>
                 <select
-                  value={editingUser.subscription_plan || 'free'}
-                  onChange={(e) => setEditingUser({...editingUser, subscription_plan: e.target.value as AdminUserRow['subscription_plan']})}
+                  value={editingUser.membership_tier || 'free'}
+                  onChange={(e) => setEditingUser({...editingUser, membership_tier: e.target.value as AdminUserRow['membership_tier']})}
                   className="w-full bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50 appearance-none font-medium capitalize"
                 >
                   <option value="free">Free Plan</option>
                   <option value="plus">Plus Plan</option>
+                  <option value="prime">LEVO PRIME</option>
                   <option value="pro">Pro Plan</option>
                 </select>
               </div>

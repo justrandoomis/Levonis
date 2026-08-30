@@ -40,7 +40,12 @@ export interface SessionUser {
   name: string;
   role: 'customer' | 'merchant' | 'admin';
   is_investor: number;
+  /** LEGACY cache (pre-0018). Its CHECK admits only free/plus/pro, so a PRIME
+   *  member reads 'free' here. Never branch on it — use membership_tier. */
   subscription_plan: 'free' | 'plus' | 'pro';
+  /** Effective tier cache written by getTierStatus from the memberships
+   *  ledger. Unconstrained column, so it can carry 'prime'. */
+  membership_tier: 'free' | 'plus' | 'pro' | 'prime';
   subscription_expiry: number;
   subscription_cost_iqd: number;
   subscription_days: number;
@@ -82,7 +87,11 @@ export function publicUser(u: SessionUser) {
     role: u.role,
     isAdmin: u.role === 'admin',
     is_investor: !!u.is_investor,
+    // Both are sent during the rollout: subscription_plan for any client build
+    // still in the wild, membership_tier as the value every current surface
+    // reads. A PRIME member is 'free' in the legacy field and 'prime' here.
     subscription_plan: u.subscription_plan,
+    membership_tier: u.membership_tier ?? u.subscription_plan ?? 'free',
     subscription_expiry: u.subscription_expiry,
     locale: localeToApi(u.locale),
     avatar_key: u.avatar_key,

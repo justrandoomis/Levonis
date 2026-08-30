@@ -84,6 +84,13 @@ export const SETTING_DEFAULTS = {
     pro_threshold_iqd: 75000,     // STRICTLY greater-than qualifies (75,000 does NOT)
     threshold_basis: 'merchandise_after_coupon', // pending owner confirmation
     pro_waiver_covers: 'all',     // 'all' | 'ordinary_only' — pending owner confirmation
+    // LEVO PRIME (product-form mandate §5): the owner stated 150,000 IQD
+    // explicitly, so it is a real default, not a placeholder. STRICTLY
+    // greater-than qualifies (150,000 does NOT; 150,001 does).
+    prime_threshold_iqd: 150000,
+    // §5 gives PRIME no PRO benefit beyond this waiver, so it covers the
+    // ordinary delivery fee only — printer and carton surcharges stay payable.
+    prime_waiver_covers: 'ordinary_only',
     carton_threshold_spools: null, // >10 spools MAY incur a carton fee — amount pending
     carton_fee_iqd: null,
     printer_advance_required: true,
@@ -94,6 +101,8 @@ export const SETTING_DEFAULTS = {
     pro_threshold_iqd: number;
     threshold_basis: 'merchandise_after_coupon' | 'merchandise_before_coupon';
     pro_waiver_covers: 'all' | 'ordinary_only';
+    prime_threshold_iqd: number;
+    prime_waiver_covers: 'all' | 'ordinary_only';
     carton_threshold_spools: number | null;
     carton_fee_iqd: number | null;
     printer_advance_required: boolean;

@@ -40,8 +40,13 @@
 
 | 30 | **LEVO Studio — إعداد المالك (أسماء فقط)**: أسرار GitHub الاختيارية `STUDIO_HANDOFF_SECRET` (سر تبادل الدخول بين الموقع والستوديو — نفس القيمة للطرفين)، `STUDIO_STAGING_MAIN_SITE_ORIGIN` و`STUDIO_PROD_MAIN_SITE_ORIGIN` (أصل الموقع الرئيسي لكل بيئة)، `STUDIO_PROD_APP_ORIGIN` (https://studio.levonis-iq.com بعد ربط النطاق). بدونها يبقى تسليم الدخول معطلًا بصدق (503). وموافقتك على إنشاء موارد الإنتاج `levonis-studio-db` و`levonis-studio-files`، وربط نطاق studio.levonis-iq.com خطوة يدوية لاحقة منفصلة. تنبيه: حزمة worker الستوديو ≈9.1MB مضغوطة — تتطلب خطة Workers المدفوعة (حد المجانية 3MB) | 🔴 لدخول الستوديو الموحد ونشر إنتاجه | GitHub → Secrets + Cloudflare |
 
+| 31 | **LEVO PRIME — مطبّق كما نص التكليف**: اشتراك سنوي فقط 99,000 د.ع (الخطة `prime_12mo`)، خصوماته عبر `prime_price_iqd` لكل منتج/خيار/لون/تركيبة، وتوصيل مجاني فقط عندما تكون البضاعة بعد الخصومات والكوبونات والنقاط **أكبر تمامًا** من 150,000 (150,000 لا تُعفى، 150,001 تُعفى). قرارات تفسيرية اتُّخذت بصراحة لأن التكليف لم ينص عليها: (أ) PRIME **لا** يشترط العنوان الافتراضي المعتمد — هذا شرط PRO المؤكَّد وحده، وفرضه كان سيمنع ميزة مدفوعة؛ (ب) إعفاء PRIME يغطي رسوم التوصيل الاعتيادية فقط ولا يغطي رسوم الطابعات ولا الكرتون (`prime_waiver_covers='ordinary_only'`) لأن «لا تمنح PRIME أي ميزة PRO أخرى تلقائيًا». غيّرهما المالك من إعدادات shippingPolicy متى شاء | 🟡 (مطبّق بافتراضين معلَنين) | worker/lib/shipping.ts + settings.ts |
+| 32 | **`users.subscription_prime` غير موجود عمدًا**: عمود `users.subscription_plan` يحمل CHECK لا يقبل 'prime'، وتوسيعه يتطلب إعادة بناء جدول `users` الذي تشير إليه 60 مفتاحًا خارجيًا. بدلًا من ذلك أضافت الهجرة 0018 عمود `users.membership_tier` بلا قيد، ونُقل كل قارئ إليه، ويبقى `subscription_plan` محدَّثًا لنطاقه القديم فقط (عضو PRIME يقرأ 'free' فيه). يُحذف العمود القديم في هجرة لاحقة آمنة بعد التأكد من عدم وجود عملاء قدامى | 🟡 (مقصود ومُوثَّق) | migrations/0018 + worker/lib/entitlements.ts |
+| 33 | **حذف الاستخراج من رابط (§2)**: حُذف `worker/routes/extract.ts` و`/api/admin/extract-v2` و`/api/extract` القديم ولوحة ExtractPanel بالكامل. بقي مسار واحد ضيق `POST /api/admin/media/ingest` يجلب **ملف صورة مباشرًا فقط** (تحقق magic bytes — صفحة HTML تُرفض)، وهو ما يسمح به التكليف صراحة لقوالب الاستيراد | ✅ | worker/routes/media.ts |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).
 Rows 3/4/5/8/9/10/12/13/14/16/18/19/21/22/24/26 block their specific
-features only — everything else proceeds.
+features only — everything else proceeds. Rows 31–33 are decisions already
+implemented with their assumptions stated, not blockers.

@@ -38,8 +38,8 @@ function removedAt<T extends { order: number }>(arr: T[], idx: number): T[] {
 
 const PRICE_LABELS: Array<{ key: keyof PriceFieldsV2; ar: string; en: string }> = [
   { key: 'regular_price_iqd', ar: 'السعر العادي', en: 'Regular (IQD)' },
+  { key: 'prime_price_iqd', ar: 'سعر PRIME', en: 'PRIME (IQD)' },
   { key: 'pro_price_iqd', ar: 'سعر PRO', en: 'PRO (IQD)' },
-  { key: 'compare_at_iqd', ar: 'سعر المقارنة', en: 'Compare-at (IQD)' },
   { key: 'cost_iqd', ar: 'الكلفة (إداري)', en: 'Cost (admin)' },
 ];
 
@@ -143,7 +143,7 @@ export function OptionsSection({ doc, setDoc }: { doc: EditorDoc; setDoc: SetDoc
         options: [...d.options, {
           id: uid('opt'), name_ar: '', name_en: '', name_ckb: '', image: '',
           order: d.options.length, active: true,
-          regular_price_iqd: null, pro_price_iqd: null, compare_at_iqd: null, cost_iqd: null,
+          regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
         }],
       }))} />
     </Section>
@@ -236,7 +236,7 @@ export function ColorsSection({ doc, setDoc }: { doc: EditorDoc; setDoc: SetDoc 
         colors: [...d.colors, {
           id: uid('col'), name_ar: '', name_en: '', name_ckb: '', hex: '', image: '', option_id: null,
           order: d.colors.length, active: true,
-          regular_price_iqd: null, pro_price_iqd: null, compare_at_iqd: null, cost_iqd: null,
+          regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
         }],
       }))} />
     </Section>
