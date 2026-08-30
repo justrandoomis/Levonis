@@ -36,7 +36,6 @@ import Referrals from './pages/Referrals';
 import Games from './pages/Games';
 import Leaderboards from './pages/Leaderboards';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
-import RequireCommunityProfile from './components/auth/RequireCommunityProfile';
 import Policies from './pages/Policies';
 import Support from './pages/Support';
 import MyGifts from './components/reviews/MyGifts';
@@ -122,7 +121,15 @@ function AppContent() {
           <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/points" element={<Rewards />} />
-          <Route path="/community" element={<RequireCommunityProfile><Community /></RequireCommunityProfile>} />
+          {/* Browsing the community needs a SESSION, not a finished profile. It
+              used to sit behind RequireCommunityProfile, which redirected to
+              /edit-profile whenever `username` was unset — and an account
+              created through Google or Telegram has no username, so the tab
+              was simply unreachable for those users. The page itself only
+              reads `username` as an avatar seed with a fallback, and the one
+              write it performs (POST /api/community/requests) is enforced
+              server-side by requireAuth alone. */}
+          <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/community/store/:id" element={<MerchantStore />} />
           <Route path="/followed-stores" element={<ProtectedRoute><FollowedStores /></ProtectedRoute>} />
           {/* §8 — /chats is NOT gated: the two permanent support entries (the

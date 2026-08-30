@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { Check, Zap, Eye, EyeOff, Printer, Info, Sparkles, Clock } from 'lucide-react';
-import CircularGallery from "../components/CircularGallery";
+import { Check, Zap, Eye, EyeOff, Printer, Info, Sparkles, Clock, Crown, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { api, formatIqd, newIdempotencyKey } from '../lib/api';
-import ScrollReveal from '../components/ScrollReveal';
-import GooeyNav from '../components/GooeyNav';
-import PixelCard from '../components/PixelCard';
 import KycSection from '../components/kyc/KycSection';
 
 /** Display-only membership number derived deterministically from the user id — cosmetic, never stored. */
@@ -61,117 +57,57 @@ interface MineResponse {
   launch: LaunchInfo;
 }
 
-// -------------------------------------------------------- canvas plan card
+// ------------------------------------------------------------ tier styling
+//
+// The plan gallery used to be a WebGL carousel (CircularGallery) fed by
+// canvas-rendered images of each card. It was replaced by ordinary DOM cards
+// in a responsive grid, for two reasons the owner hit directly:
+//
+//   * RATIO. The carousel was laid out in world units with a fixed 450px
+//     stage and `bend`, so the cards kept their own proportions regardless of
+//     the viewport and spilled off the sides of a tablet in portrait. A grid
+//     of `aspect-[3/4]` cards fits any width by construction.
+//   * ANIMATION. It span, tilted and bounced. Plain cards do not.
+//
+// Dropping it also removes a canvas rasterisation per plan per tier switch,
+// and an OGL/WebGL context on a page that only ever needed three prices.
 
-interface CanvasPlan {
-  badge: string | null;
-  number: string;
-  unit: string;
-  perMonth: string | null; // priced plans only
-  total: string | null;    // priced plans only
-  tba: string | null;      // unpriced plans: "price to be announced"
-  soonPill: string | null; // unpriced plans: "coming soon" pill
+interface TierStyle {
+  ring: string;
+  chip: string;
+  accentText: string;
+  glow: string;
+  Icon: typeof Sparkles;
 }
 
-const generatePlanImage = (plan: CanvasPlan, activeTab: string) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 800;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-
-  const isPro = activeTab === 'pro';
-  const primaryColor = isPro ? '#B03142' : '#8B9B7B';
-
-  // Background
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#27272a');
-  gradient.addColorStop(1, '#18181b');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Border
-  ctx.lineWidth = 12;
-  ctx.strokeStyle = primaryColor;
-  ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
-
-  // Badge
-  if (plan.badge) {
-    ctx.fillStyle = primaryColor;
-    ctx.fillRect(0, 0, canvas.width, 90);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(plan.badge.toUpperCase(), canvas.width / 2, 45);
-  }
-
-  // Number
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 220px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(plan.number, canvas.width / 2, 280);
-
-  // Unit
-  ctx.fillStyle = '#a1a1aa';
-  ctx.font = 'bold 60px sans-serif';
-  ctx.fillText(plan.unit, canvas.width / 2, 430);
-
-  // Divider
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(100, 520);
-  ctx.lineTo(500, 520);
-  ctx.stroke();
-
-  if (plan.tba) {
-    // Unpriced plan: honest "price to be announced" — no fabricated number.
-    ctx.fillStyle = '#facc15';
-    ctx.font = 'bold 42px sans-serif';
-    ctx.fillText(plan.tba, canvas.width / 2, 600);
-    if (plan.soonPill) {
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      const rw = 260, rh = 70, rx = canvas.width / 2 - rw / 2, ry = 660, r = 35;
-      ctx.beginPath();
-      ctx.moveTo(rx + r, ry);
-      ctx.lineTo(rx + rw - r, ry);
-      ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + r);
-      ctx.lineTo(rx + rw, ry + rh - r);
-      ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - r, ry + rh);
-      ctx.lineTo(rx + r, ry + rh);
-      ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
-      ctx.lineTo(rx, ry + r);
-      ctx.quadraticCurveTo(rx, ry, rx + r, ry);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#e4e4e7';
-      ctx.font = 'bold 34px sans-serif';
-      ctx.fillText(plan.soonPill, canvas.width / 2, ry + rh / 2 + 2);
-    }
-  } else {
-    // Price Per Unit
-    if (plan.perMonth) {
-      ctx.fillStyle = '#e4e4e7';
-      ctx.font = '44px sans-serif';
-      ctx.fillText(plan.perMonth, canvas.width / 2, 600);
-    }
-    // Total
-    if (plan.total) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 44px sans-serif';
-      ctx.fillText(plan.total, canvas.width / 2, 720);
-    }
-  }
-
-  return canvas.toDataURL('image/png');
+const TIER_STYLE: Record<'plus' | 'pro' | 'prime', TierStyle> = {
+  plus: {
+    ring: 'border-olive/60 bg-olive/10',
+    chip: 'bg-olive/20 text-olive border-olive/40',
+    accentText: 'text-olive',
+    glow: 'bg-olive/15',
+    Icon: Zap,
+  },
+  prime: {
+    ring: 'border-gold/60 bg-gold/10',
+    chip: 'bg-gold/20 text-gold border-gold/40',
+    accentText: 'text-gold',
+    glow: 'bg-gold/10',
+    Icon: Crown,
+  },
+  pro: {
+    ring: 'border-[#B03142]/70 bg-[#B03142]/10',
+    chip: 'bg-[#B03142]/20 text-[#e06070] border-[#B03142]/40',
+    accentText: 'text-[#e06070]',
+    glow: 'bg-[#B03142]/15',
+    Icon: Sparkles,
+  },
 };
 
 export default function Subscription() {
   const { t, lang, loc } = useLanguage();
   const [showCardDetails, setShowCardDetails] = useState(false);
-  const [activeTab, setActiveTab] = useState<'plus' | 'pro'>('pro');
+  const [activeTab, setActiveTab] = useState<'plus' | 'pro' | 'prime'>('pro');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const { refreshWallet } = useWallet();
   const { user, refreshUser } = useAuth();
@@ -244,24 +180,23 @@ export default function Subscription() {
 
   const selectedPlan = tierPlans.find((p) => p.id === selectedPlanId) || null;
 
-  const galleryItems = React.useMemo(() => {
-    return tierPlans.map((p) => {
-      const priced = p.price_iqd !== null; // null = unpriced; 0 is a real explicit price
-      const cp: CanvasPlan = {
-        badge: p.tier === 'pro' ? 'PRO' : 'PLUS',
-        number: String(p.duration_months),
-        unit: p.duration_months === 1 ? t('month') : t('months'),
-        perMonth: priced
-          ? `${formatIqd(Math.round((p.price_iqd as number) / p.duration_months))} / ${t('month')}`
-          : null,
-        total: priced ? formatIqd(p.price_iqd as number) : null,
-        tba: priced ? null : t('priceTBA'),
-        soonPill: priced ? null : t('comingSoon'),
-      };
-      return { image: generatePlanImage(cp, activeTab), text: '' };
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierPlans, activeTab, lang]);
+  /** Tier order follows the server's own `sort` column, so the owner reorders
+   *  the tabs from the memberships admin without a code change. */
+  const tiers = React.useMemo(() => {
+    const firstSort = new Map<string, number>();
+    for (const p of plans || []) {
+      const cur = firstSort.get(p.tier);
+      if (cur === undefined || p.sort < cur) firstSort.set(p.tier, p.sort);
+    }
+    return (['plus', 'prime', 'pro'] as const).filter((x) => firstSort.has(x)).sort(
+      (a, b) => (firstSort.get(a) ?? 0) - (firstSort.get(b) ?? 0)
+    );
+  }, [plans]);
+
+  // Never leave the page on a tab the catalog does not offer.
+  React.useEffect(() => {
+    if (tiers.length && !tiers.includes(activeTab)) setActiveTab(tiers[0]);
+  }, [tiers, activeTab]);
 
   const stateChip = (state: string): { label: string; cls: string } => {
     switch (state) {
@@ -362,6 +297,27 @@ export default function Subscription() {
     loc('منتجات وعروض حصرية لأعضاء PRO', 'PRO-only products and offers', 'بەرهەم و ئۆفەری تایبەت بە ئەندامانی PRO'),
     t('benefitPro4'),
   ];
+  // LEVO PRIME — exactly what the server enforces, and nothing more. §5 is
+  // explicit that PRIME grants no other PRO benefit automatically, so the list
+  // stays short on purpose rather than borrowing PRO's lines.
+  const primeLive: string[] = [
+    loc(
+      'توصيل مجاني عندما تتجاوز قيمة البضاعة 150,000 د.ع بعد الخصومات والكوبونات والنقاط',
+      'Free delivery when merchandise exceeds 150,000 IQD after discounts, coupons and points',
+      'گەیاندنی خۆڕایی کاتێک نرخی کاڵاکان لە ١٥٠,٠٠٠ د.ع تێدەپەڕێت دوای داشکاندن و کۆپۆن و خاڵ',
+    ),
+    loc(
+      'أسعار PRIME على المنتجات التي حُدد لها سعر PRIME',
+      'PRIME prices on products with an explicit PRIME price',
+      'نرخی PRIME بۆ ئەو بەرهەمانەی نرخی PRIME یان بۆ دانراوە',
+    ),
+    loc(
+      'اشتراك سنوي واحد — لا تجديد شهري',
+      'A single annual subscription — no monthly renewal',
+      'یەک بەشداریی ساڵانە — نوێکردنەوەی مانگانە نییە',
+    ),
+  ];
+
   const proSoon: string[] = [
     loc('اشترِ الآن وادفع لاحقًا (BNPL)', 'Buy now, pay later (BNPL)', 'ئێستا بکڕە و دواتر پارە بدە (BNPL)'),
     loc('توصيل خلال 12 ساعة', '12-hour delivery', 'گەیاندن لە ماوەی ١٢ کاتژمێردا'),
@@ -383,15 +339,14 @@ export default function Subscription() {
       >
         <h2 className="text-xl font-bold text-gold mb-6 text-center tracking-tight">{t('yourLevoCard')}</h2>
 
-        <div className="w-full max-w-sm relative group perspective-[1000px]">
+        {/* The card no longer tilts on hover and no longer runs PixelCard's
+            animated canvas: the owner asked for the animation to go, and a
+            membership card that reacts to a pointer is meaningless on the
+            iPad this is mostly read on. */}
+        <div className="w-full max-w-sm relative">
 
-          <motion.div
-            whileHover={{ rotateX: 5, rotateY: -5, scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="w-full h-full cursor-pointer"
-          >
-            <PixelCard
-              variant={currentPlan === 'pro' ? 'red' : currentPlan === 'plus' ? 'olive' : 'default'}
+          <div className="w-full h-full">
+            <div
               className={`relative backdrop-blur-2xl border border-white/20 rounded-[24px] p-6 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] overflow-hidden aspect-[1.58/1] flex flex-col justify-between w-full h-full ${
                 currentPlan === 'pro'
                   ? 'bg-gradient-to-br from-red-900/40 via-black/80 to-black/90'
@@ -474,8 +429,8 @@ export default function Subscription() {
                 </div>
               </div>
             </div>
-            </PixelCard>
-          </motion.div>
+            </div>
+          </div>
         </div>
 
         {/* Prepaid-pending-launch state on the card holder's account */}
@@ -508,22 +463,41 @@ export default function Subscription() {
       >
         <h3 className="text-lg font-bold text-gold mb-5 text-center">{t('choosePlan')}</h3>
 
-        {/* Tier Toggle */}
-        <div className="mb-8 relative shadow-lg h-[60px] bg-zinc-900/60 backdrop-blur-xl border border-white/10 rounded-full flex items-center">
-          <GooeyNav
-            items={[
-              { label: t('plus') },
-              { label: <div className="flex items-center gap-1.5">{t('pro')} <Sparkles className="w-4 h-4" /></div> }
-            ]}
-            initialActiveIndex={activeTab === 'plus' ? 0 : 1}
-            activeColor={activeTab === 'plus' ? '#8B9B7B' : '#B03142'}
-            onChange={(index) => {
-              setActiveTab(index === 0 ? 'plus' : 'pro');
-              setSelectedPlanId('');
-            }}
-          />
+        {/* Tier tabs. A plain segmented control: it holds three tiers instead
+            of two, it is keyboard- and screen-reader-addressable, and it does
+            not animate. Widths are equal fractions so PLUS / PRIME / PRO fit
+            a 360px phone without wrapping. */}
+        <div
+          role="tablist"
+          aria-label={t('choosePlan')}
+          className="mb-6 grid gap-1 p-1 bg-zinc-900/60 backdrop-blur-xl border border-white/10 rounded-2xl"
+          style={{ gridTemplateColumns: `repeat(${Math.max(tiers.length, 1)}, minmax(0, 1fr))` }}
+        >
+          {tiers.map((tier) => {
+            const st = TIER_STYLE[tier];
+            const on = activeTab === tier;
+            return (
+              <button
+                key={tier}
+                role="tab"
+                aria-selected={on}
+                data-tier-tab={tier}
+                onClick={() => { setActiveTab(tier); setSelectedPlanId(''); }}
+                className={`min-h-11 min-w-0 rounded-xl px-2 flex items-center justify-center gap-1.5 text-[13px] font-black tracking-wide transition-colors ${
+                  on ? `${st.chip} border` : 'text-zinc-400 border border-transparent hover:text-white'
+                }`}
+              >
+                <st.Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{tier.toUpperCase()}</span>
+              </button>
+            );
+          })}
         </div>
-        {/* Circular Plans Gallery — driven by the server plan catalog */}
+
+        {/* Plan cards. A responsive grid, so the layout is decided by the
+            viewport rather than by a fixed WebGL stage: one column on a phone,
+            two from 400px, three from 640px, each card a fixed 3:4 so the
+            proportions hold at every width. */}
         {plans === null ? (
           <div className="py-16 flex justify-center">
             <div className="w-8 h-8 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
@@ -533,34 +507,61 @@ export default function Subscription() {
             {loc('لا توجد خطط متاحة حاليًا', 'No plans are available right now', 'لە ئێستادا هیچ پلانێک بەردەست نییە')}
           </div>
         ) : (
-          <div className="pt-4 pb-4 min-h-[400px] w-screen relative left-1/2 -translate-x-1/2 mb-8">
-            <div style={{ height: '450px', position: 'relative' }}>
-              <CircularGallery
-                key={activeTab + ':' + tierPlans.length}
-                bend={3}
-                textColor="#ffffff"
-                borderRadius={0.1}
-                scrollEase={0.08}
-                fontUrl="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&display=swap"
-                font="bold 24px 'Plus Jakarta Sans'"
-                scrollSpeed={3.5}
-                onIndexChange={(index: number) => {
-                  if (tierPlans[index]) {
-                    setSelectedPlanId(tierPlans[index].id);
-                  }
-                }}
-                items={galleryItems}
-              />
+          <div
+            className="grid gap-3 mb-8 justify-items-center"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr))' }}
+          >
+            {tierPlans.map((p) => {
+              const st = TIER_STYLE[p.tier];
+              const priced = p.price_iqd !== null; // null = unpriced; 0 is a real price
+              const on = selectedPlanId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-plan={p.id}
+                  aria-pressed={on}
+                  onClick={() => setSelectedPlanId(p.id)}
+                  // Capped, not stretched: each tier now sells a single annual
+                  // plan, and a lone card allowed to fill a 390px phone would
+                  // be ~490px tall of mostly empty space.
+                  className={`w-full max-w-[13rem] min-w-0 aspect-[3/4] rounded-2xl border p-3 flex flex-col items-center justify-between text-center transition-colors ${
+                    on ? st.ring : 'border-white/10 bg-zinc-900/40 hover:border-white/25'
+                  }`}
+                >
+                  <span className={`text-[10px] font-black tracking-widest ${on ? st.accentText : 'text-zinc-500'}`}>
+                    {p.tier.toUpperCase()}
+                  </span>
 
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center animate-bounce z-10 pointer-events-none">
-                <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1)] text-white mb-2">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 19V5" />
-                    <path d="m5 12 7-7 7 7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+                  <span className="flex flex-col items-center min-w-0">
+                    <span className="text-white font-black leading-none text-[clamp(1.75rem,9vw,2.75rem)]" dir="ltr">
+                      {p.duration_months}
+                    </span>
+                    <span className="text-zinc-400 text-[12px] mt-1">
+                      {p.duration_months === 1 ? t('month') : t('months')}
+                    </span>
+                  </span>
+
+                  <span className="flex flex-col items-center min-w-0 w-full">
+                    {priced ? (
+                      <>
+                        <span className="text-white font-bold text-[13px] truncate max-w-full" dir="ltr">
+                          {formatIqd(p.price_iqd as number)}
+                        </span>
+                        <span className="text-zinc-500 text-[10.5px] truncate max-w-full" dir="ltr">
+                          {formatIqd(Math.round((p.price_iqd as number) / p.duration_months))} / {t('month')}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-amber-400 font-bold text-[12px] truncate max-w-full">{t('priceTBA')}</span>
+                        <span className="text-[10px] text-amber-500/80">{t('comingSoon')}</span>
+                      </>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </motion.div>
@@ -702,7 +703,7 @@ export default function Subscription() {
               {plusLive.map((text, i) => (
                 <li key={`pl-${i}`} className="flex items-start gap-3 text-[14.5px] text-zinc-400">
                   <Check className="w-5 h-5 text-olive shrink-0 mt-0.5" strokeWidth={2.5} />
-                  <ScrollReveal baseOpacity={0} enableBlur={true} baseRotation={5} blurStrength={10} containerClassName="m-0 p-0 inline-flex" textClassName="text-[14.5px] m-0 p-0 font-normal leading-normal">{text}</ScrollReveal>
+                  <span className="text-[14.5px] font-normal leading-normal">{text}</span>
                 </li>
               ))}
               {plusSoon.map((text, i) => (
@@ -715,6 +716,32 @@ export default function Subscription() {
             </ul>
           </div>
 
+          {/* LEVO PRIME */}
+          <div className="bg-zinc-900/30 backdrop-blur-xl border border-gold/20 rounded-[24px] p-6 shadow-lg">
+            <h4 className="text-gold font-bold mb-5 flex items-center gap-2.5 text-[16px]">
+              <Crown className="w-5 h-5" />
+              {loc('مزايا LEVO PRIME', 'LEVO PRIME benefits', 'تایبەتمەندییەکانی LEVO PRIME')}
+            </h4>
+            <ul className="space-y-4">
+              {primeLive.map((text, i) => (
+                <li key={`pm-${i}`} className="flex items-start gap-3 text-[14.5px] text-zinc-400">
+                  <Check className="w-5 h-5 text-gold shrink-0 mt-0.5" strokeWidth={2.5} />
+                  <span className="text-[14.5px] font-normal leading-normal">{text}</span>
+                </li>
+              ))}
+            </ul>
+            {/* The exact threshold, said plainly rather than rounded in prose:
+                150,000 is NOT free, 150,001 is. */}
+            <p className="mt-5 pt-4 border-t border-white/5 text-[11.5px] text-zinc-500 leading-relaxed flex items-start gap-2">
+              <Truck className="w-4 h-4 shrink-0 mt-0.5 text-zinc-600" />
+              {loc(
+                'الإعفاء يشمل رسوم التوصيل الاعتيادية فقط، ويبدأ فوق 150,000 د.ع تمامًا — طلب بقيمة 150,000 لا يُعفى.',
+                'The waiver covers ordinary delivery only, and starts strictly above 150,000 IQD — an order of exactly 150,000 is not waived.',
+                'لێبوردنەکە تەنها گەیاندنی ئاسایی دەگرێتەوە، و بە تەواوی لە سەرووی ١٥٠,٠٠٠ د.ع دەست پێدەکات — داواکاریی ١٥٠,٠٠٠ لێی نابوردرێت.',
+              )}
+            </p>
+          </div>
+
           <div className="bg-zinc-900/60 backdrop-blur-xl border border-[#B03142]/20 rounded-[24px] p-6 relative overflow-hidden shadow-[0_10px_30px_-15px_rgba(176,49,66,0.2)]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#B03142]/10 rounded-bl-[100px] pointer-events-none mix-blend-screen blur-xl"></div>
             <h4 className="text-[#B03142] font-bold mb-5 flex items-center gap-2 text-[16px] drop-shadow-sm">
@@ -724,7 +751,7 @@ export default function Subscription() {
               {proLive.map((text, i) => (
                 <li key={`prl-${i}`} className="flex items-start gap-3 text-[14.5px] text-zinc-300">
                   <Check className="w-5 h-5 text-[#B03142] shrink-0 mt-0.5" strokeWidth={2.5} />
-                  <ScrollReveal baseOpacity={0} enableBlur={true} baseRotation={5} blurStrength={10} containerClassName="m-0 p-0 inline-flex" textClassName="text-[14.5px] m-0 p-0 font-normal leading-normal">{text}</ScrollReveal>
+                  <span className="text-[14.5px] font-normal leading-normal">{text}</span>
                 </li>
               ))}
               {proSoon.map((text, i) => (
