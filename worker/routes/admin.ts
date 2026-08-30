@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray } from '../lib/http';
@@ -16,6 +17,18 @@ import { productPublic } from './products';
 import { orderPublic } from './orders';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
+import {
+  STAGE_SOURCE,
+  canMoveStage,
+  resolveDurations,
+  stageForLegacyStatus,
+  stageLabel,
+  stagesFor,
+  type OrderStage,
+} from '../lib/orderStages';
+import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
+import { typeForTransport } from '../lib/shippingType';
+import type { ShippingType } from '../lib/shippingType';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -460,7 +473,7 @@ adminRoutes.get('/orders/:id', async (c) => {
     }
   };
 
-  const [{ results: items }, snaps, units, invoice, chat] = await Promise.all([
+  const [{ results: items }, snaps, units, invoice, chat, stageHistory] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid').bind(id).all<Record<string, unknown>>(),
     soft('points', () => getOrderPointsSnapshots(c.env, [id]), new Map()),
     // Serialized units matter on the fulfilment screen: a printer that needs a
@@ -491,6 +504,16 @@ adminRoutes.get('/orders/:id', async (c) => {
       'chat',
       () => c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?').bind(id).first<{ id: string }>(),
       null as { id: string } | null
+    ),
+    soft(
+      'stage_history',
+      async () =>
+        (
+          await c.env.DB.prepare(
+            'SELECT stage, status, source, changed_at, changed_by, note FROM order_status_history WHERE order_id = ? ORDER BY changed_at'
+          ).bind(id).all<{ stage: string; changed_at: string }>()
+        ).results ?? [],
+      [] as { stage: string; changed_at: string }[]
     ),
   ]);
 
@@ -528,6 +551,44 @@ adminRoutes.get('/orders/:id', async (c) => {
       })),
       invoice: invoice ?? null,
       chat_id: chat?.id ?? null,
+      // The tracking path, so the fulfilment modal shows where the parcel is
+      // and offers only the moves that are actually legal from here. The
+      // panel holds no copy of the path — one authority, on the server.
+      tracking: (() => {
+        const shippingType = asShippingType(o.shipping_type);
+        const stage = String(o.stage || 'received') as OrderStage;
+        const path = stagesFor(shippingType);
+        return {
+          shipping_type: shippingType,
+          stage,
+          stage_source: o.stage_source ?? 'automatic',
+          stage_changed_at: o.stage_changed_at || o.updated_at || o.created_at,
+          next_stage: o.next_stage || null,
+          next_stage_at: o.next_stage_at ?? null,
+          delivery: {
+            provider: o.delivery_provider || '',
+            remote_id: o.delivery_remote_id || '',
+            tracking_no: o.delivery_tracking_no || '',
+            status_text: o.delivery_status_text || '',
+            synced_at: o.delivery_synced_at ?? null,
+            error: o.delivery_error || '',
+          },
+          steps: stagePath(shippingType, stage, stageHistory).map((v) => ({
+            ...v,
+            label_ar: stageLabel(v.stage, shippingType, 'ar'),
+            label_en: stageLabel(v.stage, shippingType, 'en'),
+          })),
+          available: [...path, 'cancelled' as OrderStage]
+            .filter((to) => canMoveStage(stage, to, shippingType))
+            .map((to) => ({
+              stage: to,
+              source: STAGE_SOURCE[to],
+              label_ar: stageLabel(to, shippingType, 'ar'),
+              label_en: stageLabel(to, shippingType, 'en'),
+            })),
+          history: stageHistory,
+        };
+      })(),
     },
   });
 });
@@ -554,6 +615,70 @@ adminRoutes.get('/orders/:id', async (c) => {
  * Every side effect behind these is idempotent through the inventory and
  * points ledgers, so a correction that goes forward again moves nothing twice.
  */
+/**
+ * Everything that has to happen the first time an order reaches `delivered`.
+ *
+ * Extracted because there are now TWO ways an order gets there — an admin
+ * moving the legacy status, and an admin (or the courier's API) moving the
+ * tracking stage — and the day those two granted different things would be
+ * the day a customer's warranty depended on which button was pressed.
+ *
+ * Every step is individually idempotent (UNIQUE(order_item_id, unit_index),
+ * UNIQUE(order_id) on points and on the gift), so reaching delivered twice
+ * grants nothing twice.
+ */
+/** Narrows a stored shipping_type, falling back the way the cart does. */
+function asShippingType(v: unknown): ShippingType {
+  return v === 'preorder_air' || v === 'preorder_sea' || v === 'preorder_land' || v === 'direct'
+    ? v
+    : typeForTransport(v);
+}
+
+async function deliveredEffects(
+  c: Context<AppContext>,
+  id: string
+): Promise<{ deviceUnits: CreateUnitsResult | null; deviceUnitsWarning: string | null }> {
+  let deviceUnits: CreateUnitsResult | null = null;
+  let deviceUnitsWarning: string | null = null;
+
+  // Mandate §4: create one device record per PHYSICAL unit of every
+  // serialized product, clocked to the delivered_at just stamped. Awaited
+  // (warranty clocks are account state, not a fire-and-forget message) and
+  // idempotent via UNIQUE(order_item_id, unit_index) — a replayed
+  // transition can never duplicate units or restart coverage.
+  const deliveredRow = await c.env.DB.prepare('SELECT delivered_at FROM orders WHERE id = ?')
+    .bind(id)
+    .first<{ delivered_at: string | null }>();
+  try {
+    deviceUnits = await createUnitsOnDelivery(c.env, id, deliveredRow?.delivered_at ?? new Date().toISOString());
+  } catch (e) {
+    console.error('device unit creation failed for order', id, e);
+    // Honest partial outcome: the order IS delivered, units are missing.
+    deviceUnitsWarning =
+      'Device units were not created — retry from Admin → Serials & Devices (backfill), otherwise warranty clocks for this order are missing.';
+  }
+
+  // Purchase points (decision row 20 defaults): floor(qualifying merchandise
+  // / 1000) at the delivered event. Awaited — points are account state —
+  // and idempotent via points_awards UNIQUE(order_id), so a replayed
+  // delivered transition can never double-award.
+  try {
+    await awardOrderPoints(c.env, id);
+  } catch (e) {
+    console.error('points award failed for order', id, e);
+  }
+
+  // Referral 9.1 milestone: records delivered_at-based eligibility (idempotent).
+  c.executionCtx.waitUntil(onOrderDelivered(c.env, id));
+  // PLUS gift on printer purchase, when the owner set the milestone to
+  // delivery (grant itself is idempotent per order).
+  const printerGift = await getSetting(c.env.DB, 'printerGiftConfig');
+  if (printerGift?.enabled === true && printerGift.milestone === 'delivered') {
+    c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, id));
+  }
+  return { deviceUnits, deviceUnitsWarning };
+}
+
 const ORDER_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
   confirmed: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
@@ -567,6 +692,122 @@ const ORDER_TRANSITIONS: Record<string, string[]> = {
 
 /** The states in which the stock has been taken out of inventory. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
+
+/**
+ * The tracking stages an order can be in, and the moves available from where
+ * it stands. Feeds the admin panel so the panel does not have to hold its own
+ * copy of the path — the one place the rules live is the server.
+ */
+adminRoutes.get('/orders/:id/stages', async (c) => {
+  const id = c.req.param('id');
+  const row = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!row) throw notFound('Order not found');
+  const order = stageRowFrom(row);
+  const { results: history } = await c.env.DB.prepare(
+    'SELECT stage, status, source, changed_at, changed_by, note FROM order_status_history WHERE order_id = ? ORDER BY changed_at'
+  )
+    .bind(id)
+    .all<{ stage: string; changed_at: string }>();
+
+  const path = stagesFor(order.shipping_type);
+  return c.json({
+    success: true,
+    shipping_type: order.shipping_type,
+    stage: order.stage,
+    stage_source: order.stage_source,
+    stage_changed_at: order.stage_changed_at,
+    next_stage: order.next_stage || null,
+    next_stage_at: order.next_stage_at,
+    path: stagePath(order.shipping_type, order.stage, history ?? []).map((v) => ({
+      ...v,
+      label_ar: stageLabel(v.stage, order.shipping_type, 'ar'),
+      label_en: stageLabel(v.stage, order.shipping_type, 'en'),
+    })),
+    // What the admin may actually pick. Computed here so a panel can render
+    // the real options instead of the whole path greyed out — the six-option
+    // bug the owner already reported once was a panel guessing this.
+    available: [...path, 'cancelled' as OrderStage]
+      .filter((to) => canMoveStage(order.stage, to, order.shipping_type))
+      .map((to) => ({
+        stage: to,
+        source: STAGE_SOURCE[to],
+        label_ar: stageLabel(to, order.shipping_type, 'ar'),
+        label_en: stageLabel(to, order.shipping_type, 'en'),
+      })),
+    history: history ?? [],
+  });
+});
+
+/**
+ * An admin moving an order along its path. The stage is the authority for
+ * what the customer is told; the legacy status is kept in step underneath by
+ * moveOrderStage, so the stock lifecycle and every existing filter still work.
+ */
+/**
+ * Runs the stage sweep now, instead of waiting for the next cron tick.
+ *
+ * The cron fires every fifteen minutes, which is right for a shop and wrong
+ * for an owner who has just shortened a wait in the settings and wants to see
+ * it take effect. It is the same function the cron calls — not a second
+ * implementation — so what this promotes is exactly what the cron would have.
+ */
+adminRoutes.post('/orders/sweep-stages', async (c) => {
+  const adminUser = c.get('user')!;
+  const report = await sweepDueStages(c.env, 200);
+  await audit(c.env.DB, adminUser.id, 'order.stage_sweep', '', {
+    scanned: report.scanned, promoted: report.promoted, skipped: report.skipped,
+  });
+  return c.json({ success: true, ...report });
+});
+
+adminRoutes.patch('/orders/:id/stage', async (c) => {
+  const adminUser = c.get('user')!;
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const to = str(body.stage, 'stage', { max: 40 }) as OrderStage;
+  if (!(to in STAGE_SOURCE)) throw badRequest(`Unknown stage "${to}"`);
+  const note = str(body.note, 'note', { max: 500, required: false });
+
+  const res = await moveOrderStage(c.env, {
+    orderId: id,
+    to,
+    source: 'manual',
+    changedBy: adminUser.id,
+    note,
+  });
+  if (!res.moved) {
+    if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
+    if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
+    throw badRequest(`Cannot move this order from "${res.from}" to "${to}"`, 'ILLEGAL_STAGE_MOVE', {
+      from: res.from,
+      to,
+    });
+  }
+
+  // Reaching `delivered` grants device warranties and purchase points. That
+  // lives in the legacy PATCH handler below and is NOT duplicated here: an
+  // admin marking an order delivered by stage is routed through the same
+  // grant path so the two can never award different things.
+  const notes = [...res.notes];
+  if (to === 'delivered') {
+    const effects = await deliveredEffects(c, id);
+    if (effects.deviceUnitsWarning) notes.push(effects.deviceUnitsWarning);
+  }
+
+  await audit(c.env.DB, adminUser.id, 'order.stage', id, {
+    from: res.from, to, source: 'manual',
+    legacy: `${res.legacy_from} -> ${res.legacy_to}`,
+    next_stage: res.next_stage, next_stage_at: res.next_stage_at,
+  });
+  return c.json({
+    success: true,
+    stage: to,
+    legacy_status: res.legacy_to,
+    next_stage: res.next_stage,
+    next_stage_at: res.next_stage_at,
+    ...(notes.length ? { notes } : {}),
+  });
+});
 
 adminRoutes.patch('/orders/:id', async (c) => {
   const adminUser = c.get('user')!;
@@ -636,41 +877,9 @@ adminRoutes.patch('/orders/:id', async (c) => {
   let deviceUnits: CreateUnitsResult | null = null;
   let deviceUnitsWarning: string | null = null;
   if (next === 'delivered') {
-    // Mandate §4: create one device record per PHYSICAL unit of every
-    // serialized product, clocked to the delivered_at just stamped. Awaited
-    // (warranty clocks are account state, not a fire-and-forget message) and
-    // idempotent via UNIQUE(order_item_id, unit_index) — a replayed
-    // transition can never duplicate units or restart coverage.
-    const deliveredRow = await c.env.DB.prepare('SELECT delivered_at FROM orders WHERE id = ?')
-      .bind(id)
-      .first<{ delivered_at: string | null }>();
-    try {
-      deviceUnits = await createUnitsOnDelivery(c.env, id, deliveredRow?.delivered_at ?? new Date().toISOString());
-    } catch (e) {
-      console.error('device unit creation failed for order', id, e);
-      // Honest partial outcome: the order IS delivered, units are missing.
-      deviceUnitsWarning =
-        'Device units were not created — retry from Admin → Serials & Devices (backfill), otherwise warranty clocks for this order are missing.';
-    }
-
-    // Purchase points (decision row 20 defaults): floor(qualifying merchandise
-    // / 1000) at the delivered event. Awaited — points are account state —
-    // and idempotent via points_awards UNIQUE(order_id), so a replayed
-    // delivered transition can never double-award.
-    try {
-      await awardOrderPoints(c.env, id);
-    } catch (e) {
-      console.error('points award failed for order', id, e);
-    }
-
-    // Referral 9.1 milestone: records delivered_at-based eligibility (idempotent).
-    c.executionCtx.waitUntil(onOrderDelivered(c.env, id));
-    // PLUS gift on printer purchase, when the owner set the milestone to
-    // delivery (grant itself is idempotent per order).
-    const printerGift = await getSetting(c.env.DB, 'printerGiftConfig');
-    if (printerGift?.enabled === true && printerGift.milestone === 'delivered') {
-      c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, id));
-    }
+    const effects = await deliveredEffects(c, id);
+    deviceUnits = effects.deviceUnits;
+    deviceUnitsWarning = effects.deviceUnitsWarning;
   }
 
   if (next === 'cancelled') {
@@ -718,6 +927,36 @@ adminRoutes.patch('/orders/:id', async (c) => {
       });
     }
   }
+  // Keep the tracking stage in step with the legacy status. The old dropdown
+  // is still in the panel and still the fastest way to correct an order; if
+  // it left the stage behind, the customer's tracker and the admin's list
+  // would start telling two different stories about the same parcel.
+  //
+  // The stage chosen is the EARLIEST one carrying the new status — moving an
+  // order to "shipped" must not tell the customer it already reached Iraq —
+  // and the schedule is re-armed from now, which is what cancels whatever
+  // automatic transition was pending.
+  try {
+    const shippingType = asShippingType(order.shipping_type);
+    const targetStage = stageForLegacyStatus(next, shippingType);
+    const currentStage = String(order.stage || 'received') as OrderStage;
+    if (targetStage !== currentStage) {
+      await moveOrderStage(c.env, {
+        orderId: id,
+        to: targetStage,
+        source: 'manual',
+        changedBy: adminUser.id,
+        note: adminNote || `Status changed to ${next}`,
+        // The legality of this move was already decided by ORDER_TRANSITIONS
+        // above, on the legacy statuses. Re-judging it on the stage path
+        // would reject corrections the admin is entitled to make.
+        force: true,
+      });
+    }
+  } catch (e) {
+    console.error('stage sync failed for order', id, e);
+  }
+
   await audit(c.env.DB, adminUser.id, 'order.status', id, {
     from,
     to: next,
@@ -775,6 +1014,15 @@ adminRoutes.put('/settings/:key', async (c) => {
     // filtered on every read. It also accepts the pre-hero `{id,image,link}`
     // shape unchanged, so existing banners survive the upgrade.
     value = key === 'homeBanners' ? normalizeHomeBanners(value) : normalizeSectionItems(value);
+  } else if (key === 'orderStageDurations') {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw badRequest('orderStageDurations must be an object of minute values');
+    }
+    // Validated by the same function the engine reads with, so a value that
+    // survives here is exactly the value the clock will use. An unknown key
+    // or an out-of-range number is dropped rather than stored to confuse a
+    // later reader.
+    value = resolveDurations(value);
   }
 
   await setSetting(c.env.DB, key, value);

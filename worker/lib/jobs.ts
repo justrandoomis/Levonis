@@ -6,6 +6,8 @@ import { processWalletNotifications } from './walletNotify';
 import type { ProcessReport } from './walletNotify';
 import { reconcileWallets } from './walletOps';
 import { reconcileSupportGifts } from './membershipOps';
+import { sweepDueStages } from './orderStageOps';
+import type { SweepReport } from './orderStageOps';
 import type { SupportGiftReconciliation } from './membershipOps';
 
 /**
@@ -32,6 +34,12 @@ export interface DurableJobsReport {
   wallet_reconciliation: { anomalies: number; sums_match: boolean };
   /** Support-gift entitlement re-evaluation (§3.4). */
   support_gifts: SupportGiftReconciliation;
+  /**
+   * Order tracking stages promoted this run. This is the whole automation
+   * engine's heartbeat: the owner ruled out timers in the browser, so the
+   * only thing that ever advances an order on the clock is this sweep.
+   */
+  order_stages: SweepReport;
   /** BNPL overdue enforcement is intentionally disabled — see below. */
   bnpl_overdue: 'disabled';
   errors: string[];
@@ -55,6 +63,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     wallet_notifications: { sent: 0, failed: 0, dead: 0 },
     wallet_reconciliation: { anomalies: 0, sums_match: true },
     support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
+    order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
     bnpl_overdue: 'disabled',
     errors: [],
   };
@@ -164,7 +173,17 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     report.support_gifts = await reconcileSupportGifts(env, 200);
   });
 
-  // 11. BNPL overdue checks — DELIBERATELY DISABLED STUB.
+  // 11. Order tracking stages whose configured wait has elapsed. The sweep
+  //     only sees orders that already carry a next_stage_at, and that column
+  //     is only ever written for a stage whose successor is `automatic` — so
+  //     this can never confirm an order, declare it out for delivery, or
+  //     declare it delivered. Those three belong to a person or to the
+  //     courier's API, which is exactly what the owner specified.
+  await step('order_stages', async () => {
+    report.order_stages = await sweepDueStages(env, 200, nowIso);
+  });
+
+  // 12. BNPL overdue checks — DELIBERATELY DISABLED STUB.
   await step('bnpl_overdue', async () => {
     report.bnpl_overdue = await bnplOverdueCheckStub();
   });

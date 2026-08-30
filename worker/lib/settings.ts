@@ -113,6 +113,13 @@ export const SETTING_DEFAULTS = {
   reviewPointsConfig: { enabled: false, points: null } as {
     enabled: boolean; points: number | null;
   },
+  // How long an order waits in each AUTOMATIC tracking stage, in minutes.
+  // The owner asked for every automatic transition to be editable "وخاصة
+  // Air / Sea / Land", so the three freight waits are separate keys rather
+  // than one shared number. The defaults live in worker/lib/orderStages.ts
+  // (DEFAULT_STAGE_DURATIONS) and this stays {} until an owner overrides
+  // something — an empty object means "use the defaults", not "wait zero".
+  orderStageDurations: {} as Record<string, number>,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

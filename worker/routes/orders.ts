@@ -41,7 +41,9 @@ import { notifyAdmins } from '../lib/telegram';
 import { quoteShipping } from '../lib/shipping';
 import type { ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
 import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
-import { typeForTransport } from '../lib/shippingType';
+import { typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
+import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
+import { stageLabel } from '../lib/orderStages';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
@@ -165,6 +167,19 @@ export function orderPublic(
         ? String(o.shipping_type).slice('preorder_'.length)
         : ''
     ),
+    /** §2/§3: where the order stands on that journey, and when it moved. */
+    stage: String(o.stage || 'received'),
+    stage_changed_at: o.stage_changed_at || o.updated_at || o.created_at,
+    /**
+     * The next stage and when it is expected — but ONLY when the clock owns
+     * it. A stage waiting on an admin or on the courier carries no time, and
+     * showing the customer a date we cannot keep would be worse than showing
+     * none. The tracking numbers stay off this payload entirely; a customer
+     * gets the stage, not the courier's internal ids.
+     */
+    next_stage: o.next_stage || null,
+    next_stage_at: o.next_stage_at ?? null,
+    tracking_no: o.delivery_tracking_no || null,
     address: safeParse(o.address_snapshot, {}),
     delivery_method: safeParse(o.delivery_method_snapshot, {}),
     payment_method_id: o.payment_method_id,
@@ -1105,6 +1120,18 @@ orderRoutes.post('/', async (c) => {
     throw badRequest('Order could not be placed. Please try again.');
   }
 
+  // The order takes on its tracking stage the moment it exists. Deliberately
+  // AFTER the batch, not inside it: the first stage's successor is manual
+  // (an admin confirms), so nothing is scheduled yet and a failure here costs
+  // the history row, not the order. Never fatal to a checkout that already
+  // committed — reporting "order failed" for an order that exists would be
+  // the worse lie.
+  try {
+    await initOrderStage(c.env, orderId, orderShippingType, now);
+  } catch (e) {
+    console.error('stage init failed for order', orderId, e);
+  }
+
   await audit(c.env.DB, user.id, 'order.create', orderId, {
     total_iqd: comp.totalIqd, wallet_applied_iqd: comp.walletApplied, points: comp.pointsDiscount,
     payment: input.paymentMethodId, coupon_iqd: comp.couponDiscount,
@@ -1151,6 +1178,57 @@ orderRoutes.get('/:id', async (c) => {
   if (!data || (data.order.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
   const snaps = await getOrderPointsSnapshots(c.env, [id]);
   return c.json({ success: true, order: orderPublic(data.order, data.items, snaps.get(id)) });
+});
+
+/**
+ * The customer's tracker: the whole path their order walks, which stages it
+ * has reached, and when.
+ *
+ * Deliberately separate from the order payload — a customer opening their
+ * order list does not need fourteen rows of history for every order, and the
+ * list endpoint is already the slowest thing the account screen does.
+ *
+ * The labels are resolved SERVER-SIDE. The freight stage names the mode
+ * ("جارٍ التجهيز للشحن البحري") and the browser would have to hold its own
+ * copy of the path to build that, which is one more thing to drift.
+ *
+ * The courier's internal ids are not here. The tracking number is, because
+ * that is the customer's to have; the merchant id and the raw provider status
+ * are not.
+ */
+orderRoutes.get('/:id/tracking', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  const lang = ['ar', 'en', 'ckb'].includes(c.req.query('lang') ?? '') ? c.req.query('lang')! : 'ar';
+  const row = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!row || (row.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
+  const order = stageRowFrom(row);
+
+  const { results: history } = await c.env.DB.prepare(
+    'SELECT stage, changed_at FROM order_status_history WHERE order_id = ? ORDER BY changed_at'
+  )
+    .bind(id)
+    .all<{ stage: string; changed_at: string }>();
+
+  return c.json({
+    success: true,
+    order_id: id,
+    shipping_type: order.shipping_type,
+    shipping_type_label: SHIPPING_TYPE_LABELS[order.shipping_type][lang as 'ar' | 'en' | 'ckb'],
+    stage: order.stage,
+    stage_changed_at: order.stage_changed_at,
+    // Only ever non-null when the clock owns the next move. A stage waiting
+    // on a person or on the courier promises the customer nothing.
+    next_stage_at: order.next_stage_at,
+    tracking_no: row.delivery_tracking_no || null,
+    steps: stagePath(order.shipping_type, order.stage, history ?? []).map((v) => ({
+      stage: v.stage,
+      label: stageLabel(v.stage, order.shipping_type, lang),
+      reached: v.reached,
+      current: v.current,
+      at: v.at,
+    })),
+  });
 });
 
 orderRoutes.post('/:id/cancel', async (c) => {
