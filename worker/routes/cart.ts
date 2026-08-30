@@ -7,6 +7,16 @@ import { newId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import { parseProductRow, type ProductDoc } from '../lib/productModel';
 import {
+  applyRelations,
+  EMPTY_RELATIONS,
+  loadRelationsViews,
+  publicRelations,
+  snapshotFrom,
+} from '../lib/productOverlay';
+import type { ProductRelationsView } from '../lib/productOverlay';
+import { validateSelection } from '../lib/productRelations';
+import { saleAvailability } from './products';
+import {
   resolveUnitPrice,
   proPolicyFrom,
   type ProPricingPolicy,
@@ -85,6 +95,9 @@ export interface CartSelection {
   colorId: string;
   transportMethod: string;
   warrantyPlanId: string;
+  /** §7 multi-group selection. `optionId` stays as the first entry so every
+   *  pre-0018 reader keeps working. */
+  optionValueIds?: string[];
 }
 
 /**
@@ -96,12 +109,26 @@ export function resolveCartLine(
   sel: CartSelection,
   tier: Tier,
   tierActive: boolean,
-  ctx: PricingContext
-): { doc: ProductDoc; resolved: ResolvedPrice; variantLabel: string } {
-  const doc = parseProductRow(row);
+  ctx: PricingContext,
+  view?: ProductRelationsView
+): { doc: ProductDoc; resolved: ResolvedPrice; variantLabel: string; selectionErrors: string[] } {
+  // Options and colours come from the relational tables when the product has
+  // them (migration 0022 gave every existing product its rows), so the cart
+  // prices exactly what the storefront showed.
+  const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
+  const valueIds = (sel.optionValueIds && sel.optionValueIds.length
+    ? sel.optionValueIds
+    : sel.optionId
+      ? [sel.optionId]
+      : []
+  ).filter(Boolean);
+
+  // The resolver prices ONE option; with several groups the first selected
+  // value carries the price override, and per-field inheritance fills the
+  // rest — the same rule the admin form previews.
   const resolved = resolveUnitPrice({
     product: doc,
-    optionId: sel.optionId || null,
+    optionId: valueIds[0] || null,
     colorId: sel.colorId || null,
     transportMethod: sel.transportMethod || null,
     warrantyPlanId: sel.warrantyPlanId || null,
@@ -110,16 +137,32 @@ export function resolveCartLine(
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
   });
+
+  // With relational links present, the real AND/OR algebra decides whether the
+  // colour may be bought with these options — the resolver's single-option
+  // check cannot express it.
+  const selectionErrors =
+    view && view.has_relations
+      ? validateSelection({
+          groups: view.groups,
+          values: view.values,
+          colors: view.colors,
+          links: view.links,
+          selectedValueIds: valueIds,
+          selectedColorId: sel.colorId || null,
+        })
+      : [];
+
   const labels: string[] = [];
-  if (sel.optionId) {
-    const o = doc.options.find((x) => x.id === sel.optionId);
-    labels.push(o ? o.name_ar || o.name_en || o.id : sel.optionId);
+  for (const id of valueIds) {
+    const o = doc.options.find((x: { id: string }) => x.id === id);
+    labels.push(o ? o.name_en || o.name_ar || o.id : id);
   }
   if (sel.colorId) {
-    const col = doc.colors.find((x) => x.id === sel.colorId);
-    labels.push(col ? col.name_ar || col.name_en || col.id : sel.colorId);
+    const col = doc.colors.find((x: { id: string }) => x.id === sel.colorId);
+    labels.push(col ? col.name_en || col.name_ar || col.id : sel.colorId);
   }
-  return { doc, resolved, variantLabel: labels.join(' / ') };
+  return { doc, resolved, variantLabel: labels.join(' / '), selectionErrors };
 }
 
 /** Public per-line breakdown — cost fields NEVER cross this boundary. */
@@ -145,9 +188,13 @@ const stripCost = <T extends { cost_iqd: number | null }>(x: T) => {
   return rest;
 };
 
-function selectionFromCartRow(row: Record<string, unknown>): CartSelection {
+export function selectionFromCartRow(row: Record<string, unknown>): CartSelection {
+  const stored = safeParse<unknown[]>(String(row.option_value_ids ?? '[]'), []);
+  const ids = stored.filter((x): x is string => typeof x === 'string' && !!x);
+  const legacy = String(row.option_id ?? '');
   return {
-    optionId: String(row.option_id ?? ''),
+    optionId: legacy,
+    optionValueIds: ids.length ? ids : legacy ? [legacy] : [],
     colorId: String(row.color_id ?? ''),
     transportMethod: String(row.transport_method ?? ''),
     warrantyPlanId: String(row.warranty_plan_id ?? ''),
@@ -163,8 +210,8 @@ async function loadCart(c: Context<AppContext>) {
     loadPricingContext(c.env.DB),
   ]);
   const { results } = await c.env.DB.prepare(
-    `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id, ci.shipping_method_id,
-            ci.transport_method, ci.warranty_plan_id, p.*
+    `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
+            ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, p.*
        FROM cart_items ci JOIN products p ON p.id = ci.product_id
       WHERE ci.user_id = ? ORDER BY ci.created_at DESC`
   )
@@ -179,10 +226,35 @@ async function loadCart(c: Context<AppContext>) {
     results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''))
   );
 
+  // One batched read of every product's relational structure — never N+1.
+  const views = await loadRelationsViews(
+    c.env.DB,
+    results.filter((r) => r.status === 'active').map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
+  );
+
   const items = [];
   for (const row of results) {
     if (row.status !== 'active') continue; // hidden products drop out of the cart view
-    const { doc, resolved, variantLabel } = resolveCartLine(row, selectionFromCartRow(row), tier, tierActive, ctx);
+    const view = views.get(String(row.id));
+    const sel = selectionFromCartRow(row);
+    const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(row, sel, tier, tierActive, ctx, view);
+    // What this exact line can actually be sold as, from the authoritative
+    // stock level — not from products.stock when the product tracks elsewhere.
+    const availability = saleAvailability(doc, {
+      optionValueIds: sel.optionValueIds ?? [],
+      colorId: sel.colorId || null,
+      qty: Number(row.qty) || 1,
+      transportDefaults: ctx.transportDefaults,
+      inventory: view
+        ? snapshotFrom(view, {
+            stock: doc.stock,
+            reserved: Number(row.stock_reserved ?? 0),
+            low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+          })
+        : undefined,
+      links: view?.links,
+      preferredType: String(row.transport_method ?? '') ? 'pre_order' : null,
+    });
     items.push({
       id: row.cart_item_id,
       productId: row.id,
@@ -205,7 +277,13 @@ async function loadCart(c: Context<AppContext>) {
       // Legacy field kept for existing UI: the full per-unit amount.
       unit_price_iqd: resolved.unit_subtotal_iqd,
       breakdown: publicBreakdown(resolved),
+      // Legacy field: the base row. `availability.stock` is the authoritative
+      // figure for THIS selection.
       stock: row.stock,
+      availability,
+      selection_errors: selectionErrors,
+      option_value_ids: sel.optionValueIds ?? [],
+      relations: publicRelations(view ?? EMPTY_RELATIONS),
       options: doc.options.filter((o) => o.active).map(stripCost),
       colors: doc.colors.filter((col) => col.active).map(stripCost),
       warranty_plans: doc.warranty_plans.filter((w) => w.active),
@@ -232,6 +310,15 @@ cartRoutes.post('/items', async (c) => {
   const productId = str(body.productId, 'productId', { min: 1, max: 60 });
   const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
   const optionId = str(body.optionId, 'optionId', { max: 60, required: false });
+  // §7: one value per option group. The legacy single `optionId` is folded in
+  // so an older client keeps working unchanged.
+  const rawValueIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
+  const optionValueIds: string[] = [
+    ...new Set<string>([
+      ...rawValueIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
+      ...(optionId ? [optionId] : []),
+    ]),
+  ].slice(0, 12);
   const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
   const transportMethod = parseTransportMethod(body.transportMethod);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
@@ -241,36 +328,83 @@ cartRoutes.post('/items', async (c) => {
     .first<Record<string, unknown>>();
   if (!product) throw notFound('Product not found or unavailable');
 
-  const [{ tier, active: tierActive }, ctx] = await Promise.all([
+  const [{ tier, active: tierActive }, ctx, views] = await Promise.all([
     effectiveTier(c.env, user),
     loadPricingContext(c.env.DB),
+    loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
   ]);
-  const { resolved } = resolveCartLine(
+  const view = views.get(productId);
+  const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, colorId, transportMethod, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
     tier,
     tierActive,
-    ctx
+    ctx,
+    view
   );
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
-  const stock = product.stock as number | null;
-  if (stock !== null && stock < qty) {
-    throw badRequest(`Only ${stock} left in stock`);
+  // §7: the colour/option combination must be one the admin actually offers.
+  if (selectionErrors.length > 0) {
+    throw badRequest(`Invalid selection: ${selectionErrors.join(', ')}`, 'VALIDATION');
+  }
+
+  // Stock comes from the authoritative level for THIS selection — an
+  // exhausted colour blocks the add even when the base row is full.
+  const availability = saleAvailability(doc, {
+    optionValueIds,
+    colorId: colorId || null,
+    qty,
+    transportDefaults: ctx.transportDefaults,
+    inventory: view
+      ? snapshotFrom(view, {
+          stock: doc.stock,
+          reserved: Number(product.stock_reserved ?? 0),
+          low_stock_threshold: (product.low_stock_threshold as number | null) ?? null,
+        })
+      : undefined,
+    links: view?.links,
+    preferredType: transportMethod ? 'pre_order' : null,
+  });
+  if (availability.mode === 'unavailable') {
+    throw badRequest(
+      availability.reason === 'OUT_OF_STOCK'
+        ? 'That selection is out of stock.'
+        : `This item cannot be added right now (${availability.reason ?? 'UNAVAILABLE'})`,
+      availability.reason ?? 'UNAVAILABLE'
+    );
+  }
+  if (!availability.qty_ok) {
+    throw badRequest(
+      availability.stock.available === null
+        ? `At most ${availability.stock.max_qty} per order`
+        : `Only ${availability.stock.available} left`,
+      'QTY_UNAVAILABLE'
+    );
   }
 
   // shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
   // pricing is entirely resolver-driven now.
+  // The full selection is stored canonically sorted so two requests that name
+  // the same values in a different order are the same line. option_id keeps
+  // the first value for the pre-0018 UNIQUE key and every legacy reader.
+  const canonical = [...optionValueIds].sort();
+  const primaryOption = canonical[0] ?? '';
   await c.env.DB.prepare(
-    `INSERT INTO cart_items (id, user_id, product_id, option_id, color_id, shipping_method_id, transport_method, warranty_plan_id, qty)
-     VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)
+    `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                             shipping_method_id, transport_method, warranty_plan_id, qty)
+     VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
      ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
      DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+                   option_value_ids = excluded.option_value_ids,
                    transport_method = excluded.transport_method,
                    warranty_plan_id = excluded.warranty_plan_id`
   )
-    .bind(newId('ci'), user.id, productId, optionId, colorId, transportMethod, warrantyPlanId, qty)
+    .bind(
+      newId('ci'), user.id, productId, primaryOption, JSON.stringify(canonical), colorId,
+      transportMethod, warrantyPlanId, qty
+    )
     .run();
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
@@ -290,6 +424,16 @@ cartRoutes.patch('/items/:id', async (c) => {
   const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: 99 }) : (existing.qty as number);
   const optionId =
     body.optionId !== undefined ? str(body.optionId, 'optionId', { max: 60, required: false }) : String(existing.option_id);
+  const patchRawIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
+  const optionValueIds: string[] =
+    body.optionValueIds !== undefined || body.optionId !== undefined
+      ? [
+          ...new Set<string>([
+            ...patchRawIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
+            ...(optionId ? [optionId] : []),
+          ]),
+        ].slice(0, 12)
+      : (selectionFromCartRow(existing).optionValueIds ?? []);
   const colorId =
     body.colorId !== undefined ? str(body.colorId, 'colorId', { max: 60, required: false }) : String(existing.color_id);
   const transportMethod =
@@ -308,28 +452,67 @@ cartRoutes.patch('/items/:id', async (c) => {
   // validation (previous behavior silently accepted any selection here).
   if (!product) throw badRequest('This product no longer exists — please remove it from your cart');
 
-  const [{ tier, active: tierActive }, ctx] = await Promise.all([
+  const [{ tier, active: tierActive }, ctx, views] = await Promise.all([
     effectiveTier(c.env, user),
     loadPricingContext(c.env.DB),
+    loadRelationsViews(c.env.DB, [{ id: String(existing.product_id), inventory_mode: product.inventory_mode }]),
   ]);
-  const { resolved } = resolveCartLine(
+  const view = views.get(String(existing.product_id));
+  const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, colorId, transportMethod, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
     tier,
     tierActive,
-    ctx
+    ctx,
+    view
   );
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
-  const stock = product.stock as number | null;
-  if (stock !== null && stock < qty) throw badRequest(`Only ${stock} left in stock`);
+  if (selectionErrors.length > 0) {
+    throw badRequest(`Invalid selection: ${selectionErrors.join(', ')}`, 'VALIDATION');
+  }
 
+  const availability = saleAvailability(doc, {
+    optionValueIds,
+    colorId: colorId || null,
+    qty,
+    transportDefaults: ctx.transportDefaults,
+    inventory: view
+      ? snapshotFrom(view, {
+          stock: doc.stock,
+          reserved: Number(product.stock_reserved ?? 0),
+          low_stock_threshold: (product.low_stock_threshold as number | null) ?? null,
+        })
+      : undefined,
+    links: view?.links,
+    preferredType: transportMethod ? 'pre_order' : null,
+  });
+  if (availability.mode === 'unavailable') {
+    throw badRequest(
+      `This item cannot be updated right now (${availability.reason ?? 'UNAVAILABLE'})`,
+      availability.reason ?? 'UNAVAILABLE'
+    );
+  }
+  if (!availability.qty_ok) {
+    throw badRequest(
+      availability.stock.available === null
+        ? `At most ${availability.stock.max_qty} per order`
+        : `Only ${availability.stock.available} left`,
+      'QTY_UNAVAILABLE'
+    );
+  }
+
+  const canonical = [...optionValueIds].sort();
   await c.env.DB.prepare(
-    `UPDATE cart_items SET qty = ?, option_id = ?, color_id = ?, transport_method = ?, warranty_plan_id = ?
+    `UPDATE cart_items SET qty = ?, option_id = ?, option_value_ids = ?, color_id = ?,
+            transport_method = ?, warranty_plan_id = ?
       WHERE id = ? AND user_id = ?`
   )
-    .bind(qty, optionId, colorId, transportMethod, warrantyPlanId, id, user.id)
+    .bind(
+      qty, canonical[0] ?? '', JSON.stringify(canonical), colorId,
+      transportMethod, warrantyPlanId, id, user.id
+    )
     .run();
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);

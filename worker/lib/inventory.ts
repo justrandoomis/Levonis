@@ -367,8 +367,19 @@ function guardHolds(kind: LedgerKind, qty: number, row: { stock: number | null; 
   }
 }
 
+export interface InventoryPlan extends ApplyResult {
+  /** Statements to execute. Empty when everything was skipped or rejected. */
+  statements: D1PreparedStatement[];
+}
+
 /**
- * Applies one inventory operation atomically and idempotently.
+ * Builds — but does NOT execute — the statements for one inventory operation.
+ *
+ * Exposed separately so a caller that already runs a transaction (checkout,
+ * which creates the order, spends the wallet and books the points in ONE
+ * db.batch) can append these to it. Keeping the stock movement in the caller's
+ * batch is what makes "the order exists but its stock was never deducted"
+ * impossible; running it in a second batch would open exactly that window.
  *
  * Already-applied keys are detected first and skipped, so a retry is a no-op
  * rather than an error. Then each remaining move's guard is evaluated against
@@ -384,11 +395,11 @@ function guardHolds(kind: LedgerKind, qty: number, row: { stock: number | null; 
  * on `idempotency_key` is the final race guard — the loser's INSERT violates
  * it and D1 rolls that caller's whole batch back, counters included.
  */
-export async function applyInventory(
+export async function planInventory(
   db: D1Database,
   moves: StockMove[],
   opts: ApplyOptions
-): Promise<ApplyResult> {
+): Promise<InventoryPlan> {
   const wanted: Array<{ key: string; move: StockMove; target: StockTarget }> = [];
   for (const move of moves) {
     if (move.qty <= 0) continue;
@@ -396,7 +407,7 @@ export async function applyInventory(
       wanted.push({ key: KEY(opts.kind, opts.operationId, move.line_id, t.scope, t.scope_id), move, target: t });
     }
   }
-  if (wanted.length === 0) return { applied: 0, skipped: 0, rejected: [], keys: [] };
+  if (wanted.length === 0) return { applied: 0, skipped: 0, rejected: [], keys: [], statements: [] };
 
   const placeholders = wanted.map(() => '?').join(', ');
   const { results } = await db
@@ -407,7 +418,7 @@ export async function applyInventory(
 
   const candidates = wanted.filter((w) => !done.has(w.key));
   const skipped = wanted.length - candidates.length;
-  if (candidates.length === 0) return { applied: 0, skipped, rejected: [], keys: [] };
+  if (candidates.length === 0) return { applied: 0, skipped, rejected: [], keys: [], statements: [] };
 
   // Guard pre-check against live values.
   const rejected: RejectedMove[] = [];
@@ -435,7 +446,7 @@ export async function applyInventory(
     }
     fresh.push(w);
   }
-  if (fresh.length === 0) return { applied: 0, skipped, rejected, keys: [] };
+  if (fresh.length === 0) return { applied: 0, skipped, rejected, keys: [], statements: [] };
 
   const statements: D1PreparedStatement[] = [];
   let seq = 0;
@@ -477,8 +488,21 @@ export async function applyInventory(
     );
   }
 
-  await db.batch(statements);
-  return { applied: fresh.length, skipped, rejected, keys: fresh.map((w) => w.key) };
+  return { applied: fresh.length, skipped, rejected, keys: fresh.map((w) => w.key), statements };
+}
+
+/** Plans and executes in one call — for callers with no transaction of their
+ *  own (admin adjustments, order cancellation). */
+export async function applyInventory(
+  db: D1Database,
+  moves: StockMove[],
+  opts: ApplyOptions
+): Promise<ApplyResult> {
+  const plan = await planInventory(db, moves, opts);
+  if (plan.statements.length) await db.batch(plan.statements);
+  const { statements: _statements, ...result } = plan;
+  void _statements;
+  return result;
 }
 
 /**

@@ -22,6 +22,18 @@ import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY } from '../lib/pric
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { effectiveTier } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
+import { resolveStock, isLowStock } from '../lib/inventory';
+import type { InventorySnapshot } from '../lib/inventory';
+import { colorVisibility } from '../lib/productRelations';
+import type { ColorLinkRow, GroupSelection } from '../lib/productRelations';
+import {
+  applyRelations,
+  loadRelationsView,
+  loadRelationsViews,
+  publicRelations,
+  snapshotFrom,
+} from '../lib/productOverlay';
+import type { ProductRelationsView } from '../lib/productOverlay';
 
 export const productRoutes = new Hono<AppContext>();
 
@@ -61,21 +73,24 @@ interface PricingCtx {
  * What the storefront is allowed to claim about a product is derived here,
  * server-side, from the REAL stock model — never guessed in the browser:
  *
- *  - Stock is tracked on `products.stock` ONLY (INTEGER, NULL = untracked;
- *    migrations/0001_init.sql). There is no per-option/per-color stock column
- *    and no stock-reservation table anywhere in the schema, so `scope` is
- *    reported honestly as 'product' and `reserved` is 0 with a documented
- *    basis: a confirmed order decrements the row inside the same D1 batch
- *    that creates it (worker/routes/orders.ts), guarded by CHECK (stock >= 0),
- *    and a cancellation adds it back. Nothing is held between those points,
- *    so on-hand IS sellable. The UI must therefore NOT present the product
- *    number as a per-variant figure — `scope` is what it may say.
+ *  - Stock comes from ONE authoritative level per product, chosen by
+ *    `products.inventory_mode` (BASE / OPTION / COLOR / VARIANT_COMBINATION,
+ *    migration 0018) and resolved by worker/lib/inventory.ts. `scope` reports
+ *    which level actually answered, and `reserved` is the real held count from
+ *    the inventory ledger — units held for a live order are NOT sellable.
+ *    Levels are never summed: an exhausted colour blocks the sale no matter
+ *    what the base row says. A product with no relational rows resolves at
+ *    BASE, which is exactly what it did before.
  *  - Zero is never "unlimited": untracked (NULL) and 0 are different states.
+ *  - A product may offer SEVERAL sale types at once (§6). Each is reported in
+ *    `modes` with whether it is usable and why not. The default follows the
+ *    mandate: direct sale when it is enabled and stock is actually available,
+ *    otherwise pre-order when that is enabled and usable.
  *  - Pre-order is NOT invented for every out-of-stock product. It exists only
- *    where an admin marked the product `selling_type = 'pre_order'` AND at
- *    least one active transport offer resolves to a real integer commission
- *    (own value, else the admin default). Otherwise the honest answer is
- *    "unavailable" plus the machine reason.
+ *    where an admin enabled it AND at least one active transport offer
+ *    resolves to a real integer commission (own value, else the admin
+ *    default). Otherwise the honest answer is "unavailable" plus the machine
+ *    reason.
  *  - A required option/color must be chosen before any price or stock claim:
  *    every active option REPLACES the base price (worker/lib/pricing.ts), so
  *    an unchosen option means the page has no authoritative unit price yet.
@@ -100,20 +115,26 @@ export interface SaleAvailability {
   selling_type: string;
   stock: {
     tracked: boolean;
-    scope: 'product'; // the schema tracks stock at product level only
+    /** Which level actually answered — never a guess. */
+    scope: 'product' | 'base' | 'option' | 'color' | 'variant';
     on_hand: number | null; // null = untracked
-    reserved: number; // no reservation ledger exists → always 0
+    reserved: number; // units held for live orders — not sellable
     available: number | null; // sellable now; null = untracked
     max_qty: number; // 0 when nothing is sellable
+    low: boolean; // at or below the configured warning level
   };
   selection: {
     option_required: boolean;
     color_required: boolean;
     option_id: string | null;
+    /** The full multi-group selection (§7). */
+    option_value_ids: string[];
     color_id: string | null;
     complete: boolean;
     errors: string[];
   };
+  /** §6: every sale type the product offers, with whether it can be used. */
+  modes: Array<{ type: 'direct_sale' | 'pre_order'; usable: boolean; reason: string | null }>;
   preorder: {
     enabled: boolean;
     usable: boolean;
@@ -127,60 +148,116 @@ export interface SaleAvailability {
 type AvailabilityDoc = Pick<
   ProductDoc,
   'selling_type' | 'stock' | 'options' | 'colors' | 'preorder_transports'
->;
+> & { sale_types?: string[] };
 
 const QTY_CEILING = 99; // matches the cart/checkout per-line cap
 
 export function saleAvailability(
   doc: AvailabilityDoc,
   input: {
+    /** Legacy single-option selection; folded into option_value_ids. */
     optionId?: string | null;
+    /** §7 multi-group selection: one value per option group. */
+    optionValueIds?: string[];
     colorId?: string | null;
     qty?: number;
     transportDefaults?: Array<{ method: string; commission_iqd: number }>;
+    /** When supplied, THE authority on stock (worker/lib/inventory.ts). */
+    inventory?: InventorySnapshot;
+    /** Colour→option links, for the OR-within / AND-across visibility rule. */
+    links?: ColorLinkRow[];
+    /** Which sale type the buyer asked for, when both are offered. */
+    preferredType?: string | null;
   } = {}
 ): SaleAvailability {
   const defaults = input.transportDefaults ?? [];
-  const optionId = input.optionId || '';
   const colorId = input.colorId || '';
+  const selectedValueIds = [
+    ...new Set([...(input.optionValueIds ?? []), ...(input.optionId ? [input.optionId] : [])]),
+  ].filter(Boolean);
 
   // ---- selection (a hidden option/color is not selectable)
   const activeOptions = doc.options.filter((o) => o.active !== false);
   const activeColors = doc.colors.filter((c) => c.active !== false);
   const errors: string[] = [];
 
-  const option = optionId ? activeOptions.find((o) => o.id === optionId) ?? null : null;
-  if (optionId && !option) {
-    errors.push(doc.options.some((o) => o.id === optionId) ? 'OPTION_INACTIVE' : 'OPTION_NOT_FOUND');
+  const chosenOptions = selectedValueIds
+    .map((id) => activeOptions.find((o) => o.id === id) ?? null)
+    .filter((o): o is (typeof activeOptions)[number] => o !== null);
+  for (const id of selectedValueIds) {
+    if (!activeOptions.some((o) => o.id === id)) {
+      errors.push(doc.options.some((o) => o.id === id) ? 'OPTION_INACTIVE' : 'OPTION_NOT_FOUND');
+    }
   }
+  const option = chosenOptions[0] ?? null;
 
-  const color = colorId ? activeColors.find((c) => c.id === colorId) ?? null : null;
+  const color = colorId ? (activeColors.find((c) => c.id === colorId) ?? null) : null;
   if (colorId && !color) {
     errors.push(doc.colors.some((c) => c.id === colorId) ? 'COLOR_INACTIVE' : 'COLOR_NOT_FOUND');
   }
-  if (color && color.option_id && color.option_id !== (option?.id ?? null)) {
-    errors.push('COLOR_OPTION_MISMATCH');
-  }
 
-  // Colors linked to an option only count once that option is the chosen one;
-  // with no option chosen yet the whole active set is still on the table.
-  const selectableColors = option
-    ? activeColors.filter((c) => !c.option_id || c.option_id === option.id)
-    : activeColors;
+  // Colour visibility. With relational links present the real algebra decides
+  // (OR inside a group, AND across groups); otherwise the legacy single
+  // option_id field does, exactly as before.
+  const links = input.links ?? [];
+  const groupSelection: GroupSelection = {};
+  if (links.length && input.inventory) {
+    const groupOf = new Map(input.inventory.option_values.map((v) => [v.id, v.group_id] as const));
+    for (const id of selectedValueIds) {
+      const g = groupOf.get(id);
+      if (g) groupSelection[g] = id;
+    }
+  }
+  const colorSelectable = (c: { id: string; option_id: string | null }): boolean =>
+    links.length
+      ? colorVisibility(c.id, links, groupSelection).visible
+      : !c.option_id || selectedValueIds.includes(c.option_id);
+
+  if (color && !colorSelectable(color)) errors.push('COLOR_OPTION_MISMATCH');
+  const selectableColors = activeColors.filter(colorSelectable);
 
   const optionRequired = activeOptions.length > 0;
-  const colorRequired = selectableColors.length > 0;
-  if (optionRequired && !option) errors.push('OPTION_REQUIRED');
+  const colorRequired = selectableColors.length > 0 || (activeColors.length > 0 && selectedValueIds.length === 0);
+  if (optionRequired && chosenOptions.length === 0) errors.push('OPTION_REQUIRED');
   if (colorRequired && !color) errors.push('COLOR_REQUIRED');
 
-  // ---- stock (product-level; no reservations exist in the schema)
-  const tracked = doc.stock !== null && doc.stock !== undefined;
-  const onHand = tracked ? Math.trunc(doc.stock as number) : null;
-  const reserved = 0;
-  const available = onHand === null ? null : Math.max(0, onHand - reserved);
+  // ---- stock: the ONE authoritative level for this selection
+  let tracked: boolean;
+  let onHand: number | null;
+  let reserved: number;
+  let available: number | null;
+  let scope: SaleAvailability['stock']['scope'];
+  let low = false;
 
-  // ---- pre-order policy (admin-enabled + a usable transport)
-  const enabled = doc.selling_type === 'pre_order';
+  if (input.inventory) {
+    const res = resolveStock(input.inventory, {
+      option_value_ids: selectedValueIds,
+      color_id: color ? color.id : null,
+    });
+    tracked = res.tracked;
+    scope = res.targets[0]?.scope ?? (input.inventory.inventory_mode === 'BASE' ? 'base' : 'variant');
+    onHand = res.targets.length
+      ? res.targets.reduce<number>((m, t) => Math.min(m, t.stock ?? Infinity), Infinity)
+      : null;
+    if (onHand === Infinity) onHand = null;
+    reserved = res.targets.reduce<number>((m, t) => Math.max(m, t.reserved ?? 0), 0);
+    available = res.available;
+    low = isLowStock(res);
+    if (res.error === 'VARIANT_NOT_MODELLED') errors.push('VARIANT_NOT_MODELLED');
+  } else {
+    tracked = doc.stock !== null && doc.stock !== undefined;
+    onHand = tracked ? Math.trunc(doc.stock as number) : null;
+    reserved = 0;
+    available = onHand === null ? null : Math.max(0, onHand - reserved);
+    scope = 'product';
+  }
+
+  // ---- sale types (§6): a product may offer more than one at a time
+  const saleTypes =
+    doc.sale_types && doc.sale_types.length ? doc.sale_types : [doc.selling_type || 'direct_sale'];
+  const directEnabled = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const preorderEnabled = saleTypes.includes('pre_order');
+
   const transports: TransportOptionView[] = doc.preorder_transports
     .filter((t) => t.active !== false)
     .map((t) => {
@@ -189,30 +266,39 @@ export function saleAvailability(
       const commission = own !== null ? own : fallback ? fallback.commission_iqd : null;
       return { method: t.method, commission_iqd: commission, configured: commission !== null };
     });
-  const usable = enabled && transports.some((t) => t.configured);
-  const preorderReason = enabled
-    ? usable
+  const preorderUsable = preorderEnabled && transports.some((t) => t.configured);
+  const preorderReason = preorderEnabled
+    ? preorderUsable
       ? null
       : transports.length === 0
         ? 'NO_TRANSPORT_OFFERED'
         : 'TRANSPORT_COMMISSION_UNCONFIGURED'
     : 'PREORDER_NOT_ENABLED';
 
-  // ---- mode
+  const directUsable = directEnabled && (available === null || available > 0);
+  const directReason = directEnabled ? (directUsable ? null : 'OUT_OF_STOCK') : 'DIRECT_SALE_NOT_ENABLED';
+
+  const modes: SaleAvailability['modes'] = [];
+  if (directEnabled) modes.push({ type: 'direct_sale', usable: directUsable, reason: directReason });
+  if (preorderEnabled) modes.push({ type: 'pre_order', usable: preorderUsable, reason: preorderReason });
+
+  // §6 default: direct sale when it is enabled AND stock is really available;
+  // otherwise pre-order when that is enabled and usable. A buyer who asked for
+  // a specific type gets it when it is usable.
   let mode: SaleMode;
   let reason: string | null = null;
-  if (enabled) {
-    if (usable) {
-      mode = 'preorder';
-    } else {
-      mode = 'unavailable';
-      reason = preorderReason;
-    }
-  } else if (available === null || available > 0) {
+  const wants = input.preferredType;
+  if (wants === 'pre_order' && preorderUsable) {
+    mode = 'preorder';
+  } else if (wants === 'direct_sale' && directUsable) {
     mode = 'direct_sale';
+  } else if (directUsable) {
+    mode = 'direct_sale';
+  } else if (preorderUsable) {
+    mode = 'preorder';
   } else {
     mode = 'unavailable';
-    reason = 'OUT_OF_STOCK';
+    reason = directEnabled ? directReason : preorderReason;
   }
 
   const maxQty =
@@ -226,16 +312,18 @@ export function saleAvailability(
     mode,
     reason,
     selling_type: doc.selling_type,
-    stock: { tracked, scope: 'product', on_hand: onHand, reserved, available, max_qty: maxQty },
+    stock: { tracked, scope, on_hand: onHand, reserved, available, max_qty: maxQty, low },
     selection: {
       option_required: optionRequired,
       color_required: colorRequired,
       option_id: option ? option.id : null,
+      option_value_ids: selectedValueIds,
       color_id: color ? color.id : null,
       complete: errors.length === 0,
-      errors,
+      errors: [...new Set(errors)],
     },
-    preorder: { enabled, usable, reason: preorderReason, transports },
+    modes,
+    preorder: { enabled: preorderEnabled, usable: preorderUsable, reason: preorderReason, transports },
     qty_ok: input.qty === undefined ? true : input.qty >= 1 && input.qty <= maxQty,
   };
 }
@@ -251,15 +339,25 @@ export function communityAvailability(): SaleAvailability {
     mode: 'unavailable',
     reason: 'COMMUNITY_LISTING_NOT_SELLABLE',
     selling_type: 'direct_sale',
-    stock: { tracked: false, scope: 'product', on_hand: null, reserved: 0, available: null, max_qty: 0 },
+    stock: {
+      tracked: false,
+      scope: 'product',
+      on_hand: null,
+      reserved: 0,
+      available: null,
+      max_qty: 0,
+      low: false,
+    },
     selection: {
       option_required: false,
       color_required: false,
       option_id: null,
+      option_value_ids: [],
       color_id: null,
       complete: true,
       errors: [],
     },
+    modes: [],
     preorder: { enabled: false, usable: false, reason: 'PREORDER_NOT_ENABLED', transports: [] },
     qty_ok: false,
   };
@@ -346,8 +444,12 @@ export function productPublic(
 }
 
 /** Public shape + the viewer-tier resolved display price (base selection). */
-function publicWithDisplayPrice(row: Record<string, unknown>, ctx: PricingCtx): Record<string, unknown> {
-  const doc = parseProductRow(row);
+function publicWithDisplayPrice(
+  row: Record<string, unknown>,
+  ctx: PricingCtx,
+  view?: ProductRelationsView
+): Record<string, unknown> {
+  const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
   const out = publicShape(doc);
   const resolved = resolveUnitPrice({
     product: doc,
@@ -386,8 +488,20 @@ productRoutes.get('/', async (c) => {
     sql += ' AND (subcategory_id = ? OR id IN (SELECT product_id FROM product_catalogs WHERE catalog_id = ?))';
     params.push(category, category);
   }
-  if (type === 'bundle') sql += " AND selling_type = 'bundle'";
-  if (type === 'discounted') sql += ' AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd';
+  // §6: a product may carry several sale types, so the filter matches the
+  // multi-valued column and the legacy scalar together.
+  if (type === 'bundle') {
+    sql += " AND (selling_type = 'bundle' OR EXISTS (SELECT 1 FROM json_each(products.sale_types) st WHERE st.value = 'bundle'))";
+  }
+  if (type === 'preorder') {
+    sql += " AND (selling_type = 'pre_order' OR EXISTS (SELECT 1 FROM json_each(products.sale_types) st WHERE st.value = 'pre_order'))";
+  }
+  // 'discounted' used to mean "has a compare-at price above the selling
+  // price". Compare-at was retired in §4, so the honest reading is now "has a
+  // real membership price below the regular one".
+  if (type === 'discounted') {
+    sql += ' AND ((pro_price_iqd IS NOT NULL AND pro_price_iqd < price_iqd) OR (prime_price_iqd IS NOT NULL AND prime_price_iqd < price_iqd))';
+  }
   if (type === 'featured') sql += ' AND is_featured = 1';
   sql += ' ORDER BY display_order ASC, created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
@@ -396,7 +510,15 @@ productRoutes.get('/', async (c) => {
     c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>(),
     pricingCtx(c),
   ]);
-  return c.json({ success: true, products: results.map((p) => publicWithDisplayPrice(p, ctx)) });
+  // One batched read for the whole page rather than N+1 per card.
+  const views = await loadRelationsViews(
+    c.env.DB,
+    results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
+  );
+  return c.json({
+    success: true,
+    products: results.map((p) => publicWithDisplayPrice(p, ctx, views.get(String(p.id)))),
+  });
 });
 
 productRoutes.get('/:slug', async (c) => {
@@ -406,21 +528,26 @@ productRoutes.get('/:slug', async (c) => {
     .first<Record<string, unknown>>();
   if (row) {
     const user = c.get('user');
-    const doc = parseProductRow(row);
+    const parsed = parseProductRow(row);
 
-    const [ctx, favRow, brandRow] = await Promise.all([
+    const [ctx, favRow, brandRow, relations] = await Promise.all([
       pricingCtx(c),
       user
         ? c.env.DB.prepare('SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?')
             .bind(user.id, row.id)
             .first()
         : Promise.resolve(null),
-      doc.brand_id
+      parsed.brand_id
         ? c.env.DB.prepare('SELECT id, name_ar, name_en, name_ckb FROM brands WHERE id = ? AND active = 1')
-            .bind(doc.brand_id)
+            .bind(parsed.brand_id)
             .first<{ id: string; name_ar: string; name_en: string; name_ckb: string }>()
         : Promise.resolve(null),
+      // Options, colours, links, variants and images come from the TABLES.
+      // Migration 0022 gave every existing product its rows, so this is the
+      // single source of truth, not a second one.
+      loadRelationsView(c.env.DB, String(row.id), row.inventory_mode),
     ]);
+    const doc = applyRelations(parsed, relations);
 
     const resolved = resolveUnitPrice({
       product: doc,
@@ -440,10 +567,21 @@ productRoutes.get('/:slug', async (c) => {
       source: 'catalog',
       favorite: !!favRow,
       brand: brandRow ?? null,
+      // The structure the JSON model could not express: option GROUPS, the
+      // real many-to-many colour links, modelled combinations and bound
+      // images. Null when the product has no relational rows at all.
+      relations: publicRelations(relations),
       pricing: publicQuote(resolved), // base-selection resolver result, cost-free
       // §7.2 — the sale mode the page may DEFAULT to, derived from the real
       // stock model and the admin pre-order policy (never from the browser).
-      availability: saleAvailability(doc, { transportDefaults: ctx.transportDefaults }),
+      availability: saleAvailability(doc, {
+        transportDefaults: ctx.transportDefaults,
+        inventory: snapshotFrom(relations, {
+          stock: doc.stock,
+          reserved: Number(row.stock_reserved ?? 0),
+          low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+        }),
+      }),
       viewer_tier: { tier: ctx.tier, active: ctx.tierActive },
     });
   }

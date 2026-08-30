@@ -6,7 +6,11 @@ import { requireAuth, badRequest, notFound, str, int } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
-import { resolveCartLine, pricingContextFrom, publicBreakdown } from './cart';
+import { resolveCartLine, pricingContextFrom, publicBreakdown, selectionFromCartRow } from './cart';
+import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
+import { planInventory, resolveStock } from '../lib/inventory';
+import { returnOrderStock } from '../lib/orderInventory';
+import type { StockMove, StockTarget } from '../lib/inventory';
 import { getTierStatus } from '../lib/entitlements';
 import type { TierStatus } from '../lib/entitlements';
 import {
@@ -307,6 +311,8 @@ interface ComputedLine {
   image: string;
   variant: string;
   option_id: string;
+  /** §7 full multi-group selection, stored on the order item. */
+  option_value_ids: string[];
   color_id: string;
   shipping_method_id: string;
   qty: number;
@@ -314,6 +320,9 @@ interface ComputedLine {
   line: number;
   applied_iqd: number;
   tracked: boolean;
+  /** The authoritative stock rows this line consumes (worker/lib/inventory.ts).
+   *  Empty when the line is untracked. */
+  stock_targets: StockTarget[];
   pricing_snapshot: string;
   warranty_snapshot: string | null;
   transport_snapshot: string | null;
@@ -413,8 +422,8 @@ async function computeCheckout(
   const pricingTierActive = tierStatus.tier === 'pro' ? proContext : tierStatus.active;
 
   // Load and price the cart lines server-side.
-  let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id, ci.shipping_method_id,
-                    ci.transport_method, ci.warranty_plan_id, p.*
+  let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
+                    ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, p.*
                FROM cart_items ci JOIN products p ON p.id = ci.product_id
               WHERE ci.user_id = ?`;
   const params: unknown[] = [user.id];
@@ -425,6 +434,14 @@ async function computeCheckout(
   const { results: rows } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
   if (rows.length === 0) throw badRequest('Your cart is empty');
 
+  // One batched read of every product's relational structure. Options,
+  // colours and the authoritative stock level all come from here — checkout
+  // and the storefront cannot disagree because they read the same rows.
+  const views = await loadRelationsViews(
+    c.env.DB,
+    rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
+  );
+
   let subtotal = 0;
   let merchandise = 0;
   const productIds: string[] = [];
@@ -433,24 +450,41 @@ async function computeCheckout(
   for (const row of rows) {
     const displayName = String(row.name_ar || row.name);
     if (row.status !== 'active') throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
-    const { doc, resolved, variantLabel } = resolveCartLine(
+    const view = views.get(String(row.id));
+    const sel = selectionFromCartRow(row);
+    const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
       row,
-      {
-        optionId: String(row.option_id ?? ''),
-        colorId: String(row.color_id ?? ''),
-        transportMethod: String(row.transport_method ?? ''),
-        warrantyPlanId: String(row.warranty_plan_id ?? ''),
-      },
+      sel,
       tierStatus.tier,
       pricingTierActive,
-      pricingCtx
+      pricingCtx,
+      view
     );
     if (resolved.errors.length > 0) {
       throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
     }
+    if (selectionErrors.length > 0) {
+      throw badRequest(`"${displayName}": ${selectionErrors.join(', ')}`, 'VALIDATION');
+    }
     const qty = Number(row.qty);
-    if (row.stock !== null && Number(row.stock) < qty) {
-      throw badRequest(`Only ${row.stock} of "${displayName}" left in stock`);
+
+    // §7: the ONE authoritative stock level for this exact selection. The base
+    // row is not consulted when the product tracks stock elsewhere, so an
+    // exhausted colour stops the order even with base stock in hand.
+    const snapshot = snapshotFrom(view ?? EMPTY_RELATIONS, {
+        stock: doc.stock,
+      reserved: Number(row.stock_reserved ?? 0),
+      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+    });
+    const stockRes = resolveStock(snapshot, {
+      option_value_ids: sel.optionValueIds ?? [],
+      color_id: sel.colorId || null,
+    });
+    if (stockRes.error === 'VARIANT_NOT_MODELLED') {
+      throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
+    }
+    if (stockRes.available !== null && stockRes.available < qty) {
+      throw badRequest(`Only ${stockRes.available} of "${displayName}" left in stock`, 'OUT_OF_STOCK');
     }
     const unit = resolved.unit_subtotal_iqd;
     const line = unit * qty;
@@ -467,6 +501,8 @@ async function computeCheckout(
       cart_item_id: String(row.cart_item_id),
       id: newId('oi'),
       product_id: String(row.id),
+      option_value_ids: sel.optionValueIds ?? [],
+      stock_targets: stockRes.targets,
       name: String(row.name),
       name_ar: String(row.name_ar ?? ''),
       image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
@@ -478,7 +514,7 @@ async function computeCheckout(
       unit,
       line,
       applied_iqd: resolved.applied_iqd,
-      tracked: row.stock !== null,
+      tracked: stockRes.tracked,
       pricing_snapshot: JSON.stringify(pricingSnapshot),
       warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
       transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
@@ -899,21 +935,19 @@ orderRoutes.post('/', async (c) => {
     stmts.push(
       c.env.DB.prepare(
         `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
-           option_id, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
+           option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         it.id, orderId, it.product_id, it.name, it.image, it.variant,
-        it.option_id, it.color_id, it.shipping_method_id, it.qty, it.unit, it.line,
+        it.option_id, JSON.stringify(it.option_value_ids), it.color_id, it.shipping_method_id,
+        it.qty, it.unit, it.line,
         it.pricing_snapshot, it.warranty_snapshot, it.transport_snapshot
       )
     );
-    if (it.tracked) {
-      // CHECK (stock >= 0) aborts the whole batch on oversell.
-      stmts.push(
-        c.env.DB.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').bind(it.qty, it.product_id)
-      );
-    }
+    // Stock moves through the inventory ledger AFTER this batch commits (see
+    // below): it needs its own idempotency-keyed batch so a retry of the whole
+    // checkout is a no-op rather than a second deduction.
   }
 
   // §4.4 points redemption: RESERVE and COMMIT inside this one batch. There is
@@ -993,6 +1027,39 @@ orderRoutes.post('/', async (c) => {
   // Remove the purchased lines from the cart.
   for (const it of comp.lines) {
     stmts.push(c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?').bind(it.cart_item_id, user.id));
+  }
+
+  // §7 stock: RESERVE and DEDUCT are planned here and appended to THIS batch,
+  // so the order and its stock movement commit or roll back together. The
+  // ledger's UNIQUE idempotency_key is keyed on the order id, so a retried
+  // checkout — the same idempotency key, the same order id — plans zero
+  // statements and cannot deduct a second time.
+  const stockMoves: StockMove[] = comp.lines
+    .filter((it) => it.stock_targets.length > 0)
+    .map((it) => ({
+      product_id: it.product_id,
+      qty: it.qty,
+      line_id: it.id,
+      targets: it.stock_targets,
+    }));
+  if (stockMoves.length > 0) {
+    const reservePlan = await planInventory(c.env.DB, stockMoves, {
+      kind: 'reserve',
+      operationId: orderId,
+      orderId,
+      actorUserId: user.id,
+      reason: 'checkout',
+    });
+    if (reservePlan.rejected.length > 0) {
+      throw badRequest(
+        'A stock level changed while you were checking out. Please review your cart and try again.',
+        'CONFLICT_RETRY'
+      );
+    }
+    // Only a HOLD is taken here. §7 puts the real decrement at confirmation
+    // and the return at cancellation, so an order that is never confirmed
+    // frees its units instead of permanently consuming them.
+    stmts.push(...reservePlan.statements);
   }
 
   try {
@@ -1085,14 +1152,11 @@ orderRoutes.post('/:id/cancel', async (c) => {
 
   const now = new Date().toISOString();
   const stmts = [];
-  // Restore tracked stock.
-  for (const it of data.items) {
-    if (it.product_id) {
-      stmts.push(
-        c.env.DB.prepare('UPDATE products SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL').bind(it.qty, it.product_id)
-      );
-    }
-  }
+  // §7: the units this order was holding go back through the ledger — a
+  // release when it was never confirmed, a restore when it had been. The raw
+  // "stock = stock + qty" it replaces could not tell those apart and would
+  // have handed back units that were never taken.
+  const returned = await returnOrderStock(c.env.DB, id, user.id);
   // Refund wallet and points that were applied. Deterministic transaction ids
   // make the refund idempotent if this step ever has to be re-run.
   const walletCents = Number(data.order.wallet_applied_usd_cents) || 0;
@@ -1129,7 +1193,12 @@ orderRoutes.post('/:id/cancel', async (c) => {
   stmts.push(cancelPendingAccrualStatement(c.env, id, 'order_cancelled', now));
 
   if (stmts.length > 0) await c.env.DB.batch(stmts);
-  await audit(c.env.DB, user.id, 'order.cancel', id, { refund_usd_cents: walletCents, refund_points: points });
+  await audit(c.env.DB, user.id, 'order.cancel', id, {
+    refund_usd_cents: walletCents,
+    refund_points: points,
+    stock_returned: returned.kind,
+    stock_rows: returned.applied,
+  });
   const after = (await loadOrder(c.env.DB, id))!;
   const snaps = await getOrderPointsSnapshots(c.env, [id]);
   return c.json({ success: true, order: orderPublic(after.order, after.items, snaps.get(id)) });

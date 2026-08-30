@@ -4,6 +4,7 @@ import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArr
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewFinancials, normalizeAdminScope } from '../lib/adminScope';
+import { deductOrderStock, returnOrderStock } from '../lib/orderInventory';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
@@ -426,6 +427,24 @@ adminRoutes.patch('/orders/:id', async (c) => {
     .run();
   if (flip.meta.changes === 0) throw badRequest('The order changed while you were editing — reload and retry');
 
+  // §7 stock lifecycle. Confirmation turns the hold taken at checkout into a
+  // real decrement; cancellation gives the units back — a release when the
+  // order was never confirmed, a restore when it was. Both are idempotent
+  // through the inventory ledger, so a double-clicked transition (or a replay
+  // after the status flip already landed) moves nothing twice.
+  let stockNote: string | null = null;
+  if (next === 'confirmed') {
+    const res = await deductOrderStock(c.env.DB, id, adminUser.id);
+    if (res.rejected > 0) {
+      // The status already flipped. Saying so is the honest outcome: the order
+      // IS confirmed, and the stock needs a human.
+      stockNote = `Stock could not be deducted for ${res.rejected} line(s) — check the product's stock before shipping.`;
+    }
+  } else if (next === 'cancelled') {
+    const res = await returnOrderStock(c.env.DB, id, adminUser.id);
+    if (res.kind !== 'none') stockNote = `Stock ${res.kind}d for ${res.applied} row(s).`;
+  }
+
   let deviceUnits: CreateUnitsResult | null = null;
   let deviceUnitsWarning: string | null = null;
   if (next === 'delivered') {
@@ -467,15 +486,11 @@ adminRoutes.patch('/orders/:id', async (c) => {
   }
 
   if (next === 'cancelled') {
+    // Stock was already handled above through the inventory ledger, which
+    // knows whether the units were ever deducted. The raw "stock + qty" that
+    // used to live here could not, and handed back units on an order that was
+    // cancelled before confirmation — units it had never taken.
     const stmts = [];
-    const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(id).all<Record<string, unknown>>();
-    for (const it of items) {
-      if (it.product_id) {
-        stmts.push(
-          c.env.DB.prepare('UPDATE products SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL').bind(it.qty, it.product_id)
-        );
-      }
-    }
     const walletCents = Number(order.wallet_applied_usd_cents) || 0;
     if (walletCents > 0) {
       stmts.push(
@@ -515,9 +530,10 @@ adminRoutes.patch('/orders/:id', async (c) => {
       });
     }
   }
-  await audit(c.env.DB, adminUser.id, 'order.status', id, { from, to: next });
+  await audit(c.env.DB, adminUser.id, 'order.status', id, { from, to: next, stock: stockNote });
   return c.json({
     success: true,
+    ...(stockNote ? { stock_note: stockNote } : {}),
     ...(deviceUnits ? { device_units: deviceUnits } : {}),
     ...(deviceUnitsWarning ? { device_units_warning: deviceUnitsWarning } : {}),
   });
