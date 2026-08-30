@@ -75,7 +75,7 @@ jobs:
       - name: Live worker log for the failing request
         continue-on-error: true
         run: |
-          npx wrangler tail --name levonis-staging --format json --status error \
+          npx wrangler tail levonis-staging --format json \
             > /tmp/tail.log 2>/tmp/tail.err &
           TAIL=$!
           sleep 12
@@ -93,6 +93,28 @@ jobs:
           echo
           echo "── exceptions and logs only"
           jq -c 'select(.exceptions or .logs) | {url: .event.request.url, outcome, exceptions, logs}' /tmp/tail.log 2>/dev/null | head -40 || true
+
+      # WHICH ROW POISONS THE LIST. /api/home projects the 20 newest products
+      # and answers 200; /api/products projects by display_order and answers
+      # 500 — so the list itself is fine and one row's projection throws.
+      # Walking the list one row at a time with public GETs names that row
+      # without touching the database.
+      - name: Bisect the product list one row at a time
+        continue-on-error: true
+        run: |
+          bad=0
+          for off in $(seq 0 43); do
+            code=$(curl -s -o /tmp/one.json -w '%{http_code}' --max-time 20 \
+              "https://$HOST/api/products?limit=1&offset=$off")
+            if [ "$code" = "200" ]; then
+              slug=$(jq -r '.products[0].slug // "(none)"' /tmp/one.json 2>/dev/null)
+              echo "offset $off: ok    $slug"
+            else
+              echo "offset $off: $code  <<< THIS ROW FAILS TO PROJECT"
+              bad=$((bad+1))
+            fi
+          done
+          echo "failing rows: $bad"
 
       # ------------------------------------------------------------------ D1
       - name: D1 — which databases exist
