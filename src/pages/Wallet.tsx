@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 import { useLanguage } from '../LanguageContext';
@@ -47,6 +48,26 @@ type Lang = 'ar' | 'en' | 'ckb';
 
 const STRINGS: Record<Lang, Record<string, string>> = {
   ar: {
+    operations: 'العمليات',
+    stepChannel: 'القناة',
+    stepAmount: 'المبلغ',
+    stepProof: 'الإثبات',
+    stepAccount: 'رقم الحساب',
+    stepReview: 'المراجعة',
+    next: 'التالي',
+    back2: 'السابق',
+    chooseChannel: 'اختر القناة المناسبة',
+    chooseChannelHint: 'اضغط على القناة لنسخ رقم الحساب.',
+    accountForChannel: 'اكتب رقم حسابك لهذه القناة',
+    copyDone: 'تم نسخ رقم الحساب',
+    amountWithin: 'المبلغ ضمن رصيدك المتاح',
+    optional: 'اختياري',
+    confirmDeposit: 'تأكيد الإيداع',
+    confirmWithdraw: 'تأكيد السحب',
+    channelRequired: 'اختر قناة أولًا',
+    accountRequired2: 'اكتب رقم الحساب',
+    summary: 'ملخص الطلب',
+    stepOf: 'خطوة {n} من 3',
     title: 'المحفظة',
     back: 'رجوع',
     available: 'الرصيد المتاح',
@@ -140,6 +161,26 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     pointsNote: 'النقاط رصيد منفصل ولا تتحول إلى سحب نقدي.',
   },
   en: {
+    operations: 'Operations',
+    stepChannel: 'Channel',
+    stepAmount: 'Amount',
+    stepProof: 'Proof',
+    stepAccount: 'Account',
+    stepReview: 'Review',
+    next: 'Next',
+    back2: 'Back',
+    chooseChannel: 'Choose a channel',
+    chooseChannelHint: 'Tap a channel to copy its account number.',
+    accountForChannel: 'Your account number for this channel',
+    copyDone: 'Account number copied',
+    amountWithin: 'Amount, within your available balance',
+    optional: 'optional',
+    confirmDeposit: 'Confirm deposit',
+    confirmWithdraw: 'Confirm withdrawal',
+    channelRequired: 'Choose a channel first',
+    accountRequired2: 'Enter the account number',
+    summary: 'Summary',
+    stepOf: 'Step {n} of 3',
     title: 'Wallet',
     back: 'Back',
     available: 'Available balance',
@@ -233,6 +274,26 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     pointsNote: 'Points are a separate balance and never convert into a cash payout.',
   },
   ckb: {
+    operations: 'کردارەکان',
+    stepChannel: 'کەناڵ',
+    stepAmount: 'بڕ',
+    stepProof: 'بەڵگە',
+    stepAccount: 'ژمارەی هەژمار',
+    stepReview: 'پێداچوونەوە',
+    next: 'دواتر',
+    back2: 'پێشتر',
+    chooseChannel: 'کەناڵێک هەڵبژێرە',
+    chooseChannelHint: 'کلیک لە کەناڵ بکە بۆ لەبەرگرتنی ژمارەی هەژمار.',
+    accountForChannel: 'ژمارەی هەژمارت بۆ ئەم کەناڵە',
+    copyDone: 'ژمارەی هەژمار لەبەرگیرا',
+    amountWithin: 'بڕ، لە سنووری باڵانسی بەردەستت',
+    optional: 'ئارەزوومەندانە',
+    confirmDeposit: 'دڵنیاکردنەوەی دانان',
+    confirmWithdraw: 'دڵنیاکردنەوەی دەرهێنان',
+    channelRequired: 'سەرەتا کەناڵێک هەڵبژێرە',
+    accountRequired2: 'ژمارەی هەژمار بنووسە',
+    summary: 'کورتە',
+    stepOf: 'هەنگاوی {n} لە 3',
     title: 'جزدان',
     back: 'گەڕانەوە',
     available: 'باڵانسی بەردەست',
@@ -345,6 +406,12 @@ type WithdrawalState = 'requested' | 'approved' | 'processing' | 'paid' | 'rejec
 
 interface WithdrawalView {
   id: string;
+  /**
+   * The wallet transaction this request produced. It is how the two lists the
+   * server sends are one list really: a withdrawal request and its ledger
+   * entry are the same event seen from two tables.
+   */
+  tx_id: string | null;
   number: string;
   amount_usd_cents: number;
   fee_cents: number;
@@ -357,6 +424,16 @@ interface WithdrawalView {
   payout_reference: string | null;
   outcome_reason: string | null;
   created_at: string;
+}
+
+/** One row of the merged list: a ledger entry, a withdrawal request, or both. */
+interface Operation {
+  key: string;
+  kind: 'deposit' | 'withdrawal';
+  at: string;
+  amount: number;
+  tx: TxView | null;
+  withdrawal: WithdrawalView | null;
 }
 
 interface Balances {
@@ -455,6 +532,45 @@ export default function Wallet() {
     [currency, exchangeRate]
   );
 
+  /**
+   * ONE list of operations, as the owner asked: "دمج عمليات السحب والايداع في
+   * قائمة العمليات".
+   *
+   * The server sends two arrays because they come from two tables — the wallet
+   * ledger and the withdrawal-request register — but a withdrawal and its
+   * ledger entry are the SAME EVENT, linked by tx_id. Showing them as two
+   * sections made a customer count their money twice and then hunt for the
+   * cancel button in the other list.
+   *
+   * So they are joined here, not concatenated: a withdrawal row carries its
+   * destination, its state and its cancel button, and a request that has no
+   * ledger entry yet still appears rather than vanishing until one exists.
+   */
+  const operations = useMemo<Operation[]>(() => {
+    const byTx = new Map<string, WithdrawalView>();
+    for (const w of withdrawals) if (w.tx_id) byTx.set(w.tx_id, w);
+
+    const rows: Operation[] = transactions.map((tx) => ({
+      key: tx.id,
+      kind: tx.type,
+      at: tx.date,
+      amount: tx.amount,
+      tx,
+      withdrawal: byTx.get(tx.id) ?? null,
+    }));
+
+    // A request whose hold has not produced a visible ledger row yet — or one
+    // the current filter excluded — must not disappear from the customer's
+    // own record of what they asked for.
+    const seen = new Set(rows.map((r) => r.withdrawal?.id).filter(Boolean));
+    for (const w of withdrawals) {
+      if (seen.has(w.id)) continue;
+      if (typeFilter === 'deposit') continue;
+      rows.push({ key: `wd_${w.id}`, kind: 'withdrawal', at: w.created_at, amount: w.amount_usd_cents, tx: null, withdrawal: w });
+    }
+    return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  }, [transactions, withdrawals, typeFilter]);
+
   const stateLabel = (state: WithdrawalState) =>
     ({
       requested: s.stateRequested,
@@ -488,7 +604,7 @@ export default function Wallet() {
   return (
     <div dir={dir} className="w-full bg-black min-h-screen font-sans flex flex-col pb-24">
       {/* ---------------------------------------------------------- header */}
-      <div className="bg-olive-dark rounded-b-[44px] pt-12 pb-8 px-5 sm:px-8 flex flex-col items-center relative">
+      <div className="bg-gradient-to-b from-olive to-olive-dark rounded-b-[36px] pt-12 pb-8 px-5 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
         <button
           onClick={() => navigate(-1)}
           aria-label={s.back}
@@ -510,10 +626,10 @@ export default function Wallet() {
           <span className="text-gold font-bold text-[13px]">{currency}</span>
         </button>
 
-        <h1 className="text-gold/70 text-xs font-bold uppercase tracking-widest mt-1">{s.title}</h1>
+        <h1 className="text-zinc-400 text-xs font-bold uppercase tracking-widest mt-1">{s.title}</h1>
 
         <div className="mt-6 flex flex-col items-center">
-          <span className="text-gold/60 text-[12px] font-bold">{s.available}</span>
+          <span className="text-zinc-400 text-[12px] font-bold">{s.available}</span>
           {loading ? (
             <Skeleton className="h-12 w-52 mt-2 rounded-2xl" />
           ) : (
@@ -522,7 +638,7 @@ export default function Wallet() {
               {loadError ? '—' : fmt(balances.usd_cents_available)}
             </span>
           )}
-          <span className="text-gold/40 text-[11px] mt-1">{s.availableHint}</span>
+          <span className="text-zinc-500 text-[11px] mt-1">{s.availableHint}</span>
         </div>
 
         {/* The three numbers the mandate requires to be shown separately. */}
@@ -542,24 +658,24 @@ export default function Wallet() {
               icon: <ArrowUp className="w-3.5 h-3.5" />,
             },
           ].map((card) => (
-            <div key={card.label} className="bg-olive/70 border border-gold/10 rounded-2xl p-3 text-center">
-              <div className="flex items-center justify-center gap-1 text-gold/60 text-[10px] font-bold">
+            <div key={card.label} className="bg-black/30 border border-white/10 rounded-2xl p-3 text-center">
+              <div className="flex items-center justify-center gap-1 text-zinc-400 text-[10px] font-bold">
                 {card.icon}
                 <span>{card.label}</span>
               </div>
               {loading ? (
                 <Skeleton className="h-5 w-16 mx-auto mt-2 rounded" />
               ) : (
-                <div dir="ltr" className="text-gold font-bold text-[15px] mt-1">
+                <div dir="ltr" className="text-white font-bold text-[15px] mt-1">
                   {loadError ? '—' : fmt(card.value)}
                 </div>
               )}
-              <div className="text-gold/30 text-[9px] mt-1 leading-tight">{card.hint}</div>
+              <div className="text-zinc-500 text-[9px] mt-1 leading-tight">{card.hint}</div>
             </div>
           ))}
         </div>
 
-        <div className="text-gold/40 text-[10px] mt-3 text-center max-w-md">
+        <div className="text-zinc-500 text-[10px] mt-3 text-center max-w-md">
           {s.settled}: <span dir="ltr">{loadError ? '—' : fmt(balances.usd_cents_settled)}</span> · {s.points}:{' '}
           <span dir="ltr">{loadError ? '—' : balances.points_settled.toLocaleString('en-US')}</span> — {s.pointsNote}
         </div>
@@ -567,17 +683,19 @@ export default function Wallet() {
 
       {/* --------------------------------------------------------- actions */}
       <div className="flex justify-center items-center gap-3 py-5 px-5">
+        {/* One primary action, one secondary — the old pair were identical
+            olive slabs, so neither read as the thing you came here to do. */}
         <button
           onClick={() => setModal('withdrawal')}
           disabled={loading || !!loadError}
-          className="flex-1 max-w-[240px] bg-olive-light hover:brightness-125 transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 max-w-[240px] bg-zinc-900 border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800 transition-colors text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {s.withdraw}
           <ArrowUp className="w-4 h-4" strokeWidth={3} />
         </button>
         <button
           onClick={() => setModal('deposit')}
-          className="flex-1 max-w-[240px] bg-olive-light hover:brightness-125 transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px]"
+          className="flex-1 max-w-[240px] bg-gold hover:bg-gold-light transition-colors text-black py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-[15px]"
         >
           <ArrowDown className="w-4 h-4" strokeWidth={3} />
           {s.addFunds}
@@ -595,94 +713,19 @@ export default function Wallet() {
         </div>
       )}
 
-      <div className="bg-olive-dark flex-1 rounded-t-[44px] px-4 sm:px-6 pt-7 pb-10">
-        {/* ------------------------------------------------ withdrawals */}
-        <section className="mb-8">
-          <h2 className="text-gold font-bold text-[15px] mb-3">{s.withdrawalRequests}</h2>
-          {loading ? (
-            <SkeletonGroup label={s.loading} className="space-y-2">
-              <Skeleton className="h-20 w-full rounded-2xl" />
-              <Skeleton className="h-20 w-full rounded-2xl" />
-            </SkeletonGroup>
-          ) : loadError ? (
-            <ErrorState compact error={loadError} onRetry={() => void load()} />
-          ) : withdrawals.length === 0 ? (
-            <EmptyState compact title={s.noWithdrawals} />
-          ) : (
-            <div className="space-y-3">
-              {withdrawals.map((w) => (
-                <div key={w.id} className="bg-olive border border-gold/10 rounded-[22px] p-4">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-gold font-bold text-[15px]" dir="ltr">
-                          {fmt(w.amount_usd_cents)}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            w.state === 'paid'
-                              ? 'bg-[#59A846]/10 text-[#59A846]'
-                              : w.state === 'rejected' || w.state === 'failed' || w.state === 'cancelled'
-                                ? 'bg-[#B03142]/10 text-[#B03142]'
-                                : 'bg-yellow-500/10 text-yellow-500'
-                          }`}
-                        >
-                          {stateLabel(w.state)}
-                        </span>
-                        {w.state === 'approved' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/10 text-gold/80">
-                            {s.approvedNotSent}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-gold/50 text-[11px] mt-1.5 space-y-0.5">
-                        <div>
-                          {s.operationNumber}: <span dir="ltr">{w.number}</span>
-                        </div>
-                        <div>
-                          {s.destination}: <span dir="ltr">{w.destination.kind} · {w.destination.account}</span>
-                        </div>
-                        {w.payout_reference && (
-                          <div>
-                            {s.payoutRef}: <span dir="ltr">{w.payout_reference}</span>
-                          </div>
-                        )}
-                        {w.outcome_reason && (
-                          <div>
-                            {s.reason}: {w.outcome_reason}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {(w.state === 'requested' || w.state === 'approved') && (
-                      <button
-                        onClick={() => onCancelWithdrawal(w.id)}
-                        disabled={cancellingId === w.id}
-                        className="text-[11px] font-bold text-[#e4899a] hover:text-[#B03142] border border-[#B03142]/30 rounded-xl px-3 py-2 disabled:opacity-60"
-                      >
-                        {cancellingId === w.id ? s.cancelling : s.cancelRequest}
-                      </button>
-                    )}
-                  </div>
-                  {w.needs_reconciliation && (
-                    <div className="mt-3 flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2.5 text-[11px] text-yellow-200">
-                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{s.needsReconciliation}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* --------------------------------------------------- operations */}
+      <div className="flex-1 px-4 sm:px-6 pt-2 pb-10">
+        {/* ------------------------------------------------- one operations list
+            The owner asked for the two lists to become one: "دمج عمليات السحب
+            والايداع في قائمة العمليات". A withdrawal row keeps everything the
+            separate list used to carry — its destination, its state, its
+            cancel button and its reconciliation warning — so nothing was lost
+            in the merge, only the second place to look. */}
         <section>
           <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-            <h2 className="text-gold font-bold text-[15px]">{s.activity}</h2>
+            <h2 className="text-white font-bold text-[15px]">{s.operations}</h2>
             <button
               onClick={() => void load()}
-              className="text-gold/60 hover:text-gold text-[11px] font-bold flex items-center gap-1.5"
+              className="text-zinc-400 hover:text-white text-[11px] font-bold flex items-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" /> {s.refresh}
             </button>
@@ -699,10 +742,10 @@ export default function Wallet() {
               <button
                 key={value}
                 onClick={() => setTypeFilter(value)}
-                className={`px-3 py-1.5 rounded-xl text-[12px] font-bold border transition-colors ${
+                className={`px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${
                   typeFilter === value
-                    ? 'bg-gold text-olive-dark border-gold'
-                    : 'bg-transparent text-gold/70 border-gold/20 hover:border-gold/50'
+                    ? 'bg-gold text-black border-gold'
+                    : 'bg-zinc-900/60 text-zinc-300 border-zinc-800 hover:border-zinc-600'
                 }`}
               >
                 {label}
@@ -711,7 +754,7 @@ export default function Wallet() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              className="bg-black/30 border border-gold/20 rounded-xl px-3 py-1.5 text-gold/80 text-[12px] font-bold focus:outline-none focus:border-gold/50"
+              className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-200 text-[12px] font-bold focus:outline-none focus:border-zinc-600"
             >
               <option value="all">{s.statusAll}</option>
               <option value="pending">{s.statusPending}</option>
@@ -726,12 +769,12 @@ export default function Wallet() {
               className="flex items-center gap-2 flex-1 min-w-[180px]"
             >
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-gold/40 absolute top-1/2 -translate-y-1/2 start-3" />
+                <Search className="w-3.5 h-3.5 text-zinc-500 absolute top-1/2 -translate-y-1/2 start-3" />
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder={s.searchPlaceholder}
-                  className="w-full bg-black/30 border border-gold/20 rounded-xl ps-9 pe-3 py-1.5 text-gold text-[12px] placeholder-gold/30 focus:outline-none focus:border-gold/50"
+                  className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl ps-9 pe-3 py-2 text-white text-[12px] placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
                 />
               </div>
             </form>
@@ -740,94 +783,147 @@ export default function Wallet() {
           {loading ? (
             <SkeletonGroup label={s.loading} className="space-y-2">
               {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-[76px] w-full rounded-[22px]" />
+                <Skeleton key={i} className="h-[76px] w-full rounded-2xl" />
               ))}
             </SkeletonGroup>
           ) : loadError ? (
             <ErrorState error={loadError} onRetry={() => void load()} />
-          ) : transactions.length === 0 ? (
+          ) : operations.length === 0 ? (
             <EmptyState title={s.noActivity} description={s.noActivityHint} />
           ) : (
             <div className="space-y-3">
-              {transactions.map((tx) => (
-                <div key={tx.id} className="bg-olive rounded-[22px] p-4 border border-gold/10">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-[14px] flex items-center justify-center bg-olive-light shrink-0">
-                        {tx.type === 'deposit' ? (
-                          <ArrowDownLeft className="w-5 h-5 text-gold" />
-                        ) : (
-                          <ArrowUp className="w-5 h-5 text-gold" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-gold font-bold text-[14px] truncate">
-                          {tx.note || (tx.type === 'deposit' ? s.filterDeposit : s.filterWithdrawal)}
-                        </h3>
-                        <div className="text-gold/50 text-[11px] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span dir="ltr">{tx.number}</span>
-                          <span>{new Date(tx.date).toLocaleDateString()}</span>
-                          <span
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              tx.status === 'pending'
-                                ? 'bg-yellow-500/10 text-yellow-500'
-                                : tx.status === 'approved'
-                                  ? 'bg-[#59A846]/10 text-[#59A846]'
-                                  : 'bg-[#B03142]/10 text-[#B03142]'
-                            }`}
-                          >
-                            {tx.status === 'pending' && <Clock className="w-3 h-3" />}
-                            {tx.status === 'approved' && <CheckCircle className="w-3 h-3" />}
-                            {tx.status === 'rejected' && <XCircle className="w-3 h-3" />}
-                            {tx.status === 'pending'
-                              ? s.statusPending
-                              : tx.status === 'approved'
-                                ? s.statusApproved
-                                : s.statusRejected}
-                          </span>
-                          {tx.receiptUrl && (
-                            <a
-                              href={tx.receiptUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-gold/70 hover:text-gold underline text-[10px] font-bold"
-                            >
-                              <Receipt className="w-3 h-3" /> {s.receipt}
-                            </a>
-                          )}
-                          {tx.depositContext?.reference && (
-                            <span dir="ltr" className="text-gold/40">
-                              {tx.depositContext.provider} · {tx.depositContext.reference}
-                            </span>
+              {operations.map((op) => {
+                const tx = op.tx;
+                const w = op.withdrawal;
+                const isDeposit = op.kind === 'deposit';
+                // A withdrawal's own state is more precise than the ledger's
+                // three-way status — "approved" there means processing has
+                // been authorised, not that money moved — so it wins when
+                // both exist.
+                const badge = w
+                  ? {
+                      text: stateLabel(w.state),
+                      tone:
+                        w.state === 'paid'
+                          ? 'bg-[#59A846]/15 text-[#8fd07c]'
+                          : w.state === 'rejected' || w.state === 'failed' || w.state === 'cancelled'
+                            ? 'bg-[#B03142]/15 text-[#e4899a]'
+                            : 'bg-yellow-500/15 text-yellow-400',
+                    }
+                  : {
+                      text:
+                        tx?.status === 'pending'
+                          ? s.statusPending
+                          : tx?.status === 'approved'
+                            ? s.statusApproved
+                            : s.statusRejected,
+                      tone:
+                        tx?.status === 'pending'
+                          ? 'bg-yellow-500/15 text-yellow-400'
+                          : tx?.status === 'approved'
+                            ? 'bg-[#59A846]/15 text-[#8fd07c]'
+                            : 'bg-[#B03142]/15 text-[#e4899a]',
+                    };
+                return (
+                  <div key={op.key} data-wallet-operation className="bg-zinc-900/60 rounded-2xl p-4 border border-zinc-800">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                            isDeposit ? 'bg-[#59A846]/15' : 'bg-[#B03142]/15'
+                          }`}
+                        >
+                          {isDeposit ? (
+                            <ArrowDownLeft className="w-5 h-5 text-[#8fd07c]" />
+                          ) : (
+                            <ArrowUp className="w-5 h-5 text-[#e4899a]" />
                           )}
                         </div>
-                        {tx.adminNote ? <p className="text-gold/40 text-[11px] mt-1">{tx.adminNote}</p> : null}
+                        <div className="min-w-0">
+                          <h3 className="text-white font-bold text-[14px] truncate">
+                            {tx?.note || (isDeposit ? s.filterDeposit : s.filterWithdrawal)}
+                          </h3>
+                          <div className="text-zinc-400 text-[11px] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span dir="ltr">{tx?.number ?? w?.number}</span>
+                            <span>{new Date(op.at).toLocaleDateString()}</span>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${badge.tone}`}>
+                              {!w && tx?.status === 'pending' && <Clock className="w-3 h-3" />}
+                              {!w && tx?.status === 'approved' && <CheckCircle className="w-3 h-3" />}
+                              {!w && tx?.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                              {badge.text}
+                            </span>
+                            {w?.state === 'approved' && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300">
+                                {s.approvedNotSent}
+                              </span>
+                            )}
+                            {tx?.receiptUrl && (
+                              <a
+                                href={tx.receiptUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-zinc-300 hover:text-white underline text-[10px] font-bold"
+                              >
+                                <Receipt className="w-3 h-3" /> {s.receipt}
+                              </a>
+                            )}
+                          </div>
+                          {/* Everything the separate withdrawals list used to
+                              show, kept on the row it belongs to. */}
+                          {w && (
+                            <div className="text-zinc-500 text-[11px] mt-1.5 space-y-0.5">
+                              <div>
+                                {s.destination}: <span dir="ltr">{w.destination.kind} · {w.destination.account}</span>
+                              </div>
+                              {w.payout_reference && (
+                                <div>
+                                  {s.payoutRef}: <span dir="ltr">{w.payout_reference}</span>
+                                </div>
+                              )}
+                              {w.outcome_reason && <div>{s.reason}: {w.outcome_reason}</div>}
+                            </div>
+                          )}
+                          {tx?.adminNote ? <p className="text-zinc-500 text-[11px] mt-1">{tx.adminNote}</p> : null}
+                        </div>
+                      </div>
+                      <div className="text-end shrink-0">
+                        <span dir="ltr" className={`font-bold text-[16px] ${isDeposit ? 'text-[#8fd07c]' : 'text-[#e4899a]'}`}>
+                          {isDeposit ? '+' : '-'}
+                          {fmt(op.amount)}
+                        </span>
+                        <div className="mt-2 flex flex-col items-end gap-1.5">
+                          {w && (w.state === 'requested' || w.state === 'approved') && (
+                            <button
+                              onClick={() => onCancelWithdrawal(w.id)}
+                              disabled={cancellingId === w.id}
+                              className="text-[10px] font-bold text-[#e4899a] hover:text-white border border-[#B03142]/40 rounded-lg px-2.5 py-1.5 disabled:opacity-60"
+                            >
+                              {cancellingId === w.id ? s.cancelling : s.cancelRequest}
+                            </button>
+                          )}
+                          {tx &&
+                            (tx.reviewRequested ? (
+                              <span className="text-zinc-500 text-[10px] font-bold">{s.reviewRequested}</span>
+                            ) : (
+                              <button
+                                onClick={() => setReviewFor(tx)}
+                                className="inline-flex items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-bold"
+                              >
+                                <HelpCircle className="w-3 h-3" /> {s.requestReview}
+                              </button>
+                            ))}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-end shrink-0">
-                      <span
-                        dir="ltr"
-                        className={`font-bold text-[16px] ${tx.type === 'deposit' ? 'text-[#59A846]' : 'text-[#B03142]'}`}
-                      >
-                        {tx.type === 'deposit' ? '+' : '-'}
-                        {fmt(tx.amount)}
-                      </span>
-                      <div className="mt-2">
-                        {tx.reviewRequested ? (
-                          <span className="text-gold/50 text-[10px] font-bold">{s.reviewRequested}</span>
-                        ) : (
-                          <button
-                            onClick={() => setReviewFor(tx)}
-                            className="inline-flex items-center gap-1 text-gold/60 hover:text-gold text-[10px] font-bold"
-                          >
-                            <HelpCircle className="w-3 h-3" /> {s.requestReview}
-                          </button>
-                        )}
+                    {w?.needs_reconciliation && (
+                      <div className="mt-3 flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2.5 text-[11px] text-yellow-200">
+                        <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{s.needsReconciliation}</span>
                       </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -837,6 +933,8 @@ export default function Wallet() {
         <RequestModal
           kind={modal}
           s={s}
+          lang={lang}
+          dir={dir}
           currency={currency}
           exchangeRate={exchangeRate}
           available={balances.usd_cents_available}
@@ -880,11 +978,41 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 const inputClass =
-  'w-full bg-black/25 border border-gold/15 rounded-2xl px-4 py-3 text-gold text-sm placeholder-gold/30 focus:outline-none focus:border-gold/50 transition-colors';
+  'w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-gold/60 transition-colors';
 
+/** Owner-authored names for the payout channels. Never machine-translated. */
+const PAYOUT_KIND_LABELS: Record<string, { ar: string; en: string; ckb: string }> = {
+  manual_transfer: { ar: 'تحويل يدوي', en: 'Manual transfer', ckb: 'گواستنەوەی دەستی' },
+  zaincash: { ar: 'زين كاش', en: 'ZainCash', ckb: 'زەین کاش' },
+  fib: { ar: 'FIB', en: 'FIB', ckb: 'FIB' },
+  bank_account: { ar: 'حساب مصرفي', en: 'Bank account', ckb: 'هەژماری بانکی' },
+};
+
+/**
+ * The deposit and withdrawal form, as three steps.
+ *
+ * WHY IT IS STEPPED NOW. It used to be one scroll of eight fields, and the
+ * owner reported it as broken: "هناك مشكلة في النافذة المنبثقة للسحب والايداع
+ * واريد العمليه بسيطه". Two things were wrong with it. It asked for a
+ * transfer reference and an account-holder name that nothing required, so the
+ * shortest path to depositing money was buried; and it was rendered inline,
+ * where an ancestor's transform makes `position: fixed` stop meaning the
+ * viewport — the same bug that put the order modal at the bottom of the page.
+ * It is portalled to document.body now.
+ *
+ * The steps are exactly the owner's order:
+ *
+ *   deposit     القناة → المبلغ → الصورة (والملاحظات اختيارية)
+ *   withdrawal  القناة ورقم الحساب → المبلغ (ضمن الرصيد) → الملاحظات
+ *
+ * Each step refuses to advance until its own field is valid, so an error can
+ * never be about something two screens back.
+ */
 function RequestModal({
   kind,
   s,
+  lang,
+  dir,
   currency,
   exchangeRate,
   available,
@@ -895,6 +1023,8 @@ function RequestModal({
 }: {
   kind: 'deposit' | 'withdrawal';
   s: Record<string, string>;
+  lang: string;
+  dir: 'rtl' | 'ltr';
   currency: 'IQD' | 'USD';
   exchangeRate: number;
   available: number;
@@ -903,15 +1033,15 @@ function RequestModal({
   onClose: () => void;
   onDone: (message: string) => void | Promise<void>;
 }) {
+  const [step, setStep] = useState(1);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [method, setMethod] = useState('');
   const [channel, setChannel] = useState('');
-  const [reference, setReference] = useState('');
   const [receiptKey, setReceiptKey] = useState('');
   const [destinationKind, setDestinationKind] = useState<string>(PAYOUT_KINDS[0]);
   const [destinationAccount, setDestinationAccount] = useState('');
-  const [destinationHolder, setDestinationHolder] = useState('');
+  const [copied, setCopied] = useState('');
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -928,6 +1058,8 @@ function RequestModal({
         : Math.round(rawAmount * 100)
       : 0;
   const overBalance = kind === 'withdrawal' && amountCents > available;
+  const payoutLabel = (k: string) =>
+    PAYOUT_KIND_LABELS[k]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? k;
 
   const onAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -955,28 +1087,45 @@ function RequestModal({
     }
   };
 
+  /** What is still wrong with the CURRENT step, or '' when it may advance. */
+  const stepProblem = (n: number): string => {
+    if (n === 1) {
+      if (kind === 'deposit') return method ? '' : s.channelRequired;
+      return destinationAccount.trim().length >= 3 ? '' : s.accountRequired2;
+    }
+    if (n === 2) {
+      if (!amountCents) return s.invalidAmount;
+      if (overBalance) return s.insufficient;
+      return '';
+    }
+    if (n === 3 && kind === 'deposit' && !receiptKey) return s.receiptRequired;
+    return '';
+  };
+
+  const goNext = () => {
+    const problem = stepProblem(step);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setError('');
+    setStep((n) => Math.min(3, n + 1));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || uploading) return;
+    // Re-checked at submit, not only per step: a customer can walk back and
+    // empty a field they already passed.
+    for (const n of [1, 2, 3]) {
+      const problem = stepProblem(n);
+      if (problem) {
+        setStep(n);
+        setError(problem);
+        return;
+      }
+    }
     setError('');
-    if (!amountCents) {
-      setError(s.invalidAmount);
-      return;
-    }
-    if (kind === 'deposit' && !receiptKey) {
-      setError(s.receiptRequired);
-      return;
-    }
-    if (kind === 'withdrawal') {
-      if (destinationAccount.trim().length < 3) {
-        setError(s.accountRequired);
-        return;
-      }
-      if (overBalance) {
-        setError(s.insufficient);
-        return;
-      }
-    }
     setSubmitting(true);
     try {
       if (kind === 'deposit') {
@@ -986,7 +1135,6 @@ function RequestModal({
           paymentMethod: method || undefined,
           provider: method || undefined,
           channel: channel || undefined,
-          reference: reference || undefined,
           receiptKey,
         });
         await onDone(s.depositSubmitted);
@@ -996,7 +1144,6 @@ function RequestModal({
           note: note || undefined,
           destinationKind,
           destinationAccount: destinationAccount.trim(),
-          destinationHolder: destinationHolder.trim() || undefined,
           idempotencyKey: idempotencyKeyRef.current,
         });
         await onDone(s.withdrawSubmitted);
@@ -1009,24 +1156,59 @@ function RequestModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-olive-dark border border-gold/20 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-[460px] p-6 sm:p-7 relative flex flex-col max-h-[92vh] overflow-y-auto">
+  const stepTitles =
+    kind === 'deposit'
+      ? [s.stepChannel, s.stepAmount, s.stepProof]
+      : [s.stepAccount, s.stepAmount, s.stepReview];
+
+  return createPortal(
+    <div
+      dir={dir}
+      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wallet-request-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting && !uploading) onClose();
+      }}
+    >
+      <div
+        data-wallet-modal={kind}
+        className="bg-zinc-950 border border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[460px] p-5 sm:p-6 relative flex flex-col max-h-[92vh] overflow-y-auto"
+      >
         <button
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="absolute top-5 end-5 text-gold/50 hover:text-gold bg-white/5 hover:bg-white/10 p-2 rounded-full"
+          className="absolute top-4 end-4 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 p-2 rounded-full"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-2xl font-black text-gold mb-1 text-center">
+        <h2 id="wallet-request-title" className="text-xl font-black text-white mb-1 text-center pe-10">
           {kind === 'deposit' ? s.depositTitle : s.withdrawTitle}
         </h2>
-        <p className="text-gold/60 text-center text-xs mb-5 leading-relaxed">
-          {kind === 'deposit' ? s.depositIntro : s.withdrawIntro}
-        </p>
+
+        {/* Where the customer is, and how much is left. Three dots beat a
+            scrollbar for telling someone a form is nearly over. */}
+        <div className="flex items-center justify-center gap-2 mb-4 mt-2">
+          {stepTitles.map((title, i) => (
+            <div key={title} className="flex items-center gap-2">
+              <span
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                  step === i + 1
+                    ? 'bg-gold text-black'
+                    : step > i + 1
+                      ? 'bg-zinc-800 text-zinc-300'
+                      : 'bg-zinc-900 text-zinc-600'
+                }`}
+              >
+                {title}
+              </span>
+              {i < 2 && <span className="w-3 h-px bg-zinc-700" />}
+            </div>
+          ))}
+        </div>
 
         <form onSubmit={submit} className="space-y-4">
           {error && (
@@ -1035,185 +1217,237 @@ function RequestModal({
             </div>
           )}
 
-          {kind === 'withdrawal' && (
-            <div className="bg-white/5 border border-gold/10 rounded-2xl p-4 flex items-center justify-between">
-              <span className="text-gold/70 font-medium text-sm">{s.available}</span>
-              <span dir="ltr" className="text-gold font-bold text-lg">
-                {fmt(available)}
-              </span>
+          {/* ------------------------------------------------------ step 1 */}
+          {step === 1 && kind === 'deposit' && (
+            <div className="space-y-2">
+              <p className="text-zinc-400 text-xs leading-relaxed">{s.chooseChannelHint}</p>
+              {paymentMethods.length === 0 ? (
+                // No invented account numbers. If the owner has not published
+                // a channel, saying so is the only honest screen.
+                <p className="text-zinc-400 text-xs text-center py-6 bg-zinc-900 rounded-2xl border border-zinc-800">{s.noMethods}</p>
+              ) : (
+                paymentMethods.map((m) => (
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={() => {
+                      navigator.clipboard?.writeText(m.details).then(
+                        () => setCopied(m.id),
+                        () => setCopied('')
+                      );
+                      setMethod(m.name);
+                      setChannel(m.details);
+                    }}
+                    className={`w-full flex justify-between items-center gap-3 p-3.5 rounded-2xl border transition-colors ${
+                      method === m.name ? 'bg-zinc-800 border-gold/60' : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800'
+                    }`}
+                  >
+                    <span className="text-white font-bold text-sm flex items-center gap-1.5 min-w-0 truncate">
+                      {method === m.name && <CheckCircle className="w-4 h-4 text-gold shrink-0" />}
+                      {m.name}
+                    </span>
+                    <span dir="ltr" className="text-zinc-300 font-mono bg-black/50 px-2 py-1 rounded-lg text-xs flex items-center gap-1.5 shrink-0">
+                      {m.details}
+                      <Copy className="w-3 h-3 text-zinc-500" />
+                    </span>
+                  </button>
+                ))
+              )}
+              {copied && <p className="text-[#8fd07c] text-[11px] font-bold text-center">{s.copyDone}</p>}
             </div>
           )}
 
-          {kind === 'deposit' && (
-            <div className="bg-white/5 p-4 rounded-2xl border border-gold/10">
-              <h3 className="text-gold font-bold mb-3 text-xs uppercase tracking-wider">{s.depositMethods}</h3>
-              {paymentMethods.length === 0 ? (
-                <p className="text-gold/50 text-xs text-center py-2">{s.noMethods}</p>
-              ) : (
-                <div className="space-y-2">
-                  {paymentMethods.map((m) => (
+          {step === 1 && kind === 'withdrawal' && (
+            <div className="space-y-4">
+              <Field label={s.destinationKind}>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAYOUT_KINDS.map((k) => (
                     <button
                       type="button"
-                      key={m.id}
-                      onClick={() => {
-                        navigator.clipboard?.writeText(m.details).catch(() => {});
-                        setMethod(m.name);
-                        setChannel(m.details);
-                      }}
-                      className={`w-full flex justify-between items-center p-3 rounded-xl border transition-colors ${
-                        method === m.name ? 'bg-black/40 border-gold/40' : 'bg-black/20 hover:bg-black/40 border-white/5'
+                      key={k}
+                      onClick={() => setDestinationKind(k)}
+                      className={`px-3 py-3 rounded-2xl border text-sm font-bold transition-colors ${
+                        destinationKind === k
+                          ? 'bg-zinc-800 border-gold/60 text-white'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800'
                       }`}
                     >
-                      <span className="text-gold/90 font-medium text-sm flex items-center gap-1.5">
-                        {method === m.name && <CheckCircle className="w-3.5 h-3.5 text-gold" />}
-                        {m.name}
-                      </span>
-                      <span dir="ltr" className="text-gold/80 font-mono bg-black/40 px-2 py-1 rounded-md text-xs flex items-center gap-1.5">
-                        {m.details}
-                        <Copy className="w-3 h-3 text-gold/40" />
-                      </span>
+                      {payoutLabel(k)}
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-          )}
-
-          {kind === 'withdrawal' && (
-            <>
-              <Field label={s.destinationKind}>
-                <select value={destinationKind} onChange={(e) => setDestinationKind(e.target.value)} className={inputClass}>
-                  {PAYOUT_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-                </select>
               </Field>
-              <Field label={`${s.destinationAccount} *`} hint={s.destinationFrozen}>
+              <Field label={`${s.accountForChannel} *`} hint={s.destinationFrozen}>
                 <input
                   dir="ltr"
                   value={destinationAccount}
                   onChange={(e) => setDestinationAccount(e.target.value)}
                   className={inputClass}
+                  autoComplete="off"
                   required
                 />
               </Field>
-              <Field label={s.destinationHolder}>
-                <input value={destinationHolder} onChange={(e) => setDestinationHolder(e.target.value)} className={inputClass} />
-              </Field>
-            </>
-          )}
-
-          <Field label={currency === 'IQD' ? s.amountIqd : s.amountUsd}>
-            <input
-              dir="ltr"
-              inputMode="decimal"
-              value={amount}
-              onChange={onAmountChange}
-              placeholder="0.00"
-              className={`${inputClass} font-bold text-lg`}
-              required
-            />
-          </Field>
-
-          {kind === 'withdrawal' && (
-            <div className="bg-black/25 border border-gold/10 rounded-2xl p-4 space-y-2">
-              <h3 className="text-gold/80 font-bold text-xs uppercase tracking-wider">{s.feePreview}</h3>
-              <div className="flex justify-between text-xs text-gold/70">
-                <span>{s.fee}</span>
-                <span aria-label={s.feeNotConfigured}>—</span>
-              </div>
-              <div className="flex justify-between text-sm text-gold font-bold">
-                <span>{s.net}</span>
-                <span dir="ltr">{fmt(amountCents)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-gold/60">
-                <span>{s.availableAfter}</span>
-                <span dir="ltr">{fmt(Math.max(available - amountCents, 0))}</span>
-              </div>
-              <p className="text-gold/35 text-[10px] leading-snug">{s.feeNotConfigured}</p>
-              {overBalance && <p className="text-[#e4899a] text-[11px] font-bold">{s.insufficient}</p>}
             </div>
           )}
 
-          {kind === 'deposit' && (
-            <>
-              <Field label={s.channel}>
-                <input dir="ltr" value={channel} onChange={(e) => setChannel(e.target.value)} className={inputClass} />
-              </Field>
-              <Field label={s.reference} hint={s.referenceHint}>
-                <input dir="ltr" value={reference} onChange={(e) => setReference(e.target.value)} className={inputClass} />
-              </Field>
-              <Field label={`${s.receiptLabel} *`}>
-                <div
-                  className={`relative border-2 border-dashed rounded-2xl p-5 text-center transition-all bg-black/10 ${
-                    uploading ? 'border-gold/40 cursor-wait' : 'border-gold/20 hover:border-gold/40 cursor-pointer'
-                  }`}
-                >
-                  <input
-                    type="file"
-                    ref={fileRef}
-                    accept="image/*"
-                    onChange={onUpload}
-                    disabled={uploading}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  {uploading ? (
-                    <div className="flex flex-col items-center gap-2 text-gold/70">
-                      <Spinner size="md" decorative />
-                      <span className="text-xs font-bold text-gold">{s.uploading}</span>
-                    </div>
-                  ) : receiptKey ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle className="w-6 h-6 text-[#59A846]" />
-                      <span className="text-xs font-bold text-gold">{s.receiptUploaded}</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-1.5 text-gold/50">
-                      <Upload className="w-5 h-5" />
-                      <span className="text-xs font-medium">{s.receiptUpload}</span>
-                    </div>
-                  )}
+          {/* ------------------------------------------------------ step 2 */}
+          {step === 2 && (
+            <div className="space-y-4">
+              {kind === 'withdrawal' && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
+                  <span className="text-zinc-400 font-medium text-sm">{s.available}</span>
+                  <span dir="ltr" className="text-white font-bold text-lg">{fmt(available)}</span>
                 </div>
+              )}
+              <Field
+                label={currency === 'IQD' ? s.amountIqd : s.amountUsd}
+                hint={kind === 'withdrawal' ? s.amountWithin : undefined}
+              >
+                <input
+                  dir="ltr"
+                  inputMode="decimal"
+                  autoFocus
+                  value={amount}
+                  onChange={onAmountChange}
+                  placeholder="0.00"
+                  className={`${inputClass} font-bold text-lg`}
+                  required
+                />
               </Field>
-            </>
+              {kind === 'withdrawal' && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
+                  <div className="flex justify-between text-xs text-zinc-400">
+                    <span>{s.fee}</span>
+                    <span aria-label={s.feeNotConfigured}>—</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-white font-bold">
+                    <span>{s.net}</span>
+                    <span dir="ltr">{fmt(amountCents)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-zinc-400">
+                    <span>{s.availableAfter}</span>
+                    <span dir="ltr">{fmt(Math.max(available - amountCents, 0))}</span>
+                  </div>
+                  {/* No invented percentage: the owner has not set a fee
+                      policy, so the net IS the amount and we say why. */}
+                  <p className="text-zinc-500 text-[10px] leading-snug">{s.feeNotConfigured}</p>
+                  {overBalance && <p className="text-[#e4899a] text-[11px] font-bold">{s.insufficient}</p>}
+                </div>
+              )}
+            </div>
           )}
 
-          <Field label={s.note}>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={s.notePlaceholder}
-              className={`${inputClass} h-20 resize-none`}
-            />
-          </Field>
+          {/* ------------------------------------------------------ step 3 */}
+          {step === 3 && (
+            <div className="space-y-4">
+              {kind === 'deposit' && (
+                <Field label={`${s.receiptLabel} *`}>
+                  <div
+                    className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all bg-zinc-900 ${
+                      uploading ? 'border-gold/50 cursor-wait' : 'border-zinc-700 hover:border-gold/50 cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      ref={fileRef}
+                      accept="image/*"
+                      onChange={onUpload}
+                      disabled={uploading}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {uploading ? (
+                      <div className="flex flex-col items-center gap-2 text-zinc-300">
+                        <Spinner size="md" decorative />
+                        <span className="text-xs font-bold text-white">{s.uploading}</span>
+                      </div>
+                    ) : receiptKey ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle className="w-6 h-6 text-[#8fd07c]" />
+                        <span className="text-xs font-bold text-white">{s.receiptUploaded}</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1.5 text-zinc-400">
+                        <Upload className="w-5 h-5" />
+                        <span className="text-xs font-medium">{s.receiptUpload}</span>
+                      </div>
+                    )}
+                  </div>
+                </Field>
+              )}
 
-          <div className="pt-2 flex gap-3">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-1.5 text-xs">
+                <h3 className="text-white font-bold text-[11px] uppercase tracking-wider mb-1">{s.summary}</h3>
+                <div className="flex justify-between text-zinc-400">
+                  <span>{kind === 'deposit' ? s.stepChannel : s.destinationKind}</span>
+                  <span className="text-white font-bold">
+                    {kind === 'deposit' ? method || '—' : payoutLabel(destinationKind)}
+                  </span>
+                </div>
+                {kind === 'withdrawal' && (
+                  <div className="flex justify-between text-zinc-400">
+                    <span>{s.destinationAccount}</span>
+                    <span dir="ltr" className="text-white font-mono">{destinationAccount || '—'}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-zinc-400">
+                  <span>{s.amount}</span>
+                  <span dir="ltr" className="text-white font-bold">{fmt(amountCents)}</span>
+                </div>
+              </div>
+
+              <Field label={`${s.note} — ${s.optional}`}>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={s.notePlaceholder}
+                  className={`${inputClass} h-20 resize-none`}
+                />
+              </Field>
+
+              <p className="text-zinc-500 text-[11px] leading-relaxed">
+                {kind === 'deposit' ? s.depositIntro : s.withdrawIntro}
+              </p>
+            </div>
+          )}
+
+          <div className="pt-1 flex gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-3.5 rounded-xl font-bold text-gold/60 hover:text-gold hover:bg-white/5 border border-gold/10"
+              onClick={() => (step === 1 ? onClose() : (setError(''), setStep((n) => n - 1)))}
+              className="flex-1 px-4 py-3.5 rounded-2xl font-bold text-zinc-300 hover:text-white hover:bg-zinc-900 border border-zinc-800"
             >
-              {s.cancel}
+              {step === 1 ? s.cancel : s.back2}
             </button>
-            <button
-              type="submit"
-              disabled={submitting || uploading}
-              className="flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-olive-dark font-black text-sm py-3.5 rounded-xl disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {submitting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Spinner size="sm" decorative /> {s.submitting}
-                </span>
-              ) : (
-                s.submit
-              )}
-            </button>
+            {step < 3 ? (
+              <button
+                type="button"
+                onClick={goNext}
+                className="flex-[2] bg-gold hover:bg-gold-light text-black font-black text-sm py-3.5 rounded-2xl transition-colors"
+              >
+                {s.next}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting || uploading}
+                className="flex-[2] bg-gold hover:bg-gold-light text-black font-black text-sm py-3.5 rounded-2xl disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+              >
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Spinner size="sm" decorative /> {s.submitting}
+                  </span>
+                ) : kind === 'deposit' ? (
+                  s.confirmDeposit
+                ) : (
+                  s.confirmWithdraw
+                )}
+              </button>
+            )}
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1251,19 +1485,29 @@ function ReviewModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-olive-dark border border-gold/20 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-[420px] p-6 relative">
+  // Portalled for the same reason as the request modal: under a transformed
+  // ancestor `position: fixed` stops meaning the viewport, and the dialog
+  // lands wherever that ancestor happens to be.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting) onClose();
+      }}
+    >
+      <div className="bg-zinc-950 border border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[420px] p-6 relative">
         <button
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="absolute top-5 end-5 text-gold/50 hover:text-gold bg-white/5 p-2 rounded-full"
+          className="absolute top-5 end-5 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 p-2 rounded-full"
         >
           <X className="w-5 h-5" />
         </button>
-        <h2 className="text-xl font-black text-gold mb-1 text-center">{s.reviewTitle}</h2>
-        <p className="text-gold/50 text-center text-xs mb-4" dir="ltr">
+        <h2 className="text-xl font-black text-white mb-1 text-center pe-10">{s.reviewTitle}</h2>
+        <p className="text-zinc-400 text-center text-xs mb-4" dir="ltr">
           {tx.number}
         </p>
         <form onSubmit={submit} className="space-y-4">
@@ -1279,14 +1523,14 @@ function ReviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 rounded-xl font-bold text-gold/60 hover:text-gold border border-gold/10"
+              className="flex-1 px-4 py-3 rounded-2xl font-bold text-zinc-300 hover:text-white border border-zinc-800 hover:bg-zinc-900"
             >
               {s.cancel}
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-olive-dark font-black text-sm py-3 rounded-xl disabled:opacity-70"
+              className="flex-[2] bg-gold hover:bg-gold-light text-black font-black text-sm py-3 rounded-2xl disabled:opacity-70 transition-colors"
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -1299,6 +1543,7 @@ function ReviewModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
