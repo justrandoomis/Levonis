@@ -4,6 +4,7 @@ import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArr
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewFinancials, normalizeAdminScope } from '../lib/adminScope';
+import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { deductOrderStock, returnOrderStock } from '../lib/orderInventory';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
@@ -575,6 +576,12 @@ adminRoutes.put('/settings/:key', async (c) => {
   } else if (key === 'homeBanners' || key === 'homeSectionItems') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badRequest(`${key} must be an object`);
     if (JSON.stringify(value).length > 100_000) throw badRequest(`${key} is too large`);
+    // Normalize on the WAY IN, not only on the way out. This is the content
+    // the storefront puts in an <img src> and an <a href>, so a link that is
+    // not a path or an http(s) URL is dropped here rather than stored and
+    // filtered on every read. It also accepts the pre-hero `{id,image,link}`
+    // shape unchanged, so existing banners survive the upgrade.
+    value = key === 'homeBanners' ? normalizeHomeBanners(value) : normalizeSectionItems(value);
   }
 
   await setSetting(c.env.DB, key, value);

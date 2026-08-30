@@ -39,8 +39,6 @@ export const translations = {
     buyNow: "Buy Now",
     addToCart: "Add to Cart",
     viewAll: "View All",
-    heroTitle: "Precision in Every Layer",
-    heroSub: "Explore the ultimate collection of professional 3D printers, high-grade resins, and robust filaments.",
     adminDashboard: "Dashboard",
     adminProducts: "Products",
     adminSections: "Sections",
@@ -180,6 +178,34 @@ export const translations = {
     studioCardTitle: "LEVO Studio — Print File Preparation",
     studioCardSubtitle: "Prepare, arrange, and slice your 3D models in the browser, and save projects to your account.",
     studioOpen: "Open LEVO Studio",
+
+    // ---- Home hero. Shown ONLY when the owner has configured no banner, so
+    // the home page opens on the brand instead of on an empty strip. The copy
+    // describes what LEVONIS actually is; it promises nothing it cannot do.
+    heroTitle: "3D printing, start to finish",
+    heroSubtitle: "Printers, filament and parts delivered across Iraq — and a browser studio that prepares your files before you print.",
+    heroShop: "Shop now",
+    heroStudio: "Open the Studio",
+    heroSearchPlaceholder: "Search for a printer, filament or part...",
+
+    // ---- Home sections
+    browseCategories: "Browse by category",
+    topBrands: "Top brands",
+    couponsOffers: "Coupons & offers",
+    productCount: "products",
+    seeAll: "See all",
+
+    // ---- Service cards. Every one of these is a page that exists and works.
+    svcWarrantyTitle: "Warranty & repairs",
+    svcWarrantyDesc: "Register a device, track its cover, and file a claim.",
+    svcToolsTitle: "Print tools",
+    svcToolsDesc: "Calculators and references for filament, cost and settings.",
+    svcBundlesTitle: "Bundles",
+    svcBundlesDesc: "Printer and material sets priced together.",
+    svcCommunityTitle: "Community",
+    svcCommunityDesc: "Stores, makers and requests from across Iraq.",
+    svcRewardsTitle: "Points & rewards",
+    svcRewardsDesc: "Earn on every order and spend it on your next one.",
   },
   ar: {
     active: "نشط",
@@ -205,8 +231,6 @@ export const translations = {
     buyNow: "اشتري الآن",
     addToCart: "أضف للسلة",
     viewAll: "عرض الكل",
-    heroTitle: "الدقة في كل طبقة",
-    heroSub: "اكتشف المجموعة النهائية من الطابعات ثلاثية الأبعاد الاحترافية والراتنجات عالية الجودة والخيوط القوية.",
     adminDashboard: "لوحة القيادة",
     adminProducts: "المنتجات",
     adminSections: "الأقسام",
@@ -346,6 +370,29 @@ export const translations = {
     studioCardTitle: "LEVO Studio — تجهيز ملفات الطباعة",
     studioCardSubtitle: "جهّز مجسّماتك ثلاثية الأبعاد ورتّبها وقطّعها في المتصفح، واحفظ مشاريعك في حسابك.",
     studioOpen: "افتح LEVO Studio",
+
+    heroTitle: "الطباعة ثلاثية الأبعاد من أولها إلى آخرها",
+    heroSubtitle: "طابعات وخيوط وقطع تُوصَّل في عموم العراق، واستوديو في المتصفح يجهّز ملفاتك قبل الطباعة.",
+    heroShop: "تسوّق الآن",
+    heroStudio: "افتح الاستوديو",
+    heroSearchPlaceholder: "ابحث عن طابعة أو خيط أو قطعة...",
+
+    browseCategories: "تصفّح حسب القسم",
+    topBrands: "أبرز العلامات",
+    couponsOffers: "كوبونات وعروض",
+    productCount: "منتج",
+    seeAll: "عرض الكل",
+
+    svcWarrantyTitle: "الضمان والصيانة",
+    svcWarrantyDesc: "سجّل جهازك وتابع ضمانه وافتح طلب صيانة.",
+    svcToolsTitle: "أدوات الطباعة",
+    svcToolsDesc: "حاسبات ومراجع للخيط والكلفة والإعدادات.",
+    svcBundlesTitle: "الباقات",
+    svcBundlesDesc: "مجموعات طابعة ومواد بسعر واحد.",
+    svcCommunityTitle: "المجتمع",
+    svcCommunityDesc: "متاجر وصنّاع وطلبات من عموم العراق.",
+    svcRewardsTitle: "النقاط والمكافآت",
+    svcRewardsDesc: "اجمع نقاطًا مع كل طلب واصرفها في الطلب التالي.",
   },
   ckb: {
     active: "چالاکە",
@@ -371,8 +418,6 @@ export const translations = {
     buyNow: "ئێستا بکڕە",
     addToCart: "خستنە ناو عەرەبانە",
     viewAll: "هەمووی ببینە",
-    heroTitle: "وردبینی لە هەموو چینێکدا",
-    heroSub: "باشترین کۆکراوەی پرینتەری سێ دووری پیشەیی و ڕزینی کوالیتی بەرز و فیلامێنتی بەهێز بدۆزەرەوە.",
     adminDashboard: "داشبۆرد",
     adminProducts: "بەرهەمەکان",
     adminSections: "بەشەکان",
@@ -512,5 +557,28 @@ export const translations = {
     studioCardTitle: "LEVO Studio — ئامادەکردنی فایلی پرینت",
     studioCardSubtitle: "مۆدێلە سێ دوورییەکانت لە وێبگەڕدا ئامادە بکە و ڕێکیان بخە و بۆ پرینت ئامادەیان بکە، پرۆژەکانیشت لە هەژمارەکەتدا پاشەکەوت بکە.",
     studioOpen: "LEVO Studio بکەرەوە",
+
+    heroTitle: "چاپی سێ‌دووری، لە سەرەتاوە تا کۆتایی",
+    heroSubtitle: "پرینتەر و فیلامێنت و پارچە بۆ هەموو عێراق دەگەیەنرێن، لەگەڵ ستودیۆیەک لە وێبگەڕدا کە فایلەکانت پێش چاپ ئامادە دەکات.",
+    heroShop: "ئێستا بکڕە",
+    heroStudio: "ستودیۆ بکەرەوە",
+    heroSearchPlaceholder: "بگەڕێ بۆ پرینتەر یان فیلامێنت یان پارچە...",
+
+    browseCategories: "بەپێی بەش بگەڕێ",
+    topBrands: "باشترین براندەکان",
+    couponsOffers: "کۆپۆن و ئۆفەر",
+    productCount: "بەرهەم",
+    seeAll: "هەمووی ببینە",
+
+    svcWarrantyTitle: "گەرەنتی و چاککردنەوە",
+    svcWarrantyDesc: "ئامێرەکەت تۆمار بکە، گەرەنتییەکەی بەدواداچوون بکە و داوای چاککردنەوە بکە.",
+    svcToolsTitle: "ئامرازەکانی چاپ",
+    svcToolsDesc: "ژمێرەر و سەرچاوە بۆ فیلامێنت و تێچوو و ڕێکخستنەکان.",
+    svcBundlesTitle: "پاکێجەکان",
+    svcBundlesDesc: "کۆمەڵە پرینتەر و ماددە بە یەک نرخ.",
+    svcCommunityTitle: "کۆمەڵگە",
+    svcCommunityDesc: "فرۆشگا و دروستکەر و داواکاری لە هەموو عێراقەوە.",
+    svcRewardsTitle: "خاڵ و خەڵات",
+    svcRewardsDesc: "لەگەڵ هەر داواکارییەک خاڵ کۆبکەرەوە و لە داواکاری داهاتوودا خەرجی بکە.",
   }
 };

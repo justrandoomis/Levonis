@@ -1,11 +1,13 @@
 import AnimatedItem from '../components/AnimatedItem';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { Star, ChevronRight, ChevronLeft, Pause, Play, PackageSearch, Layers } from 'lucide-react';
-import { STUDIO_URL } from '../translations';
+import { Star, ChevronRight, ChevronLeft, PackageSearch } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, ApiProduct, PublicSettings, formatIqd } from '../lib/api';
+import { api, ApiProduct, PublicSettings, HomeTaxon, formatIqd } from '../lib/api';
+import Hero from '../components/home/Hero';
+import ServicesGrid from '../components/home/ServicesGrid';
+import { ItemStrip, CategoryChips, BrandChips } from '../components/home/Strips';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
@@ -22,12 +24,9 @@ export default function Home() {
   const planActive =
     !!user && plan !== 'free' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
 
-  const [activeIndex, setActiveIndex] = useState(0);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
-
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
+  const [categories, setCategories] = useState<HomeTaxon[]>([]);
+  const [brands, setBrands] = useState<HomeTaxon[]>([]);
 
   const [discountedProducts, setDiscountedProducts] = useState<ApiProduct[]>([]);
   const [newProducts, setNewProducts] = useState<ApiProduct[]>([]);
@@ -47,13 +46,19 @@ export default function Home() {
     setInitialLoading(true);
     setLoadError(null);
     try {
-      const data = await api.get<{ settings: PublicSettings; discounted: ApiProduct[]; latest: ApiProduct[] }>(
-        '/api/home'
-      );
+      const data = await api.get<{
+        settings: PublicSettings;
+        discounted: ApiProduct[];
+        latest: ApiProduct[];
+        categories?: HomeTaxon[];
+        brands?: HomeTaxon[];
+      }>('/api/home');
       if (homeReqRef.current !== reqId) return;
       setSettings(data.settings);
       setDiscountedProducts(data.discounted || []);
       setNewProducts(data.latest || []);
+      setCategories(data.categories || []);
+      setBrands(data.brands || []);
       setHasMore((data.latest || []).length >= 20);
     } catch (err) {
       console.error('Failed to fetch home products', err);
@@ -187,159 +192,37 @@ export default function Home() {
     );
   };
 
-  // Section visibility from the admin-configured home layout.
+  // The admin-configured home layout: which sections show, and IN WHICH
+  // ORDER. The order was draggable in the admin panel and the storefront
+  // ignored it entirely, rendering a hard-coded sequence — so reordering
+  // sections changed nothing a customer could see. It is honoured now.
+  const layout = settings?.homeSections ?? [];
   const sectionVisible = (id: string) => {
-    const s = settings?.homeSections?.find((x) => x.id === id);
+    const s = layout.find((x) => x.id === id);
     return s ? s.isVisible : true;
   };
+  /** Sort key for a section, falling back to the end for unknown ids. */
+  const orderOf = (id: string) => {
+    const i = layout.findIndex((x) => x.id === id);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
 
-  const displayBanners = [
-    ...(sectionVisible('first_banner') ? settings?.homeBanners?.['first_banner'] ?? [] : []),
-    ...(sectionVisible('second_banner') ? settings?.homeBanners?.['second_banner'] ?? [] : []),
-  ].filter((b) => b && b.image);
+  const bannersFor = (slot: string) =>
+    sectionVisible(slot) ? settings?.homeBanners?.[slot] ?? [] : [];
+  const itemsFor = (slot: string) =>
+    sectionVisible(slot) ? settings?.homeSectionItems?.[slot] ?? [] : [];
+
+  // The hero takes the first banner slot the owner filled; the second slot
+  // keeps its own place further down the page, where the admin put it.
+  const heroBanners = [...bannersFor('first_banner'), ...bannersFor('second_banner')];
 
   const homeAds = sectionVisible('ads_panel') ? settings?.homeAds ?? [] : [];
 
-  const bannerCount = displayBanners.length;
-
-  // Keep the index valid when banners load or change.
-  useEffect(() => {
-    if (bannerCount === 0) {
-      setActiveIndex(0);
-    } else {
-      setActiveIndex((i) => (i >= bannerCount ? 0 : i));
-    }
-  }, [bannerCount]);
-
-  const nextSlide = useCallback(() => {
-    if (bannerCount === 0) return;
-    setActiveIndex((i) => (i + 1) % bannerCount);
-  }, [bannerCount]);
-
-  const prevSlide = useCallback(() => {
-    if (bannerCount === 0) return;
-    setActiveIndex((i) => (i - 1 + bannerCount) % bannerCount);
-  }, [bannerCount]);
-
-  useEffect(() => {
-    if (!isAutoPlaying || bannerCount < 2) return;
-    const interval = setInterval(nextSlide, 4000);
-    return () => clearInterval(interval);
-  }, [isAutoPlaying, nextSlide, bannerCount]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStartX.current || !touchEndX.current) return;
-    const distance = touchStartX.current - touchEndX.current;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe) {
-      if (dir === 'rtl') prevSlide();
-      else nextSlide();
-    } else if (isRightSwipe) {
-      if (dir === 'rtl') nextSlide();
-      else prevSlide();
-    }
-
-    touchStartX.current = 0;
-    touchEndX.current = 0;
-  };
-
-  const renderBannerMedia = (banner: { id: string; image: string; link: string }) => {
-    // Banners live in a translated carousel row — lazy loading would leave
-    // blank slides mid-swipe, so they load eagerly with an explicit fallback.
-    const img = (
-      <SafeImage
-        src={banner.image}
-        alt=""
-        aspect="auto"
-        eager
-        className="w-full h-full"
-      />
-    );
-    if (banner.link && banner.link.startsWith('/')) {
-      return (
-        <Link to={banner.link} className="block w-full h-full">
-          {img}
-        </Link>
-      );
-    }
-    if (banner.link) {
-      return (
-        <a href={banner.link} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
-          {img}
-        </a>
-      );
-    }
-    return img;
-  };
-
   return (
     <div className="w-full pb-24 text-zinc-300 bg-black">
-      {/* Reserve the banner area while /api/home loads so the page doesn't
-          jump when the configured banners arrive. */}
-      {initialLoading && bannerCount === 0 && (
-        <div
-          aria-hidden="true"
-          className="w-full h-[320px] md:h-[420px] bg-zinc-900/80 animate-pulse motion-reduce:animate-none"
-        />
-      )}
-      {/* Banner Carousel (hidden when no banners are configured) */}
-      {bannerCount > 0 && (
-        <div
-          className="relative w-full h-[320px] md:h-[420px] overflow-hidden -mt-0"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div
-            className="flex transition-transform duration-500 ease-out h-full"
-            style={{ transform: `translateX(${dir === 'rtl' ? (activeIndex * 100) : -(activeIndex * 100)}%)` }}
-          >
-            {displayBanners.map((banner) => (
-              <div key={banner.id} className="w-full h-full flex-shrink-0 bg-zinc-900 relative">
-                {renderBannerMedia(banner)}
-              </div>
-            ))}
-          </div>
+      <Hero banners={heroBanners} loading={initialLoading} />
 
-          {/* Controls overlay */}
-          <div className="absolute bottom-[40px] left-0 right-0 flex items-center justify-between px-6 z-20">
-            <div className="flex-1"></div>
-
-            {/* Pagination Dots */}
-            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-md">
-              {displayBanners.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveIndex(idx)}
-                  className={`rounded-full transition-all ${activeIndex === idx ? 'w-5 h-1.5 bg-zinc-800' : 'w-1.5 h-1.5 bg-zinc-300 hover:bg-zinc-400'}`}
-                />
-              ))}
-            </div>
-
-            {/* Play/Pause */}
-            <div className="flex-1 flex justify-end">
-              <button
-                onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-                className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:bg-zinc-200 transition-colors shadow-lg"
-              >
-                {isAutoPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className={`relative z-30 max-w-7xl mx-auto px-4 sm:px-10 py-12 bg-black ${bannerCount > 0 || initialLoading ? 'rounded-t-[36px] -mt-10' : ''}`}>
+      <div className="relative z-30 max-w-7xl mx-auto px-4 sm:px-10 py-10 sm:py-12 bg-black rounded-t-[36px] -mt-8">
 
         {/* Ads Marquee */}
         {homeAds.length > 0 && (
@@ -358,34 +241,83 @@ export default function Home() {
           </div>
         )}
 
-        {/* Services — LEVO Studio entry. A PLAIN full-page navigation to the
-            standalone subdomain (STUDIO_URL): no iframe, no embedding, no
-            prefetch/preload of any Studio asset, and no slicer code in this
-            bundle (docs/STUDIO_PLAN.md decision 6 — pinned by
-            tests/store-isolation.test.ts). Opening in a new tab stays the
-            user's own choice. */}
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1 h-6 bg-olive rounded-full"></div>
-            <h2 className="text-xl md:text-2xl font-bold text-white">{t('services')}</h2>
-          </div>
-          <a
-            href={STUDIO_URL}
-            className="group flex items-center gap-4 rounded-2xl bg-gradient-to-r from-olive/15 to-zinc-900/60 border border-olive/30 p-4 sm:p-5 hover:border-olive/60 transition-colors"
-          >
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-olive/15 border border-olive/30 flex items-center justify-center shrink-0">
-              <Layers aria-hidden="true" className="w-6 h-6 sm:w-7 sm:h-7 text-olive" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-white font-bold text-sm sm:text-base mb-0.5">{t('studioCardTitle')}</h3>
-              <p className="text-xs sm:text-sm text-zinc-400 line-clamp-2">{t('studioCardSubtitle')}</p>
-            </div>
-            <span className="shrink-0 flex items-center gap-1 text-olive text-xs sm:text-sm font-bold">
-              <span className="hidden sm:inline">{t('studioOpen')}</span>
-              {dir === 'rtl' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </span>
-          </a>
-        </div>
+        <ServicesGrid />
+
+        {/* The owner-configurable sections, in the ORDER the admin panel
+            shows them. Each renders nothing when it has no content, so an
+            unconfigured section costs no space instead of showing an empty
+            shelf. `categories` and `top_brands` fall back to the REAL
+            catalogue and brand tables when the owner has authored no cards of
+            their own — those two are data the store already has, and making
+            the owner retype their own taxonomy to see it was the reason the
+            sections stayed blank. */}
+        {[
+          {
+            id: 'coupons_offers',
+            order: orderOf('coupons_offers'),
+            node: (
+              <ItemStrip
+                key="coupons_offers"
+                id="coupons_offers"
+                title={t('couponsOffers')}
+                accent="bg-rose-500"
+                items={itemsFor('coupons_offers')}
+              />
+            ),
+          },
+          {
+            id: 'categories',
+            order: orderOf('categories'),
+            node: sectionVisible('categories') ? (
+              itemsFor('categories').length > 0 ? (
+                <ItemStrip
+                  key="categories"
+                  id="categories"
+                  title={t('browseCategories')}
+                  accent="bg-olive"
+                  items={itemsFor('categories')}
+                />
+              ) : (
+                <CategoryChips key="categories" categories={categories} />
+              )
+            ) : null,
+          },
+          {
+            id: 'top_brands',
+            order: orderOf('top_brands'),
+            node: sectionVisible('top_brands') ? (
+              itemsFor('top_brands').length > 0 ? (
+                <ItemStrip
+                  key="top_brands"
+                  id="top_brands"
+                  title={t('topBrands')}
+                  accent="bg-gold"
+                  items={itemsFor('top_brands')}
+                />
+              ) : (
+                <BrandChips key="top_brands" brands={brands} />
+              )
+            ) : null,
+          },
+          {
+            id: 'second_banner',
+            order: orderOf('second_banner'),
+            // The second banner slot only appears down here when the first
+            // slot already supplied the hero; otherwise it IS the hero and
+            // rendering it twice would show the same picture on one screen.
+            node:
+              bannersFor('first_banner').length > 0 && bannersFor('second_banner').length > 0 ? (
+                <section key="second_banner" data-home-section="second_banner" className="mb-12">
+                  <div className="rounded-2xl overflow-hidden">
+                    <Hero banners={bannersFor('second_banner')} loading={false} />
+                  </div>
+                </section>
+              ) : null,
+          },
+        ]
+          .filter((x) => x.node !== null)
+          .sort((a, b) => a.order - b.order)
+          .map((x) => x.node)}
 
         {/* Skeletons mirror the real sections (horizontal row + grid) —
             reserved dimensions, no fake names or prices. */}
@@ -421,9 +353,10 @@ export default function Home() {
           <ErrorState error={loadError} onRetry={fetchHome} />
         )}
 
-        {/* Discounted Products - Horizontal Scroll */}
-        {discountedProducts.length > 0 && (
-          <div className="mb-12">
+        {/* Discounted Products — this IS the admin's `discounts_offers`
+            section, whose visibility toggle the page used to ignore. */}
+        {discountedProducts.length > 0 && sectionVisible('discounts_offers') && (
+          <div data-home-section="discounts_offers" className="mb-12">
             <div className="flex items-center justify-between gap-3 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-6 bg-rose-500 rounded-full"></div>

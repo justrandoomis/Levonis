@@ -10,7 +10,74 @@ interface HomeSection {
   titleAr: string;
   isVisible: boolean;
 }
-interface Banner { id: string; image: string; link: string }
+interface LocalizedText { ar: string; en: string; ckb: string }
+interface Banner {
+  id: string;
+  image: string;
+  link: string;
+  // Hero copy, one string per language. NEVER machine-translated: the owner
+  // writes each one, and the storefront falls back to whichever language they
+  // actually filled in (worker/lib/homeContent.ts → pickText).
+  title?: LocalizedText;
+  subtitle?: LocalizedText;
+  cta?: LocalizedText;
+}
+
+const EMPTY_TEXT: LocalizedText = { ar: '', en: '', ckb: '' };
+const asText = (t: LocalizedText | undefined): LocalizedText => t ?? EMPTY_TEXT;
+
+/** One field, three languages. Any of them may be left blank. */
+function LocalizedField({
+  label,
+  hint,
+  value,
+  onChange,
+  multiline,
+}: {
+  label: string;
+  hint?: string;
+  value: LocalizedText;
+  onChange: (v: LocalizedText) => void;
+  multiline?: boolean;
+}) {
+  const langs: Array<{ key: keyof LocalizedText; label: string; dir: 'rtl' | 'ltr' }> = [
+    { key: 'ar', label: 'العربية', dir: 'rtl' },
+    { key: 'en', label: 'English', dir: 'ltr' },
+    { key: 'ckb', label: 'کوردی', dir: 'rtl' },
+  ];
+  const cls =
+    'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none min-h-[44px]';
+  return (
+    <div>
+      <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{label}</label>
+      {hint && <p className="text-[11px] text-zinc-500 mb-2">{hint}</p>}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        {langs.map((l) => (
+          <div key={l.key} className="min-w-0">
+            <span className="block text-[10px] text-zinc-600 mb-1">{l.label}</span>
+            {multiline ? (
+              <textarea
+                dir={l.dir}
+                rows={2}
+                value={value[l.key]}
+                onChange={(e) => onChange({ ...value, [l.key]: e.target.value })}
+                className={`${cls} resize-y`}
+              />
+            ) : (
+              <input
+                type="text"
+                dir={l.dir}
+                value={value[l.key]}
+                onChange={(e) => onChange({ ...value, [l.key]: e.target.value })}
+                className={cls}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 interface SectionItem { id: string; title: string; subtitle: string; image: string; link: string }
 
 // The icon lookup stays client-side by id — icons are never sent to the server.
@@ -410,7 +477,10 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
   const { dir } = useLanguage();
 
   const add = () => {
-    onChange([...banners, { id: 'bn_' + Date.now(), image: '', link: '' }]);
+    onChange([
+      ...banners,
+      { id: 'bn_' + Date.now(), image: '', link: '', title: EMPTY_TEXT, subtitle: EMPTY_TEXT, cta: EMPTY_TEXT },
+    ]);
   };
 
   return (
@@ -459,10 +529,44 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
                     const nb = banners.map((x, xi) => xi === i ? { ...x, link: e.target.value } : x);
                     onChange(nb);
                   }}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none"
-                  placeholder="/category/fashion"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none min-h-[44px]"
+                  placeholder="/products?category=cat_printers"
                 />
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  {dir === 'rtl'
+                    ? 'مسار داخلي يبدأ بـ / أو رابط http(s). أي شيء آخر يُهمَل.'
+                    : 'An internal path starting with / or an http(s) URL. Anything else is dropped.'}
+                </p>
               </div>
+
+              {/* The hero copy. All three languages optional — leave them all
+                  empty for a picture-only banner, exactly as before. */}
+              <LocalizedField
+                label={dir === 'rtl' ? 'العنوان' : 'Headline'}
+                hint={
+                  dir === 'rtl'
+                    ? 'يظهر فوق الصورة. اتركه فارغًا لعرض الصورة وحدها. لا تُترجم آليًا — اكتب ما تريده بكل لغة.'
+                    : 'Shown over the image. Leave empty for a picture-only banner. Nothing is auto-translated — write each language yourself.'
+                }
+                value={asText(b.title)}
+                onChange={(v) => onChange(banners.map((x, xi) => (xi === i ? { ...x, title: v } : x)))}
+              />
+              <LocalizedField
+                label={dir === 'rtl' ? 'الوصف' : 'Sub-line'}
+                value={asText(b.subtitle)}
+                onChange={(v) => onChange(banners.map((x, xi) => (xi === i ? { ...x, subtitle: v } : x)))}
+                multiline
+              />
+              <LocalizedField
+                label={dir === 'rtl' ? 'نص الزر' : 'Button label'}
+                hint={
+                  dir === 'rtl'
+                    ? 'اتركه فارغًا ليصبح البانر كله قابلًا للنقر بدل زر منفصل.'
+                    : 'Leave empty to make the whole banner clickable instead of showing a button.'
+                }
+                value={asText(b.cta)}
+                onChange={(v) => onChange(banners.map((x, xi) => (xi === i ? { ...x, cta: v } : x)))}
+              />
             </div>
             <button
               onClick={() => {

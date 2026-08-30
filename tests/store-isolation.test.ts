@@ -162,21 +162,37 @@ test('the Studio entry is a plain anchor to the configurable STUDIO_URL constant
   assert.equal(STUDIO_URL, 'https://studio.levonis-iq.com');
   assert.ok(STUDIO_URL.startsWith('https://'));
 
-  const home = readFileSync(join(ROOT, 'src', 'pages', 'Home.tsx'), 'utf8');
-  const community = readFileSync(join(ROOT, 'src', 'pages', 'Community.tsx'), 'utf8');
-  for (const [name, source] of [
-    ['src/pages/Home.tsx', home],
-    ['src/pages/Community.tsx', community],
-  ] as const) {
-    // Both entries navigate via a plain <a href={STUDIO_URL}> — full page
+  // Every file that offers a Studio entry. The home page used to hold one
+  // inline; the hero and the services grid own it now, so the guard follows
+  // the link rather than being relaxed to let it slip out of view.
+  const entries = [
+    ['src/pages/Community.tsx', join(ROOT, 'src', 'pages', 'Community.tsx'), '..'],
+    ['src/components/home/Hero.tsx', join(ROOT, 'src', 'components', 'home', 'Hero.tsx'), '../..'],
+    ['src/components/home/ServicesGrid.tsx', join(ROOT, 'src', 'components', 'home', 'ServicesGrid.tsx'), '../..'],
+  ] as const;
+
+  for (const [name, path, importPrefix] of entries) {
+    const source = readFileSync(path, 'utf8');
+    // Every entry navigates via a plain <a href={STUDIO_URL}> — full page
     // navigation, target choice left to the user (no forced new tab).
     assert.match(source, /<a\b[^>]*\bhref=\{STUDIO_URL\}/, `${name}: must render <a href={STUDIO_URL}>`);
     assert.match(
       source,
-      /import\s*\{[^}]*\bSTUDIO_URL\b[^}]*\}\s*from\s*['"]\.\.\/translations['"]/,
+      new RegExp(
+        `import\\s*\\{[^}]*\\bSTUDIO_URL\\b[^}]*\\}\\s*from\\s*['"]${importPrefix.replace(/\./g, '\\.')}/translations['"]`
+      ),
       `${name}: must import STUDIO_URL from the shared constant`
     );
   }
+
+  // And the home page must still REACH one of them, or the entry silently
+  // disappears from the storefront while every assertion above still passes.
+  const home = readFileSync(join(ROOT, 'src', 'pages', 'Home.tsx'), 'utf8');
+  assert.match(
+    home,
+    /from '\.\.\/components\/home\/(Hero|ServicesGrid)'/,
+    'src/pages/Home.tsx: must render a component that carries the Studio entry'
+  );
 
   // Within the SPA the raw URL literal lives ONLY in src/translations.ts —
   // every other src/ file must go through the constant so the target stays

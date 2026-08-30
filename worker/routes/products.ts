@@ -16,6 +16,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { notFound, int, str } from '../lib/http';
 import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
+import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
 import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY } from '../lib/pricing';
@@ -680,7 +681,7 @@ productRoutes.post('/:slug/quote', async (c) => {
 export const homeRoutes = new Hono<AppContext>();
 
 homeRoutes.get('/', async (c) => {
-  const [settings, discounted, latest, ctx] = await Promise.all([
+  const [settings, discounted, latest, categories, brands, ctx] = await Promise.all([
     getSettings(c.env.DB, PUBLIC_SETTING_KEYS),
     c.env.DB.prepare(
       "SELECT * FROM products WHERE status = 'active' AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd ORDER BY created_at DESC LIMIT 10"
@@ -688,12 +689,48 @@ homeRoutes.get('/', async (c) => {
     c.env.DB.prepare("SELECT * FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 20").all<
       Record<string, unknown>
     >(),
+    // The REAL taxonomy, so the categories strip works without the owner
+    // retyping their own catalog into the home settings. Only catalogs that
+    // actually have something to show are returned — an empty category on the
+    // home page is a dead end for the customer.
+    c.env.DB.prepare(
+      `SELECT c.id, c.slug, c.name_ar, c.name_en, c.name_ckb,
+              (SELECT COUNT(*) FROM product_catalogs pc
+                 JOIN products p ON p.id = pc.product_id
+                WHERE pc.catalog_id = c.id AND p.status = 'active') AS product_count
+         FROM catalogs c
+        WHERE c.active = 1 AND c.parent_id IS NULL
+        ORDER BY c.sort, c.name_en
+        LIMIT 12`
+    ).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,
+              (SELECT COUNT(*) FROM products p
+                WHERE p.brand_id = b.id AND p.status = 'active') AS product_count
+         FROM brands b
+        WHERE b.active = 1
+        ORDER BY product_count DESC, b.name_en
+        LIMIT 12`
+    ).all<Record<string, unknown>>(),
     pricingCtx(c),
   ]);
+
+  // Normalize on the way OUT as well as on the way in: rows written before
+  // lib/homeContent.ts existed never went through the validator, and the
+  // storefront puts these straight into an <img src> and an <a href>.
+  const raw = settings as Record<string, unknown>;
+  const safeSettings = {
+    ...raw,
+    homeBanners: normalizeHomeBanners(raw.homeBanners),
+    homeSectionItems: normalizeSectionItems(raw.homeSectionItems),
+  };
+
   return c.json({
     success: true,
-    settings,
+    settings: safeSettings,
     discounted: discounted.results.map((p) => publicWithDisplayPrice(p, ctx)),
     latest: latest.results.map((p) => publicWithDisplayPrice(p, ctx)),
+    categories: categories.results.filter((r) => Number(r.product_count) > 0),
+    brands: brands.results.filter((r) => Number(r.product_count) > 0),
   });
 });

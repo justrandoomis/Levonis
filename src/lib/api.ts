@@ -239,9 +239,53 @@ export interface PublicSettings {
   checkoutPaymentMethods: CheckoutPaymentMethod[];
   cartShippingMethods: CartShippingMethod[];
   homeSections: Array<{ id: string; titleEn: string; titleAr: string; isVisible: boolean }>;
-  homeBanners: Record<string, Array<{ id: string; image: string; link: string }>>;
-  homeSectionItems: Record<string, Array<{ id: string; title: string; subtitle: string; image: string; link: string }>>;
+  homeBanners: Record<string, HomeBanner[]>;
+  homeSectionItems: Record<string, HomeSectionItem[]>;
   homeAds: Array<{ id: string; text: string; animation: string }>;
+}
+
+/** Owner-authored copy, one string per language. Never machine-translated —
+ *  an empty language falls back to one the owner actually wrote. */
+export interface LocalizedText {
+  ar: string;
+  en: string;
+  ckb: string;
+}
+
+export interface HomeBanner {
+  id: string;
+  image: string;
+  link: string;
+  title: LocalizedText;
+  subtitle: LocalizedText;
+  cta: LocalizedText;
+}
+
+export interface HomeSectionItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  link: string;
+}
+
+/** A top-level catalog or a brand, as the home page shows it. */
+export interface HomeTaxon {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  product_count: number;
+}
+
+/** The string to show for `lang`, falling back to the first language the
+ *  owner filled in. Mirrors pickText in worker/lib/homeContent.ts. */
+export function pickText(t: LocalizedText | undefined, lang: string): string {
+  if (!t) return '';
+  const order =
+    lang === 'en' ? [t.en, t.ar, t.ckb] : lang === 'ckb' ? [t.ckb, t.ar, t.en] : [t.ar, t.en, t.ckb];
+  return order.find((v) => !!v) ?? '';
 }
 
 // ---------------------------------------------------------------- helpers
