@@ -230,6 +230,35 @@ jobs:
           curl -s --max-time 25 "https://$HOST/api/memberships/plans" \
             | jq -c '[.plans[] | {id, tier, months: .duration_months, price: .price_iqd}]'
 
+      # The §5 write-time rules refuse a save where the selling price equals
+      # the cost, or where the PRO/PRIME/Regular ladder is inverted. Existing
+      # rows are NOT re-validated — nothing breaks on deploy — but a product
+      # already in that state becomes un-editable until its price is fixed, so
+      # the owner should know which ones BEFORE the code ships. SELECT only.
+      - name: Which live products the new price rules would refuse to save
+        if: steps.dbs.outputs.staging == 'yes'
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+
+          echo "── products whose selling price EQUALS their cost"
+          q "SELECT id, sku, name, price_iqd, product_cost_iqd
+               FROM products
+              WHERE product_cost_iqd IS NOT NULL
+                AND price_iqd = product_cost_iqd" \
+            | jq -c '.[0].results'
+
+          echo "── products whose price ladder is inverted (PRO > PRIME, or either above regular)"
+          q "SELECT id, sku, name, price_iqd, prime_price_iqd, pro_price_iqd
+               FROM products
+              WHERE (prime_price_iqd IS NOT NULL AND prime_price_iqd > price_iqd)
+                 OR (pro_price_iqd   IS NOT NULL AND pro_price_iqd   > price_iqd)
+                 OR (pro_price_iqd IS NOT NULL AND prime_price_iqd IS NOT NULL
+                     AND pro_price_iqd > prime_price_iqd)" \
+            | jq -c '.[0].results'
+
+          echo "(empty results above = every live product still saves cleanly)"
+
       # Does the DEPLOYED css actually carry the palette? The owner reported
       # the colour unchanged twice, both times because nothing had shipped.
       - name: The olive the live sites actually serve
