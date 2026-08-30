@@ -51,6 +51,8 @@
 | 39 | **الخطط سنوية فقط (قرار المالك)**: الهجرة 0025 عطّلت `plus_1mo` و`plus_3mo` و`plus_6mo`، فبقيت ثلاث خطط فعّالة كلها ١٢ شهرًا: `plus_12mo` و`prime_12mo` (٩٩,٠٠٠) و`pro_12mo` (٤٩٩,٠٠٠). التعطيل لا الحذف: `memberships.plan_id` يشير إلى هذه الصفوف لكل من اشترى سابقًا، ومسار الشراء يرفض أي خطة غير فعّالة، فتختفي من الواجهة ويبقى كل اشتراك قائم صالحًا حتى انتهائه. **تنبيه مهم للمالك**: `plus_12mo` سعره ما يزال `NULL` منذ البذرة الأصلية (الهجرة 0002 بذرت خطط PLUS الأربع كلها بلا سعر) — أي أن PLUS **لم تكن قابلة للشراء أصلًا** ولم يتغير ذلك، وتظهر الآن بعبارة «السعر لاحقًا / قريبًا». لبيعها: حدّد سعرها من إدارة العضويات | 🟡 (مطبّق — PLUS بحاجة سعر) | migrations/0025 + إدارة العضويات |
 | 40 | **`/community` كان يعيد التوجيه دائمًا إلى `/edit-profile`**: البوابة `RequireCommunityProfile` كانت تشترط `username` غير فارغ، وحساب أُنشئ عبر Google أو تيليغرام لا يملك `username` — فالتبويب كان غير قابل للوصول لهؤلاء تحديدًا. والأسوأ أن فشل طلب `profile-status` كان يُعامَل كـ«ملف ناقص»، فتتحول عثرة شبكة إلى الطريق المسدود نفسه. الصفحة لا تستخدم `username` إلا بذرةً لصورة رمزية مع بديل، وكتابتها الوحيدة (`POST /api/community/requests`) محميّة على الخادم بـ`requireAuth` وحده. الآن المسار `ProtectedRoute` عادي والمكوّن محذوف | ✅ | src/App.tsx |
 
+| 41 | **بطاقة القبول §12 اكتملت — وكشفت ثلاث عيوب حقيقية**: docs/ACCEPTANCE.md يربط كل بند من §12 بملف قابل للتشغيل ورقم فعلي (0 أخطاء، 504 اختبار وحدة، 369 فحص متصفح/API). ثلاثة بنود لم يكن لها أي دليل، وكل واحد منها كان يخفي عيبًا: (أ) **مساعد الأدمن لم يكن يستطيع حفظ أي منتج له تكلفة** — لأن الـ GET يحذف حقول التكلفة، فيرجع النموذج بلا مفتاح `cost_iqd`، وكان المدقّق يقرأ الغياب على أنه «محاولة جعلها NULL» ويرفض الحفظ كليًا؛ الآن يُميَّز الغياب عن الإرسال الصريح. (ب) **لا شيء كان يفرض قاعدتي §5 عند الحفظ**: «يجب أن يختلف سعر البيع عن التكلفة، امنع الحفظ» و«PRO <= PRIME <= Regular» — الـ resolver كان يقصّ السلّم عند القراءة فقط، وتعليقه ادّعى وجود رفض عند الكتابة لم يكن موجودًا؛ الآن يرفض `validateProductDoc` الحالتين على مستوى المنتج والخيار واللون برسالة تسمّي الحقل. (ج) **ستة عناصر في لوحة الصور كانت 36px** بينما §1 يطلب 44–48px — نجت لأن فحص الاستجابة يبني منتجه بـ`images: []` واللوحة لا تُرسم بلا صورة. كما كان مدقّق الهجرات يطبع سطرًا أخضر على مجموعة فارغة للهجرة 0025 | ✅ | docs/ACCEPTANCE.md + scripts/e2e-permissions.mjs + scripts/e2e-images.mjs |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).
@@ -58,4 +60,6 @@ Rows 3/4/5/8/9/10/12/13/14/16/18/19/21/22/24/26 block their specific
 features only — everything else proceeds. Rows 31–35 are decisions already
 implemented with their assumptions stated, not blockers. Row 36 is a fixed
 incident with its restore point recorded; row 37 is an open, non-visible
-follow-up, reported as open rather than as success.
+follow-up, reported as open rather than as success. Row 41 records the §12
+acceptance matrix and the three defects writing it uncovered — see
+docs/ACCEPTANCE.md for the row-by-row table and the numbers.
