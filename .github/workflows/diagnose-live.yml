@@ -230,6 +230,27 @@ jobs:
           curl -s --max-time 25 "https://$HOST/api/memberships/plans" \
             | jq -c '[.plans[] | {id, tier, months: .duration_months, price: .price_iqd}]'
 
+      # The home page grew a hero, a categories strip and a top-brands strip.
+      # The strips are fed by the REAL catalogs and brands tables, so whether
+      # they actually appear depends on live data, not on the code — and an
+      # empty strip renders as nothing at all. This says which of them the
+      # live site can currently fill.
+      - name: What the live home page has to work with
+        continue-on-error: true
+        run: |
+          curl -s --max-time 25 "https://$HOST/api/home" -o /tmp/home.json
+          echo "── banners the owner has configured"
+          jq -c '[.settings.homeBanners // {} | to_entries[] | {slot: .key, count: (.value | length)}]' /tmp/home.json
+          echo "   (empty = the default brand hero is what visitors see)"
+          echo "── categories with at least one active product"
+          jq -c '[.categories // [] | .[] | {name: .name_en, n: .product_count}]' /tmp/home.json
+          echo "── brands with at least one active product"
+          jq -c '[.brands // [] | .[] | {name: .name_en, n: .product_count}]' /tmp/home.json
+          echo "── owner-authored section cards"
+          jq -c '[.settings.homeSectionItems // {} | to_entries[] | {slot: .key, count: (.value | length)}]' /tmp/home.json
+          echo "── the section layout the storefront now honours"
+          jq -c '[.settings.homeSections // [] | .[] | {id, visible: .isVisible}]' /tmp/home.json
+
       # The §5 write-time rules refuse a save where the selling price equals
       # the cost, or where the PRO/PRIME/Regular ladder is inverted. Existing
       # rows are NOT re-validated — nothing breaks on deploy — but a product
