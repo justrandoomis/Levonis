@@ -816,10 +816,22 @@ export default function ProductForm({
               </span>
             )}
           </span>
-          <button type="button" className={`${btnGhost} h-10`} disabled={saving} onClick={() => void save('draft')}>
+          <button
+            type="button"
+            data-action="save-draft"
+            className={`${btnGhost} h-10`}
+            disabled={saving}
+            onClick={() => void save('draft')}
+          >
             مسودة
           </button>
-          <button type="button" className={`${btnPrimary} h-10`} disabled={saving} onClick={() => void save('active')}>
+          <button
+            type="button"
+            data-action="save"
+            className={`${btnPrimary} h-10`}
+            disabled={saving}
+            onClick={() => void save('active')}
+          >
             {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} نشر
           </button>
         </div>

@@ -299,12 +299,18 @@ export function SectionCard({
 }) {
   return (
     <section
+      // §1 numbers the sections 1..8 and the order is part of the spec, so the
+      // ordinal is the stable handle for a test that needs one section in
+      // particular. The accordion opens one heavy section at a time, so
+      // "click every header" cannot reach a specific panel.
+      data-section={n}
       className={`min-w-0 rounded-xl border overflow-hidden mb-2.5 ${
         error ? 'border-red-500/50 bg-red-500/[0.03]' : 'border-zinc-800 bg-zinc-900/40'
       }`}
     >
       <button
         type="button"
+        data-section-toggle={n}
         aria-expanded={open}
         onClick={onToggle}
         className="w-full min-w-0 flex items-center gap-2.5 px-3 h-12 text-start hover:bg-zinc-800/30 transition-colors"

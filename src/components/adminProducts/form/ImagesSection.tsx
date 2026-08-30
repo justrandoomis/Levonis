@@ -268,7 +268,13 @@ export function ImagesSection({
       {rel.images.length === 0 ? (
         <p className="text-[12px] text-zinc-500">لا صور بعد.</p>
       ) : (
-        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] min-w-0">
+        <div
+          // 196px is not arbitrary: §1 sets controls at 44-48px, and the row
+          // below holds four of them plus gaps and the card padding. A
+          // narrower card would either clip a touch target or force one under
+          // 44px, which is exactly what this panel used to do.
+          className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(196px,1fr))] min-w-0"
+        >
           {rel.images.map((img, idx) => (
             <div
               key={img.id}
@@ -305,7 +311,7 @@ export function ImagesSection({
                   <button
                     type="button"
                     onClick={() => setPrimary(img.id)}
-                    className={`${iconBtn} w-9 h-9`}
+                    className={`${iconBtn} w-11 h-11`}
                     aria-label="اجعلها رئيسية"
                     title="اجعلها رئيسية"
                   >
@@ -314,7 +320,7 @@ export function ImagesSection({
                   <button
                     type="button"
                     onClick={() => move(idx, idx - 1)}
-                    className={`${iconBtn} w-9 h-9`}
+                    className={`${iconBtn} w-11 h-11`}
                     aria-label="للأعلى"
                   >
                     <ArrowUp className="w-4 h-4" />
@@ -322,7 +328,7 @@ export function ImagesSection({
                   <button
                     type="button"
                     onClick={() => move(idx, idx + 1)}
-                    className={`${iconBtn} w-9 h-9`}
+                    className={`${iconBtn} w-11 h-11`}
                     aria-label="للأسفل"
                   >
                     <ArrowDown className="w-4 h-4" />
@@ -332,7 +338,7 @@ export function ImagesSection({
                     onClick={() => {
                       if (window.confirm('حذف هذه الصورة؟')) remove(img.id);
                     }}
-                    className={`${iconBtn} w-9 h-9 hover:text-red-400`}
+                    className={`${iconBtn} w-11 h-11 hover:text-red-400`}
                     aria-label="حذف"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -342,12 +348,12 @@ export function ImagesSection({
                   value={img.alt_en}
                   onChange={(e) => patch(img.id, { alt_en: e.target.value })}
                   placeholder="Alt text (English)"
-                  className="h-9 text-[12px]"
+                  className="h-11 text-[13px]"
                   aria-label="Alt text"
                 />
                 {linkTargets.length > 0 && (
                   <Select
-                    className="h-9 text-[12px]"
+                    className="h-11 text-[13px]"
                     aria-label="ربط الصورة"
                     value={
                       img.option_value_id ? `o:${img.option_value_id}` : img.color_id ? `c:${img.color_id}` : ''
