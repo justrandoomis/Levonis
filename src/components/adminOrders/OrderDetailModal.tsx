@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronDown, MessageSquare, ClipboardList, Package } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, formatIqd, type AdminOrderDetail } from '../../lib/api';
@@ -61,7 +62,18 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const govLabel = govId ? GOVERNORATE_LABELS[govId]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? govId : '';
   const fin = detail?.financial;
 
-  return (
+  // RENDERED INTO document.body, NOT WHERE IT SITS IN THE TREE.
+  //
+  // The admin page lives inside a scrolling pane, and `position: fixed` stops
+  // meaning "the viewport" the moment any ancestor establishes a containing
+  // block (a transform, a filter, a backdrop-filter, `contain`). It did: the
+  // modal was laid out relative to that pane instead, so it opened far below
+  // the fold and the owner had to scroll to find it. A portal takes the modal
+  // out of that subtree entirely, which also escapes the pane's
+  // `overflow: hidden`. This is the fix rather than hunting the one offending
+  // ancestor, because the next ancestor to grow a transform would break it
+  // again.
+  const overlay = (
     <div
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
       role="dialog"
@@ -346,6 +358,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }
 
 function Row({

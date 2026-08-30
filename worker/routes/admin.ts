@@ -368,29 +368,56 @@ adminRoutes.post('/wallet/credit', async (c) => {
 
 adminRoutes.get('/orders', async (c) => {
   const status = str(c.req.query('status'), 'status', { max: 20, required: false });
-  let sql = `SELECT o.*, u.email, u.username FROM orders o LEFT JOIN users u ON u.id = o.user_id`;
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 30 });
+  const offset = int(c.req.query('offset'), 'offset', { min: 0, max: 100_000, def: 0 });
+
+  // TWO QUERIES, NOT 201. This used to fetch 200 orders and then run a
+  // separate `SELECT * FROM order_items WHERE order_id = ?` for EACH one —
+  // 201 round trips to D1 for one screen, which is why the orders tab took
+  // seconds to appear. The items now come back in a single IN query over the
+  // page's ids, and the page is 30 rows rather than 200.
+  let where = '';
   const params: unknown[] = [];
   if (status) {
-    sql += ' WHERE o.status = ?';
+    where = ' WHERE o.status = ?';
     params.push(status);
   }
-  sql += ' ORDER BY o.created_at DESC LIMIT 200';
-  const { results } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
-  const out = [];
-  for (const o of results) {
-    const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(o.id).all();
-    out.push({
-      ...orderPublic(o, items),
-      email: o.email,
-      username: o.username,
-      user_id: o.user_id,
-      priority: Number(o.priority) || 0,
-      delivery_waived: Number(o.delivery_waived) || 0,
-      membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
-      delivered_at: o.delivered_at ?? null,
-    });
+
+  const [{ results }, countRow] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT o.*, u.email, u.username FROM orders o
+         LEFT JOIN users u ON u.id = o.user_id${where}
+        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
+    )
+      .bind(...params, limit, offset)
+      .all<Record<string, unknown>>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM orders o${where}`)
+      .bind(...params)
+      .first<{ n: number }>(),
+  ]);
+
+  const ids = results.map((o) => String(o.id));
+  const byOrder = new Map<string, Record<string, unknown>[]>(ids.map((id) => [id, []]));
+  if (ids.length > 0) {
+    const { results: items } = await c.env.DB.prepare(
+      `SELECT * FROM order_items WHERE order_id IN (${ids.map(() => '?').join(',')}) ORDER BY rowid`
+    )
+      .bind(...ids)
+      .all<Record<string, unknown>>();
+    for (const it of items) byOrder.get(String(it.order_id))?.push(it);
   }
-  return c.json({ success: true, orders: out });
+
+  const out = results.map((o) => ({
+    ...orderPublic(o, byOrder.get(String(o.id)) ?? []),
+    email: o.email,
+    username: o.username,
+    user_id: o.user_id,
+    priority: Number(o.priority) || 0,
+    delivery_waived: Number(o.delivery_waived) || 0,
+    membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
+    delivered_at: o.delivered_at ?? null,
+  }));
+  return c.json({ success: true, orders: out, total: countRow?.n ?? out.length, limit, offset });
 });
 
 /**
@@ -417,22 +444,54 @@ adminRoutes.get('/orders/:id', async (c) => {
     .first<Record<string, unknown>>();
   if (!o) throw notFound('Order not found');
 
-  const [{ results: items }, snaps, { results: units }, invoice, chat] = await Promise.all([
+  // ENRICHMENTS DEGRADE, THEY DO NOT FAIL THE SCREEN. The units, the invoice
+  // and the order's chat thread all live in tables added by later migrations
+  // (0003, 0026). Code always reaches a deployment a moment before its
+  // migration does, and on 2026-08-30 that window turned the whole fulfilment
+  // modal into "خطأ في الخادم" because one lookup for `chats.order_id` threw.
+  // The order, its address and its money are the screen; everything else is
+  // extra, and extra that is missing is worth an empty list, not a 500.
+  const soft = async <T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await run();
+    } catch (e) {
+      console.error(`order detail enrichment unavailable (${label}): ${e instanceof Error ? e.message : String(e)}`);
+      return fallback;
+    }
+  };
+
+  const [{ results: items }, snaps, units, invoice, chat] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid').bind(id).all<Record<string, unknown>>(),
-    getOrderPointsSnapshots(c.env, [id]),
+    soft('points', () => getOrderPointsSnapshots(c.env, [id]), new Map()),
     // Serialized units matter on the fulfilment screen: a printer that needs a
     // serial written on the warranty slip is a different packing job from a
     // spool of filament.
-    c.env.DB.prepare(
-      `SELECT iu.*, ds.serial_raw
-         FROM order_item_units iu
-         LEFT JOIN device_serials ds ON ds.unit_id = iu.id
-        WHERE iu.order_id = ? ORDER BY iu.order_item_id, iu.unit_index`
-    ).bind(id).all<Record<string, unknown>>(),
-    c.env.DB.prepare(
-      'SELECT id, invoice_no, revision, payment_status FROM invoices WHERE order_id = ? ORDER BY revision DESC LIMIT 1'
-    ).bind(id).first<Record<string, unknown>>(),
-    c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?').bind(id).first<{ id: string }>(),
+    soft(
+      'units',
+      async () =>
+        (
+          await c.env.DB.prepare(
+            `SELECT iu.*, ds.serial_raw
+               FROM order_item_units iu
+               LEFT JOIN device_serials ds ON ds.unit_id = iu.id
+              WHERE iu.order_id = ? ORDER BY iu.order_item_id, iu.unit_index`
+          ).bind(id).all<Record<string, unknown>>()
+        ).results,
+      [] as Record<string, unknown>[]
+    ),
+    soft(
+      'invoice',
+      () =>
+        c.env.DB.prepare(
+          'SELECT id, invoice_no, revision, payment_status FROM invoices WHERE order_id = ? ORDER BY revision DESC LIMIT 1'
+        ).bind(id).first<Record<string, unknown>>(),
+      null as Record<string, unknown> | null
+    ),
+    soft(
+      'chat',
+      () => c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?').bind(id).first<{ id: string }>(),
+      null as { id: string } | null
+    ),
   ]);
 
   // The address as STORED ON THE ORDER, not the customer's current address —
@@ -473,20 +532,49 @@ adminRoutes.get('/orders/:id', async (c) => {
   });
 });
 
+/**
+ * Where an order may go from where it is.
+ *
+ * THIS USED TO BE A ONE-WAY RATCHET: pending offered two options, shipped
+ * offered one, and delivered and cancelled offered none. A human running a
+ * real shop mis-taps — an order marked shipped that has not shipped, or
+ * cancelled by mistake — and had no way back at all. Two choices on a screen
+ * whose whole job is moving orders is not a state machine, it is a trap.
+ *
+ * So corrections are allowed among the pre-delivery states in BOTH directions,
+ * and forward steps may skip (an order confirmed and shipped the same hour
+ * does not need a click on `processing` to be honest). What is NOT allowed:
+ *
+ *   * delivered -> anything but `shipped`. Delivery grants points, starts
+ *     warranty clocks and creates device units. Backing out to `shipped` is
+ *     offered as the one correction path for a mis-tap, and the route says
+ *     plainly what that does NOT undo.
+ *   * a no-op transition to the state the order is already in.
+ *
+ * Every side effect behind these is idempotent through the inventory and
+ * points ledgers, so a correction that goes forward again moves nothing twice.
+ */
 const ORDER_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
-  delivered: [],
-  cancelled: [],
+  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+  confirmed: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+  processing: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'],
+  shipped: ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'],
+  // Reversible only one step, and only to correct a mis-tap.
+  delivered: ['shipped'],
+  // A cancelled order can be re-opened; re-confirming re-deducts the stock.
+  cancelled: ['pending', 'confirmed', 'processing'],
 };
+
+/** The states in which the stock has been taken out of inventory. */
+const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
 
 adminRoutes.patch('/orders/:id', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const next = oneOf(body.status, 'status', ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const);
+  const next = oneOf(body.status, 'status', [
+    'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled',
+  ] as const);
   const adminNote = str(body.adminNote, 'adminNote', { max: 500, required: false });
 
   const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
@@ -515,8 +603,17 @@ adminRoutes.patch('/orders/:id', async (c) => {
   // order was never confirmed, a restore when it was. Both are idempotent
   // through the inventory ledger, so a double-clicked transition (or a replay
   // after the status flip already landed) moves nothing twice.
+  //
+  // The trigger is CROSSING THE BOUNDARY, not landing on one particular
+  // status. Now that an order may go pending -> shipped directly, or come back
+  // from cancelled to processing, keying the deduction off `next ===
+  // 'confirmed'` would have silently skipped it. Both operations are
+  // idempotent through the inventory ledger, so a correction that re-crosses
+  // the boundary moves nothing twice.
   let stockNote: string | null = null;
-  if (next === 'confirmed') {
+  const wasDeducted = STOCK_DEDUCTED_STATES.has(from);
+  const nowDeducted = STOCK_DEDUCTED_STATES.has(next);
+  if (!wasDeducted && nowDeducted) {
     const res = await deductOrderStock(c.env.DB, id, adminUser.id);
     if (res.rejected > 0) {
       // The status already flipped. Saying so is the honest outcome: the order
@@ -526,6 +623,14 @@ adminRoutes.patch('/orders/:id', async (c) => {
   } else if (next === 'cancelled') {
     const res = await returnOrderStock(c.env.DB, id, adminUser.id);
     if (res.kind !== 'none') stockNote = `Stock ${res.kind}d for ${res.applied} row(s).`;
+  }
+
+  // Reversing a delivery does not un-grant what delivery granted. Say so
+  // rather than letting the admin assume it did.
+  let reversalNote: string | null = null;
+  if (from === 'delivered' && next !== 'delivered') {
+    reversalNote =
+      'Moved back from delivered. Points already awarded, device records and warranty start dates are NOT reversed — they stay as they were granted.';
   }
 
   let deviceUnits: CreateUnitsResult | null = null;
@@ -613,10 +718,16 @@ adminRoutes.patch('/orders/:id', async (c) => {
       });
     }
   }
-  await audit(c.env.DB, adminUser.id, 'order.status', id, { from, to: next, stock: stockNote });
+  await audit(c.env.DB, adminUser.id, 'order.status', id, {
+    from,
+    to: next,
+    stock: stockNote,
+    reversal: reversalNote,
+  });
   return c.json({
     success: true,
     ...(stockNote ? { stock_note: stockNote } : {}),
+    ...(reversalNote ? { reversal_note: reversalNote } : {}),
     ...(deviceUnits ? { device_units: deviceUnits } : {}),
     ...(deviceUnitsWarning ? { device_units_warning: deviceUnitsWarning } : {}),
   });

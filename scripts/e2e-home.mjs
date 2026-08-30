@@ -176,6 +176,23 @@ async function main() {
     (home.data?.categories ?? []).every((c) => Number(c.product_count) > 0),
     JSON.stringify((home.data?.categories ?? []).map((c) => c.product_count))
   );
+  // ONE CHIP PER NAME. The live database holds seven top-level catalogs all
+  // called "Printers" and seven brands all called "Bambu Lab", left by
+  // repeated seeding — the ungrouped query rendered seven identical chips in a
+  // row on the real home page.
+  const catNames = (home.data?.categories ?? []).map((c) => c.name_en || c.name_ar);
+  const brandNames = (home.data?.brands ?? []).map((b) => b.name_en || b.name_ar);
+  check(
+    'no two category chips carry the same name',
+    new Set(catNames).size === catNames.length,
+    JSON.stringify(catNames)
+  );
+  check(
+    'no two brand chips carry the same name',
+    new Set(brandNames).size === brandNames.length,
+    JSON.stringify(brandNames)
+  );
+
   const liveCategories = (home.data?.categories ?? []).length;
   const liveBrands = (home.data?.brands ?? []).length;
   console.log(`     (${liveCategories} categories, ${liveBrands} brands with stock)`);

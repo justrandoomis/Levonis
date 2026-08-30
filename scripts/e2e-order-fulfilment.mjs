@@ -222,6 +222,51 @@ async function main() {
   const missing = await admin.get('/api/admin/orders/ORD-DOES-NOT-EXIST');
   check('an unknown order is a 404, not an empty screen', missing.status === 404, `status=${missing.status}`);
 
+  // ---- the list: a PAGE, and one query for its items
+  const list = await admin.get('/api/admin/orders?limit=5');
+  check('the list returns a page, not everything', (list.data?.orders ?? []).length <= 5, `n=${(list.data?.orders ?? []).length}`);
+  check('the list reports the total so the UI can page', typeof list.data?.total === 'number', JSON.stringify(list.data?.total));
+  check(
+    'items still come back with each order',
+    (list.data?.orders ?? []).every((o) => Array.isArray(o.items)),
+    'an order had no items array'
+  );
+  const filteredList = await admin.get('/api/admin/orders?status=pending&limit=50');
+  check(
+    'the status filter is applied by the SERVER, across the whole table',
+    (filteredList.data?.orders ?? []).every((o) => o.status === 'pending'),
+    JSON.stringify((filteredList.data?.orders ?? []).map((o) => o.status).slice(0, 8))
+  );
+
+  // ---- corrections in both directions
+  console.log('\n1b. an order can be corrected, not just advanced');
+  const move = async (to) => admin.call('PATCH', `/api/admin/orders/${orderId}`, { status: to });
+  let r2 = await move('confirmed');
+  check('pending -> confirmed', r2.status === 200, JSON.stringify(r2.data).slice(0, 160));
+  r2 = await move('shipped');
+  check('confirmed -> shipped skips a step, as a real shop does', r2.status === 200, JSON.stringify(r2.data).slice(0, 160));
+  r2 = await move('processing');
+  check('shipped -> processing BACKWARDS, to undo a mis-tap', r2.status === 200, JSON.stringify(r2.data).slice(0, 160));
+  r2 = await move('delivered');
+  check('processing -> delivered', r2.status === 200, JSON.stringify(r2.data).slice(0, 200));
+  r2 = await move('shipped');
+  check('delivered -> shipped is allowed as the one correction path', r2.status === 200, JSON.stringify(r2.data).slice(0, 160));
+  check(
+    'and it SAYS what a reversal does not undo',
+    /not reversed|NOT reversed/i.test(JSON.stringify(r2.data ?? '')),
+    JSON.stringify(r2.data).slice(0, 200)
+  );
+  r2 = await move('shipped');
+  check('a no-op move to the same status is refused', r2.status >= 400, `status=${r2.status}`);
+  r2 = await admin.call('PATCH', `/api/admin/orders/${orderId}`, { status: 'nonsense' });
+  check('an unknown status is refused', r2.status >= 400, `status=${r2.status}`);
+
+  // Leave the fixture mid-flight. `delivered` deliberately offers only the
+  // single correction path, so parking it there would make the "more than two
+  // moves" check below assert the opposite of what it means to.
+  r2 = await move('processing');
+  check('the fixture is left mid-flight for the UI checks', r2.status === 200, JSON.stringify(r2.data).slice(0, 140));
+
   // ------------------------------------------------------------ the modal
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
@@ -254,7 +299,48 @@ async function main() {
     await page.locator('[data-tab="orders"]:visible').first().click({ timeout: 15000 });
     await page.waitForTimeout(1200);
 
-    const openBtn = page.locator(`[data-action="prepare"][data-order-id="${orderId}"]`);
+    // ---- the list itself, before anything is opened
+    const layout = await page.evaluate(() => {
+      const strip = document.querySelector('[data-order-filters]');
+      const buttons = strip ? [...strip.querySelectorAll('[data-order-filter]')] : [];
+      const last = buttons[buttons.length - 1];
+      return {
+        filters: buttons.length,
+        // A strip whose content is wider than its box must be SCROLLABLE. It
+        // used to sit in a flex row with no min-w-0, so on a phone the row
+        // refused to shrink and the last filters were simply unreachable.
+        stripScrollable: strip ? strip.scrollWidth > strip.clientWidth + 1 : false,
+        stripOverflows: strip ? getComputedStyle(strip).overflowX : null,
+        lastFilterReachable: !!last && last.getBoundingClientRect().width > 0,
+        shortestFilter: buttons.length
+          ? Math.round(Math.min(...buttons.map((b) => b.getBoundingClientRect().height)))
+          : 0,
+        cards: document.querySelectorAll('[data-order-card]').length,
+        tables: [...document.querySelectorAll('table')].filter((t) => t.getBoundingClientRect().width > 0).length,
+        docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    check(`${width}px — all seven status filters are rendered`, layout.filters === 7, JSON.stringify(layout.filters));
+    check(`${width}px — every filter is at least 44px tall`, layout.shortestFilter >= 44, `${layout.shortestFilter}px`);
+    check(
+      `${width}px — the filter strip can be scrolled to its last filter`,
+      layout.stripOverflows === 'auto' || layout.stripOverflows === 'scroll' || !layout.stripScrollable,
+      JSON.stringify(layout)
+    );
+    check(`${width}px — the orders list does not scroll the page sideways`, layout.docOverflow <= 1, `${layout.docOverflow}px`);
+    if (width === 390) {
+      // CARDS on a phone. A seven-column table on a 390px screen puts the one
+      // control the owner came for off the right edge of a sideways scroll.
+      check('390px — orders render as cards, not a wide table', layout.cards > 0 && layout.tables === 0, JSON.stringify(layout));
+    } else {
+      check(`${width}px — orders render as a table from the tablet up`, layout.tables === 1, JSON.stringify(layout));
+    }
+
+    if (width === 390 || width === 1024) {
+      await page.screenshot({ path: path.join(OUT, `orders-list-${width}.png`) });
+    }
+
+    const openBtn = page.locator(`[data-action="prepare"][data-order-id="${orderId}"]:visible`);
     check(`${width}px — the order is listed with a way to open it`, (await openBtn.count()) === 1, `found=${await openBtn.count()}`);
     if ((await openBtn.count()) !== 1) {
       await page.screenshot({ path: path.join(OUT, `orders-${width}-missing.png`), fullPage: true });
@@ -266,6 +352,33 @@ async function main() {
 
     const modal = page.locator('[data-order-modal]');
     check(`${width}px — the modal opened`, (await modal.count()) === 1);
+
+    // THE MODAL MUST BE ON SCREEN WITHOUT SCROLLING. `position: fixed` stops
+    // meaning "the viewport" under any ancestor with a transform or filter,
+    // and the admin page has a scrolling pane — so the modal opened far below
+    // the fold and the owner had to hunt for it. It is portalled to <body>
+    // now; this measures where it actually landed.
+    const placement = await page.evaluate(() => {
+      const el = document.querySelector('[data-order-modal]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        top: Math.round(r.top),
+        bottom: Math.round(r.bottom),
+        inBody: el.closest('#main-scroll-container') === null,
+        vh: window.innerHeight,
+      };
+    });
+    check(
+      `${width}px — the modal is portalled out of the scrolling pane`,
+      placement?.inBody === true,
+      JSON.stringify(placement)
+    );
+    check(
+      `${width}px — the modal is visible without scrolling`,
+      !!placement && placement.top >= -2 && placement.top < placement.vh * 0.5,
+      JSON.stringify(placement)
+    );
     if ((await modal.count()) !== 1) {
       await ctx.close();
       continue;
@@ -335,6 +448,20 @@ async function main() {
     check(`${width}px — the item is listed`, items === 1, `items=${items}`);
     const itemText = await page.locator('[data-order-item]').first().innerText();
     check(`${width}px — the quantity is on the card`, /2/.test(itemText), JSON.stringify(itemText.slice(0, 120)));
+
+    // The status control must offer real choices, not two.
+    const options = await page.evaluate(() => {
+      // Both layouts are in the DOM; read the one actually on screen.
+      const sel = [...document.querySelectorAll('[data-order-status-select]')].find(
+        (e) => e.getBoundingClientRect().width > 0
+      );
+      return sel ? [...sel.querySelectorAll('option')].filter((o) => o.value).map((o) => o.value) : [];
+    });
+    check(
+      `${width}px — the status control offers more than two moves`,
+      options.length >= 3,
+      JSON.stringify(options)
+    );
 
     // Nothing spills — this is a modal on a phone.
     const overflow = await page.evaluate(

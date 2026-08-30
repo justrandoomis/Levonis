@@ -693,23 +693,50 @@ homeRoutes.get('/', async (c) => {
     // retyping their own catalog into the home settings. Only catalogs that
     // actually have something to show are returned — an empty category on the
     // home page is a dead end for the customer.
+    //
+    // GROUPED BY NAME, and that is not cosmetic. The live database holds
+    // SEVEN top-level catalogs called "Printers" and seven brands called
+    // "Bambu Lab", left behind by repeated seeding — so the ungrouped query
+    // rendered seven identical chips in a row. One chip per distinct name,
+    // pointing at the id that actually holds the most products, is what a
+    // customer can use. The duplicate ROWS are a data problem for the owner
+    // to clean up; the storefront must not put them on the home page
+    // meanwhile.
     c.env.DB.prepare(
-      `SELECT c.id, c.slug, c.name_ar, c.name_en, c.name_ckb,
-              (SELECT COUNT(*) FROM product_catalogs pc
-                 JOIN products p ON p.id = pc.product_id
-                WHERE pc.catalog_id = c.id AND p.status = 'active') AS product_count
-         FROM catalogs c
-        WHERE c.active = 1 AND c.parent_id IS NULL
-        ORDER BY c.sort, c.name_en
+      `WITH counted AS (
+         SELECT c.id, c.slug, c.name_ar, c.name_en, c.name_ckb, c.sort,
+                (SELECT COUNT(*) FROM product_catalogs pc
+                   JOIN products p ON p.id = pc.product_id
+                  WHERE pc.catalog_id = c.id AND p.status = 'active') AS n
+           FROM catalogs c
+          WHERE c.active = 1 AND c.parent_id IS NULL
+       )
+       SELECT id, slug, name_ar, name_en, name_ckb,
+              SUM(n) OVER (PARTITION BY COALESCE(NULLIF(name_en,''), name_ar)) AS product_count
+         FROM counted
+        WHERE n = (SELECT MAX(n) FROM counted c2
+                    WHERE COALESCE(NULLIF(c2.name_en,''), c2.name_ar)
+                        = COALESCE(NULLIF(counted.name_en,''), counted.name_ar))
+        GROUP BY COALESCE(NULLIF(name_en,''), name_ar)
+        ORDER BY sort, name_en
         LIMIT 12`
     ).all<Record<string, unknown>>(),
     c.env.DB.prepare(
-      `SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,
-              (SELECT COUNT(*) FROM products p
-                WHERE p.brand_id = b.id AND p.status = 'active') AS product_count
-         FROM brands b
-        WHERE b.active = 1
-        ORDER BY product_count DESC, b.name_en
+      `WITH counted AS (
+         SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,
+                (SELECT COUNT(*) FROM products p
+                  WHERE p.brand_id = b.id AND p.status = 'active') AS n
+           FROM brands b
+          WHERE b.active = 1
+       )
+       SELECT id, slug, name_ar, name_en, name_ckb,
+              SUM(n) OVER (PARTITION BY COALESCE(NULLIF(name_en,''), name_ar)) AS product_count
+         FROM counted
+        WHERE n = (SELECT MAX(n) FROM counted b2
+                    WHERE COALESCE(NULLIF(b2.name_en,''), b2.name_ar)
+                        = COALESCE(NULLIF(counted.name_en,''), counted.name_ar))
+        GROUP BY COALESCE(NULLIF(name_en,''), name_ar)
+        ORDER BY product_count DESC, name_en
         LIMIT 12`
     ).all<Record<string, unknown>>(),
     pricingCtx(c),
