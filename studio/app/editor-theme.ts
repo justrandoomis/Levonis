@@ -2,7 +2,7 @@
  * LEVONIS editor theme (slice S6).
  *
  * Lightweight design tokens copied from the main store's theme
- * (`src/index.css` — olive greens, LEVONIS gold, Cairo type) — token values
+ * (`src/index.css` — the LEVONIS greens, LEVONIS gold, Cairo type) — token values
  * only, never store bundles (mandate §2). The same values are mirrored as CSS
  * custom properties in `app/globals.css` (`:root`); keep both in sync when a
  * token changes.
@@ -23,10 +23,12 @@
 
 /** Store-derived identity tokens (values copied from src/index.css). */
 export const LEVONIS_TOKENS = {
-  /** Store olive family. */
-  olive: "#0F2F25",
-  oliveDark: "#0A1F18",
-  oliveLight: "#184235",
+  /** The store green family. Named `olive` for history only: the value was
+   *  deepened to a darker, less yellow green, and ~100 call sites across both
+   *  apps reference the token by this name. */
+  olive: "#0B2519",
+  oliveDark: "#061710",
+  oliveLight: "#123726",
   /** Store gold family. */
   gold: "#BAA369",
   goldLight: "#FFE55C",
@@ -34,18 +36,18 @@ export const LEVONIS_TOKENS = {
   fontSans: '"Cairo", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif',
 } as const;
 
-/** Studio dark surfaces derived from the olive family. */
+/** Studio dark surfaces, derived from the green family above. */
 export const STUDIO_SURFACES = {
-  shell: "#0A1410",
-  header: "#0E1D17",
-  panel: "#122419",
-  surface: "#17301F",
-  surfaceStrong: "#1E3A28",
-  canvas: "#0C1A14",
-  line: "#28453A",
-  lineSoft: "#1E362C",
+  shell: "#050C09",
+  header: "#071410",
+  panel: "#091B13",
+  surface: "#0D2417",
+  surfaceStrong: "#12301F",
+  canvas: "#04100C",
+  line: "#1A3A2B",
+  lineSoft: "#122A1F",
   text: "#EEF4EF",
-  muted: "#96A99C",
+  muted: "#8FA598",
   accent: LEVONIS_TOKENS.gold,
   accentStrong: "#9C8752",
   accentSoft: "#2A2A16",

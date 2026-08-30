@@ -4,7 +4,8 @@
  * LEVO Studio chrome — LEVONIS identity (slice S6).
  *
  * Design tokens are copied from the main store theme (src/index.css): the
- * olive family (#0F2F25 / #0A1F18 / #184235), LEVONIS gold (#BAA369 /
+ * green family (#0B2519 / #061710 / #123726 — deepened from the original
+ * olive at the owner's request), LEVONIS gold (#BAA369 /
  * #FFE55C) and the Cairo type stack — token values only, no store bundles
  * (mandate §2). The same values feed the engine shadow theme in
  * app/editor-theme.ts; keep both in sync.
@@ -20,23 +21,23 @@
 
 :root {
   /* LEVONIS identity (store tokens) */
-  --levo-olive: #0F2F25;
-  --levo-olive-dark: #0A1F18;
-  --levo-olive-light: #184235;
+  --levo-olive: #0B2519;
+  --levo-olive-dark: #061710;
+  --levo-olive-light: #123726;
   --levo-gold: #BAA369;
   --levo-gold-light: #FFE55C;
 
   /* Studio dark surfaces derived from the olive family */
-  --shell: #0A1410;
-  --header: #0E1D17;
-  --panel: #122419;
-  --surface: #17301F;
-  --surface-strong: #1E3A28;
-  --canvas: #0C1A14;
-  --line: #28453A;
-  --line-soft: #1E362C;
+  --shell: #050C09;
+  --header: #071410;
+  --panel: #091B13;
+  --surface: #0D2417;
+  --surface-strong: #12301F;
+  --canvas: #04100C;
+  --line: #1A3A2B;
+  --line-soft: #122A1F;
   --text: #EEF4EF;
-  --muted: #96A99C;
+  --muted: #8FA598;
   --accent: var(--levo-gold);
   --accent-strong: #9C8752;
   --accent-ink: #221A08;
