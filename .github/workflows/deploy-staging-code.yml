@@ -1,0 +1,143 @@
+# Deploys the CODE to the levonis-staging worker — the one serving
+# levonis-iq.com — without touching its data and without changing its config.
+#
+# WHY NOT "2 - Deploy Staging + Tests":
+#
+#   * That workflow runs the api-tests suites afterwards, and those CREATE
+#     users, orders and memberships. Correct for a throwaway staging database;
+#     wrong for the one holding real customers. This one only reads.
+#   * That workflow sets APP_ORIGIN to the workers.dev URL it just deployed to.
+#     The worker is served on a custom domain now, so that would silently
+#     re-point every password-reset and verification link in outbound email at
+#     workers.dev. This one CARRIES THE WORKER'S EXISTING VARS FORWARD.
+#
+# The second point is the whole reason this file exists. `wrangler deploy`
+# replaces a Worker's plain-text vars WHOLESALE: any var not passed on the
+# command line is deleted from the running Worker. So the current values are
+# read back from the Cloudflare API first and passed straight back in, and the
+# deploy is refused outright if that read fails — deploying blind would wipe
+# them.
+#
+# Secrets are NOT touched: they live in a separate store, `wrangler deploy`
+# leaves them alone, and this workflow never reads or writes one.
+name: 7 - Deploy Staging Code (no test data, keeps vars)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-CODE to confirm'
+        required: true
+        default: ''
+
+concurrency: staging-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-CODE" ] \
+            || { echo "::error::type DEPLOY-CODE to confirm"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Typecheck, lint and unit tests
+        run: |
+          npm run check
+          npm run test:unit
+
+      # Read the vars the running Worker has RIGHT NOW. If this fails the
+      # deploy stops: shipping without them would delete them.
+      - name: Read the running Worker's plain-text vars
+        id: vars
+        run: |
+          set -e
+          curl -sS -f \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
+            -o /tmp/settings.json
+          jq -e '.success == true' /tmp/settings.json > /dev/null \
+            || { echo "::error::could not read the worker settings — refusing to deploy and wipe its vars"; exit 1; }
+
+          # Names only. Values are masked in the log and never printed.
+          echo "vars currently set on the worker:"
+          jq -r '[.result.bindings[] | select(.type == "plain_text") | .name] | sort | join(", ")' /tmp/settings.json
+
+          jq -r '.result.bindings[] | select(.type == "plain_text") | "\(.name)\t\(.text)"' /tmp/settings.json \
+            > /tmp/vars.tsv
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            echo "::add-mask::$value"
+          done < /tmp/vars.tsv
+          echo "count=$(wc -l < /tmp/vars.tsv)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the staging database id into wrangler.jsonc
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs --env staging
+
+      - name: Build the frontend
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: npm run build
+
+      # Migrations first: code must never be ahead of its database again.
+      # This is the exact failure that took the storefront down on 2026-08-30.
+      - name: Apply any pending migrations BEFORE the code that needs them
+        run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+
+      - name: Deploy, carrying every existing var forward
+        run: |
+          set -e
+          ARGS=()
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            ARGS+=(--var "$name:$value")
+          done < /tmp/vars.tsv
+          echo "re-applying ${#ARGS[@]} existing var(s) so none are wiped"
+          npx wrangler deploy --env staging "${ARGS[@]}"
+
+      - name: Verify the live site, read-only
+        id: probe
+        run: |
+          fail=0
+          for p in /api/health /api/home '/api/products?limit=3' /api/memberships/plans; do
+            code=$(curl -s -o /tmp/b.txt -w '%{http_code}' --max-time 25 "https://levonis-iq.com$p")
+            echo "$p -> $code"
+            [ "$code" = "200" ] || fail=1
+          done
+          echo "── the plan catalog the storefront will show"
+          curl -s --max-time 25 "https://levonis-iq.com/api/memberships/plans" \
+            | jq -c '[.plans[] | {id, tier, duration_months, price_iqd}]'
+          [ "$fail" = "0" ] || { echo "::error::an endpoint did not answer 200 after the deploy"; exit 1; }
+
+      - name: Confirm the vars survived
+        run: |
+          curl -sS -f \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
+            -o /tmp/after.json
+          BEFORE=${{ steps.vars.outputs.count }}
+          AFTER=$(jq -r '[.result.bindings[] | select(.type == "plain_text")] | length' /tmp/after.json)
+          echo "plain-text vars: $BEFORE before, $AFTER after"
+          jq -r '[.result.bindings[] | select(.type == "plain_text") | .name] | sort | join(", ")' /tmp/after.json
+          [ "$AFTER" -ge "$BEFORE" ] || { echo "::error::the deploy dropped $((BEFORE - AFTER)) var(s)"; exit 1; }
