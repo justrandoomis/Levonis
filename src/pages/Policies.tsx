@@ -511,7 +511,7 @@ export default function Policies() {
               <button
                 onClick={saveDraft}
                 disabled={isSaving}
-                className="flex-1 py-3 rounded-2xl bg-olive hover:bg-[#3b5927] font-bold text-sm disabled:opacity-50"
+                className="flex-1 py-3 rounded-2xl bg-olive hover:bg-olive-light font-bold text-sm disabled:opacity-50"
               >
                 {isSaving ? t.saving : t.save}
               </button>

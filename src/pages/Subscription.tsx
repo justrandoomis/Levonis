@@ -697,7 +697,7 @@ export default function Subscription() {
         <div className="space-y-4">
           <div className="bg-zinc-900/30 backdrop-blur-xl border border-white/5 rounded-[24px] p-6 shadow-lg">
             <h4 className="text-white font-bold mb-5 flex items-center gap-2.5 text-[16px]">
-              <div className="w-2.5 h-2.5 rounded-full bg-olive shadow-[0_0_10px_rgba(15,47,37,0.6)]"></div> {t('plusBenefits')}
+              <div className="w-2.5 h-2.5 rounded-full bg-olive shadow-[0_0_10px_var(--color-olive)]"></div> {t('plusBenefits')}
             </h4>
             <ul className="space-y-4">
               {plusLive.map((text, i) => (

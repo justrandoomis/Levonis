@@ -379,7 +379,7 @@ export default function Addresses() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full bg-olive hover:bg-[#3b5927] text-white py-4 rounded-full font-bold text-[16px] shadow-lg shadow-olive/10 active:scale-95 transition-all disabled:opacity-50"
+              className="w-full bg-olive hover:bg-olive-light text-white py-4 rounded-full font-bold text-[16px] shadow-lg shadow-olive/10 active:scale-95 transition-all disabled:opacity-50"
             >
               {isSaving ? 'Saving…' : 'Save'}
             </button>

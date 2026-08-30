@@ -137,7 +137,7 @@ export default function QrCodeModal({
             <button
               type="button"
               onClick={copyLink}
-              className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-[#0F2F25] text-[#BAA369] text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity"
+              className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-olive text-[#BAA369] text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity"
             >
               {copied ? <Check className="w-4 h-4" strokeWidth={3} /> : <Copy className="w-4 h-4" strokeWidth={2} />}
               {copied ? s.copied : s.copy}

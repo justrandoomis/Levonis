@@ -146,7 +146,7 @@ export default function Header() {
               <div 
                 className="absolute top-1/2 left-1/2 w-[300%] h-[300%] -translate-x-1/2 -translate-y-1/2 animate-spin pointer-events-none"
                 style={{ 
-                  backgroundImage: subTier === 'pro' ? 'conic-gradient(from 0deg, transparent 70%, #7f1d1d 85%, #B03142 100%)' : 'conic-gradient(from 0deg, transparent 70%, #184235 85%, #59A846 100%)',
+                  backgroundImage: subTier === 'pro' ? 'conic-gradient(from 0deg, transparent 70%, #7f1d1d 85%, #B03142 100%)' : 'conic-gradient(from 0deg, transparent 70%, var(--color-olive-light) 85%, #59A846 100%)',
                   animationDuration: '3s'
                 }}
               />
@@ -214,7 +214,7 @@ export default function Header() {
              style={{ 
                background: subTier === 'pro'
                  ? 'linear-gradient(to right, #ff0000, #ff4d4d, #B03142, #7f1d1d, #B03142, #ff4d4d, #ff0000)'
-                 : 'linear-gradient(to right, #59A846, #a3e635, #184235, #0F2F25, #184235, #a3e635, #59A846)',
+                 : 'linear-gradient(to right, #59A846, #a3e635, var(--color-olive-light), var(--color-olive), var(--color-olive-light), #a3e635, #59A846)',
                backgroundSize: '50% 100%',
                animation: 'rainbow 3s linear infinite'
              }} 

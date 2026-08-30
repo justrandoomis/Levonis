@@ -488,19 +488,19 @@ export default function Wallet() {
   return (
     <div dir={dir} className="w-full bg-black min-h-screen font-sans flex flex-col pb-24">
       {/* ---------------------------------------------------------- header */}
-      <div className="bg-[#0A1F18] rounded-b-[44px] pt-12 pb-8 px-5 sm:px-8 flex flex-col items-center relative">
+      <div className="bg-olive-dark rounded-b-[44px] pt-12 pb-8 px-5 sm:px-8 flex flex-col items-center relative">
         <button
           onClick={() => navigate(-1)}
           aria-label={s.back}
-          className="absolute start-5 top-12 p-2 bg-[#0F2F25]/40 hover:bg-[#0F2F25]/80 transition-colors rounded-full"
+          className="absolute start-5 top-12 p-2 bg-olive/40 hover:bg-olive/80 transition-colors rounded-full"
         >
           <Back className="w-5 h-5 text-gold" />
         </button>
         <button
           onClick={() => setCurrency(currency === 'USD' ? 'IQD' : 'USD')}
-          className="absolute end-5 top-12 bg-[#0F2F25]/80 hover:bg-[#184235] px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-gold/20 transition-transform active:scale-95"
+          className="absolute end-5 top-12 bg-olive/80 hover:bg-olive-light px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-gold/20 transition-transform active:scale-95"
         >
-          <div className="bg-gold text-[#0A1F18] rounded-[4px] p-0.5 flex items-center justify-center">
+          <div className="bg-gold text-olive-dark rounded-[4px] p-0.5 flex items-center justify-center">
             {currency === 'USD' ? (
               <DollarSign className="w-3 h-3" strokeWidth={3} />
             ) : (
@@ -542,7 +542,7 @@ export default function Wallet() {
               icon: <ArrowUp className="w-3.5 h-3.5" />,
             },
           ].map((card) => (
-            <div key={card.label} className="bg-[#0F2F25]/70 border border-gold/10 rounded-2xl p-3 text-center">
+            <div key={card.label} className="bg-olive/70 border border-gold/10 rounded-2xl p-3 text-center">
               <div className="flex items-center justify-center gap-1 text-gold/60 text-[10px] font-bold">
                 {card.icon}
                 <span>{card.label}</span>
@@ -570,14 +570,14 @@ export default function Wallet() {
         <button
           onClick={() => setModal('withdrawal')}
           disabled={loading || !!loadError}
-          className="flex-1 max-w-[240px] bg-[#184235] hover:bg-[#205242] transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 max-w-[240px] bg-olive-light hover:brightness-125 transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {s.withdraw}
           <ArrowUp className="w-4 h-4" strokeWidth={3} />
         </button>
         <button
           onClick={() => setModal('deposit')}
-          className="flex-1 max-w-[240px] bg-[#184235] hover:bg-[#205242] transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px]"
+          className="flex-1 max-w-[240px] bg-olive-light hover:brightness-125 transition-colors text-gold py-4 rounded-[20px] flex items-center justify-center gap-2 font-bold text-[15px]"
         >
           <ArrowDown className="w-4 h-4" strokeWidth={3} />
           {s.addFunds}
@@ -595,7 +595,7 @@ export default function Wallet() {
         </div>
       )}
 
-      <div className="bg-[#0A1F18] flex-1 rounded-t-[44px] px-4 sm:px-6 pt-7 pb-10">
+      <div className="bg-olive-dark flex-1 rounded-t-[44px] px-4 sm:px-6 pt-7 pb-10">
         {/* ------------------------------------------------ withdrawals */}
         <section className="mb-8">
           <h2 className="text-gold font-bold text-[15px] mb-3">{s.withdrawalRequests}</h2>
@@ -611,7 +611,7 @@ export default function Wallet() {
           ) : (
             <div className="space-y-3">
               {withdrawals.map((w) => (
-                <div key={w.id} className="bg-[#0F2F25] border border-gold/10 rounded-[22px] p-4">
+                <div key={w.id} className="bg-olive border border-gold/10 rounded-[22px] p-4">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -701,7 +701,7 @@ export default function Wallet() {
                 onClick={() => setTypeFilter(value)}
                 className={`px-3 py-1.5 rounded-xl text-[12px] font-bold border transition-colors ${
                   typeFilter === value
-                    ? 'bg-gold text-[#0A1F18] border-gold'
+                    ? 'bg-gold text-olive-dark border-gold'
                     : 'bg-transparent text-gold/70 border-gold/20 hover:border-gold/50'
                 }`}
               >
@@ -750,10 +750,10 @@ export default function Wallet() {
           ) : (
             <div className="space-y-3">
               {transactions.map((tx) => (
-                <div key={tx.id} className="bg-[#0F2F25] rounded-[22px] p-4 border border-gold/10">
+                <div key={tx.id} className="bg-olive rounded-[22px] p-4 border border-gold/10">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-[14px] flex items-center justify-center bg-[#184235] shrink-0">
+                      <div className="w-10 h-10 rounded-[14px] flex items-center justify-center bg-olive-light shrink-0">
                         {tx.type === 'deposit' ? (
                           <ArrowDownLeft className="w-5 h-5 text-gold" />
                         ) : (
@@ -1011,7 +1011,7 @@ function RequestModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-[#0A1F18] border border-gold/20 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-[460px] p-6 sm:p-7 relative flex flex-col max-h-[92vh] overflow-y-auto">
+      <div className="bg-olive-dark border border-gold/20 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-[460px] p-6 sm:p-7 relative flex flex-col max-h-[92vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
@@ -1200,7 +1200,7 @@ function RequestModal({
             <button
               type="submit"
               disabled={submitting || uploading}
-              className="flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-[#0A1F18] font-black text-sm py-3.5 rounded-xl disabled:opacity-70 disabled:cursor-not-allowed"
+              className="flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-olive-dark font-black text-sm py-3.5 rounded-xl disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -1253,7 +1253,7 @@ function ReviewModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-[#0A1F18] border border-gold/20 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-[420px] p-6 relative">
+      <div className="bg-olive-dark border border-gold/20 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-[420px] p-6 relative">
         <button
           type="button"
           onClick={onClose}
@@ -1286,7 +1286,7 @@ function ReviewModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-[#0A1F18] font-black text-sm py-3 rounded-xl disabled:opacity-70"
+              className="flex-[2] bg-gradient-to-r from-gold to-[#BAA369] text-olive-dark font-black text-sm py-3 rounded-xl disabled:opacity-70"
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
