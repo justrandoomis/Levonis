@@ -165,6 +165,12 @@ export interface ApiAddress {
   phone: string;
   address: string;
   landmark: string;
+  /** 0026: the parts a courier's form asks for. Empty on every address saved
+   *  before that migration — nothing was parsed out of the old free-text
+   *  line, because guessing would have produced confident, wrong data. */
+  governorate: string;
+  area: string;
+  notes: string;
   is_default: number;
   created_at: string;
 }
@@ -196,6 +202,58 @@ export interface ApiOrder {
   email?: string;
   username?: string;
   user_id?: string;
+}
+
+/** One order item unit — a physical device with its own serial and cover. */
+export interface OrderUnit {
+  id: string;
+  order_item_id: string;
+  unit_index: number;
+  serial: string | null;
+  warranty_base_months: number | null;
+  warranty_ext_months: number;
+  warranty_start_at: string | null;
+  warranty_end_at: string | null;
+}
+
+/** The money view every screen reads and none recomputes (orders.ts §5). */
+export interface OrderFinancial {
+  merchandise_iqd: number;
+  fees_iqd: number;
+  subtotal_iqd: number;
+  coupon_discount_iqd: number;
+  points_used: number;
+  points_value_iqd: number;
+  shipping_iqd: number;
+  delivery_waived: boolean;
+  total_iqd: number;
+  wallet_applied_iqd: number;
+  due_on_delivery_iqd: number;
+  collected_iqd: number | null;
+  outstanding_iqd: number;
+  payment_state: string;
+}
+
+/** Everything the fulfilment screen needs for ONE order. */
+export interface AdminOrderDetail extends ApiOrder {
+  admin_note: string;
+  membership_tier_snapshot?: string;
+  delivery_waived?: boolean;
+  coupon?: { code?: string; discount_iqd?: number } | null;
+  coupon_discount_iqd?: number;
+  financial: OrderFinancial;
+  customer: {
+    id: string | null;
+    name: string | null;
+    username: string | null;
+    email: string | null;
+    account_phone: string | null;
+    membership_tier: string;
+    member_since: string | null;
+  };
+  units: OrderUnit[];
+  invoice: { id: string; invoice_no: string; revision: number; payment_status: string } | null;
+  chat_id: string | null;
 }
 
 export interface WalletTx {

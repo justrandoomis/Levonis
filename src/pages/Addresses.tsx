@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, MapPin, Edit2, Trash2, CheckCircle, User } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { api, ApiAddress } from '../lib/api';
+import { useLanguage } from '../LanguageContext';
+import { GOVERNORATES } from '../lib/governorates';
 
 export default function Addresses() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoaded } = useAuth();
+  const { loc, lang } = useLanguage();
 
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,6 +27,11 @@ export default function Addresses() {
   const [formLandmark, setFormLandmark] = useState('');
   const [formName, setFormName] = useState('');
   const [formPhone, setFormPhone] = useState('');
+  // 0026: the parts a courier's form asks for, kept separate so the admin can
+  // copy each one on its own instead of editing a paste on every order.
+  const [formGovernorate, setFormGovernorate] = useState('');
+  const [formArea, setFormArea] = useState('');
+  const [formNotes, setFormNotes] = useState('');
 
   const loadAddresses = useCallback(async () => {
     setListError('');
@@ -53,6 +61,9 @@ export default function Addresses() {
     setFormLandmark('');
     setFormName('');
     setFormPhone('');
+    setFormGovernorate('');
+    setFormArea('');
+    setFormNotes('');
     setFormError('');
     setShowAddModal(true);
   };
@@ -64,6 +75,9 @@ export default function Addresses() {
     setFormLandmark(addr.landmark || '');
     setFormName(addr.name);
     setFormPhone(addr.phone.replace(/^\+964-?/, ''));
+    setFormGovernorate(addr.governorate || '');
+    setFormArea(addr.area || '');
+    setFormNotes(addr.notes || '');
     setFormError('');
     setShowAddModal(true);
   };
@@ -72,7 +86,15 @@ export default function Addresses() {
     if (isSaving) return;
     setFormError('');
     if (!formName.trim() || !formPhone.trim() || !formLabel.trim() || !formAddress.trim()) {
-      setFormError('Name, Phone, Address Label and Address are required');
+      setFormError(loc('الاسم والرقم واسم العنوان والعنوان مطلوبة', 'Name, phone, label and address are required', 'ناو و ژمارە و ناونیشان پێویستن'));
+      return;
+    }
+    // The governorate is required for a NEW address: dispatch routes on it,
+    // and a parcel without one is a phone call. An address saved before this
+    // existed can still be edited without adding one, so nobody is locked out
+    // of fixing a typo in their own phone number.
+    if (!editingAddress && !formGovernorate) {
+      setFormError(loc('اختر المحافظة', 'Choose a governorate', 'پارێزگا هەڵبژێرە'));
       return;
     }
     const body = {
@@ -81,6 +103,9 @@ export default function Addresses() {
       phone: '+964-' + formPhone.trim(),
       address: formAddress.trim(),
       landmark: formLandmark.trim(),
+      governorate: formGovernorate,
+      area: formArea.trim(),
+      notes: formNotes.trim(),
       isDefault: editingAddress ? editingAddress.is_default === 1 : addresses.length === 0,
     };
     setIsSaving(true);
@@ -282,25 +307,76 @@ export default function Addresses() {
                     />
                   </div>
 
+                  {/* Governorate and area are their OWN fields, not part of
+                      the free-text line: dispatch routes on the governorate,
+                      and the admin copies each into a separate box on the
+                      courier's form. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2 mt-2">
+                    <div>
+                      <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
+                        {loc('المحافظة', 'Governorate', 'پارێزگا')}<span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formGovernorate}
+                        onChange={e => setFormGovernorate(e.target.value)}
+                        className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 min-h-[44px] text-white text-sm w-full outline-none transition-colors"
+                      >
+                        <option value="">{loc('اختر المحافظة', 'Choose a governorate', 'پارێزگا هەڵبژێرە')}</option>
+                        {GOVERNORATES.map(g => (
+                          <option key={g.id} value={g.id}>
+                            {lang === 'en' ? g.en : lang === 'ckb' ? g.ckb : g.ar}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
+                        {loc('المنطقة', 'Area', 'ناوچە')}
+                      </label>
+                      <input
+                        type="text"
+                        value={formArea}
+                        onChange={e => setFormArea(e.target.value)}
+                        placeholder={loc('مثال: الكرادة', 'e.g. Karrada', 'نموونە: کەڕادە')}
+                        className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 min-h-[44px] text-white text-sm w-full outline-none transition-colors"
+                      />
+                    </div>
+                  </div>
+
                   <div className="mb-2 mt-2">
-                    <label className="text-[11px] font-medium text-zinc-400 mb-1 block">Full address<span className="text-red-500">*</span></label>
+                    <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
+                      {loc('تفاصيل العنوان', 'Street and details', 'وردەکاری ناونیشان')}<span className="text-red-500">*</span>
+                    </label>
                     <textarea
                       value={formAddress}
                       onChange={e => setFormAddress(e.target.value)}
-                      placeholder="Province, city, district, street…"
+                      placeholder={loc('الحي، الشارع، رقم الدار…', 'District, street, house number…', 'گەڕەک، شەقام، ژمارەی ماڵ…')}
                       rows={2}
                       className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 py-2 text-white text-sm w-full outline-none transition-colors resize-none"
                     />
                   </div>
 
-                  <div className="flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-3 mt-2">
+                  <div className="flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-3 mt-2 min-h-[44px]">
                     <MapPin className="w-5 h-5 text-zinc-400 shrink-0 opacity-70" />
                     <input
                       type="text"
-                      placeholder="Any landmark near here? (optional)"
+                      placeholder={loc('أقرب نقطة دالة (اختياري)', 'Nearest landmark (optional)', 'نزیکترین نیشانە (ئارەزوومەندانە)')}
                       value={formLandmark}
                       onChange={e => setFormLandmark(e.target.value)}
                       className="bg-transparent border-none focus:outline-none text-white text-[14px] w-full placeholder-zinc-500"
+                    />
+                  </div>
+
+                  <div className="mt-2">
+                    <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
+                      {loc('ملاحظات للمندوب', 'Notes for the courier', 'تێبینی بۆ گەیێنەر')}
+                    </label>
+                    <textarea
+                      value={formNotes}
+                      onChange={e => setFormNotes(e.target.value)}
+                      placeholder={loc('مثال: اتصل قبل الوصول', 'e.g. call before arriving', 'نموونە: پێش هاتن پەیوەندی بکە')}
+                      rows={2}
+                      className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 py-2 text-white text-sm w-full outline-none transition-colors resize-none"
                     />
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
+import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
@@ -13,6 +14,7 @@ import { awardOrderPoints } from '../lib/pointsOps';
 import { walletTxPublic, credit } from '../lib/wallet';
 import { productPublic } from './products';
 import { orderPublic } from './orders';
+import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
 
 export const adminRoutes = new Hono<AppContext>();
@@ -389,6 +391,86 @@ adminRoutes.get('/orders', async (c) => {
     });
   }
   return c.json({ success: true, orders: out });
+});
+
+/**
+ * Everything needed to PREPARE one order, in a single call.
+ *
+ * The list endpoint above returns 200 orders with their items and was never
+ * meant to carry the fulfilment detail: the address parts a courier asks for,
+ * who the customer is, and the money breakdown behind the total. This is the
+ * order screen's own payload.
+ *
+ * §11 still applies — nothing here is cost or margin. The admin sees what the
+ * CUSTOMER was charged and how it was paid, which is what packing a box and
+ * writing a receipt needs.
+ */
+adminRoutes.get('/orders/:id', async (c) => {
+  const id = c.req.param('id');
+  const o = await c.env.DB.prepare(
+    `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164, u.membership_tier,
+            u.created_at AS user_since
+       FROM orders o LEFT JOIN users u ON u.id = o.user_id
+      WHERE o.id = ?`
+  )
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!o) throw notFound('Order not found');
+
+  const [{ results: items }, snaps, { results: units }, invoice, chat] = await Promise.all([
+    c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid').bind(id).all<Record<string, unknown>>(),
+    getOrderPointsSnapshots(c.env, [id]),
+    // Serialized units matter on the fulfilment screen: a printer that needs a
+    // serial written on the warranty slip is a different packing job from a
+    // spool of filament.
+    c.env.DB.prepare(
+      `SELECT iu.*, ds.serial_raw
+         FROM order_item_units iu
+         LEFT JOIN device_serials ds ON ds.unit_id = iu.id
+        WHERE iu.order_id = ? ORDER BY iu.order_item_id, iu.unit_index`
+    ).bind(id).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      'SELECT id, invoice_no, revision, payment_status FROM invoices WHERE order_id = ? ORDER BY revision DESC LIMIT 1'
+    ).bind(id).first<Record<string, unknown>>(),
+    c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?').bind(id).first<{ id: string }>(),
+  ]);
+
+  // The address as STORED ON THE ORDER, not the customer's current address —
+  // an order is packed for where it was sent, and a later edit must not
+  // silently repoint a parcel that is already being prepared.
+  const address = safeParse<Record<string, unknown>>(o.address_snapshot, {});
+
+  return c.json({
+    success: true,
+    order: {
+      ...orderPublic(o, items, snaps.get(id)),
+      admin_note: o.admin_note ?? '',
+      customer: {
+        id: o.user_id,
+        name: o.user_name ?? null,
+        username: o.username ?? null,
+        email: o.email ?? null,
+        // The account's own verified phone, which may differ from the one on
+        // the address — both are shown, neither is guessed from the other.
+        account_phone: o.phone_e164 ?? null,
+        membership_tier: o.membership_tier ?? 'free',
+        member_since: o.user_since ?? null,
+      },
+      address,
+      units: units.map((u) => ({
+        id: u.id,
+        order_item_id: u.order_item_id,
+        unit_index: u.unit_index,
+        serial: u.serial_raw ?? null,
+        warranty_base_months: u.warranty_base_months ?? null,
+        warranty_ext_months: u.warranty_ext_months ?? 0,
+        warranty_start_at: u.warranty_start_at ?? null,
+        warranty_end_at: u.warranty_end_at ?? null,
+      })),
+      invoice: invoice ?? null,
+      chat_id: chat?.id ?? null,
+    },
+  });
 });
 
 const ORDER_TRANSITIONS: Record<string, string[]> = {

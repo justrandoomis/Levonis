@@ -24,6 +24,7 @@ chatRoutes.get('/', async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
     `SELECT ch.id,
+            ch.order_id,
             (SELECT body FROM chat_messages m WHERE m.chat_id = ch.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
             (SELECT created_at FROM chat_messages m WHERE m.chat_id = ch.id ORDER BY m.created_at DESC LIMIT 1) AS last_at,
             (SELECT COUNT(*) FROM chat_messages m
@@ -43,19 +44,77 @@ chatRoutes.get('/', async (c) => {
   return c.json({ success: true, chats: results });
 });
 
-/** Opens (or returns) the direct chat with another user. */
+/**
+ * Opens (or returns) a chat.
+ *
+ * TWO KINDS, and the difference matters. `{userId}` is the general direct
+ * message — one per pair, exactly as before. `{orderId}` is a thread ABOUT
+ * that order: it has a subject, it belongs on the order screen, and it is
+ * deliberately NOT the same thread as the customer's general DM, so "which
+ * colour did you mean?" does not end up buried in an unrelated conversation
+ * six months later.
+ *
+ * An order thread may be opened by the order's OWNER or by an admin, and by
+ * nobody else. The two participants are always the customer and whoever
+ * opened it — an admin, in practice.
+ */
 chatRoutes.post('/open', async (c) => {
   await rateLimit(c, 'chat-open', 60, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
+
+  if (body.orderId !== undefined) {
+    const orderId = str(body.orderId, 'orderId', { min: 1, max: 60 });
+    const order = await c.env.DB.prepare('SELECT id, user_id FROM orders WHERE id = ?')
+      .bind(orderId)
+      .first<{ id: string; user_id: string }>();
+    if (!order) throw notFound('Order not found');
+    const isAdmin = user.role === 'admin';
+    if (!isAdmin && order.user_id !== user.id) throw forbidden('This is not your order');
+
+    const existing = await c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?')
+      .bind(orderId)
+      .first<{ id: string }>();
+    if (existing) {
+      // An admin opening an existing thread joins it — the first admin to
+      // reply is rarely the one who reads it next, and a thread nobody else
+      // can open is a thread that gets abandoned.
+      if (isAdmin) {
+        await c.env.DB
+          .prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
+          .bind(existing.id, user.id)
+          .run();
+      }
+      return c.json({ success: true, chatId: existing.id, orderId });
+    }
+
+    const chatId = newId('chat');
+    const stmts = [
+      c.env.DB.prepare('INSERT INTO chats (id, order_id) VALUES (?, ?)').bind(chatId, orderId),
+      c.env.DB
+        .prepare('INSERT INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
+        .bind(chatId, order.user_id),
+    ];
+    if (user.id !== order.user_id) {
+      stmts.push(
+        c.env.DB.prepare('INSERT INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(chatId, user.id)
+      );
+    }
+    await c.env.DB.batch(stmts);
+    return c.json({ success: true, chatId, orderId });
+  }
+
   const otherUserId = str(body.userId, 'userId', { min: 1, max: 60 });
   if (otherUserId === user.id) throw badRequest('You cannot chat with yourself');
   const other = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(otherUserId).first();
   if (!other) throw notFound('User not found');
 
+  // Only a GENERAL chat is reused here — an order thread must never be
+  // returned as if it were the pair's direct message.
   const existing = await c.env.DB.prepare(
     `SELECT a.chat_id FROM chat_participants a
        JOIN chat_participants b ON b.chat_id = a.chat_id AND b.user_id = ?
+       JOIN chats ch ON ch.id = a.chat_id AND ch.order_id IS NULL
       WHERE a.user_id = ?`
   )
     .bind(otherUserId, user.id)

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
 import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown } from 'lucide-react';
+import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import AdminProducts from '../components/AdminProducts';
 import AdminAds from '../components/AdminAds';
@@ -53,6 +54,7 @@ const STATUS_COLORS: Record<ApiOrder['status'], string> = {
 function AdminOrders() {
   const { dir } = useLanguage();
   const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | ApiOrder['status']>('all');
@@ -146,6 +148,9 @@ function AdminOrders() {
                 <th className="py-4 px-5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Date</th>
                 <th className="py-4 px-5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Status</th>
                 <th className="py-4 px-5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Change</th>
+                <th className="py-4 px-5 text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                  {dir === 'rtl' ? 'تجهيز' : 'Prepare'}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -192,19 +197,30 @@ function AdminOrders() {
                         <div className="text-[11px] text-red-400 mt-1 max-w-[220px]">{rowError.message}</div>
                       )}
                     </td>
+                    <td className="py-4 px-5">
+                      <button
+                        type="button"
+                        data-action="prepare"
+                        data-order-id={o.id}
+                        onClick={() => setOpenOrderId(o.id)}
+                        className="min-h-[44px] px-4 rounded-xl bg-olive/15 border border-olive/40 text-olive-light text-xs font-bold hover:bg-olive/25 transition-colors whitespace-nowrap"
+                      >
+                        {dir === 'rtl' ? 'فتح' : 'Open'}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={8} className="py-12 text-center text-zinc-500 font-medium">
                     {dir === 'rtl' ? 'لا توجد طلبات' : 'No orders found'}
                   </td>
                 </tr>
               )}
               {loading && orders.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={8} className="py-12 text-center text-zinc-500 font-medium">
                     {dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}
                   </td>
                 </tr>
@@ -213,6 +229,18 @@ function AdminOrders() {
           </table>
         </div>
       </div>
+
+      {openOrderId && (
+        <OrderDetailModal
+          orderId={openOrderId}
+          onClose={() => {
+            setOpenOrderId(null);
+            // A status may have changed inside the modal, and a stale row is
+            // worse than a second of loading.
+            loadOrders();
+          }}
+        />
+      )}
     </div>
   );
 }

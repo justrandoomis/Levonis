@@ -3,6 +3,7 @@ import type { AppContext } from '../lib/types';
 import { requireAuth, notFound, str, badRequest } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { addressMatchesSnapshot, getApprovedAddress } from './kyc';
+import { normalizeGovernorate } from '../lib/iraqGovernorates';
 
 export const addressRoutes = new Hono<AppContext>();
 addressRoutes.use('*', requireAuth);
@@ -16,7 +17,16 @@ function validateAddress(body: Record<string, unknown>) {
   const address = str(body.address, 'address', { min: 5, max: 300 });
   const label = str(body.label, 'label', { min: 1, max: 40 });
   const landmark = str(body.landmark, 'landmark', { max: 200, required: false });
-  return { name, phone, address, label, landmark };
+  // 0026: the parts a courier's form actually asks for. Optional, because
+  // every address saved before this migration has them empty and editing an
+  // old address must not suddenly become impossible without re-entering them.
+  // The governorate is a closed list — free text there is the admin's problem
+  // on every order, since dispatch routes on it.
+  const governorate = normalizeGovernorate(body.governorate);
+  if (body.governorate && !governorate) throw badRequest('Unknown governorate');
+  const area = str(body.area, 'area', { max: 120, required: false });
+  const notes = str(body.notes, 'notes', { max: 500, required: false });
+  return { name, phone, address, label, landmark, governorate, area, notes };
 }
 
 addressRoutes.get('/', async (c) => {
@@ -71,8 +81,13 @@ addressRoutes.post('/', async (c) => {
   }
   stmts.push(
     c.env.DB.prepare(
-      'INSERT INTO addresses (id, user_id, label, name, phone, address, landmark, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(id, user.id, a.label, a.name, a.phone, a.address, a.landmark, makeDefault ? 1 : 0)
+      `INSERT INTO addresses (id, user_id, label, name, phone, address, landmark,
+                              governorate, area, notes, is_default)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, user.id, a.label, a.name, a.phone, a.address, a.landmark,
+      a.governorate, a.area, a.notes, makeDefault ? 1 : 0
+    )
   );
   await c.env.DB.batch(stmts);
   return c.json({ success: true, id });
@@ -84,9 +99,12 @@ addressRoutes.put('/:id', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const a = validateAddress(body);
   const res = await c.env.DB.prepare(
-    'UPDATE addresses SET label = ?, name = ?, phone = ?, address = ?, landmark = ? WHERE id = ? AND user_id = ?'
+    `UPDATE addresses
+        SET label = ?, name = ?, phone = ?, address = ?, landmark = ?,
+            governorate = ?, area = ?, notes = ?
+      WHERE id = ? AND user_id = ?`
   )
-    .bind(a.label, a.name, a.phone, a.address, a.landmark, id, user.id)
+    .bind(a.label, a.name, a.phone, a.address, a.landmark, a.governorate, a.area, a.notes, id, user.id)
     .run();
   if (res.meta.changes === 0) throw notFound('Address not found');
 
