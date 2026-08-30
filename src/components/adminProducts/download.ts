@@ -80,6 +80,7 @@ export function filenameFromDisposition(header: string | null, fallback: string)
   // filename (control chars and \ / : * ? " < > |). Letters, digits, dots,
   // dashes and Arabic characters all survive.
   const base = (name || fallback).split(/[\\/]/).pop() ?? fallback;
+  // eslint-disable-next-line no-control-regex -- stripping control characters IS the point here
   const safe = base.replace(/[\u0000-\u001f\\/:*?"<>|]/g, '').replace(/^\.+/, '').trim() || fallback;
   return safe.toLowerCase().endsWith('.txt') ? safe : `${safe}.txt`;
 }

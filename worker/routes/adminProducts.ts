@@ -33,6 +33,8 @@ import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
 import { transportDefaultsFrom } from './products';
+import { localizeProductDoc } from '../lib/translate/localizeProduct';
+import { syncProductTranslations } from '../lib/translate/store';
 
 export const adminProductsRoutes = new Hono<AppContext>();
 
@@ -127,63 +129,63 @@ async function syncCatalogs(db: D1Database, productId: string, catalogIds: strin
   return wanted;
 }
 
-/** Arabic-source fields whose translations are tracked per language. */
+/** Fields whose per-language state is tracked. English is the SOURCE. */
 const TRACKED_FIELDS = [
-  { key: 'name', ar: 'name_ar', en: 'name_en', ckb: 'name_ckb' },
-  { key: 'description', ar: 'description_ar', en: 'description_en', ckb: 'description_ckb' },
+  { key: 'name', en: 'name_en', ar: 'name_ar', ckb: 'name_ckb' },
+  { key: 'description', en: 'description_en', ar: 'description_ar', ckb: 'description_ckb' },
 ] as const;
 
 /**
- * Translation bookkeeping (Arabic is the source language, no runtime AI):
- *  - Arabic text changed → bump content_rev once and mark en/ckb entries for
- *    those fields 'stale' (only when they were approved/imported — 'missing'
- *    stays missing, an already-stale entry keeps its original src_rev).
- *  - en/ckb text changed → that entry becomes 'imported' at the new
- *    content_rev (the translation now reflects the current source).
- *  - Editor-supplied meta (e.g. an explicit approval) is merged in first and
- *    survives whenever the text itself did not change in this save.
+ * Translation bookkeeping, ENGLISH-SOURCED (product-form mandate §3, which
+ * replaces the earlier Arabic-sourced scheme).
+ *
+ *  - The admin types English only. `localizeProductDoc` fills every ar/ckb slot
+ *    from the local deterministic engine — no network, no AI — and reports the
+ *    fields it could not cover.
+ *  - The product NAME is copied, never translated, so it reads identically in
+ *    all three languages (§3, §12).
+ *  - `translation_meta` records, per field and language, whether the stored
+ *    text came out of the engine ('machine'), still needs a human
+ *    ('review_needed'), or was approved by one ('approved' — set only through
+ *    the future review page, and preserved here as long as the English source
+ *    is unchanged).
+ *  - content_rev bumps once when any tracked ENGLISH source changed.
  */
-function applyTranslationTracking(doc: ProductDoc, prev: ProductDoc | null): void {
-  const bodyMeta: TranslationMeta = doc.translation_meta ?? {};
+function applyTranslationTracking(
+  doc: ProductDoc,
+  prev: ProductDoc | null,
+  review: string[]
+): void {
   const storedMeta: TranslationMeta = prev?.translation_meta ?? {};
   const meta: TranslationMeta = {};
-  for (const key of new Set([...Object.keys(storedMeta), ...Object.keys(bodyMeta)])) {
-    meta[key] = { ...(storedMeta[key] ?? {}), ...(bodyMeta[key] ?? {}) };
-  }
+  for (const key of Object.keys(storedMeta)) meta[key] = { ...storedMeta[key] };
 
   const text = (d: ProductDoc, field: string): string => (d as unknown as Record<string, string>)[field] ?? '';
 
   let contentRev = prev ? prev.content_rev : doc.content_rev || 1;
+  const englishChanged = prev
+    ? TRACKED_FIELDS.some((f) => text(doc, f.en) !== text(prev, f.en))
+    : true;
+  if (prev && englishChanged) contentRev += 1;
 
-  if (prev) {
-    const arChanged = TRACKED_FIELDS.filter((f) => text(doc, f.ar) !== text(prev, f.ar));
-    if (arChanged.length) {
-      contentRev += 1;
-      for (const f of arChanged) {
-        const entry = meta[f.key] ?? {};
-        for (const lang of ['en', 'ckb'] as const) {
-          const cur = entry[lang];
-          if (cur && (cur.status === 'approved' || cur.status === 'imported')) {
-            entry[lang] = { status: 'stale', src_rev: cur.src_rev };
-          }
-        }
-        meta[f.key] = entry;
+  const needsReview = new Set(review);
+  for (const f of TRACKED_FIELDS) {
+    const entry = meta[f.key] ?? {};
+    const sourceChanged = !prev || text(doc, f.en) !== text(prev, f.en);
+    entry.en = { status: text(doc, f.en).trim() ? 'imported' : 'missing', src_rev: contentRev };
+    for (const lang of ['ar', 'ckb'] as const) {
+      const cur = entry[lang];
+      // A human approval survives while the English source is unchanged.
+      if (!sourceChanged && cur && cur.status === 'approved') continue;
+      if (!text(doc, f.en).trim()) {
+        entry[lang] = { status: 'missing', src_rev: contentRev };
+      } else if (needsReview.has(f.key)) {
+        entry[lang] = { status: 'stale', src_rev: contentRev };
+      } else {
+        entry[lang] = { status: 'imported', src_rev: contentRev };
       }
     }
-    for (const f of TRACKED_FIELDS) {
-      const entry = meta[f.key] ?? {};
-      if (text(doc, f.en) !== text(prev, f.en)) entry.en = { status: 'imported', src_rev: contentRev };
-      if (text(doc, f.ckb) !== text(prev, f.ckb)) entry.ckb = { status: 'imported', src_rev: contentRev };
-      meta[f.key] = entry;
-    }
-  } else {
-    // Create: seed entries that the body did not supply.
-    for (const f of TRACKED_FIELDS) {
-      const entry = meta[f.key] ?? {};
-      if (!entry.en) entry.en = { status: text(doc, f.en).trim() ? 'imported' : 'missing', src_rev: contentRev };
-      if (!entry.ckb) entry.ckb = { status: text(doc, f.ckb).trim() ? 'imported' : 'missing', src_rev: contentRev };
-      meta[f.key] = entry;
-    }
+    meta[f.key] = entry;
   }
 
   doc.content_rev = contentRev;
@@ -624,7 +626,11 @@ adminProductsRoutes.post('/', async (c) => {
     doc.slug = await uniqueSlugIn(c.env.DB, 'products', base, null);
   }
 
-  applyTranslationTracking(doc, prev);
+  // §3: English in, ar/ckb generated locally. This mutates the doc in place
+  // BEFORE serialization, so the row that gets written already carries the
+  // generated text and the storefront needs no runtime translation.
+  const localized = localizeProductDoc(doc);
+  applyTranslationTracking(doc, prev, localized.review_needed);
 
   const record = serializeDoc(doc);
   try {
@@ -674,8 +680,19 @@ adminProductsRoutes.post('/', async (c) => {
     }
   }
 
+  // Store the English sources and their generated copies. A failure here must
+  // not lose the product that already saved, so it degrades to a warning.
+  let translationWarning: string | null = null;
+  try {
+    await syncProductTranslations(c.env.DB, doc.id, localized.fields);
+  } catch (e) {
+    console.error('translation write failed for product', doc.id, e instanceof Error ? e.message : String(e));
+    translationWarning =
+      'The product saved, but its Arabic/Kurdish copies could not be stored — re-save to retry.';
+  }
+
   await audit(c.env.DB, admin.id, prev ? 'product_v2.update' : 'product_v2.create', doc.id, {
-    name_ar: doc.name_ar,
+    name_en: doc.name_en,
     slug: doc.slug,
     status: doc.status,
     price_iqd: doc.price_iqd,
@@ -689,7 +706,12 @@ adminProductsRoutes.post('/', async (c) => {
     success: true,
     created: !prev,
     product: { ...projectAdmin(parseProductRow(fresh!)), catalog_ids: await catalogIdsFor(c.env.DB, doc.id) },
+    // Named honestly rather than hidden behind a green tick: these fields kept
+    // their English text because the local engine could not translate them
+    // safely (§3). The product is saved and live either way.
+    translation_review_needed: localized.review_needed,
     ...(priceHistoryWarning ? { price_history_warning: priceHistoryWarning } : {}),
+    ...(translationWarning ? { translation_warning: translationWarning } : {}),
   });
 });
 

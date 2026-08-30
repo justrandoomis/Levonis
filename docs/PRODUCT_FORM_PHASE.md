@@ -105,8 +105,86 @@ wrangler d1 migrations apply levonis-db --local
 
 ---
 
+## Batch 2 — the local deterministic translator (§3)
+
+English is now the source language. The admin types English once; the Arabic
+and Sorani copies are produced by `worker/lib/translate/`, which contains no
+`fetch` at all — a test greps the compiled-away comments out of the source and
+fails the build if a network call, an AI provider name or an API key appears in
+it, and a second test swaps `globalThis.fetch` for a throwing stub while a
+translation runs.
+
+### What it will and will not do
+
+The engine translates a segment only when it can PROVE the whole segment is
+covered — an exact catalog phrase, a measurement whose unit it knows, a
+`Label: value` line where both halves are covered, an enumeration where every
+member is covered, or a token that is correct as-is (`PLA`, `USB-C`, `X1C`).
+Anything else — in particular free prose — keeps its English text and the field
+is reported as `review_needed`. That is not a shortfall to fix later: §3 forbids
+inventing a translation, and a rule-based engine cannot write correct Arabic or
+Sorani sentences. Saving is never blocked, and the admin response names the
+fields that still need a human instead of showing a green tick.
+
+The catalog records `ar` and `ckb` independently. A term with a confident
+Arabic rendering but no confident Sorani one (`Acceleration`, for example)
+produces Arabic and leaves Sorani in English with `review_needed` — a
+per-language honest degrade rather than a guess.
+
+`segment(s).join('') === s` is asserted for every shape of input, so a save can
+never silently reflow the author's spacing.
+
+### Wiring
+
+* `worker/lib/translate/index.ts` — the engine, rules R1–R6, `TRANSLATION_VERSION`.
+* `worker/lib/translate/dictionary.ts` — the terminology catalog: identity
+  terms, units, and ~180 phrases across device specs, material specs, commerce
+  vocabulary and colours.
+* `worker/lib/translate/localizeProduct.ts` — applies it to a whole ProductDoc:
+  description, how-to-use, spec groups and rows, labels, content blocks and
+  warranty plans. Product, option and colour NAMES are copied, never translated.
+* `worker/lib/translate/store.ts` — upserts `product_translations`, skips
+  unchanged sources by hash, and never overwrites a human `approved` row while
+  its English source is unchanged.
+* `worker/routes/adminProducts.ts` — runs the localizer before serialization, so
+  the row written already carries the generated text and the storefront needs no
+  runtime translation. `applyTranslationTracking` was rewritten from
+  Arabic-sourced to English-sourced.
+* Storefront: the product name is now read from the English field in every
+  language (`Home`, `Products`, `Bundles`, `Profile`, `Cart`, `Checkout`,
+  `Product`, `MyReviewsTab`), satisfying §12's "اسم المنتج الإنجليزي يبقى كما هو
+  في جميع الواجهات". Community/merchant listings are a different table
+  (`community_products`, seller-authored) and are untouched.
+
+### Lint
+
+The repository had **no** lint configuration at all, so §12's "lint … بلا
+أخطاء" could not be satisfied as written. `eslint.config.js` is now a real flat
+config covering the frontend, the Worker, the scripts and the tests, wired into
+`npm run lint` and `npm run check`. It went from 66 errors to 0 by fixing the
+actual findings (dead imports, unused bindings, `prefer-const`, two expression
+statements, an unnamed caught error) — not by disabling rules. The two
+`no-control-regex` sites are deliberate sanitizers and carry a targeted
+disable with the reason. 119 warnings remain, all `no-explicit-any` and
+`react-hooks/exhaustive-deps` on pre-existing code; they are reported, not
+suppressed.
+
+### Verification (real output)
+
+```
+npm run check      tsc (frontend) + tsc (worker) + eslint → 0 errors, 119 warnings
+npm run test:unit  369 pass / 0 fail
+                     translate      19/19
+                     translateStore  8/8   (real SQLite, real 0018 schema)
+                     walletOps      31/31  (moved onto the shared fixture)
+npm run build      built in 6.86s
+```
+
+---
+
 ## Still open
 
-Batches 2–6 (translation engine, product API, form rebuild, import templates,
-acceptance suite + staging evidence) are not done yet and are **not** claimed
-as working. Nothing in this batch has been deployed to staging or production.
+Batches 3–6 (product API for options/colours/variants/images/inventory, the
+form rebuild, the Devices/Materials import templates, and the §12 acceptance
+suite with staging evidence) are not done yet and are **not** claimed as
+working. Nothing so far has been deployed to staging or production.

@@ -170,7 +170,6 @@ async function main() {
   await pointsBuyer.post('/api/auth/register', { email: `v3p-${rnd}@test.local`, username: `v3p${rnd}`, name: 'V3 Points', password: 'v3-points-pass-1' });
   await proBuyer.post('/api/auth/register', { email: `v3pro-${rnd}@test.local`, username: `v3pro${rnd}`, name: 'Pro Buyer', password: 'v3-pro-pass-1' });
   const buyerAId = (await buyerA.get('/api/auth/me')).data?.user?.id;
-  const buyerBId = (await buyerB.get('/api/auth/me')).data?.user?.id;
   const proId = (await proBuyer.get('/api/auth/me')).data?.user?.id;
 
   // Taxonomy + fixture products (canonical products-v2 editor).
@@ -438,7 +437,6 @@ async function main() {
 
   r = await admin.post('/api/reviews/admin/pools', { level: 1, kind: 'accessory', label_ar: 'مغناطيسات بامبو', label_en: 'Bambu magnets', stock: 2 });
   check('admin stocks a level-1 accessory pool item', r.status === 200 && !!r.data?.item?.id, JSON.stringify(r.data).slice(0, 140));
-  const poolItemId = r.data?.item?.id;
   const poolsBefore = new Map(((await admin.get('/api/reviews/admin/pools')).data?.items ?? []).map((i) => [i.id, i.stock]));
   r = await buyerA.post(`/api/reviews/gifts/${entId}/redeem`, { level: 1 });
   const redeemedContents = JSON.stringify(r.data?.gift?.contents ?? null);

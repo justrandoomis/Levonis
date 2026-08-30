@@ -4,7 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError, uploadFile } from '../lib/api';
 import {
-  ArrowLeft, ArrowRight, Mic, Smile, Plus, X,
+  ArrowLeft, ArrowRight, Mic, Smile, Plus,
   Image as ImageIcon, Camera, Store as StoreIcon, Gift, MapPin, UserCircle, Wallet, Send, MessageSquare
 } from 'lucide-react';
 

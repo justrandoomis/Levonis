@@ -38,7 +38,8 @@ function applyFile(db, file, sql) {
     db.exec('COMMIT');
   } catch (e) {
     const failing = stmts[n] ?? '(commit — a DEFERRED constraint was still violated)';
-    try { db.exec('ROLLBACK'); } catch {}
+    // The transaction may already be closed; the original error is what matters.
+    try { db.exec('ROLLBACK'); } catch { /* already rolled back */ }
     console.error(`\n✘ ${file} — statement #${n + 1} of ${stmts.length} failed`);
     console.error(`  ${e.message}`);
     console.error(`  ---\n${failing.split('\n').slice(0, 12).join('\n')}\n  ---`);

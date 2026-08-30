@@ -114,6 +114,7 @@ export type TokenAction = 'approve' | 'reject' | 'reject_menu' | 'menu_main';
 // differently from what is stored. Arabic and Sorani need none of them here.
 const INVISIBLE_RE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g;
 // C0/C1 controls except newline (tabs are turned into spaces beforehand).
+// eslint-disable-next-line no-control-regex -- matching control characters IS the point here
 const CONTROL_RE = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g;
 
 /**

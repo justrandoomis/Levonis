@@ -772,7 +772,7 @@ function ZipFlow({ onApplied }: { onApplied: (id: string) => void }) {
     for (const f of readyFiles) {
       // Sequential on purpose: rate-limit friendly, and each file's outcome
       // stays attributable in the report.
-      // eslint-disable-next-line no-await-in-loop
+       
       await applyFile(f);
     }
   };

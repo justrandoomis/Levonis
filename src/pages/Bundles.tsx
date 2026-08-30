@@ -6,7 +6,7 @@ import { ArrowRight, ArrowLeft, Star } from 'lucide-react';
 import { api, ApiProduct, formatIqd } from '../lib/api';
 
 export default function Bundles() {
-  const { t, lang, dir } = useLanguage();
+  const { t, dir } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -81,7 +81,8 @@ export default function Bundles() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {products.map(p => {
               const firstImage = (Array.isArray(p.images) ? p.images : [])[0] || '';
-              const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
+              // §3/§12: the product name is English in every language and is never translated.
+              const name = p.name;
 
               const proPrice = p.membership_prices?.pro ?? null;
               const planPrice =

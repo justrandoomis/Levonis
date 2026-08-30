@@ -164,7 +164,8 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
   return (
     <div className="flex flex-col gap-3">
       {reviews.map((r) => {
-        const name = lang === 'ar' && r.product_name_ar ? r.product_name_ar : r.product_name || '';
+        // §3/§12: the product name is English in every language and is never translated.
+        const name = r.product_name || '';
         const statusCls = STATUS_STYLES[r.status] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400';
         return (
           <button

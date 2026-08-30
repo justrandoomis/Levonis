@@ -266,6 +266,17 @@ interface QuoteResponse {
 
 type Lang = 'ar' | 'en' | 'ckb';
 
+/**
+ * The product, option and colour NAMES are English in every language
+ * (product-form mandate §3: "عنوان/اسم المنتج يبقى باللغة الإنجليزية في جميع
+ * الواجهات ولا تتم ترجمته"; §7 defines option and colour names as English
+ * only). The ar/ckb slots are filled with the same English string on save, so
+ * the fallbacks here only matter for rows saved before that rule existed.
+ */
+function pickName(en?: string, legacy?: string, ar?: string): string {
+  return (en || legacy || ar || '').trim();
+}
+
 /** Picks the localized field, falling back to Arabic (the source language). */
 function pick(lang: Lang, ar?: string, en?: string, ckb?: string, legacy?: string): string {
   if (lang === 'en') return (en || ar || legacy || '').trim();
@@ -532,7 +543,7 @@ export default function Product() {
   }, [location.search, location.pathname]);
 
   const handleShare = async () => {
-    const name = product ? pick(lang as Lang, product.name_ar, product.name_en, product.name_ckb, product.name) : '';
+    const name = product ? pickName(product.name_en, product.name, product.name_ar) : '';
     // §3.3 — a signed-in sharer's link carries THEIR support handle. The path
     // is built by the SERVER from the account's own username (GET
     // /api/referrals/support/link): the browser never invents a handle, and a
@@ -665,7 +676,7 @@ export default function Product() {
   }
 
   // ------------------------------------------------------------ derived view
-  const name = pick(lang as Lang, product.name_ar, product.name_en, product.name_ckb, product.name);
+  const name = pickName(product.name_en, product.name, product.name_ar);
   const description = pick(
     lang as Lang, product.description_ar, product.description_en, product.description_ckb, product.description
   );
@@ -808,7 +819,7 @@ export default function Product() {
           <div className="mt-2 flex flex-wrap gap-2">
             {options.map((opt) => {
               const selected = optionId === opt.id;
-              const label = pick(lang as Lang, opt.name_ar, opt.name_en, opt.name_ckb, opt.name) || opt.id;
+              const label = pickName(opt.name_en, opt.name, opt.name_ar) || opt.id;
               return (
                 <button
                   key={opt.id}
@@ -840,7 +851,7 @@ export default function Product() {
           <div className="mt-2 flex flex-wrap gap-2">
             {colorsForOption.map((col) => {
               const selected = colorId === col.id;
-              const label = pick(lang as Lang, col.name_ar, col.name_en, col.name_ckb, col.name) || col.id;
+              const label = pickName(col.name_en, col.name, col.name_ar) || col.id;
               return (
                 <button
                   key={col.id}

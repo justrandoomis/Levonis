@@ -699,13 +699,13 @@ function priceWarnings(doc: ProductDoc): string[] {
 
 // ------------------------------------------------------- GET /blank, /example
 
-templateRoutes.get('/blank', (c) => {
+templateRoutes.get('/blank', () => {
   return attachment(buildBlankTemplate().text, 'levonis-product-template.txt');
 });
 
 /** A filled, valid example. Creating from it yields a DRAFT — never a live
  *  product (see the create branch of /apply). */
-templateRoutes.get('/example', (c) => {
+templateRoutes.get('/example', () => {
   return attachment(buildExampleTemplate(), 'levonis-product-template-example.txt');
 });
 

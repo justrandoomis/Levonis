@@ -468,7 +468,8 @@ export default function Cart() {
   const variantItem = items.find((i) => i.id === variantItemId) ?? null;
   const shippingItem = items.find((i) => i.id === shippingItemId) ?? null;
 
-  const itemName = (item: CartItem) => (lang === 'ar' && item.name_ar ? item.name_ar : item.name);
+  // §3/§12: the product name is English in every language and is never translated.
+  const itemName = (item: CartItem) => item.name;
 
   return (
     <div className="w-full pt-16 pb-48 text-zinc-300 min-h-screen bg-black flex flex-col font-sans">
@@ -976,7 +977,8 @@ export default function Cart() {
                 <p className="text-white font-bold mb-2">{dir === 'rtl' ? 'اللون' : 'Color'}</p>
                 <div className="flex gap-2 flex-wrap">
                   {(variantItem.colors ?? []).map((c) => {
-                    const cName = lang === 'ar' && c.name_ar ? c.name_ar : c.name || c.id;
+                    // §7: colour and option names are English only.
+                    const cName = c.name || c.id;
                     const active = pendingColorId === c.id;
                     return (
                       <button
@@ -1001,7 +1003,7 @@ export default function Cart() {
                 <p className="text-white font-bold mb-2">{dir === 'rtl' ? 'الخيارات' : 'Options'}</p>
                 <div className="flex gap-2 flex-wrap">
                   {(variantItem.options ?? []).map((o) => {
-                    const oName = lang === 'ar' && o.name_ar ? o.name_ar : o.name || o.id;
+                    const oName = o.name || o.id;
                     const active = pendingOptionId === o.id;
                     return (
                       <button

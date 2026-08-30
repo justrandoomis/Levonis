@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';

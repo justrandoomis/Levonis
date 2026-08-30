@@ -87,10 +87,21 @@ export interface ContentBlockV2 {
   media_key: string; // R2 key when internal
 }
 
+export interface TranslationStatusEntry {
+  status: 'approved' | 'imported' | 'stale' | 'missing';
+  src_rev: number;
+}
+
+/**
+ * Per-field, per-language state. ENGLISH IS THE SOURCE (product-form mandate
+ * §3); `ar` and `ckb` describe the locally generated copies. `en` is kept so
+ * pre-§3 rows written under the older Arabic-sourced scheme still parse.
+ */
 export interface TranslationMeta {
   [field: string]: {
-    en?: { status: 'approved' | 'imported' | 'stale' | 'missing'; src_rev: number };
-    ckb?: { status: 'approved' | 'imported' | 'stale' | 'missing'; src_rev: number };
+    en?: TranslationStatusEntry;
+    ar?: TranslationStatusEntry;
+    ckb?: TranslationStatusEntry;
   };
 }
 

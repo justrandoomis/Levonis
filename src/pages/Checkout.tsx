@@ -353,7 +353,8 @@ export default function Checkout() {
     }
   };
 
-  const itemName = (item: CartItem) => (lang === 'ar' && item.name_ar ? item.name_ar : item.name);
+  // §3/§12: the product name is English in every language and is never translated.
+  const itemName = (item: CartItem) => item.name;
 
   // Versioned-policy consent block (§7): unchecked by default, links to the
   // published documents, resets on material quote changes. Rendered above

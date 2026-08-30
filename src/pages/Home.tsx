@@ -14,7 +14,7 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 export default function Home() {
   const navigate = useNavigate();
 
-  const { t, dir, lang, loc } = useLanguage();
+  const { t, dir, loc } = useLanguage();
   const { user } = useAuth();
 
   // Subscription plan comes exclusively from the server-side user record.
@@ -120,7 +120,8 @@ export default function Home() {
   const renderProductCard = (p: ApiProduct, widthClass = 'w-[160px]') => {
     const images = Array.isArray(p.images) ? p.images : [];
     const firstImage = images[0] || '';
-    const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
+    // §3/§12: the product name is English in every language and is never translated.
+    const name = p.name;
 
     const proPrice = p.membership_prices?.pro ?? null;
     const planPrice = planActive && (plan === 'plus' || plan === 'pro') ? p.membership_prices?.[plan] ?? null : null;
@@ -241,9 +242,11 @@ export default function Home() {
     const isRightSwipe = distance < -50;
 
     if (isLeftSwipe) {
-      dir === 'rtl' ? prevSlide() : nextSlide();
+      if (dir === 'rtl') prevSlide();
+      else nextSlide();
     } else if (isRightSwipe) {
-      dir === 'rtl' ? nextSlide() : prevSlide();
+      if (dir === 'rtl') nextSlide();
+      else prevSlide();
     }
 
     touchStartX.current = 0;

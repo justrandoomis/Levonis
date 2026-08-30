@@ -247,7 +247,7 @@ function InvestHome({ investments, formatCurrency, lang, setLang, investCurrency
   // Value-over-time series derived from the real investments (linear accrual
   // between each investment's real start and end dates).
   const activeInvs = investments.filter((inv) => inv.status !== 'cancelled');
-  let chartData: Array<{ t: number; value: number }> = [];
+  const chartData: Array<{ t: number; value: number }> = [];
   if (activeInvs.length > 0) {
     const starts = activeInvs.map((inv) => new Date(inv.start_date).getTime()).filter((n) => !isNaN(n));
     if (starts.length > 0) {

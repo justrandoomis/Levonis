@@ -47,7 +47,6 @@ import { rateLimit } from '../lib/ratelimit';
 import { sniff } from './uploads';
 import {
   parseOpsPolicy,
-  computeCoverage,
   coverageState,
   normalizeSerial,
   maskSerial,

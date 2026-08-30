@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, unavailable, str, oneOf } from '../lib/http';
+import { requireAdmin, unavailable, str, oneOf } from '../lib/http';
 import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 

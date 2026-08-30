@@ -699,7 +699,7 @@ export default function Profile() {
                       <img referrerPolicy="no-referrer" src={bundle.images[0]} alt={bundle.name} className="w-full h-full object-cover" />
                     )}
                   </div>
-                  <span className="text-[9px] font-bold text-black dark:text-white line-clamp-2 leading-tight mb-1">{lang === 'ar' && bundle.name_ar ? bundle.name_ar : bundle.name}</span>
+                  <span className="text-[9px] font-bold text-black dark:text-white line-clamp-2 leading-tight mb-1">{bundle.name}</span>
                   <div className="text-[#ff0036] font-bold flex items-baseline gap-0.5 mt-auto">
                     <span className="text-[12px] leading-none">{formatIqd(bundle.price_iqd || 0)}</span>
                   </div>
@@ -746,7 +746,8 @@ export default function Profile() {
             )}
             {suggestedProducts.map(p => {
               const firstImage = p.images?.[0] || '';
-              const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
+              // §3/§12: the product name is English in every language and is never translated.
+              const name = p.name;
 
               return (
                 <button type="button" onClick={() => navigate('/product/' + p.slug)} key={p.id} className="bg-white dark:bg-[#1a1a1a] rounded-[10px] overflow-hidden flex flex-col text-start border border-black/5 dark:border-white/5 shadow-sm pb-2 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
@@ -798,7 +799,8 @@ export default function Profile() {
              ) : (
                <div className="flex flex-col gap-3">
                  {favorites.map((item) => {
-                   const name = lang === 'ar' && item.name_ar ? item.name_ar : item.name;
+                   // §3/§12: the product name is English in every language and is never translated.
+                   const name = item.name;
                    return (
                      <button type="button" key={item.id} onClick={() => navigate(`/product/${item.slug}`)} className="bg-white dark:bg-[#1a1a1a] rounded-[10px] p-2.5 flex gap-3 shadow-sm border border-black/5 dark:border-white/5 relative text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
                        <div className="w-[110px] h-[110px] rounded-lg overflow-hidden shrink-0 bg-zinc-100 dark:bg-zinc-800">

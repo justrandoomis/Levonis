@@ -1051,7 +1051,7 @@ function RestrictionForm({
 
 // ============================================================= ticket queue
 
-function QueueSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
+function QueueSection({ s }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
   const [stateFilter, setStateFilter] = useState('');
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
   const [loading, setLoading] = useState(true);

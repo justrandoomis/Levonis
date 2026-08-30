@@ -88,7 +88,7 @@ export default function ProductEditor({
       setSavedDoc(null);
       setLoadedUpdatedAt('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [productId]);
 
   useEffect(() => {

@@ -6,9 +6,8 @@
  * These are NOT mock tests. Every statement in worker/lib/walletOps.ts runs
  * against a real SQLite database created from the REAL migration file
  * (migrations/0015_wallet_holds.sql) plus the real `wallet_transactions`
- * definition lifted out of migrations/0001_init.sql, through a thin adapter
- * that gives node:sqlite the D1 surface (prepare/bind/run/first/all/batch,
- * batch in one transaction, meta.changes from the driver). So the CHECK
+ * definition lifted out of migrations/0001_init.sql, through the shared
+ * node:sqlite → D1 adapter in tests/fixtures/d1.ts. So the CHECK
  * constraints, the UNIQUE indexes, the conditional UPDATE/INSERT guards and
  * the "0 rows updated aborts the dependent writes" behaviour are all
  * exercised for real, not asserted about.
@@ -23,8 +22,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ROOT, SqliteD1, createTableSql } from './fixtures/d1';
 
 import {
   canTransition,
@@ -53,79 +52,6 @@ import {
   type WithdrawalReconRow,
 } from '../worker/lib/walletOps';
 import type { Env } from '../worker/lib/types';
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-
-// --------------------------------------------------------------- D1 adapter
-
-type Row = Record<string, unknown>;
-
-class SqliteStatement {
-  constructor(
-    private readonly db: DatabaseSync,
-    private readonly sql: string,
-    private readonly params: unknown[] = []
-  ) {}
-
-  bind(...values: unknown[]): SqliteStatement {
-    return new SqliteStatement(this.db, this.sql, values);
-  }
-
-  private args(): never[] {
-    return this.params as never[];
-  }
-
-  async run() {
-    const res = this.db.prepare(this.sql).run(...this.args());
-    return {
-      success: true,
-      results: [],
-      meta: { changes: Number(res.changes), last_row_id: Number(res.lastInsertRowid), duration: 0 },
-    };
-  }
-
-  async first<T = Row>(): Promise<T | null> {
-    const row = this.db.prepare(this.sql).get(...this.args());
-    return (row === undefined ? null : (row as T)) as T | null;
-  }
-
-  async all<T = Row>() {
-    const rows = this.db.prepare(this.sql).all(...this.args()) as T[];
-    return { success: true, results: rows, meta: { changes: 0, duration: 0 } };
-  }
-}
-
-class SqliteD1 {
-  constructor(private readonly db: DatabaseSync) {}
-
-  prepare(sql: string): SqliteStatement {
-    return new SqliteStatement(this.db, sql);
-  }
-
-  /** D1 semantics: one transaction; any SQL error rolls the whole batch back. */
-  async batch(statements: SqliteStatement[]) {
-    this.db.exec('BEGIN');
-    try {
-      const out = [];
-      for (const s of statements) out.push(await s.run());
-      this.db.exec('COMMIT');
-      return out;
-    } catch (e) {
-      this.db.exec('ROLLBACK');
-      throw e;
-    }
-  }
-}
-
-/** Lifts one CREATE TABLE block out of a migration file, verbatim. */
-function createTableSql(file: string, table: string): string {
-  const src = readFileSync(join(ROOT, 'migrations', file), 'utf8');
-  const start = src.indexOf(`CREATE TABLE ${table} (`);
-  assert.ok(start >= 0, `${table} not found in ${file}`);
-  const end = src.indexOf('\n);', start);
-  assert.ok(end > start, `${table} block not terminated in ${file}`);
-  return `${src.slice(start, end)}\n);`;
-}
 
 function freshDb(): { db: D1Database; raw: DatabaseSync } {
   const raw = new DatabaseSync(':memory:');

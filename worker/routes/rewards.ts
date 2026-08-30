@@ -169,7 +169,7 @@ rewardRoutes.post('/browse/ping', async (c) => {
   if (seconds >= BROWSE_REQUIRED_SECS) {
     try {
       await claim(c, 'browse', today, MISSION_POINTS.browse, 'Browsed Products for 3 Mins');
-    } catch (e) {
+    } catch {
       // Already claimed via a parallel tab — treat as done.
     }
     return c.json({ success: true, done: true, seconds });

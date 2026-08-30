@@ -10,7 +10,7 @@ import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 
 export default function Products() {
-  const { t, lang, dir, loc } = useLanguage();
+  const { t, dir, loc } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -100,7 +100,8 @@ export default function Products() {
           >
             {products.map(p => {
               const firstImage = (Array.isArray(p.images) ? p.images : [])[0] || '';
-              const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
+              // §3/§12: the product name is English in every language and is never translated.
+              const name = p.name;
 
               const proPrice = p.membership_prices?.pro ?? null;
               const planPrice =
