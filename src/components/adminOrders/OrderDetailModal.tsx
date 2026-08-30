@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, MessageSquare, ClipboardList, Package } from 'lucide-react';
+import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ShieldCheck, Tag } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, formatIqd, type AdminOrderDetail } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
@@ -353,6 +353,48 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 </p>
               </section>
             )}
+          </div>
+        )}
+
+        {/* --------------------------------------------------- printing bar
+            Opened in a NEW TAB with ?print=1, which fires the browser's own
+            print dialog on load. That dialog is the only route a web page has
+            to a printer — there is no API that opens a USB or network
+            receipt printer directly — and the pages carry `@page` rules for
+            the right roll, so the shop is not asked to pick A4 and scale it.
+
+            Kept out of the chat tab: a print button beside a conversation is
+            a mis-tap waiting to happen. */}
+        {!loading && error == null && detail && tab === 'order' && (
+          <div
+            data-order-print-bar
+            className="shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 flex flex-wrap gap-2"
+          >
+            {([
+              ['receipt', `/api/admin/orders/${orderId}/receipt?print=1`, Receipt,
+                loc('وصل الشراء', 'Purchase receipt', 'پسوولەی کڕین'), false],
+              ['warranty', `/api/admin/orders/${orderId}/warranty-receipt?print=1`, ShieldCheck,
+                loc('وصل الضمان', 'Warranty receipt', 'پسوولەی گەرەنتی'), true],
+              ['label', `/api/admin/orders/${orderId}/label?print=1`, Tag,
+                loc('ستيكر التوصيل', 'Delivery label', 'ستیکەری گەیاندن'), false],
+            ] as const).map(([id, href, Icon, label, deviceOnly]) => (
+              <a
+                key={id}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-print={id}
+                // The warranty slip is offered on every order because whether
+                // an order HAS warranted units is a server-side question the
+                // panel cannot answer from what it was sent — and the route
+                // refuses with a message rather than printing a blank form.
+                title={deviceOnly ? loc('للأجهزة التي لها ضمان', 'For devices under warranty', 'بۆ ئامێرە گەرەنتیدارەکان') : undefined}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 hover:text-white transition-colors"
+              >
+                <Icon className="w-4 h-4" aria-hidden />
+                {label}
+              </a>
+            ))}
           </div>
         )}
       </div>

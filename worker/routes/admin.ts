@@ -28,6 +28,14 @@ import {
 } from '../lib/orderStages';
 import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
 import { ALWASEET, alwaseetDriver, resolveWire } from '../lib/delivery/alwaseet';
+import {
+  escposReceipt,
+  renderDeliveryLabel,
+  renderLabelSheet,
+  renderPurchaseReceipt,
+  renderWarrantyReceipt,
+} from '../lib/receipts';
+import { SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { listStatusMap, setStatusMapping, upsertRemoteStatuses } from '../lib/delivery/statusMap';
 import { syncOrderDelivery, sweepDeliveryStatuses } from '../lib/delivery/sync';
 import type { DeliveryDriver } from '../lib/delivery/types';
@@ -755,6 +763,242 @@ adminRoutes.get('/orders/:id/stages', async (c) => {
  * it take effect. It is the same function the cron calls — not a second
  * implementation — so what this promotes is exactly what the cron would have.
  */
+// ---------------------------------------------------------------- printing
+
+/**
+ * Everything the paper needs, read from the ORDER as it was placed.
+ *
+ * Nothing is recomputed. A receipt that recalculates a total is a receipt
+ * that can disagree with the order it is a receipt for — and the customer is
+ * holding the disagreement.
+ */
+async function receiptDataFor(c: Context<AppContext>, id: string) {
+  const o = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!o) throw notFound('Order not found');
+  const [{ results: items }, invoice] = await Promise.all([
+    c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid').bind(id).all<Record<string, unknown>>(),
+    c.env.DB.prepare('SELECT invoice_no FROM invoices WHERE order_id = ? ORDER BY revision DESC LIMIT 1')
+      .bind(id).first<{ invoice_no: string }>().catch(() => null),
+  ]);
+  const address = safeParse<Record<string, unknown>>(o.address_snapshot, {});
+  const coupon = safeParse<{ code?: string; discount_iqd?: number } | null>(o.coupon_snapshot, null);
+  const shippingType = asShippingType(o.shipping_type);
+
+  return {
+    order: o,
+    address,
+    data: {
+      order_id: String(o.id),
+      invoice_no: invoice?.invoice_no ?? null,
+      created_at: String(o.created_at ?? ''),
+      customer_name: String(address.name ?? ''),
+      phone: String(address.phone ?? ''),
+      governorate: String(address.governorate ?? ''),
+      area: String(address.area ?? ''),
+      address: String(address.address ?? ''),
+      landmark: String(address.landmark ?? ''),
+      notes: String(address.notes ?? ''),
+      lines: (items ?? []).map((it) => ({
+        name: String(it.name_snapshot ?? ''),
+        variant: String(it.option_snapshot ?? ''),
+        qty: Number(it.qty) || 0,
+        unit_iqd: Number(it.unit_price_iqd) || 0,
+        line_iqd: Number(it.line_total_iqd) || 0,
+      })),
+      // Only the adjustments this order actually carried. A zero row is
+      // filtered by the renderer, so an order with no coupon prints no
+      // coupon line rather than "coupon: 0".
+      adjustments: [
+        { label_ar: `خصم الكود ${coupon?.code ?? ''}`.trim(), label_en: `Coupon ${coupon?.code ?? ''}`.trim(),
+          amount_iqd: Number(coupon?.discount_iqd) || 0, negative: true },
+        { label_ar: 'خصم النقاط', label_en: 'Points', amount_iqd: Number(o.points_discount_iqd) || 0, negative: true },
+        { label_ar: 'من المحفظة', label_en: 'Wallet', amount_iqd: Number(o.wallet_applied_iqd) || 0, negative: true },
+      ],
+      subtotal_iqd: Number(o.subtotal_iqd) || 0,
+      shipping_iqd: Number(o.shipping_iqd) || 0,
+      total_iqd: Number(o.total_iqd) || 0,
+      due_on_delivery_iqd: Number(o.due_on_delivery_iqd) || 0,
+      payment_method: String(o.payment_method_id ?? ''),
+      shipping_type_label: SHIPPING_TYPE_LABELS[shippingType].ar,
+      support_code: String(safeParse<{ ref?: string } | null>(o.support_snapshot, null)?.ref ?? ''),
+    },
+  };
+}
+
+const printLang = (c: Context<AppContext>): 'ar' | 'en' => (c.req.query('lang') === 'en' ? 'en' : 'ar');
+const wantsPrint = (c: Context<AppContext>) => c.req.query('print') === '1';
+
+/** وصل الشراء — the receipt the shop hands over or puts in the box. */
+adminRoutes.get('/orders/:id/receipt', async (c) => {
+  const id = c.req.param('id');
+  const { data } = await receiptDataFor(c, id);
+  if (c.req.query('format') === 'escpos') {
+    // Raw bytes for a shop with a networked printer and a print server. A
+    // browser cannot open a printer itself; this is a body that server can
+    // forward, rendered from the same data as the HTML.
+    c.header('Content-Type', 'text/plain; charset=utf-8');
+    c.header('Cache-Control', 'no-store');
+    return c.body(escposReceipt(data, int(c.req.query('cols') ?? 48, 'cols', { min: 24, max: 96 })));
+  }
+  c.header('Cache-Control', 'no-store');
+  return c.html(renderPurchaseReceipt(data, printLang(c), wantsPrint(c),
+    int(c.req.query('width') ?? 80, 'width', { min: 50, max: 110 })));
+});
+
+/**
+ * وصل الضمان — printed ALONGSIDE the purchase receipt for devices.
+ *
+ * Refuses rather than printing an empty form. A blank warranty slip in a
+ * customer's hand is a promise nobody made, and the units only exist once
+ * the order is delivered (that is when the warranty clock starts), so before
+ * then there is genuinely nothing to print and the message says so.
+ */
+adminRoutes.get('/orders/:id/warranty-receipt', async (c) => {
+  const id = c.req.param('id');
+  const { data } = await receiptDataFor(c, id);
+  const { results: units } = await c.env.DB.prepare(
+    `SELECT iu.unit_index, iu.warranty_base_months, iu.warranty_ext_months,
+            iu.warranty_start_at, iu.warranty_end_at, oi.name_snapshot, ds.serial_raw
+       FROM order_item_units iu
+       JOIN order_items oi ON oi.id = iu.order_item_id
+       LEFT JOIN device_serials ds ON ds.unit_id = iu.id
+      WHERE iu.order_id = ?
+      ORDER BY iu.order_item_id, iu.unit_index`
+  ).bind(id).all<Record<string, unknown>>();
+
+  const warranted = (units ?? []).filter((u) => (Number(u.warranty_base_months) || 0) + (Number(u.warranty_ext_months) || 0) > 0);
+  if (warranted.length === 0) {
+    throw badRequest(
+      'This order has no warranted device units yet — warranty starts at delivery, so there is nothing to print.',
+      'NO_WARRANTY_UNITS'
+    );
+  }
+
+  // The owner's PUBLISHED warranty policy, in the language being printed,
+  // falling back to Arabic — never a paraphrase written here. No published
+  // policy prints no terms block at all rather than invented ones.
+  const lang = printLang(c);
+  const policy =
+    (await c.env.DB.prepare(
+      "SELECT body FROM policy_documents WHERE key = 'warranty' AND status = 'published' AND lang = ? ORDER BY version DESC LIMIT 1"
+    ).bind(lang).first<{ body: string }>().catch(() => null)) ??
+    (await c.env.DB.prepare(
+      "SELECT body FROM policy_documents WHERE key = 'warranty' AND status = 'published' AND lang = 'ar' ORDER BY version DESC LIMIT 1"
+    ).first<{ body: string }>().catch(() => null));
+
+  c.header('Cache-Control', 'no-store');
+  return c.html(renderWarrantyReceipt(
+    {
+      order_id: data.order_id,
+      invoice_no: data.invoice_no,
+      created_at: data.created_at,
+      customer_name: data.customer_name,
+      phone: data.phone,
+      units: warranted.map((u) => ({
+        product_name: String(u.name_snapshot ?? ''),
+        serial: (u.serial_raw as string | null) ?? null,
+        unit_index: Number(u.unit_index) || 0,
+        months: (Number(u.warranty_base_months) || 0) + (Number(u.warranty_ext_months) || 0),
+        starts_at: (u.warranty_start_at as string | null) ?? null,
+        ends_at: (u.warranty_end_at as string | null) ?? null,
+      })),
+      // The owner's published warranty policy, not a paraphrase of it.
+      terms: String(policy?.body ?? '').slice(0, 1200),
+    },
+    lang,
+    wantsPrint(c),
+    int(c.req.query('width') ?? 80, 'width', { min: 50, max: 110 })
+  ));
+});
+
+function labelFrom(data: Awaited<ReturnType<typeof receiptDataFor>>['data'], order: Record<string, unknown>, itemCount: number) {
+  return {
+    order_id: data.order_id,
+    customer_name: data.customer_name,
+    phone: data.phone,
+    governorate: data.governorate,
+    area: data.area,
+    address: data.address,
+    landmark: data.landmark,
+    notes: data.notes,
+    // Cash on delivery collects what is still owed; anything prepaid
+    // collects nothing. Read from the order, never assumed from the total.
+    cod_iqd: String(order.payment_method_id) === 'cash'
+      ? Number(order.total_iqd) || 0
+      : Number(order.due_on_delivery_iqd) || 0,
+    item_count: itemCount,
+    tracking_no: String(order.delivery_tracking_no ?? ''),
+    created_at: data.created_at,
+  };
+}
+
+/** One delivery sticker. */
+adminRoutes.get('/orders/:id/label', async (c) => {
+  const id = c.req.param('id');
+  const { data, order } = await receiptDataFor(c, id);
+  const count = data.lines.reduce((n, l) => n + l.qty, 0);
+  c.header('Cache-Control', 'no-store');
+  return c.html(renderDeliveryLabel(labelFrom(data, order, count), printLang(c), wantsPrint(c)));
+});
+
+/**
+ * A sheet of stickers for NEW orders — "طباعة ستيكرات الطلبات الجديدة".
+ *
+ * "New" is defined HERE, once, and it means an order that has not been
+ * dispatched: stage `received` or `confirmed`. Printing a sticker for a
+ * parcel already on a motorbike is how the same order goes out twice.
+ *
+ * The `ids` parameter narrows it to an explicit selection, so an admin can
+ * print the six they just packed rather than every open order — and even
+ * then the new-only rule still applies, because a selection is a convenience
+ * and not permission to re-print a dispatched order.
+ */
+adminRoutes.get('/labels', async (c) => {
+  const idsRaw = str(c.req.query('ids'), 'ids', { max: 2000, required: false });
+  const ids = idsRaw ? idsRaw.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 100) : [];
+  const limit = int(c.req.query('limit') ?? 50, 'limit', { min: 1, max: 100 });
+
+  const NEW_STAGES = ['received', 'confirmed'];
+  const placeholders = NEW_STAGES.map(() => '?').join(',');
+  const sql = ids.length
+    ? `SELECT * FROM orders WHERE stage IN (${placeholders}) AND id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at`
+    : `SELECT * FROM orders WHERE stage IN (${placeholders}) ORDER BY created_at LIMIT ?`;
+  const binds = ids.length ? [...NEW_STAGES, ...ids] : [...NEW_STAGES, limit];
+  const { results } = await c.env.DB.prepare(sql).bind(...binds).all<Record<string, unknown>>();
+
+  const orderIds = (results ?? []).map((o) => String(o.id));
+  const counts = new Map<string, number>();
+  if (orderIds.length) {
+    const { results: rows } = await c.env.DB.prepare(
+      `SELECT order_id, SUM(qty) AS n FROM order_items WHERE order_id IN (${orderIds.map(() => '?').join(',')}) GROUP BY order_id`
+    ).bind(...orderIds).all<{ order_id: string; n: number }>();
+    for (const r of rows ?? []) counts.set(String(r.order_id), Number(r.n) || 0);
+  }
+
+  const labels = (results ?? []).map((o) => {
+    const address = safeParse<Record<string, unknown>>(o.address_snapshot, {});
+    return {
+      order_id: String(o.id),
+      customer_name: String(address.name ?? ''),
+      phone: String(address.phone ?? ''),
+      governorate: String(address.governorate ?? ''),
+      area: String(address.area ?? ''),
+      address: String(address.address ?? ''),
+      landmark: String(address.landmark ?? ''),
+      notes: String(address.notes ?? ''),
+      cod_iqd: String(o.payment_method_id) === 'cash'
+        ? Number(o.total_iqd) || 0
+        : Number(o.due_on_delivery_iqd) || 0,
+      item_count: counts.get(String(o.id)) ?? 0,
+      tracking_no: String(o.delivery_tracking_no ?? ''),
+      created_at: String(o.created_at ?? ''),
+    };
+  });
+
+  c.header('Cache-Control', 'no-store');
+  return c.html(renderLabelSheet(labels, printLang(c), wantsPrint(c)));
+});
+
 // ------------------------------------------------------------ local delivery
 
 /**

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket } from 'lucide-react';
+import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import AdminCoupons from '../components/adminCoupons/AdminCoupons';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
@@ -200,13 +200,31 @@ function AdminOrders() {
       <div className="flex flex-col gap-4 min-w-0">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-2xl font-black text-white">{loc('الطلبات', 'Orders', 'داواکارییەکان')}</h2>
-          <button
-            onClick={loadOrders}
-            className="w-11 h-11 shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 hover:text-white transition-colors flex items-center justify-center"
-            title={loc('تحديث', 'Refresh', 'نوێکردنەوە')}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Stickers for the orders not yet dispatched. "New" is decided
+                on the SERVER (stage received or confirmed) — printing a
+                sticker for a parcel already on a motorbike is how the same
+                order goes out twice, and a panel-side guess at "new" would
+                drift from the list the moment the definition changed. */}
+            <a
+              href="/api/admin/labels?print=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-print-new-labels
+              className="inline-flex items-center gap-2 min-h-[44px] px-3.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-200 hover:text-white text-[13px] font-bold transition-colors whitespace-nowrap"
+              title={loc('طباعة ستيكرات الطلبات الجديدة', 'Print labels for new orders', 'چاپکردنی ستیکەری داواکارییە نوێیەکان')}
+            >
+              <Tag className="w-4 h-4" aria-hidden />
+              <span className="hidden sm:inline">{loc('ستيكرات الجديدة', 'New labels', 'ستیکەرە نوێیەکان')}</span>
+            </a>
+            <button
+              onClick={loadOrders}
+              className="w-11 h-11 shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 hover:text-white transition-colors flex items-center justify-center"
+              title={loc('تحديث', 'Refresh', 'نوێکردنەوە')}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* The filter bar scrolls on its own. It used to sit in a flex row
