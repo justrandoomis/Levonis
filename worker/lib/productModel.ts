@@ -571,7 +571,14 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     if (seenMethods.has(t.method)) fail('preorder_transports', `duplicate method "${t.method}"`);
     seenMethods.add(t.method);
   }
-  if (sellingType !== 'pre_order' && transports.some((t) => t.active)) {
+  // §6 made sale_types the authority and `selling_type` a legacy scalar kept
+  // for old readers. This guard still asked the SCALAR, so a product whose
+  // sale_types included pre_order but whose scalar was still 'direct_sale'
+  // had every transport offer silently deactivated on save — and then refused
+  // every pre-order add with TRANSPORT_NOT_OFFERED. The multi-select in §6 is
+  // exactly the case that produces that combination.
+  const saleTypesForTransport = normalizeSaleTypes(body.sale_types, sellingType as string);
+  if (!saleTypesForTransport.includes('pre_order') && transports.some((t) => t.active)) {
     // Transport offers are meaningless outside preorder — kept stored but inactive.
     transports.forEach((t) => (t.active = false));
   }

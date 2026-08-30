@@ -104,7 +104,10 @@ app.notFound((c) => {
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
-    return c.json({ success: false, error: err.message, code: err.code }, err.status as 400);
+    return c.json(
+      { success: false, error: err.message, code: err.code, ...(err.details ? { details: err.details } : {}) },
+      err.status as 400
+    );
   }
   // Detailed diagnostics stay server-side; clients get a safe generic error.
   console.error('Unhandled error', c.req.method, c.req.path, err);

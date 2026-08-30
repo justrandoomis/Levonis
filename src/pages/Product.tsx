@@ -37,6 +37,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
+import ShippingConflictDialog from '../components/cart/ShippingConflictDialog';
 import { useAuth } from '../AuthContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package,
@@ -408,6 +409,11 @@ export default function Product() {
   const [lightbox, setLightbox] = useState(false);
 
   const [addingToCart, setAddingToCart] = useState(false);
+  // Set only from the server's CART_SHIPPING_CONFLICT refusal. null = no dialog.
+  const [shippingConflict, setShippingConflict] = useState<{
+    cartType: unknown;
+    incomingType: unknown;
+  } | null>(null);
   const addInFlight = useRef(false);
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
@@ -600,40 +606,60 @@ export default function Product() {
     }
   };
 
-  const handleAddToCart = useCallback(async () => {
-    if (!product) return;
-    // Double-tap guard: a ref, not state, so two taps in the same tick cannot
-    // both pass. Retrying after a failure is safe (the server upserts one row).
-    if (addInFlight.current) return;
-    if (!isAuthenticated) {
-      navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
-      return;
-    }
-    addInFlight.current = true;
-    setAddingToCart(true);
-    setActionError('');
-    setNotice('');
-    try {
-      const body: Record<string, unknown> = { productId: product.id, qty };
-      if (optionId) body.optionId = optionId;
-      if (colorId) body.colorId = colorId;
-      if (availability?.mode === 'preorder' && transportMethod) body.transportMethod = transportMethod;
-      if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
-      const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
-      // Success is claimed ONLY after the server returns the saved cart.
-      const count = data.items.reduce((n, it) => n + it.qty, 0);
-      setNotice(`${s.added} (${count})`);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
+  // The add, factored out so the "empty the cart and add" button can repeat
+  // the SAME request with replaceCart set, rather than assembling a second
+  // body that could drift from this one.
+  const postAddToCart = useCallback(
+    async (replaceCart: boolean) => {
+      if (!product) return;
+      // Double-tap guard: a ref, not state, so two taps in the same tick cannot
+      // both pass. Retrying after a failure is safe (the server upserts one row).
+      if (addInFlight.current) return;
+      if (!isAuthenticated) {
         navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
         return;
       }
-      setActionError(err instanceof Error ? err.message : 'Failed to add to cart');
-    } finally {
-      addInFlight.current = false;
-      setAddingToCart(false);
-    }
-  }, [product, qty, optionId, colorId, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added]);
+      addInFlight.current = true;
+      setAddingToCart(true);
+      setActionError('');
+      setNotice('');
+      try {
+        const body: Record<string, unknown> = { productId: product.id, qty };
+        if (optionId) body.optionId = optionId;
+        if (colorId) body.colorId = colorId;
+        if (availability?.mode === 'preorder' && transportMethod) body.transportMethod = transportMethod;
+        if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
+        if (replaceCart) body.replaceCart = true;
+        const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
+        // Success is claimed ONLY after the server returns the saved cart.
+        const count = data.items.reduce((n, it) => n + it.qty, 0);
+        setShippingConflict(null);
+        setNotice(`${s.added} (${count})`);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+          return;
+        }
+        // A cart may hold exactly one shipping type. The SERVER owns that rule
+        // and names both types when it refuses; we only ask the customer which
+        // way out they want. Anything else stays an inline error.
+        if (err instanceof ApiError && err.code === 'CART_SHIPPING_CONFLICT') {
+          setShippingConflict({
+            cartType: err.details?.cart_shipping_type,
+            incomingType: err.details?.incoming_shipping_type,
+          });
+          return;
+        }
+        setActionError(err instanceof Error ? err.message : 'Failed to add to cart');
+      } finally {
+        addInFlight.current = false;
+        setAddingToCart(false);
+      }
+    },
+    [product, qty, optionId, colorId, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added]
+  );
+
+  const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
 
   // Escape closes the lightbox.
   useEffect(() => {
@@ -1342,6 +1368,17 @@ export default function Product() {
           />
         </div>
       ) : null}
+
+      <ShippingConflictDialog
+        open={shippingConflict !== null}
+        lang={lang}
+        dir={dir}
+        cartType={shippingConflict?.cartType}
+        incomingType={shippingConflict?.incomingType}
+        busy={addingToCart}
+        onConfirm={() => void postAddToCart(true)}
+        onCancel={() => setShippingConflict(null)}
+      />
     </div>
   );
 }

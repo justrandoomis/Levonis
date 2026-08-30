@@ -41,6 +41,8 @@ import { notifyAdmins } from '../lib/telegram';
 import { quoteShipping } from '../lib/shipping';
 import type { ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
 import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
+import { typeForTransport } from '../lib/shippingType';
+import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
 import { normalizePhone } from '../lib/phone';
@@ -157,6 +159,12 @@ export function orderPublic(
   return {
     id: o.id,
     status: o.status,
+    /** §1: which of the four journeys this order is on. */
+    shipping_type: typeForTransport(
+      String(o.shipping_type ?? '').startsWith('preorder_')
+        ? String(o.shipping_type).slice('preorder_'.length)
+        : ''
+    ),
     address: safeParse(o.address_snapshot, {}),
     delivery_method: safeParse(o.delivery_method_snapshot, {}),
     payment_method_id: o.payment_method_id,
@@ -877,6 +885,14 @@ orderRoutes.post('/', async (c) => {
 
   const orderId = newOrderId();
   const now = new Date().toISOString();
+  // The cart rule guarantees a single type across the lines, so the first one
+  // speaks for the order. Falls back to direct for an order with no transport,
+  // which is what "no transport" has always meant.
+  const orderShippingType: ShippingType = typeForTransport(
+    comp.lines
+      .map((l) => safeParse<{ method?: unknown } | null>(l.transport_snapshot, null)?.method)
+      .find((m) => m === 'air' || m === 'sea' || m === 'land') ?? ''
+  );
 
   // Versioned-policy consent (§7): required BEFORE anything is written. When
   // no checkout policy is published yet, the list is empty and nothing is
@@ -907,8 +923,8 @@ orderRoutes.post('/', async (c) => {
          payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
-         support_snapshot, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         support_snapshot, shipping_type, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.pointsDiscount, comp.walletApplied,
@@ -917,7 +933,13 @@ orderRoutes.post('/', async (c) => {
       // §5: merchandise is stored apart from fees so every screen and the
       // invoice read ONE basis. Support attribution is frozen here and can
       // never be re-pointed after purchase (§3.3) — worth 0 IQD to the buyer.
-      comp.merchandise, comp.supportSnapshot ? JSON.stringify(comp.supportSnapshot) : null, now, now
+      comp.merchandise, comp.supportSnapshot ? JSON.stringify(comp.supportSnapshot) : null,
+      // §1: the journey this order is on, frozen at purchase. A direct order
+      // moves through five states and a pre-order through fourteen, so the
+      // state machine must not have to re-derive the path from lines that can
+      // change afterwards. The cart guarantees one type, so the first line
+      // speaks for all of them.
+      orderShippingType, now, now
     ),
   ];
 

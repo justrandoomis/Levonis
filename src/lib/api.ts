@@ -7,7 +7,14 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
-    public code?: string
+    public code?: string,
+    /**
+     * Machine-readable context the server attached to a refusal, e.g. the
+     * cart's current shipping type versus the one just attempted. Without it
+     * the UI can only repeat the generic message; with it the UI can name
+     * both types and offer the right way out.
+     */
+    public details?: Record<string, unknown>
   ) {
     super(message);
   }
@@ -31,14 +38,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     throw new ApiError(0, 'Network error — check your connection and try again');
   }
-  let data: { success?: boolean; error?: string; code?: string } & T;
+  let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
   try {
     data = await res.json();
   } catch {
     throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
   }
   if (!res.ok || data.success === false) {
-    throw new ApiError(res.status, data.error || `Server error (${res.status})`, data.code);
+    throw new ApiError(res.status, data.error || `Server error (${res.status})`, data.code, data.details);
   }
   return data;
 }

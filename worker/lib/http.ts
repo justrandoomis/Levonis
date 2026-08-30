@@ -5,13 +5,18 @@ export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
-    public code?: string
+    public code?: string,
+    /** Machine-readable context the CLIENT needs to act on the refusal — e.g.
+     *  which shipping type the cart already holds, so the dialog can name it.
+     *  Serialized as-is, so it must never carry anything private. */
+    public details?: Record<string, unknown>
   ) {
     super(message);
   }
 }
 
-export const badRequest = (msg: string, code?: string) => new HttpError(400, msg, code);
+export const badRequest = (msg: string, code?: string, details?: Record<string, unknown>) =>
+  new HttpError(400, msg, code, details);
 export const unauthorized = (msg = 'Authentication required') => new HttpError(401, msg, 'UNAUTHORIZED');
 export const forbidden = (msg = 'Not allowed') => new HttpError(403, msg, 'FORBIDDEN');
 export const notFound = (msg = 'Not found') => new HttpError(404, msg, 'NOT_FOUND');

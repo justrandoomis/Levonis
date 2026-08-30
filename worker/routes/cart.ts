@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cartShippingType, typeForTransport } from '../lib/shippingType';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -296,7 +297,11 @@ async function loadCart(c: Context<AppContext>) {
 
 cartRoutes.get('/', async (c) => {
   const { items, tier, tierActive } = await loadCart(c);
-  return c.json({ success: true, items, tier, tierActive });
+  // §1: the type the cart is locked to, so the storefront can say so before
+  // the customer discovers it by being refused. null = empty, so any type may
+  // still be started.
+  const shippingType = cartShippingType(items as Array<{ transport_method?: unknown }>);
+  return c.json({ success: true, items, tier, tierActive, shipping_type: shippingType });
 });
 
 function parseTransportMethod(v: unknown): string {
@@ -384,6 +389,37 @@ cartRoutes.post('/items', async (c) => {
     );
   }
 
+  // ONE SHIPPING TYPE PER CART, checked before anything is written.
+  //
+  // Direct, air, sea and land are four different journeys with four different
+  // timelines and four different tracking paths — a basket holding two of them
+  // has no honest delivery date to show. The first item decides; a mismatch is
+  // refused with both types named, so the client can offer the only two real
+  // ways out (empty the cart and start this type, or keep what is there).
+  //
+  // `replaceCart: true` is that first choice arriving as one request: the
+  // caller has already confirmed, and doing it in a single call means a cart
+  // can never be left emptied with nothing added because the second request
+  // failed.
+  const incomingType = typeForTransport(transportMethod);
+  const { results: existingLines } = await c.env.DB
+    .prepare('SELECT transport_method FROM cart_items WHERE user_id = ?')
+    .bind(user.id)
+    .all<{ transport_method: string }>();
+  const currentType = cartShippingType(existingLines);
+  const replaceCart = body.replaceCart === true;
+
+  if (currentType !== null && currentType !== incomingType) {
+    if (!replaceCart) {
+      throw badRequest(
+        'Your cart holds items with a different shipping type. It must be emptied to add this one.',
+        'CART_SHIPPING_CONFLICT',
+        { cart_shipping_type: currentType, incoming_shipping_type: incomingType }
+      );
+    }
+    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+  }
+
   // shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
   // pricing is entirely resolver-driven now.
   // The full selection is stored canonically sorted so two requests that name
@@ -444,6 +480,28 @@ cartRoutes.patch('/items/:id', async (c) => {
     body.warrantyPlanId !== undefined
       ? str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false })
       : String(existing.warranty_plan_id ?? '');
+
+  // The one-type rule has a second door. POST /items guards the ADD, but
+  // editing an existing line's transport changes its type in place — and in a
+  // two-line cart that is exactly the mix the rule forbids, arrived at from
+  // the cart screen instead of the product screen. Only the OTHER lines are
+  // consulted: re-typing the only line in the cart re-types the whole cart,
+  // which is legal and is how a customer switches air to sea.
+  const incomingType = typeForTransport(transportMethod);
+  if (typeForTransport(existing.transport_method) !== incomingType) {
+    const { results: otherLines } = await c.env.DB
+      .prepare('SELECT transport_method FROM cart_items WHERE user_id = ? AND id != ?')
+      .bind(user.id, id)
+      .all<{ transport_method: string }>();
+    const otherType = cartShippingType(otherLines);
+    if (otherType !== null && otherType !== incomingType) {
+      throw badRequest(
+        'Your cart holds items with a different shipping type. It must be emptied to add this one.',
+        'CART_SHIPPING_CONFLICT',
+        { cart_shipping_type: otherType, incoming_shipping_type: incomingType }
+      );
+    }
+  }
 
   const product = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?')
     .bind(existing.product_id)
@@ -517,6 +575,20 @@ cartRoutes.patch('/items/:id', async (c) => {
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
   return c.json({ success: true, items, tier: t, tierActive: ta });
+});
+
+/**
+ * Empties the cart.
+ *
+ * Exists for the shipping-type conflict: "empty the cart and add this item"
+ * is one confirmed intent, and POST /items with `replaceCart: true` does it
+ * atomically. This is the plain version for a customer who just wants to
+ * start over, and it never touches anything but their own rows.
+ */
+cartRoutes.delete('/', async (c) => {
+  const user = c.get('user')!;
+  const res = await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+  return c.json({ success: true, removed: res.meta.changes ?? 0 });
 });
 
 cartRoutes.delete('/items/:id', async (c) => {
