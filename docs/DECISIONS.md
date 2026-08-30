@@ -53,6 +53,8 @@
 
 | 41 | **بطاقة القبول §12 اكتملت — وكشفت ثلاث عيوب حقيقية**: docs/ACCEPTANCE.md يربط كل بند من §12 بملف قابل للتشغيل ورقم فعلي (0 أخطاء، 504 اختبار وحدة، 369 فحص متصفح/API). ثلاثة بنود لم يكن لها أي دليل، وكل واحد منها كان يخفي عيبًا: (أ) **مساعد الأدمن لم يكن يستطيع حفظ أي منتج له تكلفة** — لأن الـ GET يحذف حقول التكلفة، فيرجع النموذج بلا مفتاح `cost_iqd`، وكان المدقّق يقرأ الغياب على أنه «محاولة جعلها NULL» ويرفض الحفظ كليًا؛ الآن يُميَّز الغياب عن الإرسال الصريح. (ب) **لا شيء كان يفرض قاعدتي §5 عند الحفظ**: «يجب أن يختلف سعر البيع عن التكلفة، امنع الحفظ» و«PRO <= PRIME <= Regular» — الـ resolver كان يقصّ السلّم عند القراءة فقط، وتعليقه ادّعى وجود رفض عند الكتابة لم يكن موجودًا؛ الآن يرفض `validateProductDoc` الحالتين على مستوى المنتج والخيار واللون برسالة تسمّي الحقل. (ج) **ستة عناصر في لوحة الصور كانت 36px** بينما §1 يطلب 44–48px — نجت لأن فحص الاستجابة يبني منتجه بـ`images: []` واللوحة لا تُرسم بلا صورة. كما كان مدقّق الهجرات يطبع سطرًا أخضر على مجموعة فارغة للهجرة 0025 | ✅ | docs/ACCEPTANCE.md + scripts/e2e-permissions.mjs + scripts/e2e-images.mjs |
 
+| 42 | **الشاشة الرئيسية: هيرو وخدمات وأقسام (طلب المالك)**: كانت الصفحة تفتح على بطاقة خدمات واحدة بلا أي هيرو، لأن الكاروسيل لا يُرسَم إلا إذا رفع المالك صورة ولم تُرفع أي صورة. الآن هيرو بوضعين: بنرات المالك حين توجد، وهيرو افتراضي بهوية LEVONIS حين لا توجد (يختفي فور رفع أول بنر). البنر صار يحمل **عنوانًا ووصفًا ونص زر** بثلاث لغات يكتبها المالك بنفسه — **لا ترجمة آلية**: اللغة الفارغة تعود إلى لغة كتبها المالك فعلًا. البنر بلا نص يظهر كما كان تمامًا، فالبنرات القائمة لا تتأثر. وثلاثة أقسام (`coupons_offers` و`categories` و`top_brands`) كانت قابلة للضبط في لوحة التحكم **ولا تُرسَم في المتجر إطلاقًا** — صارت تُرسَم، ويعودان الأخيران إلى جدولي `catalogs` و`brands` الحقيقيين حين لا يكتب المالك بطاقات خاصة، لأن إجباره على إعادة كتابة تصنيفه هو سبب بقاء القسمين فارغين. كذلك **ترتيب الأقسام** كان قابلًا للسحب ولا يفعل شيئًا، ومفتاح إظهار `discounts_offers` كان مُهمَلًا — كلاهما صار فعّالًا. الخدمات من بطاقة واحدة إلى ست، كلها مسارات موجودة وتعمل. قرار معلَن: **لا مربع بحث في الهيرو** لأن ترويسة الموقع تعرض واحدًا فوقه مباشرة. أمان: `homeBanners` و`homeSectionItems` كانا يُخزَّنان بلا تحقق سوى «كائن أقل من 100KB» بينما المتجر يضع قيمهما مباشرة في `<img src>` و`<a href>` — صار `worker/lib/homeContent.ts` يقصر الروابط على مسار داخلي أو http(s) عند **الكتابة وعند القراءة** معًا، فرابط `javascript:` يُسقَط ولا يُخزَّن | ✅ | src/components/home/ + worker/lib/homeContent.ts |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).
@@ -62,4 +64,6 @@ implemented with their assumptions stated, not blockers. Row 36 is a fixed
 incident with its restore point recorded; row 37 is an open, non-visible
 follow-up, reported as open rather than as success. Row 41 records the §12
 acceptance matrix and the three defects writing it uncovered — see
-docs/ACCEPTANCE.md for the row-by-row table and the numbers.
+docs/ACCEPTANCE.md for the row-by-row table and the numbers. Row 42 is the
+home page rebuild: a hero in two modes, six real services, and the three
+admin-configurable sections the storefront had never rendered.

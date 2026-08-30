@@ -4,6 +4,42 @@ Newest phase first. A section is filled in **only from a real run**: no number
 here is ever copied from a projection, an older report, or a suite that was not
 executed. `skipped` is never counted as a pass.
 
+## Phase: home page — hero, services, sections — LOCAL run 2026-08-30
+
+**Executed.** Same environment as the batch-6 run below: local `wrangler dev`
+on `http://127.0.0.1:8787` serving the freshly built `dist/`, local D1 migrated
+through `0025`, Chromium at `/opt/pw-browsers/chromium`. Commit `f1ea6a4`.
+LOCAL — it says nothing about the live domain.
+
+| Suite | Passed | Failed | Notes |
+|---|---:|---:|---|
+| `npm run check` | — | 0 errors | 119 pre-existing warnings, unchanged |
+| `npm run test:unit` | 526 | 0 | was 504; `tests/homeContent.test.ts` is new (22) |
+| `scripts/e2e-home.mjs` | 131 | 0 | **new** — 5 widths × both hero modes, plus the layout toggles |
+| `scripts/e2e-images.mjs` | 78 | 0 | |
+| `scripts/e2e-permissions.mjs` | 46 | 0 | |
+| `scripts/e2e-import.mjs` | 61 | 0 | |
+| `scripts/e2e-import-ui.mjs` | 44 | 0 | |
+| `scripts/e2e-product-form.mjs` | 67 | 0 | |
+| `scripts/e2e-subscription.mjs` | 73 | 0 | |
+| **browser + API total** | **500** | **0** | |
+
+`e2e-home` drives the real page at 360/390/768/1024/1440 with no banners
+configured (the fallback hero) and then with banners written through the real
+admin API, and asserts the layout toggles do something: hiding the first
+banner brings the fallback back, hiding the categories section removes it, and
+reordering two sections changes their order on the page.
+
+Two findings, both fixed in the same commit. A screenshot showed the fixed
+site header sitting on top of the hero headline — no size or overflow check
+could see it, so the suite now measures the overlap in pixels. And
+`tests/store-isolation.test.ts` failed correctly when the Studio link moved
+out of `Home.tsx`; the guard was pointed at the two new components rather than
+relaxed, and now also asserts the home page still reaches one of them.
+
+Evidence: `docs/evidence/home/home-default-{360,390,768,1024,1440}.png` and
+`home-banners-{390,1024}.png`.
+
 ## Phase: §12 acceptance matrix (batch 6) — LOCAL run 2026-08-30
 
 **Executed.** Environment: local `wrangler dev` on `http://127.0.0.1:8787`
