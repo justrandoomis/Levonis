@@ -44,6 +44,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # The Studio is its own npm workspace, but tests/auth-handoff.test.mjs
+      # imports `hono`, which is a dependency of the ROOT workspace. Locally
+      # that resolves because Node walks up into the repo's node_modules; with
+      # only studio/ installed it does not, and the suite fails on a missing
+      # package rather than on anything real.
+      - name: Install the root workspace (the Studio tests import from it)
+        working-directory: .
+        run: npm ci --no-audit --no-fund
+
       - run: npm ci --no-audit --no-fund
 
       - name: Read the running Worker's plain-text vars
