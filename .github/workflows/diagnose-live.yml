@@ -223,6 +223,13 @@ jobs:
             fi
           done
 
+      # The membership catalog the storefront will actually offer.
+      - name: Membership plans the live site serves
+        continue-on-error: true
+        run: |
+          curl -s --max-time 25 "https://$HOST/api/memberships/plans" \
+            | jq -c '[.plans[] | {id, tier, months: .duration_months, price: .price_iqd}]'
+
       - name: Summary
         if: always()
         run: echo "Read the step logs above — nothing was changed." >> "$GITHUB_STEP_SUMMARY"
