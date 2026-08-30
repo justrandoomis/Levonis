@@ -1,0 +1,78 @@
+# READ-ONLY fetch of the Al-Waseet Merchant API documentation.
+#
+# Why this exists: the delivery integration must call the REAL endpoints with
+# the REAL field names. This session's egress proxy cannot reach al-waseet.com,
+# and writing a driver against guessed field names would produce code that
+# looks finished and fails on the first live order. So the docs are fetched
+# from a runner that can reach them, and the driver is written against what
+# comes back.
+#
+# Makes NO changes to anything: no deploy, no database, no secret, no request
+# to Al-Waseet's API itself — only their public documentation pages. No
+# credentials are used or required.
+name: 9 - Fetch Al-Waseet API docs (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      extra_paths:
+        description: 'Extra doc paths to fetch, space separated (optional)'
+        required: false
+        default: ''
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the documentation pages
+        continue-on-error: true
+        run: |
+          set +e
+          mkdir -p out
+          PATHS="/apis-main/index /apis-main /apis /api/docs ${{ github.event.inputs.extra_paths }}"
+          for p in $PATHS; do
+            name=$(echo "$p" | tr '/' '_')
+            echo "=================================================="
+            echo "GET https://al-waseet.com$p"
+            code=$(curl -sSL -m 40 -o "out/$name.html" -w '%{http_code}' \
+              -H 'User-Agent: Mozilla/5.0 (compatible; LEVONIS-integration-check)' \
+              "https://al-waseet.com$p")
+            echo "  -> HTTP $code  ($(wc -c < "out/$name.html" 2>/dev/null || echo 0) bytes)"
+          done
+
+      - name: Print the readable text of each page
+        continue-on-error: true
+        run: |
+          set +e
+          for f in out/*.html; do
+            echo "=================================================="
+            echo "### $f"
+            echo "=================================================="
+            # Strip script/style, then tags, then squeeze blank lines. Enough
+            # to read endpoint tables and parameter names off a docs page.
+            perl -0777 -pe 's{<(script|style)\b.*?</\1>}{}gsi' "$f" \
+              | perl -0777 -pe 's{<br\s*/?>}{\n}gi; s{</(p|div|tr|li|h[1-6]|td|th)>}{\n}gi' \
+              | perl -0777 -pe 's{<[^>]+>}{ }gs' \
+              | perl -0777 -pe 's{&nbsp;}{ }gs; s{&amp;}{&}gs; s{&lt;}{<}gs; s{&gt;}{>}gs; s{&quot;}{"}gs' \
+              | sed 's/[[:space:]]\+/ /g' \
+              | tr -s '\n' \
+              | head -c 60000
+            echo ""
+          done
+
+      - name: Any URLs the pages link to
+        continue-on-error: true
+        run: |
+          set +e
+          cat out/*.html 2>/dev/null \
+            | grep -oiE '(href|src|action)="[^"]+"' \
+            | sed 's/.*="//; s/"$//' \
+            | grep -viE '\.(css|png|jpe?g|gif|svg|woff2?|ttf|ico)$' \
+            | sort -u | head -200
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: alwaseet-docs
+          path: out/
+          retention-days: 7
