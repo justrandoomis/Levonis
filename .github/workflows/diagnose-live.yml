@@ -68,6 +68,32 @@ jobs:
           echo "── deployments of levonis (production worker)"
           npx wrangler deployments list --name levonis 2>&1 | head -30 || true
 
+      # The worker's OWN exception. The 500 body is the generic onError
+      # message by design (it must not leak internals to the public), so the
+      # only way to see the real stack is to read the worker's log stream
+      # while the failing request is made. `wrangler tail` is read-only.
+      - name: Live worker log for the failing request
+        continue-on-error: true
+        run: |
+          npx wrangler tail --name levonis-staging --format json --status error \
+            > /tmp/tail.log 2>/tmp/tail.err &
+          TAIL=$!
+          sleep 12
+          echo "── firing the failing requests"
+          curl -s -o /dev/null "https://$HOST/api/products?limit=2" || true
+          curl -s -o /dev/null "https://$HOST/api/products" || true
+          curl -s -o /dev/null "https://$HOST/api/home" || true
+          sleep 15
+          kill $TAIL 2>/dev/null || true
+          sleep 2
+          echo "── tail stderr"
+          head -20 /tmp/tail.err || true
+          echo "── captured events"
+          cat /tmp/tail.log | head -c 6000 || true
+          echo
+          echo "── exceptions and logs only"
+          jq -c 'select(.exceptions or .logs) | {url: .event.request.url, outcome, exceptions, logs}' /tmp/tail.log 2>/dev/null | head -40 || true
+
       # ------------------------------------------------------------------ D1
       - name: D1 — which databases exist
         id: dbs
