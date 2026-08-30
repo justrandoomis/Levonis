@@ -1,0 +1,139 @@
+# Deploys the CODE to the levonis-studio-staging worker — the one serving
+# studio.levonis-iq.com — carrying its existing configuration forward.
+#
+# WHY NOT "4 - Deploy Studio Staging": that workflow's second pass re-sets
+# APP_ORIGIN and MAIN_SITE_ORIGIN from repository secrets. Per DECISIONS row
+# 30 those secrets are optional and may not be set, and `wrangler deploy`
+# replaces a Worker's plain-text vars WHOLESALE — so deploying with them empty
+# would blank the origins the sign-in handoff between the store and the Studio
+# depends on, and break Studio login on a Worker that is currently working.
+#
+# This reads the Worker's current vars from the Cloudflare API first, refuses
+# to deploy at all if that read fails, passes every one of them straight back,
+# and afterwards asserts none were dropped. Values are masked; only names are
+# logged. Secrets live in a separate store and are never read or written here.
+name: 8 - Deploy Studio Code (keeps vars)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-STUDIO-CODE to confirm'
+        required: true
+        default: ''
+
+concurrency: studio-staging-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: studio
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check the confirmation
+        working-directory: .
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-STUDIO-CODE" ] \
+            || { echo "::error::type DEPLOY-STUDIO-CODE to confirm"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+
+      - name: Read the running Worker's plain-text vars
+        id: vars
+        run: |
+          set -e
+          curl -sS -f \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-studio-staging/settings" \
+            -o /tmp/settings.json
+          jq -e '.success == true' /tmp/settings.json > /dev/null \
+            || { echo "::error::could not read the worker settings — refusing to deploy and wipe its vars"; exit 1; }
+          echo "vars currently set on the worker:"
+          jq -r '[.result.bindings[] | select(.type == "plain_text") | .name] | sort | join(", ")' /tmp/settings.json
+          jq -r '.result.bindings[] | select(.type == "plain_text") | "\(.name)\t\(.text)"' /tmp/settings.json \
+            > /tmp/vars.tsv
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            echo "::add-mask::$value"
+          done < /tmp/vars.tsv
+          echo "count=$(wc -l < /tmp/vars.tsv)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the Studio staging database id
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-studio-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-studio-db-staging not found"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "studio_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STUDIO_STAGING_DB_ID: ${{ steps.db.outputs.studio_db_id }}
+          CLOUDFLARE_ENV: staging
+        run: node scripts/set-deploy-ids.mjs
+
+      - name: Build and run the Studio test suite
+        env:
+          CLOUDFLARE_ENV: staging
+        run: |
+          npm run build
+          node --test tests/*.test.mjs
+
+      - name: Deploy, carrying every existing var forward
+        run: |
+          set -e
+          ARGS=()
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            ARGS+=(--var "$name:$value")
+          done < /tmp/vars.tsv
+          echo "re-applying ${#ARGS[@]} existing var(s) so none are wiped"
+          npx wrangler deploy --env staging "${ARGS[@]}"
+
+      # The whole point of the change: a desktop keeps the threaded core, an
+      # iPad does not, and everything else is identical.
+      - name: Verify the isolation headers per platform
+        working-directory: .
+        run: |
+          S=https://studio.levonis-iq.com
+          sleep 5
+
+          desktop=$(curl -s -o /dev/null -D - --max-time 25 "$S/" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
+            | grep -ci '^cross-origin-embedder-policy: require-corp' || true)
+          echo "desktop COEP present: $desktop"
+
+          ipad=$(curl -s -o /dev/null -D - --max-time 25 "$S/" \
+            -A "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" \
+            | grep -ci '^cross-origin-embedder-policy' || true)
+          echo "iPad COEP present: $ipad"
+
+          nosniff=$(curl -s -o /dev/null -D - --max-time 25 "$S/" \
+            -A "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" \
+            | grep -ci '^x-content-type-options: nosniff' || true)
+          echo "iPad still gets nosniff: $nosniff"
+
+          [ "$desktop" = "1" ] || { echo "::error::a desktop lost cross-origin isolation — it should keep threads"; exit 1; }
+          [ "$ipad" = "0" ] || { echo "::error::an iPad is still cross-origin isolated — it will still take the threaded core"; exit 1; }
+          [ "$nosniff" = "1" ] || { echo "::error::an iPad lost the other security headers"; exit 1; }
+
+      - name: Confirm the vars survived
+        run: |
+          curl -sS -f \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-studio-staging/settings" \
+            -o /tmp/after.json
+          BEFORE=${{ steps.vars.outputs.count }}
+          AFTER=$(jq -r '[.result.bindings[] | select(.type == "plain_text")] | length' /tmp/after.json)
+          echo "plain-text vars: $BEFORE before, $AFTER after"
+          jq -r '[.result.bindings[] | select(.type == "plain_text") | .name] | sort | join(", ")' /tmp/after.json
+          [ "$AFTER" -ge "$BEFORE" ] || { echo "::error::the deploy dropped $((BEFORE - AFTER)) var(s)"; exit 1; }
