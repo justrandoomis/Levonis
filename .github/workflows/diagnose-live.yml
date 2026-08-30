@@ -182,19 +182,28 @@ jobs:
           curl -s -o /tmp/studio.html -D /tmp/studio.hdr --max-time 25 "$S/"
           grep -iE '^(HTTP|content-type|cross-origin|cf-ray)' /tmp/studio.hdr || true
 
-          echo "── asset chunks referenced by the document"
-          grep -oE '/assets/[A-Za-z0-9_.-]+\.js' /tmp/studio.html | sort -u | head -20 > /tmp/chunks.txt
-          cat /tmp/chunks.txt
+          echo "── walking the chunk graph (the editor and its worker load lazily,"
+          echo "   so the worker chunk is NOT referenced by the document itself)"
+          : > /tmp/seen.txt
+          grep -oE '/assets/[A-Za-z0-9_.-]+\.js' /tmp/studio.html | sort -u > /tmp/queue.txt
+          for depth in 1 2 3 4; do
+            : > /tmp/next.txt
+            while read -r c; do
+              [ -n "$c" ] || continue
+              grep -qxF "$c" /tmp/seen.txt && continue
+              echo "$c" >> /tmp/seen.txt
+              curl -s --max-time 25 "$S$c" -o /tmp/chunk.js || continue
+              grep -oE '[A-Za-z0-9_.-]+\.js' /tmp/chunk.js \
+                | sed 's#^#/assets/#' | sort -u >> /tmp/next.txt || true
+            done < /tmp/queue.txt
+            sort -u /tmp/next.txt > /tmp/queue.txt
+            echo "   depth $depth: $(wc -l < /tmp/seen.txt) chunks seen"
+          done
 
-          echo "── hunting the worker chunk through the referenced chunks"
-          : > /tmp/workers.txt
-          while read -r c; do
-            [ -n "$c" ] || continue
-            curl -s --max-time 25 "$S$c" \
-              | grep -oE '[A-Za-z0-9_./-]*(slicer|parse_3mf|sla_slice|sla_reconstruct|sl1_encode)\.worker[A-Za-z0-9_.-]*\.js' \
-              >> /tmp/workers.txt || true
-          done < /tmp/chunks.txt
-          sort -u /tmp/workers.txt | head -10 | tee /tmp/w.txt
+          echo "── worker chunks found anywhere in the graph"
+          grep -hoE '[A-Za-z0-9_.-]*(slicer|parse_3mf|sla_slice|sla_reconstruct|sl1_encode)\.worker[A-Za-z0-9_.-]*\.js' \
+            /tmp/seen.txt /tmp/queue.txt 2>/dev/null | sort -u | tee /tmp/w.txt
+          [ -s /tmp/w.txt ] || echo "   (none found — the worker chunk is not reachable from the served graph)"
 
           echo "── does each worker chunk actually serve?"
           while read -r w; do
@@ -204,8 +213,15 @@ jobs:
             ct=$(grep -i '^content-type' /tmp/wh.txt | tr -d '\r')
             corp=$(grep -i '^cross-origin-resource-policy' /tmp/wh.txt | tr -d '\r')
             echo "$url -> $code | $ct | ${corp:-no CORP header}"
-            echo "   first bytes: $(head -c 80 /tmp/wb.js | tr -d '\n')"
+            echo "   first bytes: $(head -c 100 /tmp/wb.js | tr -d '\n')"
           done < /tmp/w.txt
+
+          echo "── the engine chunk that owns makeSlicerWorker"
+          for c in $(cat /tmp/seen.txt); do
+            if curl -s --max-time 20 "$S$c" | grep -q 'likely out of memory'; then
+              echo "   worker.onerror handler lives in $c"
+            fi
+          done
 
       - name: Summary
         if: always()
