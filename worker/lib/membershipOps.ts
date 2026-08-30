@@ -239,7 +239,7 @@ export interface CouponCheck {
 interface CouponRow {
   id: string;
   code: string;
-  tier_required: 'plus' | 'pro' | null;
+  tier_required: 'plus' | 'pro' | 'prime' | null;
   kind: 'fixed_iqd' | 'percent';
   value: number;
   min_total_iqd: number;
@@ -272,14 +272,15 @@ export async function validateCoupon(env: Env, userId: string, code: string, tot
   if (totalIqd < coupon.min_total_iqd) return { ok: false, reason: 'MIN_TOTAL_NOT_MET' };
 
   if (coupon.tier_required) {
-    // Server-side tier check — never a client-supplied flag. PRO satisfies
-    // a PLUS requirement (PRO is the superset tier).
+    // Server-side tier check — never a client-supplied flag.
+    //
+    // A LADDER, not an equality test. This compared tiers by name, which
+    // meant a PRIME member — the TOP tier — was refused a discount every PRO
+    // member got, because `status.tier === 'pro'` is false for them. A higher
+    // tier satisfies every requirement below it, which is what "higher" means.
     const status = await getTierStatus(env.DB, userId);
-    const tierOk =
-      status.active &&
-      (coupon.tier_required === 'plus'
-        ? status.tier === 'plus' || status.tier === 'pro'
-        : status.tier === 'pro');
+    const rank: Record<string, number> = { free: 0, plus: 1, pro: 2, prime: 3 };
+    const tierOk = status.active && (rank[status.tier] ?? 0) >= (rank[coupon.tier_required] ?? 99);
     if (!tierOk) return { ok: false, reason: 'TIER_REQUIRED' };
   }
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown } from 'lucide-react';
+import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
+import AdminCoupons from '../components/adminCoupons/AdminCoupons';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import AdminProducts from '../components/AdminProducts';
 import AdminAds from '../components/AdminAds';
@@ -31,7 +32,8 @@ type AdminTab =
   | 'serials'
   | 'reviews'
   | 'kyc'
-  | 'memberships';
+  | 'memberships'
+  | 'coupons';
 
 /**
  * Mirrors ORDER_TRANSITIONS in worker/routes/admin.ts, which is the authority
@@ -419,6 +421,7 @@ export default function Admin() {
     { id: 'reviews', icon: Star, label: dir === 'rtl' ? 'المراجعات والهدايا' : 'Reviews & Gifts' },
     { id: 'kyc', icon: ShieldCheck, label: dir === 'rtl' ? 'التحقق والعناوين' : 'KYC & Addresses' },
     { id: 'memberships', icon: Crown, label: dir === 'rtl' ? 'الأعضاء والدعم' : 'Members & Support' },
+    { id: 'coupons', icon: Ticket, label: dir === 'rtl' ? 'أكواد الخصم' : 'Promo codes' },
   ];
 
   return (
@@ -480,6 +483,8 @@ export default function Admin() {
         {activeTab === 'memberships' && (
            <AdminMemberships />
         )}
+
+        {activeTab === 'coupons' && <AdminCoupons dir={dir} />}
       </div>
     </DashboardLayout>
   );

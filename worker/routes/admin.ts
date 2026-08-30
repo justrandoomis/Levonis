@@ -1151,6 +1151,125 @@ adminRoutes.patch('/orders/:id', async (c) => {
   });
 });
 
+// ---------------------------------------------------------------- coupons
+
+/**
+ * Promo codes. The validation engine has existed since migration 0002 —
+ * tiers, date windows, global and per-user limits, fixed and percentage
+ * discounts, all enforced server-side at checkout — but there was no way to
+ * CREATE one, so the storefront's promo box had nothing to accept and was
+ * disabled with "قريباً" on it. This is the missing half.
+ *
+ * Redemptions are counted, not stored twice: the count comes from the
+ * coupon_redemptions rows the checkout writes, so a coupon's usage can never
+ * disagree with the orders that used it.
+ */
+adminRoutes.get('/coupons', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT c.*,
+            (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id) AS redeemed
+       FROM coupons c ORDER BY c.created_at DESC LIMIT 200`
+  ).all<Record<string, unknown>>();
+  return c.json({ success: true, coupons: results ?? [] });
+});
+
+/** Shared validation for create and update, so the two cannot drift apart. */
+function couponFieldsFrom(body: Record<string, unknown>) {
+  const kind = oneOf(body.kind, 'kind', ['fixed_iqd', 'percent'] as const);
+  const value = int(body.value, 'value', { min: 1, max: kind === 'percent' ? 100 : 100_000_000 });
+  const tierRaw = str(body.tier_required, 'tier_required', { max: 10, required: false });
+  if (tierRaw && !['plus', 'pro', 'prime'].includes(tierRaw)) {
+    throw badRequest('tier_required must be plus, pro or prime');
+  }
+  const startsAt = str(body.starts_at, 'starts_at', { max: 40, required: false });
+  const endsAt = str(body.ends_at, 'ends_at', { max: 40, required: false });
+  // A window that closes before it opens would silently never apply. Better
+  // refused at the form than debugged from a customer's complaint.
+  if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) {
+    throw badRequest('The end date must be after the start date');
+  }
+  const maxGlobalRaw = body.max_global;
+  const maxGlobal =
+    maxGlobalRaw === null || maxGlobalRaw === undefined || maxGlobalRaw === ''
+      ? null
+      : int(maxGlobalRaw, 'max_global', { min: 1, max: 1_000_000 });
+  return {
+    kind,
+    value,
+    tier_required: tierRaw || null,
+    min_total_iqd: int(body.min_total_iqd ?? 0, 'min_total_iqd', { min: 0, max: 1_000_000_000 }),
+    starts_at: startsAt || null,
+    ends_at: endsAt || null,
+    max_global: maxGlobal,
+    max_per_user: int(body.max_per_user ?? 1, 'max_per_user', { min: 1, max: 1000 }),
+    active: body.active === false ? 0 : 1,
+  };
+}
+
+adminRoutes.post('/coupons', async (c) => {
+  const adminUser = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  // Stored uppercased, as the column has always assumed, and with spaces
+  // stripped: a customer typing "save 10" must reach the same row.
+  const code = str(body.code, 'code', { min: 3, max: 60 }).trim().toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z0-9_-]+$/.test(code)) throw badRequest('A code may use letters, digits, - and _ only');
+  const f = couponFieldsFrom(body);
+  const id = newId('cpn');
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO coupons (id, code, tier_required, kind, value, min_total_iqd, starts_at, ends_at,
+         max_global, max_per_user, active, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+    )
+      .bind(id, code, f.tier_required, f.kind, f.value, f.min_total_iqd, f.starts_at, f.ends_at,
+            f.max_global, f.max_per_user, f.active)
+      .run();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE')) throw badRequest('That code already exists', 'CODE_TAKEN');
+    throw e;
+  }
+  await audit(c.env.DB, adminUser.id, 'coupon.create', id, { code, kind: f.kind, value: f.value });
+  return c.json({ success: true, id, code });
+});
+
+adminRoutes.patch('/coupons/:id', async (c) => {
+  const adminUser = c.get('user')!;
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const existing = await c.env.DB.prepare('SELECT id FROM coupons WHERE id = ?').bind(id).first<{ id: string }>();
+  if (!existing) throw notFound('Coupon not found');
+
+  // The CODE is not editable. Customers have it written down and orders
+  // already reference it in their snapshots; renaming it would break the
+  // first and orphan the second. Deactivate and create a new one instead.
+  const f = couponFieldsFrom(body);
+  await c.env.DB.prepare(
+    `UPDATE coupons SET tier_required = ?, kind = ?, value = ?, min_total_iqd = ?,
+            starts_at = ?, ends_at = ?, max_global = ?, max_per_user = ?, active = ?
+      WHERE id = ?`
+  )
+    .bind(f.tier_required, f.kind, f.value, f.min_total_iqd, f.starts_at, f.ends_at,
+          f.max_global, f.max_per_user, f.active, id)
+    .run();
+  await audit(c.env.DB, adminUser.id, 'coupon.update', id, f);
+  return c.json({ success: true });
+});
+
+/**
+ * Deactivates a coupon. There is no delete: coupon_redemptions references the
+ * row, and an order that says "SAVE10 was applied" must still be able to say
+ * what SAVE10 was.
+ */
+adminRoutes.delete('/coupons/:id', async (c) => {
+  const adminUser = c.get('user')!;
+  const id = c.req.param('id');
+  const res = await c.env.DB.prepare('UPDATE coupons SET active = 0 WHERE id = ?').bind(id).run();
+  if (res.meta.changes === 0) throw notFound('Coupon not found');
+  await audit(c.env.DB, adminUser.id, 'coupon.deactivate', id);
+  return c.json({ success: true });
+});
+
 // ---------------------------------------------------------------- settings
 
 adminRoutes.get('/settings', async (c) => {

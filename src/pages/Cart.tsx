@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Trash2, ChevronRight, Check, Minus, Plus, X, Sho
 import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import PromoCodeField from '../components/PromoCodeField';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import { CartSkeleton } from '../components/ui/Skeleton';
@@ -666,25 +667,10 @@ export default function Cart() {
                 </label>
               </div>
 
-              <div>
-                <p className="text-white font-bold mb-2 text-sm">{dir === 'rtl' ? 'كود الخصم' : 'Promo Code'}</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    disabled
-                    placeholder={dir === 'rtl' ? 'أدخل الكود هنا' : 'Enter code here'}
-                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white outline-none focus:border-[#ef233c] transition-colors text-sm opacity-60 cursor-not-allowed"
-                  />
-                  {/* Promo codes have no backend yet — honestly disabled. */}
-                  <button
-                    disabled
-                    title={dir === 'rtl' ? 'قريباً' : 'Coming soon'}
-                    className="bg-zinc-800 text-zinc-500 font-bold px-4 py-2 rounded-lg border border-zinc-700 text-sm opacity-60 cursor-not-allowed"
-                  >
-                    {dir === 'rtl' ? 'قريباً' : 'Coming soon'}
-                  </button>
-                </div>
-              </div>
+              {/* The engine behind this has existed since migration 0002; the
+                  box was disabled because nothing could create a code and
+                  nothing could type one. Both halves exist now. */}
+              <PromoCodeField lang={lang} formatIqd={formatIqd} />
             </div>
           )}
         </div>

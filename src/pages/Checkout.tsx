@@ -9,6 +9,20 @@ import {
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
+import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
+
+/**
+ * The refusal codes validateCoupon can produce. A quote that fails with one
+ * of these failed BECAUSE OF THE CODE, so the code is dropped and the quote
+ * retried; anything else is a real quote failure and must be shown as one.
+ * Kept as a literal rather than "any 4xx": swallowing an unrelated error as
+ * "bad coupon" would hide a genuine problem behind a wrong explanation.
+ */
+const COUPON_FAILURES = new Set([
+  'CODE_REQUIRED', 'CODE_NOT_FOUND', 'INACTIVE', 'NOT_STARTED', 'EXPIRED',
+  'MIN_TOTAL_NOT_MET', 'TIER_REQUIRED', 'GLOBAL_LIMIT_REACHED',
+  'PER_USER_LIMIT_REACHED', 'NO_DISCOUNT', 'COUPON_INVALID',
+]);
 
 // ---------------------------------------------------------------- server quote
 
@@ -142,6 +156,11 @@ export default function Checkout() {
 
   // Server-authoritative quote (POST /api/orders/quote): re-fetched whenever
   // the address, cart lines, delivery/payment method or points choice change.
+  // The promo code the SERVER has accepted for this quote — set only after a
+  // quote came back priced with it, never straight from the input. A code
+  // carried over from the cart still has to survive that check here.
+  const [couponCode, setCouponCode] = useState<string>(() => readStoredPromo());
+  const [couponError, setCouponError] = useState('');
   const [quote, setQuote] = useState<CheckoutQuoteDto | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
@@ -222,10 +241,12 @@ export default function Checkout() {
         usePoints,
         useWallet: useWalletBalance,
         supportCode: supportRef || undefined,
+        couponCode: couponCode || undefined,
       })
       .then((data) => {
         if (seq !== quoteSeqRef.current) return;
         setQuote(data.quote);
+        setCouponError('');
         // Material-change detection → consent reset (§7).
         const sig = [
           data.quote.total_iqd,
@@ -243,6 +264,17 @@ export default function Checkout() {
       })
       .catch((err) => {
         if (seq !== quoteSeqRef.current) return;
+        // A coupon that stopped being valid between the cart and here must
+        // not take the whole quote down with it: drop the code, say why, and
+        // the effect re-runs without it. Everything else is a real quote
+        // failure and is reported as one.
+        const code = err instanceof ApiError ? err.code ?? '' : '';
+        if (couponCode && COUPON_FAILURES.has(code)) {
+          setCouponError(err instanceof Error ? err.message : '');
+          setCouponCode('');
+          storePromo('');
+          return;
+        }
         setQuote(null);
         setQuoteError(err instanceof Error ? err.message : 'quote failed');
       })
@@ -250,7 +282,7 @@ export default function Checkout() {
         if (seq === quoteSeqRef.current) setQuoteLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, itemIdsKey, supportRef]);
+  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, itemIdsKey, supportRef, couponCode]);
 
   const walletBalanceIQD = usdCentsToIqd(balanceUsdCents, exchangeRate);
 
@@ -322,6 +354,9 @@ export default function Checkout() {
         // §3.3: attribution only — the server answers with the frozen
         // support snapshot and an unchanged total.
         supportCode: supportRef || undefined,
+        // Only the code the QUOTE was already priced with, so the total the
+        // customer just agreed to is the total the server computes.
+        couponCode: couponCode || undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
         policyAcceptance: policyAccepted
@@ -734,6 +769,36 @@ export default function Checkout() {
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 {S.quoteError}
               </p>
+            )}
+
+            {/* The promo code, priced against the REAL total — delivery
+                included — which is why it lives here and not only in the
+                cart. The line below is the server's figure from the quote,
+                never a client-side recomputation of it. */}
+            <div className="pt-1">
+              <PromoCodeField
+                lang={lang}
+                formatIqd={formatIqd}
+                onApplied={(code) => {
+                  setCouponError('');
+                  setCouponCode(code);
+                }}
+              />
+              {couponError && (
+                <p role="alert" className="text-[#e4899a] text-[11px] mt-2">
+                  {couponError}
+                </p>
+              )}
+            </div>
+
+            {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
+              <div className="flex justify-between items-center text-emerald-400">
+                <span className="font-light">
+                  {dir === 'rtl' ? 'خصم الكود' : 'Promo discount'}{' '}
+                  <span dir="ltr" className="text-zinc-500 text-xs">{quote.coupon.code}</span>
+                </span>
+                <span className="font-normal">-{formatIqd(Number(quote.coupon.discount_iqd))}</span>
+              </div>
             )}
 
             {pointsDiscount > 0 && (

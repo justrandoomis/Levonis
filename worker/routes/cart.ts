@@ -16,6 +16,8 @@ import {
 } from '../lib/productOverlay';
 import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
+import { validateCoupon } from '../lib/membershipOps';
+import { rateLimit } from '../lib/ratelimit';
 import { saleAvailability } from './products';
 import {
   resolveUnitPrice,
@@ -294,6 +296,65 @@ async function loadCart(c: Context<AppContext>) {
   }
   return { items, tier, tierActive };
 }
+
+/**
+ * Is this promo code real, and may THIS customer use it?
+ *
+ * WHY IT LIVES ON THE CART AND NOT ON THE QUOTE. The final discount depends
+ * on the payable total, which needs an address and a delivery method the
+ * customer has not chosen yet while they are still looking at their cart. The
+ * checkout quote stays the authority on the AMOUNT. This answers the question
+ * the cart can actually ask — does the code exist, is it live, is it for my
+ * tier, have I used it up — against the merchandise total the SERVER computes
+ * from the cart rows, never a number the browser sent.
+ *
+ * Delivery is deliberately excluded from that total, so a code whose minimum
+ * this cart only clears once delivery is added reads as "minimum not met"
+ * here rather than being promised and then refused at checkout.
+ *
+ * It redeems nothing, and it says nothing about a code the customer did not
+ * type: the minimum spend is only returned for a code that exists and is
+ * live, because returning it for one that does not would confirm which codes
+ * are real to anyone guessing.
+ */
+cartRoutes.post('/coupon-check', async (c) => {
+  await rateLimit(c, 'coupon_check', 30, 300);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const code = str(body.code, 'code', { max: 60 });
+
+  const { items } = await loadCart(c);
+  if (items.length === 0) throw badRequest('Your cart is empty', 'CART_EMPTY');
+  const merchandise = items.reduce(
+    (sum, it) => sum + Number((it as { unit_price_iqd?: number }).unit_price_iqd ?? 0) * Number((it as { qty?: number }).qty ?? 0),
+    0
+  );
+
+  const check = await validateCoupon(c.env, user.id, code, merchandise);
+  if (!check.ok) {
+    const row = await c.env.DB
+      .prepare('SELECT min_total_iqd, tier_required FROM coupons WHERE code = ? AND active = 1')
+      .bind(code.trim().toUpperCase())
+      .first<{ min_total_iqd: number; tier_required: string | null }>();
+    return c.json({
+      success: true,
+      valid: false,
+      reason: check.reason ?? 'COUPON_INVALID',
+      min_total_iqd: row ? row.min_total_iqd : null,
+      tier_required: row ? row.tier_required : null,
+      cart_total_iqd: merchandise,
+    });
+  }
+  return c.json({
+    success: true,
+    valid: true,
+    code: check.code,
+    // An ESTIMATE against merchandise only, and named for what it is. The
+    // checkout quote is the authority and will differ once delivery counts.
+    estimated_discount_iqd: check.discount_iqd,
+    cart_total_iqd: merchandise,
+  });
+});
 
 cartRoutes.get('/', async (c) => {
   const { items, tier, tierActive } = await loadCart(c);
