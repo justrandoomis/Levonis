@@ -1583,45 +1583,29 @@ adminRoutes.put('/settings/:key', async (c) => {
   return c.json({ success: true });
 });
 
-// ---------------------------------------------------------------- community moderation
-
-adminRoutes.get('/community/requests', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT cr.*, u.email, u.username FROM community_requests cr
-       LEFT JOIN users u ON u.id = cr.customer_id ORDER BY cr.created_at DESC LIMIT 200`
-  ).all();
-  return c.json({ success: true, requests: results });
-});
-
-adminRoutes.post('/community/requests/:id/close', async (c) => {
-  const adminUser = c.get('user')!;
-  const res = await c.env.DB.prepare("UPDATE community_requests SET status = 'closed' WHERE id = ?")
-    .bind(c.req.param('id'))
-    .run();
-  if (res.meta.changes === 0) throw notFound('Request not found');
-  await audit(c.env.DB, adminUser.id, 'community.request_close', c.req.param('id'));
-  return c.json({ success: true });
-});
-
-adminRoutes.patch('/community/merchants/:id', async (c) => {
-  const adminUser = c.get('user')!;
-  const body = await c.req.json().catch(() => ({}));
-  const verified = body.verified ? 1 : 0;
-  const res = await c.env.DB.prepare('UPDATE community_merchants SET verified = ? WHERE id = ?')
-    .bind(verified, c.req.param('id'))
-    .run();
-  if (res.meta.changes === 0) throw notFound('Merchant not found');
-  await audit(c.env.DB, adminUser.id, 'community.merchant_verify', c.req.param('id'), { verified });
-  return c.json({ success: true });
-});
-
-adminRoutes.delete('/community/products/:id', async (c) => {
-  const adminUser = c.get('user')!;
-  const res = await c.env.DB.prepare('DELETE FROM community_products WHERE id = ?').bind(c.req.param('id')).run();
-  if (res.meta.changes === 0) throw notFound('Product not found');
-  await audit(c.env.DB, adminUser.id, 'community.product_remove', c.req.param('id'));
-  return c.json({ success: true });
-});
+// ------------------------------------------------ community moderation
+//
+// MOVED, NOT DELETED. Community moderation lives in worker/routes/adminCommunity.ts
+// and is mounted at /api/admin/community.
+//
+// Four routes used to sit here — GET /community/requests, POST
+// /community/requests/:id/close, PATCH /community/merchants/:id and DELETE
+// /community/products/:id — and because `/api/admin` is mounted BEFORE
+// `/api/admin/community`, the first of them SHADOWED the new board: the
+// admin console was calling the dedicated module and being answered by this
+// one, silently, with a different shape.
+//
+// They are gone rather than reordered, because each was also wrong by the
+// rules the community module now enforces:
+//
+//   close    set `status` only, leaving the 0031 `state` machine stale
+//   verify   changed `verified` without recomputing the badge that depends on it
+//   delete   DELETED a community_products row outright, which blanks out what
+//            a customer actually bought — the module archives instead (§5)
+//
+// tests/storefrontIsolation.test.ts asserts no /community/* route is ever
+// declared in this file again, because a shadowing route is invisible until
+// something reads the response carefully.
 
 // ---------------------------------------------------------------- warranty
 

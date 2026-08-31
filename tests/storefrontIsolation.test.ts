@@ -191,3 +191,51 @@ test('the storefront shows availability, never the exact stock count', () => {
     'the public product shape leaks the raw stock count'
   );
 });
+
+// ------------------------------------------ the shadowing route collision
+
+/**
+ * `/api/admin` is mounted before `/api/admin/community`, so a `/community/*`
+ * route declared in admin.ts wins over the dedicated module — silently, with
+ * a different response shape and different rules.
+ *
+ * That is not hypothetical. Four such routes existed, and the first of them
+ * answered the community admin board for as long as it took someone to read
+ * a response field by field. The old `GET /community/requests` returned rows
+ * with `email`/`username` where the module returns `customer_email`, so the
+ * board rendered but the customer column was blank.
+ *
+ * Hono matches the first registration. A collision like this cannot be seen
+ * in either file alone, which is why it is asserted here.
+ */
+test('community admin lives in ONE module — admin.ts declares no /community route', () => {
+  const admin = code(read('worker/routes/admin.ts'));
+  const offenders = [...admin.matchAll(/adminRoutes\.(get|post|patch|delete|put)\(\s*['"](\/community[^'"]*)['"]/g)]
+    .map((m) => `${m[1].toUpperCase()} ${m[2]}`);
+  assert.deepEqual(
+    offenders,
+    [],
+    `these shadow /api/admin/community because /api/admin is mounted first: ${offenders.join(', ')}`
+  );
+});
+
+test('and the dedicated module is the one mounted there', () => {
+  const index = code(read('worker/index.ts'));
+  assert.match(
+    index,
+    /app\.route\(\s*['"]\/api\/admin\/community['"]\s*,\s*adminCommunityRoutes\s*\)/,
+    'the community admin module is not mounted at /api/admin/community'
+  );
+});
+
+test('nothing in the community module DELETES a product row', () => {
+  // Removing the row blanks out what a customer actually bought. The rule is
+  // archive-when-ordered (MERCHANT_STORES.md §5), and the route that used to
+  // break it lived in admin.ts.
+  const mod = code(read('worker/routes/adminCommunity.ts'));
+  assert.equal(
+    /DELETE\s+FROM\s+community_products/i.test(mod),
+    false,
+    'the community admin module deletes a product row instead of archiving it'
+  );
+});

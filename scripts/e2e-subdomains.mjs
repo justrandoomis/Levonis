@@ -98,6 +98,27 @@ class Client {
     return this.req(method, base, path, body, { Host: host });
   }
 
+  /** Multipart upload with the same cookie jar. */
+  async upload(base, path, { purpose, file }) {
+    const form = new FormData();
+    if (purpose) form.append('purpose', purpose);
+    form.append('file', new File([file.bytes], file.name, { type: file.type }));
+    const headers = { Origin: base };
+    const cookie = this.cookieHeader();
+    if (cookie) headers.Cookie = cookie;
+    let res;
+    try {
+      res = await fetch(`${base}${path}`, { method: 'POST', headers, body: form });
+    } catch (e) {
+      return { status: 0, json: null, text: '', networkError: String(e) };
+    }
+    this.absorb(res);
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* not json */ }
+    return { status: res.status, json, text };
+  }
+
   async req(method, base, path, body, extraHeaders = {}) {
     const headers = { Origin: base, ...extraHeaders };
     const cookie = this.cookieHeader();
@@ -539,6 +560,182 @@ async function main() {
       JSON.stringify(scope.json?.scope ?? null));
   }
 
+  // ------------------------------------------- 7b. R2 media (no money)
+  //
+  // A logo, a product picture and a request attachment are the four upload
+  // surfaces. None of them costs anything, and all four have a rule worth
+  // checking: an image reference must address an object THIS merchant
+  // uploaded, and a request attachment must never expose its storage key.
+  section('7b. R2 media (no money)');
+
+  // A 1x1 PNG, byte for byte. The server sniffs magic bytes, so a real
+  // picture is the only thing that gets past it — which is the point.
+  const PNG_1x1 = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64'
+  );
+
+  const upload = await merchant.upload(APEX, '/api/uploads', {
+    purpose: 'community',
+    file: { name: 'logo.png', type: 'image/png', bytes: PNG_1x1 },
+  });
+  check('a merchant can upload an image', upload.status < 400 && !!upload.json?.url,
+    `status ${upload.status} ${upload.json?.error ?? ''}`);
+  const logoUrl = upload.json?.url ?? null;
+
+  if (logoUrl) {
+    check('the upload lands under this merchant\'s own prefix',
+      String(logoUrl).startsWith('/files/community/'), String(logoUrl));
+
+    const saved = await merchant.req('PATCH', APEX, '/api/merchant/store', { logo_key: logoUrl });
+    check('it can be set as the store logo', saved.status < 400 && !!saved.json?.store?.logoUrl,
+      `status ${saved.status} ${saved.json?.error ?? ''}`);
+
+    const served = await anon.req('GET', APEX, logoUrl);
+    check('and the file is actually served', served.status === 200, `status ${served.status}`);
+  }
+
+  // THE RULE: a reference the merchant does not own is refused, so a shop
+  // cannot point its logo at somebody else's tracking pixel.
+  const hostile = await merchant.req('PATCH', APEX, '/api/merchant/store', {
+    logo_key: 'https://evil.example/pixel.gif',
+  });
+  check('an off-platform image reference is REFUSED', hostile.status === 400,
+    `status ${hostile.status}`);
+  const foreign = await merchant.req('PATCH', APEX, '/api/merchant/store', {
+    logo_key: 'community/someone-else/abcdef.jpg',
+  });
+  check('and so is another merchant\'s object', foreign.status === 400, `status ${foreign.status}`);
+
+  // ------------------------------- 7c. Community requests & offers (no money)
+  section('7c. Community requests, offers, attachments (no money)');
+
+  const req1 = await shopper.req('POST', APEX, '/api/marketplace/requests', {
+    title: `E2E bracket ${RUN}`,
+    description: 'A verification request. Nothing is bought and nothing is paid.',
+    quantity: 2, material: 'PLA', governorate: 'baghdad',
+  });
+  check('a customer posts a request', req1.status < 400,
+    `status ${req1.status} ${req1.json?.error ?? ''}`);
+  const requestId = req1.json?.request?.id ?? null;
+
+  if (requestId) {
+    const att = await shopper.upload(APEX, `/api/marketplace/requests/${requestId}/files`, {
+      file: { name: 'reference.png', type: 'image/png', bytes: PNG_1x1 },
+    });
+    check('an attachment is accepted', att.status === 201, `status ${att.status} ${att.json?.error ?? ''}`);
+
+    const detail = await shopper.req('GET', APEX, `/api/marketplace/requests/${requestId}`);
+    check('the attachment is listed on the request',
+      (detail.json?.files ?? []).length === 1, `${(detail.json?.files ?? []).length} file(s)`);
+    check('and its STORAGE KEY is never in the response',
+      !JSON.stringify(detail.json ?? {}).includes('file_key'),
+      'a file_key appeared in the response body');
+
+    const fileUrl = detail.json?.files?.[0]?.url;
+    if (fileUrl) {
+      const stream = await merchant.req('GET', APEX, fileUrl);
+      check('a merchant can read it while the request is open — they have to quote it',
+        stream.status === 200, `status ${stream.status}`);
+    }
+
+    // The public board shows the job and a display name, never contact details.
+    const board = await anon.req('GET', APEX, '/api/marketplace/requests');
+    const listed = (board.json?.requests ?? []).find((r) => r.id === requestId);
+    check('the request is on the public board', !!listed);
+    if (listed) {
+      const text = JSON.stringify(listed);
+      check('and the board carries no email, phone or address',
+        !text.includes('@') && !/"phone"|"address"/.test(text),
+        text.slice(0, 160));
+    }
+
+    const offer = await merchant.req('POST', APEX, `/api/marketplace/requests/${requestId}/offers`, {
+      price_iqd: 12000, completion_days: 3, message: 'e2e offer, nothing is charged',
+    });
+    check('the merchant submits an offer', offer.status === 201,
+      `status ${offer.status} ${offer.json?.error ?? ''}`);
+    const offerId = offer.json?.offer?.id ?? null;
+
+    const dupe = await merchant.req('POST', APEX, `/api/marketplace/requests/${requestId}/offers`, {
+      price_iqd: 9000, completion_days: 2,
+    });
+    check('a SECOND live offer from the same merchant is refused', dupe.status === 409,
+      `status ${dupe.status}`);
+
+    const asCustomer = await shopper.req('GET', APEX, `/api/marketplace/requests/${requestId}/offers`);
+    check('the customer sees the offer', (asCustomer.json?.offers ?? []).some((o) => o.id === offerId),
+      `${(asCustomer.json?.offers ?? []).length} offer(s)`);
+
+    // Attachments freeze when quoting stops — but the request is still open
+    // here, so the customer may still remove one. That is the window.
+    const fileId = detail.json?.files?.[0]?.id;
+    if (fileId) {
+      const del = await shopper.req('DELETE', APEX, `/api/marketplace/requests/${requestId}/files/${fileId}`);
+      check('the customer can remove an attachment while the request is open',
+        del.status === 200, `status ${del.status}`);
+    }
+  }
+
+  // ------------------------ 7d. the community admin console (no money)
+  section('7d. the community admin console (no money)');
+
+  const overview = await admin.req('GET', APEX, '/api/admin/community/overview');
+  check('the overview loads', overview.status === 200, `status ${overview.status}`);
+
+  const adminReqs = await admin.req('GET', APEX, '/api/admin/community/requests');
+  check('the admin board lists the new request',
+    (adminReqs.json?.requests ?? []).some((r) => r.id === requestId),
+    `${(adminReqs.json?.requests ?? []).length} request(s)`);
+  const adminRow = (adminReqs.json?.requests ?? []).find((r) => r.id === requestId);
+  check('and NAMES the customer the public board withholds',
+    !!adminRow?.customer_email, adminRow?.customer_email ?? '(none)');
+
+  if (requestId) {
+    const adminDetail = await admin.req('GET', APEX, `/api/admin/community/requests/${requestId}`);
+    check('the admin sees every offer and its price',
+      (adminDetail.json?.offers ?? []).length >= 1 && !!adminDetail.json?.offers?.[0]?.price_iqd,
+      `${(adminDetail.json?.offers ?? []).length} offer(s)`);
+  }
+
+  const adminMerchants = await admin.req('GET', APEX, `/api/admin/community/merchants?q=${RUN}`);
+  const mRow = (adminMerchants.json?.merchants ?? [])[0];
+  check('the merchant is listed for administration', !!mRow, `${(adminMerchants.json?.merchants ?? []).length} row(s)`);
+
+  if (mRow?.id) {
+    const rep = await admin.req('GET', APEX, `/api/admin/community/merchants/${mRow.id}/reputation`);
+    check('reputation shows the EARNED badge next to any override',
+      rep.status === 200 && typeof rep.json?.earned_badge === 'string',
+      `earned=${rep.json?.earned_badge} override=${rep.json?.badge_override}`);
+
+    const adjust = await admin.req('POST', APEX, `/api/admin/community/merchants/${mRow.id}/reputation`, {
+      points: 5, note: `e2e ${RUN} verification adjustment`,
+    });
+    check('an admin adjustment is appended', adjust.status === 200, `status ${adjust.status}`);
+
+    const after = await admin.req('GET', APEX, `/api/admin/community/merchants/${mRow.id}/reputation`);
+    check('and appears in the log rather than editing a number',
+      (after.json?.events ?? []).some((e) => e.kind === 'admin_adjustment'),
+      `${(after.json?.events ?? []).length} event(s)`);
+
+    // Suspending a STORE must not suspend its merchant.
+    if (mRow.store_id) {
+      const susp = await admin.req('POST', APEX, `/api/admin/community/stores/${mRow.store_id}/status`, {
+        status: 'suspended', reason: `e2e ${RUN}`,
+      });
+      check('a store can be suspended on its own', susp.status === 200, `status ${susp.status}`);
+      const recheck = await admin.req('GET', APEX, `/api/admin/community/merchants?q=${RUN}`);
+      const row2 = (recheck.json?.merchants ?? [])[0];
+      check('and its merchant stays active', row2?.status === 'active', `merchant status=${row2?.status}`);
+      await admin.req('POST', APEX, `/api/admin/community/stores/${mRow.store_id}/status`, {
+        status: 'active', reason: '',
+      });
+    }
+  }
+
+  const adminReviews = await admin.req('GET', APEX, '/api/admin/community/reviews');
+  check('the reviews moderation list loads', adminReviews.status === 200, `status ${adminReviews.status}`);
+
   // ------------------------------------------------------ 8. a real order
   //
   // EVERYTHING BELOW MOVES REAL MONEY on the database that holds real
@@ -598,21 +795,21 @@ async function main() {
   // -------------------------------------------------- 9. community escrow
   section('9. community escrow');
   const reqRes = await shopper.req('POST', APEX, '/api/marketplace/requests', {
-    title: `E2E verification request ${RUN}`,
+    title: `E2E escrow request ${RUN}`,
     description: 'An end-to-end verification of the community escrow path.',
     quantity: 1,
   });
-  check('a community request is posted', reqRes.status < 400,
+  check('a community request is posted for the escrow path', reqRes.status < 400,
     `status ${reqRes.status} ${reqRes.json?.error ?? ''}`);
-  const requestId = reqRes.json?.request?.id ?? null;
+  const escrowRequestId = reqRes.json?.request?.id ?? null;
 
-  if (!requestId) {
+  if (!escrowRequestId) {
     blocked('community escrow', 'the request was not created');
   } else {
-    const offer = await merchant.req('POST', APEX, `/api/marketplace/requests/${requestId}/offers`, {
+    const offer = await merchant.req('POST', APEX, `/api/marketplace/requests/${escrowRequestId}/offers`, {
       price_iqd: 3000, completion_days: 3, message: 'e2e offer',
     });
-    check('the merchant submits an offer', offer.status < 400,
+    check('the merchant submits an offer on it', offer.status < 400,
       `status ${offer.status} ${offer.json?.error ?? ''}`);
     const offerId = offer.json?.offer?.id ?? null;
 
@@ -647,19 +844,6 @@ async function main() {
       }
     }
   }
-
-  // ----------------------------------------------------- 10. admin console
-  section('10. the admin console sees all of it');
-  const overview = await admin.req('GET', APEX, '/api/admin/community/overview');
-  check('the community overview loads for an admin', overview.status === 200,
-    `status ${overview.status}`);
-  const merchants = await admin.req('GET', APEX, `/api/admin/community/merchants?q=${RUN}`);
-  check('the new merchant is listed in the admin console',
-    (merchants.json?.merchants ?? []).length > 0);
-  const adminRequests = await admin.req('GET', APEX, '/api/admin/community/requests');
-  check('the admin request board loads', adminRequests.status === 200, `status ${adminRequests.status}`);
-  const adminReviews = await admin.req('GET', APEX, '/api/admin/community/reviews');
-  check('the admin reviews list loads', adminReviews.status === 200, `status ${adminReviews.status}`);
 
   return finish(admin, shopperTxnId);
 }
