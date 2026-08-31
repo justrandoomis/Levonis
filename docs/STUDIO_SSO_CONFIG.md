@@ -276,3 +276,49 @@ workers in-process, and each was proved by breaking what it guards.
   fourth used the two characters `\t`, which a BRE reads as a literal `t`. The
   `GOOGLE_CLIENT_ID` line therefore survived and a duplicate `--var` reached
   wrangler. Fixed, and pinned by a test.
+
+---
+
+## 6. The email switch has two halves, and one of them was unsettable
+
+This is not part of the Studio handoff, but it was found by the same live run
+and it has the same shape, so it belongs beside it.
+
+`/api/auth/capabilities` decides both email features with one expression
+(`worker/routes/auth.ts`):
+
+```ts
+const mail = !!(c.env.EMAIL_API_KEY && (c.env.EMAIL_FROM || '').trim());
+// passwordReset: mail, emailVerification: mail
+```
+
+`worker/lib/outbox.ts` refuses identically:
+`if (!env.EMAIL_API_KEY || !env.EMAIL_FROM) return { ok: false, error: 'EMAIL_NOT_CONFIGURED' }`.
+
+So **both** are required. On the live Worker `EMAIL_API_KEY` was correctly
+installed as a secret and `EMAIL_FROM` was present as a plain var **with an
+empty value** — and nothing could change that, because `7 - Deploy LIVE main
+site` reads the Worker's current vars and writes them back, which can carry a
+value forward but can never introduce one. Setting the API key and redeploying
+any number of times would have left password reset and email verification
+switched off, with `capabilities` honestly reporting `false` and both
+endpoints answering `503 EMAIL_NOT_CONFIGURED`.
+
+| Name | GitHub secret | Worker secret | Worker variable | On which Worker |
+| --- | --- | --- | --- | --- |
+| `EMAIL_API_KEY` | **yes** | **yes** | no | main site |
+| `EMAIL_FROM` | **yes** | no | **yes**, same name | main site |
+
+**`EMAIL_FROM` format.** Either `user@domain` or `Name <user@domain>`. The
+deploy validates that shape and refuses anything else, because a malformed
+sender's only symptom at Resend is mail that never arrives.
+
+**It cannot be defaulted.** The sending domain must be verified in the owner's
+Resend account; an address invented in this repository would be rejected on
+every send. That is why it is the owner's value and why the workflow asks for
+it rather than assuming one.
+
+`EMAIL_ALLOWED_RECIPIENTS` must stay **empty** on the live Worker. When it is
+set, `outbox.ts` marks any send to an address outside the list as `skipped` —
+the API still reports success and the message never leaves. Workflow 7 already
+refuses to deploy while it is set.
