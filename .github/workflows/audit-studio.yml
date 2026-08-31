@@ -71,105 +71,122 @@ jobs:
           npx --prefix studio wrangler whoami 2>&1 | sed -n '1,60p' || true
 
       # -------------------------------------------------- studio database
-      - name: Resolve the Studio production database
+      #
+      # Both Studio databases are inspected, and which one MATTERS is decided
+      # by the Worker actually bound to the live hostname (read further down
+      # from the Cloudflare API, not assumed from a name).
+      #
+      # wrangler resolves a d1 database through studio/wrangler.jsonc, whose
+      # database_id is a committed *-PLACEHOLDER. The deploy workflows fill it
+      # with scripts/set-deploy-ids.mjs before touching D1; an earlier version
+      # of this audit did not, so every d1 command failed and the failure was
+      # misread as "no migrations have been applied". The ids are filled here
+      # for the same reason, in the checkout only — nothing remote changes.
+      - name: Resolve both Studio databases
         id: db
         continue-on-error: true
         working-directory: studio
         env:
-          STUDIO_PROD_DB_NAME: ${{ secrets.STUDIO_PROD_DB_NAME }}
+          STUDIO_PROD_DB_NAME_OVERRIDE: ${{ secrets.STUDIO_PROD_DB_NAME }}
         run: |
-          echo "name=" >> "$GITHUB_OUTPUT"
-          echo "exists=unknown" >> "$GITHUB_OUTPUT"
-          NAME="${STUDIO_PROD_DB_NAME:-levonis-studio-db}"
-          if ! npx wrangler d1 list --json > /tmp/d1.json 2>/tmp/d1.err; then
+          echo "prod_name=" >> "$GITHUB_OUTPUT"
+          echo "staging_name=" >> "$GITHUB_OUTPUT"
+          if ! npx wrangler d1 list --json > /tmp/d1.json 2>&1; then
             echo "::warning::cannot list D1 databases — the token is missing Account:D1:Read"
-            sed -n '1,20p' /tmp/d1.err || true
+            sed -n '1,20p' /tmp/d1.json || true
             exit 0
           fi
-          ID=$(jq -r --arg n "$NAME" '.[] | select(.name==$n) | .uuid' /tmp/d1.json)
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          if [ -n "$ID" ]; then
-            echo "::add-mask::$ID"
-            echo "Studio production database \"$NAME\" exists."
-            echo "exists=yes" >> "$GITHUB_OUTPUT"
-          else
-            echo "Studio production database \"$NAME\" does NOT exist yet."
-            echo "exists=no" >> "$GITHUB_OUTPUT"
-          fi
+          PROD="${STUDIO_PROD_DB_NAME_OVERRIDE:-levonis-studio-db}"
+          STAGE="levonis-studio-db-staging"
+          echo "Studio databases on this account:"
+          jq -r --arg a "$PROD" --arg b "$STAGE" \
+            '.[] | select(.name==$a or .name==$b) | "  \(.name)"' /tmp/d1.json
+          PROD_ID=$(jq -r --arg n "$PROD"  '.[] | select(.name==$n) | .uuid' /tmp/d1.json)
+          STAGE_ID=$(jq -r --arg n "$STAGE" '.[] | select(.name==$n) | .uuid' /tmp/d1.json)
+          [ -n "$PROD_ID" ]  && echo "::add-mask::$PROD_ID"
+          [ -n "$STAGE_ID" ] && echo "::add-mask::$STAGE_ID"
+          [ -n "$PROD_ID" ]  && echo "prod_name=$PROD"   >> "$GITHUB_OUTPUT"
+          [ -n "$STAGE_ID" ] && echo "staging_name=$STAGE" >> "$GITHUB_OUTPUT"
+          # Fill the placeholders so `wrangler d1 execute` can resolve either.
+          STUDIO_PROD_DB_ID="$PROD_ID" STUDIO_STAGING_DB_ID="$STAGE_ID" \
+            node scripts/set-deploy-ids.mjs
+          grep -c 'PLACEHOLDER' wrangler.jsonc | sed 's/^/remaining placeholders: /'
 
-      - name: Tables present in the Studio production database (SELECT only)
-        id: tables
-        if: steps.db.outputs.exists == 'yes'
+      - name: Schema and migration state of both databases (SELECT only)
+        id: schema
         continue-on-error: true
         working-directory: studio
+        env:
+          PROD_DB: ${{ steps.db.outputs.prod_name }}
+          STAGE_DB: ${{ steps.db.outputs.staging_name }}
         run: |
-          set -e
-          echo "tables=" >> "$GITHUB_OUTPUT"
-          echo "count=unknown" >> "$GITHUB_OUTPUT"
-          npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
-            --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" \
-            > /tmp/tables.json
-          echo "Every table, including bookkeeping tables:"
-          jq -r '.[0].results[] | "  \(.name)"' /tmp/tables.json
-          # The production deploy workflow's emptiness gate excludes exactly
-          # these three prefixes, so reproduce it verbatim here.
-          GATED=$(jq -r '[.[0].results[].name
-                          | select(startswith("sqlite_") or startswith("_cf_") or startswith("d1_") | not)]
-                         | join(", ")' /tmp/tables.json)
-          N=$(jq -r '[.[0].results[].name
-                      | select(startswith("sqlite_") or startswith("_cf_") or startswith("d1_") | not)]
-                     | length' /tmp/tables.json)
-          echo ""
-          echo "Counted by the deploy gate ($N): ${GATED:-none}"
-          echo "tables=${GATED:-none}" >> "$GITHUB_OUTPUT"
-          echo "count=$N" >> "$GITHUB_OUTPUT"
-          if [ "$N" = "0" ]; then
-            echo "gate=WOULD PASS — apply_migrations=true is accepted" >> "$GITHUB_OUTPUT"
-          else
-            echo "gate=WOULD REFUSE — $N tables present" >> "$GITHUB_OUTPUT"
-          fi
+          # One helper, run against each database. Every statement is a SELECT.
+          # A command that FAILS is reported as a failure — never silently
+          # reinterpreted as "the table is absent", which is how the previous
+          # run of this audit produced a confident and wrong answer.
+          inspect() {
+            DB="$1"; ENVNAME="$2"
+            echo ""
+            echo "=============================================================="
+            echo "  $DB"
+            echo "=============================================================="
+            if [ -z "$DB" ]; then echo "  (not present on this account)"; return; fi
 
-      - name: Migrations wrangler believes are applied (SELECT only)
-        id: applied
-        if: steps.db.outputs.exists == 'yes'
-        continue-on-error: true
-        working-directory: studio
-        run: |
-          echo "applied=none" >> "$GITHUB_OUTPUT"
-          # d1_migrations is wrangler's own bookkeeping table. Absent means no
-          # migration has ever been applied through wrangler on this database.
-          if ! npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
-              --command "SELECT name, applied_at FROM d1_migrations ORDER BY id" > /tmp/applied.json 2>/tmp/applied.err; then
-            echo "d1_migrations does not exist — wrangler has never applied a migration here."
-            sed -n '1,5p' /tmp/applied.err || true
-            echo "applied=NONE (no d1_migrations table)" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          LIST=$(jq -r '[.[0].results[].name] | join(", ")' /tmp/applied.json)
-          echo "applied per d1_migrations: ${LIST:-none}"
-          echo "applied=${LIST:-none}" >> "$GITHUB_OUTPUT"
-
-      - name: Rows in each Studio table (SELECT COUNT only)
-        id: rows
-        if: steps.tables.outputs.count != '0' && steps.db.outputs.exists == 'yes'
-        continue-on-error: true
-        working-directory: studio
-        run: |
-          for T in projects project_revisions project_files studio_sessions; do
-            if echo "${{ steps.tables.outputs.tables }}" | grep -qw "$T"; then
-              N=$(npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
-                    --command "SELECT COUNT(*) AS n FROM $T" | jq -r '.[0].results[0].n')
-              echo "  $T: $N rows"
-            else
-              echo "  $T: table absent"
+            if ! npx wrangler d1 execute "$DB" --remote --json $ENVNAME \
+                 --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" \
+                 > /tmp/t.json 2>/tmp/t.err; then
+              echo "  QUERY FAILED — the state of this database is UNKNOWN, not empty:"
+              sed -n '1,25p' /tmp/t.err
+              sed -n '1,25p' /tmp/t.json
+              return
             fi
-          done
+            echo "  every table, including bookkeeping:"
+            jq -r '.[0].results[] | "    \(.name)"' /tmp/t.json
+            GATED=$(jq -r '[.[0].results[].name
+                            | select(startswith("sqlite_") or startswith("_cf_") or startswith("d1_") | not)]
+                           | join(", ")' /tmp/t.json)
+            N=$(jq -r '[.[0].results[].name
+                        | select(startswith("sqlite_") or startswith("_cf_") or startswith("d1_") | not)]
+                       | length' /tmp/t.json)
+            echo "  counted by the deploy gate ($N): ${GATED:-none}"
+            if [ "$N" = "0" ]; then
+              echo "  => apply_migrations=true WOULD BE ACCEPTED on this database"
+            else
+              echo "  => apply_migrations=true WOULD BE REFUSED on this database"
+            fi
+
+            # d1_migrations is wrangler's bookkeeping table. Distinguish
+            # "absent" (never migrated) from "the query itself failed".
+            HAS=$(jq -r '[.[0].results[].name | select(. == "d1_migrations")] | length' /tmp/t.json)
+            if [ "$HAS" = "0" ]; then
+              echo "  d1_migrations: absent — wrangler has never applied a migration here"
+            else
+              npx wrangler d1 execute "$DB" --remote --json $ENVNAME \
+                --command "SELECT name FROM d1_migrations ORDER BY id" > /tmp/m.json 2>/tmp/m.err \
+                && echo "  d1_migrations records: $(jq -r '[.[0].results[].name] | join(", ")' /tmp/m.json)" \
+                || { echo "  d1_migrations read FAILED:"; sed -n '1,10p' /tmp/m.err; }
+            fi
+
+            for T in projects project_revisions project_files studio_sessions; do
+              if jq -e --arg t "$T" '[.[0].results[].name | select(. == $t)] | length > 0' /tmp/t.json >/dev/null; then
+                npx wrangler d1 execute "$DB" --remote --json $ENVNAME \
+                  --command "SELECT COUNT(*) AS n FROM $T" > /tmp/c.json 2>/dev/null \
+                  && echo "    rows in $T: $(jq -r '.[0].results[0].n' /tmp/c.json)" \
+                  || echo "    rows in $T: count failed"
+              else
+                echo "    $T: table absent"
+              fi
+            done
+          }
+
+          inspect "$PROD_DB" ""
+          inspect "$STAGE_DB" "--env staging"
 
       - name: Migrations this repo would apply, and what each one does
         continue-on-error: true
         run: |
-          echo "Studio migrations tracked in studio/drizzle (the only ones this"
-          echo "workflow family ever applies to levonis-studio-db):"
+          echo "Studio migrations tracked in studio/drizzle (the only ones any"
+          echo "Studio workflow ever applies to a Studio database):"
           for F in studio/drizzle/*.sql; do
             [ -e "$F" ] || continue
             echo ""
@@ -307,6 +324,38 @@ jobs:
             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/domains" -o /tmp/alldomains.json || true
           jq -r '.result[]? | "  \(.hostname) -> \(.service)"' /tmp/alldomains.json 2>/dev/null || true
 
+      # -------------------------------------------------------- bindings
+      - name: Which database the Worker on the live hostname is actually bound to
+        id: bindings
+        continue-on-error: true
+        env:
+          BOUND: ${{ steps.domains.outputs.bound }}
+        run: |
+          echo "d1=unknown" >> "$GITHUB_OUTPUT"
+          # The service name comes from the custom-domain answer above, so this
+          # follows the real binding instead of assuming from the worker name.
+          SERVICE=$(printf '%s' "$BOUND" | sed 's/ (.*//')
+          if [ -z "$SERVICE" ] || [ "$SERVICE" = "none" ] || [ "$SERVICE" = "unknown" ]; then
+            echo "no service resolved for $HOST — skipping"; exit 0
+          fi
+          echo "Worker serving $HOST: $SERVICE"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$SERVICE/settings" \
+            -o /tmp/settings.json || true
+          if ! jq -e '.success == true' /tmp/settings.json > /dev/null 2>&1; then
+            echo "::warning::cannot read Worker settings — missing Account / Workers Scripts / Read"
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/settings.json 2>/dev/null || true
+            echo "d1=MISSING Account:Workers Scripts:Read" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Bindings on $SERVICE (names and types only — no secret values):"
+          jq -r '.result.bindings[]? | "  \(.type)  \(.name)  \(.database_name // .bucket_name // "")"' \
+            /tmp/settings.json
+          D1=$(jq -r '[.result.bindings[]? | select(.type == "d1") | .database_name] | join(", ")' /tmp/settings.json)
+          echo ""
+          echo "D1 database bound to the Worker serving $HOST: ${D1:-none}"
+          echo "d1=${D1:-none}" >> "$GITHUB_OUTPUT"
+
       # --------------------------------------------------------- scripts
       - name: Worker scripts that exist on this account
         id: scripts
@@ -353,11 +402,13 @@ jobs:
             echo "### Production database"
             echo "| Question | Answer |"
             echo "| --- | --- |"
-            echo "| Database | ${{ steps.db.outputs.name }} (exists: ${{ steps.db.outputs.exists }}) |"
-            echo "| Tables counted by the deploy gate | ${{ steps.tables.outputs.count || 'not read' }} |"
-            echo "| Table names | ${{ steps.tables.outputs.tables || 'not read' }} |"
-            echo "| d1_migrations says applied | ${{ steps.applied.outputs.applied || 'not read' }} |"
-            echo "| apply_migrations=true would | ${{ steps.tables.outputs.gate || 'unknown' }} |"
+            echo "| Studio production DB | ${{ steps.db.outputs.prod_name || 'not resolved' }} |"
+            echo "| Studio staging DB | ${{ steps.db.outputs.staging_name || 'not resolved' }} |"
+            echo "| DB bound to the Worker on ${{ env.HOST }} | ${{ steps.bindings.outputs.d1 || 'not read' }} |"
+            echo ""
+            echo "Per-database table lists, d1_migrations state and row counts are in the"
+            echo "\"Schema and migration state\" step log. A failed query is reported as a"
+            echo "failure there, never as an empty database."
             echo ""
             echo "### Cloudflare routing for ${{ env.HOST }}"
             echo "| Check | Permission | Result |"
@@ -368,6 +419,7 @@ jobs:
             echo "| Zone Worker routes | Zone:Workers Routes:Read | ${{ steps.routes.outputs.perm }} — ${{ steps.routes.outputs.match }} |"
             echo "| Worker custom domains | Account:Workers Scripts:Read | ${{ steps.domains.outputs.perm }} — ${{ steps.domains.outputs.bound }} |"
             echo "| Worker script list | Account:Workers Scripts:Read | ${{ steps.scripts.outputs.perm }} |"
+            echo "| Live Worker bindings | Account:Workers Scripts:Read | ${{ steps.bindings.outputs.d1 }} |"
             echo ""
             echo "No migration was applied, no DNS record written, no route bound,"
             echo "no Worker deployed. Every database statement was a SELECT."
