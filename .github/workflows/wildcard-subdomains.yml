@@ -285,7 +285,17 @@ jobs:
           curl -s -o /dev/null -w '  studio:           %{http_code}\n' --max-time 25 "https://studio.$DOMAIN/" || true
 
           echo
+          echo "--- what is actually answering on a merchant host"
+          # A status code alone cannot tell a Worker apart from a redirect
+          # rule sitting in front of one. The response headers can.
+          curl -sSI --max-time 25 "https://$PROBE/api/health" 2>&1 \
+            | grep -iE '^(HTTP/|location|server|cf-ray|cf-cache-status|content-type):' \
+            | sed 's/^/  /' || true
+
+          echo
           echo "--- THE ONE THAT MATTERS: platform admin refused off the apex"
+          curl -sSI --max-time 25 "https://$PROBE/api/admin/community/overview" 2>&1 \
+            | grep -iE '^(HTTP/|location|server):' | sed 's/^/  /' || true
           CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 \
             "https://$PROBE/api/admin/community/overview" || echo 000)
           echo "  /api/admin/community/overview on a merchant host: $CODE"
@@ -298,6 +308,17 @@ jobs:
               echo "  refused as expected — the route does not exist on this host";;
             000)
               echo "  the host does not resolve yet, so there is nothing to reach";;
+            30*)
+              # Something in front of the Worker is redirecting. Follow it: if
+              # it lands on the apex, the admin API is being reached under the
+              # apex's own hostname, which is fine — but it also means merchant
+              # subdomains are not served by the Worker at all yet.
+              echo "  a redirect is intercepting this host. Following it:"
+              curl -sSL -o /dev/null --max-time 25 \
+                -w '    final url: %{url_effective}\n    final code: %{http_code}\n' \
+                "https://$PROBE/api/admin/community/overview" || true
+              echo "  UNPROVEN: the Worker is not answering on merchant hosts"
+              ;;
             *)
               echo "  unexpected status; treat as unproven";;
           esac
