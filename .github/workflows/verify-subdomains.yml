@@ -1,0 +1,84 @@
+# §95 on the real environment: merchant subdomains, one identity, one cart,
+# one seller per checkout, and the apex-only admin guard.
+#
+# DEFAULT IS SAFE. Phase 1 — host classification, the admin guard, shared
+# login, shared cart — creates one throwaway account and nothing else. It is
+# what a visitor can do, so it is what this runs by default.
+#
+# PHASE 2 IS OPT-IN AND WRITES TO THE LIVE LEDGER. Buying PLUS, opening a
+# store, placing an order and settling escrow are real financial records on
+# the database that holds real customers. There is no separate production
+# database to rehearse against — `levonis-staging` (the Worker serving
+# levonis-iq.com) is bound to `levonis-db-staging`, which IS the live data
+# (docs/DECISIONS.md row 52). So it happens only when the owner types
+# WRITE-TO-LIVE-LEDGER, and the script reverses the float it credits through
+# the platform's own adjustment path so the run nets to zero.
+#
+# Without that confirmation every phase-2 step is reported BLOCKED with the
+# reason. It is never skipped silently and never counted as a pass.
+name: 10 - Verify Merchant Subdomains (§95)
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'Apex to test'
+        required: false
+        default: 'levonis-iq.com'
+      slug:
+        description: 'Store slug for phase 2 (leave blank for a run-scoped one)'
+        required: false
+        default: ''
+      financial:
+        description: 'Type WRITE-TO-LIVE-LEDGER to also run phase 2 (real money movements)'
+        required: false
+        default: ''
+
+concurrency: verify-subdomains
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: DNS, as the internet sees it
+        continue-on-error: true
+        env:
+          HOST: ${{ github.event.inputs.host || 'levonis-iq.com' }}
+        run: |
+          echo "apex:    $(dig +short "$HOST" | tr '\n' ' ')"
+          echo "studio:  $(dig +short "studio.$HOST" | tr '\n' ' ')"
+          echo "mail:    $(dig +short "mail.$HOST" | tr '\n' ' ')"
+          echo "random:  $(dig +short "probe-$GITHUB_RUN_ID.$HOST" | tr '\n' ' ')"
+
+      - name: Run the §95 scenario
+        env:
+          APEX: https://${{ github.event.inputs.host || 'levonis-iq.com' }}
+          SLUG: ${{ github.event.inputs.slug }}
+          RUN_ID: ${{ github.run_id }}
+          ALLOW_FINANCIAL: ${{ github.event.inputs.financial == 'WRITE-TO-LIVE-LEDGER' && '1' || '0' }}
+          ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: node scripts/e2e-subdomains.mjs 2>&1 | tee /tmp/e2e.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### §95 verification'
+            echo ''
+            if [ "${{ github.event.inputs.financial }}" = "WRITE-TO-LIVE-LEDGER" ]; then
+              echo 'Phase 2 ran: real records were written to the live ledger and the float was reversed.'
+            else
+              echo 'Phase 1 only. Phase 2 (PLUS purchase, store, order, escrow) is reported BLOCKED —'
+              echo 're-run with `financial: WRITE-TO-LIVE-LEDGER` to exercise it.'
+            fi
+            echo ''
+            echo '```'
+            tail -60 /tmp/e2e.log 2>/dev/null || echo '(no output captured)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

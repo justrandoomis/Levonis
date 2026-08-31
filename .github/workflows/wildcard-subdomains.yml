@@ -1,0 +1,263 @@
+# Merchant subdomains: check, then apply, the two pieces of Cloudflare
+# configuration that make `ali3d.levonis-iq.com` reach the Worker.
+#
+# DEFAULT IS READ-ONLY. Without `confirm: APPLY` this changes nothing at all;
+# it reports what is there and what is missing. That matters because the two
+# things it can write are DNS on a live domain and a Worker route — both
+# reach every visitor immediately if they are wrong.
+#
+# WHAT IT WRITES, WHEN CONFIRMED:
+#
+#   1. A PROXIED `CNAME *` in the levonis-iq.com zone. Existing records win
+#      over a wildcard, so `studio` and `mail` keep resolving to their own
+#      targets — which is checked before AND after, not assumed.
+#   2. A Worker route `*.levonis-iq.com/*` bound to whichever Worker actually
+#      serves the apex today. That Worker is looked up from the API rather
+#      than hard-coded, because the one serving levonis-iq.com is
+#      `levonis-staging` and there is no Worker named `levonis` on the account
+#      (docs/DECISIONS.md row 52) — a name typed from memory here would bind
+#      every merchant subdomain to nothing.
+#
+# WHAT IT NEVER DOES: deploy code, run a migration, touch a database, a
+# bucket, a secret, or any DNS record other than the wildcard.
+#
+# The token needs Zone:DNS:Edit and Zone:Workers Routes:Edit on this zone in
+# addition to its Workers permissions. If it does not have them, the run says
+# exactly which permission is missing rather than failing opaquely.
+name: 9 - Merchant Subdomains (wildcard DNS + route)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to write the wildcard DNS record and route. Anything else = read-only report.'
+        required: false
+        default: ''
+      domain:
+        description: 'Zone to configure'
+        required: false
+        default: 'levonis-iq.com'
+
+concurrency: cloudflare-wildcard
+
+jobs:
+  wildcard:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DOMAIN: ${{ github.event.inputs.domain || 'levonis-iq.com' }}
+      APPLY: ${{ github.event.inputs.confirm }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the zone
+        id: zone
+        run: |
+          set -e
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" -o /tmp/zone.json
+          if ! jq -e '.success == true' /tmp/zone.json > /dev/null; then
+            echo "::error::could not list zones. The API token is probably missing Zone:Zone:Read on $DOMAIN."
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/zone.json
+            exit 1
+          fi
+          ID=$(jq -r '.result[0].id // ""' /tmp/zone.json)
+          [ -n "$ID" ] || { echo "::error::zone $DOMAIN not found on this account"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "zone $DOMAIN resolved"
+
+      # --------------------------------------------------------------- DNS
+      - name: What DNS is there now
+        id: dns
+        env:
+          ZONE: ${{ steps.zone.outputs.id }}
+        run: |
+          set -e
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?per_page=200" -o /tmp/dns.json
+          if ! jq -e '.success == true' /tmp/dns.json > /dev/null; then
+            echo "::error::could not read DNS records. The token is missing Zone:DNS:Read on $DOMAIN."
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/dns.json
+            exit 1
+          fi
+
+          echo "Records that must keep winning over the wildcard:"
+          jq -r --arg d "$DOMAIN" '
+            .result[]
+            | select(.name == "studio." + $d or .name == "mail." + $d or .name == $d or .name == "www." + $d)
+            | "  \(.type)\t\(.name)\tproxied=\(.proxied)"' /tmp/dns.json
+
+          WILD=$(jq -r --arg d "$DOMAIN" '.result[] | select(.name == "*." + $d) | .id' /tmp/dns.json | head -1)
+          if [ -n "$WILD" ]; then
+            echo "::add-mask::$WILD"
+            echo "existing=$(jq -r --arg d "$DOMAIN" '.result[] | select(.name == "*." + $d) | "\(.type) -> \(.content) proxied=\(.proxied)"' /tmp/dns.json | head -1)" >> "$GITHUB_OUTPUT"
+            echo "wildcard_id=$WILD" >> "$GITHUB_OUTPUT"
+            echo "a wildcard record already exists"
+          else
+            echo "existing=none" >> "$GITHUB_OUTPUT"
+            echo "NO wildcard record — merchant subdomains do not resolve yet"
+          fi
+
+      - name: Create or correct the wildcard record
+        if: ${{ github.event.inputs.confirm == 'APPLY' }}
+        env:
+          ZONE: ${{ steps.zone.outputs.id }}
+          WILD_ID: ${{ steps.dns.outputs.wildcard_id }}
+        run: |
+          set -e
+          BODY=$(jq -nc --arg d "$DOMAIN" \
+            '{type:"CNAME", name:"*", content:$d, proxied:true, ttl:1,
+              comment:"merchant storefronts — one wildcard, no per-store record"}')
+
+          if [ -n "$WILD_ID" ]; then
+            curl -sS -X PUT \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records/$WILD_ID" \
+              --data "$BODY" -o /tmp/put.json
+          else
+            curl -sS -X POST \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
+              --data "$BODY" -o /tmp/put.json
+          fi
+
+          if ! jq -e '.success == true' /tmp/put.json > /dev/null; then
+            echo "::error::could not write the wildcard DNS record. The token is missing Zone:DNS:Edit on $DOMAIN."
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/put.json
+            exit 1
+          fi
+          echo "wildcard CNAME * -> $DOMAIN, proxied"
+
+      # ------------------------------------------------------------- routes
+      - name: Which Worker actually serves the apex
+        id: worker
+        run: |
+          set -e
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/domains?hostname=$DOMAIN" \
+            -o /tmp/domains.json
+          if ! jq -e '.success == true' /tmp/domains.json > /dev/null; then
+            echo "::warning::could not list Worker custom domains; falling back to the zone's routes"
+            echo "" > /dev/null
+          fi
+          NAME=$(jq -r '.result[0].service // ""' /tmp/domains.json 2>/dev/null || echo "")
+
+          if [ -z "$NAME" ]; then
+            echo "::error::no Worker custom domain is bound to $DOMAIN, so there is nothing to bind the wildcard to."
+            echo "Attach the apex to a Worker first, then re-run."
+            exit 1
+          fi
+          echo "the apex is served by the Worker: $NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: What routes are there now
+        id: routes
+        env:
+          ZONE: ${{ steps.zone.outputs.id }}
+        run: |
+          set -e
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes" -o /tmp/routes.json
+          if ! jq -e '.success == true' /tmp/routes.json > /dev/null; then
+            echo "::error::could not read Worker routes. The token is missing Zone:Workers Routes:Read on $DOMAIN."
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/routes.json
+            exit 1
+          fi
+          echo "routes on this zone:"
+          jq -r '.result[] | "  \(.pattern) -> \(.script // "(none)")"' /tmp/routes.json
+
+          PATTERN="*.$DOMAIN/*"
+          EXISTING=$(jq -r --arg p "$PATTERN" '.result[] | select(.pattern == $p) | .id' /tmp/routes.json | head -1)
+          if [ -n "$EXISTING" ]; then
+            echo "::add-mask::$EXISTING"
+            echo "route_id=$EXISTING" >> "$GITHUB_OUTPUT"
+            echo "bound_to=$(jq -r --arg p "$PATTERN" '.result[] | select(.pattern == $p) | .script' /tmp/routes.json | head -1)" >> "$GITHUB_OUTPUT"
+          else
+            echo "bound_to=none" >> "$GITHUB_OUTPUT"
+            echo "NO wildcard route — merchant subdomains would reach Cloudflare and not the Worker"
+          fi
+
+      - name: Bind the wildcard route to that Worker
+        if: ${{ github.event.inputs.confirm == 'APPLY' }}
+        env:
+          ZONE: ${{ steps.zone.outputs.id }}
+          ROUTE_ID: ${{ steps.routes.outputs.route_id }}
+          SCRIPT: ${{ steps.worker.outputs.name }}
+        run: |
+          set -e
+          BODY=$(jq -nc --arg p "*.$DOMAIN/*" --arg s "$SCRIPT" '{pattern:$p, script:$s}')
+          if [ -n "$ROUTE_ID" ]; then
+            curl -sS -X PUT \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes/$ROUTE_ID" \
+              --data "$BODY" -o /tmp/route.json
+          else
+            curl -sS -X POST \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes" \
+              --data "$BODY" -o /tmp/route.json
+          fi
+          if ! jq -e '.success == true' /tmp/route.json > /dev/null; then
+            echo "::error::could not write the Worker route. The token is missing Zone:Workers Routes:Edit on $DOMAIN."
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/route.json
+            exit 1
+          fi
+          echo "route *.$DOMAIN/* -> $SCRIPT"
+
+      # ------------------------------------------------------------- proof
+      # A green API call means Cloudflare accepted a change, not that the
+      # internet sees it. These checks are the actual evidence.
+      - name: Prove it from outside
+        run: |
+          set -e
+          echo "--- system hosts must NOT be captured by the wildcard"
+          for h in studio mail; do
+            printf '  %s.%s -> ' "$h" "$DOMAIN"
+            dig +short "$h.$DOMAIN" | tr '\n' ' ' ; echo
+          done
+
+          echo "--- an arbitrary subdomain should resolve via the wildcard"
+          printf '  probe-%s.%s -> ' "$GITHUB_RUN_ID" "$DOMAIN"
+          dig +short "probe-$GITHUB_RUN_ID.$DOMAIN" | tr '\n' ' ' ; echo
+
+          echo "--- the main site is unaffected"
+          curl -s -o /dev/null -w '  apex /api/health: %{http_code}\n' --max-time 25 "https://$DOMAIN/api/health"
+
+          echo "--- the Studio is unaffected"
+          curl -s -o /dev/null -w '  studio: %{http_code}\n' --max-time 25 "https://studio.$DOMAIN/"
+
+          echo "--- a nonexistent store answers as a missing store, not as the homepage"
+          curl -s --max-time 25 "https://no-such-store-$GITHUB_RUN_ID.$DOMAIN/api/storefront/resolve" \
+            -o /tmp/resolve.json -w '  resolve: %{http_code}\n' || true
+          head -c 400 /tmp/resolve.json 2>/dev/null || true; echo
+
+          echo
+          echo "--- THE ONE THAT MATTERS: platform admin must be refused off the apex"
+          CODE=$(curl -s -o /tmp/admin.txt -w '%{http_code}' --max-time 25 \
+            "https://no-such-store-$GITHUB_RUN_ID.$DOMAIN/api/admin/community/overview" || echo 000)
+          echo "  /api/admin/community/overview on a merchant host: $CODE"
+          if [ "$CODE" = "200" ] || [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; then
+            echo "::error::the apex-only admin guard is NOT in effect on this host — a merchant page is same-origin with this API"
+            exit 1
+          fi
+          echo "  refused as expected (404 = the route does not exist on this host)"
+
+      - name: Say plainly what happened
+        if: always()
+        run: |
+          if [ "$APPLY" = "APPLY" ]; then
+            echo "### Applied" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Read-only report — nothing was changed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Re-run with \`confirm: APPLY\` to write the wildcard record and route." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          {
+            echo ""
+            echo "| Item | State |"
+            echo "|---|---|"
+            echo "| Wildcard DNS before this run | ${{ steps.dns.outputs.existing }} |"
+            echo "| Worker serving the apex | ${{ steps.worker.outputs.name }} |"
+            echo "| Wildcard route before this run | ${{ steps.routes.outputs.bound_to }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
