@@ -1,10 +1,18 @@
-# LEVO Studio sign-in — the configuration it is waiting on
+# LEVO Studio sign-in — its configuration, and where each value lives
+
+> **Status: configured and deployed.** The owner set the three repository
+> secrets, and workflows 7 and 8 carried them onto the two Workers that serve
+> users. Both are verified from Cloudflare's own binding list by
+> `15 - Verify Live Auth`, which then walks the whole handoff against the live
+> origins. The rest of this document is the reference for what each value is
+> and where it lives — read it when something needs changing, not to enable
+> anything.
 
 The server-to-server sign-in handoff between `levonis-iq.com` and
 `studio.levonis-iq.com` is **fully implemented on both sides**. Nothing is
-left to write. It is disabled because three configuration values are unset,
-and every endpoint says so honestly (`503 STUDIO_NOT_CONFIGURED`,
-`AUTH_NOT_CONFIGURED`) rather than half-working.
+left to write. Before the secrets were set it was disabled, and every endpoint
+said so honestly (`503 STUDIO_NOT_CONFIGURED`, `AUTH_NOT_CONFIGURED`) rather
+than half-working.
 
 This document names those three values, says exactly where each one goes, and
 gives the format each is parsed with. **No real value appears here, and none
@@ -85,7 +93,8 @@ So:
 
 * scheme is **required** — `https://studio.levonis-iq.com`, not
   `studio.levonis-iq.com`;
-* a trailing slash is tolerated and stripped;
+* a trailing slash is tolerated and stripped — the stored value on the live
+  Worker has one, and it is correct;
 * surrounding spaces are tolerated;
 * the incoming `?dest=` is reduced to `new URL(dest).origin` and matched with
   `Array.includes` — **exact origin equality, no prefixes and no wildcards**.
@@ -117,8 +126,9 @@ for: `403`, and the code is never minted.
 (env.MAIN_SITE_ORIGIN || env.MAIN_ORIGIN || '').trim().replace(/\/+$/, '')
 ```
 
-**Format.** A **single origin**, scheme included, no path, trailing slash
-stripped:
+**Format.** A **single origin**, scheme included, no path. A trailing slash is
+tolerated and stripped by `mainSiteOrigin()`; the stored value on the live
+Worker has one, and it is correct:
 
 ```
 https://levonis-iq.com
