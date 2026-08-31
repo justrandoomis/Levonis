@@ -34,15 +34,30 @@ const REPORT_PATH = join(STUDIO_ROOT, "tests", "perf-browser-memory.latest.json"
 const PLATES = 9;               // the engine's plate cap
 const BYTES_PER_PLATE = 20 * 1024 * 1024;
 
+/**
+ * Finds a Chromium to drive. `--chromium <path>` and CHROMIUM_PATH win;
+ * otherwise it searches the Playwright browser cache.
+ *
+ * Both layouts are checked on purpose: older Playwright builds unpack into
+ * `chrome-linux/chrome`, and Chrome-for-Testing builds unpack into
+ * `chrome-linux64/chrome`. Looking for only one of them is how this script
+ * first failed in CI, on a runner that had downloaded the browser correctly.
+ */
 function resolveChromium() {
-  const flagIndex = process.argv.indexOf("--chromium");
-  if (flagIndex >= 0 && process.argv[flagIndex + 1]) return process.argv[flagIndex + 1];
+  const flag = process.argv.indexOf("--chromium");
+  if (flag >= 0 && process.argv[flag + 1]) return process.argv[flag + 1];
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
-  const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  if (root && existsSync(root)) {
+  const roots = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    process.env.HOME ? join(process.env.HOME, ".cache", "ms-playwright") : null,
+  ].filter((root) => root && existsSync(root));
+  for (const root of roots) {
     for (const entry of readdirSync(root)) {
-      const candidate = join(root, entry, "chrome-linux", "chrome");
-      if (entry.startsWith("chromium-") && existsSync(candidate)) return candidate;
+      if (!entry.startsWith("chromium-")) continue;
+      for (const layout of ["chrome-linux/chrome", "chrome-linux64/chrome"]) {
+        const candidate = join(root, entry, ...layout.split("/"));
+        if (existsSync(candidate)) return candidate;
+      }
     }
   }
   return null;

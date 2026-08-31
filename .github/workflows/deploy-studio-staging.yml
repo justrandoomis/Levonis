@@ -169,16 +169,9 @@ jobs:
           set -e
           npm i --no-save playwright-core >/dev/null
           npx --yes playwright@1 install --with-deps chromium
-          CHROMIUM_PATH="$(node -e "
-            const { readdirSync, existsSync } = require('node:fs');
-            const { join } = require('node:path');
-            const root = join(process.env.HOME, '.cache', 'ms-playwright');
-            const dir = readdirSync(root).find((d) => d.startsWith('chromium-'));
-            const p = join(root, dir, 'chrome-linux', 'chrome');
-            if (!existsSync(p)) { console.error('no chromium'); process.exit(1); }
-            console.log(p);
-          ")"
-          node tests/perf-browser-editor.mjs "${{ steps.deploy.outputs.url }}/" --chromium "$CHROMIUM_PATH" | tee /tmp/studio-browser.txt
+          # The script finds the downloaded browser itself (both the
+          # chrome-linux and Chrome-for-Testing chrome-linux64 layouts).
+          node tests/perf-browser-editor.mjs "${{ steps.deploy.outputs.url }}/" | tee /tmp/studio-browser.txt
 
       - name: Fail if the deployed editor regressed
         run: |

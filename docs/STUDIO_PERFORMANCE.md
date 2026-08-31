@@ -243,6 +243,23 @@ Also in `perf-shell.mjs`, read out of the shipped WASM glue:
 | Module instantiations | 9 | **0** | 17 (unchanged) |
 | Kernel bytes fetched at load | 5.0 MB | **0** | 5.0 MB (unchanged) |
 
+### 3.5 On the deployed worker, on every staging deploy
+
+`4 - Deploy Studio Staging` now runs `tests/perf-browser-editor.mjs` against
+the URL it just deployed and **fails the deploy** on any of:
+
+- a phone constructing a slicer worker at page load (the kernel is being warmed
+  again),
+- pressing Slice not starting one (the deferral has become a removal),
+- a duplicate landing off the bed,
+- the worker-release patch missing from the built bundle.
+
+The measurement is uploaded as a run artifact and printed into the run summary,
+so the numbers for the live worker are on the record for every deploy rather
+than only in this document. The check runs as a guest — it imports a fixture
+and slices client-side and never signs in — so nothing is written to the
+staging database or bucket.
+
 ---
 
 ## 4. What did NOT change, deliberately
@@ -274,6 +291,10 @@ Also in `perf-shell.mjs`, read out of the shipped WASM glue:
 - **iOS could not be measured here.** The container has Chromium only. The
   Apple path is exercised by user agent (`tests/device-profile.test.mjs`) and
   by the response headers, but the numbers in §3 are Chromium's.
+- **The owner's own device is still the last word.** Every number here is from
+  a browser under automation. Whether the crash is gone on the iPad it was
+  photographed on is not something this repository can prove, and is not
+  claimed.
 - **Cancel does not work without cross-origin isolation.** The engine's cancel
   flag lives in a SharedArrayBuffer, which only exists on the threaded kernel.
   That is why isolation was *not* withheld from Android — but it means iOS and
