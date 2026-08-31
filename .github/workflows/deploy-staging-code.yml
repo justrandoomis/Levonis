@@ -167,6 +167,61 @@ jobs:
             echo "STUDIO_HANDOFF_SECRET not set — Studio sign-in stays honestly disabled"
           fi
 
+      # The same proof the Studio deploy now carries, for the store. A green
+      # deploy only means wrangler did not error; it does not mean the browser
+      # is being handed the new bundle. Vite content-hashes asset filenames, so
+      # if levonis-iq.com serves the exact file this run built, byte for byte,
+      # then what visitors load IS what was just built.
+      #
+      # The anchor is client-rendered, so no amount of curling the HTML would
+      # show it — the assertion has to be about the script that renders it.
+      - name: Prove the live store serves the bundle this run built
+        run: |
+          set -e
+          LOCAL=$(grep -l 'data-service":"studio"' dist/assets/*.js | head -1)
+          if [ -z "$LOCAL" ]; then
+            echo "::error::no built asset renders the Studio card — tests/store-isolation.test.ts should have caught this"
+            exit 1
+          fi
+          NAME=$(basename "$LOCAL")
+          echo "the Studio card is rendered by $NAME ($(wc -c < "$LOCAL") bytes)"
+
+          for i in $(seq 1 10); do
+            curl -fsS --max-time 30 "https://levonis-iq.com/assets/$NAME" -o /tmp/live.js && break
+            echo "attempt $i: $NAME not served yet"
+            sleep 6
+          done
+          if [ ! -s /tmp/live.js ]; then
+            echo "::error::levonis-iq.com does not serve $NAME — the live store is running an older bundle"
+            exit 1
+          fi
+
+          cmp -s "$LOCAL" /tmp/live.js \
+            || { echo "::error::levonis-iq.com serves a DIFFERENT $NAME than this run built"; exit 1; }
+          echo "live $NAME is byte-identical to the file this run built"
+
+          # And the specific behaviour the owner asked for: the Studio opens in
+          # its own tab, and cannot hand the new tab a handle on this page.
+          # Checked around the marker rather than as one literal string — the
+          # minifier is free to reorder props, and a check that breaks on a
+          # reordering would fail a build that is perfectly correct.
+          node -e '
+            const fs = require("node:fs");
+            const js = fs.readFileSync("/tmp/live.js", "utf8");
+            const marker = "\"data-service\":\"studio\"";
+            let at = js.indexOf(marker), seen = 0, bad = [];
+            while (at !== -1) {
+              seen++;
+              const win = js.slice(Math.max(0, at - 300), at + 300);
+              const missing = ["_blank", "noopener", "noreferrer"].filter((t) => !win.includes(t));
+              if (missing.length) bad.push(`occurrence ${seen} is missing: ${missing.join(", ")}`);
+              at = js.indexOf(marker, at + 1);
+            }
+            if (!seen) { console.error("::error::the live bundle renders no Studio card at all"); process.exit(1); }
+            if (bad.length) { console.error("::error::" + bad.join("; ")); process.exit(1); }
+            console.log(`the live store opens the Studio in its own tab (${seen} entry point(s), each with noopener and noreferrer)`);
+          '
+
       - name: Verify the live site, read-only
         id: probe
         run: |
