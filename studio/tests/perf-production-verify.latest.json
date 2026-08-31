@@ -1,7 +1,7 @@
 {
   "kind": "levo-studio-production-verify",
   "version": 1,
-  "generatedAt": "2026-08-31T09:13:09.899Z",
+  "generatedAt": "2026-08-31T09:22:50.578Z",
   "target": "http://127.0.0.1:8799/",
   "passed": true,
   "failures": [],
@@ -13,8 +13,8 @@
     "scripts": []
   },
   "pageLoad": {
-    "interactiveMs": 565,
-    "rendererRssKb": 135636,
+    "interactiveMs": 594,
+    "rendererRssKb": 132144,
     "workers": 0,
     "sliceWorkerAlive": false
   },
@@ -25,18 +25,18 @@
   "gestures": [
     {
       "name": "orbit",
-      "elapsedMs": 1617,
-      "frames": 83,
+      "elapsedMs": 1633,
+      "frames": 82,
       "p50Ms": 16.7,
       "p95Ms": 33.4,
-      "maxMs": 83.2,
+      "maxMs": 83.3,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "orbit-back",
-      "elapsedMs": 1557,
-      "frames": 81,
+      "elapsedMs": 1524,
+      "frames": 85,
       "p50Ms": 16.7,
       "p95Ms": 33.4,
       "maxMs": 33.4,
@@ -45,28 +45,48 @@
     },
     {
       "name": "pinch-zoom-in",
-      "elapsedMs": 1633,
-      "frames": 76,
+      "elapsedMs": 1588,
+      "frames": 77,
       "p50Ms": 16.7,
-      "p95Ms": 49.9,
+      "p95Ms": 33.4,
       "maxMs": 50.1,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "pinch-zoom-out",
-      "elapsedMs": 1595,
-      "frames": 68,
+      "elapsedMs": 1618,
+      "frames": 67,
       "p50Ms": 33.3,
-      "p95Ms": 33.5,
-      "maxMs": 66.6,
+      "p95Ms": 50,
+      "maxMs": 83.3,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "drag-object",
-      "elapsedMs": 2823,
-      "frames": 90,
+      "elapsedMs": 2719,
+      "frames": 91,
+      "p50Ms": 33.3,
+      "p95Ms": 50,
+      "maxMs": 50,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "gizmo-move",
+      "elapsedMs": 2477,
+      "frames": 81,
+      "p50Ms": 33.3,
+      "p95Ms": 50,
+      "maxMs": 66.7,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "gizmo-rotate",
+      "elapsedMs": 2578,
+      "frames": 81,
       "p50Ms": 33.3,
       "p95Ms": 50,
       "maxMs": 50.1,
@@ -74,31 +94,11 @@
       "freezeFrames": 0
     },
     {
-      "name": "gizmo-move",
-      "elapsedMs": 2603,
-      "frames": 81,
-      "p50Ms": 33.3,
-      "p95Ms": 50.1,
-      "maxMs": 83.3,
-      "jankFrames": 0,
-      "freezeFrames": 0
-    },
-    {
-      "name": "gizmo-rotate",
-      "elapsedMs": 2650,
-      "frames": 79,
-      "p50Ms": 33.3,
-      "p95Ms": 50.1,
-      "maxMs": 66.7,
-      "jankFrames": 0,
-      "freezeFrames": 0
-    },
-    {
       "name": "gizmo-scale",
-      "elapsedMs": 2628,
+      "elapsedMs": 2694,
       "frames": 79,
-      "p50Ms": 33.3,
-      "p95Ms": 50,
+      "p50Ms": 33.4,
+      "p95Ms": 50.1,
       "maxMs": 83.3,
       "jankFrames": 0,
       "freezeFrames": 0
@@ -216,12 +216,12 @@
   "autosave": {
     "frames": 1194,
     "p50Ms": 16.7,
-    "p95Ms": 16.8,
+    "p95Ms": 16.7,
     "maxMs": 50,
     "jankFrames": 0,
     "freezeFrames": 0,
-    "longTasks": 1,
-    "longestTaskMs": 53
+    "longTasks": 0,
+    "longestTaskMs": 0
   },
   "sliceCycles": [
     {
@@ -229,24 +229,24 @@
       "workers": 1,
       "sliceWorkerAlive": true,
       "messages": 0,
-      "rendererRssKb": 288416
+      "rendererRssKb": 276148
     },
     {
       "cycle": 2,
       "workers": 1,
       "sliceWorkerAlive": true,
       "messages": 0,
-      "rendererRssKb": 294580
+      "rendererRssKb": 278420
     },
     {
       "cycle": 3,
       "workers": 1,
       "sliceWorkerAlive": true,
       "messages": 0,
-      "rendererRssKb": 306556
+      "rendererRssKb": 290844
     }
   ],
-  "rendererGrowthKbAcrossSlices": 18140,
+  "rendererGrowthKbAcrossSlices": 14696,
   "paintKeepsWorker": {
     "workerBefore": true,
     "paintPanelOpened": true,
