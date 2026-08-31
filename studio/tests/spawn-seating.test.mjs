@@ -178,3 +178,15 @@ test("an empty request is a no-op, not an error", () => {
   const plan = planSeats([], [], { bedWidth: BED, bedDepth: BED });
   assert.deepEqual(plan, { seats: [], unseated: [] });
 });
+
+test("a single object on an empty plate goes to the middle, not into a corner", () => {
+  // The corner-point set on its own offers nothing but the bed's front-left
+  // corner when there is nothing to sit beside — which would take the first
+  // model someone imports and shove it into the corner of the plate.
+  const plan = planSeats([{ id: 1, width: 40, depth: 30 }], [], {
+    bedWidth: BED, bedDepth: BED, preferredPlate: 0, availablePlates: [0],
+  });
+  assert.equal(plan.seats.length, 1);
+  assert.equal(plan.seats[0].offsetX, 0);
+  assert.equal(plan.seats[0].offsetY, 0);
+});

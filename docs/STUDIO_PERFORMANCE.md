@@ -174,20 +174,27 @@ construct zero workers until they slice.
 **Duplicate placement**, ten presses of the editor's own Duplicate. The
 engine's duplicate is synchronous and the shell re-seats on the objects event a
 task later, so one run yields both numbers with no rebuild and no straw man.
-Source at `(-115, 115)`, plate centre `(0, 0)`, 256 × 256 bed:
+A 10 mm cube imported into an empty project, plate centre `(0, 0)`, 256 × 256
+bed:
 
 | | copies off the bed | furthest from the original |
 |---|---|---|
-| BEFORE (engine cursor) | **4 / 10** | **321.3 mm** |
-| AFTER (shell seating) | **0 / 10** | **48 mm** |
+| BEFORE (engine cursor) | **4 / 10** | **185 mm** |
+| AFTER (shell seating) | **0 / 10** | **32 mm** |
 
 ```
 BEFORE  [23,0] [41,0] [59,0] [77,0] [95,0] [113,0] [131,0] [149,0] [167,0] [185,0]
-AFTER   [-99,115] [-115,99] [-99,99] [-83,115] [-115,83] [-83,99] [-99,83] [-83,83] [-67,115] [-115,67]
+AFTER   [0,16] [-16,0] [16,0] [0,-16] [-16,16] [16,16] [-16,-16] [16,-16] [0,32] [-32,0]
 ```
 
 The BEFORE row is the reported bug exactly: the copies march away along +X at
-`z = 0`, ignoring both the bed edge and the original's position.
+`z = 0`, ignoring both the bed edge and the original's position. The AFTER row
+is a 16 mm grid — the cube plus the packer's 6 mm gap — closing in around it.
+
+(An earlier run of the same script, with the source sitting in the bed's
+front-left corner instead of the middle, measured 4/10 off the bed at up to
+321.3 mm before and 0/10 at up to 48 mm after. Where the original sits changes
+the numbers; it does not change the shape of either row.)
 
 ### 3.2 Main-thread memory held by stored slice results
 
@@ -255,6 +262,10 @@ Also in `perf-shell.mjs`, read out of the shipped WASM glue:
   that just appeared; a restore, an undo and an archive import are all excluded.
 - **Nothing that does not fit is squeezed.** An object with no room is left
   where the engine put it and reported, never scaled, rotated or stacked.
+- **A lone object still lands in the middle of the plate.** The free-corner
+  search offers the centred position as well as the flush ones, so importing a
+  single model does not push it into a corner — a regression the live
+  measurement caught before this shipped.
 
 ---
 

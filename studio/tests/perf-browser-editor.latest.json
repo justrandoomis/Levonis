@@ -1,15 +1,15 @@
 {
   "kind": "levo-studio-browser-editor",
   "version": 1,
-  "generatedAt": "2026-08-31T07:55:20.191Z",
+  "generatedAt": "2026-08-31T08:04:45.087Z",
   "target": "http://127.0.0.1:8799/",
   "pageLoad": {
     "desktop": {
       "label": "desktop — the behaviour Studio has always had",
       "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
-      "loadMs": 85,
-      "interactiveMs": 481,
-      "rendererRssDeltaKb": 130976,
+      "loadMs": 92,
+      "interactiveMs": 562,
+      "rendererRssDeltaKb": 132004,
       "workersConstructed": 1,
       "workerUrls": [
         "slicer.worker-BfMOX4YG.js"
@@ -23,9 +23,9 @@
     "phone": {
       "label": "phone — the deferred path",
       "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-      "loadMs": 67,
-      "interactiveMs": 477,
-      "rendererRssDeltaKb": 119876,
+      "loadMs": 66,
+      "interactiveMs": 469,
+      "rendererRssDeltaKb": 120584,
       "workersConstructed": 0,
       "workerUrls": [],
       "crossOriginIsolated": false,
@@ -49,8 +49,8 @@
   "duplicatePlacement": {
     "source": {
       "id": 1,
-      "x": -115,
-      "z": 115
+      "x": 0,
+      "z": 0
     },
     "plateCentre": {
       "x": 0,
@@ -59,7 +59,7 @@
     "before": {
       "copies": 10,
       "offBed": 4,
-      "furthestFromSourceMm": 321.3,
+      "furthestFromSourceMm": 185,
       "positions": [
         [
           23,
@@ -106,47 +106,47 @@
     "after": {
       "copies": 10,
       "offBed": 0,
-      "furthestFromSourceMm": 48,
+      "furthestFromSourceMm": 32,
       "positions": [
         [
-          -99,
-          115
+          0,
+          16
         ],
         [
-          -115,
-          99
+          -16,
+          0
         ],
         [
-          -99,
-          99
+          16,
+          0
         ],
         [
-          -83,
-          115
+          0,
+          -16
         ],
         [
-          -115,
-          83
+          -16,
+          16
         ],
         [
-          -83,
-          99
+          16,
+          16
         ],
         [
-          -99,
-          83
+          -16,
+          -16
         ],
         [
-          -83,
-          83
+          16,
+          -16
         ],
         [
-          -67,
-          115
+          0,
+          32
         ],
         [
-          -115,
-          67
+          -32,
+          0
         ]
       ]
     }

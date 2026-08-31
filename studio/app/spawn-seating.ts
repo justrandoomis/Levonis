@@ -155,8 +155,13 @@ function seatOnPlate(
   const maxY = usableDepth / 2;
 
   const trimmed = occupied.length > FULL_CANDIDATE_SET_LIMIT;
-  const xs = new Set<number>([minX]);
-  const ys = new Set<number>([minY]);
+  // The bed's own corner, and the position that centres the object on the
+  // plate. The centre matters: on an empty plate the corner set alone would
+  // offer nothing but the front-left corner, and the first model imported into
+  // a project would be shoved into it — which is not where the engine, or
+  // anyone, puts a single object.
+  const xs = new Set<number>([minX, -width / 2]);
+  const ys = new Set<number>([minY, -depth / 2]);
   for (const rect of occupied) {
     xs.add(rect.maxX + GAP);
     ys.add(rect.maxY + GAP);
