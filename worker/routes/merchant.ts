@@ -33,6 +33,7 @@ import {
   type StoreContext,
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
+import { merchantBalance } from '../lib/escrowOps';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -676,5 +677,345 @@ merchantRoutes.get('/followers', async (c) => {
     total: total?.n ?? 0,
     followers: results,
     next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+  });
+});
+
+// ---------------------------------------------------------------- orders
+//
+// The section the old dashboard left empty with "no merchant-order backend
+// exists yet". Every query is scoped to the caller's own merchant id, so a
+// merchant sees their orders and nobody else's — the isolation is the WHERE
+// clause, not a filter the client could drop.
+
+/** Both commerce paths in one list, with an origin filter (§74). */
+merchantRoutes.get('/orders', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 30 });
+  const cursor = c.req.query('cursor') || '';
+  const status = c.req.query('status') || '';
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT o.id, o.status, o.stage, o.origin, o.total_iqd, o.subtotal_iqd, o.shipping_iqd,
+            o.platform_fee_iqd, o.merchant_receivable_iqd, o.payment_method_id,
+            o.created_at, o.updated_at,
+            u.name AS customer_name,
+            (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
+       FROM orders o JOIN users u ON u.id = o.user_id
+      WHERE o.merchant_id = ?
+        AND (? = '' OR o.status = ?)
+        AND (? = '' OR o.created_at < ?)
+      ORDER BY o.created_at DESC LIMIT ?`
+  ).bind(ctx.merchant.id, status, status, cursor, cursor, limit).all();
+
+  return c.json({
+    success: true,
+    orders: results,
+    next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+  });
+});
+
+/**
+ * One order, in full — including what the merchant needs to actually deliver
+ * it.
+ *
+ * The customer's delivery address and phone ARE shown here, because a
+ * merchant who cannot reach the buyer cannot fulfil the order. What is not
+ * shown is anything unrelated to this transaction: no wallet balance, no
+ * other purchases, no account metadata, no other store's history (§51, §60).
+ */
+merchantRoutes.get('/orders/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+
+  const order = await c.env.DB.prepare(
+    `SELECT o.*, u.name AS customer_name, u.phone AS customer_phone
+       FROM orders o JOIN users u ON u.id = o.user_id
+      WHERE o.id = ? AND o.merchant_id = ?`
+  ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
+  if (!order) throw notFound('Order not found');
+
+  const items = await c.env.DB.prepare(
+    'SELECT * FROM order_items WHERE order_id = ?'
+  ).bind(id).all();
+
+  return c.json({
+    success: true,
+    order: {
+      id: order.id,
+      status: order.status,
+      stage: order.stage,
+      origin: order.origin,
+      created_at: order.created_at,
+      subtotal_iqd: order.subtotal_iqd,
+      shipping_iqd: order.shipping_iqd,
+      total_iqd: order.total_iqd,
+      platform_fee_iqd: order.platform_fee_iqd,
+      merchant_receivable_iqd: order.merchant_receivable_iqd,
+      payment_method_id: order.payment_method_id,
+      due_on_delivery_iqd: order.due_on_delivery_iqd,
+      customer_name: order.customer_name,
+      customer_phone: order.customer_phone,
+      address: safeParse(order.address_snapshot, {}),
+    },
+    items: items.results,
+  });
+});
+
+/** The states a merchant may move their own order through. */
+const MERCHANT_ORDER_FLOW: Record<string, readonly string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  // Terminal: money settles on delivery, so there is no path onward.
+  delivered: [],
+  cancelled: [],
+};
+
+/**
+ * Move an order forward.
+ *
+ * On delivery the merchant's pending payout becomes available (§77) — that
+ * is the moment the sale is really theirs. The ledger row is flipped by a
+ * conditional UPDATE keyed on the order, so a double tap cannot make the
+ * money available twice.
+ */
+merchantRoutes.post('/orders/:id/status', async (c) => {
+  await rateLimit(c, 'merchant-order-status', 120, 3600);
+  const ctx = await requireStoreOwner(c);
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({}));
+  const to = str(body.status, 'status', { min: 1, max: 30 });
+
+  const order = await c.env.DB.prepare(
+    'SELECT id, status FROM orders WHERE id = ? AND merchant_id = ?'
+  ).bind(id, ctx.merchant.id).first<{ id: string; status: string }>();
+  if (!order) throw notFound('Order not found');
+
+  const allowed = MERCHANT_ORDER_FLOW[order.status] ?? [];
+  if (!allowed.includes(to)) {
+    throw conflict(`An order that is ${order.status} cannot become ${to}`);
+  }
+
+  const ts = nowIso();
+  const stmts = [
+    c.env.DB.prepare(
+      `UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND merchant_id = ? AND status = ?`
+    ).bind(to, ts, id, ctx.merchant.id, order.status),
+  ];
+
+  if (to === 'delivered') {
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE merchant_payout_ledger SET state = 'available'
+          WHERE order_id = ? AND merchant_id = ? AND kind = 'sale_credit' AND state = 'pending'`
+      ).bind(id, ctx.merchant.id)
+    );
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO merchant_reputation_events (id, merchant_id, kind, points, order_id)
+         VALUES (?,?,'order_completed',10,?)`
+      ).bind(newId('rep'), ctx.merchant.id, id)
+    );
+    stmts.push(
+      c.env.DB.prepare('UPDATE community_merchants SET completed_orders = completed_orders + 1 WHERE id = ?')
+        .bind(ctx.merchant.id)
+    );
+  }
+
+  if (to === 'cancelled') {
+    // The sale never happened: the pending credit is reversed rather than
+    // deleted, so the ledger still explains itself.
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE merchant_payout_ledger SET state = 'reversed'
+          WHERE order_id = ? AND merchant_id = ? AND kind = 'sale_credit' AND state = 'pending'`
+      ).bind(id, ctx.merchant.id)
+    );
+  }
+
+  await c.env.DB.batch(stmts);
+  await audit(c.env.DB, ctx.store.user_id, 'merchant.order_status', id, { from: order.status, to });
+  return c.json({ success: true, status: to });
+});
+
+// ---------------------------------------------------------------- payouts
+
+merchantRoutes.get('/payouts', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const balance = await merchantBalance(c.env.DB, ctx.merchant.id);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, kind, amount_iqd, state, order_id, community_order_id, note, created_at
+       FROM merchant_payout_ledger WHERE merchant_id = ?
+      ORDER BY created_at DESC LIMIT 100`
+  ).bind(ctx.merchant.id).all();
+  // The balance is a SUM over these rows, so the merchant can add up the
+  // list and get the same number. A stored balance they could not reconcile
+  // is the thing this design exists to avoid.
+  return c.json({ success: true, balance, entries: results });
+});
+
+// ---------------------------------------------------------------- reviews
+
+merchantRoutes.get('/reviews', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.*, u.name AS customer_name
+       FROM merchant_reviews r JOIN users u ON u.id = r.customer_id
+      WHERE r.merchant_id = ? ORDER BY r.created_at DESC LIMIT 100`
+  ).bind(ctx.merchant.id).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    reviews: results.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      body: r.body,
+      images: safeParse(r.images, []),
+      customer_name: r.customer_name,
+      merchant_reply: r.merchant_reply || null,
+      merchant_replied_at: r.merchant_replied_at,
+      hidden: !!r.hidden,
+      order_id: r.order_id,
+      community_order_id: r.community_order_id,
+      created_at: r.created_at,
+    })),
+  });
+});
+
+/**
+ * Reply to a review. Once.
+ *
+ * A merchant may answer a customer publicly, which is fair. They may not edit
+ * that answer repeatedly after the fact, and they cannot touch the review
+ * itself — hiding one is an admin moderation decision, never the reviewed
+ * party's (§39).
+ */
+merchantRoutes.post('/reviews/:id/reply', async (c) => {
+  await rateLimit(c, 'merchant-review-reply', 30, 3600);
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const reply = str(body.reply, 'reply', { min: 1, max: 1500 });
+
+  const res = await c.env.DB.prepare(
+    `UPDATE merchant_reviews SET merchant_reply = ?, merchant_replied_at = ?, updated_at = ?
+      WHERE id = ? AND merchant_id = ? AND merchant_reply = ''`
+  ).bind(reply, nowIso(), nowIso(), str(c.req.param('id'), 'id', { min: 1, max: 60 }), ctx.merchant.id).run();
+  if (!res.meta.changes) throw conflict('That review is not yours, or you have already replied');
+
+  return c.json({ success: true });
+});
+
+// -------------------------------------------------------------- customers
+
+/**
+ * The people who have actually bought from THIS store (§60).
+ *
+ * Not a user directory: it is built from this merchant's own orders, so a
+ * merchant can only ever see someone they have traded with, and only the
+ * totals of that trading relationship.
+ */
+merchantRoutes.get('/customers', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.name,
+            COUNT(o.id) AS order_count,
+            COALESCE(SUM(o.total_iqd), 0) AS lifetime_iqd,
+            MAX(o.created_at) AS last_order_at
+       FROM orders o JOIN users u ON u.id = o.user_id
+      WHERE o.merchant_id = ?
+      GROUP BY u.id, u.name
+      ORDER BY last_order_at DESC LIMIT 100`
+  ).bind(ctx.merchant.id).all();
+  return c.json({ success: true, customers: results });
+});
+
+// -------------------------------------------------------------- analytics
+
+/**
+ * Real numbers, from this store's own rows (§50).
+ *
+ * Computed on read rather than from the pre-aggregated daily table, because
+ * a store's lifetime volume is small enough to sum directly and a figure a
+ * merchant can reconcile against their own order list is worth more than a
+ * faster one they cannot.
+ */
+merchantRoutes.get('/analytics', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const user = c.get('user')!;
+  const tier = await getTierStatus(c.env.DB, user.id);
+  if (!benefits.merchantAnalytics(tier)) {
+    throw forbidden('Analytics are part of LEVO PLUS. Renew to see them again.');
+  }
+
+  const orders = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS orders,
+            COALESCE(SUM(total_iqd), 0) AS gross,
+            COALESCE(SUM(platform_fee_iqd), 0) AS fees,
+            COALESCE(SUM(merchant_receivable_iqd), 0) AS receivable,
+            SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+       FROM orders WHERE merchant_id = ?`
+  ).bind(ctx.merchant.id).first<Record<string, number>>();
+
+  const products = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active,
+            COALESCE(SUM(view_count), 0) AS views,
+            COALESCE(SUM(sold_count), 0) AS sold
+       FROM community_products WHERE merchant_id = ?`
+  ).bind(ctx.merchant.id).first<Record<string, number>>();
+
+  const top = await c.env.DB.prepare(
+    `SELECT id, name, sold_count, view_count, price_iqd FROM community_products
+      WHERE merchant_id = ? ORDER BY sold_count DESC, view_count DESC LIMIT 5`
+  ).bind(ctx.merchant.id).all();
+
+  const offers = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS sent, SUM(CASE WHEN state = 'accepted' THEN 1 ELSE 0 END) AS accepted
+       FROM community_offers WHERE merchant_id = ?`
+  ).bind(ctx.merchant.id).first<Record<string, number>>();
+
+  const followers = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM follows WHERE merchant_id = ?'
+  ).bind(ctx.merchant.id).first<{ n: number }>();
+
+  const repeat = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM (
+       SELECT user_id FROM orders WHERE merchant_id = ? GROUP BY user_id HAVING COUNT(*) > 1
+     )`
+  ).bind(ctx.merchant.id).first<{ n: number }>();
+
+  const orderCount = Number(orders?.orders ?? 0);
+  const sent = Number(offers?.sent ?? 0);
+
+  return c.json({
+    success: true,
+    orders: {
+      total: orderCount,
+      completed: Number(orders?.completed ?? 0),
+      cancelled: Number(orders?.cancelled ?? 0),
+      gross_iqd: Number(orders?.gross ?? 0),
+      platform_fees_iqd: Number(orders?.fees ?? 0),
+      receivable_iqd: Number(orders?.receivable ?? 0),
+      // Guarded: an average over zero orders is not 0, it is "no data".
+      average_order_iqd: orderCount ? Math.round(Number(orders?.gross ?? 0) / orderCount) : null,
+    },
+    products: {
+      total: Number(products?.total ?? 0),
+      active: Number(products?.active ?? 0),
+      views: Number(products?.views ?? 0),
+      sold: Number(products?.sold ?? 0),
+    },
+    top_products: top.results,
+    offers: {
+      sent,
+      accepted: Number(offers?.accepted ?? 0),
+      win_rate: sent ? Math.round((Number(offers?.accepted ?? 0) / sent) * 100) : null,
+    },
+    followers: followers?.n ?? 0,
+    repeat_customers: repeat?.n ?? 0,
+    rating: ctx.merchant.rating_count ? ctx.merchant.rating_avg_x100 / 100 : null,
+    rating_count: ctx.merchant.rating_count,
+    balance: await merchantBalance(c.env.DB, ctx.merchant.id),
   });
 });

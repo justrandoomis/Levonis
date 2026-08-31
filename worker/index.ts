@@ -39,6 +39,9 @@ import { classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storefrontRoutes } from './routes/storefront';
 import { marketplaceRoutes } from './routes/marketplace';
+import { storeOrderRoutes } from './routes/storeOrders';
+import { communityReviewRoutes } from './routes/merchantReviews';
+import { adminCommunityRoutes } from './routes/adminCommunity';
 
 const app = new Hono<AppContext>();
 
@@ -110,6 +113,7 @@ app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);
 app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
+app.route('/api/admin/community', adminCommunityRoutes);
 app.route('/api/admin/import', adminImportRoutes);
 // Mounted on the same prefix as adminProductsRoutes; the paths are distinct
 // (/:id/relations, /:id/stock) so neither router shadows the other.
@@ -136,6 +140,10 @@ app.route('/api/merchant', merchantRoutes);
 app.route('/api/storefront', storefrontRoutes);
 // The customer-request marketplace: requests, offers, escrowed community orders.
 app.route('/api/marketplace', marketplaceRoutes);
+// Checkout for merchant store products — the other merchant commerce path.
+app.route('/api/store-orders', storeOrderRoutes);
+// Customer-side reviews and store follows.
+app.route('/api/community-reviews', communityReviewRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.

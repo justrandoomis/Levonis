@@ -66,6 +66,21 @@ export const SETTING_DEFAULTS = {
     { method: 'sea', commission_iqd: null },
     { method: 'land', commission_iqd: null },
   ] as Array<{ method: string; commission_iqd: number | null }>,
+  // LEVO Community commission and lifecycle timings (§30, §34, §75).
+  // Percentages are held in HUNDREDTHS of a percent so the split stays
+  // integer arithmetic all the way to the ledger — 500 = 5.00%. The seeded
+  // values are conservative starting points, not a business decision; the
+  // owner sets the real rates in the community admin, and whatever they are
+  // at the moment of sale is snapshot onto that order forever.
+  communityFeeRequestPercentX100: 500,
+  communityFeeStorePercentX100: 500,
+  communityFeeMinIqd: 0,
+  // Days a customer has to confirm or dispute before work auto-completes.
+  // 0 disables automatic release entirely — the safe default for a policy
+  // that has not been decided yet, because it means money only ever moves
+  // when a human says so.
+  communityAutoCompleteDays: 7,
+  communityRequestExpiryDays: 30,
   // Owner-configured launch event for memberships (mandate §8.1).
   launchConfig: { launch_at: null, activated: false, activated_at: null } as {
     launch_at: string | null; activated: boolean; activated_at: string | null;
