@@ -155,6 +155,68 @@ jobs:
             || { echo "::error::CORP header missing on the HTML document"; cat /tmp/studio-headers.txt; exit 1; }
           echo "COOP/COEP/CORP present on the worker-rendered HTML document."
 
+      # The three failures the owner reported, checked in a real browser against
+      # the worker that was just deployed. Header presence above cannot see any
+      # of them: whether the page constructs a slicer worker before anything is
+      # on the bed, whether slicing still starts one when asked, and where a
+      # duplicated object actually lands. See docs/STUDIO_PERFORMANCE.md.
+      #
+      # Guest session only — it imports a fixture and slices client-side, and
+      # never signs in, so nothing is written to the staging database or bucket.
+      - name: Verify the editor in a real browser (OOM / duplicate / slice)
+        id: browser
+        run: |
+          set -e
+          npm i --no-save playwright-core >/dev/null
+          npx --yes playwright@1 install --with-deps chromium
+          CHROMIUM_PATH="$(node -e "
+            const { readdirSync, existsSync } = require('node:fs');
+            const { join } = require('node:path');
+            const root = join(process.env.HOME, '.cache', 'ms-playwright');
+            const dir = readdirSync(root).find((d) => d.startsWith('chromium-'));
+            const p = join(root, dir, 'chrome-linux', 'chrome');
+            if (!existsSync(p)) { console.error('no chromium'); process.exit(1); }
+            console.log(p);
+          ")"
+          node tests/perf-browser-editor.mjs "${{ steps.deploy.outputs.url }}/" --chromium "$CHROMIUM_PATH" | tee /tmp/studio-browser.txt
+
+      - name: Fail if the deployed editor regressed
+        run: |
+          set -e
+          node -e '
+            const report = require("./tests/perf-browser-editor.latest.json");
+            const fail = (message) => { console.error(`::error::${message}`); process.exitCode = 1; };
+
+            // 1. Nothing is loaded before anything is on the bed…
+            if (report.pageLoad.phone.workersConstructed !== 0) {
+              fail(`a phone constructed ${report.pageLoad.phone.workersConstructed} worker(s) at page load — the kernel is being warmed again`);
+            }
+            // 2. …and slicing still works, so this is a deferral and not a removal.
+            if (report.sliceOnDemand.workersAfterSlice < 1 || !report.sliceOnDemand.sliceWorkerAfterSlice) {
+              fail("pressing Slice did not start a worker — the kernel is deferred into never");
+            }
+            // 3. A duplicate lands beside its original, on the bed.
+            const duplicate = report.duplicatePlacement;
+            if (duplicate.error) fail(`duplicate placement not measured: ${duplicate.error}`);
+            else if (duplicate.after.offBed !== 0) {
+              fail(`${duplicate.after.offBed} of ${duplicate.after.copies} duplicates landed off the bed`);
+            }
+            if (!report.pageLoad.desktop.releaseHookPresent) {
+              fail("the worker-release patch is missing from the deployed build");
+            }
+            if (process.exitCode) process.exit(1);
+            console.log("Deployed editor verified: 0 workers before slicing, slicing still starts one, 0 duplicates off the bed, release hook present.");
+          '
+
+      - name: Upload the browser measurement
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-staging-browser-measurement
+          path: |
+            studio/tests/perf-browser-editor.latest.json
+          if-no-files-found: warn
+
       - name: Summary
         if: always()
         run: |
@@ -162,7 +224,12 @@ jobs:
             echo "## Studio staging deployment"
             echo "- URL: ${{ steps.deploy.outputs.url }}"
             echo "- COOP/COEP/CORP headers verified on the HTML document (CI half of T15)."
-            echo "- Browser-side checks (crossOriginIsolated, engine boot, login, save) are"
-            echo "  behavioral T15/T2/T4 verification against this URL — not claimed here."
             echo "- Store staging was not touched: separate worker, DB, bucket and concurrency group."
+            echo ""
+            echo "### Editor verified in a real browser against the deployed worker"
+            echo '```'
+            cat /tmp/studio-browser.txt 2>/dev/null || echo "(the browser check did not produce output)"
+            echo '```'
+            echo "- Sign-in was NOT exercised here: this is a guest session, so nothing"
+            echo "  was written to the staging database or bucket."
           } >> "$GITHUB_STEP_SUMMARY"
