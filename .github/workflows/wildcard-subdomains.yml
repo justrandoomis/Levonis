@@ -24,7 +24,7 @@
 # The token needs Zone:DNS:Edit and Zone:Workers Routes:Edit on this zone in
 # addition to its Workers permissions. If it does not have them, the run says
 # exactly which permission is missing rather than failing opaquely.
-name: 9 - Merchant Subdomains (wildcard DNS + route)
+name: 10 - Merchant Subdomains (wildcard DNS + route)
 
 on:
   workflow_dispatch:

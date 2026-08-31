@@ -16,7 +16,7 @@
 #
 # Without that confirmation every phase-2 step is reported BLOCKED with the
 # reason. It is never skipped silently and never counted as a pass.
-name: 10 - Verify Merchant Subdomains (§95)
+name: 11 - Verify Merchant Subdomains (§95)
 
 on:
   workflow_dispatch:
