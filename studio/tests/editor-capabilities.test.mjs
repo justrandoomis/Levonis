@@ -702,3 +702,28 @@ test("restores and project imports are never mistaken for a spawn", async () => 
   // restore of the previous project's ids.
   assert.match(app, /everSeenObjectIdsRef\.current = new Set\(\);/);
 });
+
+test("a restored layout is protected on every route, not only the shell's", async () => {
+  const [adapter, engine] = await Promise.all([
+    readFile(adapterUrl, "utf8"),
+    readFile(engineUrl, "utf8"),
+  ]);
+
+  // The shell is NOT the only way objects appear: the engine renders its own
+  // open-file, ctx-open and empty-pick controls into the same hidden input, so
+  // a .3mf opened through any of them never reaches importSelectedFiles and
+  // cannot arm the shell's restore latch.
+  for (const id of ["open-file", "ctx-open", "empty-pick", "stl-input"]) {
+    assert.ok(engine.includes(`data-testid": "${id}`), `engine control ${id} is missing`);
+  }
+
+  // So the seating asks where the objects actually ARE. The engine's spawn
+  // cursor only ever steps along X and leaves z at the plate centre; anything
+  // positioned deliberately generally is not on that row.
+  assert.match(engine, /_e\.position\.set\(Mt\.x \+ l\.current \+ Ke \/ 2, 0, Mt\.z\)/);
+  assert.match(adapter, /let allOnSpawnRow = true;/);
+  assert.match(adapter, /if \(Math\.abs\(relative\(snapshot, plate\)\.offsetY\) > 0\.01\) allOnSpawnRow = false;/);
+  // One object off the row condemns the whole transition — a restore is
+  // all-or-nothing, and seating half a project would be worse than none.
+  assert.match(adapter, /if \(!allOnSpawnRow\) return \{ ok: false, reason: "restored-layout"/);
+});

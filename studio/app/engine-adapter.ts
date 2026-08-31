@@ -895,7 +895,7 @@ export interface SeatNewObjectsOptions {
 
 export interface SeatNewObjectsResult {
   ok: boolean;
-  reason?: "engine-unavailable" | "no-new-objects";
+  reason?: "engine-unavailable" | "no-new-objects" | "restored-layout";
   /** Objects moved into free space. */
   seatedCount: number;
   /**
@@ -945,6 +945,12 @@ export function seatNewObjects(
   const occupied: SeatedFootprint[] = [];
   const requests: SeatRequest[] = [];
   let near: { x: number; y: number } | null = null;
+  /**
+   * True when every new object is still sitting where the engine's spawn
+   * cursor put it. See the check below — this is what tells a spawn from a
+   * restore no matter which route created the objects.
+   */
+  let allOnSpawnRow = true;
 
   let sourceId = options.sourceId ?? null;
   if (sourceId === null || sourceId === undefined) {
@@ -959,6 +965,25 @@ export function seatNewObjects(
     const footprint = snapshotFootprint(snapshot);
     if (newIds.has(snapshot.id)) {
       requests.push({ id: snapshot.id, width: footprint.width, depth: footprint.depth });
+      // THE ROUTE-INDEPENDENT GUARD. The engine's spawn cursor always places a
+      // new object at `platePos(plate).z` exactly — it only ever steps along X
+      // (`_e.position.set(Mt.x + l.current + Ke / 2, 0, Mt.z)`). Anything
+      // positioned deliberately — a project's own layout applied through
+      // placeObjectOnPlate, an undo through restoreScene — generally is not on
+      // that row.
+      //
+      // This matters because the shell is not the only way objects appear. The
+      // engine renders its own `open-file`, `ctx-open` and `empty-pick`
+      // controls straight into the same hidden file input, so a .3mf opened
+      // through ANY of those never passes through the shell's import path and
+      // cannot arm the shell's restore latch. Asking where the objects
+      // actually are needs no such cooperation.
+      //
+      // One object off the row condemns the whole transition: a restore is
+      // all-or-nothing, and seating half of a project's objects would be worse
+      // than seating none.
+      const plate = adapter.plateOfSnapshot(snapshot, plateCount);
+      if (Math.abs(relative(snapshot, plate).offsetY) > 0.01) allOnSpawnRow = false;
       continue;
     }
     const plate = adapter.plateOfSnapshot(snapshot, plateCount);
@@ -970,6 +995,7 @@ export function seatNewObjects(
   }
 
   if (!requests.length) return { ok: false, reason: "no-new-objects", ...NOTHING_SEATED };
+  if (!allOnSpawnRow) return { ok: false, reason: "restored-layout", ...NOTHING_SEATED };
 
   const availablePlates: number[] = [];
   for (let plate = 0; plate < plateCount; plate += 1) availablePlates.push(plate);
