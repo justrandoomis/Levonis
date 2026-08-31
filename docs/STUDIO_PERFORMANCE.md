@@ -345,8 +345,8 @@ An earlier version of this section said the worker NAME behind
 `studio.levonis-iq.com` could not be established because the deploy token
 "does not appear to carry account-level Workers-domains read". **That was
 wrong, and it was a guess rather than a finding — the call had not been
-tried.** Workflow `12 - Audit Studio Migrations and Routing` (run
-33380828524) made every one of these read-only calls with the token the repo
+tried.** Workflow `12 - Audit Studio Migrations and Routing` (runs 33380828524 and
+33382596554) made every one of these read-only calls with the token the repo
 already has, and none of them failed:
 
 | Read | Permission it needs | Result |
@@ -378,12 +378,23 @@ Two consequences worth stating plainly:
    `4 - Deploy Studio Staging`. The body hashes agree: the live host and
    `levonis-studio-staging.workers.dev` are byte-identical (`1c38f9c6…`),
    while `levonis-studio.workers.dev` differs (`6b74c82c…`).
-2. **The database behind the live host already has the schema.**
-   `levonis-studio-staging` binds `levonis-studio-db-staging`, which holds all
-   four tables with `d1_migrations` recording `0000_studio_projects.sql` and
-   zero rows. The empty database is `levonis-studio-db`, which nothing points
-   at. So account project save/open on the live host is **not** blocked on a
-   migration, contrary to what the previous report said.
+2. **The database behind the live host already has the schema.** The live
+   Worker's own bindings, read from
+   `GET /accounts/{acct}/workers/scripts/levonis-studio-staging/settings`, name
+   `levonis-studio-db-staging`, which holds all four tables with
+   `d1_migrations` recording `0000_studio_projects.sql` and zero rows. The
+   empty database is `levonis-studio-db`, which nothing points at. So account
+   project save/open on the live host is **not** blocked on a migration,
+   contrary to what the previous report said.
+
+   It would not have been blocked even on an unmigrated database: the Studio
+   Worker creates these tables itself, idempotently, at runtime
+   (`ensureStudioTables` / `TABLE_SQL`, `studio/worker/api/router.ts:142-201`,
+   all `CREATE TABLE IF NOT EXISTS`). The migration is the declared source of
+   truth; it is not what makes the feature work. The corollary matters for
+   anyone applying it: the migration's own project-table statements have **no**
+   `IF NOT EXISTS`, so once a Worker has bootstrapped a database,
+   `wrangler d1 migrations apply` fails on it.
 
 ---
 
