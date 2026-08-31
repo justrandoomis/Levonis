@@ -13,10 +13,23 @@
 # The "-staging" names are historical. They are the production Workers.
 # Full table: docs/WORKERS.md
 # ---------------------------------------------------------------------------
-# Deploys the STAGING environment (worker "levonis-staging" on workers.dev)
-# with its own D1 database and R2 bucket, then runs the full automated API
-# test suite against it. Never touches the production database, the
-# production bucket, or any DNS/domain.
+# Rebuilds the levonis-staging Worker's D1 database and R2 bucket if they are
+# missing, deploys to it, and runs the full automated API suite against it.
+#
+# READ THE BANNER ABOVE FIRST. This header used to say "the STAGING
+# environment ... on workers.dev" and "never touches the production database".
+# Both were false, and dangerously so: levonis-staging is the Worker serving
+# levonis-iq.com, and levonis-db-staging is the real customer database. The
+# api-tests suites register @test.local accounts in it, and the last step
+# demotes them with a direct UPDATE. That is test data written to live data.
+#
+# It also REPLACES the Worker's plain-text vars wholesale, passing only five
+# of the seven the config declares — STORE_ROOT_DOMAIN, EXTRA_ALLOWED_ORIGINS
+# and STUDIO_ALLOWED_DESTINATIONS are dropped — and repoints APP_ORIGIN at a
+# workers.dev URL.
+#
+# For an ordinary code deploy use `7 - Deploy LIVE main site levonis-staging`,
+# which preserves every var and writes no test data.
 name: 2 - Rebuild levonis-staging + run API tests (LIVE main site — writes test data)
 
 on:

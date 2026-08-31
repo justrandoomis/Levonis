@@ -62,7 +62,7 @@ the branch → Run):
    whether `CLOUDFLARE_DATABASE_ID` matches a real database (and whether it
    already holds tables/data), the R2 buckets, the Telegram bot token
    (`getMe`), and which optional settings are present. Changes nothing.
-2. **`2 - Deploy Staging + Tests`** — creates/reuses `levonis-db-staging` +
+2. **`2 - Rebuild levonis-staging + run API tests`** — creates/reuses `levonis-db-staging` +
    `levonis-files-staging`, applies migrations to the STAGING database only,
    deploys the `levonis-staging` worker to workers.dev, uploads the Telegram
    secrets to it, then runs the full 60-check API test suite against the

@@ -16,7 +16,7 @@
 # Deploys the CODE to the levonis-staging worker — the one serving
 # levonis-iq.com — without touching its data and without changing its config.
 #
-# WHY NOT "2 - Deploy Staging + Tests":
+# WHY NOT "2 - Rebuild levonis-staging + run API tests":
 #
 #   * That workflow runs the api-tests suites afterwards, and those CREATE
 #     users, orders and memberships. Correct for a throwaway staging database;

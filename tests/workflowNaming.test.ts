@@ -124,3 +124,79 @@ test('routing is still not declared in either wrangler config', () => {
     assert.ok(!/"custom_domains"\s*:/.test(withoutComments), `${config} now declares custom_domains`);
   }
 });
+
+/**
+ * The display name is a claim. This is the check that it is TRUE.
+ *
+ * Everything above compares display strings against the table at the top of
+ * this file — which is a table I wrote. If someone added `--env staging` to
+ * deploy-production.yml tomorrow, that workflow would start deploying the LIVE
+ * main site while still calling itself an alternate Worker that serves no
+ * domain, and every assertion above would pass. So this one ignores the table
+ * and resolves the Worker the way wrangler does: from the deploy invocation
+ * and the config it reads.
+ */
+function workerActuallyDeployed(file: string): string {
+  const text = read(file);
+  const studio = file.includes('studio');
+  const config = readFileSync(
+    new URL(studio ? '../studio/wrangler.jsonc' : '../wrangler.jsonc', import.meta.url),
+    'utf8'
+  );
+  // Strip // comments so a name mentioned in prose is never mistaken for config.
+  const bare = config.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+
+  const deploys = text
+    .split('\n')
+    .filter((l) => /wrangler deploy/.test(l) && !l.trim().startsWith('#'));
+  assert.ok(deploys.length > 0, `${file} never runs wrangler deploy`);
+
+  // An --env on ANY deploy line, or a CLOUDFLARE_ENV anywhere, selects the
+  // named environment block; otherwise the top-level name applies.
+  const envFlag = deploys.join('\n').match(/--env\s+([a-z0-9_-]+)/i);
+  // Only a real YAML assignment counts. deploy-studio-production.yml explains
+  // itself with the prose "No CLOUDFLARE_ENV: the top-level wrangler.jsonc
+  // environment is ...", and a regex over the whole file reads that as an
+  // environment called "the".
+  const envVar = text
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('#'))
+    .map((l) => l.match(/^\s*CLOUDFLARE_ENV:\s*([a-z0-9_-]+)\s*$/i))
+    .find(Boolean);
+  const env = envFlag?.[1] ?? envVar?.[1] ?? null;
+
+  if (!env) {
+    const top = bare.match(/"name"\s*:\s*"([^"]+)"/);
+    assert.ok(top, 'the wrangler config has no top-level name');
+    return top[1];
+  }
+  const block = bare.slice(bare.indexOf(`"${env}"`));
+  const named = block.match(/"name"\s*:\s*"([^"]+)"/);
+  assert.ok(named, `the wrangler config has no name under env "${env}"`);
+  return named[1];
+}
+
+test('each deploy workflow really deploys the Worker its name claims', () => {
+  for (const { file, worker } of DEPLOYS) {
+    assert.equal(
+      workerActuallyDeployed(file),
+      worker,
+      `${file} deploys a different Worker than its name and this table say`
+    );
+  }
+});
+
+test('no workflow header still calls a live Worker a staging environment', () => {
+  // Two headers survived the rename saying "Never touches the production
+  // database ... or any DNS/domain" directly above a banner stating that the
+  // Worker they deploy serves levonis-iq.com and studio.levonis-iq.com. A
+  // comment that contradicts the file it sits in is worse than no comment.
+  for (const { file, live } of DEPLOYS) {
+    if (!live) continue;
+    const text = read(file);
+    assert.ok(
+      !/Never touches the production database/.test(text),
+      `${file} still claims it never touches production data, and it deploys a live Worker`
+    );
+  }
+});

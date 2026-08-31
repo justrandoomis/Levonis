@@ -158,7 +158,7 @@ staging.
 
 ## Phase: final phase (v3) — STAGING run 2026-08-28 (live Cloudflare)
 
-Workflow `2 - Deploy Staging + Tests` on commit `5e427d9` deployed
+Workflow `2 - Rebuild levonis-staging + run API tests` on commit `5e427d9` deployed
 migrations 0001–0010 + both new secrets to the staging worker and ran all
 three suites remotely against
 https://levonis-staging.just-randoomis.workers.dev:
@@ -256,7 +256,7 @@ default PRO address, so it is now
 
 All checks below ran against `wrangler dev` (local D1/R2) on the current
 branch head; the same two API suites run automatically against staging in
-workflow `2 - Deploy Staging + Tests`.
+workflow `2 - Rebuild levonis-staging + run API tests`.
 
 | Check | Command | Result |
 | --- | --- | --- |

@@ -19,8 +19,18 @@
 # depends on (acceptance test T15's CI half). Completely separate from the
 # store deploys: separate worker, separate database/bucket, separate
 # concurrency group — a Studio deploy can never break or block a store deploy.
-# Never touches the production database, the production bucket, or any
-# DNS/domain.
+#
+# READ THE BANNER ABOVE FIRST. This header used to end "never touches the
+# production database, the production bucket, or any DNS/domain". The Worker
+# it deploys, levonis-studio-staging, is the one serving studio.levonis-iq.com
+# — so it is not a staging environment, whatever its name says.
+#
+# It REPLACES the Worker's plain-text vars wholesale: the second pass writes
+# APP_ORIGIN from the workers.dev URL it just deployed to, so running this on
+# the live Studio overwrites the real origin with a workers.dev address.
+#
+# For an ordinary code deploy use `8 - Deploy LIVE Studio
+# levonis-studio-staging`, which preserves every var.
 name: 4 - Rebuild levonis-studio-staging (LIVE Studio — replaces vars)
 
 on:

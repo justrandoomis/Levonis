@@ -16,7 +16,7 @@
 # Deploys the CODE to the levonis-studio-staging worker — the one serving
 # studio.levonis-iq.com — carrying its existing configuration forward.
 #
-# WHY NOT "4 - Deploy Studio Staging": that workflow's second pass re-sets
+# WHY NOT "4 - Rebuild levonis-studio-staging": that workflow's second pass re-sets
 # APP_ORIGIN and MAIN_SITE_ORIGIN from repository secrets. Per DECISIONS row
 # 30 those secrets are optional and may not be set, and `wrangler deploy`
 # replaces a Worker's plain-text vars WHOLESALE — so deploying with them empty
