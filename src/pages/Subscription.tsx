@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { api, formatIqd, newIdempotencyKey } from '../lib/api';
+import StoreCta from '../components/merchant/StoreCta';
 import KycSection from '../components/kyc/KycSection';
 
 /** Display-only membership number derived deterministically from the user id — cosmetic, never stored. */
@@ -280,12 +281,25 @@ export default function Subscription() {
   // enforces (entitlements); unshipped ones are marked "coming soon".
   const plusLive: string[] = [
     loc('ملف تاجر احترافي في مجتمع ليفو', 'Professional merchant profile in the Levo community', 'پڕۆفایلی بازرگانی پیشەیی لە کۆمەڵگەی Levo'),
+    // The store benefits. Every one of these is backed by a server-side
+    // entitlement check and a working screen — none is an advertised promise
+    // with nothing behind it.
+    loc('متجرك الخاص في مجتمع ليفو', 'Your own store in the Levo community', 'فرۆشگای تایبەتی خۆت لە کۆمەڵگەی Levo'),
+    loc('رابط فرعي خاص بمتجرك (اسمك.levonis-iq.com)', 'Your own store address (yourname.levonis-iq.com)', 'ناونیشانی تایبەتی فرۆشگاکەت (ناوەکەت.levonis-iq.com)'),
+    loc('لوحة تحكم كاملة: منتجات، طلبات، رسائل، تحليلات', 'A full dashboard: products, orders, messages, analytics', 'داشبۆردی تەواو: بەرهەم، داواکاری، نامە، شیکاری'),
+    loc('استقبال الطلبات والدفع عبر منصة ليفونيس', 'Take orders and payments through the LEVONIS platform', 'وەرگرتنی داواکاری و پارەدان لە ڕێگەی پلاتفۆرمی LEVONIS'),
+    loc('تقديم عروض على طلبات العملاء المخصصة', 'Submit offers on custom customer requests', 'پێشکەشکردنی ئۆفەر بۆ داواکارییە تایبەتەکانی کڕیاران'),
+    loc('متابعون وتقييمات وسمعة تاجر', 'Followers, reviews and merchant reputation', 'شوێنکەوتوان، هەڵسەنگاندن و ناوبانگی بازرگان'),
     loc('الوصول إلى الأقسام الحصرية: العروض الخاصة، البندلات، الفيلامنت العشوائي', 'Access to exclusive sections: special offers, bundles, random filament', 'دەستگەیشتن بە بەشە تایبەتەکان: ئۆفەرەکان، پاکێجەکان، فیلامێنتی هەڕەمەکی'),
+    loc('أهلية كوبونات PLUS الحصرية', 'Eligibility for PLUS-only coupons', 'شیاوی کۆپۆنە تایبەتەکانی PLUS'),
     t('benefitPlus5'),
   ];
+  // What is left. BNPL is not a screen that has not been built — it is a set
+  // of business rules (eligibility, ceilings, what happens when someone does
+  // not pay) that the owner has not decided, and inventing them would be
+  // worse than saying so.
   const plusSoon: string[] = [
     loc('اشترِ الآن وادفع لاحقًا (BNPL)', 'Buy now, pay later (BNPL)', 'ئێستا بکڕە و دواتر پارە بدە (BNPL)'),
-    loc('كوبونات خصم خاصة', 'Exclusive discount coupons', 'کۆپۆنی داشکاندنی تایبەت'),
   ];
   const proLive: string[] = [
     t('benefitPro1'),
@@ -565,6 +579,8 @@ export default function Subscription() {
           </div>
         )}
       </motion.div>
+
+      <StoreCta />
 
       {/* 3. Subscribe action + honest launch note */}
       <motion.div

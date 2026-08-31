@@ -1,5 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { StoreProvider, useStore } from './StoreContext';
+import Storefront from './pages/Storefront';
+import MerchantStart from './pages/MerchantStart';
+import MerchantDashboardPage from './pages/MerchantDashboardPage';
 import { LanguageProvider } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -62,8 +66,50 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * When the hostname IS a store, the whole application is that store.
+ *
+ * This branch sits above every other route on purpose. A merchant subdomain
+ * must not render the main site's header, bottom nav or homepage with a shop
+ * embedded in it — the browser stays on ali3d.levonis-iq.com and what it
+ * shows is that shop (§6, §10). The shared cookie means the visitor is
+ * already signed in; nothing here re-authenticates.
+ */
+function StorefrontApp() {
+  const { store } = useStore();
+  return (
+    <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
+      <Routes>
+        <Route path="/" element={<Storefront store={store} />} />
+        <Route path="/products" element={<Storefront store={store} />} />
+        <Route path="/about" element={<Storefront store={store} />} />
+        <Route path="/reviews" element={<Storefront store={store} />} />
+        {/* Account, cart and checkout are the PLATFORM's, reached from the
+            shop. They are deliberately not re-implemented per store: one
+            cart, one checkout, one order history (§94). */}
+        <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+        <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/admin" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
+        <Route path="*" element={<Storefront store={store} />} />
+      </Routes>
+    </div>
+  );
+}
+
 function AppContent() {
   const location = useLocation();
+  const { store, resolved, unknownStore } = useStore();
+
+  // Hold the first paint until the host question is answered. It is a single
+  // request and it decides which application this is — rendering the main
+  // site first and swapping to a storefront would flash the wrong brand at
+  // someone who opened a merchant's link.
+  if (!resolved) {
+    return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+  }
+  if (store || unknownStore) return <StorefrontApp />;
   const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/games', '/leaderboards', '/support'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
@@ -135,6 +181,13 @@ function AppContent() {
               server-side by requireAuth alone. */}
           <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/community/store/:id" element={<MerchantStore />} />
+          {/* The subdomain-free way into a shop. Kept working forever so
+              existing links, shared messages and search results never break
+              (§57); the storefront reports its canonical subdomain URL. */}
+          <Route path="/community/store/:slug/p/:productSlug" element={<Storefront />} />
+          <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
+          <Route path="/merchant" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
+          <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/followed-stores" element={<ProtectedRoute><FollowedStores /></ProtectedRoute>} />
           {/* §8 — /chats is NOT gated: the two permanent support entries (the
               automated assistant and the real ticket flow) must be reachable
@@ -183,7 +236,9 @@ export default function App() {
       <LanguageProvider>
         <WalletProvider>
           <Router>
-            <AppContent />
+            <StoreProvider>
+              <AppContent />
+            </StoreProvider>
           </Router>
         </WalletProvider>
       </LanguageProvider>
