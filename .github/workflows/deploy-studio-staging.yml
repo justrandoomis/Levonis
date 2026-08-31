@@ -1,3 +1,18 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# Established from Cloudflare's own configuration, not from behaviour:
+# custom domains, zone routes and the live Worker's bindings, read by
+# `12 - Audit Studio Migrations and Routing` (runs 33380828524, 33382596554).
+# The "-staging" names are historical. They are the production Workers.
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
 # Deploys the LEVO STUDIO STAGING environment (worker "levonis-studio-staging"
 # on workers.dev) with its own D1 database and R2 bucket, then verifies the
 # deployed worker serves the COOP/COEP isolation headers the slicer engine
@@ -6,7 +21,7 @@
 # concurrency group — a Studio deploy can never break or block a store deploy.
 # Never touches the production database, the production bucket, or any
 # DNS/domain.
-name: 4 - Deploy Studio Staging
+name: 4 - Rebuild levonis-studio-staging (LIVE Studio — replaces vars)
 
 on:
   workflow_dispatch:

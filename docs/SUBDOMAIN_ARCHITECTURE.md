@@ -274,7 +274,7 @@ to the host classifier.
 | `APP_ORIGIN` | `https://levonis-iq.com` | Set, but **does not currently name this domain** — see below |
 
 Both are plain vars. `wrangler deploy` **replaces plain-text vars wholesale**,
-so use workflow `7 - Deploy Staging Code`, which reads the running Worker's
+so use workflow `7 - Deploy LIVE main site levonis-staging`, which reads the running Worker's
 vars from the Cloudflare API and passes every one back.
 
 > **STORE_ROOT_DOMAIN used to be optional. It is not any more, and the reason

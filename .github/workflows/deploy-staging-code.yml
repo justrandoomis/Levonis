@@ -1,3 +1,18 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# Established from Cloudflare's own configuration, not from behaviour:
+# custom domains, zone routes and the live Worker's bindings, read by
+# `12 - Audit Studio Migrations and Routing` (runs 33380828524, 33382596554).
+# The "-staging" names are historical. They are the production Workers.
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
 # Deploys the CODE to the levonis-staging worker — the one serving
 # levonis-iq.com — without touching its data and without changing its config.
 #
@@ -23,7 +38,7 @@
 # opt-in: if the owner has set the STUDIO_HANDOFF_SECRET repository secret,
 # it is uploaded after the deploy so the Studio sign-in handoff has a shared
 # secret to compare. Unset, this workflow touches no secret at all.
-name: 7 - Deploy Staging Code (no test data, keeps vars)
+name: 7 - Deploy LIVE main site levonis-staging (keeps vars, no test data)
 
 on:
   workflow_dispatch:

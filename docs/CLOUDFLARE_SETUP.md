@@ -67,8 +67,8 @@ the branch → Run):
    deploys the `levonis-staging` worker to workers.dev, uploads the Telegram
    secrets to it, then runs the full 60-check API test suite against the
    live staging URL. Never touches production data or DNS.
-3. **`3 - Deploy Production (approval required)`** — refuses to run unless
-   you type `DEPLOY-PRODUCTION` into the confirmation input. Deploys the
+3. **`3 - Deploy levonis (ALTERNATE main worker)`** — refuses to run unless
+   you type `DEPLOY-ALTERNATE-MAIN-WORKER` into the confirmation input. Deploys the
    production worker to its workers.dev URL only (no custom domain, no DNS).
    Migrations run only when the `apply_migrations` box is ticked AND the
    production database is empty; a non-empty database aborts with an error.

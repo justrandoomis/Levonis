@@ -8,7 +8,7 @@
 # It changes nothing. It signs in to nothing. A guest's autosave writes to that
 # browser's IndexedDB and nowhere else, so no production database, bucket or
 # revision is touched — see the SAFETY note in tests/perf-production-verify.mjs.
-name: 6 - Verify Studio Live (browser acceptance)
+name: 14 - Verify Studio Live (browser acceptance, read-only)
 
 on:
   workflow_dispatch:

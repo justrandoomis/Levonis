@@ -135,9 +135,9 @@ GET main/api/studio/handoff/start?dest=<origin>&state=…
 
 ## أي workflow ينشر studio.levonis-iq.com
 
-**`8 - Deploy Studio Code` (`deploy-studio-code.yml`)** — وهي التي تنشر على
+**`8 - Deploy LIVE Studio levonis-studio-staging` (`deploy-studio-code.yml`)** — وهي التي تنشر على
 `levonis-studio-staging`، العامل الذي يخدم النطاق فعلًا. ملفها يقول ذلك في
-سطره الأول. و`5 - Deploy Studio Production` **لم تُشغَّل ولا مرة**، ولا يوجد
+سطره الأول. و`5 - Deploy levonis-studio (ALTERNATE …)` **لم تُشغَّل ولا مرة**، ولا يوجد
 عامل باسم `levonis` على الحساب أصلًا (تحقّقت منه: `wrangler deployments list
 --name levonis` يرد `This Worker does not exist on your account`).
 
@@ -145,7 +145,7 @@ GET main/api/studio/handoff/start?dest=<origin>&state=…
 
 ### لماذا لا تُستعمل workflow 4 لرفع السر
 
-هذا فخّ حقيقي: `4 - Deploy Studio Staging` ترفع السر إلى العامل الصحيح
+هذا فخّ حقيقي: `4 - Rebuild levonis-studio-staging (LIVE Studio)` ترفع السر إلى العامل الصحيح
 (`--env staging`)، لكنها في نفس التشغيل تعيد النشر بـ
 `--var APP_ORIGIN:<workers.dev url>` و`--var MAIN_SITE_ORIGIN:$STUDIO_STAGING_MAIN_SITE_ORIGIN`.
 وبما أن `levonis-studio-staging` هو العامل الذي يخدم `studio.levonis-iq.com`
@@ -169,9 +169,9 @@ GET main/api/studio/handoff/start?dest=<origin>&state=…
 
 ثم شغّل الاثنتين — الترتيب لا يهم، لكن **كلتيهما لازمة**؛ كلٌّ منهما تضبط طرفها:
 
-1. `7 - Deploy Staging Code` (اكتب `DEPLOY-CODE`) — تضبط
+1. `7 - Deploy LIVE main site levonis-staging` (اكتب `DEPLOY-CODE`) — تضبط
    `STUDIO_ALLOWED_DESTINATIONS` على `levonis-staging` وترفع السر المشترك إليه.
-2. `8 - Deploy Studio Code` (اكتب `DEPLOY-STUDIO-CODE`) — تضبط `APP_ORIGIN`
+2. `8 - Deploy LIVE Studio levonis-studio-staging` (اكتب `DEPLOY-STUDIO-CODE`) — تضبط `APP_ORIGIN`
    و`MAIN_SITE_ORIGIN` على `levonis-studio-staging` وترفع السر المشترك إليه.
 
 **إن ضبطت السر ولم تُعِد التشغيل، لن يتغيّر شيء**: الأسرار تُرفع أثناء النشر،

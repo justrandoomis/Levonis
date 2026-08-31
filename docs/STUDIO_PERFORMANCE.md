@@ -246,7 +246,7 @@ Also in `perf-shell.mjs`, read out of the shipped WASM glue:
 ### 3.5 On the deployed worker
 
 Same script, run against `https://levonis-studio-staging.just-randoomis.workers.dev/`
-after `4 - Deploy Studio Staging`:
+after `4 - Rebuild levonis-studio-staging (LIVE Studio)`:
 
 | Page load | desktop (= before) | phone (= after) |
 |---|---|---|
@@ -266,7 +266,7 @@ deployed worker.
 
 ### 3.6 …and on every staging deploy from here on
 
-`4 - Deploy Studio Staging` now runs `tests/perf-browser-editor.mjs` against
+`4 - Rebuild levonis-studio-staging (LIVE Studio)` now runs `tests/perf-browser-editor.mjs` against
 the URL it just deployed and **fails the deploy** on any of:
 
 - a phone constructing a slicer worker at page load (the kernel is being warmed
@@ -319,7 +319,7 @@ intended rather than memory piling up.
 
 ### 3.7.1 The original nine-point run (b62f453)
 
-`6 - Verify Studio Live` against the origin the owner actually visits, in a
+`14 - Verify Studio Live` against the origin the owner actually visits, in a
 touch-emulated phone session. All nine acceptance points passed:
 
 | # | Point | Result |
@@ -373,9 +373,9 @@ same service, so `studio.levonis-iq.com` is served by **`levonis-studio-staging`
 
 Two consequences worth stating plainly:
 
-1. **`5 - Deploy Studio Production` deploys `levonis-studio`, which serves no
+1. **`5 - Deploy levonis-studio (ALTERNATE …)` deploys `levonis-studio`, which serves no
    domain.** It ran green, but what put this build in front of users was
-   `4 - Deploy Studio Staging`. The body hashes agree: the live host and
+   `4 - Rebuild levonis-studio-staging (LIVE Studio)`. The body hashes agree: the live host and
    `levonis-studio-staging.workers.dev` are byte-identical (`1c38f9c6…`),
    while `levonis-studio.workers.dev` differs (`6b74c82c…`).
 2. **The database behind the live host already has the schema.** The live

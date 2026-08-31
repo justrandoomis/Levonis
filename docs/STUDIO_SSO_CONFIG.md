@@ -158,18 +158,18 @@ site) and **`levonis-studio-staging`** (Studio). The Workers called
    * `STUDIO_ALLOWED_DESTINATIONS`
    * `STUDIO_PROD_MAIN_SITE_ORIGIN`
 2. Re-run the two workflows that deploy the **live** Workers:
-   * `7 - Deploy Staging Code (no test data, keeps vars)` — main site. It sets
+   * `7 - Deploy LIVE main site levonis-staging` — main site. It sets
      `STUDIO_ALLOWED_DESTINATIONS` as a var and uploads
      `STUDIO_HANDOFF_SECRET` to `levonis-staging`.
-   * `8 - Deploy Studio Code (keeps vars)` — Studio. It sets `MAIN_SITE_ORIGIN`
+   * `8 - Deploy LIVE Studio levonis-studio-staging` — Studio. It sets `MAIN_SITE_ORIGIN`
      from `STUDIO_PROD_MAIN_SITE_ORIGIN` and uploads `STUDIO_HANDOFF_SECRET`
      to `levonis-studio-staging`.
 
-   (`4 - Deploy Studio Staging` also uploads to `levonis-studio-staging`, but
+   (`4 - Rebuild levonis-studio-staging (LIVE Studio)` also uploads to `levonis-studio-staging`, but
    `wrangler deploy` replaces plain-text vars wholesale, which is exactly why
    the "keeps vars" workflows exist. Prefer them.)
 
-   Running `5 - Deploy Studio Production` would put the secret on
+   Running `5 - Deploy levonis-studio (ALTERNATE …)` would put the secret on
    `levonis-studio`, which no domain points at — it would look successful and
    change nothing about sign-in.
 

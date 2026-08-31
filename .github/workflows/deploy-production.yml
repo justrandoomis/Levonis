@@ -1,17 +1,32 @@
-# PRODUCTION deploy — gated. Requires typing DEPLOY-PRODUCTION into the
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# Established from Cloudflare's own configuration, not from behaviour:
+# custom domains, zone routes and the live Worker's bindings, read by
+# `12 - Audit Studio Migrations and Routing` (runs 33380828524, 33382596554).
+# The "-staging" names are historical. They are the production Workers.
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# PRODUCTION deploy — gated. Requires typing DEPLOY-ALTERNATE-MAIN-WORKER into the
 # confirmation input. Deploys the "levonis" worker to its workers.dev URL
 # only: it does NOT attach the custom domain and does NOT change DNS
 # (domain attachment is a separate, manual dashboard step after approval).
 # Migrations run only when apply_migrations=true AND the production database
 # is empty — a database with existing tables requires a reviewed upgrade
 # plan and a backup first.
-name: 3 - Deploy Production (approval required)
+name: 3 - Deploy levonis (ALTERNATE main worker — workers.dev only, serves no domain)
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type DEPLOY-PRODUCTION to confirm'
+        description: 'Type DEPLOY-ALTERNATE-MAIN-WORKER to confirm'
         required: true
       apply_migrations:
         description: 'Apply migrations to the production D1 (only if empty)'
@@ -29,7 +44,7 @@ jobs:
     steps:
       - name: Confirmation gate
         run: |
-          [ "${{ inputs.confirm }}" = "DEPLOY-PRODUCTION" ] \
+          [ "${{ inputs.confirm }}" = "DEPLOY-ALTERNATE-MAIN-WORKER" ] \
             || { echo "::error::confirmation text mismatch — aborting"; exit 1; }
 
       - uses: actions/checkout@v4
