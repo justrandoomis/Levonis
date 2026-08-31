@@ -328,6 +328,19 @@ fall through that gap again.
 If you see live configuration change without a deploy you started, this is
 the first thing to check.
 
+**It also races the asset upload.** A push during a workflow-7 deploy can put
+a *different build of the same commit* on the live site — same content hash,
+different bytes, because the two paths do not get the same build variables
+(`VITE_GOOGLE_CLIENT_ID` among them). The byte-identity proof now retries and,
+if it never converges, says so by name instead of just "different".
+
+> **Recommendation: disconnect the Git integration.** Cloudflare dashboard →
+> Workers & Pages → `levonis-staging` → Settings → Build → disconnect the
+> repository. Workflow 7 is the deliberate path: it runs the tests, applies
+> migrations *before* the code that needs them, carries the vars, and proves
+> byte-identity afterwards. The Git integration does none of that and can
+> silently replace what it deploys.
+
 The fix is verified the only way it can be: set the variable through workflow
 7, push an unrelated commit, wait for the Git-integration deploy, and read the
 variable again. It has to still be there.

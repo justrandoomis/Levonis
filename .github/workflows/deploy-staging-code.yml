@@ -253,8 +253,28 @@ jobs:
             exit 1
           fi
 
-          cmp -s "$LOCAL" /tmp/live.js \
-            || { echo "::error::levonis-iq.com serves a DIFFERENT $NAME than this run built"; exit 1; }
+          # A MISMATCH HERE IS USUALLY A RACE, AND IT HAS A NAME.
+          #
+          # The Cloudflare Git integration deploys this Worker on every push
+          # to the default branch, about a minute later. When a push and this
+          # workflow overlap, that build can land ON TOP of the assets this
+          # run just uploaded — same commit, same content hash, different
+          # bytes, because the two builds do not get the same build
+          # variables. So the comparison is retried for a bounded window
+          # before it is called a failure, and if it never converges the
+          # error says what is actually happening rather than "different".
+          for i in $(seq 1 8); do
+            cmp -s "$LOCAL" /tmp/live.js && break
+            echo "attempt $i: $NAME differs — re-fetching in case a second deploy is mid-flight"
+            sleep 10
+            curl -fsS --max-time 30 "https://levonis-iq.com/assets/$NAME" -o /tmp/live.js || true
+          done
+
+          if ! cmp -s "$LOCAL" /tmp/live.js; then
+            echo "::error::levonis-iq.com serves a DIFFERENT $NAME than this run built."
+            echo "::error::Two deploy paths are writing this Worker: this workflow, and the Cloudflare Git integration that fires on every push to the default branch. They build the same commit with different build variables, so whichever lands last wins. Disable the Git integration (Cloudflare dashboard -> Workers & Pages -> levonis-staging -> Settings -> Build -> disconnect the repository) so this workflow is the only path, or accept that a push can silently replace a deploy."
+            exit 1
+          fi
           echo "live $NAME is byte-identical to the file this run built"
 
           # And the specific behaviour the owner asked for: the Studio opens in
