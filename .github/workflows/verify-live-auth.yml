@@ -67,6 +67,16 @@ jobs:
           set -e
           echo "secret=unknown" >> "$GITHUB_OUTPUT"
           echo "dest=unknown" >> "$GITHUB_OUTPUT"
+          FAIL=0
+          # Origins are compared the way the WORKER compares them. Both
+          # readers strip a trailing slash before use — worker/routes/studio.ts
+          # allowedDestinations() and studio/worker/auth/session.ts
+          # mainSiteOrigin() both do .trim().replace(/\/+$/, '') — so a stored
+          # "https://levonis-iq.com/" is correct configuration, and a check
+          # that calls it wrong is a check that cries wolf.
+          norm() { printf '%s' "$1" | sed 's#/*$##'; }
+          APEX_N=$(norm "$APEX"); STUDIO_N=$(norm "$STUDIO")
+
           curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
             -o /tmp/main.json
@@ -83,35 +93,53 @@ jobs:
             echo "secret=present (secret_text)" >> "$GITHUB_OUTPUT"
           else
             echo "::error::STUDIO_HANDOFF_SECRET is not a secret_text binding on levonis-staging"
-            echo "secret=MISSING" >> "$GITHUB_OUTPUT"
+            echo "secret=MISSING" >> "$GITHUB_OUTPUT"; FAIL=1
           fi
 
-          # STUDIO_ALLOWED_DESTINATIONS is a plain var, so its value is
-          # readable and is not a secret — it is a list of public origins.
+          # STUDIO_ALLOWED_DESTINATIONS is a plain var; its value is a list of
+          # public origins, not a secret.
           DEST=$(jq -r '[.result.bindings[]? | select(.name=="STUDIO_ALLOWED_DESTINATIONS") | .text] | first // ""' /tmp/main.json)
           echo "STUDIO_ALLOWED_DESTINATIONS = ${DEST:-<unset>}"
           echo "dest=${DEST:-<unset>}" >> "$GITHUB_OUTPUT"
-          case ",$(printf '%s' "$DEST" | tr -d ' ')," in
-            *",${STUDIO},"*|*",${STUDIO}/,"*) echo "the live Studio origin is allow-listed" ;;
-            *) echo "::error::STUDIO_ALLOWED_DESTINATIONS does not contain $STUDIO" ;;
-          esac
+          MATCH=0
+          IFS=, read -ra ENTRIES <<< "$DEST"
+          for e in "${ENTRIES[@]}"; do
+            [ "$(norm "$(printf '%s' "$e" | tr -d ' ')")" = "$STUDIO_N" ] && MATCH=1
+          done
+          if [ "$MATCH" = "1" ]; then
+            echo "the live Studio origin is allow-listed (trailing slashes are stripped by the worker)"
+          else
+            echo "::error::STUDIO_ALLOWED_DESTINATIONS does not contain $STUDIO_N"; FAIL=1
+          fi
 
           APP_ORIGIN=$(jq -r '[.result.bindings[]? | select(.name=="APP_ORIGIN") | .text] | first // ""' /tmp/main.json)
           echo "APP_ORIGIN = ${APP_ORIGIN:-<unset>}"
-          [ "$APP_ORIGIN" = "$APEX" ] || echo "::warning::APP_ORIGIN is not $APEX — reset and verification links would not point there"
+          if [ "$(norm "$APP_ORIGIN")" = "$APEX_N" ]; then
+            echo "reset and verification links will be built on $APEX_N"
+          else
+            echo "::error::APP_ORIGIN is not $APEX_N — reset and verification links would not point there"; FAIL=1
+          fi
 
           if jq -e '[.result.bindings[]? | select(.name=="EMAIL_API_KEY" and .type=="secret_text")] | length > 0' /tmp/main.json > /dev/null; then
             echo "EMAIL_API_KEY: present as a Worker SECRET"
           else
-            echo "::error::EMAIL_API_KEY is not a secret_text binding on levonis-staging"
+            echo "::error::EMAIL_API_KEY is not a secret_text binding on levonis-staging"; FAIL=1
+          fi
+
+          EMAIL_FROM=$(jq -r '[.result.bindings[]? | select(.name=="EMAIL_FROM") | .text] | first // ""' /tmp/main.json)
+          if [ -n "$EMAIL_FROM" ]; then
+            echo "EMAIL_FROM is set (capabilities needs BOTH it and EMAIL_API_KEY)"
+          else
+            echo "::error::EMAIL_FROM is empty — passwordReset and emailVerification both report false without it"; FAIL=1
           fi
 
           ALLOW=$(jq -r '[.result.bindings[]? | select(.name=="EMAIL_ALLOWED_RECIPIENTS") | .text] | first // ""' /tmp/main.json)
           if [ -n "$ALLOW" ]; then
-            echo "::error::EMAIL_ALLOWED_RECIPIENTS is set on the live Worker — every address outside it is silently dropped, so a 'sent' email may never arrive."
+            echo "::error::EMAIL_ALLOWED_RECIPIENTS is set on the live Worker — every address outside it is silently dropped, so a 'sent' email may never arrive."; FAIL=1
           else
             echo "EMAIL_ALLOWED_RECIPIENTS is empty — no staging drop filter in the way"
           fi
+          exit $FAIL
 
       - name: Bindings on the LIVE Studio Worker (levonis-studio-staging)
         id: studiobind
@@ -120,6 +148,10 @@ jobs:
           set -e
           echo "secret=unknown" >> "$GITHUB_OUTPUT"
           echo "main_origin=unknown" >> "$GITHUB_OUTPUT"
+          FAIL=0
+          norm() { printf '%s' "$1" | sed 's#/*$##'; }
+          APEX_N=$(norm "$APEX")
+
           curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-studio-staging/settings" \
             -o /tmp/studio.json
@@ -134,13 +166,17 @@ jobs:
             echo "secret=present (secret_text)" >> "$GITHUB_OUTPUT"
           else
             echo "::error::STUDIO_HANDOFF_SECRET is not a secret_text binding on levonis-studio-staging"
-            echo "secret=MISSING" >> "$GITHUB_OUTPUT"
+            echo "secret=MISSING" >> "$GITHUB_OUTPUT"; FAIL=1
           fi
 
           MAIN=$(jq -r '[.result.bindings[]? | select(.name=="MAIN_SITE_ORIGIN") | .text] | first // ""' /tmp/studio.json)
           echo "MAIN_SITE_ORIGIN = ${MAIN:-<unset>}"
           echo "main_origin=${MAIN:-<unset>}" >> "$GITHUB_OUTPUT"
-          [ "$MAIN" = "$APEX" ] || echo "::error::MAIN_SITE_ORIGIN is not $APEX — the server-to-server redemption has nowhere to go"
+          if [ "$(norm "$MAIN")" = "$APEX_N" ]; then
+            echo "the server-to-server redemption will reach $APEX_N (mainSiteOrigin() strips the trailing slash)"
+          else
+            echo "::error::MAIN_SITE_ORIGIN is not $APEX_N — the server-to-server redemption has nowhere to go"; FAIL=1
+          fi
 
           # Both Workers must hold the SAME secret. Neither value is readable,
           # so the guarantee comes from provenance: one repository secret feeds
@@ -150,20 +186,36 @@ jobs:
           echo "both are uploaded from the single STUDIO_HANDOFF_SECRET repository secret"
           echo "(deploy-staging-code.yml and deploy-studio-code.yml). Cloudflare never"
           echo "returns a secret's value, so it cannot be compared here — and should not be."
+          exit $FAIL
 
       # -------------------------------------------------- the live scenario
       - name: Generate a run-scoped throwaway identity
         id: identity
         env:
           EMAIL_TEST_RECIPIENT: ${{ secrets.EMAIL_TEST_RECIPIENT }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          INITIAL_ADMIN_EMAIL: ${{ secrets.INITIAL_ADMIN_EMAIL }}
         run: |
           set -e
-          if [ -z "$EMAIL_TEST_RECIPIENT" ]; then
-            echo "::error::EMAIL_TEST_RECIPIENT is not set. The email checks need a real inbox to deliver to; without one this workflow cannot prove delivery and will not pretend to."
+          # A real, reachable inbox is required: the point of these two checks
+          # is that a message actually goes somewhere. Preference order is
+          # most-purpose-built first. Whichever is present, the account is
+          # created on a plus-tagged variant so this run's mail is identifiable
+          # and the owner's own address is never itself registered.
+          BASE=""
+          SOURCE=""
+          for candidate in "EMAIL_TEST_RECIPIENT:$EMAIL_TEST_RECIPIENT" "E2E_ADMIN_EMAIL:$E2E_ADMIN_EMAIL" "INITIAL_ADMIN_EMAIL:$INITIAL_ADMIN_EMAIL"; do
+            name="${candidate%%:*}"; value="${candidate#*:}"
+            if [ -n "$value" ]; then BASE="$value"; SOURCE="$name"; break; fi
+          done
+          if [ -z "$BASE" ]; then
+            echo "::error::No test inbox is configured. Set ONE of EMAIL_TEST_RECIPIENT, E2E_ADMIN_EMAIL or INITIAL_ADMIN_EMAIL as a repository secret. Proving an email was delivered needs somewhere to deliver it, and this workflow will not report a pass it cannot support."
             exit 1
           fi
-          LOCAL="${EMAIL_TEST_RECIPIENT%@*}"
-          DOMAIN="${EMAIL_TEST_RECIPIENT#*@}"
+          echo "test inbox taken from the $SOURCE repository secret (value masked)"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          LOCAL="${BASE%@*}"
+          DOMAIN="${BASE#*@}"
           TAG="levo-e2e-${GITHUB_RUN_ID}"
           ADDR="${LOCAL}+${TAG}@${DOMAIN}"
           PASS="Lv-$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')-e2e"
