@@ -418,8 +418,15 @@ BLK  a published merchant product is discoverable
      — no active community product exists on this deployment yet
 ```
 
-`GET /api/community/products` on levonis-iq.com returns an empty list. **No
-merchant store has published anything on the live site.** Credentials were
+`GET /api/community/products` on levonis-iq.com returns an empty list, and
+the deploy's own read of the live database agrees:
+
+```
+live store slugs read (json): 0
+slugs=ok
+```
+
+**No merchant store exists on the live site at all.** Credentials were
 never the blocker for most of it — there is no shop to look at. That also
 means the reserved-list expansion could not have taken any storefront offline,
 because none exists yet.
