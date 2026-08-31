@@ -281,6 +281,34 @@ than only in this document. The check runs as a guest — it imports a fixture
 and slices client-side and never signs in — so nothing is written to the
 staging database or bucket.
 
+### 3.7 On production — https://studio.levonis-iq.com
+
+`6 - Verify Studio Live` against the origin the owner actually visits, in a
+touch-emulated phone session. All nine acceptance points passed:
+
+| # | Point | Result |
+|---|---|---|
+| 1 | no out-of-memory message anywhere | **pass** |
+| 2 | no worker created in advance | **pass** — 0 at load, 0 after importing a model |
+| 3 | the first worker starts only at Slice | **pass** — 1, with the engine logging `core: st` |
+| 4 | repeated Duplicate stays on the bed | **pass** — 9/10 off the bed at up to 716.5 mm before, **0/10 at up to 56.6 mm** after |
+| 5 | no false "Beyond the bed" | **pass** — nothing in `bed-warn`, `over-bed` or the shell banner |
+| 6 | orbit / pinch / drag / move / rotate / scale | **pass** — worst frame 66.7 ms (orbit), **0 janky frames** across all eight gestures |
+| 7 | autosave without jank or freeze | **pass** — 1202 frames through the window, max frame 16.8 ms, **longest main-thread task 0 ms** |
+| 8 | slice → cancel → slice, no accumulation | **pass** — 1 worker each cycle; renderer RSS 365.7 → 368.6 → 430.9 MB |
+| 9 | this origin serves the patched build | **pass** — `window.__vpReleaseWorker` present, cross-origin isolated |
+
+Points 2 and 9 are what prove the origin is not serving a stale bundle:
+`__vpReleaseWorker` exists only in the patched build, and zero workers at load
+happens only with the warmup gating. Both are behavioural, not configuration
+inspection, so neither can be satisfied by an older deploy.
+
+The account-level Workers custom-domain listing did **not** come back in that
+run — the deploy token is deliberately scoped narrowly and does not appear to
+carry account-level Workers-domains read. So the worker NAME behind that
+hostname is not established here; what is established is that whatever answers
+on it is running this build.
+
 ---
 
 ## 4. What did NOT change, deliberately
