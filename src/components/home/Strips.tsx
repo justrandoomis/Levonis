@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 import type { HomeSectionItem, HomeTaxon } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
+import Marquee from './Marquee';
 
 /**
  * The shared shelf scroller: a snap rail on phones that relaxes into a
@@ -218,8 +219,7 @@ function MarqueeMark({ entry, first }: { entry: MarqueeEntry; first: boolean }) 
 }
 
 export function BrandMarquee({ items, brands }: { items: HomeSectionItem[]; brands: HomeTaxon[] }) {
-  const { t, dir, loc } = useLanguage();
-  const [held, setHeld] = useState(false);
+  const { t, loc } = useLanguage();
 
   const entries: MarqueeEntry[] =
     items.length > 0
@@ -241,47 +241,25 @@ export function BrandMarquee({ items, brands }: { items: HomeSectionItem[]; bran
         }));
   if (entries.length === 0) return null;
 
-  // Enough copies that the belt is always wider than any viewport; the
-  // animation walks exactly ONE copy's width, so the loop point is seamless.
-  const copies = entries.length >= 12 ? 2 : 4;
-  const step = 100 / copies;
-  const duration = Math.max(18, entries.length * 3.2);
-
-  const stop = () => setHeld(false);
-
   return (
     <section data-home-section="top_brands" className="mb-10 sm:mb-12">
       <SectionHeader title={t('topBrands')} accent="bg-gold" />
-      {/* The whole animation lives in the STYLESHEET, duration included via
-          a CSS variable. An inline `animation:` shorthand would carry its own
-          inline-specificity play-state and silently beat the :hover /
-          .is-held pause rules — it did, in the first version. */}
-      <style>{`
-        @keyframes lv-brandmq { to { transform: translateX(${dir === 'rtl' ? '' : '-'}${step}%); } }
-        .lv-brandmq__track { animation: lv-brandmq var(--mq-dur, 30s) linear infinite; }
-        .lv-brandmq:hover .lv-brandmq__track,
-        .lv-brandmq.is-held .lv-brandmq__track { animation-play-state: paused; }
-        @media (prefers-reduced-motion: reduce) {
-          .lv-brandmq { overflow-x: auto; }
-          .lv-brandmq__track { animation: none !important; }
-        }
-      `}</style>
-      <div
-        className={`lv-brandmq overflow-hidden -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 hide-scrollbar${held ? ' is-held' : ''}`}
-        onPointerDown={() => setHeld(true)}
-        onPointerUp={stop}
-        onPointerLeave={stop}
-        onPointerCancel={stop}
-      >
-        <div
-          className="lv-brandmq__track flex w-max items-start gap-3"
-          style={{ '--mq-dur': `${duration}s` } as React.CSSProperties}
-        >
-          {Array.from({ length: copies }, (_, c) =>
-            entries.map((e) => <MarqueeMark key={`${c}-${e.key}`} entry={e} first={c === 0} />)
-          )}
-        </div>
-      </div>
+      {/* Marquee measures the screen and repeats the set until the belt is
+          wider than any viewport, so ONE brand still fills an iPad edge to
+          edge and the loop has no visible seam. The set carries its own
+          trailing space (pe-3 = the internal gap) so every copy's stride is
+          identical — that exactness is what makes the wrap invisible. */}
+      <Marquee
+        speed={34}
+        className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+        renderSet={(first) => (
+          <div className="flex items-start gap-3 pe-3">
+            {entries.map((e) => (
+              <MarqueeMark key={e.key} entry={e} first={first} />
+            ))}
+          </div>
+        )}
+      />
     </section>
   );
 }

@@ -7,13 +7,14 @@ import Hero from '../components/home/Hero';
 import ServicesGrid from '../components/home/ServicesGrid';
 import ProductCard from '../components/home/ProductCard';
 import SectionHeader from '../components/home/SectionHeader';
+import Marquee from '../components/home/Marquee';
 import { ItemStrip, CategoryChips, BrandMarquee } from '../components/home/Strips';
 import Spinner from '../components/ui/Spinner';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 
 export default function Home() {
-  const { t, dir, loc } = useLanguage();
+  const { t, loc } = useLanguage();
 
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [categories, setCategories] = useState<HomeTaxon[]>([]);
@@ -147,22 +148,22 @@ export default function Home() {
 
         {/* Ads Marquee — the cap of the black panel: flush with its top
             edge, bleeding across the full width so the rounded corners clip
-            it, with gold separators marking where one notice ends and the
-            next begins. */}
+            it, no rule underneath (the owner asked the line gone). Marquee
+            measures the viewport and repeats the notices until the belt is
+            wider than any screen, so it loops endlessly with no visible
+            edge even when the owner wrote a single short line. */}
         {homeAds.length > 0 && (
-          <div className="-mt-8 sm:-mt-10 -mx-4 sm:-mx-6 lg:-mx-8 mb-8 sm:mb-10 overflow-hidden rounded-t-[28px] bg-zinc-900/40 border-b border-zinc-800/80">
-            <style>{`@keyframes home-ads-marquee { from { transform: translateX(0); } to { transform: translateX(${dir === 'rtl' ? '' : '-'}50%); } }`}</style>
-            <div
-              className="flex items-center whitespace-nowrap py-2.5 w-max motion-reduce:animate-none"
-              style={{ animation: 'home-ads-marquee 25s linear infinite' }}
-            >
-              {[...homeAds, ...homeAds].map((ad, i) => (
-                <span key={`${ad.id}-${i}`} className="flex items-center text-[13px] text-zinc-300 shrink-0">
-                  <span className="px-6">{ad.text}</span>
-                  <span aria-hidden className="w-1 h-1 rounded-full bg-gold/60 shrink-0" />
-                </span>
-              ))}
-            </div>
+          <div className="-mt-8 sm:-mt-10 -mx-4 sm:-mx-6 lg:-mx-8 mb-8 sm:mb-10 rounded-t-[28px] bg-zinc-900/40 overflow-hidden">
+            <Marquee speed={42}>
+              <div className="flex items-center whitespace-nowrap py-2.5">
+                {homeAds.map((ad) => (
+                  <span key={ad.id} className="flex items-center text-[13px] text-zinc-300 shrink-0">
+                    <span className="px-6">{ad.text}</span>
+                    <span aria-hidden className="w-1 h-1 rounded-full bg-gold/60 shrink-0" />
+                  </span>
+                ))}
+              </div>
+            </Marquee>
           </div>
         )}
 
