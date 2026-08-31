@@ -55,7 +55,12 @@ nothing is exactly the confusion this file exists to end.
 | `14 - Verify Studio Live` | the Studio editor in a real browser on the live origin |
 | `15 - Verify Live Auth` | SSO round trip, logout liveness, Resend delivery |
 
-Nothing in that list writes.
+The first four write nothing at all. `15 - Verify Live Auth` is the one
+exception and it is worth stating plainly: it registers **one throwaway
+account** per run, on a plus-tagged address, because a password-reset email
+and a verification email cannot be proved without an account to send them to.
+It buys nothing, touches no wallet, no order and no ledger, and everything
+else it does is a GET or a SELECT.
 
 ## Routing is not managed from this repository
 
