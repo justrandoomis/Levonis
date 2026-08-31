@@ -54,6 +54,15 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
 
+      # `npm run check` now typechecks studio/ too, and it FAILS rather than
+      # skipping when that workspace is not installed — deliberately, because
+      # a check that quietly passes on code it never read is what let an
+      # unbuildable Studio sit in main for a day. So it has to be installed
+      # here. It is a separate workspace with its own lockfile; ~20s.
+      - name: Install the Studio workspace (npm run check covers it)
+        working-directory: studio
+        run: npm ci --no-audit --no-fund
+
       - name: Typecheck, lint and unit tests
         run: |
           npm run check

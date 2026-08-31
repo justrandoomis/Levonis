@@ -31,7 +31,7 @@ const TSC = join(STUDIO, 'node_modules', '.bin', 'tsc');
 if (!existsSync(TSC)) {
   console.error(
     'check-studio: the Studio workspace is not installed, so it was NOT checked.\n' +
-      '  Install it first:  npm ci --prefix studio\n' +
+      '  Install it first:  (cd studio && npm ci)\n' +
       '  (This is a hard failure on purpose. Reporting "0 errors" for code that\n' +
       '   was never looked at is how a broken Studio shipped for a day.)'
   );

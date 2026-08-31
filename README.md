@@ -44,9 +44,16 @@ frontend config: copy `.env.example` to `.env`.
 ## Build & checks
 
 ```bash
-npm run check              # TypeScript (frontend + worker)
+npm ci && (cd studio && npm ci)   # both workspaces — see the note below
+npm run check              # TypeScript + lint: frontend, worker, tests, studio
 npm run build              # Vite production build into dist/
 ```
+
+`npm run check` covers the Studio (`studio/`), which is a separate npm
+workspace with its own lockfile. If it is not installed the check **fails**
+instead of skipping it. That is deliberate: it used to skip `studio/`
+silently, and an unbuildable Studio sat in the branch for a day while every
+check reported zero errors.
 
 ## Deployment
 
