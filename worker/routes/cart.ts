@@ -525,6 +525,7 @@ cartRoutes.post('/items', async (c) => {
                              shipping_method_id, transport_method, warranty_plan_id, qty)
      VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
      ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+       WHERE product_id IS NOT NULL
      DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                    option_value_ids = excluded.option_value_ids,
                    transport_method = excluded.transport_method,
@@ -778,7 +779,8 @@ cartRoutes.post('/merchant-items', async (c) => {
     `INSERT INTO cart_items
        (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty)
      VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (user_id, product_id, community_product_id, option_id, color_id, shipping_method_id)
+     ON CONFLICT (user_id, community_product_id, option_id, color_id)
+       WHERE community_product_id IS NOT NULL
      DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`
   ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty).run();
 

@@ -58,6 +58,17 @@ export interface HostInfo {
   slug: string | null;
   /** The system label (e.g. 'studio'), when kind === 'system'. */
   system: string | null;
+  /**
+   * Is this hostname the configured root domain, or anything beneath it?
+   *
+   * `kind` alone cannot answer that. `foreign` covers two completely
+   * different situations — a host OUTSIDE the platform's domain (a
+   * workers.dev URL, a preview deployment, localhost, or no root domain
+   * configured at all), and a host INSIDE it that is too deep to be a store
+   * (`a.b.levonis-iq.com`). The first is operator territory; the second is
+   * next to merchant-controlled content. `adminAllowedOn` is the difference.
+   */
+  underRoot: boolean;
 }
 
 /**
@@ -127,10 +138,11 @@ export function isSystemSlug(slug: string): boolean {
 export function classifyHost(rawHost: string | null | undefined, rootDomain: string | null | undefined): HostInfo {
   const host = normalizeHost(rawHost);
   const root = normalizeHost(rootDomain);
-  const fallback: HostInfo = { kind: 'foreign', host: host ?? '', slug: null, system: null };
+  const underRoot = !!host && !!root && (host === root || host.endsWith('.' + root));
+  const fallback: HostInfo = { kind: 'foreign', host: host ?? '', slug: null, system: null, underRoot };
   if (!host || !root) return fallback;
 
-  if (host === root) return { kind: 'main', host, slug: null, system: null };
+  if (host === root) return { kind: 'main', host, slug: null, system: null, underRoot: true };
   if (!host.endsWith('.' + root)) return fallback;
 
   const prefix = host.slice(0, -(root.length + 1));
@@ -139,10 +151,47 @@ export function classifyHost(rawHost: string | null | undefined, rootDomain: str
   // certificate scoping mistakes get exploited.
   if (prefix.includes('.')) return fallback;
 
-  if (prefix === 'www') return { kind: 'main', host, slug: null, system: null };
-  if (isSystemSlug(prefix)) return { kind: 'system', host, slug: null, system: prefix };
+  if (prefix === 'www') return { kind: 'main', host, slug: null, system: null, underRoot: true };
+  if (isSystemSlug(prefix)) return { kind: 'system', host, slug: null, system: prefix, underRoot: true };
   if (!isValidSlugSyntax(prefix)) return fallback;
-  return { kind: 'merchant', host, slug: prefix, system: null };
+  return { kind: 'merchant', host, slug: prefix, system: null, underRoot: true };
+}
+
+/**
+ * May platform administration be served on this host?
+ *
+ * THE THREAT: a page served from `evil.levonis-iq.com` is same-origin with
+ * `evil.levonis-iq.com/api/…`, and the session cookie is scoped to the parent
+ * domain, so that page can drive the API with a visiting admin's own
+ * credentials. Anything under the platform's domain that is not the apex is
+ * therefore refused (§53).
+ *
+ * WHAT THIS FIXES: the guard used to be `kind === 'main'`, which quietly made
+ * a CONFIGURATION MISTAKE into a total outage. When STORE_ROOT_DOMAIN and
+ * APP_ORIGIN do not name the domain the site is actually served on, every
+ * host classifies as `foreign` — including the apex — and the whole admin API
+ * answered 404. That is precisely what happened on the first production
+ * verification run, and a security guard that fails closed onto the
+ * operators, on a host no merchant can control, is not making anyone safer.
+ *
+ * So the rule is about the RELATIONSHIP to the root domain, not the label:
+ *
+ *   main                          → yes, this is the platform
+ *   system / merchant             → no, a merchant may control this page
+ *   foreign, under the root       → no (`a.b.levonis-iq.com` — one wildcard
+ *                                  certificate covers one level, and deeper
+ *                                  names are where scoping mistakes get
+ *                                  exploited)
+ *   foreign, outside the root     → yes — a workers.dev deployment, a preview
+ *                                  URL, localhost, or a root domain that is
+ *                                  not configured. No merchant can be served
+ *                                  there, and the operator has to be able to
+ *                                  administer their own deployment.
+ */
+export function adminAllowedOn(info: HostInfo): boolean {
+  if (info.kind === 'main') return true;
+  if (info.kind === 'system' || info.kind === 'merchant') return false;
+  return !info.underRoot;
 }
 
 /**

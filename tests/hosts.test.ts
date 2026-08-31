@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  adminAllowedOn,
   classifyHost,
   normalizeHost,
   isValidSlugSyntax,
@@ -193,4 +194,83 @@ test('a storefront URL falls back to the in-app route when wildcard DNS is not c
   // becomes a link to a system host.
   assert.equal(storeUrl('studio', ROOT, 'store_1'), '/community/store/store_1');
   assert.equal(storeUrl('bad slug', ROOT, 'store_1'), '/community/store/store_1');
+});
+
+// ------------------------------------------- who may reach platform admin
+
+/**
+ * `adminAllowedOn` replaced a bare `kind === 'main'`, and the reason is worth
+ * keeping in the test names: the old check turned a mistyped APP_ORIGIN into
+ * a total admin outage. When no root domain matches the host it is served on,
+ * EVERY host classifies as `foreign` — the apex included — and the whole
+ * admin API answered 404 on the real site.
+ *
+ * The rule is about the relationship to the root domain, not the label.
+ */
+test('admin is allowed on the apex and on www', () => {
+  const R = 'levonis-iq.com';
+  assert.equal(adminAllowedOn(classifyHost('levonis-iq.com', R)), true);
+  assert.equal(adminAllowedOn(classifyHost('www.levonis-iq.com', R)), true);
+});
+
+test('admin is REFUSED on a merchant storefront — the whole point', () => {
+  const R = 'levonis-iq.com';
+  assert.equal(adminAllowedOn(classifyHost('ali3d.levonis-iq.com', R)), false);
+  assert.equal(adminAllowedOn(classifyHost('evil.levonis-iq.com', R)), false);
+});
+
+test('admin is REFUSED on a system host', () => {
+  const R = 'levonis-iq.com';
+  assert.equal(adminAllowedOn(classifyHost('studio.levonis-iq.com', R)), false);
+  assert.equal(adminAllowedOn(classifyHost('mail.levonis-iq.com', R)), false);
+});
+
+test('admin is REFUSED on a deeper name under the root, which is foreign but adjacent', () => {
+  const R = 'levonis-iq.com';
+  const info = classifyHost('a.b.levonis-iq.com', R);
+  assert.equal(info.kind, 'foreign');
+  assert.equal(info.underRoot, true);
+  // A universal certificate covers one level. Deeper names are where cookie
+  // and certificate scoping mistakes get exploited, so they are not admin.
+  assert.equal(adminAllowedOn(info), false);
+  assert.equal(adminAllowedOn(classifyHost('x.ali3d.levonis-iq.com', R)), false);
+});
+
+test('admin IS allowed outside the root domain — that is the operator, not a merchant', () => {
+  const R = 'levonis-iq.com';
+  for (const host of ['levonis-staging.someone.workers.dev', 'localhost:8787', '127.0.0.1']) {
+    const info = classifyHost(host, R);
+    assert.equal(info.underRoot, false, host);
+    assert.equal(adminAllowedOn(info), true, host);
+  }
+});
+
+test('a misconfigured root domain does not take the admin API down', () => {
+  // THE REGRESSION. With no root domain — or one that does not match the host
+  // the site is actually served on — every host is `foreign`, and the old
+  // guard refused the apex along with everything else.
+  for (const root of [null, undefined, '', 'levonis-staging.workers.dev']) {
+    const info = classifyHost('levonis-iq.com', root);
+    assert.equal(info.kind, 'foreign');
+    assert.equal(info.underRoot, false);
+    assert.equal(adminAllowedOn(info), true, `root=${String(root)}`);
+  }
+});
+
+test('a spoofed Host that is not under the root cannot become a merchant', () => {
+  const R = 'levonis-iq.com';
+  const info = classifyHost('ali3d.levonis-iq.com.evil.example', R);
+  assert.equal(info.kind, 'foreign');
+  assert.equal(info.underRoot, false);
+  assert.equal(info.slug, null);
+});
+
+test('a host that cannot be parsed at all is never admin-adjacent by accident', () => {
+  const R = 'levonis-iq.com';
+  // An unparseable Host yields host: '' and underRoot false. It reaches no
+  // merchant and no store; whether admin is served there is decided by
+  // whether the caller is an admin, as everywhere else.
+  const info = classifyHost('has a space', R);
+  assert.equal(info.kind, 'foreign');
+  assert.equal(info.host, '');
 });

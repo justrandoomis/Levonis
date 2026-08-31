@@ -26,10 +26,15 @@ function code(source: string): string {
 
 // ------------------------------------------------- the apex-only admin guard
 
-test('platform admin is refused on every host except the main site', () => {
+test('platform admin is refused on every host a merchant could control', () => {
   // THE guard that makes wildcard subdomains survivable. Without it, a page
   // on evil.levonis-iq.com is same-origin with evil.levonis-iq.com/api/admin
   // and carries a visiting admin's own session.
+  //
+  // The DECISION lives in hosts.ts (`adminAllowedOn`) and is tested against
+  // real hostnames in tests/hosts.test.ts. This asserts only that the
+  // middleware still asks it, and still answers 404 — a later refactor that
+  // inlined a different condition here is exactly what this catches.
   const index = code(read('worker/index.ts'));
   assert.match(
     index,
@@ -37,7 +42,8 @@ test('platform admin is refused on every host except the main site', () => {
     'no host guard is mounted on /api/admin/*'
   );
   const guard = /app\.use\(\s*['"]\/api\/admin\/\*['"][\s\S]{0,400}?\}\);/.exec(index)?.[0] ?? '';
-  assert.match(guard, /host['"]?\)\.kind\s*!==\s*['"]main['"]/, 'the guard does not compare the host kind to main');
+  assert.match(guard, /adminAllowedOn\(\s*c\.get\(\s*['"]host['"]\s*\)\s*\)/,
+    'the guard does not consult adminAllowedOn');
   assert.match(guard, /404/, 'a wrong-host caller should get 404, not a 403 that confirms the route exists');
 });
 

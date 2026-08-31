@@ -140,6 +140,46 @@ jobs:
           mv /tmp/vars.keep /tmp/vars.tsv
           echo "STUDIO_ALLOWED_DESTINATIONS will be set on this deploy"
 
+      # STORE_ROOT_DOMAIN decides what `classifyHost` calls the apex, and
+      # therefore whether /api/admin/* is served at all. It was previously
+      # DERIVED from APP_ORIGIN — and APP_ORIGIN on this Worker does not name
+      # levonis-iq.com, so every host classified as `foreign`, including the
+      # apex, and the whole admin API answered 404 on the live site.
+      #
+      # hosts.ts no longer fails closed onto the operator that way, but the
+      # derivation is still the wrong thing to depend on: the domain the site
+      # is served on is a fact this workflow already knows (it curls it, four
+      # steps down). So it is set explicitly, and the repository variable
+      # overrides it for anyone serving the code somewhere else.
+      - name: Pin the store root domain
+        env:
+          STORE_ROOT_DOMAIN: ${{ vars.STORE_ROOT_DOMAIN || 'levonis-iq.com' }}
+        run: |
+          set -e
+          grep -v "^STORE_ROOT_DOMAIN	" /tmp/vars.tsv > /tmp/vars.keep || true
+          printf 'STORE_ROOT_DOMAIN\t%s\n' "$STORE_ROOT_DOMAIN" >> /tmp/vars.keep
+          mv /tmp/vars.keep /tmp/vars.tsv
+          echo "STORE_ROOT_DOMAIN will be set to $STORE_ROOT_DOMAIN"
+
+      # APP_ORIGIN is a different question and this workflow deliberately does
+      # NOT change it: it is what outbound password-reset and verification
+      # links are built from, and repointing those is the owner's call. But a
+      # value that does not name the live domain is worth SAYING, since it
+      # means every emailed link goes somewhere else.
+      - name: Check whether APP_ORIGIN names the live domain
+        env:
+          EXPECTED: ${{ vars.STORE_ROOT_DOMAIN || 'levonis-iq.com' }}
+        run: |
+          CURRENT=$(awk -F'\t' '$1=="APP_ORIGIN"{print $2}' /tmp/vars.tsv)
+          if [ -z "$CURRENT" ]; then
+            echo "::warning::APP_ORIGIN is not set on this Worker"
+          elif echo "$CURRENT" | grep -q "://$EXPECTED"; then
+            echo "APP_ORIGIN names $EXPECTED — emailed links point at the live site"
+          else
+            # The value itself is masked; only the verdict is printed.
+            echo "::warning::APP_ORIGIN does NOT name $EXPECTED — password-reset and verification links in outbound email point somewhere else. Set it deliberately; this workflow will not change it for you."
+          fi
+
       - name: Deploy, carrying every existing var forward
         run: |
           set -e
@@ -235,6 +275,34 @@ jobs:
           curl -s --max-time 25 "https://levonis-iq.com/api/memberships/plans" \
             | jq -c '[.plans[] | {id, tier, duration_months, price_iqd}]'
           [ "$fail" = "0" ] || { echo "::error::an endpoint did not answer 200 after the deploy"; exit 1; }
+
+      # The two failures the first production verification found, checked on
+      # every deploy from now on. Both were invisible to `npm run check`.
+      - name: Prove the apex still serves its own admin API and its own cart
+        run: |
+          set -e
+          # 401 (or 403) means the route EXISTS and refused a stranger. 404
+          # means the host guard is refusing the apex itself, which is how the
+          # entire admin console went dark.
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 \
+            "https://levonis-iq.com/api/admin/community/overview" || echo 000)
+          echo "/api/admin/community/overview (signed out) -> $CODE"
+          case "$CODE" in
+            401|403) echo "  the admin API is reachable on the apex" ;;
+            404) echo "::error::the apex is refusing its own admin API — STORE_ROOT_DOMAIN does not match this host"; exit 1 ;;
+            *) echo "::error::unexpected status $CODE"; exit 1 ;;
+          esac
+
+          # Adding to a cart needs a session, so this checks the statement's
+          # own failure mode instead: a signed-out add must be refused by AUTH
+          # (401), never by a 500 from SQL that names an index that does not
+          # exist. That 500 is exactly what shipped.
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 -X POST \
+            -H 'Content-Type: application/json' -H 'Origin: https://levonis-iq.com' \
+            --data '{"productId":"nope","qty":1}' \
+            "https://levonis-iq.com/api/cart/items" || echo 000)
+          echo "POST /api/cart/items (signed out) -> $CODE"
+          [ "$CODE" != "500" ] || { echo "::error::the cart endpoint is answering 500"; exit 1; }
 
       - name: Confirm the vars survived
         run: |
