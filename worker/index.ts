@@ -35,13 +35,55 @@ import { kycRoutes } from './routes/kyc';
 import { supportRoutes } from './routes/support';
 import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
+import { classifyHost, rootDomainFrom } from './lib/hosts';
 
 const app = new Hono<AppContext>();
 
 app.use('*', securityHeaders());
 app.use('*', originCheck());
+
+/**
+ * Classify the request host ONCE, before anything else looks at it.
+ *
+ * Every merchant-scoped route reads `c.get('host')` rather than re-parsing
+ * the Host header, so there is exactly one place in the Worker where a
+ * hostname turns into a decision.
+ */
+app.use('*', async (c, next) => {
+  c.set('host', classifyHost(c.req.header('Host'), rootDomainFrom(c.env)));
+  await next();
+});
+
 app.use('*', async (c, next) => {
   await loadSessionUser(c);
+  await next();
+});
+
+/**
+ * GLOBAL ADMIN IS APEX-ONLY. This is the guard that makes wildcard merchant
+ * subdomains survivable.
+ *
+ * The session cookie is scoped to `.levonis-iq.com`, so it is sent to every
+ * storefront. A merchant controls the content of their own storefront. If
+ * `evil.levonis-iq.com` could serve a page that calls
+ * `evil.levonis-iq.com/api/admin/...`, that call would be SAME-ORIGIN —
+ * `originCheck` sees a matching origin and allows it — and it would carry a
+ * visiting platform admin's own session. One admin visiting one hostile shop
+ * would be enough.
+ *
+ * So platform administration is refused on every host except the main site.
+ * A merchant page cannot reach it at all, whatever it puts in the request
+ * (§53). Merchant administration is NOT here: it lives under
+ * /api/merchant/*, is scoped to the caller's own store, and is deliberately
+ * a different thing with a different name.
+ *
+ * 404, not 403: a wrong-host caller learns the route does not exist here
+ * rather than that it exists elsewhere.
+ */
+app.use('/api/admin/*', async (c, next) => {
+  if (c.get('host').kind !== 'main') {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
   await next();
 });
 

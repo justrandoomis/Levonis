@@ -145,6 +145,43 @@ const notGated = (t: TierStatus, name: string) => !(t.gated_benefits ?? []).incl
 export const benefits = {
   /** PLUS+PRO: professional merchant profile in the community. */
   merchantProfile: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantProfile'),
+
+  // ---------------------------------------------------------------------
+  // LEVO PLUS merchant stores (§83). PRO INHERITS every PLUS merchant
+  // benefit — a PRO member is a more privileged merchant, not a lesser one.
+  // PRIME does NOT: it is a delivery/priority tier for buyers, and granting
+  // it selling rights would let someone open a shop on a plan that was never
+  // sold as one. That exclusion is deliberate and is asserted in
+  // tests/entitlements.test.ts so it cannot be "tidied up" later.
+  //
+  // Each is a separate name rather than one merchant flag, because
+  // gated_benefits works per name: an admin must be able to suspend exactly
+  // one capability — say, publishing products — over a complaint, without
+  // cancelling a paid membership or locking the merchant out of their own
+  // order history (§84).
+  // ---------------------------------------------------------------------
+
+  /** May own and operate a storefront. The gate for everything commercial. */
+  merchantStore: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantStore'),
+  /** May publish products to that storefront. */
+  merchantProducts: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantProducts'),
+  /** May receive and fulfil store orders. */
+  merchantOrders: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantOrders'),
+  /** May submit offers on customer requests in the community marketplace. */
+  communityOffers: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'communityOffers'),
+  /** May see their own store analytics. */
+  merchantAnalytics: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantAnalytics'),
+  /** Gets a dedicated storefront subdomain. */
+  merchantSubdomain: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantSubdomain'),
+  /** PLUS+PRO: eligibility for PLUS-only coupons where the owner configures them. */
+  exclusiveCoupons: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'exclusiveCoupons'),
   /** PLUS+PRO: exclusive sections (bundles, random filament, special offers). */
   exclusiveSections: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'exclusiveSections'),
   /** PRO: explicit/policy product discounts (resolver applies pricing). */

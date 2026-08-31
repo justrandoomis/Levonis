@@ -2,9 +2,44 @@ import type { Context } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { AppContext, SessionUser } from './types';
 import { randomToken, sha256Hex } from './crypto';
+import { rootDomainFrom, sessionCookieDomain } from './hosts';
 
 const COOKIE_NAME = 'levonis_session';
 const SESSION_TTL_DAYS = 14;
+
+/**
+ * Where the session cookie is valid.
+ *
+ * ONE Levonis identity, everywhere (§8). A customer signed in on
+ * levonis-iq.com must already be signed in when they open
+ * ali3d.levonis-iq.com — so in production the cookie is scoped to the parent
+ * domain and every storefront shares it. There is no second account system
+ * and no token in JavaScript: the cookie stays HttpOnly.
+ *
+ * Environment-aware because it has to be. `localhost` has no dot and
+ * `*.workers.dev` is a public suffix, so a browser SILENTLY DISCARDS a
+ * Set-Cookie naming either as Domain. No error is raised anywhere; sign-in
+ * just never sticks. `sessionCookieDomain` returns null for those, and
+ * omitting Domain gives a host-only cookie that works.
+ *
+ * Every write and every delete goes through this one function, because a
+ * cookie deleted with different Domain/Path attributes than it was created
+ * with is not deleted at all — the browser keeps offering the old one and
+ * "log out" becomes a lie.
+ */
+function cookieOptions(c: Context<AppContext>) {
+  const domain = sessionCookieDomain(c.req.header('Host'), rootDomainFrom(c.env));
+  return {
+    httpOnly: true,
+    secure: true,
+    // Lax, not None. The cookie must survive a top-level navigation from the
+    // main site to a storefront, which Lax allows; it must NOT ride along on
+    // a cross-site POST, which is the protection §53 says not to weaken.
+    sameSite: 'Lax' as const,
+    path: '/',
+    ...(domain ? { domain } : {}),
+  };
+}
 
 export async function createSession(c: Context<AppContext>, userId: string): Promise<void> {
   const token = randomToken(32);
@@ -15,13 +50,7 @@ export async function createSession(c: Context<AppContext>, userId: string): Pro
   )
     .bind(id, userId, expires.toISOString(), (c.req.header('User-Agent') || '').slice(0, 255))
     .run();
-  setCookie(c, COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    expires,
-  });
+  setCookie(c, COOKIE_NAME, token, { ...cookieOptions(c), expires });
 }
 
 export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
@@ -47,15 +76,34 @@ export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
   c.set('sessionId', String(session_id));
 }
 
+/**
+ * Deleting must mirror creating. `deleteCookie` sends an expired Set-Cookie,
+ * and the browser only matches it to the stored cookie when Domain and Path
+ * agree. Signing out on a storefront with a host-only delete would leave the
+ * parent-domain cookie in place and the customer still signed in everywhere
+ * else — so the same options are used here, minus the expiry.
+ */
+function clearCookie(c: Context<AppContext>): void {
+  const { httpOnly, secure, sameSite, path, ...rest } = cookieOptions(c);
+  const domain = (rest as { domain?: string }).domain;
+  deleteCookie(c, COOKIE_NAME, {
+    path,
+    secure,
+    sameSite,
+    httpOnly,
+    ...(domain ? { domain } : {}),
+  });
+}
+
 export async function destroySession(c: Context<AppContext>): Promise<void> {
   const sessionId = c.get('sessionId');
   if (sessionId) {
     await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run();
   }
-  deleteCookie(c, COOKIE_NAME, { path: '/' });
+  clearCookie(c);
 }
 
 export async function destroyAllSessions(c: Context<AppContext>, userId: string): Promise<void> {
   await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
-  deleteCookie(c, COOKIE_NAME, { path: '/' });
+  clearCookie(c);
 }

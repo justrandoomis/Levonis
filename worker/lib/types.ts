@@ -1,3 +1,5 @@
+import type { HostInfo } from './hosts';
+
 export interface Env {
   DB: D1Database;
   BUCKET: R2Bucket;
@@ -14,6 +16,13 @@ export interface Env {
   /** Trusted absolute origin for links in emails (per environment). Never
    *  derive email links from the request Host header. */
   APP_ORIGIN?: string;
+  /** The registrable domain merchant storefronts live under, e.g.
+   *  "levonis-iq.com". Drives subdomain resolution and the shared session
+   *  cookie. Derived from APP_ORIGIN when unset; when NEITHER is set no host
+   *  is ever treated as a merchant, which is the safe direction — the
+   *  platform refuses to guess which domain it is rather than believing the
+   *  Host header. */
+  STORE_ROOT_DOMAIN?: string;
   /** Staging safety: comma-separated allowlist; when set, outbound email is
    *  only sent to these addresses (other requests behave normally but skip
    *  the send). Leave unset in production. */
@@ -74,6 +83,10 @@ export type AppContext = {
   Variables: {
     user: SessionUser | null;
     sessionId: string | null;
+    /** Set once per request by the host middleware in worker/index.ts.
+     *  Every merchant-scoped route reads it instead of re-parsing the Host,
+     *  so there is exactly one place where a hostname becomes a decision. */
+    host: HostInfo;
   };
 };
 
