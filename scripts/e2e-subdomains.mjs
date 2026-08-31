@@ -332,6 +332,90 @@ async function main() {
   }
 
   // ---------------------------------------------------------- 5. one cart
+  // ------------------------------- 4b. what this deployment can sign people in with
+  //
+  // The auth page renders exactly what this endpoint reports, so a wrong
+  // answer here is a wrong login screen. It is also the check that would have
+  // caught the Google outage on the day it started: the button used to be
+  // decided by a value baked into the JavaScript bundle while the sign-in
+  // could only succeed if a DIFFERENT value was set on the Worker.
+  section('4b. the sign-in methods this deployment reports');
+
+  const caps = await anon.req('GET', APEX, '/api/auth/capabilities');
+  check('the capabilities endpoint answers', caps.status === 200, `status ${caps.status}`);
+  if (caps.status === 200) {
+    const c = caps.json ?? {};
+    // The platform's own sign-in never depends on an external provider.
+    check('email + password is always available', c.emailPassword === true, JSON.stringify(c.emailPassword));
+    check('a phone number is a valid sign-IN identifier', c.phoneSignIn === true, JSON.stringify(c.phoneSignIn));
+    check('no SMS flow is advertised, because there is no SMS provider', c.phoneOtp === false, JSON.stringify(c.phoneOtp));
+
+    // These three are CONFIGURATION, not correctness — report what is live
+    // rather than asserting a value this deployment may not have set.
+    for (const [name, on] of [['Google', c.google], ['password reset', c.passwordReset], ['Telegram', c.telegram]]) {
+      if (on) ok(`${name} is configured on this deployment`);
+      else blocked(`${name} is configured on this deployment`, 'not configured — the auth page will not offer it');
+    }
+    // A client id is public and belongs here; a secret never does.
+    if (c.google) {
+      check('the Google client id is a Google client id',
+        typeof c.googleClientId === 'string' && c.googleClientId.endsWith('.apps.googleusercontent.com'),
+        `googleClientId=${String(c.googleClientId).slice(0, 12)}…`);
+    }
+    const leaked = JSON.stringify(c).match(/re_[A-Za-z0-9]{10,}|bot[0-9]{6,}:/);
+    check('no secret appears in the response', !leaked, leaked ? `found ${leaked[0].slice(0, 6)}…` : '');
+  }
+
+  // Handles: the answer carries a REASON, so "unavailable" never sends a
+  // person hunting through variations of a name that can never be accepted.
+  const uname = (u) => anon.req('GET', APEX, `/api/auth/username-available?u=${encodeURIComponent(u)}`);
+  const reserved = await uname('support');
+  check('a reserved handle is refused as RESERVED', reserved.json?.available === false && reserved.json?.reason === 'reserved',
+    `available=${reserved.json?.available} reason=${reserved.json?.reason}`);
+  const tooShort = await uname('ab');
+  check('a too-short handle says so rather than "unavailable"', tooShort.json?.reason === 'too_short',
+    `reason=${tooShort.json?.reason}`);
+  const freeName = await uname(`e2e${RUN}handle`);
+  check('an unused handle is free', freeName.json?.available === true, `reason=${freeName.json?.reason}`);
+
+  const reservedSignup = await anon.req('POST', APEX, '/api/auth/register', {
+    email: `e2e.reserved.${RUN}@levonis-iq.com`, username: 'admin', name: 'X', password: `Levonis!${RUN}aA1`,
+  });
+  check('signup refuses a reserved handle instead of creating the account',
+    reservedSignup.status === 400 && reservedSignup.json?.code === 'USERNAME_RESERVED',
+    `status ${reservedSignup.status} code=${reservedSignup.json?.code}`);
+
+  // Profile completion: computed from the fields on every read, and the
+  // decision to PROMPT is the server's so a dismissal follows the person
+  // across devices.
+  const completion = await shopper.req('GET', APEX, '/api/profile/completion');
+  check('the account reports what its profile is missing', completion.status === 200 && Array.isArray(completion.json?.missing),
+    `status ${completion.status}`);
+  if (completion.status === 200) {
+    check('a brand-new account is not complete, and says which pieces are missing',
+      completion.json.complete === false && completion.json.missing.length > 0,
+      `percent=${completion.json.percent} missing=${JSON.stringify(completion.json.missing)}`);
+    // Straight after signup the wizard is asking, so the prompt must not.
+    check('the completion prompt does not fire on top of the signup wizard',
+      completion.json.shouldPrompt === false,
+      `onboarding=${completion.json.onboarding} shouldPrompt=${completion.json.shouldPrompt}`);
+  }
+
+  const skipped = await shopper.req('POST', APEX, '/api/profile/onboarding', { state: 'skipped' });
+  check('the signup wizard can be skipped, and the account stays usable',
+    skipped.status === 200 && skipped.json?.user?.onboarding === 'skipped',
+    `status ${skipped.status} onboarding=${skipped.json?.user?.onboarding}`);
+
+  const afterSkip = await shopper.req('GET', APEX, '/api/profile/completion');
+  check('skipping does not put the prompt on the very next page',
+    afterSkip.json?.shouldPrompt === false,
+    `shouldPrompt=${afterSkip.json?.shouldPrompt}`);
+
+  const dismissed = await shopper.req('POST', APEX, '/api/profile/completion/dismiss', {});
+  check('"maybe later" is recorded on the SERVER, with a date it may ask again',
+    dismissed.status === 200 && typeof dismissed.json?.nextPromptAt === 'string',
+    `status ${dismissed.status} next=${dismissed.json?.nextPromptAt}`);
+
   section('5. one cart, wherever they are shopping');
   const catalog = await anon.req('GET', APEX, '/api/products?limit=25');
   const products = catalog.json?.products ?? [];
@@ -965,6 +1049,25 @@ async function verifyAnExistingStore(shopper) {
   const real = hostUrl(slug);
 
   const resolved = await anon.req('GET', real, '/api/storefront/resolve');
+  if (resolved.status === 0) {
+    // The hostname does not resolve from HERE. That is a fact about this
+    // machine's DNS, not about the deployment, and reporting it as eight
+    // failures would bury the one thing that is actually true: these checks
+    // did not run. (On production the wildcard record resolves every name;
+    // locally only the hosts in /etc/hosts do.)
+    for (const step of [
+      'the storefront serves a real store on its own hostname',
+      'that hostname serves the application, not an error page',
+      'the same session is the same user on that storefront',
+      'the merchant cart line is visible from the store hostname',
+      'the store publishes products on its own hostname',
+      'platform admin is refused on a REAL merchant hostname',
+      'a visitor on that storefront is not its merchant',
+    ]) {
+      blocked(step, `${slug}.${ROOT_DOMAIN} does not resolve from here — ${resolved.networkError ?? 'no answer'}`);
+    }
+    return;
+  }
   check('the storefront serves a real store on its own hostname',
     resolved.status === 200 && resolved.json?.kind === 'merchant' && resolved.json?.store?.slug === slug,
     `status ${resolved.status} kind=${resolved.json?.kind} slug=${resolved.json?.store?.slug ?? 'none'}`);
