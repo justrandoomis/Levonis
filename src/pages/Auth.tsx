@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Mail, Send, Chrome } from 'lucide-react';
+import { ArrowLeft, AtSign, CheckCircle2, Lock, Mail, Send, UserRound } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import AuthShell from '../components/auth/AuthShell';
+import AuthDivider from '../components/auth/AuthDivider';
 import AuthTextField from '../components/auth/AuthTextField';
+import GoogleAuthButton from '../components/auth/GoogleAuthButton';
+import SocialAuthButton, { TelegramIcon } from '../components/auth/SocialAuthButton';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
 import FillButton, {
@@ -19,39 +23,30 @@ import FillButton, {
 } from '../components/auth/FillButton';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { toAsciiDigitsClient } from '../components/auth/PhoneField';
-import MethodSwitch, {
-  methodPanelId,
-  methodTabId,
-  type AuthMethod,
-} from '../components/auth/MethodSwitch';
 import ReferralBar from '../components/auth/ReferralBar';
-import '../components/auth/auth.css';
 
 /**
- * /auth — one dark LEVONIS screen (integrated mandate §2).
+ * /auth — the door into LEVONIS, styled as the control surface of a premium
+ * 3D-printing machine (AuthShell owns the manufacturing scene behind it).
  *
- * Organization (§2.1): sign-in / create-account / forgot / reset stay
- * separate steps, and INSIDE sign-in & sign-up the four methods
- * (email / phone / Google / Telegram) are a segmented MethodSwitch — never
- * one long column of every form at once. Non-sensitive values (email,
- * username, name, phone) survive method switches; passwords/OTP never touch
- * localStorage/analytics/logs.
+ * Organization: email/password is the PRIMARY interface, visible immediately
+ * — no method tabs. Google and Telegram are secondary actions under an "أو"
+ * seam; tapping Telegram swaps the card to the Telegram-verified phone flow
+ * (the only route that can prove number ownership), with a way back.
+ * Non-sensitive values (email, username, name) survive every swap;
+ * passwords/OTP never touch localStorage/analytics/logs.
  *
  * FillButton (§2.2): the submit button's background fills with REAL
  * validation progress and enables only when every rule passes — never on
  * text length alone and never because an animation finished. Enter submits
  * when (and only when) the button is ready.
  *
- * Server contracts:
+ * Server contracts (unchanged by the redesign):
  * - POST /api/auth/login    { identifier (email|username|phone), password }
  *   (the legacy `email` field carries the same value for the current server)
  * - POST /api/auth/register { username, name, email, password, referralCode? }
- *   — and { phone, ... } once the auth-server slice accepts it. Today that
- *   slice answers PHONE_REQUIRES_VERIFICATION, because a phone may only be
- *   stored after ownership is PROVEN (§2.3): the page surfaces that answer
- *   verbatim and offers the Telegram verification path. Nothing is faked.
  * - POST /api/auth/google   { credential, referralCode? }  (GIS credential)
- * - GET  /api/auth/referrer-info?ref=…  (ReferralBar, §2.6 — 404 = honest
+ * - GET  /api/auth/referrer-info?ref=…  (ReferralBar — 404 = honest
  *   "code not found", continuing without a code is always allowed)
  * - POST /api/auth/forgot-password { email, lang } · POST /api/auth/reset-password
  *
@@ -61,39 +56,30 @@ import '../components/auth/auth.css';
 
 const STRINGS = {
   ar: {
-    tagline: 'حسابك في متجر ليفونيس',
     signInTitle: 'تسجيل الدخول',
-    signInHint: 'اختر طريقة الدخول ثم أكمل بياناتك.',
+    signInHint: 'أدخل بياناتك للمتابعة إلى حسابك.',
     signUpTitle: 'إنشاء حساب',
-    signUpHint: 'أنشئ حسابًا جديدًا بالطريقة التي تناسبك.',
+    signUpHint: 'أنشئ حسابك الجديد في ليفونيس.',
     forgotTitle: 'إعادة تعيين كلمة المرور',
     forgotHint: 'أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.',
     resetTitle: 'اختر كلمة مرور جديدة',
     resetHint: 'أدخل كلمة مرور جديدة لحسابك. رابط إعادة التعيين يصلح لمرة واحدة فقط.',
-    methodsLabel: 'طريقة الدخول',
-    methodEmail: 'البريد',
-    methodPhone: 'الهاتف',
-    methodTelegram: 'تيليغرام',
     identifier: 'البريد الإلكتروني أو اسم المستخدم أو رقم الهاتف',
     identifierPlaceholder: 'email@example.com',
     googleNote: 'سنستخدم اسمك وبريدك من Google فقط. لن نصل إلى أي شيء آخر في حسابك.',
     email: 'البريد الإلكتروني',
     username: 'اسم المستخدم',
     fullName: 'الاسم',
-    optionalSuffix: ' (اختياري)',
     password: 'كلمة المرور',
     newPassword: 'كلمة المرور الجديدة',
     confirmPassword: 'تأكيد كلمة المرور',
     showPassword: 'إظهار كلمة المرور',
     hidePassword: 'إخفاء كلمة المرور',
-    forgotLink: 'هل نسيت كلمة المرور؟',
-    phoneLabel: 'رقم الهاتف',
-    countryLabel: 'الدولة',
-    phoneOwnershipNote: 'إثبات ملكية الرقم عبر تيليغرام مطلوب لإكمال التسجيل بالهاتف.',
-    phoneRegisterUnavailable:
-      'لإنشاء حساب برقم الهاتف يجب إثبات ملكية الرقم أولًا عبر تيليغرام، وتُعيَّن كلمة المرور في نهاية تلك الخطوة.',
-    continueWithTelegram: 'المتابعة عبر تيليغرام',
-    errPhone: 'أدخل رقم هاتف صحيحًا (لموبايل عراقي: يبدأ بـ 7 وطوله 10 أرقام بعد +964)',
+    forgotLink: 'نسيت كلمة المرور؟',
+    orLabel: 'أو',
+    backLabel: 'رجوع',
+    continueWithTelegram: 'المتابعة باستخدام تيليغرام',
+    googleWorking: 'جارٍ المتابعة عبر Google…',
     errPasswordMismatch: 'كلمتا المرور غير متطابقتين',
     signInCta: 'تسجيل الدخول',
     signingIn: 'جارٍ تسجيل الدخول…',
@@ -108,7 +94,6 @@ const STRINGS = {
     settingPassword: 'جارٍ الحفظ…',
     hintIdentifier: 'أدخل بريدك الإلكتروني أو اسم المستخدم (3 أحرف على الأقل)',
     hintPasswordLogin: 'أدخل كلمة المرور',
-    hintPhone: 'أكمل رقم الهاتف',
     hintUsername: 'اسم المستخدم: 3–30 من الأحرف الإنجليزية أو الأرقام أو . _ -',
     hintName: 'أدخل الاسم',
     hintEmail: 'أدخل بريدًا إلكترونيًا صحيحًا',
@@ -121,7 +106,6 @@ const STRINGS = {
     signInAction: 'سجّل الدخول',
     termsPrefix: 'بإنشاء الحساب فأنت توافق على',
     termsLink: 'الشروط وسياسة الخصوصية',
-    googleUnavailable: 'تسجيل الدخول عبر Google غير مفعّل على هذه النسخة بعد (معرّف العميل غير مضبوط في البناء).',
     googleServerNotConfigured: 'تسجيل الدخول عبر Google غير مهيأ على الخادم بعد.',
     googleNoCredential: 'لم تُرجع Google بيانات الدخول. حاول مرة أخرى.',
     googleFailed: 'تعذر تسجيل الدخول عبر Google. حاول مرة أخرى.',
@@ -148,39 +132,30 @@ const STRINGS = {
     errNetwork: 'تعذّر الاتصال. تحقّق من اتصالك وحاول مرة أخرى.',
   },
   en: {
-    tagline: 'Your LEVONIS store account',
     signInTitle: 'Sign in',
-    signInHint: 'Pick a method, then complete your details.',
+    signInHint: 'Enter your details to continue.',
     signUpTitle: 'Create account',
-    signUpHint: 'Create a new account with the method that suits you.',
+    signUpHint: 'Create your new LEVONIS account.',
     forgotTitle: 'Reset password',
     forgotHint: "Enter your email address and we'll send you a reset link.",
     resetTitle: 'Choose a new password',
     resetHint: 'Enter a new password for your account. The reset link can only be used once.',
-    methodsLabel: 'Sign-in method',
-    methodEmail: 'Email',
-    methodPhone: 'Phone',
-    methodTelegram: 'Telegram',
     identifier: 'Email, username or phone',
     identifierPlaceholder: 'email@example.com',
     googleNote: 'We only use your name and email from Google. Nothing else in your account is touched.',
     email: 'Email',
     username: 'Username',
     fullName: 'Name',
-    optionalSuffix: ' (optional)',
     password: 'Password',
     newPassword: 'New password',
     confirmPassword: 'Confirm password',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     forgotLink: 'Forgot password?',
-    phoneLabel: 'Phone number',
-    countryLabel: 'Country',
-    phoneOwnershipNote: 'Proving you own the number (via Telegram) is required to complete phone sign-up.',
-    phoneRegisterUnavailable:
-      'Creating a phone account requires proving you own the number first, via Telegram; the password is set at the end of that step.',
+    orLabel: 'or',
+    backLabel: 'Back',
     continueWithTelegram: 'Continue with Telegram',
-    errPhone: 'Enter a valid phone number (Iraqi mobile: starts with 7, 10 digits after +964)',
+    googleWorking: 'Continuing with Google…',
     errPasswordMismatch: 'Passwords do not match',
     signInCta: 'Sign in',
     signingIn: 'Signing in…',
@@ -195,7 +170,6 @@ const STRINGS = {
     settingPassword: 'Saving…',
     hintIdentifier: 'Enter your email or username (at least 3 characters)',
     hintPasswordLogin: 'Enter your password',
-    hintPhone: 'Complete the phone number',
     hintUsername: 'Username: 3–30 letters, digits or . _ -',
     hintName: 'Enter your name',
     hintEmail: 'Enter a valid email address',
@@ -208,7 +182,6 @@ const STRINGS = {
     signInAction: 'Sign in',
     termsPrefix: 'By creating an account you agree to the',
     termsLink: 'Terms & Privacy Policy',
-    googleUnavailable: 'Google sign-in is not enabled on this deployment yet (no client id was configured at build time).',
     googleServerNotConfigured: "Google sign-in isn't configured on the server yet.",
     googleNoCredential: 'Google did not return a credential. Please try again.',
     googleFailed: 'Google sign-in failed. Please try again.',
@@ -235,39 +208,30 @@ const STRINGS = {
     errNetwork: 'Could not reach the server. Check your connection and try again.',
   },
   ckb: {
-    tagline: 'هەژمارەکەت لە فرۆشگای LEVONIS',
     signInTitle: 'چوونەژوورەوە',
-    signInHint: 'شێوازێک هەڵبژێرە و زانیارییەکانت تەواو بکە.',
+    signInHint: 'زانیارییەکانت بنووسە بۆ بەردەوامبوون.',
     signUpTitle: 'دروستکردنی هەژمار',
-    signUpHint: 'بەو شێوازەی گونجاوە هەژمارێکی نوێ دروست بکە.',
+    signUpHint: 'هەژمارە نوێیەکەت لە LEVONIS دروست بکە.',
     forgotTitle: 'ڕێکخستنەوەی وشەی نهێنی',
     forgotHint: 'ئیمەیلەکەت بنووسە، بەستەری ڕێکخستنەوەت بۆ دەنێرین.',
     resetTitle: 'وشەی نهێنی نوێ هەڵبژێرە',
     resetHint: 'وشەی نهێنیيەکی نوێ بۆ هەژمارەکەت بنووسە. ئەم بەستەرە تەنها جارێک کاردەکات.',
-    methodsLabel: 'شێوازی چوونەژوورەوە',
-    methodEmail: 'ئیمەیل',
-    methodPhone: 'مۆبایل',
-    methodTelegram: 'تێلێگرام',
     identifier: 'ئیمەیل، ناوی بەکارهێنەر یان ژمارەی تەلەفۆن',
     identifierPlaceholder: 'email@example.com',
     googleNote: 'تەنها ناو و ئیمەیلەکەت لە Google بەکاردەهێنین. هیچی تر لە هەژمارەکەت دەستی لێنادرێت.',
     email: 'ئیمەیل',
     username: 'ناوی بەکارهێنەر',
     fullName: 'ناو',
-    optionalSuffix: ' (ئارەزوومەندانە)',
     password: 'وشەی نهێنی',
     newPassword: 'وشەی نهێنی نوێ',
     confirmPassword: 'دووپاتکردنەوەی وشەی نهێنی',
     showPassword: 'پیشاندانی وشەی نهێنی',
     hidePassword: 'شاردنەوەی وشەی نهێنی',
     forgotLink: 'وشەی نهێنیت لەبیر چووە؟',
-    phoneLabel: 'ژمارەی مۆبایل',
-    countryLabel: 'وڵات',
-    phoneOwnershipNote: 'بۆ تەواوکردنی تۆمارکردن بە مۆبایل، سەلماندنی خاوەندارێتی ژمارەکە لە ڕێگەی تێلێگرامەوە پێویستە.',
-    phoneRegisterUnavailable:
-      'بۆ دروستکردنی هەژمار بە ژمارەی مۆبایل، سەرەتا دەبێت خاوەندارێتی ژمارەکە لە ڕێگەی تێلێگرامەوە بسەلمێنرێت؛ وشەی نهێنیش لە کۆتایی ئەو هەنگاوەدا دادەنرێت.',
+    orLabel: 'یان',
+    backLabel: 'گەڕانەوە',
     continueWithTelegram: 'بەردەوامبوون بە تێلێگرام',
-    errPhone: 'ژمارەیەکی دروست بنووسە (مۆبایلی عێراقی: بە 7 دەست پێدەکات و 10 ژمارەیە دوای +964)',
+    googleWorking: 'بەردەوامبوون بە Google…',
     errPasswordMismatch: 'وشە نهێنیيەکان یەک ناگرنەوە',
     signInCta: 'چوونەژوورەوە',
     signingIn: 'چاوەڕوان بە…',
@@ -282,7 +246,6 @@ const STRINGS = {
     settingPassword: 'پاشەکەوت دەکرێت…',
     hintIdentifier: 'ئیمەیل یان ناوی بەکارهێنەرت بنووسە (لانیکەم ٣ پیت)',
     hintPasswordLogin: 'وشەی نهێنیت بنووسە',
-    hintPhone: 'ژمارەی مۆبایلەکە تەواو بکە',
     hintUsername: 'ناوی بەکارهێنەر: ٣–٣٠ لە پیتی ئینگلیزی، ژمارە یان . _ -',
     hintName: 'ناوەکەت بنووسە',
     hintEmail: 'ئیمەیلێکی دروست بنووسە',
@@ -295,7 +258,6 @@ const STRINGS = {
     signInAction: 'بچۆرە ژوورەوە',
     termsPrefix: 'بە دروستکردنی هەژمار ڕازیت بە',
     termsLink: 'مەرجەکان و سیاسەتی تایبەتمەندی',
-    googleUnavailable: 'چوونەژوورەوە بە Google لەسەر ئەم وەشانە هێشتا چالاک نەکراوە (ناسنامەی کڕیار لە بنیاتنان دانەنراوە).',
     googleServerNotConfigured: 'چوونەژوورەوە بە Google لەسەر ڕاژەکار هێشتا ڕێکنەخراوە.',
     googleNoCredential: 'Google زانیاری چوونەژوورەوەی نەگەڕاندەوە. دووبارە هەوڵ بدە.',
     googleFailed: 'چوونەژوورەوە بە Google سەرکەوتوو نەبوو. دووبارە هەوڵ بدە.',
@@ -324,11 +286,11 @@ const STRINGS = {
 };
 
 type AuthView = 'signin' | 'signup' | 'forgot';
+/** What the card is currently showing inside a view. */
+type AuthPanel = 'form' | 'telegram';
 
 /** Client mirror of worker/lib/http.ts USERNAME_RE (server lowercases). */
 const USERNAME_SHAPE_RE = /^[a-zA-Z0-9._-]{3,30}$/;
-
-const METHOD_ID_PREFIX = 'auth-method';
 
 /**
  * Does what somebody typed into the identifier field LOOK like a phone
@@ -348,15 +310,14 @@ export default function Auth() {
   const { loginWithGoogle, refreshUser } = useAuth();
   const { lang, dir } = useLanguage();
   const s = STRINGS[lang];
-  // §2.2: respect the OS "reduce motion" setting everywhere on this screen,
-  // not only in the button's CSS — the step/method transitions become plain
-  // cross-fades (offset 0) instead of sliding.
+  // Respect the OS "reduce motion" setting everywhere on this screen — the
+  // step transitions become plain cross-fades and the stagger collapses.
   const reduceMotion = useReducedMotion();
   const slide = reduceMotion ? 0 : 6;
 
   const resetToken = searchParams.get('reset') || '';
   // Friend-invite referral code from ?ref=CODE — user-editable in the
-  // ReferralBar (§2.6), page-level so it survives view/method switches and
+  // ReferralBar (§2.6), page-level so it survives view/panel switches and
   // later URL cleanups. The user's explicitly chosen code wins.
   const [referralCode, setReferralCode] = useState(() => searchParams.get('ref') || '');
   const [refFromLink] = useState(() => !!searchParams.get('ref'));
@@ -371,8 +332,11 @@ export default function Auth() {
   // so the sign-up step (the only one that carries the referral bar) opens
   // first and the inviter's name is resolved before they finish registering.
   const [view, setView] = useState<AuthView>(() => (searchParams.get('ref') ? 'signup' : 'signin'));
-  const [method, setMethod] = useState<AuthMethod>('email');
+  const [panel, setPanel] = useState<AuthPanel>('form');
   const [submitting, setSubmitting] = useState(false);
+  // Which action is in flight. The form CTA and the Google slot are both on
+  // screen now, so a Google roundtrip must never animate the form button.
+  const [via, setVia] = useState<'form' | 'google' | null>(null);
   // A REAL success (the server answered 2xx), never assumed: it is set only
   // after a resolved request and drives the FillButton's success state.
   const [succeeded, setSucceeded] = useState(false);
@@ -383,9 +347,9 @@ export default function Auth() {
   const [forgotMessage, setForgotMessage] = useState('');
   const [emailNotConfigured, setEmailNotConfigured] = useState(false);
 
-  // Field values are PAGE-level so switching method/view never loses
-  // non-sensitive input (§2.1). Passwords live only in memory here — never
-  // in localStorage/analytics/logs.
+  // Field values are PAGE-level so switching panel/view never loses
+  // non-sensitive input. Passwords live only in memory here — never in
+  // localStorage/analytics/logs.
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -395,26 +359,30 @@ export default function Auth() {
   const [resetDone, setResetDone] = useState(false);
   const [resetTokenError, setResetTokenError] = useState<'' | 'used' | 'expired'>('');
 
-  // Honest not-configured state: without a build-time client id the Google
-  // button could only ever fail, so we say so instead of rendering it.
   /**
    * WHICH METHODS THIS DEPLOYMENT ACTUALLY HAS, asked at runtime.
    *
-   * This used to read `import.meta.env.VITE_GOOGLE_CLIENT_ID` — a value baked
-   * into the bundle at build time — so the Google button's presence depended
-   * on the build while its ability to work depended on the Worker. When they
-   * disagreed the customer got "Google sign-in is not enabled on this
-   * deployment", which is a sentence about a build pipeline shown to someone
-   * trying to log in. One runtime answer now decides both.
-   *
-   * `null` means the answer has not arrived; email/password is rendered
-   * meanwhile because it is the platform's own and needs no configuration.
+   * One answer, from the deployment itself (/api/auth/capabilities); the
+   * build carries no provider configuration at all. `null` means the answer
+   * has not arrived; email/password is rendered meanwhile because it is the
+   * platform's own and needs no configuration. An unconfigured provider is
+   * not shown as a disabled button with an explanation — it is simply not
+   * offered.
    */
   const caps = useCapabilities();
   const googleConfigured = !!caps?.google;
   const googleClientId = caps?.googleClientId ?? '';
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
+
+  /**
+   * If the open Telegram panel stops being offered — the capabilities answer
+   * arrives and says Telegram is off, or a stale state is restored — fall
+   * back to the form instead of rendering an empty panel.
+   */
+  useEffect(() => {
+    if (panel === 'telegram' && caps && !caps.telegram) setPanel('form');
+  }, [caps, panel]);
 
   /**
    * A refusal, in the reader's language.
@@ -482,7 +450,13 @@ export default function Auth() {
 
   const switchView = (next: AuthView) => {
     clearMessages();
+    setPanel('form');
     setView(next);
+  };
+
+  const openTelegram = () => {
+    clearMessages();
+    setPanel('telegram');
   };
 
   // Editing ANY field leaves a previous success state behind: the meter and
@@ -510,12 +484,6 @@ export default function Auth() {
   const onConfirmChange = (v: string) => {
     clearSuccessOnEdit();
     setConfirmPassword(v);
-  };
-
-  const switchMethod = (next: AuthMethod) => {
-    // Values are intentionally KEPT (only messages clear) — §2.1.
-    clearMessages();
-    setMethod(next);
   };
 
   // ------------------------------------------------- real-validation state
@@ -594,6 +562,7 @@ export default function Auth() {
     // One field, three kinds of identifier — the server has always matched
     // email, username OR verified phone against this value.
     const identifier = trimmedEmail;
+    setVia('form');
     setSubmitting(true);
     try {
       // Auth-server contract: identifier = email | username | phone. The
@@ -622,6 +591,7 @@ export default function Auth() {
     if (!signupEmailFill.ready) return;
     clearMessages();
     const referral = referralCode.trim();
+    setVia('form');
     setSubmitting(true);
     try {
       await api.post('/api/auth/register', {
@@ -657,6 +627,7 @@ export default function Auth() {
       return;
     }
     const referral = referralCode.trim();
+    setVia('google');
     setSubmitting(true);
     try {
       if (referral) {
@@ -688,6 +659,7 @@ export default function Auth() {
     if (submitting) return;
     if (!forgotFill.ready) return;
     clearMessages();
+    setVia('form');
     setSubmitting(true);
     try {
       // lang tells the server which language to write the reset email in.
@@ -711,6 +683,7 @@ export default function Auth() {
     if (submitting) return;
     if (!resetFill.ready) return;
     setServerError('');
+    setVia('form');
     setSubmitting(true);
     try {
       // The reset token is consumed ONLY here, on explicit submit — the page
@@ -750,22 +723,36 @@ export default function Auth() {
     setView('signin');
   };
 
+  // -------------------------------------------------------- motion recipes
+  // One orchestrated entrance per screen: title, then fields, CTA, seam,
+  // providers, footer — 50ms apart. Collapses to nothing under reduced
+  // motion. The outer AnimatePresence still cross-fades between screens.
+
+  const listV = {
+    hidden: {},
+    show: { transition: { staggerChildren: reduceMotion ? 0 : 0.05 } },
+  };
+  const itemV = {
+    hidden: { opacity: 0, y: reduceMotion ? 0 : 10 },
+    show: { opacity: 1, y: 0, transition: { duration: reduceMotion ? 0 : 0.3, ease: 'easeOut' as const } },
+  };
+
   // ---------------------------------------------------------- shared pieces
 
-  const backLink = (onClick: () => void) => (
+  const backLink = (onClick: () => void, label: string = s.backToSignIn) => (
     <button
       type="button"
       onClick={onClick}
       className="-ms-2 mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
     >
       <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
-      {s.backToSignIn}
+      {label}
     </button>
   );
 
   const heading = (title: string, hint: string) => (
-    <div className="mb-4">
-      <h1 className="text-[22px] font-bold text-white">{title}</h1>
+    <div className="mb-5">
+      <h1 className="text-[24px] font-extrabold leading-tight text-white">{title}</h1>
       <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{hint}</p>
     </div>
   );
@@ -781,7 +768,7 @@ export default function Auth() {
            proof — hand the user the real path instead of a dead end. */
         <button
           type="button"
-          onClick={() => switchMethod('telegram')}
+          onClick={openTelegram}
           className="mt-2.5 inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-3.5 text-[13px] font-bold text-gold transition-colors hover:bg-gold/20"
         >
           <Send className="h-4 w-4" aria-hidden />
@@ -793,91 +780,19 @@ export default function Auth() {
 
   const revealLabels = { show: s.showPassword, hide: s.hidePassword };
 
-  // incomplete/ready → idle, then submitting → success | error (§2.2).
-  const buttonStatus: FillButtonStatus = submitting
-    ? 'submitting'
-    : succeeded
-      ? 'success'
-      : serverError
-        ? 'error'
-        : 'idle';
+  // incomplete/ready → idle, then submitting → success | error (§2.2). Only
+  // the FORM's own roundtrips drive the form CTA; a Google roundtrip dims
+  // the Google slot instead.
+  const buttonStatus: FillButtonStatus =
+    submitting && via === 'form'
+      ? 'submitting'
+      : succeeded && via === 'form'
+        ? 'success'
+        : serverError && via === 'form'
+          ? 'error'
+          : 'idle';
 
-  /**
-   * Only methods that can actually complete.
-   *
-   * The separate PHONE tab is gone, and that is a fix rather than a removal.
-   * Signing UP with a phone number always failed there — the server refuses
-   * to create an account on an unproven number, so the panel's only possible
-   * outcome was an error telling you to use Telegram. Signing IN with a phone
-   * never needed its own tab: the identifier field below takes an email, a
-   * username OR a phone number, which is what the server has always matched.
-   * So phone sign-in still works, phone sign-up goes through Telegram where
-   * ownership is actually proven, and there is no tab whose job is to fail.
-   *
-   * Google and Telegram appear only when this deployment has them. An
-   * unconfigured provider is not shown as a disabled button with an
-   * explanation — it is simply not offered.
-   */
-  const methodOptions = [
-    { id: 'email' as const, label: s.methodEmail, icon: <Mail className="h-5 w-5" /> },
-    ...(googleConfigured ? [{ id: 'google' as const, label: 'Google', icon: <Chrome className="h-5 w-5" /> }] : []),
-    ...(telegramConfigured
-      ? [{ id: 'telegram' as const, label: s.methodTelegram, icon: <Send className="h-5 w-5" /> }]
-      : []),
-  ];
-
-  /**
-   * If the selected method stops being offered — the capabilities answer
-   * arrives and says Telegram is off, or a stale tab is restored — fall back
-   * to the one method that always exists rather than rendering an empty
-   * panel under a tab strip that no longer contains it.
-   */
-  useEffect(() => {
-    if (!methodOptions.some((o) => o.id === method)) setMethod('email');
-    // methodOptions is derived from `caps`; depending on caps keeps this to
-    // one run per capability change instead of one per render.
-  }, [caps, method]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const methodPanel = (m: AuthMethod, children: React.ReactNode) => (
-    <div role="tabpanel" id={methodPanelId(METHOD_ID_PREFIX, m)} aria-labelledby={methodTabId(METHOD_ID_PREFIX, m)}>
-      {children}
-    </div>
-  );
-
-  /**
-   * The provider is mounted HERE rather than around the whole app, because
-   * the client id is now fetched at runtime and there is nothing to give it
-   * at app-mount time. It is also the only place in the app that needs it.
-   * The tab does not exist at all unless `googleConfigured`, so there is no
-   * "not enabled" panel to reach.
-   */
-  const googlePanel = googleClientId ? (
-    <div className="flex min-h-[56px] flex-col items-center justify-center gap-3">
-      <GoogleLogin
-        onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
-        onError={() => setServerError(s.googleFailed)}
-        theme="filled_black"
-        text={view === 'signup' ? 'signup_with' : 'signin_with'}
-        width="320"
-      />
-      <p className="text-center text-[12px] leading-relaxed text-zinc-500">{s.googleNote}</p>
-    </div>
-  ) : null;
-
-  /** Animated wrapper around the active method's panel. */
-  const methodArea = (children: React.ReactNode) => (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={method}
-        initial={{ opacity: 0, y: slide }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -slide }}
-        transition={{ duration: reduceMotion ? 0 : 0.15 }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
+  const googleBusy = submitting && via === 'google';
 
   const passwordField = (
     autoComplete: 'current-password' | 'new-password',
@@ -891,6 +806,7 @@ export default function Auth() {
       onChange={onPasswordChange}
       autoComplete={autoComplete}
       minLength={autoComplete === 'new-password' ? 8 : undefined}
+      icon={<Lock className="h-[18px] w-[18px]" />}
       revealLabels={revealLabels}
     />
   );
@@ -905,6 +821,7 @@ export default function Auth() {
       autoComplete="new-password"
       minLength={8}
       error={confirmMismatchError}
+      icon={<Lock className="h-[18px] w-[18px]" />}
       revealLabels={revealLabels}
     />
   );
@@ -912,7 +829,7 @@ export default function Auth() {
   // Offering "forgot password" when no mail provider is configured sends a
   // person to a screen whose only possible answer is "we cannot email you".
   const forgotRow = !resetConfigured ? null : (
-    <div className="mt-1.5 flex justify-end">
+    <div className="mt-1 flex justify-end">
       <button
         type="button"
         onClick={() => switchView('forgot')}
@@ -922,6 +839,50 @@ export default function Auth() {
       </button>
     </div>
   );
+
+  /**
+   * The secondary sign-in actions: an "أو" seam, then Google (its official
+   * credential button, staged) and Telegram as full-width quiet buttons.
+   * Providers this deployment does not have simply do not appear.
+   */
+  const providerBlock =
+    googleConfigured || telegramConfigured ? (
+      <>
+        <motion.div variants={itemV}>
+          <AuthDivider label={s.orLabel} />
+        </motion.div>
+        <div className="space-y-2.5">
+          {googleConfigured && (
+            <motion.div variants={itemV}>
+              <GoogleAuthButton
+                onCredential={handleGoogleCredential}
+                onError={() => setServerError(s.googleFailed)}
+                view={view === 'signup' ? 'signup' : 'signin'}
+                busy={googleBusy}
+              />
+              <span className="sr-only" role="status">
+                {googleBusy ? s.googleWorking : ''}
+              </span>
+            </motion.div>
+          )}
+          {telegramConfigured && (
+            <motion.div variants={itemV}>
+              <SocialAuthButton
+                icon={<TelegramIcon />}
+                label={s.continueWithTelegram}
+                onClick={openTelegram}
+                disabled={submitting}
+              />
+            </motion.div>
+          )}
+        </div>
+        {googleConfigured && (
+          <motion.div variants={itemV}>
+            <p className="mt-2.5 text-center text-[11px] leading-relaxed text-zinc-600">{s.googleNote}</p>
+          </motion.div>
+        )}
+      </>
+    ) : null;
 
   // ---------------------------------------------------------------- screens
 
@@ -936,11 +897,7 @@ export default function Auth() {
           <CheckCircle2 className="mb-4 h-12 w-12 text-gold" />
           <h1 className="mb-1.5 text-[20px] font-bold text-white">{s.resetDoneTitle}</h1>
           <p className="mb-7 max-w-xs text-[13px] leading-relaxed text-zinc-400">{s.resetDoneBody}</p>
-          <button
-            type="button"
-            onClick={backToLoginFromReset}
-            className="flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-gold text-[15px] font-bold text-black transition-all hover:brightness-110 active:scale-[0.99]"
-          >
+          <button type="button" onClick={backToLoginFromReset} className="lv-btn-gold">
             {s.signInCta}
           </button>
         </div>
@@ -954,11 +911,7 @@ export default function Auth() {
             {resetTokenError === 'used' ? s.resetUsedTitle : s.resetExpiredTitle}
           </h1>
           <p className="mb-7 max-w-xs text-[13px] leading-relaxed text-zinc-400">{s.resetDeadBody}</p>
-          <button
-            type="button"
-            onClick={switchToForgotForm}
-            className="flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-gold text-[15px] font-bold text-black transition-all hover:brightness-110 active:scale-[0.99]"
-          >
+          <button type="button" onClick={switchToForgotForm} className="lv-btn-gold">
             {s.requestNewLink}
           </button>
           <button
@@ -981,7 +934,7 @@ export default function Auth() {
             {passwordField('new-password', s.newPassword)}
             {confirmField}
           </div>
-          <div className="mt-7">
+          <div className="mt-6">
             <FillButton
               id="reset-submit"
               label={s.setPasswordCta}
@@ -1039,8 +992,9 @@ export default function Auth() {
           valueDir="ltr"
           autoCapitalize="none"
           spellCheck={false}
+          icon={<Mail className="h-[18px] w-[18px]" />}
         />
-        <div className="mt-7">
+        <div className="mt-6">
           <FillButton
             id="forgot-submit"
             label={s.sendResetCta}
@@ -1055,255 +1009,211 @@ export default function Auth() {
       </form>
     );
   } else if (view === 'signup') {
-    screenKey = 'signup';
-    screen = (
-      <>
-        {backLink(() => switchView('signin'))}
-        {heading(s.signUpTitle, s.signUpHint)}
-        {/* §2.6 — optional referral bar; the code survives every method
-            switch and is attributed server-side only when an account is
-            actually created. It NEVER blocks signup. */}
-        <div className="mb-3">
-          <ReferralBar
-            code={referralCode}
-            onCodeChange={setReferralCode}
-            fromLink={refFromLink}
-            disabled={submitting}
+    screenKey = `signup:${panel}`;
+    screen =
+      panel === 'telegram' && telegramConfigured ? (
+        <div>
+          {backLink(() => setPanel('form'), s.backLabel)}
+          {heading(s.signUpTitle, s.signUpHint)}
+          {errorSummary}
+          {/* TelegramAuth owns its own <form>; rendering it alone in the
+              panel keeps the no-nested-forms rule trivially true. */}
+          <TelegramAuth
+            mode="signup"
+            onSuccess={() => finishAuth(true)}
+            onSwitchMode={switchView}
+            referralCode={referralCode}
           />
         </div>
-        <MethodSwitch
-          options={methodOptions}
-          value={method}
-          onChange={switchMethod}
-          ariaLabel={s.methodsLabel}
-          dir={dir}
-          idPrefix={METHOD_ID_PREFIX}
-        />
-        <div className="mt-4">
+      ) : (
+        <motion.div variants={listV} initial="hidden" animate="show">
+          <motion.div variants={itemV}>{backLink(() => switchView('signin'))}</motion.div>
+          <motion.div variants={itemV}>{heading(s.signUpTitle, s.signUpHint)}</motion.div>
+          {/* §2.6 — optional referral bar; the code survives every panel
+              switch and is attributed server-side only when an account is
+              actually created. It NEVER blocks signup. */}
+          <motion.div variants={itemV} className="mb-4">
+            <ReferralBar
+              code={referralCode}
+              onCodeChange={setReferralCode}
+              fromLink={refFromLink}
+              disabled={submitting}
+            />
+          </motion.div>
           {errorSummary}
-          {methodArea(
-            method === 'email' ? (
-              methodPanel(
-                'email',
-                <form onSubmit={handleSignUp} noValidate aria-busy={submitting}>
-                  <div className="space-y-4">
-                    <AuthTextField
-                      id="username"
-                      label={s.username}
-                      value={username}
-                      onChange={onUsernameChange}
-                      autoComplete="username"
-                      placeholder="username123"
-                      minLength={3}
-                      valueDir="ltr"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                    />
-                    <AuthTextField
-                      id="name"
-                      label={s.fullName}
-                      value={name}
-                      onChange={onNameChange}
-                      autoComplete="name"
-                      valueDir="auto"
-                    />
-                    <AuthTextField
-                      id="email"
-                      label={s.email}
-                      type="email"
-                      value={email}
-                      onChange={onEmailChange}
-                      autoComplete="email"
-                      inputMode="email"
-                      placeholder="email@example.com"
-                      valueDir="ltr"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                    />
-                    {passwordField('new-password')}
-                    {confirmField}
-                  </div>
-                  <div className="mt-5">
-                    <FillButton
-                      id="signup-submit"
-                      label={s.signUpCta}
-                      workingLabel={s.signingUp}
-                      successLabel={s.signedUp}
-                      progress={signupEmailFill.progress}
-                      ready={signupEmailFill.ready}
-                      status={buttonStatus}
-                      hint={signupEmailHint || undefined}
-                    />
-                  </div>
-                </form>
-              )
-            ) : method === 'google' ? (
-              methodPanel('google', googlePanel)
-            ) : (
-              methodPanel(
-                'telegram',
-                /* TelegramAuth owns its own <form>; rendering it as its own
-                   panel keeps the no-nested-forms rule trivially true. */
-                <TelegramAuth mode="signup" onSuccess={() => finishAuth(true)} onSwitchMode={switchView} referralCode={referralCode} />
-              )
-            )
-          )}
-        </div>
-        <p className="mt-3 text-center text-[12px] leading-relaxed text-zinc-500">
-          {s.termsPrefix}{' '}
-          <Link to="/policies" className="font-semibold text-gold hover:underline">
-            {s.termsLink}
-          </Link>
-        </p>
-        <p className="mt-3 text-center text-[13px] text-zinc-400">
-          {s.haveAccount}{' '}
-          <button
-            type="button"
-            onClick={() => switchView('signin')}
-            className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
-          >
-            {s.signInAction}
-          </button>
-        </p>
-      </>
-    );
+          <form onSubmit={handleSignUp} noValidate aria-busy={submitting && via === 'form'}>
+            <div className="space-y-4">
+              <motion.div variants={itemV}>
+                <AuthTextField
+                  id="username"
+                  label={s.username}
+                  value={username}
+                  onChange={onUsernameChange}
+                  autoComplete="username"
+                  placeholder="username123"
+                  minLength={3}
+                  valueDir="ltr"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  icon={<AtSign className="h-[18px] w-[18px]" />}
+                />
+              </motion.div>
+              <motion.div variants={itemV}>
+                <AuthTextField
+                  id="name"
+                  label={s.fullName}
+                  value={name}
+                  onChange={onNameChange}
+                  autoComplete="name"
+                  valueDir="auto"
+                  icon={<UserRound className="h-[18px] w-[18px]" />}
+                />
+              </motion.div>
+              <motion.div variants={itemV}>
+                <AuthTextField
+                  id="email"
+                  label={s.email}
+                  type="email"
+                  value={email}
+                  onChange={onEmailChange}
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="email@example.com"
+                  valueDir="ltr"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  icon={<Mail className="h-[18px] w-[18px]" />}
+                />
+              </motion.div>
+              <motion.div variants={itemV}>{passwordField('new-password')}</motion.div>
+              <motion.div variants={itemV}>{confirmField}</motion.div>
+            </div>
+            <motion.div variants={itemV} className="mt-6">
+              <FillButton
+                id="signup-submit"
+                label={s.signUpCta}
+                workingLabel={s.signingUp}
+                successLabel={s.signedUp}
+                progress={signupEmailFill.progress}
+                ready={signupEmailFill.ready}
+                status={buttonStatus}
+                hint={signupEmailHint || undefined}
+              />
+            </motion.div>
+          </form>
+          {providerBlock}
+          <motion.div variants={itemV}>
+            <p className="mt-4 text-center text-[12px] leading-relaxed text-zinc-500">
+              {s.termsPrefix}{' '}
+              <Link to="/policies" className="font-semibold text-gold hover:underline">
+                {s.termsLink}
+              </Link>
+            </p>
+            <p className="mt-1 text-center text-[13px] text-zinc-400">
+              {s.haveAccount}{' '}
+              <button
+                type="button"
+                onClick={() => switchView('signin')}
+                className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
+              >
+                {s.signInAction}
+              </button>
+            </p>
+          </motion.div>
+        </motion.div>
+      );
   } else {
-    screenKey = 'signin';
-    screen = (
-      <>
-        {heading(s.signInTitle, s.signInHint)}
-        <MethodSwitch
-          options={methodOptions}
-          value={method}
-          onChange={switchMethod}
-          ariaLabel={s.methodsLabel}
-          dir={dir}
-          idPrefix={METHOD_ID_PREFIX}
-        />
-        <div className="mt-4">
+    screenKey = `signin:${panel}`;
+    screen =
+      panel === 'telegram' && telegramConfigured ? (
+        <div>
+          {backLink(() => setPanel('form'), s.backLabel)}
+          {heading(s.signInTitle, s.signInHint)}
           {errorSummary}
-          {methodArea(
-            method === 'email' ? (
-              methodPanel(
-                'email',
-                <form onSubmit={handleSignIn} noValidate aria-busy={submitting}>
-                  <div className="space-y-4">
-                    <AuthTextField
-                      id="identifier"
-                      label={s.identifier}
-                      value={email}
-                      onChange={onEmailChange}
-                      autoComplete="username"
-                      inputMode="email"
-                      placeholder={s.identifierPlaceholder}
-                      valueDir="ltr"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                    />
-                    <div>
-                      {passwordField('current-password')}
-                      {forgotRow}
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <FillButton
-                      id="signin-submit"
-                      label={s.signInCta}
-                      workingLabel={s.signingIn}
-                      successLabel={s.signedIn}
-                      progress={signinEmailFill.progress}
-                      ready={signinEmailFill.ready}
-                      status={buttonStatus}
-                      hint={signinEmailHint || undefined}
-                    />
-                  </div>
-                </form>
-              )
-            ) : method === 'google' ? (
-              methodPanel('google', googlePanel)
-            ) : (
-              methodPanel(
-                'telegram',
-                <TelegramAuth mode="signin" onSuccess={() => finishAuth(false)} onSwitchMode={switchView} />
-              )
-            )
-          )}
+          <TelegramAuth mode="signin" onSuccess={() => finishAuth(false)} onSwitchMode={switchView} />
         </div>
-        <p className="mt-5 text-center text-[13px] text-zinc-400">
-          {s.noAccount}{' '}
-          <button
-            type="button"
-            onClick={() => switchView('signup')}
-            className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
-          >
-            {s.signUpAction}
-          </button>
-        </p>
-      </>
-    );
+      ) : (
+        <motion.div variants={listV} initial="hidden" animate="show">
+          <motion.div variants={itemV}>{heading(s.signInTitle, s.signInHint)}</motion.div>
+          {errorSummary}
+          <form onSubmit={handleSignIn} noValidate aria-busy={submitting && via === 'form'}>
+            <div className="space-y-4">
+              <motion.div variants={itemV}>
+                <AuthTextField
+                  id="identifier"
+                  label={s.identifier}
+                  value={email}
+                  onChange={onEmailChange}
+                  autoComplete="username"
+                  inputMode="email"
+                  placeholder={s.identifierPlaceholder}
+                  valueDir="ltr"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  icon={<UserRound className="h-[18px] w-[18px]" />}
+                />
+              </motion.div>
+              <motion.div variants={itemV}>
+                {passwordField('current-password')}
+                {forgotRow}
+              </motion.div>
+            </div>
+            <motion.div variants={itemV} className="mt-5">
+              <FillButton
+                id="signin-submit"
+                label={s.signInCta}
+                workingLabel={s.signingIn}
+                successLabel={s.signedIn}
+                progress={signinEmailFill.progress}
+                ready={signinEmailFill.ready}
+                status={buttonStatus}
+                hint={signinEmailHint || undefined}
+              />
+            </motion.div>
+          </form>
+          {providerBlock}
+          <motion.div variants={itemV}>
+            <p className="mt-5 text-center text-[13px] text-zinc-400">
+              {s.noAccount}{' '}
+              <button
+                type="button"
+                onClick={() => switchView('signup')}
+                className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
+              >
+                {s.signUpAction}
+              </button>
+            </p>
+          </motion.div>
+        </motion.div>
+      );
   }
 
   // ------------------------------------------------------------------ page
 
   /**
-   * The provider is mounted ONCE for the whole page, outside the animated
-   * panel, and only when there is a real client id to give it.
-   *
-   * Not around the app (that is what forced a build-time value in the first
-   * place), and not inside the tab panel either: `@react-oauth/google` injects
-   * and removes Google's script on mount and unmount, so putting it in the
-   * panel would tear the script down and re-add it on every tab switch.
+   * The provider is mounted ONCE for the whole page and only when there is a
+   * real client id to give it. Not around the app (that is what forced a
+   * build-time value in the first place), and not inside the animated panel:
+   * `@react-oauth/google` injects and removes Google's script on mount and
+   * unmount, so putting it in the panel would tear the script down and
+   * re-add it on every screen switch.
    */
   const withGoogle = (node: React.ReactNode) =>
     googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{node}</GoogleOAuthProvider> : node;
 
   return withGoogle(
-    <div
-      dir={dir}
-      className="lv-auth min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-black via-black to-olive-dark font-sans text-white"
-    >
-      {/* Balanced card: full width minus padding on phones, a fixed
-          comfortable max on iPad/desktop — the form never stretches across
-          a large screen (§2.1). */}
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-0 md:max-w-[30rem]">
-        <div className="m-auto w-full py-4">
-          {/* Brand: LEVONIS wordmark in the site's gold, calm and balanced. */}
-          <div className="mb-5 flex flex-col items-center">
-            <Link
-              to="/"
-              aria-label="LEVONIS"
-              className="flex min-h-[44px] items-center justify-center"
-            >
-              <span
-                dir="ltr"
-                className="text-[26px] font-black leading-none text-gold"
-                style={{ letterSpacing: '0.35em', paddingInlineStart: '0.35em' }}
-              >
-                LEVONIS
-              </span>
-            </Link>
-            <span
-              aria-hidden
-              className="mt-2 h-px w-24 bg-gradient-to-r from-transparent via-gold/70 to-transparent"
-            />
-            <p className="mt-2 text-[12px] text-zinc-500">{s.tagline}</p>
-          </div>
-
-          <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-6">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={screenKey}
-                initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
-                transition={{ duration: reduceMotion ? 0 : 0.18 }}
-              >
-                {screen}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthShell dir={dir}>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={screenKey}
+          initial={{ opacity: 0, y: slide }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -slide }}
+          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+        >
+          {screen}
+        </motion.div>
+      </AnimatePresence>
+    </AuthShell>
   );
 }

@@ -3,9 +3,12 @@ import { Eye, EyeOff } from 'lucide-react';
 
 /**
  * Labeled input for the /auth screen: a REAL <label> above the input,
- * inline error wired via aria-describedby, and an optional show/hide
- * toggle for passwords (44px touch target). Paste is never blocked and
- * nothing here interferes with password managers.
+ * inline error wired via aria-describedby, an optional leading icon, and an
+ * optional show/hide toggle for passwords (44px touch target). Paste is
+ * never blocked and nothing here interferes with password managers.
+ *
+ * 16px value text is deliberate: anything smaller makes iOS Safari zoom the
+ * whole page when the field is focused.
  */
 
 export interface AuthTextFieldProps {
@@ -28,6 +31,8 @@ export interface AuthTextFieldProps {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   spellCheck?: boolean;
   disabled?: boolean;
+  /** Leading icon, rendered at the field's inline start. Decorative. */
+  icon?: React.ReactNode;
   /** Accessible labels for the password reveal toggle. */
   revealLabels?: { show: string; hide: string };
 }
@@ -48,6 +53,7 @@ export default function AuthTextField({
   autoCapitalize,
   spellCheck,
   disabled,
+  icon,
   revealLabels,
 }: AuthTextFieldProps) {
   const [revealed, setRevealed] = useState(false);
@@ -59,12 +65,17 @@ export default function AuthTextField({
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
+      <label htmlFor={id} className="lv-field__label">
         {label}
       </label>
-      {/* The wrapper takes the VALUE's direction so the logical end-* /pe-*
-          utilities of the input and the toggle resolve to the same side. */}
-      <div className="relative" dir={dirValue}>
+      {/* The wrapper takes the VALUE's direction so the logical start/end
+          of the input, the icon and the toggle all resolve to the same side. */}
+      <div className="lv-field__frame" dir={dirValue}>
+        {icon && (
+          <span aria-hidden className="lv-field__icon">
+            {icon}
+          </span>
+        )}
         <input
           id={id}
           name={id}
@@ -81,9 +92,9 @@ export default function AuthTextField({
           disabled={disabled}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={`w-full min-h-[48px] rounded-xl border bg-zinc-950/70 px-4 py-3 text-[15px] text-white placeholder-zinc-600 outline-none transition-colors focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60 ${
-            error ? 'border-red-500/70' : 'border-zinc-800'
-          } ${isPassword ? 'pe-13' : ''}`}
+          className={`lv-field__input${icon ? ' has-icon' : ''}${isPassword ? ' has-reveal' : ''}${
+            error ? ' is-error' : ''
+          }`}
         />
         {isPassword && (
           <button
@@ -91,7 +102,7 @@ export default function AuthTextField({
             onClick={() => setRevealed((v) => !v)}
             aria-label={revealed ? revealLabels?.hide : revealLabels?.show}
             aria-pressed={revealed}
-            className="absolute end-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:text-white focus-visible:ring-1 focus-visible:ring-gold/60"
+            className="lv-field__reveal"
           >
             {revealed ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>

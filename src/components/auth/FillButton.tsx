@@ -158,7 +158,23 @@ export default function FillButton({
       <span>{successLabel || label}</span>
     </>
   ) : (
-    <span>{label}</span>
+    <>
+      <span>{label}</span>
+      {/* Forward arrow (auth.css mirrors it in RTL). Same box as the
+          spinner, so submit never shifts the label. */}
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        className="lv-fillbtn__arrow"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4.5 12h15M13.5 6l6 6-6 6" />
+      </svg>
+    </>
   );
 
   return (

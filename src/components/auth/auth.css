@@ -1,40 +1,385 @@
 /*
  * Scoped styles for the /auth screen (src/pages/Auth.tsx).
- * src/index.css is shared (and frozen for this task), so the dark-theme
- * autofill overrides live here, scoped under .lv-auth.
+ *
+ * Design language: a premium hardware-control surface for a 3D-printing
+ * platform. Near-black ground, machined charcoal panels, one gold accent,
+ * a quiet filament-green secondary, and a background that reads as "a part
+ * is being manufactured behind the glass" — never louder than the form.
+ *
+ * Everything animated here moves by transform/opacity only, and every
+ * animation collapses to a finished static frame under
+ * prefers-reduced-motion.
  */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+.lv-auth {
+  /* Machined-surface palette (page-scoped; brand gold comes from @theme). */
+  --lv-void: #050506;        /* page ground */
+  --lv-carbon: #0b0b0d;      /* card */
+  --lv-well: #101013;        /* inputs, secondary buttons */
+  --lv-line: #232327;        /* hairline borders */
+  --lv-line-strong: #303036;
+  --lv-gold: var(--color-gold, #baa369);
+  --lv-gold-bright: #d8c08a; /* gradient top / hover */
+  --lv-gold-deep: #8f7b47;   /* gradient bottom */
+  --lv-filament: #7e8f4f;    /* the green of loaded filament — sparingly */
+  --lv-ink: #fafaf7;
+  --plx-x: 0;                /* pointer parallax, set by AuthShell (desktop) */
+  --plx-y: 0;
+  background: var(--lv-void);
+}
+
+.lv-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* =====================================================================
+ * Background — layered, subtle, 3D-printing specific.
+ * Layer order: glows < build-plate grid < print build (SVG) < particles.
+ * ===================================================================== */
+
+.lv-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Soft ambient light: warm gold high in the inline-start corner, a breath
+   of filament green low in the opposite one. Pre-blurred gradients — no
+   filter cost, no banding on OLED blacks. */
+.lv-bg__glow {
+  position: absolute;
+  inset: -20%;
+  transform: translate3d(calc(var(--plx-x) * -12px), calc(var(--plx-y) * -8px), 0);
+  background:
+    radial-gradient(42% 30% at 18% 6%, rgba(186, 163, 105, 0.10), transparent 70%),
+    radial-gradient(36% 26% at 88% 96%, rgba(126, 143, 79, 0.08), transparent 72%),
+    radial-gradient(70% 55% at 50% 110%, rgba(15, 18, 8, 0.55), transparent 75%);
+}
+
+/* Build-plate grid: fine 1px cells with a brighter major line every 5th —
+   the floor of a CNC/printer build volume, fading out toward the edges so
+   it never fights the card. Outer div carries parallax, inner the drift. */
+.lv-bg__gridwrap {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(calc(var(--plx-x) * 5px), calc(var(--plx-y) * 4px), 0);
+  mask-image: radial-gradient(120% 90% at 50% 42%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 42%, #000 30%, transparent 78%);
+}
+.lv-bg__grid {
+  position: absolute;
+  inset: -220px;
+  background-image:
+    linear-gradient(to right, rgba(250, 250, 247, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(250, 250, 247, 0.028) 1px, transparent 1px),
+    linear-gradient(to right, rgba(216, 192, 138, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(216, 192, 138, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px, 44px 44px, 220px 220px, 220px 220px;
+  animation: lv-grid-drift 90s linear infinite;
+}
+@keyframes lv-grid-drift {
+  to {
+    transform: translate3d(220px, 220px, 0);
+  }
+}
+
+/* ------------------------------------------------ the part being printed */
+
+.lv-print {
+  position: absolute;
+  top: max(2.25rem, env(safe-area-inset-top));
+  inset-inline-start: 50%;
+  width: min(64vw, 300px);
+  translate: -50% 0;
+  transform: translate3d(calc(var(--plx-x) * 9px), calc(var(--plx-y) * 7px), 0);
+  /* On phones the build sits behind the wordmark: quiet enough to read
+     through, alive enough to notice. Desktop moves it into open space. */
+  opacity: 0.35;
+}
+[dir='rtl'] .lv-print {
+  translate: 50% 0;
+}
+@media (min-width: 1024px) {
+  .lv-print {
+    top: 50%;
+    inset-inline-start: 7vw;
+    width: min(30vw, 460px);
+    translate: 0 -50%;
+    opacity: 0.75;
+  }
+  [dir='rtl'] .lv-print {
+    translate: 0 -50%;
+  }
+}
+/* The fixture ticks only make sense where the build volume stands free —
+   on phones they poke out beside the brand as stray marks. */
+@media (max-width: 1023.98px) {
+  .lv-print__tick {
+    display: none;
+  }
+}
+
+/* One 16s manufacturing cycle: layers rise 0→72%, dwell, then the finished
+   part dims and the cycle restarts. The mask rect grows bottom-up; the
+   toolhead tracks the active layer and retracts when the build completes. */
+.lv-print__mask-rect {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: lv-print-build 16s linear infinite;
+}
+@keyframes lv-print-build {
+  0% { transform: scaleY(0.001); }
+  72% { transform: scaleY(1); }
+  100% { transform: scaleY(1); }
+}
+.lv-print__cycle {
+  animation: lv-print-cycle 16s linear infinite;
+}
+@keyframes lv-print-cycle {
+  0% { opacity: 0.9; }
+  72% { opacity: 1; }
+  93% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+/* Toolhead: carried up with the build, oscillating across the layer. */
+.lv-print__head {
+  animation: lv-print-headz 16s linear infinite;
+}
+@keyframes lv-print-headz {
+  0% { transform: translateY(0); opacity: 1; }
+  72% { transform: translateY(-235px); opacity: 1; }
+  76% { transform: translateY(-235px); opacity: 0; }
+  100% { transform: translateY(-235px); opacity: 0; }
+}
+.lv-print__head-x {
+  animation: lv-print-headx 1.3s ease-in-out infinite alternate;
+}
+@keyframes lv-print-headx {
+  from { transform: translateX(-52px); }
+  to { transform: translateX(52px); }
+}
+
+/* Viewfinder ticks framing the build volume — fixture, not decoration. */
+.lv-print__tick {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(250, 250, 247, 0.14);
+}
+.lv-print__tick--tl { top: -8px; inset-inline-start: -10px; border-width: 1px 0 0 1px; }
+.lv-print__tick--tr { top: -8px; inset-inline-end: -10px; border-width: 1px 1px 0 0; }
+.lv-print__tick--bl { bottom: -8px; inset-inline-start: -10px; border-width: 0 0 1px 1px; }
+.lv-print__tick--br { bottom: -8px; inset-inline-end: -10px; border-width: 0 1px 1px 0; }
+[dir='rtl'] .lv-print__tick--tl { border-width: 1px 1px 0 0; }
+[dir='rtl'] .lv-print__tick--tr { border-width: 1px 0 0 1px; }
+[dir='rtl'] .lv-print__tick--bl { border-width: 0 1px 1px 0; }
+[dir='rtl'] .lv-print__tick--br { border-width: 0 0 1px 1px; }
+
+/* Machine readout under the build volume. Always LTR: it is telemetry. */
+.lv-print__hud {
+  position: absolute;
+  bottom: -1.7rem;
+  inset-inline-start: -2px;
+  direction: ltr;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: rgba(250, 250, 247, 0.34);
+  white-space: nowrap;
+}
+.lv-print__hud b {
+  font-weight: 500;
+  color: rgba(216, 192, 138, 0.55);
+}
+
+/* ------------------------------------------------------ filament motes */
+
+.lv-bg__dots span {
+  position: absolute;
+  bottom: -4vh;
+  inset-inline-start: var(--x);
+  width: var(--s);
+  height: var(--s);
+  border-radius: 9999px;
+  background: var(--c);
+  opacity: 0;
+  animation: lv-rise var(--t) linear infinite;
+  animation-delay: var(--d);
+  will-change: transform, opacity;
+}
+@keyframes lv-rise {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  12% { opacity: var(--o, 0.3); }
+  82% { opacity: var(--o, 0.3); }
+  100% { transform: translate3d(var(--wx, 8px), -88vh, 0); opacity: 0; }
+}
+
+/* =====================================================================
+ * Brand
+ * ===================================================================== */
+
+.lv-brand__mark {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--lv-gold);
+  letter-spacing: 0.34em;
+  padding-inline-start: 0.34em; /* optically recenters tracked type */
+  text-shadow: 0 0 18px rgba(186, 163, 105, 0.18);
+}
+.lv-brand__seam {
+  height: 1px;
+  width: 7.5rem;
+  margin-top: 0.6rem;
+  background: linear-gradient(to right, transparent, rgba(216, 192, 138, 0.75), transparent);
+}
+.lv-brand__eyebrow {
+  margin-top: 0.55rem;
+  direction: ltr;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  padding-inline-start: 0.32em;
+  color: rgba(250, 250, 247, 0.38);
+}
+
+/* =====================================================================
+ * Card — a machined panel, integrated with the ground it sits on.
+ * ===================================================================== */
+
+.lv-card {
+  position: relative;
+  border-radius: 22px;
+  border: 1px solid var(--lv-line);
+  background: linear-gradient(180deg, #0d0d10 0%, var(--lv-carbon) 22%, var(--lv-carbon) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 1px 0 rgba(0, 0, 0, 0.6),
+    0 28px 70px -30px rgba(0, 0, 0, 0.9);
+}
+/* The one gold detail the panel is allowed: a hairline seam along its top
+   edge, like a light catching a chamfer. */
+.lv-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  inset-inline: 22px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(216, 192, 138, 0.55), transparent);
+}
+
+/* =====================================================================
+ * Inputs (AuthTextField)
+ * ===================================================================== */
+
+.lv-field__label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9c9cf;
+}
+.lv-field__frame {
+  position: relative;
+  border-radius: 14px;
+}
+.lv-field__input {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 14px;
+  border: 1px solid var(--lv-line);
+  background: var(--lv-well);
+  padding-block: 0.8rem;
+  padding-inline: 1rem;
+  font-size: 16px; /* ≥16px: iOS Safari must not zoom the form on focus */
+  color: var(--lv-ink);
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.lv-field__input::placeholder {
+  color: #55555e;
+}
+.lv-field__input:hover:not(:disabled) {
+  border-color: var(--lv-line-strong);
+}
+.lv-field__input:focus {
+  border-color: rgba(216, 192, 138, 0.65);
+  box-shadow: 0 0 0 3px rgba(186, 163, 105, 0.16);
+  background: #121215;
+}
+.lv-field__input:disabled {
+  opacity: 0.6;
+}
+.lv-field__input.has-icon {
+  padding-inline-start: 2.9rem;
+}
+.lv-field__input.has-reveal {
+  padding-inline-end: 3.25rem;
+}
+.lv-field__input.is-error {
+  border-color: rgba(239, 68, 68, 0.65);
+}
+.lv-field__icon {
+  position: absolute;
+  inset-inline-start: 0.95rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: #62626b;
+  pointer-events: none;
+  transition: color 0.18s ease;
+}
+.lv-field__frame:focus-within .lv-field__icon {
+  color: var(--lv-gold);
+}
+.lv-field__reveal {
+  position: absolute;
+  inset-inline-end: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 10px;
+  color: #71717a;
+  transition: color 0.15s ease;
+}
+.lv-field__reveal:hover { color: #fff; }
+.lv-field__reveal:focus-visible {
+  outline: 2px solid var(--lv-gold);
+  outline-offset: -2px;
+}
 
 /*
- * WebKit/Blink paint autofilled inputs with a light yellow/white background
- * that makes white text unreadable on the dark theme. The inset box-shadow
- * trick repaints the field, -webkit-text-fill-color keeps the value visible,
- * and the huge transition delay stops the UA background from ever fading in.
- * Password managers and paste are unaffected — this is presentation only.
+ * WebKit/Blink autofill paints a light background that breaks the dark
+ * theme; repaint it and keep the value readable. Presentation only —
+ * password managers and paste are untouched.
  */
 .lv-auth input:-webkit-autofill,
 .lv-auth input:-webkit-autofill:hover,
 .lv-auth input:-webkit-autofill:focus,
 .lv-auth input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #0f0f11 inset !important;
-  box-shadow: 0 0 0 1000px #0f0f11 inset !important;
-  -webkit-text-fill-color: #fafafa !important;
-  caret-color: #fafafa;
+  -webkit-box-shadow: 0 0 0 1000px #101013 inset !important;
+  box-shadow: 0 0 0 1000px #101013 inset !important;
+  -webkit-text-fill-color: #fafaf7 !important;
+  caret-color: #fafaf7;
   transition: background-color 9999999s ease-out;
 }
-
-/* Firefox's :autofill highlight — best effort; keeps the value readable.
-   (Kept as a separate rule: an unknown selector in a list would invalidate
-   the whole -webkit-autofill rule above in other engines.) */
 .lv-auth input:autofill {
-  box-shadow: 0 0 0 1000px #0f0f11 inset;
-  -webkit-text-fill-color: #fafafa;
-  caret-color: #fafafa;
+  box-shadow: 0 0 0 1000px #101013 inset;
+  -webkit-text-fill-color: #fafaf7;
+  caret-color: #fafaf7;
 }
 
 /* =====================================================================
- * FillButton (§2.2) — the background fills with form-completion progress.
- * Transform-only animation on an inner layer; a second clipped label layer
- * keeps text contrast on both the filled and unfilled regions.
+ * FillButton (§2.2) — unchanged contract, machined-gold skin.
+ * The background fills with REAL form-completion progress; a clipped
+ * second label keeps contrast on both regions. Transform-only.
  * ===================================================================== */
 
 .lv-fillbtn {
@@ -42,24 +387,24 @@
   overflow: hidden;
   display: block;
   width: 100%;
-  min-height: 52px;
-  border-radius: 1rem;
-  border: 1px solid rgba(186, 163, 105, 0.35);
-  background: #141416;
+  min-height: 56px;
+  border-radius: 15px;
+  border: 1px solid rgba(186, 163, 105, 0.34);
+  background: #131316;
   isolation: isolate;
   cursor: pointer;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
 }
 .lv-fillbtn:disabled {
   cursor: not-allowed;
 }
 .lv-fillbtn:not(:disabled):active {
-  transform: scale(0.99);
+  transform: scale(0.98);
 }
 .lv-fillbtn:focus-visible {
-  outline: 2px solid var(--color-gold, #baa369);
+  outline: 2px solid var(--lv-gold);
   outline-offset: 2px;
 }
 
@@ -68,7 +413,7 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: var(--color-gold, #baa369);
+  background: linear-gradient(180deg, var(--lv-gold-bright) 0%, var(--lv-gold) 55%, var(--lv-gold-deep) 130%);
   transform: scaleX(var(--lv-fill-scale, 0));
   transform-origin: 0% 50%;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
@@ -77,12 +422,20 @@
 [dir='rtl'] .lv-fillbtn__fill {
   transform-origin: 100% 50%;
 }
+/* A specular line along the filled surface's top edge. */
+.lv-fillbtn__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: rgba(255, 248, 230, 0.55);
+}
 
 .lv-fillbtn__layer {
   position: relative;
   z-index: 1;
   display: flex;
-  min-height: 52px;
+  min-height: 56px;
   width: 100%;
   align-items: center;
   justify-content: center;
@@ -100,7 +453,7 @@
   position: absolute;
   inset: 0;
   z-index: 2;
-  color: #0a0a0a;
+  color: #121006;
   clip-path: inset(0 calc(100% - var(--lv-fill-pct, 0%)) 0 0);
   transition: clip-path 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -108,26 +461,50 @@
   clip-path: inset(0 0 0 calc(100% - var(--lv-fill-pct, 0%)));
 }
 
+/* Forward arrow: LTR "→" mirrors to "←" in RTL. Same box as the spinner,
+   so swapping them never shifts the label. */
+.lv-fillbtn__arrow {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+  transition: transform 0.18s ease;
+}
+[dir='rtl'] .lv-fillbtn__arrow {
+  transform: scaleX(-1);
+}
+.lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__arrow {
+  transform: translateX(2px);
+}
+[dir='rtl'] .lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__arrow {
+  transform: scaleX(-1) translateX(2px);
+}
+
 .lv-fillbtn.is-ready {
-  border-color: var(--color-gold, #baa369);
-  box-shadow: 0 8px 28px -10px rgba(186, 163, 105, 0.55);
+  border-color: rgba(216, 192, 138, 0.9);
+  box-shadow:
+    0 10px 30px -12px rgba(186, 163, 105, 0.5),
+    inset 0 0 0 1px rgba(255, 240, 200, 0.06);
 }
 .lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__fill {
-  filter: brightness(1.08);
+  filter: brightness(1.07);
 }
 .lv-fillbtn.is-error {
   border-color: rgba(239, 68, 68, 0.6);
+  animation: lv-nudge 0.26s ease;
 }
-/* Success is a REAL server answer, not an assumption: the fill is complete
-   and the state reads differently from a merely "ready" button. */
+@keyframes lv-nudge {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+}
+/* Success is a REAL server answer, not an assumption. */
 .lv-fillbtn[data-status='success'] {
   border-color: rgba(16, 185, 129, 0.7);
   box-shadow: 0 8px 28px -10px rgba(16, 185, 129, 0.45);
 }
 /* NOTE: the not-ready button is NOT dimmed. §2.2 forbids lowering the
-   label's contrast, so the incomplete state is signalled by the missing
-   gold border/glow (.is-ready) and by the visible requirement hint —
-   never by washing the text out. */
+   label's contrast; incompleteness is signalled by the missing gold
+   border/glow and the visible requirement hint — never by washed text. */
 
 .lv-fillbtn__hint {
   margin-top: 0.5rem;
@@ -138,8 +515,8 @@
 }
 
 .lv-fillbtn__spinner {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
   flex: none;
   border-radius: 9999px;
   border: 2px solid rgba(10, 10, 10, 0.25);
@@ -151,81 +528,125 @@
   border-top-color: #fff;
 }
 .lv-fillbtn__check {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
   flex: none;
 }
 @keyframes lv-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .lv-fillbtn__fill,
-  .lv-fillbtn__layer--fill {
-    transition: none;
-  }
-  .lv-fillbtn:not(:disabled):active {
-    transform: none;
-  }
-  .lv-fillbtn__spinner {
-    animation-duration: 1.6s;
-  }
+/* Plain gold action (reset-done / dead-link screens): same skin as a fully
+   filled FillButton, without the meter machinery. */
+.lv-btn-gold {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 15px;
+  border: 1px solid rgba(216, 192, 138, 0.9);
+  background: linear-gradient(180deg, var(--lv-gold-bright) 0%, var(--lv-gold) 55%, var(--lv-gold-deep) 130%);
+  color: #121006;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 10px 30px -12px rgba(186, 163, 105, 0.5);
+  transition: filter 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.lv-btn-gold:hover { filter: brightness(1.07); }
+.lv-btn-gold:active { transform: scale(0.98); }
+.lv-btn-gold:focus-visible {
+  outline: 2px solid var(--lv-gold);
+  outline-offset: 2px;
 }
 
 /* =====================================================================
- * MethodSwitch (§2.1) — segmented email / phone / Google / Telegram tabs.
+ * Divider + secondary (provider) actions
  * ===================================================================== */
 
-.lv-methods {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 1rem;
-  border: 1px solid #27272a;
-  background: rgba(9, 9, 11, 0.6);
-}
-.lv-methods__tab {
+.lv-divider {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 56px;
-  padding: 6px 2px;
-  border-radius: 0.75rem;
-  border: 0;
-  background: transparent;
+  gap: 0.9rem;
+  margin-block: 1.1rem;
+}
+.lv-divider::before,
+.lv-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(to right, transparent, var(--lv-line-strong));
+}
+.lv-divider::after {
+  background: linear-gradient(to left, transparent, var(--lv-line-strong));
+}
+.lv-divider__label {
   font-size: 12px;
   font-weight: 600;
-  font-family: inherit;
-  color: #a1a1aa;
-  cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
+  color: #6b6b74;
 }
-.lv-methods__tab[aria-selected='true'] {
-  background: rgba(186, 163, 105, 0.14);
-  color: var(--color-gold, #baa369);
-  box-shadow: inset 0 0 0 1px rgba(186, 163, 105, 0.35);
-}
-.lv-methods__tab:focus-visible {
-  outline: 2px solid var(--color-gold, #baa369);
-  outline-offset: -2px;
-}
-.lv-methods__icon {
+
+.lv-social {
   display: flex;
+  width: 100%;
+  min-height: 52px;
   align-items: center;
   justify-content: center;
+  gap: 0.65rem;
+  border-radius: 14px;
+  border: 1px solid var(--lv-line);
+  background: var(--lv-well);
+  color: #e6e6ea;
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.lv-social:hover:not(:disabled) {
+  border-color: var(--lv-line-strong);
+  background: #141417;
+}
+.lv-social:active:not(:disabled) {
+  transform: scale(0.985);
+}
+.lv-social:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.lv-social:focus-visible {
+  outline: 2px solid var(--lv-gold);
+  outline-offset: 2px;
+}
+.lv-social__icon {
+  display: flex;
   width: 1.25rem;
   height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .lv-methods__tab {
-    transition: none;
-  }
+
+/* The Google identity button is Google's own iframe (the credential flow
+   requires it). It gets a socketed well matching the Telegram button, with a
+   fixed height so the async iframe load never shifts layout — and so the row
+   still reads as a control, not a hole, in the moment before Google's script
+   arrives. */
+.lv-google {
+  position: relative;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border-radius: 14px;
+  border: 1px solid var(--lv-line);
+  background: var(--lv-well);
+}
+.lv-google.is-busy {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* =====================================================================
@@ -246,16 +667,16 @@
   font-weight: 700;
   font-family: inherit;
   color: #fff;
-  background: rgba(9, 9, 11, 0.7);
-  border: 1px solid #27272a;
+  background: var(--lv-well);
+  border: 1px solid var(--lv-line);
   border-radius: 0.75rem;
   outline: none;
-  caret-color: var(--color-gold, #baa369);
+  caret-color: var(--lv-gold);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .lv-otp__box:focus {
-  border-color: rgba(186, 163, 105, 0.7);
-  box-shadow: 0 0 0 1px rgba(186, 163, 105, 0.4);
+  border-color: rgba(216, 192, 138, 0.7);
+  box-shadow: 0 0 0 3px rgba(186, 163, 105, 0.16);
 }
 .lv-otp__box.is-filled {
   border-color: rgba(186, 163, 105, 0.5);
@@ -267,23 +688,12 @@
   opacity: 0.6;
 }
 @media (max-width: 359px) {
-  .lv-otp {
-    gap: 0.375rem;
-  }
-  .lv-otp__box {
-    width: 2.5rem;
-    height: 3rem;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lv-otp__box {
-    transition: none;
-  }
+  .lv-otp { gap: 0.375rem; }
+  .lv-otp__box { width: 2.5rem; height: 3rem; }
 }
 
 /* =====================================================================
- * ReferralBar (§2.6) — smooth expander; collapsed content leaves the
- * tab order (visibility) while grid-rows animates the height.
+ * ReferralBar (§2.6) — smooth expander.
  * ===================================================================== */
 
 .lv-refbar__panel {
@@ -303,9 +713,28 @@
 .lv-refbar__panel.is-open .lv-refbar__inner {
   visibility: visible;
 }
+
+/* =====================================================================
+ * Reduced motion: a clean static scene. The build appears finished, the
+ * toolhead is parked, nothing drifts, rises or nudges.
+ * ===================================================================== */
 @media (prefers-reduced-motion: reduce) {
-  .lv-refbar__panel,
-  .lv-refbar__inner {
-    transition: none;
-  }
+  .lv-bg__grid { animation: none; }
+  .lv-bg__dots { display: none; }
+  .lv-print__mask-rect { animation: none; transform: scaleY(1); }
+  .lv-print__cycle { animation: none; opacity: 1; }
+  .lv-print__head { animation: none; opacity: 0; }
+  .lv-print__head-x { animation: none; }
+  .lv-fillbtn__fill,
+  .lv-fillbtn__layer--fill,
+  .lv-field__input,
+  .lv-field__icon { transition: none; }
+  .lv-fillbtn.is-error { animation: none; }
+  .lv-fillbtn:not(:disabled):active,
+  .lv-btn-gold:active,
+  .lv-social:active:not(:disabled) { transform: none; }
+  .lv-fillbtn__spinner { animation-duration: 1.6s; }
+  .lv-fillbtn__arrow { transition: none; }
+  .lv-refbar__panel, .lv-refbar__inner { transition: none; }
+  .lv-otp__box { transition: none; }
 }
