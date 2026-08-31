@@ -79,8 +79,20 @@ class Client {
     }
   }
 
-  async req(method, base, path, body) {
-    const headers = { Origin: base };
+  /**
+   * Send to `base` but claim to be `host`.
+   *
+   * TLS is negotiated for `base`, so Cloudflare routes the request there; the
+   * Worker reads the Host header, so it classifies the request as `host`.
+   * That is how the Worker's own host handling can be tested while a redirect
+   * rule or a missing route stands in front of the real hostname.
+   */
+  reqWithHost(method, base, host, path, body) {
+    return this.req(method, base, path, body, { Host: host });
+  }
+
+  async req(method, base, path, body, extraHeaders = {}) {
+    const headers = { Origin: base, ...extraHeaders };
     const cookie = this.cookieHeader();
     if (cookie) headers.Cookie = cookie;
     const init = { method, headers, redirect: 'manual' };
@@ -154,6 +166,36 @@ async function main() {
     'the same route EXISTS on the apex (401 for a stranger, not 404)',
     apexAdmin.status === 401 || apexAdmin.status === 403,
     `status ${apexAdmin.status}`
+  );
+
+  // THE SAME QUESTION, ASKED PAST WHATEVER SITS IN FRONT OF THE WORKER.
+  //
+  // A redirect rule or a missing route intercepts a real merchant hostname
+  // before the Worker ever sees it, and "the request never arrived" is not
+  // evidence that the guard works — it is evidence that nothing was tested.
+  // TLS is negotiated for the apex and the Host header carries the merchant
+  // name, so Cloudflare routes on the apex and the WORKER sees exactly what
+  // it would see on a real storefront. That isolates the Worker's own
+  // decision from the routing in front of it.
+  const spoofed = await anon.reqWithHost('GET', APEX, `ali3d.${ROOT_DOMAIN}`, '/api/admin/community/overview');
+  check(
+    'the WORKER itself refuses platform admin for a merchant Host (404)',
+    spoofed.status === 404,
+    `status ${spoofed.status}`
+  );
+
+  const spoofedResolve = await anon.reqWithHost('GET', APEX, `ali3d.${ROOT_DOMAIN}`, '/api/storefront/resolve');
+  check(
+    'the WORKER classifies a merchant Host as a store, not as the platform',
+    spoofedResolve.status === 404 || spoofedResolve.json?.kind === 'merchant',
+    `status ${spoofedResolve.status} kind=${spoofedResolve.json?.kind ?? '-'}`
+  );
+
+  const spoofedSystem = await anon.reqWithHost('GET', APEX, `studio.${ROOT_DOMAIN}`, '/api/admin/community/overview');
+  check(
+    'the WORKER refuses platform admin for a system Host too',
+    spoofedSystem.status === 404,
+    `status ${spoofedSystem.status}`
   );
 
   // ------------------------------------------------------ 4. one identity
