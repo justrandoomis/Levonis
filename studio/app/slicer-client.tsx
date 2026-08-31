@@ -283,8 +283,16 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
   const plateCountRef = useRef(1);
   const selectedPlateRef = useRef(0);
-  /** Object ids the shell has already seen, so it can tell a spawn from a split. */
+  /** Object ids currently in the scene, so the shell can tell a spawn from a split. */
   const seenObjectIdsRef = useRef<Set<number>>(new Set());
+  /**
+   * Every id this session has EVER seen. The engine hands out object ids from
+   * a counter that only increases, so an id that comes back is an object being
+   * restored — an undo of a delete, an undo of Delete All, a redo — and never
+   * a new spawn. Without this, pressing Ctrl+Z after deleting something would
+   * re-seat the very objects the undo just put back where they belonged.
+   */
+  const everSeenObjectIdsRef = useRef<Set<number>>(new Set());
   /**
    * Set while the shell itself is placing objects — an undo restore, a project
    * open, a new project. Those already carry exact positions, so the
@@ -293,6 +301,34 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const suppressSeatingRef = useRef(false);
   /** Pending idle release of the engine's slice worker (constrained devices). */
   const workerReleaseTimerRef = useRef<number | null>(null);
+  /**
+   * True once this session has entered a paint mode, or opened a project that
+   * carried painting. It is a one-way latch, and it vetoes two things.
+   *
+   * WHY IT EXISTS. Support and material painting live in the SELECTOR inside
+   * the kernel's WASM heap, and nowhere else. Two consequences the shell has
+   * to respect:
+   *
+   * 1. Releasing the worker destroys that state — and the viewer does not
+   *    know. It caches the prepared mesh's identity outside the worker
+   *    (`l.current = { identity, topology }` in viewer/dist/Viewport.js) and
+   *    only re-sends `cmd:"prepare"` when that identity CHANGES, which
+   *    terminating a worker does not. So after a release the brush paints into
+   *    a kernel with no registered mesh, and `exportPaint` — which the 3MF
+   *    save calls — hits the worker's `if (d.cmd === 'exportPaint' && !modPromise)`
+   *    branch and answers `{supported:false, facets:[], hex:''}`. The project
+   *    then saves, and uploads, with every painted facet stripped, reporting
+   *    success. That is silent, permanent loss of the user's work.
+   *
+   * 2. The autosave skip cannot see paint either: brush strokes change the
+   *    saved 3MF but change nothing in the scene fingerprint, the settings, or
+   *    anything else projectContentSignature covers.
+   *
+   * So a painted session releases no worker and skips no save. Both
+   * optimisations stay for everyone who never picks up the brush, which is the
+   * overwhelming majority of sessions, and neither can cost anyone a stroke.
+   */
+  const sessionHasPaintRef = useRef(false);
   const suppressSeatingTimerRef = useRef<number | null>(null);
 
   /**
@@ -377,6 +413,17 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    */
   const projectContentSignature = useCallback((): string | null => {
     if (!adapter.api()) return null;
+    // Brush strokes change the saved 3MF and change nothing this signature can
+    // see — they live in the kernel's selector, not in the scene, the settings
+    // or the plate count. Returning null is the honest answer: it says "I
+    // cannot tell whether this changed", and the controller then saves
+    // unconditionally, exactly as it did before the skip existed.
+    if (sessionHasPaintRef.current) return null;
+    try {
+      if (adapter.api()?.hasPaintImport?.()) return null;
+    } catch {
+      return null;
+    }
     const settingsRecord = settings as unknown as Record<string, unknown>;
     const settingsPart = Object.keys(settingsRecord)
       .sort()
@@ -609,6 +656,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setError("");
     setNotice("");
     setToolTrayOpen(false);
+    // A 3MF is a PROJECT: it carries the author's own plate layout, and the
+    // engine restores those positions itself as it parses. Re-seating them
+    // would throw that layout away. The orchestrator is already finished by
+    // the time the engine emits the objects (only a ZIP leaves a pending
+    // arrangement behind), so `orchestrator.busy` cannot be the guard here.
+    if (rawFiles.some((file) => /\.3mf$/i.test(file.name))) suppressSeating();
     const importNotices: string[] = [];
     try {
       const result = await orchestrator.importFiles(rawFiles, {
@@ -643,7 +696,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setError(localizeImportError(reason));
       setStatus("error");
     }
-  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
+  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, suppressSeating, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
 
   const handlePickedFiles = useCallback((files: File[]) => {
     setNotice("");
@@ -961,28 +1014,41 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
   }, []);
 
+  /** The one place that decides whether letting the worker go is safe. */
+  const releaseSlicerWorkerIfSafe = useCallback(() => {
+    // Painting only exists inside the worker's WASM heap, and the engine's
+    // prepared-mesh cache would not notice it going away — see
+    // sessionHasPaintRef. Memory is never worth a user's brush strokes.
+    if (sessionHasPaintRef.current) return false;
+    return adapter.releaseSlicerWorker();
+  }, [adapter]);
+
   const scheduleIdleWorkerRelease = useCallback(() => {
     cancelIdleWorkerRelease();
     const delay = device.idleWorkerReleaseMs;
     if (delay === null) return;
     workerReleaseTimerRef.current = window.setTimeout(() => {
       workerReleaseTimerRef.current = null;
-      adapter.releaseSlicerWorker();
+      releaseSlicerWorkerIfSafe();
     }, delay);
-  }, [adapter, cancelIdleWorkerRelease, device.idleWorkerReleaseMs]);
+  }, [cancelIdleWorkerRelease, device.idleWorkerReleaseMs, releaseSlicerWorkerIfSafe]);
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    // Only devices that were never given the warm kernel give it back. A
+    // desktop keeps its worker across a tab switch: this used to fire for
+    // everyone, which threw away the warm kernel every time the user looked at
+    // another tab — the exact opposite of "desktop behaviour is unchanged".
+    if (typeof document === "undefined" || !device.memoryConstrained) return;
     const onVisibilityChange = () => {
       if (document.visibilityState !== "hidden") return;
       // A backgrounded tab is where a mobile OS reclaims memory, and it is the
       // moment holding a WASM heap costs the most and buys the least.
       cancelIdleWorkerRelease();
-      adapter.releaseSlicerWorker();
+      releaseSlicerWorkerIfSafe();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [adapter, cancelIdleWorkerRelease]);
+  }, [cancelIdleWorkerRelease, device.memoryConstrained, releaseSlicerWorkerIfSafe]);
 
   useEffect(() => cancelIdleWorkerRelease, [cancelIdleWorkerRelease]);
 
@@ -1073,6 +1139,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     for (const id of previous) if (!next.has(id)) return;
 
     const appeared = [...next].filter((id) => !previous.has(id));
+    for (const id of appeared) {
+      // A returning id is a restore. Record the rest as genuinely new.
+      if (everSeenObjectIdsRef.current.has(id)) return;
+    }
+    for (const id of next) everSeenObjectIdsRef.current.add(id);
     if (!appeared.length) return;
     // An archive import has its own multi-plate arrangement; a project restore
     // places every object at the author's own offsets. Neither is a spawn, and
@@ -1117,6 +1188,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     } else if (event.type === "selectedPlate") {
       selectedPlateRef.current = event.value;
       setSelectedPlate(event.value);
+    } else if (event.type === "paintMode") {
+      // A one-way latch: entering a paint mode is the only way to make a
+      // stroke, so from here on this session neither releases its worker nor
+      // trusts the autosave skip.
+      if (event.value !== "off") sessionHasPaintRef.current = true;
     } else if (event.type === "canvasMode") {
       setCanvasMode(event.value);
       if (event.value === "preview") setToolTrayOpen(false);
@@ -1158,6 +1234,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     slicing.clearResults();
     orchestrator.clearPendingArrangement();
     seenObjectIdsRef.current = new Set();
+    everSeenObjectIdsRef.current = new Set();
     arrangeUndoRef.current = null;
     setArrangeUndoAvailable(false);
     setObjects([]);

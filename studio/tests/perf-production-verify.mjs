@@ -505,6 +505,48 @@ if (afterImport.workers !== 0) fail("2. no worker in advance", `importing a mode
   }
 }
 
+// -- point 10: a painted session keeps its worker ---------------------------
+//
+// Painting lives only in the kernel's WASM heap, and the viewer caches the
+// prepared mesh's identity outside the worker — so releasing the worker
+// silently destroys the strokes AND makes the next 3MF save export zero
+// painted facets while reporting success. The shell must therefore refuse to
+// release a worker once the session has entered a paint mode. This drives that
+// path: enter paint, background the tab, and check the worker survived.
+{
+  const paint = await page.evaluate(async ({ source }) => {
+    const findShadow = new Function(`${source}; return findShadow;`)();
+    const before = Boolean(window.__vpWorker);
+    const paintButton = findShadow(document, '[data-testid="gizmo-paint"]');
+    if (!paintButton) return { error: "the paint control was not found" };
+    paintButton.click();
+    await new Promise((r) => setTimeout(r, 1000));
+    const painting = Boolean(findShadow(document, '[data-testid="paint-enforcer"]')
+      || findShadow(document, '[data-testid="paint-tools"]')
+      || findShadow(document, '[data-testid="paint-counts"]'));
+
+    // Background the tab the way a phone does when the user switches apps.
+    const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, "visibilityState");
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await new Promise((r) => setTimeout(r, 1500));
+    if (descriptor) Object.defineProperty(Document.prototype, "visibilityState", descriptor);
+    delete document.visibilityState;
+
+    return { workerBefore: before, paintPanelOpened: painting, workerAfterHidden: Boolean(window.__vpWorker) };
+  }, { source: SHADOW_QUERY });
+
+  results.paintKeepsWorker = paint;
+  if (paint.error) {
+    fail("10. painting keeps its worker", paint.error);
+  } else if (!paint.workerBefore) {
+    // Nothing to protect if no worker existed; record it rather than pretend.
+    results.paintKeepsWorker.note = "no worker was alive when the paint check ran — nothing to release";
+  } else if (!paint.workerAfterHidden) {
+    fail("10. painting keeps its worker", "the slice worker was released after entering paint mode — brush strokes and the next 3MF save would lose their painted facets");
+  }
+}
+
 // -- point 1: no out-of-memory message anywhere -----------------------------
 {
   const pageMessages = await page.evaluate(({ source }) => {
@@ -567,12 +609,13 @@ if (results.sliceCycles?.length) {
   console.log(`  8. slice/cancel/slice no buildup : ${failures.some((f) => f.startsWith("8.")) ? "FAIL" : "pass"}  (${results.sliceCycles.map((c) => `#${c.cycle} ${c.workers}w ${mb(c.rendererRssKb)}`).join(", ")})`);
 }
 console.log(`  9. patched build on this origin  : ${failures.some((f) => f.startsWith("9.")) ? "FAIL" : "pass"}  (release hook: ${results.buildIdentity?.releaseHookPresent}, isolated: ${results.buildIdentity?.crossOriginIsolated})`);
+console.log(` 10. painting keeps its worker     : ${failures.some((f) => f.startsWith("10.")) ? "FAIL" : "pass"}  (worker before ${results.paintKeepsWorker?.workerBefore}, after backgrounding ${results.paintKeepsWorker?.workerAfterHidden}${results.paintKeepsWorker?.note ? " — " + results.paintKeepsWorker.note : ""})`);
 console.log("");
 if (failures.length) {
   console.log("  FAILURES:");
   for (const failure of failures) console.log(`    - ${failure}`);
 } else {
-  console.log("  All nine acceptance points passed.");
+  console.log("  All acceptance points passed.");
 }
 
 writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2) + "\n");

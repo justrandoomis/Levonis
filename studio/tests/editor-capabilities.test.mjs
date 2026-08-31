@@ -628,3 +628,68 @@ test("the expensive autosave capture is gated on a cheap change signal", async (
   assert.match(app, /adapter\.suspendRendering\(true\)/);
   assert.match(app, /if \(rendering\) adapter\.suspendRendering\(false\)/);
 });
+
+test("a painted session never releases its worker and never skips a save", async () => {
+  const [app, adapter, engineWorker, engine] = await Promise.all([
+    readFile(appUrl, "utf8"),
+    readFile(adapterUrl, "utf8"),
+    readFile(new URL("../node_modules/three-slicer/engine/src/slicer.worker.js", import.meta.url), "utf8"),
+    readFile(engineUrl, "utf8"),
+  ]);
+
+  // THE HAZARD, still present in the installed engine. Painting lives in the
+  // kernel's selector, inside the worker's WASM heap. The viewer caches the
+  // prepared mesh's identity OUTSIDE the worker and only re-prepares when that
+  // identity changes — which terminating a worker does not.
+  assert.match(engine, /l\.current = \{ identity: ee, topology: j\.topology \}/);
+  // And a save against a worker that never loaded the kernel answers with an
+  // empty export, which the 3MF writer takes at face value.
+  assert.match(engineWorker, /d\.cmd === 'exportPaint' && !modPromise/);
+  assert.match(engineWorker, /supported: false, facets: \[\], hex: ''/);
+
+  // So the shell latches on the engine's own paintMode event…
+  assert.match(app, /event\.type === "paintMode"/);
+  assert.match(app, /if \(event\.value !== "off"\) sessionHasPaintRef\.current = true/);
+  // …and that latch vetoes the release outright.
+  assert.match(app, /releaseSlicerWorkerIfSafe[\s\S]{0,600}if \(sessionHasPaintRef\.current\) return false/);
+  // Every release path goes through the guard; none calls the adapter direct.
+  const rawReleaseCalls = [...app.matchAll(/adapter\.releaseSlicerWorker\(\)/g)].length;
+  assert.equal(rawReleaseCalls, 1, "releaseSlicerWorkerIfSafe must be the only caller of the adapter release");
+  assert.doesNotMatch(app, /workerReleaseTimerRef\.current = null;\s*adapter\.releaseSlicerWorker\(\)/);
+
+  // A painted session also refuses to authorise an autosave skip, because a
+  // brush stroke changes the 3MF and nothing the signature covers.
+  assert.match(app, /if \(sessionHasPaintRef\.current\) return null/);
+  assert.match(app, /hasPaintImport\?\.\(\)/);
+  assert.match(adapter, /"hasPaintImport"/);
+});
+
+test("only devices that were never given the warm kernel give it back", async () => {
+  const app = await readFile(appUrl, "utf8");
+  // The visibilitychange release used to run for everyone, so every desktop
+  // tab switch threw away a warm kernel that was never a memory problem.
+  assert.match(app, /if \(typeof document === "undefined" \|\| !device\.memoryConstrained\) return;/);
+  assert.match(app, /document\.visibilityState !== "hidden"/);
+});
+
+test("restores and project imports are never mistaken for a spawn", async () => {
+  const app = await readFile(appUrl, "utf8");
+
+  // The engine's object ids only ever increase, so an id that comes BACK is an
+  // undo of a delete (or a redo), not a new object. Seating those would move
+  // the very objects the undo just put back.
+  assert.match(app, /everSeenObjectIdsRef/);
+  assert.match(app, /if \(everSeenObjectIdsRef\.current\.has\(id\)\) return;/);
+
+  // A 3MF carries the author's own layout and the engine restores it as it
+  // parses — after the orchestrator is already finished, so `busy` cannot be
+  // the guard.
+  assert.ok(
+    app.includes("/\\.3mf$/i.test(file.name))) suppressSeating();"),
+    "a 3MF import must suppress the free-space seating"
+  );
+
+  // A new project forgets both sets, or the next import would look like a
+  // restore of the previous project's ids.
+  assert.match(app, /everSeenObjectIdsRef\.current = new Set\(\);/);
+});

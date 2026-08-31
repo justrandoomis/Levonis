@@ -80,6 +80,7 @@ export const ENGINE_API_METHODS = [
   "frame",
   "suspendRendering",
   "selectedObjectId",
+  "hasPaintImport",
 ] as const;
 
 /**
@@ -121,6 +122,8 @@ declare global {
     suspendRendering(suspended: boolean): void;
     /** Id of the selected object, or null/0 when nothing is selected. */
     selectedObjectId(): number | null;
+    /** True when an opened project carried painted facets the kernel holds. */
+    hasPaintImport(): boolean;
   }
   interface Window {
     /**
