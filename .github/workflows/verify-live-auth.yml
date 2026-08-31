@@ -228,6 +228,37 @@ jobs:
           echo "A throwaway address was generated with the plus-tag +$TAG."
           echo "The address itself is masked; the tag is what the outbox is searched by."
 
+      # The two email paths differ, and the difference decides how each can be
+      # proved:
+      #   verification -> enqueue() + processOutbox(), so the outbox records
+      #                   state='sent' only after Resend answered 2xx, and the
+      #                   row's payload carries the link.
+      #   password reset -> sendEmail() DIRECTLY (worker/routes/auth.ts:1560,
+      #                   "reset links must not sit in a queue"). No outbox row
+      #                   is ever written, so an outbox-only check would report
+      #                   a failure for a reset that was delivered perfectly.
+      # What the reset path does leave is a console.error naming the provider's
+      # status when it is refused. So the Worker's log is captured across the
+      # scenario: a line here is the Resend response, and its absence alongside
+      # a minted token and a 200 is what says the send was not rejected.
+      - name: Start capturing the live Worker's log
+        id: tail
+        continue-on-error: true
+        run: |
+          set -e
+          echo "started=no" >> "$GITHUB_OUTPUT"
+          nohup npx wrangler tail levonis-staging --env staging --format json \
+            > /tmp/tail.jsonl 2>/tmp/tail.err &
+          echo $! > /tmp/tail.pid
+          sleep 12
+          if kill -0 "$(cat /tmp/tail.pid)" 2>/dev/null; then
+            echo "tail attached to levonis-staging"
+            echo "started=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::wrangler tail did not attach — a Resend rejection will not be visible here"
+            sed -n '1,15p' /tmp/tail.err || true
+          fi
+
       - name: Studio SSO, negative cases and logout liveness, live
         id: scenario
         continue-on-error: true
@@ -243,6 +274,34 @@ jobs:
           # was reading nothing.
           set -o pipefail
           node scripts/e2e-live-auth.mjs 2>&1 | tee /tmp/scenario.log
+
+      - name: What the provider said, from the Worker's own log
+        id: providerlog
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "errors=unknown" >> "$GITHUB_OUTPUT"
+          if [ -f /tmp/tail.pid ]; then kill "$(cat /tmp/tail.pid)" 2>/dev/null || true; fi
+          sleep 3
+          if [ "${{ steps.tail.outputs.started }}" != "yes" ]; then
+            echo "no capture was running; the provider's response is not observable here"
+            echo "errors=not captured" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "captured $(wc -l < /tmp/tail.jsonl) log line(s)"
+          # sendEmail logs "sendEmail: provider responded <status>: <body>" on a
+          # non-2xx, and outbox.ts records "resend <status>: ..." in last_error.
+          # Neither contains a token or a key; the API key is never logged.
+          N=$(grep -c 'provider responded\|resend [0-9]' /tmp/tail.jsonl 2>/dev/null || true)
+          N=${N:-0}
+          echo "provider-error lines: $N"
+          if [ "$N" != "0" ]; then
+            echo "What Resend answered:"
+            grep -o 'provider responded [^"]*\|resend [0-9][^"]*' /tmp/tail.jsonl | head -10
+            echo "::error::Resend refused at least one send — the status is above"
+          else
+            echo "no provider error was logged during the scenario"
+          fi
+          echo "errors=$N" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------- did Resend take them?
       # The API reporting success is not evidence a message was sent: both
@@ -296,23 +355,34 @@ jobs:
           TOTAL=$(n "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%'")
           echo "rows: $TOTAL, accepted by Resend: $SENT"
 
-          # Which of the two is which, by the link each carries. The predicate
-          # runs INSIDE SQLite and returns a count — the link never comes back.
-          RESET=$(n "SELECT COUNT(*) AS n FROM outbox
-                      WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
-                        AND payload LIKE '%${APEX}/auth?reset=%'")
+          # THE VERIFICATION EMAIL goes through the outbox, so its row proves
+          # Resend accepted it (state='sent' is written only after a 2xx) and
+          # its payload carries the link. The predicate runs INSIDE SQLite and
+          # returns a count — the link never comes back.
           VERIFY=$(n "SELECT COUNT(*) AS n FROM outbox
                        WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
-                         AND payload LIKE '%${APEX}/%verify%'")
+                         AND payload LIKE '%${APEX}/%verify_email=%'")
           OFFSITE=$(n "SELECT COUNT(*) AS n FROM outbox
                         WHERE recipient LIKE '%+${TAG}@%'
                           AND payload LIKE '%https://%'
                           AND payload NOT LIKE '%${APEX}%'")
 
+          # THE PASSWORD RESET DOES NOT. worker/routes/auth.ts:1560 sends it
+          # immediately through sendEmail() rather than the queue, deliberately
+          # ("reset links must not sit in a queue"), so NO outbox row is ever
+          # written for it — an outbox-only check would call a perfectly
+          # delivered reset a failure. What it does leave is the token row,
+          # inserted immediately BEFORE the send: a row proves the endpoint did
+          # the work rather than refusing with 503, and the Worker log captured
+          # above proves Resend did not reject the send itself.
+          RESET=$(n "SELECT COUNT(*) AS n
+                       FROM password_reset_tokens t JOIN users u ON u.id = t.user_id
+                      WHERE u.email LIKE '%+${TAG}@%'")
+
           echo ""
-          echo "password-reset email accepted by Resend, link on ${APEX} : $RESET"
-          echo "verification email accepted by Resend, link on ${APEX}   : $VERIFY"
-          echo "any link in those emails pointing off ${APEX}            : $OFFSITE"
+          echo "verification email accepted by Resend, link on ${APEX} : $VERIFY"
+          echo "password-reset token minted (send attempted, not 503)   : $RESET"
+          echo "any queued link pointing off ${APEX}                    : $OFFSITE"
           echo "reset=$RESET" >> "$GITHUB_OUTPUT"
           echo "verify=$VERIFY" >> "$GITHUB_OUTPUT"
           echo "offsite=$OFFSITE" >> "$GITHUB_OUTPUT"
@@ -320,13 +390,13 @@ jobs:
           FAIL=0
           for v in RESET VERIFY OFFSITE SENT TOTAL; do
             case "${!v}" in
-              ''|*[!0-9]*) echo "::error::the query for $v returned '${!v}', not a number — the outbox state is UNKNOWN, not empty"; FAIL=1 ;;
+              ''|*[!0-9]*) echo "::error::the query for $v returned '${!v}', not a number — the state is UNKNOWN, not empty"; FAIL=1 ;;
             esac
           done
           [ "$FAIL" = "0" ] || exit 1
-          [ "$RESET" -ge 1 ] || { echo "::error::no password-reset email was accepted by Resend for this run"; FAIL=1; }
+          [ "$RESET" -ge 1 ] || { echo "::error::no password-reset token was minted — the endpoint refused rather than sending"; FAIL=1; }
           [ "$VERIFY" -ge 1 ] || { echo "::error::no verification email was accepted by Resend for this run"; FAIL=1; }
-          [ "$OFFSITE" = "0" ] || { echo "::error::an email for this run carries a link outside ${APEX}"; FAIL=1; }
+          [ "$OFFSITE" = "0" ] || { echo "::error::a queued email for this run carries a link outside ${APEX}"; FAIL=1; }
           exit $FAIL
 
       - name: Result
@@ -342,9 +412,10 @@ jobs:
             echo "| levonis-studio-staging · STUDIO_HANDOFF_SECRET | ${{ steps.studiobind.outputs.secret }} |"
             echo "| levonis-studio-staging · MAIN_SITE_ORIGIN | ${{ steps.studiobind.outputs.main_origin }} |"
             echo "| Scenario (SSO, negatives, logout liveness) | ${{ steps.scenario.outcome }} |"
-            echo "| Password-reset emails accepted by Resend | ${{ steps.outbox.outputs.reset }} |"
-            echo "| Verification emails accepted by Resend | ${{ steps.outbox.outputs.verify }} |"
-            echo "| Links pointing off ${{ env.APEX }} | ${{ steps.outbox.outputs.offsite }} |"
+            echo "| Verification email accepted by Resend (outbox state=sent) | ${{ steps.outbox.outputs.verify }} |"
+            echo "| Password-reset token minted (immediate send, no outbox row) | ${{ steps.outbox.outputs.reset }} |"
+            echo "| Provider-error lines in the Worker log | ${{ steps.providerlog.outputs.errors }} |"
+            echo "| Queued links pointing off ${{ env.APEX }} | ${{ steps.outbox.outputs.offsite }} |"
             echo ""
             echo '```'
             sed -n '/^=\{40,\}$/,$p' /tmp/scenario.log 2>/dev/null | head -60 || echo "(scenario produced no summary)"
@@ -367,4 +438,5 @@ jobs:
           [ "${{ steps.outbox.outcome }}" = "success" ] || { echo "::error::the email delivery check failed"; exit 1; }
           [ "${{ steps.mainbind.outcome }}" = "success" ] || { echo "::error::the main Worker binding check failed"; exit 1; }
           [ "${{ steps.studiobind.outcome }}" = "success" ] || { echo "::error::the Studio Worker binding check failed"; exit 1; }
+          [ "${{ steps.providerlog.outputs.errors }}" = "0" ] || { echo "::error::Resend rejected a send, or its response could not be observed (${{ steps.providerlog.outputs.errors }})"; exit 1; }
           echo "every check passed"
