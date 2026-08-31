@@ -297,6 +297,29 @@ It is not currently a security exposure: the redirect means `/api/admin/*` is
 unreachable on those hosts rather than served. But unreachable is not the same
 as guarded, and the verification reports it as **blocked**, never as a pass.
 
+**A THIRD DEPLOY PATH IS ALSO DEPLOYING THIS WORKER**, and it is what made
+the configuration look haunted. A Cloudflare Workers Git integration deploys
+`levonis-staging` on **every push to the default branch**, about 60 seconds
+later, with no GitHub Actions run involved:
+
+```
+push 03:36:26  →  deploy 03:37:25   source=wrangler
+push 03:40:19  →  deploy 03:41:04   source=wrangler
+push 03:41:37  →  deploy 03:42:20   source=wrangler
+push 03:43:21  →  deploy 03:44:22   source=wrangler
+```
+
+`scripts/prepare-deploy-config.mjs` exists to make that path safe, and it
+preserves the live vars — but it only looked at names **already declared in
+`wrangler.jsonc`**. `STORE_ROOT_DOMAIN` was not one, so the GitHub Actions
+deploy set it at 03:31 and the next push erased it at 03:37, taking merchant
+subdomain resolution with it. Both are fixed: the preservation pass now walks
+every live name, and the variable is declared in the config so it can never
+fall through that gap again.
+
+If you see live configuration change without a deploy you started, this is
+the first thing to check.
+
 **Two things the owner has to do**, neither of which is code:
 
 1. **Remove the wildcard redirect** in the Cloudflare dashboard

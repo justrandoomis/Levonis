@@ -219,12 +219,29 @@ const fromEnv = {
   APP_ORIGIN: process.env.APP_ORIGIN,
   EMAIL_ALLOWED_RECIPIENTS: process.env.EMAIL_ALLOWED_RECIPIENTS,
   EMAIL_FROM: process.env.EMAIL_FROM,
+  // The host classifier reads this. Without it every host is `foreign`, no
+  // merchant subdomain resolves, and — before adminAllowedOn — the whole
+  // admin API answered 404 on the apex.
+  STORE_ROOT_DOMAIN: process.env.STORE_ROOT_DOMAIN,
 };
 
 const preserved = [];
 const overridden = [];
 const live = await liveVars(cfg.name).catch(() => null);
-for (const key of Object.keys(cfg.vars)) {
+
+// EVERY live name, not only the ones this file happens to declare.
+//
+// This loop used to iterate `Object.keys(cfg.vars)`, which meant a variable
+// present on the running Worker but absent from the committed config was
+// never considered for preservation — and `wrangler deploy` replaces vars
+// wholesale, so it was silently erased. That is exactly the failure this
+// script exists to prevent, reappearing through the one gap it left.
+//
+// It cost STORE_ROOT_DOMAIN on the live site: set by the GitHub Actions
+// deploy, then dropped ~60 seconds after the next push, taking merchant
+// subdomain resolution with it.
+const names = new Set([...Object.keys(cfg.vars), ...Object.keys(live ?? {})]);
+for (const key of names) {
   if (fromEnv[key]) {
     cfg.vars[key] = fromEnv[key];
     overridden.push(key);

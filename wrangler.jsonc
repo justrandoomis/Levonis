@@ -49,7 +49,12 @@
     "EXTRA_ALLOWED_ORIGINS": "",
     "APP_ORIGIN": "",
     "EMAIL_ALLOWED_RECIPIENTS": "",
-    "EMAIL_FROM": ""
+    "EMAIL_FROM": "",
+    // The root domain the host classifier measures every request against.
+    // Declared here even though it is filled at deploy time: a name that is
+    // not in this file is a name the Workers-Builds preservation pass cannot
+    // see, and an unpreserved var is a wiped var.
+    "STORE_ROOT_DOMAIN": ""
   },
 
   "observability": { "enabled": true },
@@ -89,7 +94,8 @@
         "EXTRA_ALLOWED_ORIGINS": "",
         "APP_ORIGIN": "",
         "EMAIL_ALLOWED_RECIPIENTS": "",
-        "EMAIL_FROM": ""
+        "EMAIL_FROM": "",
+        "STORE_ROOT_DOMAIN": ""
       },
       "observability": { "enabled": true },
       "triggers": { "crons": ["*/15 * * * *"] }

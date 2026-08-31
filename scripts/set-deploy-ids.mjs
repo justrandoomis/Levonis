@@ -142,6 +142,10 @@ const VARS = {
   APP_ORIGIN: process.env.APP_ORIGIN,
   EMAIL_ALLOWED_RECIPIENTS: process.env.EMAIL_ALLOWED_RECIPIENTS,
   EMAIL_FROM: process.env.EMAIL_FROM,
+  // Not optional any more. Derived from APP_ORIGIN it was one wrong variable
+  // away from classifying the apex as `foreign`, which is how the admin API
+  // went dark on the live site.
+  STORE_ROOT_DOMAIN: process.env.STORE_ROOT_DOMAIN,
 };
 const filled = [];
 for (const [key, value] of Object.entries(VARS)) {
@@ -159,7 +163,7 @@ if (filled.length) changes.push(`${target} vars: ${filled.join(', ')}`);
 // loudly rather than silently shipping a config that breaks Google sign-in
 // or the origin used in e-mail links. (Worker SECRETS are unaffected by a
 // deploy — only these plain-text vars are replaced.)
-const criticalEmpty = ['GOOGLE_CLIENT_ID', 'APP_ORIGIN', 'INITIAL_ADMIN_EMAIL'].filter((k) =>
+const criticalEmpty = ['GOOGLE_CLIENT_ID', 'APP_ORIGIN', 'INITIAL_ADMIN_EMAIL', 'STORE_ROOT_DOMAIN'].filter((k) =>
   new RegExp(`"${k}"\\s*:\\s*""`).test(target === 'staging' ? tail : head)
 );
 if (criticalEmpty.length) {
