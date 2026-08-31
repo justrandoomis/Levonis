@@ -320,6 +320,10 @@ fall through that gap again.
 If you see live configuration change without a deploy you started, this is
 the first thing to check.
 
+The fix is verified the only way it can be: set the variable through workflow
+7, push an unrelated commit, wait for the Git-integration deploy, and read the
+variable again. It has to still be there.
+
 **Two things the owner has to do**, neither of which is code:
 
 1. **Remove the wildcard redirect** in the Cloudflare dashboard
