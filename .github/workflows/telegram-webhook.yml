@@ -1,0 +1,184 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# Why this exists: the owner reported that Telegram sign-in stalls — the
+# customer presses Start, /start goes to the bot, and nothing comes back. The
+# webhook handler on the LIVE Worker is fine; what usually breaks is the
+# REGISTRATION between the bot and that Worker (a bot has exactly ONE webhook
+# URL). This diagnoses that registration end to end, and — only with the
+# typed confirmation — repairs it the same way the in-app admin endpoint
+# would (worker/routes/telegram.ts admin/set-webhook: same URL, same secret
+# token, same allowed_updates, and NEVER drop_pending_updates).
+#
+# WHAT IT NEVER PRINTS. No secret value: the bot token and webhook secret are
+# masked, Telegram answers are reduced to a fixed whitelist of operational
+# fields, and the wrong-secret probe sends a literal dummy string.
+name: 16 - Telegram Webhook (diagnose / repair)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'diagnose (read-only) or repair (registers the webhook)'
+        required: true
+        default: diagnose
+        type: choice
+        options: [diagnose, repair]
+      confirm:
+        description: 'For repair, type: SET-WEBHOOK'
+        required: false
+        default: ''
+
+concurrency: telegram-webhook
+
+env:
+  APEX: https://levonis-iq.com
+  WEBHOOK_URL: https://levonis-iq.com/api/telegram/webhook
+
+jobs:
+  webhook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse a repair without the typed confirmation
+        if: ${{ github.event.inputs.mode == 'repair' }}
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "SET-WEBHOOK" ] \
+            || { echo "::error::repair requires confirm=SET-WEBHOOK — a bot has exactly ONE webhook and re-pointing it is not a casual act"; exit 1; }
+
+      # The handler's own answer distinguishes every failure mode without
+      # reading a single secret: 403 means the route is deployed AND the
+      # worker holds a webhook secret (our dummy header simply doesn't match);
+      # 503 means the worker has NO webhook secret, so Telegram's deliveries
+      # die here no matter what the bot has registered; 404 means the route
+      # is not deployed at all.
+      - name: What the LIVE handler answers a wrong-secret probe
+        id: probe
+        run: |
+          CODE=$(curl -s -o /tmp/probe.json -w '%{http_code}' --max-time 25 -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'X-Telegram-Bot-Api-Secret-Token: not-the-real-secret-probe' \
+            --data '{}' "$WEBHOOK_URL" || echo 000)
+          echo "POST $WEBHOOK_URL (wrong secret) -> $CODE"
+          case "$CODE" in
+            403) echo "  the handler is deployed and a webhook secret IS set on the Worker" ;;
+            503) echo "::error::the Worker has NO TELEGRAM_WEBHOOK_SECRET — every delivery dies with 503 regardless of the bot's registration" ;;
+            404) echo "::error::the webhook route is not deployed on this origin" ;;
+            *)   echo "::warning::unexpected status $CODE" ;;
+          esac
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Bindings on the LIVE main Worker (names only, never values)
+        run: |
+          set -e
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
+            -o /tmp/main.json
+          jq -e '.success == true' /tmp/main.json > /dev/null \
+            || { echo "::error::cannot read levonis-staging settings"; exit 1; }
+          for NAME in TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET; do
+            if jq -e --arg n "$NAME" '[.result.bindings[]? | select(.name==$n and .type=="secret_text")] | length > 0' /tmp/main.json > /dev/null; then
+              echo "$NAME: present as a Worker SECRET"
+            else
+              echo "::error::$NAME is not a secret_text binding on levonis-staging"
+            fi
+          done
+          APP_ORIGIN=$(jq -r '[.result.bindings[]? | select(.name=="APP_ORIGIN") | .text] | first // ""' /tmp/main.json)
+          echo "APP_ORIGIN = ${APP_ORIGIN:-<unset>}"
+
+      - name: Which repository secrets exist (presence only)
+        run: |
+          [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] \
+            && echo "TELEGRAM_BOT_TOKEN: set as a repository secret" \
+            || echo "::error::TELEGRAM_BOT_TOKEN is NOT a repository secret — this workflow cannot ask Telegram anything without it"
+          [ -n "${{ secrets.TELEGRAM_WEBHOOK_SECRET }}" ] \
+            && echo "TELEGRAM_WEBHOOK_SECRET: set as a repository secret" \
+            || echo "::warning::TELEGRAM_WEBHOOK_SECRET is NOT a repository secret — repair could not set a secret_token"
+
+      # Telegram's own record of where this bot delivers. The token never
+      # appears: it rides only in the URL of the curl call, and the output is
+      # reduced to a whitelist of operational fields.
+      - name: What Telegram has registered for this bot
+        id: info
+        env:
+          TG: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -e
+          [ -n "$TG" ] || { echo "::error::no bot token; skipping"; exit 1; }
+          curl -sS --max-time 25 "https://api.telegram.org/bot${TG}/getWebhookInfo" -o /tmp/info.json
+          jq -e '.ok == true' /tmp/info.json > /dev/null || { echo "::error::Telegram refused getWebhookInfo"; exit 1; }
+          URL=$(jq -r '.result.url // ""' /tmp/info.json)
+          PENDING=$(jq -r '.result.pending_update_count // 0' /tmp/info.json)
+          LAST_ERR=$(jq -r '.result.last_error_message // ""' /tmp/info.json)
+          LAST_ERR_AT=$(jq -r '.result.last_error_date // 0' /tmp/info.json)
+          ALLOWED=$(jq -c '.result.allowed_updates // []' /tmp/info.json)
+          echo "registered url : ${URL:-<none>}"
+          echo "pending updates: $PENDING"
+          echo "allowed updates: $ALLOWED"
+          if [ "$LAST_ERR_AT" != "0" ]; then
+            echo "last error     : $(date -u -d @$LAST_ERR_AT '+%Y-%m-%d %H:%M:%SZ' 2>/dev/null || echo t=$LAST_ERR_AT) — $LAST_ERR"
+          else
+            echo "last error     : none recorded"
+          fi
+          if [ "$URL" = "$WEBHOOK_URL" ]; then
+            echo "the bot points at the LIVE handler"
+            echo "matches=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::the bot does NOT point at $WEBHOOK_URL — /start never reaches the live Worker, which is exactly the reported symptom"
+            echo "matches=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Mirrors worker/routes/telegram.ts admin/set-webhook exactly:
+      # same URL shape, same secret_token, 'callback_query' kept for the
+      # wallet approval buttons, and NEVER drop_pending_updates.
+      - name: Repair — register the LIVE webhook
+        if: ${{ github.event.inputs.mode == 'repair' }}
+        env:
+          TG: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          WHS: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+        run: |
+          set -e
+          [ -n "$TG" ]  || { echo "::error::TELEGRAM_BOT_TOKEN repository secret is required"; exit 1; }
+          [ -n "$WHS" ] || { echo "::error::TELEGRAM_WEBHOOK_SECRET repository secret is required (the handler validates every delivery against it)"; exit 1; }
+          jq -n --arg url "$WEBHOOK_URL" --arg st "$WHS" \
+            '{url:$url, secret_token:$st, allowed_updates:["message","callback_query"], drop_pending_updates:false}' \
+            > /tmp/req.json
+          CODE=$(curl -sS --max-time 25 -o /tmp/set.json -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' --data @/tmp/req.json \
+            "https://api.telegram.org/bot${TG}/setWebhook")
+          OK=$(jq -r '.ok // false' /tmp/set.json)
+          DESC=$(jq -r '.description // ""' /tmp/set.json)
+          echo "setWebhook -> HTTP $CODE ok=$OK ($DESC)"
+          [ "$OK" = "true" ] || { echo "::error::Telegram refused the registration"; exit 1; }
+
+      - name: Repair — read the registration back
+        if: ${{ github.event.inputs.mode == 'repair' }}
+        env:
+          TG: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -e
+          curl -sS --max-time 25 "https://api.telegram.org/bot${TG}/getWebhookInfo" -o /tmp/info2.json
+          URL=$(jq -r '.result.url // ""' /tmp/info2.json)
+          echo "registered url now: ${URL:-<none>}"
+          [ "$URL" = "$WEBHOOK_URL" ] || { echo "::error::registration did not stick"; exit 1; }
+          # And the live handler must still be the one refusing strangers.
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'X-Telegram-Bot-Api-Secret-Token: not-the-real-secret-probe' \
+            --data '{}' "$WEBHOOK_URL" || echo 000)
+          echo "wrong-secret probe after repair -> $CODE (must stay 403)"
+          [ "$CODE" = "403" ] || { echo "::error::the handler no longer validates the secret as expected"; exit 1; }
+          echo "Telegram now delivers /start (and contact shares, and wallet buttons) to the LIVE Worker."
