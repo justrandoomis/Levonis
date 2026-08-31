@@ -384,6 +384,76 @@ jobs:
               echo "  unexpected status; treat as unproven";;
           esac
 
+      # A redirect that survives the DNS fix lives in RULES, which this token
+      # deliberately cannot touch — narrower is correct for a token that also
+      # holds DNS write. So the run prints the exact clicks instead of
+      # reporting "blocked" and leaving the owner to guess.
+      - name: If a redirect still stands, say exactly what to click
+        if: ${{ steps.proof.outputs.admin_code != '404' && steps.proof.outputs.admin_code != '000' }}
+        run: |
+          {
+            echo ""
+            echo "## A redirect is still intercepting \`*.$DOMAIN\`"
+            echo ""
+            echo "The wildcard DNS record is not the cause (this run just wrote it)."
+            echo "Something in **Rules** answers before any Worker route can. Check these"
+            echo "four places, in this order — the first one that has a matching entry is it."
+            echo ""
+            echo "Everything below is in the Cloudflare dashboard at <https://dash.cloudflare.com>,"
+            echo "after selecting the **$DOMAIN** zone."
+            echo ""
+            echo "### 1. Redirect Rules  (most likely)"
+            echo ""
+            echo "**Rules → Overview → Redirect Rules** (older accounts: **Rules → Redirect Rules**)."
+            echo ""
+            echo "Look for a rule whose target URL contains \`l.ink\`, or whose expression"
+            echo "matches on hostname with \`wildcard\`, \`contains\`, or \`ends with\`."
+            echo "Open it and confirm the redirect target is \`levonis-iq-com.l.ink\`."
+            echo ""
+            echo "Then either **Delete** it, or — if you want the shortener kept for the apex —"
+            echo "**Edit** it and change the expression so it no longer matches storefronts:"
+            echo ""
+            echo '```'
+            echo "(http.host eq \"$DOMAIN\")"
+            echo '```'
+            echo ""
+            echo "Save. It takes effect within a few seconds."
+            echo ""
+            echo "### 2. Page Rules  (legacy, still active on many zones)"
+            echo ""
+            echo "**Rules → Page Rules**. Look for a rule whose URL pattern is \`*.$DOMAIN/*\`"
+            echo "with the setting **Forwarding URL**. Delete it, or narrow the pattern to"
+            echo "\`$DOMAIN/*\`."
+            echo ""
+            echo "### 3. Bulk Redirects  (account level, not zone level)"
+            echo ""
+            echo "Top-left account name → **Bulk Redirects**. Open each list and search for"
+            echo "\`$DOMAIN\`. Remove any row whose source is the wildcard."
+            echo ""
+            echo "### 4. The link-shortener app"
+            echo ""
+            echo "If **l.ink** or a URL-shortener integration is installed on this zone,"
+            echo "disable it for wildcard hostnames — it installs its own catch-all redirect."
+            echo ""
+            echo "---"
+            echo ""
+            echo "### After you change it"
+            echo ""
+            echo "Re-run **workflow 10** (read-only is enough). This line has to become 404:"
+            echo ""
+            echo '```'
+            echo "curl -s -o /dev/null -w '%{http_code}\n' https://anything.$DOMAIN/api/admin/community/overview"
+            echo '```'
+            echo ""
+            echo "404 means the Worker is answering on merchant hosts AND refusing platform"
+            echo "admin there. 302 means the redirect is still in front. 200, 401 or 403 mean"
+            echo "the Worker is answering but the host guard is not — tell me immediately if"
+            echo "you ever see one of those."
+            echo ""
+            echo "Then run **workflow 11** to verify the whole §95 chain."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "the exact steps are in this run's summary"
+
       - name: Say plainly what happened
         if: always()
         run: |

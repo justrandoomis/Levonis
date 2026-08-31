@@ -16,6 +16,7 @@ import {
   oneOf,
 } from '../lib/http';
 import { newId, hashPassword, verifyPassword, isLegacyHash, randomToken, sha256Hex } from '../lib/crypto';
+import { trustedOrigin } from '../lib/appOrigin';
 import { createSession, destroySession, destroyAllSessions, loadSessionUser } from '../lib/session';
 import { verifyGoogleIdToken } from '../lib/google';
 import { rateLimit } from '../lib/ratelimit';
@@ -1357,18 +1358,6 @@ authRoutes.post('/change-email', requireAuth, async (c) => {
 
 // Email helpers --------------------------------------------------------------
 
-/**
- * Origin used for links inside emails. NEVER derived from the request Host
- * header in deployed environments — a spoofed Host must not be able to point
- * reset links at an attacker's origin. The deploy workflows set APP_ORIGIN
- * per environment; the request-origin fallback exists only for local dev,
- * where APP_ORIGIN is empty.
- */
-function trustedOrigin(c: Context<AppContext>): string {
-  const configured = (c.env.APP_ORIGIN || '').trim().replace(/\/+$/, '');
-  if (configured) return configured;
-  return new URL(c.req.url).origin;
-}
 
 /**
  * Sends one email through the Resend API (immediate path for time-critical

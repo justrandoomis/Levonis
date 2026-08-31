@@ -38,6 +38,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { localeToApi } from '../lib/types';
 import { badRequest, forbidden, unauthorized, unavailable, str } from '../lib/http';
+import { trustedOrigin } from '../lib/appOrigin';
 import { randomToken, sha256Hex, timingSafeEqual } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -150,16 +151,6 @@ async function mintHandoffUrl(c: Context<AppContext>, dest: string, state: strin
   return `${dest}/auth/callback?code=${code}&state=${encodeURIComponent(state)}`;
 }
 
-/**
- * Origin for links back into the main site (login resume). Mirrors
- * routes/auth.ts trustedOrigin: APP_ORIGIN in deployed environments, the
- * request origin only as a local-dev fallback.
- */
-function trustedOrigin(c: Context<AppContext>): string {
-  const configured = (c.env.APP_ORIGIN || '').trim().replace(/\/+$/, '');
-  if (configured) return configured;
-  return new URL(c.req.url).origin;
-}
 
 /**
  * Browser navigation entry (top-level GET from the Studio host). Session
