@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 import type { HomeSectionItem, HomeTaxon } from '../../lib/api';
@@ -145,42 +145,143 @@ export function CategoryChips({ categories }: { categories: HomeTaxon[] }) {
 }
 
 /**
- * Top brands from the real `brands` table, ordered by how many active
- * products actually carry them. Used only when the owner has authored no
- * `top_brands` cards of their own — theirs can carry a logo, this cannot,
- * since the brands table has no image column; a gold monogram medallion
- * stands in, at a constant size so the rail never ragged-edges.
+ * The brands strip: a self-scrolling ticker of brand marks, at the owner's
+ * request — logos only, no cards or counts, drifting sideways until a finger
+ * or pointer rests on it and resuming when it leaves.
+ *
+ * TWO SOURCES, one look. Owner-authored `top_brands` cards win and their
+ * pictures ARE the logos, shown in a light puck so dark marks survive the
+ * dark page. With none authored it falls back to the real `brands` table
+ * ordered by how many active products carry each brand — that table has no
+ * image column, so a gold monogram puck stands in rather than a fake logo.
+ *
+ * The loop renders the set several times so the belt never shows a seam;
+ * only the FIRST copy carries data attributes and keyboard focus, so tests
+ * count real brands (not copies) and a keyboard user meets each brand once.
+ * prefers-reduced-motion parks the belt and leaves a plain swipeable rail.
  */
-export function BrandChips({ brands }: { brands: HomeTaxon[] }) {
-  const { t, loc } = useLanguage();
-  if (brands.length === 0) return null;
+interface MarqueeEntry {
+  key: string;
+  name: string;
+  image: string;
+  link: string;
+  /** data attribute name for the first copy: strip item vs brand chip. */
+  data: 'strip' | 'brand';
+  id: string;
+}
+
+function MarqueeMark({ entry, first }: { entry: MarqueeEntry; first: boolean }) {
+  const body = (
+    <>
+      <span
+        aria-hidden={!!entry.image || undefined}
+        className={`w-14 h-14 rounded-full shrink-0 flex items-center justify-center overflow-hidden border ${
+          entry.image
+            ? 'bg-zinc-100 border-zinc-300/40'
+            : 'bg-gold/10 border-gold/30 text-gold font-black text-base'
+        }`}
+      >
+        {entry.image ? (
+          <img src={entry.image} alt="" loading="lazy" className="w-full h-full object-contain p-2" />
+        ) : (
+          monogramOf(entry.name)
+        )}
+      </span>
+      <span className="block w-full text-center text-[10px] font-semibold text-zinc-400 truncate group-hover:text-white transition-colors">
+        {entry.name}
+      </span>
+    </>
+  );
+  const cls = 'group w-[84px] shrink-0 flex flex-col items-center gap-1.5 min-w-0';
+  const dataProps: Record<string, unknown> = first
+    ? { [entry.data === 'brand' ? 'data-brand-chip' : 'data-strip-item']: entry.id }
+    : { 'aria-hidden': true, tabIndex: -1 };
+  if (entry.link.startsWith('/')) {
+    return (
+      <Link to={entry.link} className={cls} {...dataProps}>
+        {body}
+      </Link>
+    );
+  }
+  if (entry.link) {
+    return (
+      <a href={entry.link} target="_blank" rel="noopener noreferrer" className={cls} {...dataProps}>
+        {body}
+      </a>
+    );
+  }
+  return (
+    <span className={cls} {...dataProps}>
+      {body}
+    </span>
+  );
+}
+
+export function BrandMarquee({ items, brands }: { items: HomeSectionItem[]; brands: HomeTaxon[] }) {
+  const { t, dir, loc } = useLanguage();
+  const [held, setHeld] = useState(false);
+
+  const entries: MarqueeEntry[] =
+    items.length > 0
+      ? items.map((it) => ({
+          key: it.id,
+          name: it.title,
+          image: it.image,
+          link: it.link,
+          data: 'strip' as const,
+          id: it.id,
+        }))
+      : brands.map((b) => ({
+          key: b.id,
+          name: loc(b.name_ar, b.name_en || b.name_ar, b.name_ckb),
+          image: '',
+          link: `/products?search=${encodeURIComponent(b.name_en || b.name_ar)}`,
+          data: 'brand' as const,
+          id: b.id,
+        }));
+  if (entries.length === 0) return null;
+
+  // Enough copies that the belt is always wider than any viewport; the
+  // animation walks exactly ONE copy's width, so the loop point is seamless.
+  const copies = entries.length >= 12 ? 2 : 4;
+  const step = 100 / copies;
+  const duration = Math.max(18, entries.length * 3.2);
+
+  const stop = () => setHeld(false);
+
   return (
     <section data-home-section="top_brands" className="mb-10 sm:mb-12">
       <SectionHeader title={t('topBrands')} accent="bg-gold" />
-      <Rail>
-        {brands.map((b) => {
-          const name = loc(b.name_ar, b.name_en || b.name_ar, b.name_ckb);
-          return (
-            <Link
-              key={b.id}
-              to={`/products?search=${encodeURIComponent(b.name_en || b.name_ar)}`}
-              data-brand-chip={b.id}
-              className="w-[120px] sm:w-[136px] shrink-0 snap-start flex flex-col items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-3.5 min-h-[104px] hover:border-gold/50 transition-colors min-w-0"
-            >
-              <span
-                aria-hidden
-                className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center bg-gold/10 border border-gold/30 text-gold font-black"
-              >
-                {monogramOf(b.name_en || b.name_ar)}
-              </span>
-              <span className="min-w-0 w-full text-center">
-                <span className="block text-[12px] font-bold text-white truncate">{name}</span>
-                <span className="block text-[10px] text-zinc-500">{b.product_count}</span>
-              </span>
-            </Link>
-          );
-        })}
-      </Rail>
+      {/* The whole animation lives in the STYLESHEET, duration included via
+          a CSS variable. An inline `animation:` shorthand would carry its own
+          inline-specificity play-state and silently beat the :hover /
+          .is-held pause rules — it did, in the first version. */}
+      <style>{`
+        @keyframes lv-brandmq { to { transform: translateX(${dir === 'rtl' ? '' : '-'}${step}%); } }
+        .lv-brandmq__track { animation: lv-brandmq var(--mq-dur, 30s) linear infinite; }
+        .lv-brandmq:hover .lv-brandmq__track,
+        .lv-brandmq.is-held .lv-brandmq__track { animation-play-state: paused; }
+        @media (prefers-reduced-motion: reduce) {
+          .lv-brandmq { overflow-x: auto; }
+          .lv-brandmq__track { animation: none !important; }
+        }
+      `}</style>
+      <div
+        className={`lv-brandmq overflow-hidden -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 hide-scrollbar${held ? ' is-held' : ''}`}
+        onPointerDown={() => setHeld(true)}
+        onPointerUp={stop}
+        onPointerLeave={stop}
+        onPointerCancel={stop}
+      >
+        <div
+          className="lv-brandmq__track flex w-max items-start gap-3"
+          style={{ '--mq-dur': `${duration}s` } as React.CSSProperties}
+        >
+          {Array.from({ length: copies }, (_, c) =>
+            entries.map((e) => <MarqueeMark key={`${c}-${e.key}`} entry={e} first={c === 0} />)
+          )}
+        </div>
+      </div>
     </section>
   );
 }

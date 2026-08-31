@@ -109,13 +109,27 @@ async function measure(page) {
   return page.evaluate(() => {
     const q = (s) => document.querySelector(s);
     const all = (s) => [...document.querySelectorAll(s)];
+    // An element only spills as far as its clipping ancestors let it PAINT.
+    // The brands belt is a transform-animated track inside overflow-hidden:
+    // its bounding rect runs far past the viewport while the page shows (and
+    // scrolls) nothing — the raw rect flagged it, the visible edge does not.
+    // Real page-level overflow is still covered twice: docOverflow measures
+    // the scroll width directly, and any element poking out of a
+    // non-clipping parent still reports its full rect here.
     let spill = 0;
     for (const el of document.querySelectorAll('body *')) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       const style = getComputedStyle(el);
       if (style.overflowX === 'auto' || style.overflowX === 'scroll') continue;
-      spill = Math.max(spill, Math.ceil(r.right) - document.documentElement.clientWidth);
+      let right = r.right;
+      for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+        const o = getComputedStyle(a).overflowX;
+        if (o === 'auto' || o === 'scroll' || o === 'hidden' || o === 'clip') {
+          right = Math.min(right, a.getBoundingClientRect().right);
+        }
+      }
+      spill = Math.max(spill, Math.ceil(right) - document.documentElement.clientWidth);
     }
     const heroEl = q('[data-hero]');
 

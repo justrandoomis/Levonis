@@ -7,7 +7,7 @@ import Hero from '../components/home/Hero';
 import ServicesGrid from '../components/home/ServicesGrid';
 import ProductCard from '../components/home/ProductCard';
 import SectionHeader from '../components/home/SectionHeader';
-import { ItemStrip, CategoryChips, BrandChips } from '../components/home/Strips';
+import { ItemStrip, CategoryChips, BrandMarquee } from '../components/home/Strips';
 import Spinner from '../components/ui/Spinner';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
@@ -145,10 +145,12 @@ export default function Home() {
 
       <div className="relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-2 bg-black rounded-t-[28px] -mt-7">
 
-        {/* Ads Marquee — gold separators mark where one notice ends and the
-            next begins, which a plain gap never did once two ran together. */}
+        {/* Ads Marquee — the cap of the black panel: flush with its top
+            edge, bleeding across the full width so the rounded corners clip
+            it, with gold separators marking where one notice ends and the
+            next begins. */}
         {homeAds.length > 0 && (
-          <div className="mb-8 sm:mb-10 overflow-hidden rounded-xl bg-zinc-900/40 border border-zinc-800">
+          <div className="-mt-8 sm:-mt-10 -mx-4 sm:-mx-6 lg:-mx-8 mb-8 sm:mb-10 overflow-hidden rounded-t-[28px] bg-zinc-900/40 border-b border-zinc-800/80">
             <style>{`@keyframes home-ads-marquee { from { transform: translateX(0); } to { transform: translateX(${dir === 'rtl' ? '' : '-'}50%); } }`}</style>
             <div
               className="flex items-center whitespace-nowrap py-2.5 w-max motion-reduce:animate-none"
@@ -208,18 +210,12 @@ export default function Home() {
           {
             id: 'top_brands',
             order: orderOf('top_brands'),
+            // One rendering for both sources: the owner's authored cards
+            // become the belt's logos; the real brands table is the
+            // fallback. The belt drifts, pauses under a finger or pointer,
+            // and resumes when it leaves.
             node: sectionVisible('top_brands') ? (
-              itemsFor('top_brands').length > 0 ? (
-                <ItemStrip
-                  key="top_brands"
-                  id="top_brands"
-                  title={t('topBrands')}
-                  accent="bg-gold"
-                  items={itemsFor('top_brands')}
-                />
-              ) : (
-                <BrandChips key="top_brands" brands={brands} />
-              )
+              <BrandMarquee key="top_brands" items={itemsFor('top_brands')} brands={brands} />
             ) : null,
           },
           {

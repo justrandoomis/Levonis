@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Layers, ShieldCheck, Wrench, Package, Users, Gift } from 'lucide-react';
+import { Layers, ShieldCheck, Wrench, Package, Users, Gift } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
 import SectionHeader from './SectionHeader';
 
 /**
- * What LEVONIS does besides sell boxes.
+ * What LEVONIS does besides sell boxes — six compact cards on one
+ * horizontally swiped rail (the owner asked for small modern cards, not a
+ * stacked list eating a phone screen).
  *
  * EVERY CARD POINTS AT A PAGE THAT EXISTS. This is a storefront promise, so
  * nothing here is aspirational: each route below is registered in App.tsx and
@@ -29,7 +31,7 @@ import SectionHeader from './SectionHeader';
  */
 
 const CARD_BASE =
-  'group flex items-center gap-3.5 rounded-2xl border p-4 min-h-[88px] transition-colors min-w-0';
+  'group flex w-[124px] min-h-[112px] shrink-0 snap-start flex-col items-center justify-center gap-2.5 rounded-xl border px-3 py-3.5 text-center transition-colors min-w-0';
 const CARD_PLAIN = 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600';
 const CARD_FEATURED =
   'bg-gradient-to-br from-olive/20 to-zinc-900/60 border-olive/40 hover:border-olive/70';
@@ -37,30 +39,22 @@ const CARD_FEATURED =
 function CardBody({
   icon: Icon,
   title,
-  desc,
   featured,
 }: {
   icon: React.ElementType;
   title: string;
-  desc: string;
   featured?: boolean;
 }) {
-  const { dir } = useLanguage();
-  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
   return (
     <>
       <div
-        className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
           featured ? 'bg-olive/25 border-olive/50' : 'bg-zinc-800/70 border-zinc-700/60'
         }`}
       >
-        <Icon aria-hidden="true" className={`w-6 h-6 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
+        <Icon aria-hidden="true" className={`w-5 h-5 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
       </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="text-white font-bold text-sm mb-0.5 line-clamp-2">{title}</h3>
-        <p className="text-xs text-zinc-400 line-clamp-2">{desc}</p>
-      </div>
-      <Chevron aria-hidden="true" className={`w-4 h-4 shrink-0 ${featured ? 'text-olive-light' : 'text-zinc-500'}`} />
+      <h3 className="w-full text-[12px] font-bold leading-snug text-white line-clamp-2">{title}</h3>
     </>
   );
 }
@@ -68,22 +62,22 @@ function CardBody({
 export default function ServicesGrid() {
   const { t } = useLanguage();
 
-  const inApp: Array<{ id: string; to: string; title: string; desc: string; icon: React.ElementType }> = [
-    { id: 'warranty', to: '/warranty', title: t('svcWarrantyTitle'), desc: t('svcWarrantyDesc'), icon: ShieldCheck },
-    { id: 'tools', to: '/tools', title: t('svcToolsTitle'), desc: t('svcToolsDesc'), icon: Wrench },
-    { id: 'bundles', to: '/bundles', title: t('svcBundlesTitle'), desc: t('svcBundlesDesc'), icon: Package },
-    { id: 'community', to: '/community', title: t('svcCommunityTitle'), desc: t('svcCommunityDesc'), icon: Users },
-    { id: 'rewards', to: '/points', title: t('svcRewardsTitle'), desc: t('svcRewardsDesc'), icon: Gift },
+  const inApp: Array<{ id: string; to: string; title: string; icon: React.ElementType }> = [
+    { id: 'warranty', to: '/warranty', title: t('svcWarrantyTitle'), icon: ShieldCheck },
+    { id: 'tools', to: '/tools', title: t('svcToolsTitle'), icon: Wrench },
+    { id: 'bundles', to: '/bundles', title: t('svcBundlesTitle'), icon: Package },
+    { id: 'community', to: '/community', title: t('svcCommunityTitle'), icon: Users },
+    { id: 'rewards', to: '/points', title: t('svcRewardsTitle'), icon: Gift },
   ];
 
   return (
     <section data-home-section="services" className="mb-10 sm:mb-12">
       <SectionHeader title={t('services')} accent="bg-olive" />
 
-      {/* One column on a phone, two on a tablet, three on a wide screen —
-          §1's responsive grid, with min-w-0 so a long Kurdish title wraps
-          instead of widening the row. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* One swipe rail at every width; six small cards fit a desktop row
+          outright, so the rail only actually scrolls where it should — on a
+          phone. min-w-0 so a long Kurdish title wraps inside its card. */}
+      <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 sm:gap-3">
         {/* Opens in its OWN tab. The Studio is a separate application on a
             separate subdomain, and replacing the store with it costs the
             customer their cart, their scroll position and their place in
@@ -96,12 +90,12 @@ export default function ServicesGrid() {
           data-service="studio"
           className={`${CARD_BASE} ${CARD_FEATURED}`}
         >
-          <CardBody icon={Layers} title={t('studioCardTitle')} desc={t('studioCardSubtitle')} featured />
+          <CardBody icon={Layers} title={t('studioCardTitle')} featured />
         </a>
 
         {inApp.map((s) => (
           <Link key={s.id} to={s.to} data-service={s.id} className={`${CARD_BASE} ${CARD_PLAIN}`}>
-            <CardBody icon={s.icon} title={s.title} desc={s.desc} />
+            <CardBody icon={s.icon} title={s.title} />
           </Link>
         ))}
       </div>
