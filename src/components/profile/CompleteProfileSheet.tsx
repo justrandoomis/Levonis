@@ -59,10 +59,12 @@ export default function CompleteProfileSheet() {
       .then((r) => {
         if (!alive) return;
         setData(r);
-        if (r.shouldPrompt && !r.complete) {
-          setOpen(true);
-          setAskedThisSession(true);
-        }
+        // Marked ASKED whether or not it opened: the question was put to the
+        // server once for this tab, and asking again on every user-object
+        // change would be a request per navigation for an answer that only
+        // moves on a timescale of days.
+        setAskedThisSession(true);
+        if (r.shouldPrompt && !r.complete) setOpen(true);
       })
       .catch(() => {
         /* A prompt that cannot load is a prompt that is not shown. */
