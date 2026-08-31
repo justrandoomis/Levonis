@@ -82,6 +82,63 @@ jobs:
           echo "an arbitrary subdomain reaching the Worker: $CODE"
           echo "worker=$CODE" >> "$GITHUB_OUTPUT"
 
+      # ------------------------------------------------- what the Worker holds
+      # The §95 run saw the apex classify as `main` at 03:36 and `foreign` at
+      # 03:40 with no deploy between, so the variable itself has to be read
+      # rather than inferred from behaviour. VALUES ARE NEVER PRINTED — only
+      # whether each one is present and whether it names this domain.
+      - name: Does the Worker actually hold the root domain
+        id: vars
+        continue-on-error: true
+        run: |
+          echo "root=unknown" >> "$GITHUB_OUTPUT"
+          echo "origin=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/levonis-staging/settings" \
+            -o /tmp/settings.json || true
+          if ! jq -e '.success == true' /tmp/settings.json > /dev/null 2>&1; then
+            echo "::warning::could not read the Worker settings"
+            exit 0
+          fi
+
+          echo "plain-text vars on the Worker:"
+          jq -r '[.result.bindings[] | select(.type=="plain_text") | .name] | sort | join(", ")' /tmp/settings.json
+
+          ROOT=$(jq -r --arg n STORE_ROOT_DOMAIN \
+            '.result.bindings[] | select(.type=="plain_text" and .name==$n) | .text // ""' /tmp/settings.json)
+          ORIGIN=$(jq -r --arg n APP_ORIGIN \
+            '.result.bindings[] | select(.type=="plain_text" and .name==$n) | .text // ""' /tmp/settings.json)
+          [ -z "$ROOT" ] || echo "::add-mask::$ROOT"
+          [ -z "$ORIGIN" ] || echo "::add-mask::$ORIGIN"
+
+          if [ -z "$ROOT" ]; then
+            echo "STORE_ROOT_DOMAIN: ABSENT"
+            echo "root=absent" >> "$GITHUB_OUTPUT"
+          elif [ "$ROOT" = "$DOMAIN" ]; then
+            echo "STORE_ROOT_DOMAIN: present and equal to $DOMAIN"
+            echo "root=ok" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::STORE_ROOT_DOMAIN is set but is NOT $DOMAIN"
+            echo "root=WRONG VALUE" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$ORIGIN" | grep -q "://$DOMAIN"; then
+            echo "APP_ORIGIN: names $DOMAIN"
+            echo "origin=ok" >> "$GITHUB_OUTPUT"
+          else
+            echo "APP_ORIGIN: does NOT name $DOMAIN"
+            echo "origin=WRONG VALUE" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Which version of the script is deployed, and when. A behaviour
+          # change with no deploy of ours means somebody else's deploy, or a
+          # rollout still in progress.
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/levonis-staging/deployments" \
+            -o /tmp/dep.json || true
+          jq -r '.result.deployments[-3:][]? | "  deployment \(.id[0:8]) at \(.created_on) by \(.author_email // "?") source=\(.source // "?")"' \
+            /tmp/dep.json 2>/dev/null || echo "  (deployment list unavailable)"
+
       # --------------------------------------------------------------- zone
       - name: Resolve the zone
         id: zone
@@ -335,6 +392,8 @@ jobs:
             echo ""
             echo "| Item | State |"
             echo "|---|---|"
+            echo "| STORE_ROOT_DOMAIN on the Worker | ${{ steps.vars.outputs.root }} |"
+            echo "| APP_ORIGIN names this domain | ${{ steps.vars.outputs.origin }} |"
             echo "| An arbitrary subdomain resolves | ${{ steps.outside.outputs.dns }} |"
             echo "| …and reaches the Worker (HTTP) | ${{ steps.outside.outputs.worker }} |"
             echo "| DNS API access | ${{ steps.dns.outputs.perm }} |"
