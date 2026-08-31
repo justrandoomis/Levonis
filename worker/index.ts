@@ -38,6 +38,7 @@ import { studioRoutes } from './routes/studio';
 import { classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storefrontRoutes } from './routes/storefront';
+import { marketplaceRoutes } from './routes/marketplace';
 
 const app = new Hono<AppContext>();
 
@@ -133,6 +134,8 @@ app.route('/api/studio', studioRoutes);
 app.route('/api/merchant', merchantRoutes);
 // The public shopfront: readable by anyone, on any host.
 app.route('/api/storefront', storefrontRoutes);
+// The customer-request marketplace: requests, offers, escrowed community orders.
+app.route('/api/marketplace', marketplaceRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.
