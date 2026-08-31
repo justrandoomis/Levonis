@@ -1,0 +1,286 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# Verifies, against the REAL origins, that Studio sign-on works, that logging
+# out of the main site takes Studio access with it, that the handoff refuses
+# everything it is supposed to refuse, and that Resend actually accepted a
+# password-reset email and a verification email.
+#
+# WHAT IT WRITES. One throwaway account, with a run-scoped plus-tagged address
+# derived from EMAIL_TEST_RECIPIENT so the two real emails land in the owner's
+# inbox and are identifiable. It buys nothing, touches no wallet, no order and
+# no ledger. Everything else it does is a GET or a SELECT.
+#
+# WHAT IT NEVER PRINTS. No secret value, and no token: a password-reset link
+# and a verification link are live credentials, so they are asserted with SQL
+# predicates that return booleans and never with anything that echoes them.
+# The generated account address and password are masked before first use.
+name: 15 - Verify Live Auth (SSO, logout liveness, Resend)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+      studio:
+        description: 'Studio origin'
+        required: false
+        default: 'https://studio.levonis-iq.com'
+
+concurrency: verify-live-auth
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+      STUDIO: ${{ github.event.inputs.studio || 'https://studio.levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # ---------------------------------------------------- bindings, first
+      # A binding check before the behaviour check, so a failure downstream
+      # can be attributed instead of guessed at. Presence only — a secret's
+      # value is never read, and wrangler does not expose it anyway.
+      - name: Bindings on the LIVE main Worker (levonis-staging)
+        id: mainbind
+        continue-on-error: true
+        run: |
+          set -e
+          echo "secret=unknown" >> "$GITHUB_OUTPUT"
+          echo "dest=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
+            -o /tmp/main.json
+          jq -e '.success == true' /tmp/main.json > /dev/null \
+            || { echo "::error::cannot read levonis-staging settings"; jq -r '.errors[]?|"  \(.code) \(.message)"' /tmp/main.json; exit 1; }
+
+          echo "Binding names and types on levonis-staging (no values):"
+          jq -r '.result.bindings[]? | "  \(.type)  \(.name)"' /tmp/main.json | sort
+
+          # A Worker secret appears as a binding of type secret_text with no
+          # readable value. That presence is the whole assertion.
+          if jq -e '[.result.bindings[]? | select(.name=="STUDIO_HANDOFF_SECRET" and .type=="secret_text")] | length > 0' /tmp/main.json > /dev/null; then
+            echo "STUDIO_HANDOFF_SECRET: present as a Worker SECRET"
+            echo "secret=present (secret_text)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::STUDIO_HANDOFF_SECRET is not a secret_text binding on levonis-staging"
+            echo "secret=MISSING" >> "$GITHUB_OUTPUT"
+          fi
+
+          # STUDIO_ALLOWED_DESTINATIONS is a plain var, so its value is
+          # readable and is not a secret — it is a list of public origins.
+          DEST=$(jq -r '[.result.bindings[]? | select(.name=="STUDIO_ALLOWED_DESTINATIONS") | .text] | first // ""' /tmp/main.json)
+          echo "STUDIO_ALLOWED_DESTINATIONS = ${DEST:-<unset>}"
+          echo "dest=${DEST:-<unset>}" >> "$GITHUB_OUTPUT"
+          case ",$(printf '%s' "$DEST" | tr -d ' ')," in
+            *",${STUDIO},"*|*",${STUDIO}/,"*) echo "the live Studio origin is allow-listed" ;;
+            *) echo "::error::STUDIO_ALLOWED_DESTINATIONS does not contain $STUDIO" ;;
+          esac
+
+          APP_ORIGIN=$(jq -r '[.result.bindings[]? | select(.name=="APP_ORIGIN") | .text] | first // ""' /tmp/main.json)
+          echo "APP_ORIGIN = ${APP_ORIGIN:-<unset>}"
+          [ "$APP_ORIGIN" = "$APEX" ] || echo "::warning::APP_ORIGIN is not $APEX — reset and verification links would not point there"
+
+          if jq -e '[.result.bindings[]? | select(.name=="EMAIL_API_KEY" and .type=="secret_text")] | length > 0' /tmp/main.json > /dev/null; then
+            echo "EMAIL_API_KEY: present as a Worker SECRET"
+          else
+            echo "::error::EMAIL_API_KEY is not a secret_text binding on levonis-staging"
+          fi
+
+          ALLOW=$(jq -r '[.result.bindings[]? | select(.name=="EMAIL_ALLOWED_RECIPIENTS") | .text] | first // ""' /tmp/main.json)
+          if [ -n "$ALLOW" ]; then
+            echo "::error::EMAIL_ALLOWED_RECIPIENTS is set on the live Worker — every address outside it is silently dropped, so a 'sent' email may never arrive."
+          else
+            echo "EMAIL_ALLOWED_RECIPIENTS is empty — no staging drop filter in the way"
+          fi
+
+      - name: Bindings on the LIVE Studio Worker (levonis-studio-staging)
+        id: studiobind
+        continue-on-error: true
+        run: |
+          set -e
+          echo "secret=unknown" >> "$GITHUB_OUTPUT"
+          echo "main_origin=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-studio-staging/settings" \
+            -o /tmp/studio.json
+          jq -e '.success == true' /tmp/studio.json > /dev/null \
+            || { echo "::error::cannot read levonis-studio-staging settings"; exit 1; }
+
+          echo "Binding names and types on levonis-studio-staging (no values):"
+          jq -r '.result.bindings[]? | "  \(.type)  \(.name)"' /tmp/studio.json | sort
+
+          if jq -e '[.result.bindings[]? | select(.name=="STUDIO_HANDOFF_SECRET" and .type=="secret_text")] | length > 0' /tmp/studio.json > /dev/null; then
+            echo "STUDIO_HANDOFF_SECRET: present as a Worker SECRET"
+            echo "secret=present (secret_text)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::STUDIO_HANDOFF_SECRET is not a secret_text binding on levonis-studio-staging"
+            echo "secret=MISSING" >> "$GITHUB_OUTPUT"
+          fi
+
+          MAIN=$(jq -r '[.result.bindings[]? | select(.name=="MAIN_SITE_ORIGIN") | .text] | first // ""' /tmp/studio.json)
+          echo "MAIN_SITE_ORIGIN = ${MAIN:-<unset>}"
+          echo "main_origin=${MAIN:-<unset>}" >> "$GITHUB_OUTPUT"
+          [ "$MAIN" = "$APEX" ] || echo "::error::MAIN_SITE_ORIGIN is not $APEX — the server-to-server redemption has nowhere to go"
+
+          # Both Workers must hold the SAME secret. Neither value is readable,
+          # so the guarantee comes from provenance: one repository secret feeds
+          # both `wrangler secret put` calls. Recorded, not asserted.
+          echo ""
+          echo "Byte-equality of the two secrets is guaranteed by construction:"
+          echo "both are uploaded from the single STUDIO_HANDOFF_SECRET repository secret"
+          echo "(deploy-staging-code.yml and deploy-studio-code.yml). Cloudflare never"
+          echo "returns a secret's value, so it cannot be compared here — and should not be."
+
+      # -------------------------------------------------- the live scenario
+      - name: Generate a run-scoped throwaway identity
+        id: identity
+        env:
+          EMAIL_TEST_RECIPIENT: ${{ secrets.EMAIL_TEST_RECIPIENT }}
+        run: |
+          set -e
+          if [ -z "$EMAIL_TEST_RECIPIENT" ]; then
+            echo "::error::EMAIL_TEST_RECIPIENT is not set. The email checks need a real inbox to deliver to; without one this workflow cannot prove delivery and will not pretend to."
+            exit 1
+          fi
+          LOCAL="${EMAIL_TEST_RECIPIENT%@*}"
+          DOMAIN="${EMAIL_TEST_RECIPIENT#*@}"
+          TAG="levo-e2e-${GITHUB_RUN_ID}"
+          ADDR="${LOCAL}+${TAG}@${DOMAIN}"
+          PASS="Lv-$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')-e2e"
+          # Masked before either is used anywhere, so neither can reach the log.
+          echo "::add-mask::$ADDR"
+          echo "::add-mask::$PASS"
+          echo "addr=$ADDR" >> "$GITHUB_OUTPUT"
+          echo "pass=$PASS" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "A throwaway address was generated with the plus-tag +$TAG."
+          echo "The address itself is masked; the tag is what the outbox is searched by."
+
+      - name: Studio SSO, negative cases and logout liveness, live
+        id: scenario
+        continue-on-error: true
+        env:
+          TEST_EMAIL: ${{ steps.identity.outputs.addr }}
+          TEST_PASSWORD: ${{ steps.identity.outputs.pass }}
+          MERCHANT_ORIGIN: https://levo-e2e-check.levonis-iq.com
+        run: node scripts/e2e-live-auth.mjs 2>&1 | tee /tmp/scenario.log
+
+      # -------------------------------------------- did Resend take them?
+      # The API reporting success is not evidence a message was sent: both
+      # endpoints answer identically whether or not an account exists, and the
+      # outbox is where the truth is. `state='sent'` is written only after
+      # Resend answered 2xx (worker/lib/outbox.ts).
+      - name: Did Resend accept the two emails
+        id: outbox
+        continue-on-error: true
+        env:
+          TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          set -e
+          echo "reset=unknown" >> "$GITHUB_OUTPUT"
+          echo "verify=unknown" >> "$GITHUB_OUTPUT"
+          # Give the outbox processor a moment; sends run via ctx.waitUntil.
+          sleep 20
+
+          q() {
+            npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "$1" \
+              | jq -r '.[0].results'
+          }
+
+          # Never select the payload: it contains a live reset token and a live
+          # verification token. Only counts and states leave the database.
+          echo "Outbox rows for this run's address (by plus-tag, no payload read):"
+          q "SELECT kind, state, substr(last_error,1,120) AS last_error, COUNT(*) AS n
+              FROM outbox WHERE recipient LIKE '%+${TAG}@%' GROUP BY kind, state, last_error" \
+            | jq -r '.[] | "  \(.kind)  state=\(.state)  n=\(.n)  \(.last_error // "")"'
+
+          SENT=$(q "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%' AND state='sent'" | jq -r '.[0].n')
+          TOTAL=$(q "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%'" | jq -r '.[0].n')
+          echo "rows: $TOTAL, accepted by Resend: $SENT"
+
+          # Which of the two is which, by the link each carries. The predicate
+          # runs INSIDE SQLite and returns a count — the link never comes back.
+          RESET=$(q "SELECT COUNT(*) AS n FROM outbox
+                      WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
+                        AND payload LIKE '%${APEX}/auth?reset=%'" | jq -r '.[0].n')
+          VERIFY=$(q "SELECT COUNT(*) AS n FROM outbox
+                       WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
+                         AND payload LIKE '%${APEX}/%verify%'" | jq -r '.[0].n')
+          OFFSITE=$(q "SELECT COUNT(*) AS n FROM outbox
+                        WHERE recipient LIKE '%+${TAG}@%'
+                          AND payload LIKE '%https://%'
+                          AND payload NOT LIKE '%${APEX}%'" | jq -r '.[0].n')
+
+          echo ""
+          echo "password-reset email accepted by Resend, link on ${APEX} : $RESET"
+          echo "verification email accepted by Resend, link on ${APEX}   : $VERIFY"
+          echo "any link in those emails pointing off ${APEX}            : $OFFSITE"
+          echo "reset=$RESET" >> "$GITHUB_OUTPUT"
+          echo "verify=$VERIFY" >> "$GITHUB_OUTPUT"
+          echo "offsite=$OFFSITE" >> "$GITHUB_OUTPUT"
+
+          FAIL=0
+          [ "$RESET" -ge 1 ] || { echo "::error::no password-reset email was accepted by Resend for this run"; FAIL=1; }
+          [ "$VERIFY" -ge 1 ] || { echo "::error::no verification email was accepted by Resend for this run"; FAIL=1; }
+          [ "$OFFSITE" = "0" ] || { echo "::error::an email for this run carries a link outside ${APEX}"; FAIL=1; }
+          exit $FAIL
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo "## Live auth verification"
+            echo ""
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| levonis-staging · STUDIO_HANDOFF_SECRET | ${{ steps.mainbind.outputs.secret }} |"
+            echo "| levonis-staging · STUDIO_ALLOWED_DESTINATIONS | ${{ steps.mainbind.outputs.dest }} |"
+            echo "| levonis-studio-staging · STUDIO_HANDOFF_SECRET | ${{ steps.studiobind.outputs.secret }} |"
+            echo "| levonis-studio-staging · MAIN_SITE_ORIGIN | ${{ steps.studiobind.outputs.main_origin }} |"
+            echo "| Scenario (SSO, negatives, logout liveness) | ${{ steps.scenario.outcome }} |"
+            echo "| Password-reset emails accepted by Resend | ${{ steps.outbox.outputs.reset }} |"
+            echo "| Verification emails accepted by Resend | ${{ steps.outbox.outputs.verify }} |"
+            echo "| Links pointing off ${{ env.APEX }} | ${{ steps.outbox.outputs.offsite }} |"
+            echo ""
+            echo '```'
+            sed -n '/^=\{40,\}$/,$p' /tmp/scenario.log 2>/dev/null | head -60 || echo "(scenario produced no summary)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-auth-verification
+          path: |
+            /tmp/scenario.log
+            /tmp/live-auth-results.json
+          if-no-files-found: warn
+
+      - name: Fail the run if anything failed
+        if: always()
+        run: |
+          [ "${{ steps.scenario.outcome }}" = "success" ] || { echo "::error::the live scenario failed"; exit 1; }
+          [ "${{ steps.outbox.outcome }}" = "success" ] || { echo "::error::the email delivery check failed"; exit 1; }
+          [ "${{ steps.mainbind.outcome }}" = "success" ] || { echo "::error::the main Worker binding check failed"; exit 1; }
+          [ "${{ steps.studiobind.outcome }}" = "success" ] || { echo "::error::the Studio Worker binding check failed"; exit 1; }
+          echo "every check passed"
