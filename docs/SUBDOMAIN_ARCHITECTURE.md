@@ -276,8 +276,16 @@ workflow rather than trusting it.
 | Wildcard DNS (`*`) | ✅ **in place** — an arbitrary subdomain resolves to Cloudflare |
 | `studio.` and `mail.` | ✅ unaffected; the Studio answers 200 |
 | Worker on the apex | ✅ `levonis-staging` |
+| `STORE_ROOT_DOMAIN` on the Worker | ✅ set, and survives a Git-integration deploy |
+| Apex classifies as `main` | ✅ 10/10 requests |
+| Admin API on the apex | ✅ 401 for a stranger (not 404) |
+| Adding to the cart | ✅ no longer 500 |
 | Wildcard Worker route | ❌ **not verified** — the API token cannot read routes |
 | **A redirect intercepts every subdomain** | ❌ **blocker** |
+| `APP_ORIGIN` names this domain | ❌ owner decision — emailed links point elsewhere |
+
+The §95 run (workflow 11) currently reports **10 passed, 0 failed, 15
+blocked**. Every blocked item names its reason; none is counted as a pass.
 
 **THE BLOCKER.** Every `*.levonis-iq.com` hostname answers `302` to
 `https://levonis-iq-com.l.ink/…`, which then 404s:
