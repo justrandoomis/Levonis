@@ -789,15 +789,13 @@ export default function Auth() {
    */
   const googlePanel = googleClientId ? (
     <div className="flex min-h-[56px] flex-col items-center justify-center gap-3">
-      <GoogleOAuthProvider clientId={googleClientId}>
-        <GoogleLogin
-          onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
-          onError={() => setServerError(s.googleFailed)}
-          theme="filled_black"
-          text={view === 'signup' ? 'signup_with' : 'signin_with'}
-          width="320"
-        />
-      </GoogleOAuthProvider>
+      <GoogleLogin
+        onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
+        onError={() => setServerError(s.googleFailed)}
+        theme="filled_black"
+        text={view === 'signup' ? 'signup_with' : 'signin_with'}
+        width="320"
+      />
       <p className="text-center text-[12px] leading-relaxed text-zinc-500">{s.googleNote}</p>
     </div>
   ) : null;
@@ -1183,7 +1181,19 @@ export default function Auth() {
 
   // ------------------------------------------------------------------ page
 
-  return (
+  /**
+   * The provider is mounted ONCE for the whole page, outside the animated
+   * panel, and only when there is a real client id to give it.
+   *
+   * Not around the app (that is what forced a build-time value in the first
+   * place), and not inside the tab panel either: `@react-oauth/google` injects
+   * and removes Google's script on mount and unmount, so putting it in the
+   * panel would tear the script down and re-add it on every tab switch.
+   */
+  const withGoogle = (node: React.ReactNode) =>
+    googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{node}</GoogleOAuthProvider> : node;
+
+  return withGoogle(
     <div
       dir={dir}
       className="lv-auth min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-black via-black to-olive-dark font-sans text-white"
