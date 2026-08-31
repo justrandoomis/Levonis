@@ -34,7 +34,8 @@ import type { SettingsPanelProps } from "three-slicer/components";
 import { uiTree } from "three-slicer/data";
 import type { ViewportEvent, ViewportProps } from "three-slicer/viewer";
 import { registerExtendedModelLoaders } from "./model-loaders";
-import { arrangeCurrentObjects, createEngineAdapter, type EngineTestId } from "./engine-adapter";
+import { arrangeCurrentObjects, createEngineAdapter, seatNewObjects, type EngineTestId } from "./engine-adapter";
+import { currentDeviceProfile } from "./device-profile";
 import { createImportOrchestrator, ImportError, type ImportNotice, type ImportProgressUpdate } from "./import-orchestrator";
 import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from "./hooks/use-slicing-state";
 import { EDITOR_SHADOW_CSS } from "./editor-theme";
@@ -126,6 +127,38 @@ const EDITOR_PANELS = {
   resinCard: false,
   bedWarn: true,
 } as unknown as NonNullable<ViewportProps["panels"]>;
+
+/**
+ * Viewport props that never change, hoisted out of the render.
+ *
+ * They used to be object and array literals written inline in JSX, so every
+ * one of the shell's renders handed the engine a new `features`, a new
+ * `defaultExtruderColors` and a new `onSliced`. The shell re-renders several
+ * times a second while a slice runs (throttled progress) and on every engine
+ * `objects` event, and each of those was a fresh identity for props the engine
+ * has no reason to re-read. Constants cost nothing and remove that entirely.
+ */
+const EXTRUDER_COLORS = ["#303438", "#f3f4f4", "#BAA369", "#3a8dff"];
+
+/**
+ * Load the WASM kernel at mount (`warmup: true`) or leave it until something
+ * actually slices (`warmup: false`).
+ *
+ * This is the single most expensive decision on the page. The engine's warmup
+ * message loads `slicer_core.mt.js`, which reserves a 4 GiB SHARED
+ * WebAssembly.Memory and spawns one extra Worker per logical core, compiling
+ * the 5 MB module into every one of them before it reports ready — all of it
+ * for a bed with nothing on it. That is the crash the owner photographed on a
+ * project with nothing loaded. See app/device-profile.ts for the engine source
+ * this is read from.
+ *
+ * Nothing is disabled either way: a constrained device loads the identical
+ * kernel the moment the user slices. `warmup` is the engine's own documented
+ * opt-out for exactly this ("Off, nothing is downloaded or compiled until
+ * something actually slices").
+ */
+const EDITOR_FEATURES_WARM = { warmup: true, logs: false } as const;
+const EDITOR_FEATURES_COLD = { warmup: false, logs: false } as const;
 
 function SettingsBook({
   Panel,
@@ -249,9 +282,42 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const projectFilesRef = useRef<File[]>([]);
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
   const plateCountRef = useRef(1);
+  const selectedPlateRef = useRef(0);
+  /** Object ids the shell has already seen, so it can tell a spawn from a split. */
+  const seenObjectIdsRef = useRef<Set<number>>(new Set());
+  /**
+   * Set while the shell itself is placing objects — an undo restore, a project
+   * open, a new project. Those already carry exact positions, so the
+   * free-space seating must keep its hands off them.
+   */
+  const suppressSeatingRef = useRef(false);
+  /** Pending idle release of the engine's slice worker (constrained devices). */
+  const workerReleaseTimerRef = useRef<number | null>(null);
+  const suppressSeatingTimerRef = useRef<number | null>(null);
+
+  /**
+   * Holds the free-space seating off while the shell itself is placing
+   * objects. A restore (undo, opening a project, a 3MF import) supplies exact
+   * positions that must be honoured; objects appearing during it are recorded
+   * as known but never moved. The window is generous because the engine emits
+   * its objects events asynchronously as it parses.
+   */
+  const suppressSeating = useCallback((ms = 3_000) => {
+    suppressSeatingRef.current = true;
+    if (suppressSeatingTimerRef.current !== null) window.clearTimeout(suppressSeatingTimerRef.current);
+    suppressSeatingTimerRef.current = window.setTimeout(() => {
+      suppressSeatingTimerRef.current = null;
+      suppressSeatingRef.current = false;
+    }, ms);
+  }, []);
+
 
   // The S4 typed engine adapter carries the LEVONIS theme into every engine
   // shadow root (event-driven — no polling); one instance for the shell's life.
+  // Read once per mount: the answer cannot change without a reload, and it
+  // decides the engine `features` prop, the autosave cadence and whether the
+  // idle slice worker is released.
+  const [device] = useState(currentDeviceProfile);
   const [adapter] = useState(() => createEngineAdapter({ themeCss: EDITOR_SHADOW_CSS }));
   const orchestrator = useMemo(() => createImportOrchestrator(adapter), [adapter]);
   const slicing = useSlicingState(adapter);
@@ -269,11 +335,17 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const captureEngineSnapshot = useCallback((): Promise<SnapshotCapture | null> => {
     if (exportIntentRef.current) return Promise.resolve(null);
     const safeName = (projectName.trim() || "LEVO Project").replace(/[^\p{L}\p{N}._-]+/gu, "-");
+    // The engine's 3MF export walks every object's geometry and deflates it on
+    // the main thread. Frames drawn during it are identical pictures that only
+    // delay it — the engine exposes suspendRendering for exactly this case and
+    // says so in its own doc comment. Resumed in settle(), on every path.
+    const rendering = adapter.suspendRendering(true);
     return new Promise<SnapshotCapture | null>((resolve) => {
       let settled = false;
       const settle = (file: File | null) => {
         if (settled) return;
         settled = true;
+        if (rendering) adapter.suspendRendering(false);
         if (snapshotResolverRef.current === settle) snapshotResolverRef.current = null;
         if (exportIntentRef.current === "persist") exportIntentRef.current = null;
         resolve(file ? { file, name: `${safeName}.3mf` } : null);
@@ -287,6 +359,39 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       window.setTimeout(() => settle(null), 30_000);
     });
   }, [adapter, projectName]);
+
+  /**
+   * Everything that would change the saved 3MF, as one cheap string.
+   *
+   * The autosave effect marks the session dirty whenever the objects array or
+   * the settings object changes identity, which is far more often than the
+   * project actually changes. Without this, every one of those fires paid for
+   * a full engine export, a thumbnail read-back and a SHA-256 over a
+   * multi-megabyte file before discovering the bytes were identical — the
+   * upload hash can only skip the network, never the work.
+   *
+   * It must cover everything the snapshot depends on and nothing else. Scene
+   * transforms, extruders and visibility come from the adapter's own
+   * fingerprint; names, plates, the preset choice, the settings map and the
+   * project name are added here.
+   */
+  const projectContentSignature = useCallback((): string | null => {
+    if (!adapter.api()) return null;
+    const settingsRecord = settings as unknown as Record<string, unknown>;
+    const settingsPart = Object.keys(settingsRecord)
+      .sort()
+      .map((key) => `${key}=${JSON.stringify(settingsRecord[key])}`)
+      .join("&");
+    const namesPart = objects.map((object) => `${object.id}:${object.name}`).sort().join(",");
+    return [
+      projectName.trim(),
+      `${profileId}:${quality}:${strength}:${support}`,
+      `plates=${plateCount}`,
+      namesPart,
+      adapter.sceneFingerprint(),
+      settingsPart,
+    ].join("|");
+  }, [adapter, objects, plateCount, profileId, projectName, quality, settings, strength, support]);
 
   const persistence = useProjectPersistence({
     user: user?.id ? { id: user.id } : null,
@@ -325,6 +430,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       thumbnail,
     }),
     getMeta: () => ({ schemaVersion: 2, engineVersion: "three-slicer@0.2.2" }),
+    contentSignature: () => projectContentSignature(),
+    // A save costs a full 3MF export, a canvas read-back and a SHA-256 over
+    // the result. On a phone that is worth doing less often; see
+    // app/device-profile.ts.
+    debounceMs: device.autosaveDebounceMs,
   });
 
   // Surface the hook's local-save bookkeeping in the existing status labels:
@@ -571,9 +681,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     const undo = arrangeUndoRef.current;
     arrangeUndoRef.current = null;
     setArrangeUndoAvailable(false);
+    // A restore re-creates objects at their captured positions; seating them
+    // again would undo the undo.
+    suppressSeating();
     if (undo?.()) setNotice(t.arrangeUndone);
     else setNotice(t.actionUnavailable);
-  }, [t.actionUnavailable, t.arrangeUndone]);
+  }, [suppressSeating, t.actionUnavailable, t.arrangeUndone]);
 
   // -- autosave: the S5 sync layer owns debounce, capture, draft + upload ----
   // Any edit signal marks the session dirty; the controller then captures a
@@ -602,6 +715,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       : null;
     slicing.clearResults();
     orchestrator.clearPendingArrangement();
+    // A saved project carries its own layout — restore it, do not re-seat it.
+    suppressSeating();
     projectFilesRef.current = saved.files;
     setProjectId(saved.id);
     setProjectName(saved.name);
@@ -638,7 +753,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapter, orchestrator, requestedPresetKey, t.engineUnavailable, t.savedLocalFull, t.savedLocalSourceOnly]);
+  }, [adapter, orchestrator, requestedPresetKey, suppressSeating, t.engineUnavailable, t.savedLocalFull, t.savedLocalSourceOnly]);
 
   // Open an account project: download the head revision (ownership enforced
   // server-side), restore files + manifest settings, and surface a degraded
@@ -735,8 +850,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [lanAction, t.actionUnavailable]);
 
   const transmitNativePrint = useCallback(async () => {
-    const gcode = slicing.freshGcode(selectedPlate);
-    if (!gcode) {
+    const baseName = `LEVO-${profile.shortName}-plate-${selectedPlate + 1}`;
+    const gcodeFile = slicing.freshGcodeFile(selectedPlate, `${baseName}.gcode`);
+    if (!gcodeFile) {
       setLanMessage(slicing.resultState(selectedPlate) === "stale" ? t.printStale : t.printNotReady);
       return;
     }
@@ -745,8 +861,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setLanMessage(t.lanBridgeIncomplete);
       return;
     }
-    const baseName = `LEVO-${profile.shortName}-plate-${selectedPlate + 1}`;
-    const gcodeFile = new File([gcode], `${baseName}.gcode`, { type: "text/x-gcode" });
     let checksum: string;
     try { checksum = await sha256Hex(gcodeFile); }
     catch { setLanMessage(t.actionUnavailable); return; }
@@ -780,7 +894,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setLanAction("idle");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nativeEnvironment.capabilities, printerStatus, profile, selectedPlate, slicing.freshGcode, slicing.resultState, t.actionUnavailable, t.confirmLanPrint, t.lanBridgeIncomplete, t.lanPrintQueued, t.printNotReady, t.printStale]);
+  }, [nativeEnvironment.capabilities, printerStatus, profile, selectedPlate, slicing.freshGcodeFile, slicing.resultState, t.actionUnavailable, t.confirmLanPrint, t.lanBridgeIncomplete, t.lanPrintQueued, t.printNotReady, t.printStale]);
 
   // -- 3MF export intents (engine save-project via adapter) ------------------
   const handleViewportExport = useCallback<NonNullable<ViewportProps["onExport"]>>((file, filename) => {
@@ -824,26 +938,75 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }, 30_000);
   }, [adapter, t.actionUnavailable]);
 
+  // -- slice worker lifecycle ------------------------------------------------
+  //
+  // The engine keeps its slice worker for the lifetime of the page: it is only
+  // ever terminated on unmount. After a slice, that worker still holds the
+  // grown WASM heap (WebAssembly memory never shrinks) and, on the threaded
+  // kernel, the whole `navigator.hardwareConcurrency` pthread pool it spawned.
+  // On a phone that is why the SECOND slice is the one that dies.
+  //
+  // `patches/three-slicer+0.2.2.patch` adds the entry point that lets the
+  // engine hand it back; the shell decides when. Releasing is not free — the
+  // next slice recompiles the kernel — so it is only done where the memory is
+  // worth more than the warm start: on a memory-constrained device after an
+  // idle period, and whenever the tab goes to the background.
+  //
+  // The release itself refuses while a slice is pending, so none of this can
+  // interrupt work. It is not a cancel and is never used as one.
+  const cancelIdleWorkerRelease = useCallback(() => {
+    if (workerReleaseTimerRef.current !== null) {
+      window.clearTimeout(workerReleaseTimerRef.current);
+      workerReleaseTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleIdleWorkerRelease = useCallback(() => {
+    cancelIdleWorkerRelease();
+    const delay = device.idleWorkerReleaseMs;
+    if (delay === null) return;
+    workerReleaseTimerRef.current = window.setTimeout(() => {
+      workerReleaseTimerRef.current = null;
+      adapter.releaseSlicerWorker();
+    }, delay);
+  }, [adapter, cancelIdleWorkerRelease, device.idleWorkerReleaseMs]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      // A backgrounded tab is where a mobile OS reclaims memory, and it is the
+      // moment holding a WASM heap costs the most and buys the least.
+      cancelIdleWorkerRelease();
+      adapter.releaseSlicerWorker();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [adapter, cancelIdleWorkerRelease]);
+
+  useEffect(() => cancelIdleWorkerRelease, [cancelIdleWorkerRelease]);
+
   // -- slicing / output ------------------------------------------------------
   const triggerSlice = useCallback((allPlates = false) => {
+    // A slice is about to need the worker: never let a pending idle release
+    // fire into it.
+    cancelIdleWorkerRelease();
     if (status === "slicing" || plateCount === 1) {
       if (!adapter.clickControl("slice-btn")) setNotice(t.actionUnavailable);
       return;
     }
     if (!adapter.triggerSlice(allPlates ? "all" : "current")) setNotice(t.actionUnavailable);
-  }, [adapter, plateCount, status, t.actionUnavailable]);
+  }, [adapter, cancelIdleWorkerRelease, plateCount, status, t.actionUnavailable]);
 
   const currentResultState = slicing.resultState(selectedPlate);
   const currentStale = currentResultState === "stale";
-  const printReady = status !== "slicing" && status !== "error" && Boolean(slicing.freshGcode(selectedPlate));
+  const printReady = status !== "slicing" && status !== "error" && currentResultState === "fresh";
 
   const currentGcodeFile = useCallback(() => {
-    const gcode = slicing.freshGcode(selectedPlate);
-    if (!gcode) return null;
     const name = `LEVO-${profile.shortName}-plate-${selectedPlate + 1}.gcode`;
-    return new File([gcode], name, { type: "text/x-gcode" });
+    return slicing.freshGcodeFile(selectedPlate, name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.shortName, selectedPlate, slicing.freshGcode]);
+  }, [profile.shortName, selectedPlate, slicing.freshGcodeFile]);
 
   const downloadCurrentGcode = useCallback(() => {
     const file = currentGcodeFile();
@@ -888,17 +1051,63 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     else triggerSlice(false);
   }, [openPrintCenter, printReady, status, triggerSlice]);
 
+  // -- newly spawned objects: seat them in real free space -------------------
+  //
+  // The engine places anything it spawns without an explicit position from a
+  // cursor that only grows and resets only when the scene empties (the code is
+  // quoted in app/spawn-seating.ts). So the second copy lands at the bed edge
+  // and the fourth lands in open space far past it, with room still free next
+  // to the original — the "duplicate throws the copy far away" report.
+  //
+  // This runs on the engine's own `objects` event, so it covers every route
+  // that spawns one: the toolbar button, the engine's context menu, Ctrl+K,
+  // paste, and a file dropped straight onto the canvas.
+  const seatNewObjectsIfNeeded = useCallback((nextIds: readonly number[]) => {
+    const previous = seenObjectIdsRef.current;
+    const next = new Set(nextIds);
+    seenObjectIdsRef.current = next;
+
+    // A split removes one object and adds its parts AT THEIR ORIGINAL
+    // POSITIONS — that is the point of splitting, so the parts must stay put.
+    // Any transition that also removed an id is therefore not a spawn.
+    for (const id of previous) if (!next.has(id)) return;
+
+    const appeared = [...next].filter((id) => !previous.has(id));
+    if (!appeared.length) return;
+    // An archive import has its own multi-plate arrangement; a project restore
+    // places every object at the author's own offsets. Neither is a spawn, and
+    // re-seating either would throw away a layout that is already correct.
+    if (orchestrator.busy || orchestrator.hasPendingArrangement || suppressSeatingRef.current) return;
+
+    const result = seatNewObjects(adapter, {
+      newIds: appeared,
+      bedWidth: profile.bedWidth,
+      bedDepth: profile.bedDepth,
+      plateCount: plateCountRef.current,
+      selectedPlate: selectedPlateRef.current,
+    });
+    // Nothing that did not fit was squeezed, scaled or stacked — it stays
+    // where the engine put it and the user is told, rather than finding a
+    // silently overlapping plate later.
+    if (result.ok && result.unseatedCount) {
+      setNotice(templateText(t.zipOverflow, { count: result.unseatedCount }));
+    }
+  }, [adapter, orchestrator, profile.bedDepth, profile.bedWidth, t.zipOverflow]);
+
   // -- engine event stream ---------------------------------------------------
   const handleEvent = useCallback((event: ViewportEvent) => {
     slicing.handleViewportEvent(event as SlicingViewportEvent);
     if (event.type === "objects") {
       setObjects(event.value);
-      orchestrator.notifyObjects(event.value.map((object) => object.id));
+      const ids = event.value.map((object) => object.id);
+      orchestrator.notifyObjects(ids);
+      seatNewObjectsIfNeeded(ids);
       if (event.value.length) setStatus((current) => current === "slicing" ? current : "editing");
     } else if (event.type === "plateCount") {
       plateCountRef.current = event.value;
       setPlateCount(event.value);
     } else if (event.type === "selectedPlate") {
+      selectedPlateRef.current = event.value;
       setSelectedPlate(event.value);
     } else if (event.type === "canvasMode") {
       setCanvasMode(event.value);
@@ -916,7 +1125,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orchestrator, slicing.handleViewportEvent]);
+  }, [orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
 
   const handleSliced = useCallback((payload: SlicePayload) => {
     const outcome = slicing.handleSliced(payload);
@@ -927,13 +1136,20 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
     setError("");
     setStatus("ready");
+    scheduleIdleWorkerRelease();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.shortName, slicing.handleSliced, t.overBedError]);
+  }, [profile.shortName, scheduleIdleWorkerRelease, slicing.handleSliced, t.overBedError]);
+
+  /** Stable identity for the engine prop — see EXTRUDER_COLORS above. */
+  const handleEngineSliced = useCallback((payload: { plate: number; stats: Record<string, unknown>; gcode: string }) => {
+    handleSliced(payload as SlicePayload);
+  }, [handleSliced]);
 
   const newProject = useCallback(() => {
     if (objects.length && !window.confirm(t.newConfirm)) return;
     slicing.clearResults();
     orchestrator.clearPendingArrangement();
+    seenObjectIdsRef.current = new Set();
     arrangeUndoRef.current = null;
     setArrangeUndoAvailable(false);
     setObjects([]);
@@ -1070,10 +1286,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
               motionPanel={motionPanel}
               filamentPanel={filamentPanel}
               panels={EDITOR_PANELS}
-              features={{ warmup: true, logs: false }}
-              defaultExtruderColors={["#303438", "#f3f4f4", "#BAA369", "#3a8dff"]}
+              features={device.memoryConstrained ? EDITOR_FEATURES_COLD : EDITOR_FEATURES_WARM}
+              defaultExtruderColors={EXTRUDER_COLORS}
               onEvent={handleEvent}
-              onSliced={(payload) => handleSliced(payload as SlicePayload)}
+              onSliced={handleEngineSliced}
               onExport={handleViewportExport}
             />
           ) : (

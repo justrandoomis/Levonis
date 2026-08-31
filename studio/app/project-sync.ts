@@ -685,6 +685,29 @@ export interface ProjectSyncCallbacks {
   /** Local IndexedDB draft write (namespaced by the hook). */
   persistDraft?(payload: DraftPersistPayload): Promise<void>;
   onState?(state: PersistenceState): void;
+  /**
+   * A CHEAP fingerprint of everything that would change the saved snapshot —
+   * scene transforms, settings revision, plate count, project name. Return
+   * null when it cannot be computed; the save then runs unconditionally.
+   *
+   * WHY IT EXISTS. A save is expensive: a full engine 3MF export (merge every
+   * object's geometry, write the XML, deflate it), a canvas read-back for the
+   * thumbnail, and a SHA-256 over the whole file — which needs the entire
+   * multi-megabyte snapshot in one ArrayBuffer. The content hash that decides
+   * whether to UPLOAD is computed from that file, so it can only skip the
+   * network, never the work.
+   *
+   * Meanwhile `markDirty()` fires from an effect watching object and settings
+   * identity, so plenty of runs have nothing new to save at all. On a phone
+   * holding a 20 MB model, paying the full export every few seconds for an
+   * unchanged scene is a stutter the user feels and a memory spike the slice
+   * worker does not survive.
+   *
+   * So this runs FIRST and, when it matches the last completed full save,
+   * nothing is captured, hashed, written or uploaded. It is only ever allowed
+   * to skip work that would have produced identical bytes.
+   */
+  contentSignature?(): string | null;
 }
 
 export interface SyncTimers {
@@ -731,6 +754,13 @@ export class ProjectSyncController {
   private saving: Promise<void> | null = null;
   private saveQueued = false;
   private lastSyncedHash: string | null = null;
+  /**
+   * Signature of the last run that completed as a FULL snapshot with no
+   * failure. Cleared on every degraded or failed run, so a save that fell back
+   * to source-only (or failed to write, upload or resolve a conflict) is always
+   * retried rather than skipped by a matching signature.
+   */
+  private lastSavedSignature: string | null = null;
   private baseRevision: number | null;
 
   constructor(options: ProjectSyncControllerOptions) {
@@ -796,6 +826,7 @@ export class ProjectSyncController {
     if (this.disposed) return;
     this.baseRevision = baseRevision;
     this.lastSyncedHash = synced?.hash ?? null;
+    this.lastSavedSignature = null;
     this.setState({
       remoteProjectId: projectId,
       conflict: null,
@@ -813,6 +844,8 @@ export class ProjectSyncController {
     if (this.disposed) return;
     this.baseRevision = null;
     this.lastSyncedHash = null;
+    // A different project must never inherit this one's "already saved" mark.
+    this.lastSavedSignature = null;
     this.setState({
       remoteProjectId: null,
       conflict: null,
@@ -959,6 +992,27 @@ export class ProjectSyncController {
   private async runSave(): Promise<void> {
     const { callbacks } = this.opts;
 
+    // 0. Cheap change check BEFORE any expensive work. See the doc comment on
+    //    ProjectSyncCallbacks.contentSignature: capture + thumbnail + SHA-256
+    //    over a multi-megabyte 3MF is the most expensive thing this editor
+    //    does off the slice path, and markDirty() fires far more often than
+    //    the project actually changes.
+    let signature: string | null = null;
+    try {
+      signature = this.opts.callbacks.contentSignature?.() ?? null;
+    } catch {
+      signature = null;
+    }
+    if (signature !== null && signature === this.lastSavedSignature) {
+      // Identical content to the last completed FULL save: capturing it again
+      // would produce the same bytes. The state must still settle honestly —
+      // "synced" only where the previous run really reached a committed
+      // revision, "saved-local" otherwise.
+      const synced = this.state.remoteProjectId !== null && this.state.lastSyncedRevision !== null;
+      this.setState({ dirty: false, status: synced ? "synced" : "saved-local", failure: null });
+      return;
+    }
+
     // 1. Capture: full engine snapshot, honestly degrading to source-only.
     let files: File[] = [];
     let kind: SnapshotKind = "source-only";
@@ -1016,6 +1070,10 @@ export class ProjectSyncController {
         failure: { kind: "local", message: error instanceof Error ? error.message : String(error), retryable: true },
       });
     }
+    // Only a clean FULL save is allowed to suppress a later identical run. A
+    // degraded source-only save (the engine did not answer) or a failed write
+    // must be retried next time, not skipped because the scene looks the same.
+    this.lastSavedSignature = localSaved && kind === "full" ? signature : null;
     if (this.disposed) return;
     if (localSaved) {
       this.setState({
@@ -1037,6 +1095,11 @@ export class ProjectSyncController {
       return;
     }
 
+    // From here on the run has network work left to do. Drop the skip mark for
+    // the duration: if the upload fails, the auto-retry (and the next edit)
+    // must run the whole save again, not find a matching signature and decide
+    // there is nothing to do. It is restored below only on a committed upload.
+    this.lastSavedSignature = null;
     this.setState({ status: "uploading" });
     const meta = callbacks.getMeta();
     const uploadFiles: SnapshotUploadFile[] = files.map((file) => ({
@@ -1067,6 +1130,7 @@ export class ProjectSyncController {
     if (result.ok) {
       this.baseRevision = result.revision;
       this.lastSyncedHash = result.contentHash;
+      this.lastSavedSignature = kind === "full" ? signature : null;
       this.setState({
         status: this.state.dirty ? "unsaved" : "synced",
         lastSyncedRevision: result.revision,

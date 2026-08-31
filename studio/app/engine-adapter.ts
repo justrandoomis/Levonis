@@ -29,6 +29,7 @@ import {
   type ArrangeCandidate,
   type ArrangePlan,
 } from "./plate-packing";
+import { planSeats, type SeatedFootprint, type SeatRequest } from "./spawn-seating";
 
 // ---------------------------------------------------------------------------
 // Engine contract (verified by tests/editor-capabilities.test.mjs)
@@ -77,6 +78,22 @@ export const ENGINE_API_METHODS = [
   "placeObjectOnPlate",
   "platePos",
   "frame",
+  "suspendRendering",
+  "selectedObjectId",
+] as const;
+
+/**
+ * Engine globals this adapter reaches for that are NOT part of `__vpApi`.
+ *
+ * `__vpReleaseWorker` is added by `patches/three-slicer+0.2.2.patch` — see
+ * patches/README.md for why the shell cannot free the idle slice worker
+ * without it. Listing it here means tests/editor-capabilities.test.mjs fails
+ * loudly if the patch ever stops being applied, instead of Studio quietly
+ * going back to holding a WASM heap and a pthread pool on phones.
+ */
+export const ENGINE_WINDOW_HOOKS = [
+  "__vpApi",
+  "__vpReleaseWorker",
 ] as const;
 
 export type EngineStaticTestId = (typeof ENGINE_STATIC_TEST_IDS)[number];
@@ -96,6 +113,23 @@ declare global {
     restoreScene(entries: readonly LevoSceneSnapshot[]): void;
     /** three.js (x,z) world offset of plate `plateIndex`'s centre. */
     platePos(plateIndex: number): { x: number; z: number };
+    /**
+     * Stops the engine's render loop while something long and non-visual runs.
+     * The engine's own doc comment: "on a large model each one is a main-thread
+     * block that delays the very worker replies the export is waiting on."
+     */
+    suspendRendering(suspended: boolean): void;
+    /** Id of the selected object, or null/0 when nothing is selected. */
+    selectedObjectId(): number | null;
+  }
+  interface Window {
+    /**
+     * Added by patches/three-slicer+0.2.2.patch. Terminates the idle slice
+     * worker (and with it the pthread pool it owns) so the engine builds a
+     * fresh one on the next slice. Returns false — changing nothing — while a
+     * slice is pending. Absent when the patch is not applied.
+     */
+    __vpReleaseWorker?: () => boolean;
   }
 }
 
@@ -467,6 +501,58 @@ export class EngineAdapter {
   }
 
   /**
+   * Stops (or resumes) the engine's render loop. The engine exposes this for
+   * exactly the case the shell has: a long, non-visual main-thread job — a
+   * full 3MF export for autosave, a G-code export, an import dispatch — where
+   * every frame drawn in the meantime is an identical picture that delays the
+   * job. Resuming redraws once, so nothing is left stale on screen.
+   *
+   * Always pair a `true` with a `false` in a `finally`. Returns false when the
+   * engine has not mounted yet.
+   */
+  suspendRendering(suspended: boolean): boolean {
+    const api = this.api();
+    if (!api || typeof api.suspendRendering !== "function") return false;
+    api.suspendRendering(suspended);
+    return true;
+  }
+
+  /** Runs `work` with the engine's render loop suspended, restoring it after. */
+  async withRenderingSuspended<T>(work: () => Promise<T>): Promise<T> {
+    const suspended = this.suspendRendering(true);
+    try {
+      return await work();
+    } finally {
+      if (suspended) this.suspendRendering(false);
+    }
+  }
+
+  /**
+   * Releases the engine's idle slice worker, freeing its WASM heap and — on
+   * the threaded kernel — the `navigator.hardwareConcurrency` pthread workers
+   * it owns. The engine creates a fresh worker on the next slice.
+   *
+   * Returns false and changes nothing when a slice is running, or when the
+   * hook is absent (see patches/README.md). It is NOT a cancel: it never
+   * interrupts work, and callers must not use it as one.
+   */
+  releaseSlicerWorker(): boolean {
+    if (typeof window === "undefined") return false;
+    const release = window.__vpReleaseWorker;
+    if (typeof release !== "function") return false;
+    try {
+      return release() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** True when the installed engine build carries the worker-release patch. */
+  canReleaseSlicerWorker(): boolean {
+    return typeof window !== "undefined" && typeof window.__vpReleaseWorker === "function";
+  }
+
+  /**
    * Nearest-plate classification of a snapshot from the engine's own plate
    * offsets (`platePos`). Plates are laid out further apart than a bed width,
    * so nearest-centre is exact for on-bed objects.
@@ -781,4 +867,123 @@ export async function arrangeCurrentObjects(
     undo: captured ? () => adapter.restoreSceneState(captured) : null,
   };
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Seating newly spawned objects (duplicate / paste / canvas drop)
+// ---------------------------------------------------------------------------
+
+export interface SeatNewObjectsOptions {
+  /** Ids that appeared in this transition — the objects to seat. */
+  newIds: readonly number[];
+  bedWidth: number;
+  bedDepth: number;
+  /** Plate tabs that currently exist. */
+  plateCount: number;
+  /** Plate the user is looking at; the preferred home for the new objects. */
+  selectedPlate: number;
+  /**
+   * The object the copies came from. Defaults to the engine's current
+   * selection, which duplicate/paste leave on the source. The nearest free
+   * spot to this object wins, so a copy lands beside its original.
+   */
+  sourceId?: number | null;
+}
+
+export interface SeatNewObjectsResult {
+  ok: boolean;
+  reason?: "engine-unavailable" | "no-new-objects";
+  /** Objects moved into free space. */
+  seatedCount: number;
+  /**
+   * Objects that fit nowhere on any existing plate. They are LEFT where the
+   * engine put them and reported — never scaled, rotated or stacked to fit.
+   */
+  unseatedCount: number;
+}
+
+const NOTHING_SEATED: Omit<SeatNewObjectsResult, "ok" | "reason"> = { seatedCount: 0, unseatedCount: 0 };
+
+/**
+ * Puts objects the engine has just spawned into real free space.
+ *
+ * The engine seats them from a cursor that only grows (see the header of
+ * spawn-seating.ts for the verbatim code), so by the third or fourth copy the
+ * new object is well past the edge of the bed while the space beside the
+ * original is empty. This recomputes the position from the actual scene and
+ * moves the copy there through the engine's own `placeObjectOnPlate`.
+ *
+ * Only the new objects move. Nothing that was already on the bed is touched —
+ * this is not an arrange, and a user who has carefully positioned a plate does
+ * not lose that layout because they pressed Duplicate.
+ */
+export function seatNewObjects(
+  adapter: EngineAdapter,
+  options: SeatNewObjectsOptions,
+): SeatNewObjectsResult {
+  const api = adapter.api();
+  if (!api) return { ok: false, reason: "engine-unavailable", ...NOTHING_SEATED };
+  const newIds = new Set(options.newIds);
+  if (!newIds.size) return { ok: false, reason: "no-new-objects", ...NOTHING_SEATED };
+
+  const snapshots = api.sceneSnapshot();
+  if (!snapshots.length) return { ok: false, reason: "no-new-objects", ...NOTHING_SEATED };
+
+  const plateCount = Math.max(1, Math.min(PLATE_CAP, options.plateCount || 1));
+  const preferredPlate = Math.max(0, Math.min(plateCount - 1, options.selectedPlate || 0));
+
+  // Plate-relative offsets, in the same convention placeObjectOnPlate takes:
+  // model mm from the plate centre, +Y = depth (three -z).
+  const relative = (snapshot: LevoSceneSnapshot, plate: number) => {
+    const centre = api.platePos(plate);
+    return { offsetX: snapshot.pos.x - centre.x, offsetY: -(snapshot.pos.z - centre.z) };
+  };
+
+  const occupied: SeatedFootprint[] = [];
+  const requests: SeatRequest[] = [];
+  let near: { x: number; y: number } | null = null;
+
+  let sourceId = options.sourceId ?? null;
+  if (sourceId === null || sourceId === undefined) {
+    try {
+      sourceId = api.selectedObjectId?.() ?? null;
+    } catch {
+      sourceId = null;
+    }
+  }
+
+  for (const snapshot of snapshots) {
+    const footprint = snapshotFootprint(snapshot);
+    if (newIds.has(snapshot.id)) {
+      requests.push({ id: snapshot.id, width: footprint.width, depth: footprint.depth });
+      continue;
+    }
+    const plate = adapter.plateOfSnapshot(snapshot, plateCount);
+    const { offsetX, offsetY } = relative(snapshot, plate);
+    occupied.push({ id: snapshot.id, plate, offsetX, offsetY, width: footprint.width, depth: footprint.depth });
+    if (sourceId !== null && snapshot.id === sourceId && plate === preferredPlate) {
+      near = { x: offsetX, y: offsetY };
+    }
+  }
+
+  if (!requests.length) return { ok: false, reason: "no-new-objects", ...NOTHING_SEATED };
+
+  const availablePlates: number[] = [];
+  for (let plate = 0; plate < plateCount; plate += 1) availablePlates.push(plate);
+
+  const plan = planSeats(requests, occupied, {
+    bedWidth: options.bedWidth,
+    bedDepth: options.bedDepth,
+    preferredPlate,
+    availablePlates,
+    nearOffsetX: near?.x ?? 0,
+    nearOffsetY: near?.y ?? 0,
+  });
+
+  for (const seat of plan.seats) {
+    api.placeObjectOnPlate(seat.id, seat.plate, seat.offsetX, seat.offsetY);
+  }
+  if (plan.seats.length) adapter.notifySceneEdited();
+
+  return { ok: true, seatedCount: plan.seats.length, unseatedCount: plan.unseated.length };
 }

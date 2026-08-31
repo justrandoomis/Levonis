@@ -20,6 +20,8 @@ const aboutSheetUrl = new URL("../app/components/sheets/about.tsx", import.meta.
 const i18nEnUrl = new URL("../app/i18n/en.ts", import.meta.url);
 const profilesUrl = new URL("../app/printer-profiles.ts", import.meta.url);
 const orchestratorUrl = new URL("../app/import-orchestrator.ts", import.meta.url);
+const slicingStateUrl = new URL("../app/hooks/use-slicing-state.ts", import.meta.url);
+const syncUrl = new URL("../app/project-sync.ts", import.meta.url);
 const prepareUrl = new URL("../app/makerworld/prepare.tsx", import.meta.url);
 const fflateEsmUrl = new URL("../node_modules/fflate/esm/index.mjs", import.meta.url);
 const bridgeUrl = new URL("../app/native-printer-bridge.ts", import.meta.url);
@@ -89,6 +91,16 @@ test("engine adapter contract: every testid and __vpApi member exists in the ins
   // Shadow-root discovery and theme injection are event-driven — the 500 ms
   // polling interval must not come back.
   assert.doesNotMatch(adapter, /setInterval/);
+
+  // Window hooks the adapter reaches for that are not part of __vpApi. The
+  // release hook is added by patches/three-slicer+0.2.2.patch — if the patch
+  // ever stops being applied, this is where it is caught, not on a phone weeks
+  // later. See patches/README.md.
+  const windowHooks = extractContractArray(adapter, "ENGINE_WINDOW_HOOKS");
+  for (const hook of windowHooks) {
+    assert.ok(engine.includes(hook), `engine window hook ${hook} is missing from the installed build`);
+  }
+  assert.ok(windowHooks.includes("__vpReleaseWorker"), "the worker-release hook left the contract");
 });
 
 test("mobile and desktop controls target real editor actions", async () => {
@@ -137,13 +149,14 @@ test("mobile and desktop controls target real editor actions", async () => {
 });
 
 test("upload, export, sharing, and official print handoff are real actions", async () => {
-  const [app, header, adapter, printSheet, prepare, en] = await Promise.all([
+  const [app, header, adapter, printSheet, prepare, en, slicingState] = await Promise.all([
     readFile(appUrl, "utf8"),
     readFile(headerUrl, "utf8"),
     readFile(adapterUrl, "utf8"),
     readFile(printSheetUrl, "utf8"),
     readFile(prepareUrl, "utf8"),
     readFile(i18nEnUrl, "utf8"),
+    readFile(slicingStateUrl, "utf8"),
   ]);
 
   // Engine file injection lives behind the S4 typed adapter now.
@@ -156,7 +169,17 @@ test("upload, export, sharing, and official print handoff are real actions", asy
   assert.doesNotMatch(header, /accept=\{FILE_PICKER_ACCEPT\}/);
   assert.doesNotMatch(app, /accept=\{FILE_PICKER_ACCEPT\}/);
 
-  assert.match(app, /new File\(\[gcode\], name, \{ type: "text\/x-gcode" \}\)/);
+  // The download/share/print File now comes from the slicing hook, which keeps
+  // the G-code as a Blob rather than a multi-megabyte JS string per plate (see
+  // the MEMORY note in use-slicing-state.ts). The shell asks for a named File;
+  // the hook is the only place that builds one.
+  assert.match(app, /slicing\.freshGcodeFile\(selectedPlate, name\)/);
+  assert.match(slicingState, /new File\(\[stored\.gcode\], fileName, \{ type: GCODE_MIME \}\)/);
+  assert.match(slicingState, /new Blob\(\[payload\.gcode\], \{ type: GCODE_MIME \}\)/);
+  assert.match(slicingState, /gcode: Blob;/);
+  // A stale result is still never exportable: the fresh accessor is what the
+  // export paths use, and it returns null unless the result matches the scene.
+  assert.match(slicingState, /if \(!stored \|\| !isFresh\(stored\)\) return null;/);
   assert.match(app, /downloadBlob\(file, file\.name\)/);
   assert.match(app, /const data: ShareData = \{ files: \[file\], title: file\.name \}/);
   assert.match(app, /await navigator\.share\(data\)/);
@@ -535,4 +558,70 @@ test("archive extraction refuses zip-bomb expansion ratios", async () => {
     }),
     (error) => error instanceof Error && error.name === "ArchiveLimitError" && error.code === "expansion-ratio",
   );
+});
+
+test("the editor shell does not pay for the WASM kernel before it slices", async () => {
+  const [app, engine] = await Promise.all([readFile(appUrl, "utf8"), readFile(engineUrl, "utf8")]);
+
+  // The engine warms the kernel on mount unless features.warmup is false —
+  // and on an isolated page that kernel reserves 4 GiB of shared memory and
+  // spawns one worker per core. The shell must decide per device.
+  assert.match(engine, /postMessage\(\{ cmd: "warmup"/);
+  assert.match(app, /features=\{device\.memoryConstrained \? EDITOR_FEATURES_COLD : EDITOR_FEATURES_WARM\}/);
+  assert.match(app, /const EDITOR_FEATURES_COLD = \{ warmup: false, logs: false \}/);
+  assert.match(app, /const EDITOR_FEATURES_WARM = \{ warmup: true, logs: false \}/);
+  // The literal that used to sit inline in the JSX must not come back: it
+  // handed the engine a new object on every one of the shell's renders.
+  assert.doesNotMatch(app, /features=\{\{/);
+  assert.doesNotMatch(app, /defaultExtruderColors=\{\[/);
+  assert.match(app, /defaultExtruderColors=\{EXTRUDER_COLORS\}/);
+  assert.match(app, /onSliced=\{handleEngineSliced\}/);
+
+  // Nothing is disabled to achieve this: the same kernel loads on the first
+  // slice. Only the timing changes.
+  assert.doesNotMatch(app, /features=\{\{ *warmup: false/);
+});
+
+test("newly spawned objects are seated in free space, and restores are left alone", async () => {
+  const [app, adapter] = await Promise.all([readFile(appUrl, "utf8"), readFile(adapterUrl, "utf8")]);
+
+  // Driven by the engine's own objects event, so it covers the toolbar button,
+  // the engine's context menu, Ctrl+K, paste and a canvas drop alike.
+  assert.match(app, /seatNewObjectsIfNeeded\(ids\)/);
+  assert.match(adapter, /export function seatNewObjects\(/);
+  assert.match(adapter, /api\.placeObjectOnPlate\(seat\.id, seat\.plate, seat\.offsetX, seat\.offsetY\)/);
+
+  // A split keeps its parts where they were — it removes an id as well as
+  // adding some, and that is how the shell tells the two apart.
+  assert.match(app, /for \(const id of previous\) if \(!next\.has\(id\)\) return;/);
+  // An archive import arranges itself; a project restore carries exact
+  // positions. Neither may be re-seated.
+  assert.match(app, /orchestrator\.busy \|\| orchestrator\.hasPendingArrangement \|\| suppressSeatingRef\.current/);
+  assert.match(app, /suppressSeating\(\);/);
+  // Objects that fit nowhere are reported, never squeezed onto a full plate.
+  assert.match(app, /result\.ok && result\.unseatedCount/);
+  assert.match(adapter, /unseatedCount: plan\.unseated\.length/);
+});
+
+test("the expensive autosave capture is gated on a cheap change signal", async () => {
+  const [app, sync] = await Promise.all([readFile(appUrl, "utf8"), readFile(syncUrl, "utf8")]);
+
+  assert.match(app, /contentSignature: \(\) => projectContentSignature\(\)/);
+  assert.match(app, /debounceMs: device\.autosaveDebounceMs/);
+  // The signature must cover everything the 3MF depends on.
+  assert.match(app, /adapter\.sceneFingerprint\(\)/);
+  assert.match(app, /`plates=\$\{plateCount\}`/);
+  assert.match(app, /`\$\{profileId\}:\$\{quality\}:\$\{strength\}:\$\{support\}`/);
+
+  // And the controller must check it BEFORE capturing, not after — a hash of
+  // the produced file can only ever skip the upload.
+  const signatureIndex = sync.indexOf("signature === this.lastSavedSignature");
+  const captureIndex = sync.indexOf("await callbacks.captureSnapshot()");
+  assert.ok(signatureIndex > 0 && captureIndex > 0);
+  assert.ok(signatureIndex < captureIndex, "the change check must run before the capture");
+
+  // The engine's render loop is stopped for the duration of the export — the
+  // engine exposes suspendRendering for exactly this and says so.
+  assert.match(app, /adapter\.suspendRendering\(true\)/);
+  assert.match(app, /if \(rendering\) adapter\.suspendRendering\(false\)/);
 });

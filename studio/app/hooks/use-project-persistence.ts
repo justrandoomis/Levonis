@@ -67,6 +67,13 @@ export interface UseProjectPersistenceOptions {
     thumbnail: Blob | null;
   }) => StoredLevoProject;
   getMeta: () => { schemaVersion: number; engineVersion?: string };
+  /**
+   * Cheap fingerprint of everything that would change the saved snapshot. When
+   * it matches the last completed full save, the controller skips the whole
+   * capture (see ProjectSyncCallbacks.contentSignature). Return null to always
+   * save.
+   */
+  contentSignature?: () => string | null;
   debounceMs?: number;
   api?: StudioProjectsApi;
 }
@@ -142,6 +149,7 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
       captureThumbnail: () => callbacksRef.current.captureThumbnail?.() ?? Promise.resolve(null),
       buildManifest: (kind) => callbacksRef.current.buildManifest(kind),
       getMeta: () => callbacksRef.current.getMeta(),
+      contentSignature: () => callbacksRef.current.contentSignature?.() ?? null,
       persistDraft: async (payload) => {
         const draft = callbacksRef.current.buildDraft(payload);
         await saveDraft(namespace, draft);
@@ -164,8 +172,7 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
       if (controllerRef.current === controller) controllerRef.current = null;
     };
     // The controller is identity-bound to the user/namespace only; callbacks
-    // flow through callbacksRef.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // flow through callbacksRef, which is why none of them appear here.
   }, [userId, namespace, api]);
 
   const markDirty = useCallback(() => {

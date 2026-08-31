@@ -10,13 +10,23 @@
  * - fingerprints the scene at slice START (adapter.sceneFingerprint) and
  *   tracks a settings revision, so any geometry/transform/extruder edit or
  *   settings/material change afterwards makes stored results STALE,
- * - refuses to hand out stale G-code through `freshGcode` — the export paths
- *   must use it; `staleGcode` exists only for explicitly-labeled use,
+ * - refuses to hand out stale G-code through `freshGcodeFile` — the export
+ *   paths must use it; `staleGcodeFile` exists only for explicitly-labeled use,
  * - never stores an over_bed result as exportable output (§1 build-volume row:
  *   a result that exceeds the build volume is rejected, not archived).
  *
  * Scene-edit signals are event-driven: the adapter's gesture listeners plus
  * the engine's `objects`/`extruderColors`/`plateCount` events. No polling.
+ *
+ * MEMORY. A plate's G-code is kept as a Blob, never as a JS string. The
+ * difference is not cosmetic: a real plate is tens of megabytes of text, the
+ * engine already holds its own copy behind a blob: URL, and up to nine plates
+ * can have a stored result at once. Holding those as strings puts hundreds of
+ * megabytes on the main thread's JS heap — and on a phone the JS heap and the
+ * slice worker share one per-tab budget, so the thing that dies is the worker,
+ * reported as "Worker terminated (likely out of memory)". A Blob keeps the
+ * bytes in blob storage instead, where they can be paged out, and every
+ * consumer here wanted a File anyway (download, share, LAN print).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +48,9 @@ export interface SlicePayload {
   gcode: string;
 }
 
+/** MIME type every G-code File this hook hands out carries. */
+export const GCODE_MIME = "text/x-gcode";
+
 /** The subset of the engine's ViewportEvent stream this hook consumes. */
 export type SlicingViewportEvent =
   | { type: "slicing"; value: boolean }
@@ -58,7 +71,10 @@ export interface SliceOutcome {
 }
 
 interface StoredSliceResult {
-  gcode: string;
+  /** The G-code bytes, off the JS heap. See the MEMORY note in the header. */
+  gcode: Blob;
+  /** Byte length, so callers can report size without reading the Blob back. */
+  bytes: number;
   stats: SliceStats;
   /** Scene fingerprint captured when the producing slice run started. */
   sceneFingerprint: string;
@@ -81,16 +97,18 @@ export interface SlicingStateApi {
   /** State of the stored result for a plate. */
   resultState: (plate: number) => PlateResultState;
   /**
-   * G-code for a plate ONLY while it still matches the current scene and
-   * settings. Returns null for stale, rejected, or missing results — export
-   * and share paths must use this accessor.
+   * G-code for a plate as a named File, ONLY while it still matches the
+   * current scene and settings. Returns null for stale, rejected, or missing
+   * results — export, share and print paths must use this accessor.
    */
-  freshGcode: (plate: number) => string | null;
+  freshGcodeFile: (plate: number, fileName: string) => File | null;
   /**
    * Stale or fresh G-code, for callers that explicitly present it as an old
    * result (e.g. a preview labeled "outdated"). Never silently exportable.
    */
-  staleGcode: (plate: number) => string | null;
+  staleGcodeFile: (plate: number, fileName: string) => File | null;
+  /** Stored G-code size in bytes for a plate (0 when there is no result). */
+  gcodeBytes: (plate: number) => number;
   stats: (plate: number) => SliceStats | null;
   /** Plates with a stored (fresh or stale) result. */
   storedPlateCount: number;
@@ -177,14 +195,20 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     return isFresh(stored) ? "fresh" : "stale";
   }, [isFresh, overBedPlates, results]);
 
-  const freshGcode = useCallback<SlicingStateApi["freshGcode"]>((plate) => {
+  const freshGcodeFile = useCallback<SlicingStateApi["freshGcodeFile"]>((plate, fileName) => {
     const stored = results().get(plate);
     if (!stored || !isFresh(stored)) return null;
-    return stored.gcode;
+    return new File([stored.gcode], fileName, { type: GCODE_MIME });
   }, [isFresh, results]);
 
-  const staleGcode = useCallback<SlicingStateApi["staleGcode"]>((plate) => (
-    results().get(plate)?.gcode ?? null
+  const staleGcodeFile = useCallback<SlicingStateApi["staleGcodeFile"]>((plate, fileName) => {
+    const stored = results().get(plate);
+    if (!stored) return null;
+    return new File([stored.gcode], fileName, { type: GCODE_MIME });
+  }, [results]);
+
+  const gcodeBytes = useCallback<SlicingStateApi["gcodeBytes"]>((plate) => (
+    results().get(plate)?.bytes ?? 0
   ), [results]);
 
   const stats = useCallback<SlicingStateApi["stats"]>((plate) => (
@@ -202,8 +226,12 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     }
     overBedPlates().delete(payload.plate);
     const currentFingerprint = adapterRef.current?.sceneFingerprint() ?? "";
+    // The payload string becomes garbage the moment this returns; only the
+    // Blob is retained. See the MEMORY note at the top of this file.
+    const gcode = new Blob([payload.gcode], { type: GCODE_MIME });
     results().set(payload.plate, {
-      gcode: payload.gcode,
+      gcode,
+      bytes: gcode.size,
       stats: payload.stats,
       // The scene as the slice run saw it: the fingerprint captured when the
       // run started. If edits happened mid-slice the start fingerprint no
@@ -301,8 +329,9 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     progress,
     layerCount,
     resultState,
-    freshGcode,
-    staleGcode,
+    freshGcodeFile,
+    staleGcodeFile,
+    gcodeBytes,
     stats,
     storedPlateCount,
     anyFresh,

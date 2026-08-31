@@ -83,6 +83,8 @@
 
 | 56 | **تحديث الصف 38 (نفاد ذاكرة الاستوديو على iPad): التخفيف منشور فعلًا منذ 2026-08-30 05:08، والآن صار مُختبَرًا**: بعد اكتشاف الصف 55 (الاستوديو لم يكن يُبنى) كان السؤال الطبيعي: هل وصل إصلاح الـiPad أصلًا؟ **نعم**. `isMemoryConstrainedApple` أُضيف في `273b8fe` الساعة 03:52، وآخر نشر ناجح `5054453` وقع 05:08 — **بعده**؛ أما ما انكسر فهو ما جاء بعد 21:27 (`36530a2`). فالتخفيف حيّ منذ ذلك الحين، وتؤكده خطوة التحقق في workflow 8 على النطاق الحيّ: `desktop COEP present: 1` و`iPad COEP present: 0`. **وسلسلة السبب مُتحقَّق منها في كود المحرّك نفسه**: `node_modules/three-slicer/engine/src/slicer.worker.js` يختار نواته بإشارة واحدة لا غير — `const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated; if (isolated) { ...mt... } else { ...st... }` — فحجب الترويسة يعني حرفيًا أن المحرّك يأخذ فرعه أحادي الخيط. **لكن الدالة التي تحمل هذا كلّه لم يكن عليها اختبار واحد**، وهي سطران من regex: «تبسيط» يبدو معقولًا (الاكتفاء بـ`/iPad/`) يعيد إعطاء الـiPad النواة الخيطية بصمت، والعرض الوحيد أن يعود المالك بعد أسابيع بالشكوى نفسها. لذلك نُقلت إلى `worker/platform.ts` — ملف بلا استيرادات، لأن `worker/index.ts` يستورد vinext فلا يستطيع أي اختبار عادي تحميله — وأُضيف `tests/platform.test.mjs` بـ11 user agent حقيقيًا، أهمّها **iPad في وضع سطح المكتب** الذي يقول `Macintosh` ولا يذكر iPad إطلاقًا؛ وأُثبت أن حذف ذلك الفرع يُسقط الاختبار. **وصُحِّح تعليق مضلّل**: كان يقول إن Chrome/Firefox على macOS يُستثنيان بفضل شرط `!/Chrome|Chromium|Firefox/`، والحقيقة أن ما يستثنيهما هو غياب رمز `Version/N` — حذف الشرط لا يُسقط أي اختبار؛ صار مكتوبًا في الملف وفي الاختبار أنه تأمين احتياطي لا أكثر، حتى لا يُوثق به أكثر مما يستحق. **ما يبقى غير مثبت بصدق**: أن هذا يُنهي الانهيار على جهاز المالك فعلًا — لا يمكن إثباته إلا بتجربته على iPad حقيقي | 🟡 (منشور ومُختبَر · التأكيد الميداني على المالك) | studio/worker/platform.ts + studio/tests/platform.test.mjs |
 
+| 57 | **الأعطال الثلاثة في الاستوديو: السبب الجذري مُثبَت من مصدر المحرّك، والإصلاح مقيس قبل/بعد**: (١) رسالة `Worker terminated (likely out of memory)` على مشروع فارغ ليست عن تحميل مجسّم إطلاقًا — المحرّك يُحمّل النواة عند **الإقلاع** (`postMessage({cmd:"warmup"})` داخل `useEffect` بلا شروط سوى `features.warmup`)، وعلى صفحة معزولة تلك النواة هي `slicer_core.mt.js` التي تحجز **4 غيغابايت SharedArrayBuffer** (`maximum:65536,shared:true`) وتُنشئ **عاملًا لكل نواة معالج** يُصرّف فيها الوحدة (5 ميغابايت) قبل أن تُعلن جاهزيتها. فتحُ الصفحة كان هو التكلفة، لا المجسّم. الحل: `features.warmup=false` على الأجهزة المقيّدة — **تأجيل لا تعطيل**، وقيس حيًّا: صفر عامل عند الإقلاع، صفر بعد الاستيراد، وعامل واحد فور الضغط على Slice مع `[slicer.worker] core: st` في السجل. (٢) العامل لا يُحرَّر أبدًا إلا عند التفكيك، وذاكرة WebAssembly لا تنكمش — لذلك القِطعة **الثانية** هي التي تموت على الهاتف. هذا الوحيد الذي تعذّر إصلاحه من القشرة (العامل داخل closure ref)، فأُضيف **سطر واحد** عبر `patch-package --error-on-fail` يكشف `window.__vpReleaseWorker`، ويرفض التحرير أثناء أي قطع جارٍ. (٣) النسخة تُرمى بعيدًا لأن المحرّك يضع كل مجسّم جديد من مؤشّر **يزداد فقط** ولا يُصفَّر إلا حين تفرغ المنصة، ولا يعرف عرض المنصة. قيس حيًّا على بناء حقيقي: **قبل ٤ من ١٠ نسخ خارج المنصة وأبعدها 321.3 مم عن الأصل، بعد صفر خارج المنصة وأبعدها 48 مم**. (٤) الحفظ التلقائي كان يُصدّر 3MF كاملًا + لقطة canvas + SHA-256 على الملف كله عند **كل إشارة تعديل** لا كل تعديل حقيقي: **قبل 16 تصديرًا و192 ميغابايت في الدقيقة، بعد 4 و48**. (٥) نتائج القطع كانت تُحفظ كنصوص JS: **قبل 188.7 ميغابايت في عملية العرض، بعد 2.3**. لم يُعطَّل شيء، ولم تُمَسّ دقّة التصدير، ولم تُضَف أي إعادة محاولة. التفاصيل والقياسات في `docs/STUDIO_PERFORMANCE.md` | ✅ (الكود والقياس) · 🔴 (نشر الإنتاج بيد المالك) | studio/app/* + studio/patches/ + docs/STUDIO_PERFORMANCE.md |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).
@@ -137,4 +139,18 @@ been live since. Its whole mechanism was two regexes with no test, now
 moved to an importable file and pinned by eleven real user agents,
 including the desktop-mode iPad that never says "iPad" at all. Whether it
 actually ends the crash on the owner's device is still unproven, and is
-not claimed.
+not claimed. Row 57 is why that mitigation was never going to be enough on
+its own, and it comes from reading the engine's own source rather than
+guessing at it: the crash on an empty project was never about loading a
+model, because the viewer loads the 4 MB kernel at MOUNT and, on an
+isolated page, that kernel reserves four gigabytes of shared memory and
+spawns one worker per CPU core before a single triangle exists. Withholding
+isolation only changed WHICH kernel paid that at page load. The kernel is
+now deferred until something actually slices — measured live: zero workers
+at load, zero after an import, one the moment Slice is pressed — and the
+engine gained one added line so an idle worker can be handed back at all.
+The duplicate bug turned out to be the same kind of thing: an engine
+placement cursor that only ever grows, which put four of ten copies off the
+bed, the furthest 321 mm from the original, while the space beside it was
+empty. All of it is measured before and after in docs/STUDIO_PERFORMANCE.md,
+in a real browser against a real build; nothing there is an estimate.

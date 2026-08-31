@@ -884,3 +884,182 @@ test("edits during an upload coalesce into a follow-up save", async () => {
   assert.equal(controller.getState().status, "synced");
   controller.dispose();
 });
+
+// ---------------------------------------------------------------------------
+// Autosave cost: the expensive capture is skipped when nothing changed
+// ---------------------------------------------------------------------------
+//
+// A save is a full engine 3MF export, a canvas read-back and a SHA-256 over
+// the whole file — the most expensive thing the editor does off the slice
+// path. The content HASH can only skip the upload, because it is computed
+// from the file the export already produced. `contentSignature` runs first and
+// skips the work itself. These tests pin that it only ever skips work that
+// would have produced identical bytes.
+
+function countingCallbacks(signature) {
+  const persisted = [];
+  let captures = 0;
+  let thumbnails = 0;
+  const callbacks = {
+    persisted,
+    get captures() { return captures; },
+    get thumbnails() { return thumbnails; },
+    async captureSnapshot() {
+      captures += 1;
+      return { file: new Blob(["snapshot"]), name: "P.3mf" };
+    },
+    getSourceFiles() { return [new File(["src"], "part.stl")]; },
+    async captureThumbnail() { thumbnails += 1; return null; },
+    buildManifest() { return { version: 1, generator: "levo-studio", project: { name: "P" } }; },
+    getMeta() { return { schemaVersion: 2, engineVersion: "three-slicer@0.2.2" }; },
+    async persistDraft(payload) { persisted.push(payload); },
+    contentSignature: () => signature.value,
+  };
+  return callbacks;
+}
+
+test("an unchanged scene costs no export, no thumbnail and no hash", async () => {
+  const { timers, advance } = makeTimers();
+  const signature = { value: "scene-a" };
+  const callbacks = countingCallbacks(signature);
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 10 });
+
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.captures, 1);
+  assert.equal(callbacks.persisted.length, 1);
+  assert.equal(controller.getState().status, "saved-local");
+
+  // The editor marks dirty on every objects/settings identity change, which is
+  // far more often than the project changes. None of these may cost anything.
+  for (let i = 0; i < 5; i += 1) {
+    controller.markDirty();
+    await advance(10);
+    await idle(controller);
+  }
+  assert.equal(callbacks.captures, 1, "an unchanged scene must not be re-exported");
+  assert.equal(callbacks.thumbnails, 1, "an unchanged scene must not be re-captured");
+  assert.equal(callbacks.persisted.length, 1, "an unchanged scene must not be re-written");
+  // And the UI must not be left claiming unsaved work that does not exist.
+  assert.equal(controller.getState().status, "saved-local");
+  assert.equal(controller.getState().dirty, false);
+  controller.dispose();
+});
+
+test("a real change is always saved — the skip never hides work", async () => {
+  const { timers, advance } = makeTimers();
+  const signature = { value: "scene-a" };
+  const callbacks = countingCallbacks(signature);
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 10 });
+
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.captures, 1);
+
+  signature.value = "scene-b";
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.captures, 2, "a changed scene must be captured");
+  assert.equal(callbacks.persisted.length, 2);
+  controller.dispose();
+});
+
+test("a degraded source-only save is retried, never suppressed by a matching signature", async () => {
+  const { timers, advance } = makeTimers();
+  const signature = { value: "scene-a" };
+  const callbacks = countingCallbacks(signature);
+  // The engine did not answer: the save degrades to source-only. The next run
+  // must try the full export again rather than decide it already saved.
+  callbacks.captureSnapshot = async () => null;
+
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 10 });
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.persisted[0].kind, "source-only");
+
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 2, "a degraded save must be retried");
+  controller.dispose();
+});
+
+test("a failed upload is retried, never suppressed by a matching signature", async () => {
+  const { timers, advance } = makeTimers();
+  const signature = { value: "scene-a" };
+  const callbacks = countingCallbacks(signature);
+  let uploads = 0;
+  const controller = new ProjectSyncController({
+    userId: "u1",
+    callbacks,
+    timers,
+    debounceMs: 10,
+    remoteProjectId: "p1",
+    uploader: async () => {
+      uploads += 1;
+      return uploads === 1
+        ? { ok: false, kind: "network", message: "offline", retryable: true }
+        : { ok: true, revision: 1, revisionId: "r", committedAt: null, contentHash: "h", snapshotKind: "full" };
+    },
+  });
+
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(uploads, 1);
+  assert.equal(controller.getState().status, "failed");
+
+  // Same scene, but the upload never landed — the retry must run the whole
+  // save, not find a matching signature and report success.
+  await controller.retryNow();
+  await idle(controller);
+  assert.equal(uploads, 2, "a failed upload must be retried");
+  assert.equal(controller.getState().status, "synced");
+
+  // Now it really is synced, so an identical run may skip.
+  const capturesAfterSync = callbacks.captures;
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.captures, capturesAfterSync);
+  assert.equal(controller.getState().status, "synced");
+  controller.dispose();
+});
+
+test("switching projects clears the skip mark — a new project always saves", async () => {
+  const { timers, advance } = makeTimers();
+  const signature = { value: "scene-a" };
+  const callbacks = countingCallbacks(signature);
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 10 });
+
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.captures, 1);
+
+  // Same content, different destination: the bytes exist nowhere in the new
+  // project yet, so "already saved" must not carry over.
+  controller.linkRemoteProject("p2", null);
+  controller.markDirty();
+  await advance(10);
+  await idle(controller);
+  assert.equal(callbacks.captures, 2, "linking a project must clear the skip mark");
+  controller.dispose();
+});
+
+test("no signature at all means the old always-save behaviour, unchanged", async () => {
+  const { timers, advance } = makeTimers();
+  const callbacks = countingCallbacks({ value: null });
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 10 });
+  for (let i = 0; i < 3; i += 1) {
+    controller.markDirty();
+    await advance(10);
+    await idle(controller);
+  }
+  assert.equal(callbacks.captures, 3);
+  controller.dispose();
+});
