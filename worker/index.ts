@@ -36,6 +36,8 @@ import { supportRoutes } from './routes/support';
 import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
 import { classifyHost, rootDomainFrom } from './lib/hosts';
+import { merchantRoutes } from './routes/merchant';
+import { storefrontRoutes } from './routes/storefront';
 
 const app = new Hono<AppContext>();
 
@@ -126,6 +128,11 @@ app.route('/api/support', supportRoutes);
 // them separate and never lets a support code touch pricing.
 app.route('/api/referrals', referralRoutes);
 app.route('/api/studio', studioRoutes);
+// Merchant store administration. Scoped to the caller's OWN store on every
+// route — deliberately not under /api/admin, which is the platform's.
+app.route('/api/merchant', merchantRoutes);
+// The public shopfront: readable by anyone, on any host.
+app.route('/api/storefront', storefrontRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.

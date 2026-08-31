@@ -75,6 +75,10 @@ export function normalizeHost(raw: string | null | undefined): string | null {
   // a trailing newline, turning a header-injection attempt into a hostname
   // that looks perfectly ordinary. Nothing upstream should ever deliver one;
   // if it does, that is a reason to refuse the request, not to tidy it up.
+  // Matching control characters is exactly the intent here: a Host header
+  // containing one is a header-injection attempt, not a hostname, and must be
+  // refused rather than sanitised.
+  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(raw)) return null;
   let h = raw.trim().toLowerCase();
   if (!h) return null;

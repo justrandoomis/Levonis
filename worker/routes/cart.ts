@@ -1,5 +1,14 @@
 import { Hono } from 'hono';
 import { cartShippingType, typeForTransport } from '../lib/shippingType';
+import {
+  cartSellerScope,
+  sellerConflict,
+  conflictDetails,
+  merchantScope,
+  PLATFORM_SCOPE,
+  CART_SELLER_CONFLICT,
+  type SellerLine,
+} from '../lib/cartSeller';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -464,11 +473,34 @@ cartRoutes.post('/items', async (c) => {
   // failed.
   const incomingType = typeForTransport(transportMethod);
   const { results: existingLines } = await c.env.DB
-    .prepare('SELECT transport_method FROM cart_items WHERE user_id = ?')
+    .prepare('SELECT transport_method, seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
     .bind(user.id)
-    .all<{ transport_method: string }>();
+    .all<{ transport_method: string; seller_type: string; merchant_id: string | null; store_id: string | null }>();
   const currentType = cartShippingType(existingLines);
   const replaceCart = body.replaceCart === true;
+
+  // ONE SELLER PER CART (§14). This is a Levonis product; if the cart is
+  // currently a merchant's, the two cannot settle as one order — different
+  // fulfilment, different commission, different party responsible. Checked
+  // before any pricing work, and refused the same way whether or not the
+  // client showed the customer a dialogue first.
+  const sellerClash = sellerConflict(existingLines as SellerLine[], PLATFORM_SCOPE);
+  if (sellerClash && !replaceCart) {
+    const shop = sellerClash.current.merchant_id
+      ? await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
+          .bind(sellerClash.current.merchant_id)
+          .first<{ name: string }>()
+      : null;
+    throw badRequest(
+      'Your cart holds items from another store. Empty it to shop from LEVONIS.',
+      CART_SELLER_CONFLICT,
+      conflictDetails(sellerClash, { current: shop?.name ?? null, incoming: 'LEVONIS' })
+    );
+  }
+  if (sellerClash && replaceCart) {
+    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+    existingLines.length = 0;
+  }
 
   if (currentType !== null && currentType !== incomingType) {
     if (!replaceCart) {
@@ -659,4 +691,192 @@ cartRoutes.delete('/items/:id', async (c) => {
     .run();
   const { items, tier, tierActive } = await loadCart(c);
   return c.json({ success: true, items, tier, tierActive });
+});
+
+// ---------------------------------------------------------------------------
+// MERCHANT PRODUCTS IN THE SAME CART
+//
+// The same cart table, the same customer, the same checkout — one cart
+// infrastructure (§14). What differs is the seller, and the seller is what
+// decides whether two lines can sit together.
+//
+// PRICE IS NEVER TAKEN FROM THE BROWSER (§17). The client sends an id and a
+// quantity; everything that costs money is read from D1 here. A client that
+// posts `price_iqd` is ignored, not trusted and not rejected-with-a-hint.
+// ---------------------------------------------------------------------------
+
+/** Loads a merchant product that is actually buyable right now. */
+async function loadBuyableMerchantProduct(c: Context<AppContext>, productId: string) {
+  const row = await c.env.DB.prepare(
+    `SELECT p.*, s.id AS s_id, s.slug AS s_slug, s.name AS s_name, s.status AS s_status,
+            m.id AS m_id, m.name AS m_name, m.status AS m_status
+       FROM community_products p
+       JOIN merchant_stores s ON s.id = p.store_id
+       JOIN community_merchants m ON m.id = p.merchant_id
+      WHERE p.id = ?`
+  ).bind(productId).first<Record<string, unknown>>();
+
+  if (!row) throw notFound('Product not found');
+  // Each refusal names only what a shopper needs to know. "This store is not
+  // taking orders" is true whether the merchant paused it, an admin suspended
+  // it, or their subscription lapsed — a customer has no business being told
+  // which, and a probe learns nothing about another account's billing.
+  if (row.lifecycle !== 'active' || row.status !== 'active') throw notFound('Product not found');
+  if (row.s_status !== 'active' || row.m_status === 'suspended') {
+    throw badRequest('This store is not taking orders right now', 'STORE_CLOSED');
+  }
+  return row;
+}
+
+cartRoutes.post('/merchant-items', async (c) => {
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const productId = str(body.productId, 'productId', { min: 1, max: 60 });
+  const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
+  const optionId = str(body.optionId, 'optionId', { max: 60, required: false });
+  const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
+  const replaceCart = body.replaceCart === true;
+
+  const product = await loadBuyableMerchantProduct(c, productId);
+  const incoming = merchantScope(String(product.m_id), String(product.s_id));
+
+  const { results: existingLines } = await c.env.DB
+    .prepare('SELECT seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
+    .bind(user.id)
+    .all<SellerLine>();
+
+  const clash = sellerConflict(existingLines, incoming);
+  if (clash && !replaceCart) {
+    // Name BOTH shops. "Items from another store" leaves the customer
+    // guessing which of the shops they were browsing is in the way.
+    const currentName = clash.current.seller_type === 'levonis'
+      ? 'LEVONIS'
+      : (await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
+          .bind(clash.current.merchant_id)
+          .first<{ name: string }>())?.name ?? null;
+    throw badRequest(
+      'Your cart holds items from a different seller. Empty it to shop from this store.',
+      CART_SELLER_CONFLICT,
+      conflictDetails(clash, { current: currentName, incoming: String(product.m_name) })
+    );
+  }
+  if (clash && replaceCart) {
+    // One request, one confirmed intent — so the cart can never be left
+    // emptied with nothing added because a second call failed.
+    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+  }
+
+  // Stock, from the row that was just read under the same request.
+  if (product.track_stock && Number(product.stock) < qty) {
+    throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', {
+      available: Number(product.stock),
+    });
+  }
+
+  const id = newId('ci');
+  await c.env.DB.prepare(
+    `INSERT INTO cart_items
+       (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty)
+     VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (user_id, product_id, community_product_id, option_id, color_id, shipping_method_id)
+     DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`
+  ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty).run();
+
+  const cart = await loadMerchantCart(c);
+  return c.json({ success: true, ...cart }, 201);
+});
+
+/**
+ * The merchant half of the cart, priced from the database.
+ *
+ * Kept separate from `loadCart` rather than folded into it: `loadCart` runs
+ * the whole platform pricing resolver — membership pricing, transport
+ * defaults, warranty plans, support-gift eligibility — none of which applies
+ * to a merchant's own goods. Forcing one function to do both would make the
+ * platform path harder to read in order to serve a path that needs almost
+ * none of it. The two never run together anyway: a cart is one seller.
+ */
+async function loadMerchantCart(c: Context<AppContext>) {
+  const user = c.get('user')!;
+  const { results } = await c.env.DB.prepare(
+    `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id,
+            p.id, p.name, p.name_ar, p.images, p.price_iqd, p.original_price_iqd,
+            p.stock, p.track_stock, p.lifecycle, p.prep_days,
+            s.id AS store_id, s.slug AS store_slug, s.name AS store_name,
+            m.id AS merchant_id, m.name AS merchant_name
+       FROM cart_items ci
+       JOIN community_products p ON p.id = ci.community_product_id
+       JOIN merchant_stores s ON s.id = ci.store_id
+       JOIN community_merchants m ON m.id = ci.merchant_id
+      WHERE ci.user_id = ? AND ci.seller_type = 'merchant'
+      ORDER BY ci.created_at DESC`
+  ).bind(user.id).all<Record<string, unknown>>();
+
+  let subtotal = 0;
+  const items = results.map((r) => {
+    const unit = Number(r.price_iqd) || 0;
+    const qty = Number(r.qty) || 1;
+    const line = unit * qty;
+    subtotal += line;
+    return {
+      cart_item_id: r.cart_item_id,
+      product_id: r.id,
+      name: r.name,
+      name_ar: r.name_ar,
+      images: safeParse(r.images, []),
+      qty,
+      option_id: r.option_id,
+      color_id: r.color_id,
+      unit_price_iqd: unit,
+      original_price_iqd: r.original_price_iqd,
+      line_total_iqd: line,
+      prep_days: r.prep_days,
+      // Whether this line can still be bought. A product hidden or sold out
+      // after it was added stays visible in the cart, flagged, rather than
+      // vanishing without explanation.
+      available: r.lifecycle === 'active' && (!r.track_stock || Number(r.stock) >= qty),
+      stock: r.track_stock ? Number(r.stock) : null,
+    };
+  });
+
+  const first = results[0];
+  return {
+    scope: cartSellerScope(
+      results.map((r) => ({ seller_type: 'merchant', merchant_id: r.merchant_id, store_id: r.store_id }))
+    ),
+    store: first
+      ? { id: first.store_id, slug: first.store_slug, name: first.store_name, merchant_id: first.merchant_id }
+      : null,
+    items,
+    subtotal_iqd: subtotal,
+  };
+}
+
+/**
+ * What is in the cart, and whose it is.
+ *
+ * The frontend calls this to decide which cart view to render. A cart is one
+ * seller, so the answer is one shape or the other, never both.
+ */
+cartRoutes.get('/scope', async (c) => {
+  const user = c.get('user')!;
+  const { results } = await c.env.DB
+    .prepare('SELECT seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
+    .bind(user.id)
+    .all<SellerLine>();
+  const scope = cartSellerScope(results);
+  if (!scope || scope.seller_type === 'levonis') {
+    return c.json({ success: true, scope, store: null, count: results.length });
+  }
+  const store = await c.env.DB.prepare(
+    `SELECT s.id, s.slug, s.name, m.id AS merchant_id, m.name AS merchant_name
+       FROM merchant_stores s JOIN community_merchants m ON m.id = s.merchant_id
+      WHERE s.id = ?`
+  ).bind(scope.store_id).first();
+  return c.json({ success: true, scope, store, count: results.length });
+});
+
+/** The merchant cart, priced. Returns an empty cart rather than 404 for a platform cart. */
+cartRoutes.get('/merchant', async (c) => {
+  return c.json({ success: true, ...(await loadMerchantCart(c)) });
 });
