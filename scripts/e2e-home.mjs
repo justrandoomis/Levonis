@@ -148,6 +148,11 @@ async function measure(page) {
       shortestService: all('[data-service]').length
         ? Math.round(Math.min(...all('[data-service]').map((e) => e.getBoundingClientRect().height)))
         : 0,
+      // Read off the LIVE element, so the check covers what the build
+      // actually shipped rather than what the source says.
+      studioTarget: document.querySelector('[data-service="studio"]')?.getAttribute('target') ?? null,
+      studioRel: document.querySelector('[data-service="studio"]')?.getAttribute('rel') ?? null,
+      studioHref: document.querySelector('[data-service="studio"]')?.getAttribute('href') ?? null,
       sections: all('[data-home-section]').map((e) => e.getAttribute('data-home-section')),
       categoryChips: all('[data-category-chip]').length,
       shortestChip: all('[data-category-chip]').length
@@ -204,7 +209,13 @@ async function main() {
 
   // ------------------------------------------- 1. no banners: the fallback
   console.log('\n1. no banners configured — the default hero');
-  sql("DELETE FROM admin_settings WHERE key = 'homeBanners'");
+  // BOTH keys, not just the banners. Section 3 hides `categories` and
+  // reorders the sections, and that layout outlives the process: a run that
+  // is interrupted after section 3 leaves the next run starting with the
+  // categories section switched off, and sections 1 and 2 then fail with
+  // chips=0 and mode=default on a codebase that is perfectly fine. Reset
+  // everything this suite writes, so a run's result depends on the run.
+  sql("DELETE FROM admin_settings WHERE key IN ('homeBanners', 'homeSections')");
   await settle();
 
   for (const width of WIDTHS) {
@@ -236,6 +247,26 @@ async function main() {
       JSON.stringify(m.services)
     );
     check(`${width}px — every service card is at least 44px`, m.shortestService >= 44, `${m.shortestService}px`);
+
+    // The Studio opens on its OWN page. Asserted against the RENDERED DOM,
+    // not the source: the owner reported the Studio taking over the store's
+    // tab, and a source-only guard cannot tell whether the attribute survived
+    // the build and reached the browser.
+    check(
+      `${width}px — the Studio card opens in a new tab`,
+      m.studioTarget === '_blank',
+      `target=${JSON.stringify(m.studioTarget)}`
+    );
+    check(
+      `${width}px — and carries rel="noopener noreferrer"`,
+      (m.studioRel ?? '').includes('noopener') && (m.studioRel ?? '').includes('noreferrer'),
+      `rel=${JSON.stringify(m.studioRel)}`
+    );
+    check(
+      `${width}px — pointing at the Studio subdomain, not a store path`,
+      (m.studioHref ?? '').startsWith('https://studio.'),
+      `href=${JSON.stringify(m.studioHref)}`
+    );
 
     check(`${width}px — the page does not scroll sideways`, m.docOverflow <= 1, `${m.docOverflow}px`);
     check(`${width}px — nothing spills past the viewport`, m.spill <= 2, `${m.spill}px`);

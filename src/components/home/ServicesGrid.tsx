@@ -15,10 +15,16 @@ import { STUDIO_URL } from '../../translations';
  * The Studio card is written out as a LITERAL `<a href={STUDIO_URL}>` rather
  * than looped with the rest. That is deliberate: tests/store-isolation.test.ts
  * greps for exactly that anchor, and a link hidden behind an array entry would
- * pass review while silently becoming a router <Link> or growing a
- * target="_blank". The entry is a PLAIN full-page navigation to the standalone
- * subdomain — no iframe, no prefetch, no Studio code in this bundle
- * (docs/STUDIO_PLAN.md decision 6).
+ * pass review while silently becoming a router <Link>.
+ *
+ * It opens in a NEW TAB, at the owner's request: the Studio is a separate
+ * application on a separate subdomain, and taking over the store's tab costs
+ * the visitor their cart and their place on the page. An earlier version of
+ * this comment argued the opposite — that the target should be the user's
+ * choice — and the owner has since said plainly that it should open on its
+ * own page. Still no iframe, no prefetch and no Studio code in this bundle
+ * (docs/STUDIO_PLAN.md decision 6): a new tab is a navigation, not an
+ * embedding.
  */
 
 const CARD_BASE =
@@ -80,7 +86,18 @@ export default function ServicesGrid() {
           §1's responsive grid, with min-w-0 so a long Kurdish title wraps
           instead of widening the row. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <a href={STUDIO_URL} data-service="studio" className={`${CARD_BASE} ${CARD_FEATURED}`}>
+        {/* Opens in its OWN tab. The Studio is a separate application on a
+            separate subdomain, and replacing the store with it costs the
+            customer their cart, their scroll position and their place in
+            whatever they were doing. rel="noopener" because a new tab gets
+            window.opener otherwise, which is a handle onto this page. */}
+        <a
+          href={STUDIO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-service="studio"
+          className={`${CARD_BASE} ${CARD_FEATURED}`}
+        >
           <CardBody icon={Layers} title={t('studioCardTitle')} desc={t('studioCardSubtitle')} featured />
         </a>
 

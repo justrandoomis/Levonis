@@ -105,15 +105,82 @@ GET main/api/studio/handoff/start?dest=<origin>&state=…
 
 ## ما لم يُوصَّل بعد (صادقًا)
 
-1. **تركيب المسار في worker الموقع:** `worker/routes/studio.ts` موجود لكنه
-   **غير مركب** بعد في `worker/index.ts`
-   (`app.route('/api/studio', studioRoutes)`) — الملف محجوز للمنسق.
-2. **تسمية السر في workflows الاستوديو:** ترفع
-   `deploy-studio-*.yml` السر باسم `HANDOFF_EXCHANGE_SECRET` بينما الكود يقرأ
-   `env.STUDIO_HANDOFF_SECRET` — يجب توحيد الاسم قبل أول اختبار على staging.
-3. **workflows الموقع الرئيسي** لا تضبط بعد `STUDIO_HANDOFF_SECRET` ولا
-   `STUDIO_ALLOWED_DESTINATIONS` على worker المتجر.
-4. `Env` في `worker/lib/types.ts` لا يضم المتغيرين بعد (الملف محجوز) —
-   المسار يتعامل معهما كاختياريين ويرد 503 حتى إضافتهما.
-5. اختبار T2 على staging HTTPS الحقيقي (دخول + عودة + `crossOriginIsolated`)
-   ينتظر اكتمال 1–3.
+**حُدِّثت هذه القائمة في 2026-08-30 بعد تدقيق فعلي للملفات — أربعة من بنودها
+الخمسة كانت قد أُنجزت أو أُصلحت والقائمة لم تُحدَّث معها.**
+
+1. ~~**تركيب المسار في worker الموقع**~~ ✅ **مركَّب**: `worker/index.ts:86`
+   يحمل `app.route('/api/studio', studioRoutes)`.
+2. ~~**تسمية السر في workflows الاستوديو**~~ ✅ **أُصلح**. كانت
+   `deploy-studio-*.yml` ترفع السر باسم `HANDOFF_EXCHANGE_SECRET` بينما الكود
+   يقرأ `env.STUDIO_HANDOFF_SECRET`، **ولا شيء في الكود يقرأ الاسم القديم**.
+   أثر هذا العطل أنه صامت تمامًا: السر يُرفع بنجاح، النشر ينجح، ثم يظل تسجيل
+   الدخول يرد `AUTH_NOT_CONFIGURED` بلا خطأ في أي مكان يفسّر السبب. صار
+   الاسمان موحّدين على `STUDIO_HANDOFF_SECRET`.
+3. ~~**workflows الموقع الرئيسي**~~ ✅ **أُصلح**: `deploy-production.yml` صار
+   يمرّر `STUDIO_ALLOWED_DESTINATIONS` كمتغيّر و`STUDIO_HANDOFF_SECRET` كسر،
+   وحين لا يوجد أيٌّ منهما يبقى التبادل معطّلًا بصدق.
+4. ~~`Env` في `worker/lib/types.ts`~~ ✅ **مضاف**: الحقلان موجودان الآن.
+5. **ما يبقى فعلًا**: ضبط الأربعة أسرار في المستودع ثم تشغيل workflows 7
+   و8 — التفصيل في «إعداد تسجيل الدخول» أسفل هذا الملف. حتى ذلك الحين
+   الاستوديو يعمل كضيف وتسجيل الدخول وحده معطّل.
+
+## ما يراه الزائر فعلًا (تصحيح مهم)
+
+الاستوديو **ليس** محجوبًا خلف تسجيل الدخول: زائر على `/` يحصل على المحرر
+كاملًا كضيف، والتحرير يعمل بلا حساب. `AUTH_NOT_CONFIGURED` تظهر **فقط** عند
+الضغط على «تسجيل الدخول» (المسار `/auth/login` أو `/auth/callback`)، لأن أول
+سطر في كلا المعالجَين يتحقق من `MAIN_SITE_ORIGIN` و`STUDIO_HANDOFF_SECRET`
+(`studio/worker/auth/callback.ts:119` و`:166`). فالمشكلة تخص الحساب والمشاريع
+المحفوظة، لا استعمال الاستوديو نفسه.
+
+## أي workflow ينشر studio.levonis-iq.com
+
+**`8 - Deploy Studio Code` (`deploy-studio-code.yml`)** — وهي التي تنشر على
+`levonis-studio-staging`، العامل الذي يخدم النطاق فعلًا. ملفها يقول ذلك في
+سطره الأول. و`5 - Deploy Studio Production` **لم تُشغَّل ولا مرة**، ولا يوجد
+عامل باسم `levonis` على الحساب أصلًا (تحقّقت منه: `wrangler deployments list
+--name levonis` يرد `This Worker does not exist on your account`).
+
+نتيجة عملية: **تغييرات الكود** في الاستوديو تصل عبر workflow 8 وحدها.
+
+### لماذا لا تُستعمل workflow 4 لرفع السر
+
+هذا فخّ حقيقي: `4 - Deploy Studio Staging` ترفع السر إلى العامل الصحيح
+(`--env staging`)، لكنها في نفس التشغيل تعيد النشر بـ
+`--var APP_ORIGIN:<workers.dev url>` و`--var MAIN_SITE_ORIGIN:$STUDIO_STAGING_MAIN_SITE_ORIGIN`.
+وبما أن `levonis-studio-staging` هو العامل الذي يخدم `studio.levonis-iq.com`
+فعلًا، فإن تشغيلها يكتب عنوان workers.dev فوق origin النطاق الحقيقي — أي
+تُعطِّل التحقّق من روابط العودة على موقع يعمل، لتفعّل تسجيل الدخول. لذلك
+**نُقل الإعداد كلّه إلى workflows 7 و8**، وهما اللتان تقرآن vars العامل الحيّة
+وتعيدانها كما هي.
+
+## إعداد تسجيل الدخول — الخطوات بالترتيب
+
+كل قيمة أدناه تُضبط كـ**repository secret** في
+`Settings → Secrets and variables → Actions → New repository secret`.
+لا أرى قيمة أيّ سر ولا أطلبها؛ أنت تضبطها وأنا أتحقّق من النتيجة.
+
+| # | اسم الـ secret | القيمة | لماذا |
+|---|---|---|---|
+| 1 | `STUDIO_HANDOFF_SECRET` | قيمة عشوائية تولّدها أنت مرّة واحدة، مثلًا `openssl rand -base64 32` | السر المشترك بين العاملَين. يُرفع إلى **كليهما** من نفس الـ secret، فيكون متطابقًا بالضرورة |
+| 2 | `STUDIO_ALLOWED_DESTINATIONS` | `https://studio.levonis-iq.com` | قائمة origins المسموح تسليم الجلسة إليها. مطابقة تامّة، بلا wildcards |
+| 3 | `STUDIO_PROD_APP_ORIGIN` | `https://studio.levonis-iq.com` | origin الاستوديو نفسه: تحقّق روابط العودة والكوكيز |
+| 4 | `STUDIO_PROD_MAIN_SITE_ORIGIN` | `https://levonis-iq.com` | origin الموقع الرئيسي الذي يبادل الاستوديو معه الشيفرة خادمًا-لخادم |
+
+ثم شغّل الاثنتين — الترتيب لا يهم، لكن **كلتيهما لازمة**؛ كلٌّ منهما تضبط طرفها:
+
+1. `7 - Deploy Staging Code` (اكتب `DEPLOY-CODE`) — تضبط
+   `STUDIO_ALLOWED_DESTINATIONS` على `levonis-staging` وترفع السر المشترك إليه.
+2. `8 - Deploy Studio Code` (اكتب `DEPLOY-STUDIO-CODE`) — تضبط `APP_ORIGIN`
+   و`MAIN_SITE_ORIGIN` على `levonis-studio-staging` وترفع السر المشترك إليه.
+
+**إن ضبطت السر ولم تُعِد التشغيل، لن يتغيّر شيء**: الأسرار تُرفع أثناء النشر،
+لا لحظة حفظها في GitHub. وإن تركت أيّ واحد من الأربعة فارغًا، تبقى الخطوة
+معطّلة **بصدق** (503 برسالة تسمّي المفقود) بدل أن تفشل بصمت.
+
+### كيف يُتحقَّق أن الأمر نجح فعلًا
+
+بعد التشغيلين، على `levonis-iq.com` وأنت مسجّل الدخول:
+`POST /api/studio/handoff` يجب أن يردّ `200` مع `redirect_url`. ما دام أيّ
+طرف ناقصًا يردّ `503` ويسمّي المتغيّر الناقص بالاسم — وهذا هو الفرق عن العطل
+القديم، الذي كان يردّ `AUTH_NOT_CONFIGURED` بلا أيّ أثر يفسّر السبب.

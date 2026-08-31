@@ -219,6 +219,7 @@ export default function Community() {
         <div className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
            <a
              href={STUDIO_URL}
+             target="_blank"
              data-testid="community-studio-link"
              rel="noopener noreferrer"
              aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}

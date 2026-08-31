@@ -118,7 +118,12 @@ jobs:
           STUDIO_HANDOFF_SECRET: ${{ secrets.STUDIO_HANDOFF_SECRET }}
         run: |
           if [ -n "$STUDIO_HANDOFF_SECRET" ]; then
-            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put HANDOFF_EXCHANGE_SECRET --env staging
+            # The NAME matters: studio/worker/auth/callback.ts reads
+            # env.STUDIO_HANDOFF_SECRET. This used to upload it as
+            # HANDOFF_EXCHANGE_SECRET, which nothing reads — so the secret
+            # landed on the worker and sign-in still answered
+            # AUTH_NOT_CONFIGURED, with no error anywhere to explain why.
+            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put STUDIO_HANDOFF_SECRET --env staging
           else
             echo "STUDIO_HANDOFF_SECRET not set — the server-to-server login handoff stays honestly disabled on staging"
           fi

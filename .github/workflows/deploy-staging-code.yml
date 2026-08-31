@@ -18,8 +18,11 @@
 # deploy is refused outright if that read fails — deploying blind would wipe
 # them.
 #
-# Secrets are NOT touched: they live in a separate store, `wrangler deploy`
-# leaves them alone, and this workflow never reads or writes one.
+# Secrets live in a separate store and `wrangler deploy` leaves them alone,
+# so no existing secret is ever read or rewritten here. The one write is
+# opt-in: if the owner has set the STUDIO_HANDOFF_SECRET repository secret,
+# it is uploaded after the deploy so the Studio sign-in handoff has a shared
+# secret to compare. Unset, this workflow touches no secret at all.
 name: 7 - Deploy Staging Code (no test data, keeps vars)
 
 on:
@@ -105,6 +108,29 @@ jobs:
       - name: Apply any pending migrations BEFORE the code that needs them
         run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
 
+      # Carrying vars forward preserves what is already there, but it gives
+      # the owner no way to SET one — and the Studio sign-in handoff needs a
+      # var this worker has never had. STUDIO_ALLOWED_DESTINATIONS is the
+      # exact-origin allowlist read by worker/routes/studio.ts; without it
+      # every handoff answers 503 STUDIO_NOT_CONFIGURED. Setting the
+      # repository secret of the same name adds it here and overrides any
+      # stale value; leaving it unset changes nothing.
+      - name: Let the owner set the Studio handoff allowlist
+        env:
+          STUDIO_ALLOWED_DESTINATIONS: ${{ secrets.STUDIO_ALLOWED_DESTINATIONS }}
+        run: |
+          set -e
+          if [ -z "$STUDIO_ALLOWED_DESTINATIONS" ]; then
+            echo "STUDIO_ALLOWED_DESTINATIONS not set — Studio sign-in stays honestly disabled"
+            exit 0
+          fi
+          # Drop any existing row for this name first, so the value below is
+          # the only one that reaches --var (a repeated --var is ambiguous).
+          grep -v "^STUDIO_ALLOWED_DESTINATIONS	" /tmp/vars.tsv > /tmp/vars.keep || true
+          printf 'STUDIO_ALLOWED_DESTINATIONS\t%s\n' "$STUDIO_ALLOWED_DESTINATIONS" >> /tmp/vars.keep
+          mv /tmp/vars.keep /tmp/vars.tsv
+          echo "STUDIO_ALLOWED_DESTINATIONS will be set on this deploy"
+
       - name: Deploy, carrying every existing var forward
         run: |
           set -e
@@ -115,6 +141,22 @@ jobs:
           done < /tmp/vars.tsv
           echo "re-applying ${#ARGS[@]} existing var(s) so none are wiped"
           npx wrangler deploy --env staging "${ARGS[@]}"
+
+      # AFTER the deploy, never before: a deploy does not touch secrets, but
+      # uploading to a worker that is about to be replaced is pointless
+      # ordering. The shared secret must be byte-identical to the one on
+      # levonis-studio-staging — the Studio worker presents it on
+      # /api/studio/handoff/redeem and this worker compares it in constant
+      # time. Unset here means the handoff stays honestly disabled.
+      - name: Upload the Studio handoff shared secret
+        env:
+          STUDIO_HANDOFF_SECRET: ${{ secrets.STUDIO_HANDOFF_SECRET }}
+        run: |
+          if [ -n "$STUDIO_HANDOFF_SECRET" ]; then
+            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put STUDIO_HANDOFF_SECRET --env staging
+          else
+            echo "STUDIO_HANDOFF_SECRET not set — Studio sign-in stays honestly disabled"
+          fi
 
       - name: Verify the live site, read-only
         id: probe

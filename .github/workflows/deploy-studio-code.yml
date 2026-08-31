@@ -11,7 +11,14 @@
 # This reads the Worker's current vars from the Cloudflare API first, refuses
 # to deploy at all if that read fails, passes every one of them straight back,
 # and afterwards asserts none were dropped. Values are masked; only names are
-# logged. Secrets live in a separate store and are never read or written here.
+# logged.
+#
+# Two exceptions to "carry forward only", both opt-in and both no-ops unless
+# the owner sets the matching repository secret: the sign-in origins
+# (APP_ORIGIN, MAIN_SITE_ORIGIN) can be SET here, because carrying vars
+# forward can never introduce a var the worker has never had; and the shared
+# handoff secret is uploaded after the deploy. A deploy never reads or
+# rewrites any other secret — those live in a separate store and survive it.
 name: 8 - Deploy Studio Code (keeps vars)
 
 on:
@@ -98,6 +105,29 @@ jobs:
           npm run build
           node --test tests/*.test.mjs
 
+      # This worker is the one behind studio.levonis-iq.com, so its own
+      # trusted origin is the custom domain — NOT the workers.dev URL that
+      # workflow 4 writes. Both vars are read by studio/worker/auth/session.ts
+      # (MAIN_SITE_ORIGIN, for the server-to-server code exchange) and
+      # studio/worker/index.ts (APP_ORIGIN, for return-URL validation and
+      # cookies). Carrying vars forward could never introduce them; these two
+      # repository secrets can. Unset leaves the worker exactly as it is.
+      - name: Let the owner set the Studio sign-in origins
+        env:
+          STUDIO_APP_ORIGIN: ${{ secrets.STUDIO_PROD_APP_ORIGIN }}
+          STUDIO_MAIN_SITE_ORIGIN: ${{ secrets.STUDIO_PROD_MAIN_SITE_ORIGIN }}
+        run: |
+          set -e
+          set_var() {
+            [ -n "$2" ] || { echo "$1 not set — leaving it as it is"; return 0; }
+            grep -v "^$1	" /tmp/vars.tsv > /tmp/vars.keep || true
+            printf '%s\t%s\n' "$1" "$2" >> /tmp/vars.keep
+            mv /tmp/vars.keep /tmp/vars.tsv
+            echo "$1 will be set on this deploy"
+          }
+          set_var APP_ORIGIN "$STUDIO_APP_ORIGIN"
+          set_var MAIN_SITE_ORIGIN "$STUDIO_MAIN_SITE_ORIGIN"
+
       - name: Deploy, carrying every existing var forward
         run: |
           set -e
@@ -108,6 +138,21 @@ jobs:
           done < /tmp/vars.tsv
           echo "re-applying ${#ARGS[@]} existing var(s) so none are wiped"
           npx wrangler deploy --env staging "${ARGS[@]}"
+
+      # The NAME matters: studio/worker/auth/callback.ts reads
+      # env.STUDIO_HANDOFF_SECRET. Workflow 4 used to upload this under a
+      # name nothing reads, so the secret landed on the worker and sign-in
+      # still answered AUTH_NOT_CONFIGURED with no error to explain why.
+      # It must be byte-identical to the secret on levonis-staging.
+      - name: Upload the Studio handoff shared secret
+        env:
+          STUDIO_HANDOFF_SECRET: ${{ secrets.STUDIO_HANDOFF_SECRET }}
+        run: |
+          if [ -n "$STUDIO_HANDOFF_SECRET" ]; then
+            printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put STUDIO_HANDOFF_SECRET --env staging
+          else
+            echo "STUDIO_HANDOFF_SECRET not set — Studio sign-in stays honestly disabled"
+          fi
 
       # The whole point of the change: a desktop keeps the threaded core, an
       # iPad does not, and everything else is identical.

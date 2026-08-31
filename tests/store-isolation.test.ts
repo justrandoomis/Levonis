@@ -157,6 +157,40 @@ test('no store source embeds, prefetches, or preloads a Studio asset', () => {
   }
 });
 
+/**
+ * The opening `<a ...>` tag of the Studio anchor, or null.
+ *
+ * WHY THIS IS NOT A REGEX. Two things defeat the obvious one:
+ *
+ *   1. These files DOCUMENT the anchor in prose — "written out as a LITERAL
+ *      `<a href={STUDIO_URL}>`" — so a plain search finds the comment first
+ *      and then happily asserts against a sentence. Comments are stripped.
+ *   2. A JSX attribute value may legitimately contain a `>`; an
+ *      `onClick={() => ...}` is the everyday case. Slicing to the first `>`
+ *      would cut the tag in half and report a missing target that is right
+ *      there. So the scan tracks brace depth and stops at the first `>` that
+ *      is actually outside an expression.
+ *
+ * Getting this wrong does not make the guard fail open — it makes it fail
+ * CLOSED on a valid edit, which is worse: it trains the next person to
+ * delete the assertion.
+ */
+function studioOpenTag(source: string): string | null {
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const at = code.search(/href=\{\s*STUDIO_URL\s*\}/);
+  if (at < 0) return null;
+  const start = code.lastIndexOf('<a', at);
+  if (start < 0) return null;
+  let depth = 0;
+  for (let i = start; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+    else if (ch === '>' && depth === 0) return code.slice(start, i + 1);
+  }
+  return null;
+}
+
 test('the Studio entry is a plain anchor to the configurable STUDIO_URL constant', () => {
   // The constant itself: https, the real subdomain, no path/query baggage.
   assert.equal(STUDIO_URL, 'https://studio.levonis-iq.com');
@@ -173,9 +207,32 @@ test('the Studio entry is a plain anchor to the configurable STUDIO_URL constant
 
   for (const [name, path, importPrefix] of entries) {
     const source = readFileSync(path, 'utf8');
-    // Every entry navigates via a plain <a href={STUDIO_URL}> — full page
-    // navigation, target choice left to the user (no forced new tab).
+    // Every entry navigates via a plain <a href={STUDIO_URL}> — a navigation,
+    // never a router <Link>, an iframe or a prefetch.
     assert.match(source, /<a\b[^>]*\bhref=\{STUDIO_URL\}/, `${name}: must render <a href={STUDIO_URL}>`);
+
+    // AND it opens in its own tab. This assertion reverses an earlier one:
+    // the target used to be left to the visitor, and the owner asked for the
+    // Studio to open on its own page instead of replacing the store — losing
+    // the cart and the scroll position of whoever clicked it. Pinned here so
+    // it cannot quietly revert.
+    //
+    // rel="noopener noreferrer" is not decoration: without noopener the new
+    // tab receives window.opener, a live handle onto the store page that a
+    // compromised Studio build could navigate.
+    const openTag = studioOpenTag(source);
+    assert.ok(openTag, `${name}: no Studio anchor found outside comments`);
+    assert.match(openTag!, /\btarget=(["']|\{['"])_blank/, `${name}: the Studio entry must open in a new tab — got ${openTag}`);
+
+    // rel is checked as a SET, not a string: "noreferrer noopener" protects
+    // exactly as well as "noopener noreferrer", and a guard that fails on the
+    // word order teaches people to fight the test instead of reading it.
+    const rel = /\brel=["']([^"']*)["']/.exec(openTag!)?.[1] ?? '';
+    const relTokens = new Set(rel.split(/\s+/).filter(Boolean));
+    assert.ok(
+      relTokens.has('noopener') && relTokens.has('noreferrer'),
+      `${name}: a _blank Studio entry needs rel with noopener AND noreferrer — got rel="${rel}"`
+    );
     assert.match(
       source,
       new RegExp(
