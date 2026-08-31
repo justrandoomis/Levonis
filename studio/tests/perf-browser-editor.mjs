@@ -40,6 +40,19 @@ const FIXTURE = join(STUDIO_ROOT, "tests", "fixtures", "cube-10mm.stl");
 
 const target = process.argv.find((arg) => arg.startsWith("http")) ?? "http://127.0.0.1:8799/";
 
+/**
+ * Hard ceiling on the whole run. A browser check that hangs — a page that
+ * never mounts, a control that never appears — must fail the deploy quickly
+ * and say so, not sit on a runner until the job limit. Every wait below is
+ * bounded too; this is the backstop for the ones that are not obviously so.
+ */
+const DEADLINE_MS = Number(process.env.PERF_BROWSER_DEADLINE_MS ?? 8 * 60 * 1000);
+const deadline = setTimeout(() => {
+  console.error(`::error::perf-browser-editor: no result after ${Math.round(DEADLINE_MS / 1000)}s against ${target}`);
+  process.exit(3);
+}, DEADLINE_MS);
+deadline.unref?.();
+
 const DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 const PHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -207,7 +220,7 @@ async function measureSliceOnDemandAndDuplicate(browser) {
     sliceWorkerAlive: Boolean(window.__vpWorker),
   }));
 
-  await page.setInputFiles("input.native-file-input", FIXTURE);
+  await page.setInputFiles("input.native-file-input", FIXTURE, { timeout: 60_000 });
   await page.waitForFunction(() => (window.__vpApi?.()?.sceneSnapshot?.() ?? []).length > 0, null, { timeout: 60_000 });
   await page.waitForTimeout(2_500);
   const afterImport = await page.evaluate(() => ({
@@ -216,6 +229,7 @@ async function measureSliceOnDemandAndDuplicate(browser) {
     sliceWorkerAlive: Boolean(window.__vpWorker),
   }));
 
+  page.setDefaultTimeout(60_000);
   const duplicate = await page.evaluate(async ({ shadowQuerySource, copies }) => {
     const findShadow = new Function(`${shadowQuerySource}; return findShadow;`)();
     const api = window.__vpApi();
@@ -337,3 +351,4 @@ if (duplicateReport.error) {
 
 writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2) + "\n");
 console.log(`\nReport written: ${relative(process.cwd(), REPORT_PATH)}`);
+clearTimeout(deadline);

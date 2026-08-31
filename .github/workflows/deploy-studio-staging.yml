@@ -165,6 +165,10 @@ jobs:
       # never signs in, so nothing is written to the staging database or bucket.
       - name: Verify the editor in a real browser (OOM / duplicate / slice)
         id: browser
+        # Bounded twice on purpose: the script carries its own deadline so it
+        # reports WHY it gave up, and the step carries one so a hung browser
+        # can never hold a runner. A deploy must fail fast, not sit.
+        timeout-minutes: 12
         run: |
           set -e
           npm i --no-save playwright-core >/dev/null

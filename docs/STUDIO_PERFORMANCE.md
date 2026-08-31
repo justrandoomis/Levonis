@@ -243,7 +243,28 @@ Also in `perf-shell.mjs`, read out of the shipped WASM glue:
 | Module instantiations | 9 | **0** | 17 (unchanged) |
 | Kernel bytes fetched at load | 5.0 MB | **0** | 5.0 MB (unchanged) |
 
-### 3.5 On the deployed worker, on every staging deploy
+### 3.5 On the deployed worker
+
+Same script, run against `https://levonis-studio-staging.just-randoomis.workers.dev/`
+after `4 - Deploy Studio Staging`:
+
+| Page load | desktop (= before) | phone (= after) |
+|---|---|---|
+| Workers constructed | **1** | **0** |
+| Slice worker alive with an empty bed | **yes** | **no** |
+| Time to an interactive editor | 1105 ms | **570 ms** |
+| Renderer RSS after load | **+145.7 MB** | **+112.6 MB** |
+| Worker-release hook present | yes | (no worker to release yet) |
+
+Deferred, not disabled: **0 workers at load, 0 after importing the fixture, 1
+the moment Slice was pressed**, with the engine logging
+`[slicer.worker] core: st`.
+
+Duplicate placement, ten presses: **4/10 off the bed at up to 185 mm before,
+0/10 at up to 32 mm after** — the same numbers as the local build, on the
+deployed worker.
+
+### 3.6 …and on every staging deploy from here on
 
 `4 - Deploy Studio Staging` now runs `tests/perf-browser-editor.mjs` against
 the URL it just deployed and **fails the deploy** on any of:
