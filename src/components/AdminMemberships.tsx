@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { api, ApiError, formatIqd } from '../lib/api';
+import { api, ApiError, formatIqd, newIdempotencyKey } from '../lib/api';
 import { RefreshCw, Users, Inbox, ShieldAlert, ChevronDown, X, MessageSquare } from 'lucide-react';
 
 /**
@@ -731,6 +731,7 @@ function MemberDetail({
                 ))}
               </div>
             )}
+            <GrantMembership userId={userId} onGranted={() => { load(); onChanged(); }} />
           </div>
 
           {/* identity */}
@@ -915,6 +916,108 @@ function MemberDetail({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Give an account a membership without a payment.
+ *
+ * The schema has allowed `source = 'admin'` since the beginning and nothing
+ * ever wrote one, so until now the only way to hold PLUS was to buy it. That
+ * left an admin unable to comp a member whose payment failed, restore a
+ * subscription cancelled by mistake, or set up a merchant — without pushing
+ * real money through a real wallet to do it.
+ *
+ * It is an ENTITLEMENT, not a transaction: `price_paid_iqd` is 0 and no
+ * wallet row moves. A reason is required, because a membership somebody
+ * cannot explain later is one that gets revoked by whoever asks loudest.
+ */
+function GrantMembership({ userId, onGranted }: { userId: string; onGranted: () => void }) {
+  const { loc } = useLanguage();
+  const [plans, setPlans] = useState<Array<{ id: string; tier: string; duration_months: number; purchasable: boolean }>>([]);
+  const [planId, setPlanId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+
+  useEffect(() => {
+    api
+      .get<{ plans: Array<{ id: string; tier: string; duration_months: number; purchasable: boolean }> }>(
+        '/api/memberships/plans'
+      )
+      .then((d) => {
+        setPlans(d.plans);
+        // Default to the shortest PLUS term: a comp should be the smallest
+        // thing that solves the problem, not the largest.
+        const plus = d.plans.filter((p) => p.tier === 'plus').sort((a, b) => a.duration_months - b.duration_months);
+        setPlanId(plus[0]?.id ?? d.plans[0]?.id ?? '');
+      })
+      .catch(() => setPlans([]));
+  }, []);
+
+  async function grant() {
+    const reason = window.prompt(
+      loc('سبب المنح (مطلوب — يُسجَّل):', 'Reason for the grant (required — it is recorded):', 'هۆکاری پێدان (پێویستە):')
+    );
+    if (!reason?.trim() || reason.trim().length < 3) return;
+
+    setBusy(true);
+    setError('');
+    setDone('');
+    try {
+      const r = await api.post<{ replayed: boolean; tier?: string; active?: boolean; note?: string }>(
+        '/api/memberships/admin/grant',
+        { userId, planId, reason: reason.trim(), idempotencyKey: newIdempotencyKey() }
+      );
+      setDone(
+        r.replayed
+          ? loc('هذا المنح مسجّل مسبقًا.', 'That grant was already recorded.', 'ئەم پێدانە پێشتر تۆمارکراوە.')
+          : r.note ?? loc('تم المنح.', 'Granted.', 'پێدرا.')
+      );
+      onGranted();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : loc('تعذّر المنح', 'Could not grant it', 'نەتوانرا بدرێت'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!plans.length) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-zinc-800">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={planId}
+          onChange={(e) => setPlanId(e.target.value)}
+          className="min-h-[34px] rounded-lg bg-zinc-800 border border-zinc-700 px-2 text-white text-xs outline-none"
+        >
+          {plans.map((p) => (
+            <option key={p.id} value={p.id} className="bg-zinc-900">
+              {p.tier.toUpperCase()} · {p.duration_months}mo
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={grant}
+          disabled={busy || !planId}
+          className="min-h-[34px] px-3 rounded-lg bg-olive text-white text-xs font-bold disabled:opacity-40"
+        >
+          {busy
+            ? loc('جارٍ...', 'Working…', 'خەریکە...')
+            : loc('منح اشتراك بدون دفع', 'Grant without payment', 'بەخشینی بەشداری')}
+        </button>
+      </div>
+      <p className="text-[11px] text-zinc-600 mt-1.5">
+        {loc(
+          'منح صلاحية وليس عملية مالية — لا تُسجَّل أي حركة في المحفظة، والسبب يُحفظ في سجل التدقيق.',
+          'An entitlement, not a transaction — no wallet movement is recorded, and the reason is kept in the audit log.',
+          'مافێکە نەک کارێکی دارایی — هیچ جووڵەیەکی جزدان تۆمار ناکرێت.'
+        )}
+      </p>
+      {done && <p className="text-emerald-400 text-[11.5px] mt-1">{done}</p>}
+      {error && <p className="text-red-400 text-[11.5px] mt-1">{error}</p>}
     </div>
   );
 }

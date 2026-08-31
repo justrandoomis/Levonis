@@ -605,6 +605,94 @@ membershipsRoutes.post('/admin/activate-launch', async (c) => {
   return c.json({ success: true, already_activated: already, converted, activated_at: activatedAt });
 });
 
+/**
+ * Grant a membership without a payment.
+ *
+ * `memberships.source` has allowed `'admin'` since 0001 and nothing has ever
+ * written one. That gap is not cosmetic: until now the ONLY way an account
+ * could hold PLUS was to buy it, so an admin could not comp a member whose
+ * payment failed, restore a subscription cancelled by mistake, hand a
+ * partner an account, or stand up a merchant to test the storefront chain —
+ * without moving real money through a real wallet to do it.
+ *
+ * THIS IS AN ENTITLEMENT, NOT A TRANSACTION. `price_paid_iqd` is 0, no
+ * wallet transaction is written, no ledger row moves. What it changes is what
+ * the account may DO. That distinction is why this can be used to verify the
+ * merchant chain on a live deployment without a financial movement.
+ *
+ * It respects the launch gate exactly as a purchase does: before launch the
+ * grant lands as `prepaid_pending_launch` rather than pretending to be
+ * active, because an entitlement that outruns the launch is a different bug
+ * from a grant that was never made.
+ */
+membershipsRoutes.post('/admin/grant', async (c) => {
+  const admin = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const userId = str(body.userId, 'userId', { min: 1, max: 60 });
+  const planId = str(body.planId, 'planId', { min: 1, max: 60 });
+  const reason = str(body.reason, 'reason', { min: 3, max: 300 });
+  // Deterministic on the caller's key, so a double-tapped button grants once.
+  const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
+
+  const db = c.env.DB;
+  const target = await db.prepare('SELECT id, email FROM users WHERE id = ?').bind(userId)
+    .first<{ id: string; email: string }>();
+  if (!target) throw notFound('User not found');
+
+  const plan = await db.prepare('SELECT id, tier, duration_months FROM membership_plans WHERE id = ?')
+    .bind(planId)
+    .first<{ id: string; tier: 'plus' | 'pro' | 'prime'; duration_months: number }>();
+  if (!plan) throw notFound('Plan not found');
+
+  const launch = await getLaunchConfig(db);
+  const nowIso = new Date().toISOString();
+  const id = `mem_grant_${idempotencyKey}`.slice(0, 60);
+
+  try {
+    await db.prepare(
+      `INSERT INTO memberships
+         (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd,
+          purchased_at, starts_at, expires_at, source, source_ref)
+       VALUES (?,?,?,?,?,?,0,?,?,?,'admin',?)`
+    ).bind(
+      id, userId, plan.id, plan.tier,
+      launch.activated ? 'active' : 'prepaid_pending_launch',
+      plan.duration_months,
+      nowIso,
+      launch.activated ? nowIso : null,
+      launch.activated ? addMonths(nowIso, plan.duration_months) : null,
+      `admin:${admin.id}:${reason}`.slice(0, 200)
+    ).run();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // The id is derived from the caller's key, so a retry lands here rather
+    // than granting a second membership.
+    if (msg.includes('UNIQUE') || msg.includes('PRIMARY KEY')) {
+      return c.json({ success: true, replayed: true, membership_id: id });
+    }
+    throw e;
+  }
+
+  // Refresh the cached tier on the user row immediately, so the next request
+  // from that account already sees what it may do.
+  const tier = await getTierStatus(db, userId);
+  await audit(c.env.DB, admin.id, 'admin.membership_granted', id, {
+    user: userId, plan: plan.id, tier: plan.tier, reason,
+  });
+
+  return c.json({
+    success: true,
+    replayed: false,
+    membership_id: id,
+    tier: tier.tier,
+    active: tier.active,
+    expires_at: tier.expires_at,
+    note: launch.activated
+      ? 'Granted and active now.'
+      : 'Granted, and will activate with the launch — it is not active yet.',
+  });
+});
+
 membershipsRoutes.post('/admin/:id/cancel', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');

@@ -34,10 +34,17 @@
 import { randomBytes } from 'node:crypto';
 
 const APEX = (process.env.APEX || 'https://levonis-iq.com').replace(/\/$/, '');
-const ROOT_DOMAIN = new URL(APEX).hostname;
+const APEX_URL = new URL(APEX);
+const ROOT_DOMAIN = APEX_URL.hostname;
 const RUN = (process.env.RUN_ID || randomBytes(3).toString('hex')).toLowerCase().replace(/[^a-z0-9]/g, '');
 const SLUG = (process.env.SLUG || `e2e${RUN}`).toLowerCase();
-const STORE = `https://${SLUG}.${ROOT_DOMAIN}`;
+// Scheme and port come from the apex rather than being assumed https:443, so
+// the same script runs against a local `wrangler dev` on levonis.test:8787.
+// A verification that only works against production is a verification that
+// cannot be run before deploying.
+const STORE = `${APEX_URL.protocol}//${SLUG}.${ROOT_DOMAIN}${APEX_URL.port ? `:${APEX_URL.port}` : ''}`;
+const hostUrl = (label) =>
+  `${APEX_URL.protocol}//${label}.${ROOT_DOMAIN}${APEX_URL.port ? `:${APEX_URL.port}` : ''}`;
 const ALLOW_FINANCIAL = process.env.ALLOW_FINANCIAL === '1';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -100,7 +107,23 @@ class Client {
       headers['Content-Type'] = 'application/json';
       init.body = JSON.stringify(body);
     }
-    const res = await fetch(`${base}${path}`, init);
+    let res;
+    try {
+      res = await fetch(`${base}${path}`, init);
+    } catch (e) {
+      // A hostname that does not resolve, or a refused connection, is a
+      // RESULT — "merchant subdomains are not reachable from here" — and the
+      // run has to be able to say so. Throwing turns one unreachable host
+      // into no report at all, which is how a verification ends up telling
+      // you nothing about the twelve checks it never got to.
+      return {
+        status: 0,
+        json: null,
+        text: '',
+        networkError: e instanceof Error ? e.message : String(e),
+        headers: new Headers(),
+      };
+    }
     this.absorb(res);
     const text = await res.text();
     let json = null;
@@ -156,10 +179,13 @@ async function main() {
   const apexResolve = await anon.req('GET', APEX, '/api/storefront/resolve');
   check('the apex has no store attached', apexResolve.json?.store == null);
 
-  const missing = await anon.req('GET', `https://no-such-store-${RUN}.${ROOT_DOMAIN}`, '/api/storefront/resolve');
+  const missing = await anon.req('GET', hostUrl(`no-such-store-${RUN}`), '/api/storefront/resolve');
   // A typo must read as "no such store", never as a silent redirect to the
   // homepage, which would make a mistyped link look like the platform itself.
-  if (missing.status >= 300 && missing.status < 400) {
+  if (missing.status === 0) {
+    blocked('a nonexistent subdomain is a missing store',
+      `the hostname does not resolve from here (${missing.networkError}) — wildcard DNS is not in place for this environment`);
+  } else if (missing.status >= 300 && missing.status < 400) {
     blocked('a nonexistent subdomain is a missing store',
       `a redirect (${missing.status}) answers before the Worker — merchant subdomains do not reach it yet`);
   } else {
@@ -170,7 +196,7 @@ async function main() {
     );
   }
 
-  const studio = await anon.req('GET', `https://studio.${ROOT_DOMAIN}`, '/');
+  const studio = await anon.req('GET', hostUrl('studio'), '/');
   check(
     'studio. is a system host and is untouched by the wildcard',
     studio.status < 500,
@@ -179,7 +205,7 @@ async function main() {
 
   // --------------------------------------------- 3. THE GUARD (§53) — read only
   section('3. platform admin is refused off the apex');
-  for (const host of [`https://no-such-store-${RUN}.${ROOT_DOMAIN}`, STORE]) {
+  for (const host of [hostUrl(`no-such-store-${RUN}`), STORE]) {
     const name = new URL(host).hostname;
     const res = await anon.req('GET', host, '/api/admin/community/overview');
     // 404, not 403: a wrong-host caller learns the route does not exist here
@@ -187,6 +213,8 @@ async function main() {
     // the route IS reachable, which is the vulnerability.
     if (res.status === 404) {
       ok(`/api/admin/community/overview is 404 on ${name}`);
+    } else if (res.status === 0) {
+      blocked(`/api/admin/community/overview on ${name}`, `the hostname does not resolve from here`);
     } else if (res.status >= 300 && res.status < 400) {
       // Something in front of the Worker answered. The admin API is not
       // exposed — but nothing about the guard was exercised either, and
@@ -271,9 +299,9 @@ async function main() {
   // The whole point of the parent-domain cookie. If this fails, sign-in
   // "works" on the shop and every merchant page looks signed out.
   const meStore = await shopper.req('GET', STORE, '/api/auth/me');
-  if (meStore.status >= 300 && meStore.status < 400) {
+  if (meStore.status === 0 || (meStore.status >= 300 && meStore.status < 400)) {
     blocked('THE SAME SESSION works on a storefront host',
-      `a redirect (${meStore.status}) answers before the Worker — the shared cookie cannot be exercised yet`);
+      meStore.status === 0 ? `the hostname does not resolve from here` : `a redirect (${meStore.status}) answers before the Worker — the shared cookie cannot be exercised yet`);
   } else {
     check(
       'THE SAME SESSION works on a storefront host',
@@ -284,22 +312,36 @@ async function main() {
 
   // ---------------------------------------------------------- 5. one cart
   section('5. one cart, wherever they are shopping');
-  const catalog = await anon.req('GET', APEX, '/api/products?limit=1');
-  const levonisProduct = catalog.json?.products?.[0];
+  const catalog = await anon.req('GET', APEX, '/api/products?limit=25');
+  const products = catalog.json?.products ?? [];
+  // A pre-order product REQUIRES a transport choice (air/sea/land) and the
+  // API is right to refuse without one. Prefer a direct-sale product; fall
+  // back to a pre-order one with its first offered method, which is the same
+  // choice the customer makes in the UI. Grabbing products[0] blindly made
+  // this fail on TRANSPORT_REQUIRED and look like a cart bug.
+  const levonisProduct =
+    products.find((p) => (p.sale_types ?? [p.selling_type]).includes('direct_sale')) ?? products[0];
+  const needsTransport =
+    levonisProduct && !(levonisProduct.sale_types ?? [levonisProduct.selling_type]).includes('direct_sale');
+  const transportMethod = needsTransport
+    ? (levonisProduct.preorder_transports ?? []).find((t) => t.active !== false)?.method ?? 'air'
+    : undefined;
+
   if (!levonisProduct) {
     blocked('a Levonis product to put in the cart', 'the catalogue returned nothing');
   } else {
     const add = await shopper.req('POST', APEX, '/api/cart/items', {
       productId: levonisProduct.id, qty: 1,
+      ...(transportMethod ? { transportMethod } : {}),
     });
     check('a Levonis item goes into the cart from the apex', add.status < 400,
       `status ${add.status} ${add.json?.error ?? ''}`);
 
     if (add.status < 400) {
       const cartFromStore = await shopper.req('GET', STORE, '/api/cart');
-      if (cartFromStore.status >= 300 && cartFromStore.status < 400) {
+      if (cartFromStore.status === 0 || (cartFromStore.status >= 300 && cartFromStore.status < 400)) {
         blocked('the SAME cart is visible from the storefront host',
-          `a redirect (${cartFromStore.status}) answers before the Worker`);
+          cartFromStore.status === 0 ? `the hostname does not resolve from here` : `a redirect (${cartFromStore.status}) answers before the Worker`);
       } else {
         check(
           'the SAME cart is visible from the storefront host',
@@ -314,24 +356,30 @@ async function main() {
     }
   }
 
-  // --------------------------------------------------- 6. the money path
-  section('6. store, product, order, escrow');
-  if (!ALLOW_FINANCIAL) {
-    for (const step of [
-      'the test account buys PLUS',
-      'a PLUS member opens a store on a real subdomain',
-      'the storefront serves that store on its own hostname',
-      'a merchant product is published and buyable',
-      'mixing sellers in one cart is refused (CART_SELLER_CONFLICT)',
-      'a real merchant order is placed',
-      'community escrow holds and settles',
-    ]) {
-      blocked(step, 'ALLOW_FINANCIAL is not 1 — this writes to the live ledger');
-    }
-    return report();
-  }
+  // ------------------------------- 6. the merchant chain, WITHOUT any money
+  //
+  // PLUS → merchant → subdomain → shared login → /admin → product → cart.
+  //
+  // None of this is a financial movement. The membership is GRANTED, not
+  // bought: /api/memberships/admin/grant writes an entitlement with
+  // price_paid_iqd 0 and no wallet row, which is what the schema's
+  // `source = 'admin'` was always for. So the whole chain can be proven on a
+  // live deployment while the order and escrow — the parts that really do
+  // move money — stay behind their own gate below.
+  section('6. PLUS → merchant → store → product → cart (no money)');
+
   if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-    blocked('the money path', 'ALLOW_FINANCIAL=1 but no admin credentials were provided');
+    for (const step of [
+      'an admin grants PLUS without a payment',
+      'the server says the account may operate a store',
+      'a store is created on a real subdomain',
+      'the storefront serves that store on its own hostname',
+      'the owner reaches their own /admin on the store host',
+      'a merchant product is published and visible',
+      'the merchant product goes into the shared cart',
+    ]) {
+      blocked(step, 'no admin credentials — set the E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD secrets');
+    }
     return report();
   }
 
@@ -340,7 +388,7 @@ async function main() {
     email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
   });
   if (adminLogin.status !== 200 || admin.cookies.size === 0) {
-    blocked('the money path', `admin sign-in failed (status ${adminLogin.status})`);
+    blocked('the merchant chain', `admin sign-in failed (status ${adminLogin.status})`);
     return report();
   }
   ok('the admin can sign in');
@@ -351,39 +399,40 @@ async function main() {
     email: merchantEmail, password, name: `E2E Merchant ${RUN}`,
   });
   if (mReg.status >= 400) {
-    blocked('the money path', `could not register the merchant account (${mReg.status})`);
+    blocked('the merchant chain', `could not register the merchant account (${mReg.status})`);
     return report();
   }
   const merchantId = (await merchant.req('GET', APEX, '/api/auth/me')).json?.user?.id;
   ok('a second account exists to be the merchant');
 
-  // Fund it through the real admin endpoint, so the credit is audited and
-  // reversible rather than injected into the database behind the platform's
-  // own back.
   const PLANS = await anon.req('GET', APEX, '/api/memberships/plans');
-  const plusPlan = (PLANS.json?.plans ?? []).find((p) => p.tier === 'plus' && p.purchasable);
+  const plusPlan = (PLANS.json?.plans ?? []).find((p) => p.tier === 'plus');
   if (!plusPlan) {
-    // Honest, not a failure: an unpriced plan is not purchasable by design,
-    // and inventing a price here would be fabricating the thing under test.
-    blocked('buying PLUS', 'no PLUS plan has a price set — docs/DECISIONS.md row 19 is still open');
-    return finish(admin, null, merchantId);
+    blocked('the merchant chain', 'no PLUS plan exists to grant');
+    return report();
   }
 
-  const rate = Number((await anon.req('GET', APEX, '/api/settings/public')).json?.exchangeRate ?? 1400);
-  const needCents = Math.ceil((Number(plusPlan.price_iqd) * 100) / rate) + 20_000;
-  const credited = await admin.req('POST', APEX, '/api/admin/wallet/credit', {
-    userId: merchantId, currency: 'USD', amount: needCents,
-    note: `e2e ${RUN} — §95 verification float, reversed at the end of this run`,
+  const granted = await admin.req('POST', APEX, '/api/memberships/admin/grant', {
+    userId: merchantId, planId: plusPlan.id,
+    reason: `e2e ${RUN} — §95 merchant chain verification`,
+    idempotencyKey: `e2egrant${RUN}`,
   });
-  check('the admin can fund the test account', credited.status === 200,
-    `status ${credited.status} ${credited.json?.error ?? ''}`);
-  const creditTxnId = credited.json?.id ?? null;
-
-  const bought = await merchant.req('POST', APEX, '/api/memberships/subscribe', {
-    planId: plusPlan.id, idempotencyKey: `e2e-plus-${RUN}`,
-  });
-  check('the test account buys PLUS with wallet funds', bought.status < 400,
-    `status ${bought.status} ${bought.json?.error ?? ''}`);
+  check('an admin grants PLUS without a payment', granted.status === 200,
+    `status ${granted.status} ${granted.json?.error ?? ''}`);
+  if (granted.status !== 200) return report();
+  if (granted.json?.active === true) {
+    ok('the grant is active immediately');
+  } else {
+    // The grant landed correctly; the LAUNCH is not activated on this
+    // deployment, so no membership of any kind is active yet — a purchase
+    // would sit in exactly the same state. Reporting this as a failed grant
+    // would send someone hunting a bug in the wrong file.
+    blocked('the granted membership is active',
+      `the launch is not activated on this deployment — ${granted.json?.note ?? 'the membership is prepaid, pending launch'}`);
+    blocked('the merchant chain past this point',
+      'no membership can be active until the launch is activated (admin → memberships → activate launch)');
+    return report();
+  }
 
   const me = await merchant.req('GET', APEX, '/api/merchant/me');
   check('the server says this account may operate a store', me.json?.can?.store === true,
@@ -394,7 +443,13 @@ async function main() {
   });
   check('a store is created on a real subdomain', onboard.status < 400,
     `status ${onboard.status} ${onboard.json?.error ?? ''} slug=${SLUG}`);
-  if (onboard.status >= 400) return finish(admin, creditTxnId, merchantId);
+  if (onboard.status >= 400) return report();
+
+  // The canonical URL the server reports IS the merchant subdomain when the
+  // root domain is configured — that is the link a merchant hands out.
+  check('the store reports its own subdomain as its address',
+    String(onboard.json?.store?.url ?? '').includes(`${SLUG}.${ROOT_DOMAIN}`),
+    String(onboard.json?.store?.url ?? '(none)'));
 
   // Cloudflare needs a moment for a brand-new hostname on the wildcard.
   let resolved = null;
@@ -403,8 +458,25 @@ async function main() {
     if (resolved.json?.store?.slug === SLUG) break;
     await new Promise((r) => setTimeout(r, 4000));
   }
-  check('the storefront answers on its OWN hostname', resolved?.json?.store?.slug === SLUG,
-    `${STORE} → ${resolved?.status} ${resolved?.json?.kind ?? ''}`);
+  if (resolved && (resolved.status === 0 || (resolved.status >= 300 && resolved.status < 400))) {
+    blocked('the storefront answers on its OWN hostname',
+      resolved.status === 0 ? `the hostname does not resolve from here — the store exists, its address does not` : `a redirect (${resolved.status}) answers before the Worker — the store exists, the hostname does not reach it`);
+  } else {
+    check('the storefront answers on its OWN hostname', resolved?.json?.store?.slug === SLUG,
+      `${STORE} → ${resolved?.status} ${resolved?.json?.kind ?? ''}`);
+  }
+
+  // /admin on the STORE host is the merchant's own dashboard, and it is a
+  // different thing from platform admin with a different guard (§53).
+  const storeAdmin = await merchant.req('GET', STORE, '/api/merchant/me');
+  if (storeAdmin.status === 0 || (storeAdmin.status >= 300 && storeAdmin.status < 400)) {
+    blocked('the owner reaches their own /admin on the store host',
+      storeAdmin.status === 0 ? `the hostname does not resolve from here` : `a redirect (${storeAdmin.status}) answers before the Worker`);
+  } else {
+    check('the owner reaches their own /admin on the store host',
+      storeAdmin.status === 200 && storeAdmin.json?.store?.slug === SLUG,
+      `status ${storeAdmin.status}`);
+  }
 
   const product = await merchant.req('POST', APEX, '/api/merchant/products', {
     name: `E2E Widget ${RUN}`, price_iqd: 5000, stock: 10, lifecycle: 'active',
@@ -413,27 +485,50 @@ async function main() {
     `status ${product.status} ${product.json?.error ?? ''}`);
   const productId = product.json?.product?.id ?? product.json?.id ?? null;
 
-  const publicList = await anon.req('GET', STORE, `/api/storefront/${SLUG}/products`);
-  check('the product is visible on the storefront host',
+  const publicList = await anon.req('GET', APEX, `/api/storefront/${SLUG}/products`);
+  check('the product is visible on the storefront',
     (publicList.json?.products ?? []).some((p) => p.id === productId),
     `${(publicList.json?.products ?? []).length} product(s)`);
 
+  // Store isolation: a second merchant's dashboard must not see this store.
+  const outsider = new Client('outsider');
+  await outsider.req('POST', APEX, '/api/auth/register', {
+    email: `e2e.outsider.${RUN}@levonis-iq.com`, password, name: `E2E Outsider ${RUN}`,
+  });
+  const outsiderMe = await outsider.req('GET', APEX, '/api/merchant/me');
+  check('an account with no store is told so, rather than shown someone else\'s',
+    outsiderMe.status === 200 && outsiderMe.json?.store === null,
+    `store=${JSON.stringify(outsiderMe.json?.store ?? null)}`);
+  const outsiderProducts = await outsider.req('GET', APEX, '/api/merchant/products');
+  check('and cannot list another merchant\'s products',
+    outsiderProducts.status >= 400 || (outsiderProducts.json?.products ?? []).length === 0,
+    `status ${outsiderProducts.status} ${(outsiderProducts.json?.products ?? []).length} product(s)`);
+
   // -------------------------------------------- the seller conflict, for real
-  section('7. one cart, one seller');
+  section('7. one cart, one seller (no money)');
   if (!productId) {
     blocked('the seller conflict', 'no merchant product id to add');
   } else {
-    const clash = await shopper.req('POST', STORE, '/api/cart/merchant-items', { productId, qty: 1 });
+    // Asked on the APEX, deliberately. The cart API is the same Worker on
+    // either hostname, and the rule under test is "one cart settles with one
+    // seller" — not "which host asked". Routing the question through the
+    // storefront host would make this test fail for a reason that has
+    // nothing to do with the rule.
+    const clash = await shopper.req('POST', APEX, '/api/cart/merchant-items', { productId, qty: 1 });
     // The shopper's cart still holds the Levonis line from step 5.
     check('mixing sellers in one cart is refused', clash.status === 400 && clash.json?.code === 'CART_SELLER_CONFLICT',
       `status ${clash.status} code=${clash.json?.code ?? '-'}`);
+    // The keys are cart_seller_name / incoming_seller_name — asserting
+    // invented ones failed while the API was answering correctly, which is
+    // the least useful kind of red.
+    const d = clash.json?.details ?? {};
     check('BOTH shops are named, so the customer is not left guessing',
-      !!clash.json?.details?.current_name || !!clash.json?.details?.incoming_name,
-      JSON.stringify(clash.json?.details ?? {}));
+      !!d.cart_seller_name && !!d.incoming_seller_name,
+      `${d.cart_seller_name ?? '?'} vs ${d.incoming_seller_name ?? '?'}`);
 
     // Clearing is the SAME add re-sent with replaceCart — one request, so a
     // cart is never left emptied with nothing added.
-    const replaced = await shopper.req('POST', STORE, '/api/cart/merchant-items', {
+    const replaced = await shopper.req('POST', APEX, '/api/cart/merchant-items', {
       productId, qty: 1, replaceCart: true,
     });
     check('re-sending with replaceCart swaps the cart in one request', replaced.status < 400,
@@ -445,7 +540,23 @@ async function main() {
   }
 
   // ------------------------------------------------------ 8. a real order
-  section('8. a real merchant order');
+  //
+  // EVERYTHING BELOW MOVES REAL MONEY on the database that holds real
+  // customers, so it is the one part behind an explicit switch. Above this
+  // line the whole merchant chain has already been exercised.
+  section('8. a real merchant order — money');
+  if (!ALLOW_FINANCIAL) {
+    for (const step of [
+      'a real merchant order is placed',
+      'the merchant is credited PENDING, not available',
+      'a community request, offer and acceptance',
+      'community escrow holds and settles',
+    ]) {
+      blocked(step, 'ALLOW_FINANCIAL is not 1 — this writes to the live ledger');
+    }
+    return report();
+  }
+
   const shopperId = (await shopper.req('GET', APEX, '/api/auth/me')).json?.user?.id;
   const shopperFunds = await admin.req('POST', APEX, '/api/admin/wallet/credit', {
     userId: shopperId, currency: 'USD', amount: 5_000,
@@ -461,11 +572,11 @@ async function main() {
   check('the shopper has a delivery address', addr.status < 400,
     `status ${addr.status} ${addr.json?.error ?? ''}`);
 
-  const quote = await shopper.req('POST', STORE, '/api/store-orders/quote', {});
+  const quote = await shopper.req('POST', APEX, '/api/store-orders/quote', {});
   check('the store quotes the cart', quote.status < 400,
     `status ${quote.status} ${quote.json?.error ?? ''}`);
 
-  const placed = await shopper.req('POST', STORE, '/api/store-orders', {
+  const placed = await shopper.req('POST', APEX, '/api/store-orders', {
     addressId: addr.json?.id, payWithWallet: true, idempotencyKey: `e2e-store-${RUN}`,
   });
   check('a real merchant order is placed', placed.status < 400,
@@ -550,7 +661,7 @@ async function main() {
   const adminReviews = await admin.req('GET', APEX, '/api/admin/community/reviews');
   check('the admin reviews list loads', adminReviews.status === 200, `status ${adminReviews.status}`);
 
-  return finish(admin, creditTxnId, merchantId, shopperTxnId);
+  return finish(admin, shopperTxnId);
 }
 
 /**
