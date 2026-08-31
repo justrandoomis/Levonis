@@ -1,0 +1,102 @@
+# Live acceptance for LEVO Studio, run in a real browser against a real origin.
+#
+# WHY THIS IS A WORKFLOW AND NOT A LOCAL SCRIPT. The agent container's egress
+# proxy refuses CONNECT to levonis-iq.com, studio.levonis-iq.com and
+# workers.dev (organization policy, 403). A GitHub runner can reach them, so
+# this is the only place the owner's own origin can actually be exercised.
+#
+# It changes nothing. It signs in to nothing. A guest's autosave writes to that
+# browser's IndexedDB and nowhere else, so no production database, bucket or
+# revision is touched — see the SAFETY note in tests/perf-production-verify.mjs.
+name: 6 - Verify Studio Live (browser acceptance)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Origin to verify (e.g. https://studio.levonis-iq.com)'
+        required: true
+        default: 'https://studio.levonis-iq.com'
+      report_domains:
+        description: 'Also report which worker serves each Studio custom domain'
+        type: boolean
+        default: true
+
+concurrency: studio-live-verify
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      # WHICH WORKER ANSWERS ON THE OWNER'S HOSTNAME. This is the question the
+      # repository cannot answer on its own, and getting it wrong is how three
+      # earlier rounds ended with "nothing changed" (docs/DECISIONS.md row 52):
+      # a deploy that succeeds against a worker nobody visits looks identical
+      # to a deploy that worked.
+      - name: Which worker serves each Studio custom domain
+        if: ${{ inputs.report_domains }}
+        id: domains
+        continue-on-error: true
+        run: |
+          set -e
+          RESPONSE=$(curl -fsS -m 20 \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" || echo '')
+          if [ -z "$RESPONSE" ]; then
+            echo "could not list Workers custom domains (token may lack the Workers scope) — reporting that honestly rather than guessing"
+            exit 0
+          fi
+          echo "$RESPONSE" | jq -r '.result[] | "\(.hostname)\t-> \(.service) [\(.environment)]"' | sort | tee /tmp/studio-domains.txt
+
+      - name: Install Chromium
+        run: |
+          npm i --no-save playwright-core >/dev/null
+          npx --yes playwright@1 install --with-deps chromium
+
+      - name: Browser acceptance against ${{ inputs.url }}
+        id: verify
+        timeout-minutes: 20
+        run: node tests/perf-production-verify.mjs "${{ inputs.url }}" | tee /tmp/studio-verify.txt
+
+      - name: Upload the acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-live-acceptance
+          path: studio/tests/perf-production-verify.latest.json
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Studio live acceptance — ${{ inputs.url }}"
+            echo '```'
+            cat /tmp/studio-verify.txt 2>/dev/null || echo "(the acceptance run produced no output)"
+            echo '```'
+            if [ -s /tmp/studio-domains.txt ]; then
+              echo ""
+              echo "### Workers custom domains on this account"
+              echo '```'
+              cat /tmp/studio-domains.txt
+              echo '```'
+            fi
+            echo ""
+            echo "- Guest session only: nothing was signed in, uploaded, or written to any"
+            echo "  production database or bucket."
+          } >> "$GITHUB_STEP_SUMMARY"

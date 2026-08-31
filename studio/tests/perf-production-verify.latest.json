@@ -1,0 +1,258 @@
+{
+  "kind": "levo-studio-production-verify",
+  "version": 1,
+  "generatedAt": "2026-08-31T08:31:43.660Z",
+  "target": "http://127.0.0.1:8799/",
+  "passed": true,
+  "failures": [],
+  "buildIdentity": {
+    "origin": "http://127.0.0.1:8799/",
+    "releaseHookPresent": true,
+    "crossOriginIsolated": true,
+    "workersConstructed": 1,
+    "scripts": []
+  },
+  "pageLoad": {
+    "interactiveMs": 742,
+    "rendererRssKb": 133992,
+    "workers": 0,
+    "sliceWorkerAlive": false
+  },
+  "afterImport": {
+    "objects": 1,
+    "workers": 0
+  },
+  "gestures": [
+    {
+      "name": "orbit",
+      "elapsedMs": 1670,
+      "frames": 83,
+      "p50Ms": 16.7,
+      "p95Ms": 33.4,
+      "maxMs": 116.6,
+      "jankFrames": 1,
+      "freezeFrames": 0
+    },
+    {
+      "name": "orbit-back",
+      "elapsedMs": 1622,
+      "frames": 81,
+      "p50Ms": 16.7,
+      "p95Ms": 33.4,
+      "maxMs": 66.7,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "pinch-zoom-in",
+      "elapsedMs": 1769,
+      "frames": 77,
+      "p50Ms": 16.8,
+      "p95Ms": 50,
+      "maxMs": 66.6,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "pinch-zoom-out",
+      "elapsedMs": 1675,
+      "frames": 66,
+      "p50Ms": 33.3,
+      "p95Ms": 66.6,
+      "maxMs": 83.3,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "drag-object",
+      "elapsedMs": 3166,
+      "frames": 88,
+      "p50Ms": 33.3,
+      "p95Ms": 83.5,
+      "maxMs": 116.6,
+      "jankFrames": 1,
+      "freezeFrames": 0
+    },
+    {
+      "name": "gizmo-move",
+      "elapsedMs": 2579,
+      "frames": 81,
+      "p50Ms": 33.3,
+      "p95Ms": 50,
+      "maxMs": 83.4,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "gizmo-rotate",
+      "elapsedMs": 2789,
+      "frames": 82,
+      "p50Ms": 33.3,
+      "p95Ms": 66.6,
+      "maxMs": 83.3,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    },
+    {
+      "name": "gizmo-scale",
+      "elapsedMs": 2641,
+      "frames": 79,
+      "p50Ms": 33.4,
+      "p95Ms": 50.1,
+      "maxMs": 66.7,
+      "jankFrames": 0,
+      "freezeFrames": 0
+    }
+  ],
+  "gestureJankFrames": 2,
+  "duplicate": {
+    "source": {
+      "id": 1,
+      "x": 8.1,
+      "z": 0
+    },
+    "plateCentre": {
+      "x": 0,
+      "z": 0
+    },
+    "before": {
+      "copies": 10,
+      "offBed": 9,
+      "furthestFromSourceMm": 716.5,
+      "positions": [
+        [
+          51.4,
+          0
+        ],
+        [
+          126.2,
+          0
+        ],
+        [
+          201,
+          0
+        ],
+        [
+          275.8,
+          0
+        ],
+        [
+          350.6,
+          0
+        ],
+        [
+          425.4,
+          0
+        ],
+        [
+          500.2,
+          0
+        ],
+        [
+          575,
+          0
+        ],
+        [
+          649.8,
+          0
+        ],
+        [
+          724.6,
+          0
+        ]
+      ]
+    },
+    "after": {
+      "copies": 10,
+      "offBed": 0,
+      "furthestFromSourceMm": 56.6,
+      "positions": [
+        [
+          8.1,
+          16
+        ],
+        [
+          8.1,
+          -16
+        ],
+        [
+          8.1,
+          32
+        ],
+        [
+          8.1,
+          -32
+        ],
+        [
+          54.8,
+          0
+        ],
+        [
+          8.1,
+          48
+        ],
+        [
+          8.1,
+          -48
+        ],
+        [
+          54.8,
+          16
+        ],
+        [
+          54.8,
+          -16
+        ],
+        [
+          54.8,
+          32
+        ]
+      ]
+    },
+    "bedWarnText": null,
+    "overBedText": null,
+    "bannerText": "تمت إضافة الملفات إلى المشروع."
+  },
+  "autosave": {
+    "frames": 1195,
+    "p50Ms": 16.7,
+    "p95Ms": 16.8,
+    "maxMs": 50,
+    "jankFrames": 0,
+    "freezeFrames": 0,
+    "longTasks": 1,
+    "longestTaskMs": 56
+  },
+  "sliceCycles": [
+    {
+      "cycle": 1,
+      "workers": 1,
+      "sliceWorkerAlive": true,
+      "messages": 0,
+      "rendererRssKb": 280652
+    },
+    {
+      "cycle": 2,
+      "workers": 1,
+      "sliceWorkerAlive": true,
+      "messages": 0,
+      "rendererRssKb": 297636
+    },
+    {
+      "cycle": 3,
+      "workers": 1,
+      "sliceWorkerAlive": true,
+      "messages": 0,
+      "rendererRssKb": 299732
+    }
+  ],
+  "rendererGrowthKbAcrossSlices": 19080,
+  "messages": {
+    "console": [
+      "info: [slicer.worker] core: st"
+    ],
+    "page": [
+      "11 object(s) · selected: — | M/R/S · Ctrl+click to add · Shift+drag to box-select · ? for shortcuts"
+    ]
+  }
+}
