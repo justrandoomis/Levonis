@@ -924,19 +924,30 @@ async function verifyAnExistingStore(shopper) {
   }
   ok('a published merchant product is discoverable', `${candidates.length} on the community feed`);
 
-  // One cart, one seller. The shopper is already holding a LEVONIS line from
-  // section 5, so the first attempt must be REFUSED and must name both shops
-  // — that rule is the reason a cart can be shared across hostnames at all.
+  // One cart, one seller. If section 5 left a LEVONIS line in this cart, the
+  // first attempt must be REFUSED and must name both shops — that rule is the
+  // reason a cart can be shared across hostnames at all. The state is READ
+  // rather than assumed: if section 5 could not add anything, an accepted
+  // merchant line is correct behaviour, and asserting a conflict there would
+  // report a fault that is not one.
   const product = candidates[0];
-  const conflict = await shopper.req('POST', APEX, '/api/cart/merchant-items', { productId: product.id, qty: 1 });
-  check('a merchant item is refused while a LEVONIS item is in the cart',
-    conflict.status === 400 && conflict.json?.code === 'CART_SELLER_CONFLICT',
-    `status ${conflict.status} code=${conflict.json?.code ?? 'none'}`);
-  if (conflict.status === 400) {
-    const d = conflict.json?.details ?? {};
-    check('and it names both shops rather than "another seller"',
-      typeof d.cart_seller_name === 'string' && typeof d.incoming_seller_name === 'string',
-      `details=${JSON.stringify(d)}`);
+  const before = await shopper.req('GET', APEX, '/api/cart/scope');
+  const holdsLevonis = before.json?.scope?.seller_type === 'levonis';
+
+  if (holdsLevonis) {
+    const conflict = await shopper.req('POST', APEX, '/api/cart/merchant-items', { productId: product.id, qty: 1 });
+    check('a merchant item is refused while a LEVONIS item is in the cart',
+      conflict.status === 400 && conflict.json?.code === 'CART_SELLER_CONFLICT',
+      `status ${conflict.status} code=${conflict.json?.code ?? 'none'}`);
+    if (conflict.status === 400) {
+      const d = conflict.json?.details ?? {};
+      check('and it names both shops rather than "another seller"',
+        typeof d.cart_seller_name === 'string' && typeof d.incoming_seller_name === 'string',
+        `details=${JSON.stringify(d)}`);
+    }
+  } else {
+    blocked('a merchant item is refused while a LEVONIS item is in the cart',
+      `the cart holds no LEVONIS line to conflict with (scope=${JSON.stringify(before.json?.scope ?? null)})`);
   }
 
   const added = await shopper.req('POST', APEX, '/api/cart/merchant-items',
