@@ -30,17 +30,71 @@
  */
 
 /**
- * Subdomains a merchant can never be. Checked before `reserved_slugs`, and
- * kept in code on purpose: this list must hold even if the database is
- * unreachable, mid-migration, or has had a row deleted by accident.
+ * Subdomains a merchant can never be.
+ *
+ * Checked BEFORE `reserved_slugs`, and kept in code on purpose: this list has
+ * to hold even if the database is unreachable, mid-migration, or has had a
+ * row deleted by accident. A wildcard that resolves before the database
+ * answers is a wildcard that must be safe without it.
+ *
+ * Grouped by WHY, because the reason decides whether a future name belongs
+ * here. Two of the groups are not about names we use:
+ *
+ *   - the phishing surface (`login`, `verify`, `secure`…) is reserved because
+ *     of who could otherwise ask for it. A merchant controls the content of
+ *     their storefront, so a merchant on `login.levonis-iq.com` gets a valid
+ *     certificate, the real brand's domain, and a page they write, aimed at
+ *     this platform's own customers.
+ *   - mail infrastructure (`send`, `dkim`, `bounce`…) is reserved because
+ *     those names already speak for this domain's email to the rest of the
+ *     internet.
+ *
+ * `docs/SUBDOMAIN_ARCHITECTURE.md` §3 carries the same reasoning for
+ * operators. Names a merchant should not have for BUSINESS reasons live in
+ * the `reserved_slugs` table instead, so they can change without a deploy.
  */
 export const SYSTEM_SUBDOMAINS: ReadonlySet<string> = new Set([
-  'www', 'api', 'admin', 'studio', 'mail', 'support', 'cdn', 'assets', 'static',
-  'auth', 'account', 'community', 'shop', 'store', 'app', 'dashboard', 'status',
-  'help', 'billing', 'checkout', 'blog', 'docs', 'dev', 'staging', 'test',
-  'ftp', 'smtp', 'imap', 'ns1', 'ns2', 'mx', 'webmail', 'cpanel',
-  'files', 'media', 'img', 'images', 'pay', 'payments', 'wallet',
-  'security', 'abuse', 'legal', 'privacy',
+  // 1. RUNNING SERVICES. Handing one of these to a merchant takes a live
+  //    product down. `studio` serves LEVO Studio; `send` and `mail` carry
+  //    outbound email.
+  'www', 'studio', 'mail', 'send', 'api', 'app', 'community', 'support',
+
+  // 2. MAIL INFRASTRUCTURE. A merchant on any of these does not just get a
+  //    page — they get a name the world already trusts to speak for this
+  //    domain's email, and deliverability breaks the moment it moves.
+  'smtp', 'imap', 'pop', 'pop3', 'mx', 'webmail', 'email', 'mailer',
+  'newsletter', 'bounce', 'bounces', 'unsubscribe', 'dkim', 'dmarc', 'spf',
+  'autodiscover', 'autoconfig', 'em', 'mg', 'mandrill', 'postmaster',
+
+  // 3. THE PHISHING SURFACE, and the reason this list is longer than it looks.
+  //    A merchant controls the CONTENT of their storefront. A merchant on
+  //    `login.levonis-iq.com` gets a real certificate, a real subdomain of
+  //    the real brand, and a page they write themselves — pointed at this
+  //    platform's own customers. These names are refused because of who
+  //    could otherwise ask for them, not because we plan to use them all.
+  'auth', 'login', 'signin', 'signup', 'register', 'account', 'accounts',
+  'id', 'sso', 'oauth', 'verify', 'verification', 'reset', 'password',
+  'secure', 'security', 'my', 'me', 'profile', 'session',
+
+  // 4. PLATFORM FUNCTIONS. A shop at `checkout.` or `wallet.` is
+  //    indistinguishable from the platform doing the same thing.
+  'admin', 'dashboard', 'checkout', 'cart', 'order', 'orders', 'invoice',
+  'invoices', 'receipt', 'receipts', 'pay', 'payments', 'payment', 'wallet',
+  'billing', 'shop', 'store', 'stores', 'merchant', 'merchants', 'seller',
+  'sellers', 'vendor', 'vendors', 'help', 'contact', 'about', 'legal',
+  'terms', 'privacy', 'refund', 'refunds', 'abuse', 'report',
+
+  // 5. INFRASTRUCTURE AND OPERATIONS.
+  'cdn', 'assets', 'static', 'files', 'media', 'img', 'images', 'video',
+  'ns', 'ns1', 'ns2', 'ns3', 'ns4', 'dns', 'ftp', 'sftp', 'ssh', 'vpn',
+  'git', 'ci', 'build', 'deploy', 'status', 'health', 'metrics', 'logs',
+  'grafana', 'kibana', 'monitor', 'cpanel', 'whm', 'plesk', 'webdisk',
+
+  // 6. ENVIRONMENTS. A merchant on `staging.` or `beta.` will be mistaken
+  //    for this platform's own pre-release site, by customers and by us.
+  'dev', 'development', 'staging', 'stage', 'test', 'testing', 'qa',
+  'beta', 'alpha', 'preview', 'sandbox', 'demo', 'local', 'localhost',
+  'internal', 'private', 'root', 'blog', 'docs', 'doc', 'wiki', 'news',
 ]);
 
 /** Slug syntax. Deliberately narrow — it becomes a DNS label and a URL. */

@@ -390,16 +390,18 @@ async function main() {
   section('6. PLUS → merchant → store → product → cart (no money)');
 
   if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    // No admin session, so no store can be CREATED here. That does not make
+    // the merchant half unverifiable: a store that already exists on this
+    // deployment can be found from public data and exercised on its own real
+    // hostname, which is the half of §13 that wildcard routing actually
+    // changed. Only the steps that genuinely need an admin are blocked.
+    await verifyAnExistingStore(shopper);
     for (const step of [
       'an admin grants PLUS without a payment',
-      'the server says the account may operate a store',
       'a store is created on a real subdomain',
-      'the storefront serves that store on its own hostname',
       'the owner reaches their own /admin on the store host',
-      'a merchant product is published and visible',
-      'the merchant product goes into the shared cart',
     ]) {
-      blocked(step, 'no admin credentials — set the E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD secrets');
+      blocked(step, 'needs an admin session — nothing on this deployment can grant PLUS or open a store without one');
     }
     return report();
   }
@@ -867,6 +869,136 @@ async function finish(admin, ...txnIds) {
   }
   if (!txnIds.filter(Boolean).length) console.log('  (nothing to reverse)');
   return report();
+}
+
+/**
+ * The merchant half of §13, against a store that ALREADY EXISTS, with no
+ * credentials of any kind.
+ *
+ * WHY THIS EXISTS. Creating a store needs PLUS, and granting PLUS needs an
+ * admin session. But §13's acceptance chain is not really about creating a
+ * store — it is about what a wildcard hostname does once one exists:
+ *
+ *     levonis-iq.com login → ali3d.levonis-iq.com → same authenticated user
+ *     → product → cart
+ *
+ * Every one of those steps can be checked against a store somebody already
+ * opened, and checking it there is STRONGER evidence than checking it against
+ * a store this script made two seconds earlier: the hostname is a real one, a
+ * real merchant published the product, and the DNS record and Worker route
+ * are the ones serving real customers.
+ *
+ * The slug is discovered rather than configured. `POST /api/cart/merchant-items`
+ * answers with the store the product belongs to, slug included, so one public
+ * product id is enough to learn a real storefront hostname. Nothing here needs
+ * to be told anything, and nothing here is a secret.
+ *
+ * NO MONEY MOVES. A cart line is not a ledger entry. The order and escrow
+ * steps that do move money stay behind ALLOW_FINANCIAL, untouched.
+ */
+async function verifyAnExistingStore(shopper) {
+  const anon = new Client('anon2');
+
+  const listing = await anon.req('GET', APEX, '/api/community/products');
+  const candidates = listing.json?.products ?? [];
+  if (listing.status !== 200) {
+    blocked('a published merchant product is discoverable',
+      `/api/community/products answered ${listing.status}`);
+    return;
+  }
+  if (!candidates.length) {
+    // Not a failure of anything under test: there is simply no merchant
+    // product on this deployment yet. Say exactly that, and exactly what
+    // makes it testable, rather than reporting a green run over an empty set.
+    blocked('a published merchant product is discoverable',
+      'no active community product exists on this deployment yet — publish one store product and re-run');
+    for (const step of [
+      'the storefront serves a real store on its own hostname',
+      'the same session is the same user on that storefront',
+      'a merchant product goes into the shared cart',
+      'platform admin is refused on a REAL merchant hostname',
+    ]) {
+      blocked(step, 'no merchant product exists to discover');
+    }
+    return;
+  }
+  ok('a published merchant product is discoverable', `${candidates.length} on the community feed`);
+
+  // One cart, one seller. The shopper is already holding a LEVONIS line from
+  // section 5, so the first attempt must be REFUSED and must name both shops
+  // — that rule is the reason a cart can be shared across hostnames at all.
+  const product = candidates[0];
+  const conflict = await shopper.req('POST', APEX, '/api/cart/merchant-items', { productId: product.id, qty: 1 });
+  check('a merchant item is refused while a LEVONIS item is in the cart',
+    conflict.status === 400 && conflict.json?.code === 'CART_SELLER_CONFLICT',
+    `status ${conflict.status} code=${conflict.json?.code ?? 'none'}`);
+  if (conflict.status === 400) {
+    const d = conflict.json?.details ?? {};
+    check('and it names both shops rather than "another seller"',
+      typeof d.cart_seller_name === 'string' && typeof d.incoming_seller_name === 'string',
+      `details=${JSON.stringify(d)}`);
+  }
+
+  const added = await shopper.req('POST', APEX, '/api/cart/merchant-items',
+    { productId: product.id, qty: 1, replaceCart: true });
+  check('a merchant product goes into the shared cart', added.status === 201,
+    `status ${added.status} ${added.json?.error ?? ''}`);
+  const slug = added.json?.store?.slug ?? null;
+  if (!slug) {
+    blocked('a real storefront hostname is discovered', 'the cart response carried no store slug');
+    return;
+  }
+  ok('a real storefront hostname is discovered', `${slug}.${ROOT_DOMAIN}`);
+
+  // ---- and now the hostname itself, which is what the wildcard changed.
+  const real = hostUrl(slug);
+
+  const resolved = await anon.req('GET', real, '/api/storefront/resolve');
+  check('the storefront serves a real store on its own hostname',
+    resolved.status === 200 && resolved.json?.kind === 'merchant' && resolved.json?.store?.slug === slug,
+    `status ${resolved.status} kind=${resolved.json?.kind} slug=${resolved.json?.store?.slug ?? 'none'}`);
+
+  const page = await anon.req('GET', real, '/');
+  check('that hostname serves the application, not an error page', page.status === 200,
+    `status ${page.status}`);
+
+  const meThere = await shopper.req('GET', real, '/api/auth/me');
+  check('the same session is the same user on that storefront',
+    meThere.status === 200 && meThere.json?.user?.email === `e2e.shopper.${RUN}@levonis-iq.com`,
+    `status ${meThere.status}`);
+
+  const cartThere = await shopper.req('GET', real, '/api/cart/merchant');
+  const line = (cartThere.json?.items ?? []).find((i) => i.product_id === product.id);
+  check('the merchant cart line is visible from the store hostname', !!line,
+    `status ${cartThere.status} items=${(cartThere.json?.items ?? []).length}`);
+  check('and the cart reports that store as its seller scope',
+    cartThere.json?.store?.slug === slug && cartThere.json?.scope?.seller_type === 'merchant',
+    `scope=${JSON.stringify(cartThere.json?.scope ?? null)}`);
+
+  const list = await anon.req('GET', real, `/api/storefront/${slug}/products`);
+  check('the store publishes products on its own hostname',
+    list.status === 200 && Array.isArray(list.json?.products),
+    `status ${list.status}`);
+
+  // The guard, on a hostname a real merchant controls the content of — not a
+  // synthetic probe name that resolves to nothing.
+  const adminThere = await anon.req('GET', real, '/api/admin/community/overview');
+  check('platform admin is refused on a REAL merchant hostname', adminThere.status === 404,
+    `status ${adminThere.status} (404 is correct; 401/403 would mean the route exists here)`);
+
+  // A visitor is not the owner. `/api/merchant/me` answers on every host —
+  // what it must never say on somebody else's storefront is "you may run a
+  // store here".
+  const notOwner = await shopper.req('GET', real, '/api/merchant/me');
+  check('a visitor on that storefront is not its merchant',
+    notOwner.status === 200 && notOwner.json?.can?.store !== true && !notOwner.json?.store,
+    `status ${notOwner.status} can=${JSON.stringify(notOwner.json?.can ?? null)}`);
+
+  const notOwnerProducts = await shopper.req('GET', real, '/api/merchant/products');
+  check("a visitor cannot read that store's merchant product list",
+    notOwnerProducts.status === 403 || notOwnerProducts.status === 404 ||
+      (notOwnerProducts.json?.products ?? []).length === 0,
+    `status ${notOwnerProducts.status}`);
 }
 
 function report() {

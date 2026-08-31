@@ -57,6 +57,9 @@ jobs:
       APPLY: ${{ github.event.inputs.confirm }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       # ------------------------------------------------------ outside first
       # No token, no API. This is what a visitor's browser would find, and it
@@ -201,6 +204,28 @@ jobs:
           else
             echo "existing=none" >> "$GITHUB_OUTPUT"
             echo "NO wildcard record — merchant subdomains do not resolve yet"
+          fi
+
+      # ---------------------------------------- the list vs. the zone
+      # SYSTEM_SUBDOMAINS is a list somebody typed. The zone's records are the
+      # names that actually exist. The wildcard route matches a hostname
+      # regardless of whether that hostname has its own record, so a PROXIED
+      # record for a name the code does not reserve is a live service whose
+      # traffic the Worker would classify as a merchant slug.
+      #
+      # This is the check that answers "and any subdomain already dedicated to
+      # an existing service" without anyone having to remember the list.
+      - name: Every name in this zone is protected in code
+        id: reserved
+        continue-on-error: true
+        run: |
+          echo "audit=skipped" >> "$GITHUB_OUTPUT"
+          OUT=$(DOMAIN="$DOMAIN" node scripts/audit-reserved-subdomains.mjs /tmp/dns.json 2>&1) || true
+          echo "$OUT"
+          RESULT=$(echo "$OUT" | sed -n 's/^audit=//p' | tail -1)
+          echo "audit=${RESULT:-unknown}" >> "$GITHUB_OUTPUT"
+          if [ "$RESULT" = "FAILED" ]; then
+            echo "::error::a proxied subdomain of $DOMAIN is not reserved in worker/lib/hosts.ts"
           fi
 
       - name: Create or correct the wildcard record
@@ -478,6 +503,7 @@ jobs:
             echo "| Wildcard route | ${{ steps.routes.outputs.bound_to }} |"
             echo "| Wildcard route write | ${{ steps.routewrite.outputs.result || 'not attempted' }} |"
             echo "| /api/admin/* on a merchant host | ${{ steps.proof.outputs.admin_code || 'not measured' }} (404 is correct) |"
+            echo "| Every zone subdomain reserved in code | ${{ steps.reserved.outputs.audit || 'not run' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # The job's own verdict, after the report rather than instead of it.
@@ -485,4 +511,10 @@ jobs:
         if: ${{ steps.proof.outcome == 'failure' }}
         run: |
           echo "::error::see the proof step — a merchant host could reach /api/admin/*"
+          exit 1
+
+      - name: Fail if a live subdomain is not reserved in code
+        if: ${{ steps.reserved.outputs.audit == 'FAILED' }}
+        run: |
+          echo "::error::see the audit step — a proxied name in this zone would classify as a merchant"
           exit 1

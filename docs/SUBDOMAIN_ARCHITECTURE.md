@@ -124,6 +124,33 @@ QR code already printed on a box points at them.
 `slug` is **never a primary key**. Stores are keyed on `store_id`, so a future
 custom domain can be mapped to a store without touching a single order (§69).
 
+### Which names a merchant can never have, and why
+
+`SYSTEM_SUBDOMAINS` in `worker/lib/hosts.ts` holds **138 names**, checked
+**before** `reserved_slugs` and kept in code on purpose: a wildcard that
+resolves before the database answers is a wildcard that has to be safe without
+it. They are grouped by *why*, because the reason decides whether a future name
+belongs there:
+
+| Group | Examples | Why |
+|---|---|---|
+| Running services | `www`, `studio`, `mail`, `send`, `api`, `app`, `community`, `support` | Handing one over takes a live product down. `send` and `mail` carry outbound email |
+| Mail infrastructure | `smtp`, `mx`, `dkim`, `dmarc`, `spf`, `bounce`, `postmaster` | These names already speak for this domain's email to the rest of the internet |
+| The phishing surface | `login`, `signin`, `verify`, `reset`, `password`, `secure`, `account`, `my` | A merchant controls the *content* of their storefront. On `login.levonis-iq.com` they would get a valid certificate on the real brand's domain and write the page our own customers are looking at |
+| Platform functions | `admin`, `checkout`, `cart`, `wallet`, `orders`, `invoice`, `refunds` | A shop at `checkout.` is indistinguishable from the platform doing the same thing |
+| Infrastructure | `cdn`, `assets`, `ns1`, `dns`, `vpn`, `git`, `ci`, `status`, `metrics` | Operator names, and the ones scanners try first |
+| Environments | `dev`, `staging`, `beta`, `sandbox`, `demo`, `internal`, `docs` | A merchant on `staging.` will be mistaken for our own pre-release site |
+
+Two of those groups are not about names we use. That is deliberate: a name is
+reserved because of **who could otherwise ask for it**, not because we plan to
+use it.
+
+Names a merchant should not have for *business* reasons live in the
+`reserved_slugs` table instead, so they can change without a deploy.
+
+The list is compared against the zone's real DNS records on every run of
+workflow 10 — see §7.5.4.
+
 ---
 
 ## 4. Frontend resolution
@@ -320,38 +347,81 @@ Proven there, with no financial movement at all:
 | Community | request, attachment (key never in a response), offer, one-live-offer rule |
 | Community admin | overview, board with the customer named, reputation, store-only suspension |
 
-What production adds that local cannot: Cloudflare's edge. That is precisely
-what the two owner actions above unblock.
+What production adds that local cannot: Cloudflare's edge — the wildcard
+record, the route, and whatever else in the zone answers before either of
+them. That is what §7.5.1 below is about.
 
-### One more thing production needs, and it is not Cloudflare
+### 7.5.1 The blocker is gone: what production answers today
 
-Section 6 of the run signs in as an admin to grant PLUS. Two repository
-secrets — `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` — let that half run
-against the live site. It moves no money: the membership is granted, not
-bought. Without them those seven checks report blocked.
+Both owner actions landed. The wildcard redirect to `l.ink` was removed by
+hand, the API token was widened to `Zone:DNS:Edit` + `Zone:Workers Routes:Edit`
++ `Zone:Zone:Read` scoped to this zone, and workflow 10 wrote the last missing
+piece — the route. Read-only run afterwards:
 
-**THE BLOCKER.** Every `*.levonis-iq.com` hostname answers `302` to
-`https://levonis-iq-com.l.ink/…`, which then 404s:
+| | |
+|---|---|
+| An arbitrary subdomain resolves | resolving |
+| …and reaches the Worker (HTTP) | **200** |
+| Wildcard DNS record | `CNAME * -> levonis-iq.com`, proxied |
+| Wildcard route | `*.levonis-iq.com/*` → `levonis-staging` |
+| `/api/admin/*` on a merchant host | **404** |
 
-```
-$ curl -sSI https://anything.levonis-iq.com/api/health
-location: https://levonis-iq-com.l.ink/api/health
-server: cloudflare
-```
+And the §95 run against the live site, with no credentials of any kind:
 
-`l.ink` is Cloudflare's link shortener. Something in the zone — a Redirect
-Rule, a Page Rule, or the shortener app — matches every subdomain and answers
-before any Worker route can. **No merchant storefront can load until it is
-removed or narrowed**, and no §95 check that needs a subdomain can be run.
+| Checked on levonis-iq.com | Result |
+|---|---|
+| the apex classifies as the platform, ten requests running | `main` ×10 |
+| a nonexistent subdomain | 404, `kind: merchant` — a missing store, not the homepage |
+| `studio.levonis-iq.com` | 200, system host, untouched by the wildcard |
+| `/api/admin/community/overview` on a merchant host | 404 |
+| the same route on the apex | 401 — it exists, the stranger is refused |
+| register on the apex, then call the storefront host | the same session, the same user |
+| add to cart on the apex, then read it on the storefront host | the same cart |
 
-It is not currently a security exposure: the redirect means `/api/admin/*` is
-unreachable on those hosts rather than served. But unreachable is not the same
-as guarded, and the verification reports it as **blocked**, never as a pass.
+Three checks stay **blocked and are not blockable any other way**: they ask
+what the Worker does with a *forged* `Host`, and Cloudflare rewrites `Host` to
+the hostname it routed for (§7.6), so the question cannot be asked from
+outside at all. `tests/hosts.test.ts` asks it directly, against the same real
+hostnames.
 
-**A THIRD DEPLOY PATH IS ALSO DEPLOYING THIS WORKER**, and it is what made
-the configuration look haunted. A Cloudflare Workers Git integration deploys
-`levonis-staging` on **every push to the default branch**, about 60 seconds
-later, with no GitHub Actions run involved:
+### 7.5.2 The merchant half, without a single credential
+
+Creating a store needs PLUS, and granting PLUS needs an admin session. That
+does **not** make the merchant half unverifiable, because §13 is not really
+about creating a store — it is about what a wildcard hostname does once one
+exists. So the verification finds a store that already exists instead:
+
+1. `GET /api/community/products` — public. Any active merchant product.
+2. `POST /api/cart/merchant-items` with that product id. The response carries
+   the store it belongs to, **slug included**.
+3. That slug is a real storefront hostname, and everything else runs there.
+
+Nothing has to be configured and nothing is secret. What it proves on the real
+hostname of a real shop: the storefront resolves and serves the app, the
+session from the apex is the same user, the cart line is visible, the store
+publishes its products, platform admin is 404, and a visitor is not the
+merchant (`can.store: false`, and the merchant product list refuses them).
+
+It also proves the one-seller rule the hard way: the first attempt is made
+while a LEVONIS item is in the cart and must be **refused** with
+`CART_SELLER_CONFLICT` naming both shops, before `replaceCart` is used.
+
+Locally that path is 29 passed / 0 failed; the whole chain with an admin is
+60 passed / 0 failed. No money moves in either: a cart line is not a ledger
+entry, and the order and escrow steps stay behind `ALLOW_FINANCIAL`.
+
+Two things still need an admin session and are reported blocked, never as a
+pass: **granting PLUS** and **opening a store**, and with them **the owner
+reaching their own `/admin` on their store host** — that one needs the
+owner's session, which no discovery can substitute for. The action that
+unblocks all three needs no credentials handed to anyone: grant PLUS to an
+account and open a store through the site's own admin UI, once.
+
+### 7.5.3 The Git integration: the case for keeping it, and against
+
+A Cloudflare Workers Git integration deploys `levonis-staging` on **every push
+to the default branch**, about 60 seconds later, with no GitHub Actions run
+involved:
 
 ```
 push 03:36:26  →  deploy 03:37:25   source=wrangler
@@ -360,50 +430,82 @@ push 03:41:37  →  deploy 03:42:20   source=wrangler
 push 03:43:21  →  deploy 03:44:22   source=wrangler
 ```
 
-`scripts/prepare-deploy-config.mjs` exists to make that path safe, and it
-preserves the live vars — but it only looked at names **already declared in
-`wrangler.jsonc`**. `STORE_ROOT_DOMAIN` was not one, so the GitHub Actions
-deploy set it at 03:31 and the next push erased it at 03:37, taking merchant
-subdomain resolution with it. Both are fixed: the preservation pass now walks
-every live name, and the variable is declared in the config so it can never
-fall through that gap again.
+It has caused exactly two real failures here, and the code now absorbs both.
 
-If you see live configuration change without a deploy you started, this is
-the first thing to check.
+**1. It erased a live variable.** `wrangler deploy` replaces plain-text vars
+wholesale, so a deploy that does not carry `STORE_ROOT_DOMAIN` deletes it.
+Workflow 7 set it at 03:31; the next push erased it at 03:37, taking merchant
+subdomain resolution down with it.
 
-**It also races the asset upload.** A push during a workflow-7 deploy can put
-a *different build of the same commit* on the live site — same content hash,
-different bytes, because the two paths do not get the same build variables
-(`VITE_GOOGLE_CLIENT_ID` among them). The byte-identity proof now retries and,
-if it never converges, says so by name instead of just "different".
+*Fixed in code.* `scripts/prepare-deploy-config.mjs` used to preserve only
+names already declared in `wrangler.jsonc`, and `STORE_ROOT_DOMAIN` was not
+one. It now reads the live vars from the Cloudflare API and walks the **union**
+of live and declared names, so a variable it has never heard of still survives
+a deploy. The variable is also declared in the config, so it cannot fall
+through that gap twice.
 
-> **Recommendation: disconnect the Git integration.** Cloudflare dashboard →
-> Workers & Pages → `levonis-staging` → Settings → Build → disconnect the
-> repository. Workflow 7 is the deliberate path: it runs the tests, applies
-> migrations *before* the code that needs them, carries the vars, and proves
-> byte-identity afterwards. The Git integration does none of that and can
-> silently replace what it deploys.
+**2. It races the asset upload.** A push during a workflow-7 deploy can put a
+*different build of the same commit* on the live site — same content, different
+bytes, because the two paths do not get the same build variables
+(`VITE_GOOGLE_CLIENT_ID` among them).
 
-The fix is verified the only way it can be: set the variable through workflow
-7, push an unrelated commit, wait for the Git-integration deploy, and read the
-variable again. It has to still be there.
+*Absorbed, not fixed.* The byte-identity proof retries, and if it never
+converges it names this race instead of reporting a bare "different". It
+happened once and passed on re-run with no code change.
 
-**Two things the owner has to do**, neither of which is code:
+Nothing else it does is harmful. It cannot touch DNS, routes, secrets, or the
+database, and it deploys the same commit workflow 7 deploys.
 
-1. **Remove the wildcard redirect** in the Cloudflare dashboard
-   (Rules → Redirect Rules / Page Rules, and the link-shortener app if it is
-   enabled), so `*.levonis-iq.com` reaches the Worker.
-2. **Widen the API token** on this zone with `Zone:DNS:Edit` and
-   `Zone:Workers Routes:Edit`. It currently has `Zone:Zone:Read` and nothing
-   else at zone level, so workflow 10 can report but cannot apply, and the
-   wildcard route cannot even be read:
+**The comparison, plainly:**
 
-   ```
-   cloudflare: 10000 Authentication error   (on /zones/<id>/dns_records)
-   cloudflare: 10000 Authentication error   (on /zones/<id>/workers/routes)
-   ```
+| | Keep it connected | Disconnect it |
+|---|---|---|
+| Migrations | **Never applied.** A push whose code needs a new column deploys that code with the old schema for as long as it takes someone to run workflow 7 | Workflow 7 applies migrations *before* the code that needs them |
+| Tests | **Not run.** A push that fails CI still reaches production ~60s later | A red build never deploys |
+| Variables | Preserved now — by a script, on every path, verified after the fact | Preserved by the same script; one less path that has to be right |
+| Asset bytes | Can race workflow 7 and win | One writer |
+| Rollback | Reverting the branch is enough | Reverting the branch, then workflow 7 |
+| Speed | Push, and it is live in ~60s | Push, run workflow 7, ~4 min |
+| Blast radius of a bad push to the default branch | Immediate | Bounded by the workflow gate |
 
-Then re-run workflow 10 with `confirm: APPLY`, and workflow 11 to verify.
+**The recommendation is to disconnect it, and the reason is the migration
+row, not the variable row.** The variable failure is fixed in code and cannot
+recur. The migration failure cannot be fixed in code from this side: a deploy
+path that does not know about `migrations/` will always be able to ship code
+ahead of its schema, and the window is a live customer database.
+
+**It has not caused an overwrite since the fix.** No variable has gone missing
+across any push since `prepare-deploy-config.mjs` started walking the union,
+and the byte-identity check has passed on every run since. So this is not
+urgent, and the integration is not currently doing damage — it is a path that
+skips the two gates that exist for a reason.
+
+**The one condition that should force the decision:** the next migration. Do
+not merge a schema change to the default branch while this is connected
+without running workflow 7 first, or accept disconnecting it before that
+merge.
+
+To disconnect: Cloudflare dashboard → Workers & Pages → `levonis-staging` →
+Settings → Build → disconnect the repository. Nothing in this repo needs
+changing; workflow 7 is already the deliberate path.
+
+### 7.5.4 The reserved list is now checked against the zone, not memory
+
+`SYSTEM_SUBDOMAINS` protects 138 names in six documented groups (§3). A list
+somebody typed can fall behind the zone, so workflow 10 now compares the two
+on every run — `scripts/audit-reserved-subdomains.mjs`, tested in
+`tests/reservedSubdomains.test.ts`:
+
+* a **proxied** DNS record whose name is not reserved **fails the run**. The
+  wildcard route matches a hostname whether or not it has its own record, so
+  that name's traffic reaches the Worker and would classify as a merchant slug.
+* an **unproxied** record that is not reserved is a warning: it never reaches
+  the Worker, but a merchant could still take the slug.
+* the reverse is deliberately not checked. Reserving a name with *no* record
+  is the entire point of the phishing group.
+
+That is what makes "and any subdomain already dedicated to an existing
+service" a check rather than a promise.
 
 ### 7.6 A forged Host header cannot reach the Worker
 

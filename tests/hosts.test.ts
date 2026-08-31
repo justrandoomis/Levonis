@@ -274,3 +274,102 @@ test('a host that cannot be parsed at all is never admin-adjacent by accident', 
   assert.equal(info.kind, 'foreign');
   assert.equal(info.host, '');
 });
+
+// -------------------------------------- the reserved list, name by name
+//
+// The wildcard is live. `*.levonis-iq.com` now reaches this Worker, so this
+// list is no longer a precaution — it is the only thing standing between a
+// merchant slug and a name that already means something on this domain.
+
+test('the four names that are running services today are never a merchant', () => {
+  // studio → LEVO Studio. mail + send → outbound email. www → the site.
+  // Handing any of these to a merchant takes a live product down; `send`
+  // additionally breaks deliverability for every address on the domain.
+  for (const name of ['studio', 'mail', 'send', 'www']) {
+    const h = classifyHost(`${name}.${ROOT}`, ROOT);
+    assert.notEqual(h.kind, 'merchant', `${name}. was handed to a merchant`);
+    assert.equal(h.slug, null, `${name}. produced a slug`);
+    assert.equal(h.underRoot, true);
+  }
+  // www is the site itself; the other three are system hosts.
+  assert.equal(classifyHost(`www.${ROOT}`, ROOT).kind, 'main');
+  for (const name of ['studio', 'mail', 'send']) {
+    assert.equal(classifyHost(`${name}.${ROOT}`, ROOT).kind, 'system', name);
+  }
+});
+
+test('the reserved list survives the shapes a Host header actually arrives in', () => {
+  // Uppercase, a trailing FQDN dot, a port — all legal, all normalised
+  // before classification. A reserved name that only matched the tidy form
+  // would be no protection at all.
+  for (const raw of ['STUDIO.levonis-iq.com', 'Send.LEVONIS-IQ.com.', 'mail.levonis-iq.com:443']) {
+    assert.equal(classifyHost(raw, ROOT).kind, 'system', raw);
+  }
+});
+
+test('no name appears twice, because a Set would hide the mistake', async () => {
+  // Two entries for one name is a symptom — usually a name added to the
+  // wrong group by someone who did not find the one already there. `new Set`
+  // swallows it silently, so the source is what gets checked.
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { ROOT: REPO } = await import('./fixtures/d1');
+  const src = readFileSync(join(REPO, 'worker/lib/hosts.ts'), 'utf8');
+  const block = src.slice(src.indexOf('SYSTEM_SUBDOMAINS'), src.indexOf('/** Slug syntax.'));
+  const names = [...block.matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
+  assert.equal(names.length, SYSTEM_SUBDOMAINS.size, 'the literal and the Set disagree on size');
+  const seen = new Set<string>();
+  const dupes = names.filter((n) => (seen.has(n) ? true : (seen.add(n), false)));
+  assert.deepEqual(dupes, [], `duplicated in the literal: ${dupes.join(', ')}`);
+});
+
+test('every reserved name is stored in the form a hostname label arrives in', () => {
+  // A stray capital, space or dot makes an entry unreachable: the prefix
+  // being tested is already lowercase and cannot contain a dot. Such an
+  // entry looks like protection in a code review and provides none.
+  for (const s of SYSTEM_SUBDOMAINS) {
+    assert.equal(s, s.toLowerCase().trim(), `"${s}" is not normalised`);
+    assert.equal(s.includes('.'), false, `"${s}" contains a dot and can never match a label`);
+    assert.match(s, /^[a-z0-9][a-z0-9-]*$/, `"${s}" is not a DNS label`);
+  }
+});
+
+test('reservation is what refuses these names — not slug syntax', () => {
+  // A name refused only because it is too short or oddly shaped would come
+  // back the moment the syntax rules loosened. Every entry that IS
+  // slug-shaped must be refused by the list itself.
+  for (const s of SYSTEM_SUBDOMAINS) {
+    if (s === 'www') continue; // www is the main site, handled before the list
+    if (!isValidSlugSyntax(s)) continue; // too short to be a slug anyway
+    assert.equal(isSystemSlug(s), true, `"${s}" is slug-shaped and not reserved`);
+    assert.equal(classifyHost(`${s}.${ROOT}`, ROOT).kind, 'system', s);
+  }
+});
+
+test('the phishing names are reserved for who could ask for them, not for us', () => {
+  // These are the ones worth naming explicitly. A merchant controls their
+  // storefront's content, so a merchant holding `login.levonis-iq.com` gets a
+  // valid certificate on the real brand's domain and writes the page that
+  // this platform's own customers are looking at.
+  for (const name of ['login', 'signin', 'verify', 'reset', 'password', 'secure', 'account', 'wallet', 'checkout']) {
+    assert.equal(classifyHost(`${name}.${ROOT}`, ROOT).kind, 'system', name);
+  }
+});
+
+test('a reserved name buried deeper is foreign, not system', () => {
+  // `send.ali3d.levonis-iq.com` is two labels deep. It is refused for being
+  // deep, and must not be reported as a system host — a caller that trusted
+  // `kind === 'system'` to mean "our service" would be wrong about it.
+  const h = classifyHost(`send.ali3d.${ROOT}`, ROOT);
+  assert.equal(h.kind, 'foreign');
+  assert.equal(h.system, null);
+  assert.equal(h.underRoot, true); // still adjacent to merchant content
+  assert.equal(adminAllowedOn(h), false);
+});
+
+test('no system host may serve platform admin, whatever the name', () => {
+  for (const s of SYSTEM_SUBDOMAINS) {
+    if (s === 'www') continue; // www IS the main site
+    assert.equal(adminAllowedOn(classifyHost(`${s}.${ROOT}`, ROOT)), false, s);
+  }
+});
