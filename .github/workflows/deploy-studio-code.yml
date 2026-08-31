@@ -154,6 +154,50 @@ jobs:
             echo "STUDIO_HANDOFF_SECRET not set — Studio sign-in stays honestly disabled"
           fi
 
+      # THE CHECK THAT WAS MISSING. Three times the owner reported the Studio
+      # unchanged, and three times the answer came from reading git history
+      # afterwards instead of from the deploy saying so. The third time the
+      # cause was that the Studio could not build at all.
+      #
+      # Vite content-hashes every asset filename, so if the live domain serves
+      # the exact file this run just built, byte for byte, then the bundle out
+      # there IS the bundle in here. That is the whole claim, checked rather
+      # than assumed — and it fails loudly instead of leaving the owner to
+      # notice.
+      - name: Prove the live Studio serves the bundle this run built
+        run: |
+          set -e
+          S=https://studio.levonis-iq.com
+          LOCAL=$(grep -rl '\.tb-logo { display: none !important; }' dist/client/assets/*.js | head -1)
+          if [ -z "$LOCAL" ]; then
+            echo "::error::no built asset carries the branding rule — studio/tests/editor-theme.test.mjs should have caught this"
+            exit 1
+          fi
+          NAME=$(basename "$LOCAL")
+          echo "the branding rule is in $NAME ($(wc -c < "$LOCAL") bytes)"
+
+          # A fresh deploy takes a moment to propagate to every edge.
+          for i in $(seq 1 10); do
+            curl -fsS --max-time 30 "$S/assets/$NAME" -o /tmp/live.js && break
+            echo "attempt $i: $NAME not served yet"
+            sleep 6
+          done
+          if [ ! -s /tmp/live.js ]; then
+            echo "::error::$S does not serve $NAME — the live Studio is running an older bundle"
+            exit 1
+          fi
+
+          if cmp -s "$LOCAL" /tmp/live.js; then
+            echo "live $NAME is byte-identical to the file this run built"
+          else
+            echo "::error::$S serves a DIFFERENT $NAME than this run built"
+            exit 1
+          fi
+
+          grep -q '\.tb-logo { display: none !important; }' /tmp/live.js \
+            || { echo "::error::the live bundle does not carry the wordmark rule"; exit 1; }
+          echo "the live Studio carries the LEVONIS branding"
+
       # The whole point of the change: a desktop keeps the threaded core, an
       # iPad does not, and everything else is identical.
       - name: Verify the isolation headers per platform
