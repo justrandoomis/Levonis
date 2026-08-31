@@ -460,10 +460,15 @@ authRoutes.post('/login', async (c) => {
   // to discover which addresses/usernames/phones exist or which sign in with
   // Google/Telegram. The Google/Telegram hint is part of the SAME message for
   // everyone, so it stays useful without becoming a signal.
+  // The CODE is what the UI reads, so the message can be rendered in the
+  // reader's own language instead of showing them two languages at once. The
+  // text stays for anything that is not the browser app.
   const fail = () =>
-    unauthorized(
+    new HttpError(
+      401,
       'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره. / ' +
-        'Incorrect email/username/phone or password. If you created your account with Google or Telegram, use that button.'
+        'Incorrect email/username/phone or password. If you created your account with Google or Telegram, use that button.',
+      'LOGIN_FAILED'
     );
   // Uniform in TIME as well as in wording: when there is no account, or the
   // account is provider-only, the same PBKDF2 work is still performed

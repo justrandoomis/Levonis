@@ -135,6 +135,17 @@ const STRINGS = {
     resetDeadBody: 'روابط إعادة التعيين تصلح لمرة واحدة ولمدة 30 دقيقة فقط. اطلب رابطًا جديدًا للمتابعة.',
     requestNewLink: 'طلب رابط جديد',
     genericError: 'حدث خطأ ما. حاول مرة أخرى.',
+    errLoginFailed: 'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره.',
+    errEmailTaken: 'يوجد حساب بهذا البريد بالفعل. سجّل الدخول بدلًا من ذلك.',
+    errUsernameTaken: 'اسم المستخدم هذا محجوز بالفعل. جرّب اسمًا آخر.',
+    errUsernameReserved: 'اسم المستخدم هذا محجوز للمنصّة.',
+    errUsernameShort: 'اسم المستخدم يجب أن يكون ٣ أحرف على الأقل.',
+    errUsernameChars: 'اسم المستخدم يقبل الأحرف الإنجليزية والأرقام و . _ - فقط.',
+    errMailOff: 'خدمة البريد غير مهيأة على هذه النسخة، لذلك لا يمكن إرسال رسالة الآن. تواصل مع الدعم.',
+    errGoogleNeedsVerify: 'يوجد حساب بهذا البريد لم يُوثَّق بعد. سجّل الدخول بكلمة المرور ووثّق بريدك، ثم سيُربط Google تلقائيًا.',
+    errResetLink: 'رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.',
+    errTooMany: 'محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.',
+    errNetwork: 'تعذّر الاتصال. تحقّق من اتصالك وحاول مرة أخرى.',
   },
   en: {
     tagline: 'Your LEVONIS store account',
@@ -211,6 +222,17 @@ const STRINGS = {
     resetDeadBody: 'Reset links work once and expire after 30 minutes. Request a new link to continue.',
     requestNewLink: 'Request a new link',
     genericError: 'Something went wrong. Please try again.',
+    errLoginFailed: 'Incorrect email, username, phone or password. If you created your account with Google or Telegram, use that button.',
+    errEmailTaken: 'An account with this email already exists. Sign in instead.',
+    errUsernameTaken: 'That username is already taken. Try another one.',
+    errUsernameReserved: 'That username is reserved for the platform.',
+    errUsernameShort: 'A username must be at least 3 characters.',
+    errUsernameChars: 'A username may only contain letters, numbers and . _ -',
+    errMailOff: 'The mail service is not configured on this deployment, so nothing can be sent right now. Please contact support.',
+    errGoogleNeedsVerify: 'An account with this email exists but was never verified. Sign in with your password and verify your email — Google then links automatically.',
+    errResetLink: 'That reset link is invalid or has expired. Request a new one.',
+    errTooMany: 'Too many attempts. Wait a moment and try again.',
+    errNetwork: 'Could not reach the server. Check your connection and try again.',
   },
   ckb: {
     tagline: 'هەژمارەکەت لە فرۆشگای LEVONIS',
@@ -287,6 +309,17 @@ const STRINGS = {
     resetDeadBody: 'بەستەرەکانی ڕێکخستنەوە تەنها جارێک و بۆ ٣٠ خولەک کاردەکەن. بەستەرێکی نوێ داوا بکە.',
     requestNewLink: 'داواکردنی بەستەری نوێ',
     genericError: 'هەڵەیەک ڕوویدا. دووبارە هەوڵ بدە.',
+    errLoginFailed: 'ئیمەیل، ناوی بەکارهێنەر، ژمارە یان وشەی نهێنی هەڵەیە. ئەگەر هەژمارەکەت بە Google یان تەلەگرام دروستکردووە، ئەو دوگمەیە بەکاربهێنە.',
+    errEmailTaken: 'هەژمارێک بەم ئیمەیلە هەیە. لەبری ئەوە بچۆرەژوورەوە.',
+    errUsernameTaken: 'ئەم ناوە پێشتر وەرگیراوە. یەکێکی تر تاقی بکەرەوە.',
+    errUsernameReserved: 'ئەم ناوە بۆ پلاتفۆرمەکە پاراستراوە.',
+    errUsernameShort: 'ناوی بەکارهێنەر دەبێت لانیکەم ٣ پیت بێت.',
+    errUsernameChars: 'ناوی بەکارهێنەر تەنها پیت و ژمارە و . _ - قبوڵ دەکات.',
+    errMailOff: 'خزمەتگوزاری ئیمەیل لەسەر ئەم وەشانە ڕێکنەخراوە، بۆیە ئێستا هیچ نانێردرێت. پەیوەندی بە پشتگیری بکە.',
+    errGoogleNeedsVerify: 'هەژمارێک بەم ئیمەیلە هەیە بەڵام پشتڕاست نەکراوەتەوە. بە وشەی نهێنی بچۆرەژوورەوە و ئیمەیلەکەت پشتڕاست بکەرەوە، پاشان Google خۆکارانە دەبەسترێتەوە.',
+    errResetLink: 'ئەم بەستەرەی ڕێکخستنەوە نادروستە یان بەسەرچووە. بەستەرێکی نوێ داوا بکە.',
+    errTooMany: 'هەوڵی زۆر. کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدە.',
+    errNetwork: 'نەتوانرا پەیوەندی بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدە.',
   },
 };
 
@@ -383,8 +416,39 @@ export default function Auth() {
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
 
-  const errMsg = (err: unknown): string =>
-    err instanceof Error && err.message ? err.message : s.genericError;
+  /**
+   * A refusal, in the reader's language.
+   *
+   * Server messages are written for every caller and several are bilingual
+   * ("… / …") because they have no idea who is reading. The UI does know, so
+   * a KNOWN code is rendered from this page's own strings and only an
+   * unrecognised one falls through to the server's wording — which is still
+   * better than a generic "something went wrong" that hides a real answer.
+   */
+  const CODE_MESSAGES: Record<string, string> = {
+    LOGIN_FAILED: s.errLoginFailed,
+    EMAIL_TAKEN: s.errEmailTaken,
+    USERNAME_TAKEN: s.errUsernameTaken,
+    USERNAME_RESERVED: s.errUsernameReserved,
+    USERNAME_TOO_SHORT: s.errUsernameShort,
+    USERNAME_BAD_CHARACTERS: s.errUsernameChars,
+    EMAIL_NOT_CONFIGURED: s.errMailOff,
+    GOOGLE_NOT_CONFIGURED: s.googleServerNotConfigured,
+    EMAIL_NOT_VERIFIED: s.errGoogleNeedsVerify,
+    BAD_TOKEN: s.errResetLink,
+    TOKEN_USED: s.errResetLink,
+    TOKEN_EXPIRED: s.errResetLink,
+    RATE_LIMITED: s.errTooMany,
+  };
+
+  const errMsg = (err: unknown): string => {
+    if (err instanceof ApiError) {
+      if (err.code && CODE_MESSAGES[err.code]) return CODE_MESSAGES[err.code];
+      if (err.status === 429) return s.errTooMany;
+      if (err.status === 0) return s.errNetwork;
+    }
+    return err instanceof Error && err.message ? err.message : s.genericError;
+  };
 
   const finishAuth = (createdAccount = false) => {
     // A brand-new account goes through setup first, carrying the intended
