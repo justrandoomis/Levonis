@@ -235,7 +235,14 @@ jobs:
           TEST_EMAIL: ${{ steps.identity.outputs.addr }}
           TEST_PASSWORD: ${{ steps.identity.outputs.pass }}
           MERCHANT_ORIGIN: https://levo-e2e-check.levonis-iq.com
-        run: node scripts/e2e-live-auth.mjs 2>&1 | tee /tmp/scenario.log
+        run: |
+          # WITHOUT pipefail this step CANNOT FAIL: a pipeline's status is the
+          # last command's, and that is `tee`, which always succeeds. Run 2
+          # reported the scenario as "success" while its own printed summary
+          # said "33 checks, 5 failed" — the numbers were right and the gate
+          # was reading nothing.
+          set -o pipefail
+          node scripts/e2e-live-auth.mjs 2>&1 | tee /tmp/scenario.log
 
       # -------------------------------------------- did Resend take them?
       # The API reporting success is not evidence a message was sent: both
@@ -251,6 +258,17 @@ jobs:
           set -e
           echo "reset=unknown" >> "$GITHUB_OUTPUT"
           echo "verify=unknown" >> "$GITHUB_OUTPUT"
+
+          # wrangler resolves a D1 database through wrangler.jsonc, whose
+          # database_id is a committed *-PLACEHOLDER that the deploy workflows
+          # fill in first. Skipping that is what made every query here fail —
+          # the same trap workflow 12 hit and fixed, repeated in a new file.
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found on this account"; exit 1; }
+          echo "::add-mask::$ID"
+          STAGING_DB_ID="$ID" node scripts/set-deploy-ids.mjs --env staging
+          grep -c 'PLACEHOLDER' wrangler.jsonc | sed 's/^/remaining placeholders: /' || true
+
           # Give the outbox processor a moment; sends run via ctx.waitUntil.
           sleep 20
 
