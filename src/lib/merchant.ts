@@ -235,3 +235,241 @@ export function badgeLabel(
       return loc('جديد', 'New', 'نوێ');
   }
 }
+
+// ---------------------------------------------------------------------------
+// PLATFORM ADMIN
+//
+// These call /api/admin/community/*, which the Worker serves ONLY on the apex
+// host. On a merchant storefront every one of them answers 404 by design — the
+// guard that makes wildcard subdomains safe. Nothing here should ever be
+// rendered on a store host, and if it somehow were, it would get nothing.
+// ---------------------------------------------------------------------------
+
+export interface CommunityOverview {
+  merchants: { total: number; verified: number; suspended: number };
+  stores: { total: number; active: number };
+  products: { total: number; active: number };
+  requests: { total: number; open: number };
+  offers: { total: number };
+  orders: { total: number; gross: number; fees: number; completed: number };
+  escrows: Array<{ state: string; n: number; total: number }>;
+  complaints: { total: number; open: number };
+}
+
+export interface AdminMerchantRow {
+  id: string;
+  user_id: string;
+  name: string;
+  status: string;
+  status_reason: string;
+  verified: number;
+  badge: string;
+  badge_override: string;
+  rating_avg_x100: number;
+  rating_count: number;
+  completed_orders: number;
+  store_id: string | null;
+  store_slug: string | null;
+  store_status: string | null;
+  store_status_reason: string | null;
+  store_name: string | null;
+  owner_email: string;
+  owner_name: string;
+  created_at: string;
+}
+
+export interface AdminComplaintRow {
+  id: string;
+  reporter_id: string;
+  reporter_name: string;
+  merchant_id: string | null;
+  merchant_name: string | null;
+  community_order_id: string | null;
+  order_id: string | null;
+  category: string;
+  description: string;
+  status: string;
+  priority: string;
+  resolution: string;
+  created_at: string;
+}
+
+export interface AdminEscrow {
+  id: string;
+  community_order_id: string;
+  customer_id: string;
+  merchant_id: string;
+  gross_iqd: number;
+  platform_fee_iqd: number;
+  merchant_receivable_iqd: number;
+  released_iqd: number;
+  refunded_iqd: number;
+  state: string;
+  held_at: string | null;
+  released_at: string | null;
+  refunded_at: string | null;
+  disputed_at: string | null;
+}
+
+export interface AdminRequestRow {
+  id: string;
+  title: string;
+  state: string;
+  status: string;
+  category: string;
+  quantity: number;
+  budget_iqd: number | null;
+  governorate: string;
+  visibility: string;
+  deadline: string | null;
+  expires_at: string | null;
+  accepted_offer_id: string | null;
+  community_order_id: string | null;
+  created_at: string;
+  customer_id: string;
+  customer_name: string;
+  customer_email: string;
+  offers_total: number;
+  offers_pending: number;
+}
+
+export interface AdminOfferRow {
+  id: string;
+  request_id: string;
+  merchant_id: string;
+  merchant_name: string;
+  merchant_status: string;
+  badge: string;
+  verified: number;
+  store_slug: string | null;
+  price_iqd: number;
+  completion_days: number;
+  delivery_method: string;
+  message: string;
+  state: string;
+  created_at: string;
+}
+
+export interface AdminReviewRow {
+  id: string;
+  merchant_id: string;
+  merchant_name: string;
+  rating: number;
+  body: string;
+  hidden: number;
+  merchant_reply: string;
+  edited_count: number;
+  order_id: string | null;
+  community_order_id: string | null;
+  customer_name: string;
+  customer_email: string;
+  rating_avg_x100: number;
+  rating_count: number;
+  created_at: string;
+}
+
+export interface AdminReputationEvent {
+  id: string;
+  kind: string;
+  points: number;
+  note: string;
+  order_id: string | null;
+  community_order_id: string | null;
+  review_id: string | null;
+  created_at: string;
+}
+
+export interface AdminReputation {
+  merchant: Record<string, string | number>;
+  /** What the published criteria award right now — shown next to any override. */
+  earned_badge: string;
+  badge_override: string;
+  reputation_points: number;
+  breakdown: Array<{ rating: number; n: number }>;
+  events: AdminReputationEvent[];
+}
+
+export const adminCommunityApi = {
+  overview: () => api.get<{ success: true } & CommunityOverview>('/api/admin/community/overview'),
+  settings: () => api.get<{ settings: Record<string, string> }>('/api/admin/community/settings'),
+  saveSettings: (body: Record<string, number>) =>
+    api.patch<{ settings: Record<string, number>; applies_to: string }>('/api/admin/community/settings', body),
+
+  merchants: (q = '') =>
+    api.get<{ merchants: AdminMerchantRow[] }>(
+      `/api/admin/community/merchants${q ? `?q=${encodeURIComponent(q)}` : ''}`
+    ),
+  verify: (id: string, verified: boolean) =>
+    api.post<{ verified: boolean }>(`/api/admin/community/merchants/${id}/verify`, { verified }),
+  setStatus: (id: string, status: string, reason: string) =>
+    api.post<{ status: string }>(`/api/admin/community/merchants/${id}/status`, { status, reason }),
+  setBadge: (id: string, badge: string) =>
+    api.post(`/api/admin/community/merchants/${id}/badge`, { badge }),
+  /** Suspending a STORE is a different sanction from suspending its merchant. */
+  setStoreStatus: (storeId: string, status: 'active' | 'suspended', reason: string) =>
+    api.post<{ status: string }>(`/api/admin/community/stores/${storeId}/status`, { status, reason }),
+  finance: (id: string) =>
+    api.get<{
+      balance: { available_iqd: number; pending_iqd: number; paid_iqd: number };
+      ledger: Record<string, unknown>[];
+      escrows: AdminEscrow[];
+    }>(`/api/admin/community/merchants/${id}/finance`),
+  payout: (id: string, amount_iqd: number, note: string, idempotencyKey: string) =>
+    api.post<{ replayed: boolean; balance: { available_iqd: number; pending_iqd: number; paid_iqd: number } }>(
+      `/api/admin/community/merchants/${id}/payout`,
+      { amount_iqd, note, idempotencyKey }
+    ),
+
+  complaints: (status = '') =>
+    api.get<{ complaints: AdminComplaintRow[] }>(
+      `/api/admin/community/complaints${status ? `?status=${status}` : ''}`
+    ),
+  complaint: (id: string) =>
+    api.get<{
+      complaint: AdminComplaintRow;
+      messages: Record<string, unknown>[];
+      escrow: AdminEscrow | null;
+      escrow_events: Record<string, unknown>[];
+    }>(`/api/admin/community/complaints/${id}`),
+  setComplaintStatus: (id: string, status: string, resolution: string) =>
+    api.post<{ status: string }>(`/api/admin/community/complaints/${id}/status`, { status, resolution }),
+
+  /** The settlement decision. Appends events; never rewrites amounts. */
+  resolveEscrow: (id: string, decision: 'release' | 'refund' | 'partial_refund', reason: string, amount_iqd?: number) =>
+    api.post<{ decision: string; replayed: boolean }>(`/api/admin/community/escrows/${id}/resolve`, {
+      decision,
+      reason,
+      ...(amount_iqd !== undefined ? { amount_iqd } : {}),
+    }),
+
+  requests: (state = '', q = '') =>
+    api.get<{ requests: AdminRequestRow[] }>(
+      `/api/admin/community/requests?state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}`
+    ),
+  request: (id: string) =>
+    api.get<{
+      request: Record<string, unknown>;
+      offers: AdminOfferRow[];
+      files: Array<{ id: string; file_name: string; content_type: string; size_bytes: number; kind: string }>;
+      order: Record<string, unknown> | null;
+      escrow: AdminEscrow | null;
+    }>(`/api/admin/community/requests/${id}`),
+  rejectOffer: (id: string, reason: string) =>
+    api.post<{ state: string }>(`/api/admin/community/offers/${id}/reject`, { reason }),
+
+  reviews: (params: { merchant?: string; hidden?: string; maxRating?: number } = {}) =>
+    api.get<{ reviews: AdminReviewRow[] }>(
+      `/api/admin/community/reviews?merchant=${encodeURIComponent(params.merchant ?? '')}` +
+        `&hidden=${encodeURIComponent(params.hidden ?? '')}&maxRating=${params.maxRating ?? 5}`
+    ),
+  reputation: (id: string) =>
+    api.get<AdminReputation>(`/api/admin/community/merchants/${id}/reputation`),
+  adjustReputation: (id: string, points: number, note: string) =>
+    api.post(`/api/admin/community/merchants/${id}/reputation`, { points, note }),
+
+  hideProduct: (id: string) => api.post(`/api/admin/community/products/${id}/hide`),
+  hideReview: (id: string, hidden: boolean) =>
+    api.post<{ hidden: boolean }>(`/api/admin/community/reviews/${id}/hide`, { hidden }),
+  removeRequest: (id: string, reason: string) =>
+    api.post(`/api/admin/community/requests/${id}/remove`, { reason }),
+};

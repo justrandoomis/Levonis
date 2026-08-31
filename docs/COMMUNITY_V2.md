@@ -271,6 +271,12 @@ decision, never the reviewed party's.
 merchant can be shown why they have the standing they have, and a mistaken
 event is countered by another event rather than by editing a number.
 
+That is why `POST /merchants/:id/reputation` only ever INSERTs. An admin
+reversing a wrong `dispute_lost` adds a `+20 admin_adjustment` with a reason;
+both rows stay in the log and the derived score returns to where it should be.
+There is no update path and no delete path, so the log can still be used as
+evidence months later. `tests/adminCommunity.test.ts` asserts the two rows.
+
 Badges (`new | trusted | professional | elite`) need **volume as well as a good
 rating** — five stars from two customers is a good start, not a track record.
 `elite` additionally requires admin verification, so volume alone cannot buy
@@ -294,10 +300,41 @@ it. An admin can pin a badge; a merchant never can (§42).
 ### `/api/admin/community/*` — apex host only
 `GET /overview` · `GET|PATCH /settings` · `GET /merchants` ·
 `POST /merchants/:id/verify|status|badge` · `GET /merchants/:id/finance` ·
-`POST /merchants/:id/payout` · `POST /products/:id/hide` ·
-`POST /reviews/:id/hide` · `POST /requests/:id/remove` · `GET /complaints` ·
+`POST /merchants/:id/payout` · `GET|POST /merchants/:id/reputation` ·
+`POST /stores/:id/status` · `GET /requests` · `GET /requests/:id` ·
+`POST /requests/:id/remove` · `POST /offers/:id/reject` · `GET /reviews` ·
+`POST /reviews/:id/hide` · `POST /products/:id/hide` · `GET /complaints` ·
 `GET /complaints/:id` · `POST /complaints/:id/status` ·
 **`POST /escrows/:id/resolve`**
+
+Every one of these has a control in `src/components/adminCommunity/`. The
+mandate's rule against buttons that do nothing runs the other way too: an
+endpoint an operator cannot reach is a feature that does not exist.
+
+### What an admin sees that a merchant does not
+
+| | Public board | Merchant | Admin |
+|---|---|---|---|
+| Who posted a request | ✗ | only once their offer wins | ✓ |
+| A rival's offer price | ✗ | ✗ | ✓ |
+| Attachment file keys | ✗ | ✗ | **✗** |
+
+The last row is not an oversight. R2 keys are never handed to any browser
+(§67); an admin sees that three files exist and what they are, and downloads
+stream through the Worker after an authorisation check.
+
+### Two sanctions, not one
+
+Suspending a **merchant** stops them trading everywhere and shuts their shop
+with them. Suspending a **store** takes the storefront down and leaves the
+merchant bidding, fulfilling and answering for the work they already owe.
+A bad banner should not cancel someone else's half-finished order.
+
+`paused` is the merchant's own switch and is not reachable from the admin
+endpoint at all — if an admin could write it, the merchant re-opening their
+shop would silently lift an admin decision (§50). For the same reason a store
+cannot be re-opened while its owner is suspended: the two decisions would
+contradict each other and the storefront would have to pick a winner.
 
 ---
 

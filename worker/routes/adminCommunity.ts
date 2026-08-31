@@ -26,6 +26,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
 import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow, merchantBalance } from '../lib/escrowOps';
+import { badgeFor } from '../lib/merchantOps';
+import { canMoveOffer, type OfferState } from '../lib/communityStates';
 import { refreshMerchantRating } from './merchantReviews';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
@@ -144,7 +146,8 @@ adminCommunityRoutes.get('/merchants', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
   const q = c.req.query('q') || '';
   const { results } = await c.env.DB.prepare(
-    `SELECT m.*, s.slug AS store_slug, s.status AS store_status, s.name AS store_name,
+    `SELECT m.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status,
+            s.name AS store_name, s.status_reason AS store_status_reason,
             u.email AS owner_email, u.name AS owner_name
        FROM community_merchants m
        LEFT JOIN merchant_stores s ON s.merchant_id = m.id
@@ -225,6 +228,51 @@ adminCommunityRoutes.post('/merchants/:id/badge', async (c) => {
   return c.json({ success: true });
 });
 
+/**
+ * Suspend or restore a STORE, without touching the merchant.
+ *
+ * The two are different sanctions and the mandate names them separately.
+ * A storefront can be the problem on its own — a banner, a description, a
+ * product listing — while the merchant is still fulfilling accepted work and
+ * bidding honestly on the request board. Shutting the whole merchant for a
+ * bad banner would cancel the work they owe other customers.
+ *
+ * `paused` is the merchant's own switch and is NOT reachable from here: an
+ * admin decision must be distinguishable from a shopkeeper closing for the
+ * afternoon, or "only an admin can lift an admin suspension" (§50) becomes
+ * unenforceable the moment the merchant re-opens.
+ */
+adminCommunityRoutes.post('/stores/:id/status', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({}));
+  const status = oneOf(body.status, 'status', ['active', 'suspended'] as const);
+  const reason = str(body.reason, 'reason', { min: 0, max: 500, required: false });
+
+  const store = await c.env.DB.prepare(
+    'SELECT s.id, s.merchant_id, m.status AS merchant_status FROM merchant_stores s ' +
+    'JOIN community_merchants m ON m.id = s.merchant_id WHERE s.id = ?'
+  ).bind(id).first<{ id: string; merchant_id: string; merchant_status: string }>();
+  if (!store) throw notFound('Store not found');
+
+  // Re-opening a shop whose OWNER is suspended would contradict the merchant
+  // sanction that is still in force, and the storefront would then have to
+  // decide which of two admin decisions wins. Lift the merchant suspension
+  // first, deliberately.
+  if (status === 'active' && store.merchant_status === 'suspended') {
+    throw conflict('That merchant is suspended — restore the merchant first');
+  }
+
+  await c.env.DB.prepare(
+    'UPDATE merchant_stores SET status = ?, status_reason = ?, updated_at = ? WHERE id = ?'
+  ).bind(status, reason, nowIso(), id).run();
+
+  await audit(c.env.DB, admin.id, 'admin.store_status', id, {
+    status, reason, merchant: store.merchant_id,
+  });
+  return c.json({ success: true, status });
+});
+
 // -------------------------------------------------------------- moderation
 
 adminCommunityRoutes.post('/products/:id/hide', async (c) => {
@@ -268,6 +316,263 @@ adminCommunityRoutes.post('/requests/:id/remove', async (c) => {
     throw conflict('That request is already settled or has work under way — resolve it as a dispute instead');
   }
   await audit(c.env.DB, admin.id, 'admin.request_removed', id, { reason });
+  return c.json({ success: true });
+});
+
+// ------------------------------------------------------ requests & offers
+
+/**
+ * The request board as an admin sees it.
+ *
+ * The PUBLIC board deliberately withholds who is asking (§24) — a merchant
+ * learns how to reach a customer when their offer is accepted, and not
+ * before. That rule protects a customer from merchants; it was never a rule
+ * against Levonis itself, which has to answer "who posted this and what
+ * became of it" when a dispute lands on the desk. So the customer is named
+ * here, in a route the host guard keeps on the apex, and nowhere else.
+ */
+adminCommunityRoutes.get('/requests', async (c) => {
+  const state = c.req.query('state') || '';
+  const q = c.req.query('q') || '';
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.id, r.title, r.state, r.status, r.category, r.quantity, r.budget_iqd,
+            r.governorate, r.visibility, r.deadline, r.expires_at,
+            r.accepted_offer_id, r.community_order_id, r.created_at,
+            r.customer_id, u.name AS customer_name, u.email AS customer_email,
+            (SELECT COUNT(*) FROM community_offers o WHERE o.request_id = r.id) AS offers_total,
+            (SELECT COUNT(*) FROM community_offers o
+              WHERE o.request_id = r.id AND o.state = 'pending') AS offers_pending
+       FROM community_requests r
+       JOIN users u ON u.id = r.customer_id
+      WHERE (? = '' OR r.state = ?)
+        AND (? = '' OR r.title LIKE '%' || ? || '%' OR r.id = ?)
+      ORDER BY r.created_at DESC
+      LIMIT ?`
+  ).bind(state, state, q, q, q, limit).all();
+
+  return c.json({ success: true, requests: results });
+});
+
+/**
+ * One request with every offer on it.
+ *
+ * A merchant cannot read a rival's price (§25). An admin moderating the board
+ * must be able to, or "this offer is abusive" is a claim they have no way to
+ * check. Same table, different question, different caller.
+ *
+ * Attachments are listed WITHOUT their R2 keys (§22, §67). An admin sees that
+ * three files exist and what they are; the key stays server-side so no
+ * response anywhere in the platform teaches a reader how to address the
+ * bucket directly.
+ */
+adminCommunityRoutes.get('/requests/:id', async (c) => {
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+
+  const request = await c.env.DB.prepare(
+    `SELECT r.*, u.name AS customer_name, u.email AS customer_email
+       FROM community_requests r
+       JOIN users u ON u.id = r.customer_id
+      WHERE r.id = ?`
+  ).bind(id).first<Record<string, unknown>>();
+  if (!request) throw notFound('Request not found');
+
+  const [offers, files, order] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT o.*, m.name AS merchant_name, m.status AS merchant_status,
+              m.badge, m.verified, s.slug AS store_slug
+         FROM community_offers o
+         JOIN community_merchants m ON m.id = o.merchant_id
+         LEFT JOIN merchant_stores s ON s.id = o.store_id
+        WHERE o.request_id = ?
+        ORDER BY o.created_at`
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT id, file_name, content_type, size_bytes, kind, created_at
+         FROM community_request_files WHERE request_id = ? ORDER BY created_at`
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT o.*, m.name AS merchant_name
+         FROM community_orders o
+         JOIN community_merchants m ON m.id = o.merchant_id
+        WHERE o.request_id = ? ORDER BY o.created_at DESC LIMIT 1`
+    ).bind(id).first<Record<string, unknown>>(),
+  ]);
+
+  // The money for this request, if it got that far — so the admin reading a
+  // reported request sees immediately whether anything is at stake.
+  const escrow = order ? await escrowForOrder(c.env.DB, String(order.id)) : null;
+
+  return c.json({
+    success: true,
+    request,
+    offers: offers.results,
+    files: files.results,
+    order: order ?? null,
+    escrow,
+  });
+});
+
+/**
+ * Reject one abusive offer without touching the request.
+ *
+ * Only while it is PENDING. An accepted offer is the contract behind a
+ * community order and an escrow (§26) — pulling it out from underneath them
+ * would leave money held against a promise that no longer exists. Once work
+ * is under way the answer is a dispute resolution, which moves the money
+ * deliberately and leaves a record; `canMoveOffer` is what says so here
+ * rather than a hand-written condition that could drift from the table.
+ */
+adminCommunityRoutes.post('/offers/:id/reject', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const reason = str((await c.req.json().catch(() => ({}))).reason, 'reason', { min: 3, max: 300 });
+
+  const offer = await c.env.DB.prepare(
+    'SELECT id, request_id, merchant_id, state FROM community_offers WHERE id = ?'
+  ).bind(id).first<{ id: string; request_id: string; merchant_id: string; state: OfferState }>();
+  if (!offer) throw notFound('Offer not found');
+
+  if (!canMoveOffer(offer.state, 'rejected')) {
+    throw conflict(
+      offer.state === 'accepted'
+        ? 'That offer has been accepted — settle it as a dispute instead of removing it'
+        : `An offer that is ${offer.state} cannot be rejected`
+    );
+  }
+
+  const res = await c.env.DB.prepare(
+    `UPDATE community_offers SET state = 'rejected', updated_at = ? WHERE id = ? AND state = 'pending'`
+  ).bind(nowIso(), id).run();
+  if (!res.meta.changes) throw conflict('That offer changed while you were deciding — reload it');
+
+  // offer_count is what the board shows; leaving it stale advertises offers
+  // that are no longer there.
+  await c.env.DB.prepare(
+    `UPDATE community_requests
+        SET offer_count = (SELECT COUNT(*) FROM community_offers
+                            WHERE request_id = ? AND state IN ('pending','accepted')),
+            updated_at = ?
+      WHERE id = ?`
+  ).bind(offer.request_id, nowIso(), offer.request_id).run();
+
+  await audit(c.env.DB, admin.id, 'admin.offer_rejected', id, { reason, merchant: offer.merchant_id });
+  return c.json({ success: true, state: 'rejected' });
+});
+
+// --------------------------------------------------- reviews & reputation
+
+/**
+ * Every review, for moderation.
+ *
+ * Hidden ones are included by default and marked, not filtered away: an admin
+ * reviewing a moderation decision needs to see what was hidden as readily as
+ * what is live, and a merchant appealing "you hid my review" cannot be
+ * answered from a list that no longer contains it.
+ */
+adminCommunityRoutes.get('/reviews', async (c) => {
+  const merchantId = c.req.query('merchant') || '';
+  const hidden = c.req.query('hidden') || '';        // '' | '0' | '1'
+  const maxRating = int(c.req.query('maxRating'), 'maxRating', { min: 1, max: 5, def: 5 });
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT rv.id, rv.merchant_id, rv.rating, rv.body, rv.hidden, rv.merchant_reply,
+            rv.merchant_replied_at, rv.edited_count, rv.order_id, rv.community_order_id,
+            rv.created_at, rv.updated_at,
+            m.name AS merchant_name, m.rating_avg_x100, m.rating_count,
+            u.name AS customer_name, u.email AS customer_email
+       FROM merchant_reviews rv
+       JOIN community_merchants m ON m.id = rv.merchant_id
+       JOIN users u ON u.id = rv.customer_id
+      WHERE (? = '' OR rv.merchant_id = ?)
+        AND (? = '' OR rv.hidden = CAST(? AS INTEGER))
+        AND rv.rating <= ?
+      ORDER BY rv.created_at DESC
+      LIMIT ?`
+  ).bind(merchantId, merchantId, hidden, hidden, maxRating, limit).all();
+
+  return c.json({ success: true, reviews: results });
+});
+
+/**
+ * Why this merchant has the standing they have.
+ *
+ * The score and the badge are DERIVED (§41, §42), so this returns the inputs
+ * rather than a number to be trusted: the raw events, the rating breakdown by
+ * star, and — importantly — the badge the criteria actually earn alongside
+ * any admin override. An admin about to pin a badge can see what they are
+ * overriding, and an admin clearing an override can see what the merchant
+ * will fall back to.
+ */
+adminCommunityRoutes.get('/merchants/:id/reputation', async (c) => {
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+
+  const merchant = await c.env.DB.prepare(
+    `SELECT id, name, verified, status, status_reason, badge, badge_override,
+            rating_avg_x100, rating_count, completed_orders, reputation_score, created_at
+       FROM community_merchants WHERE id = ?`
+  ).bind(id).first<Record<string, number | string>>();
+  if (!merchant) throw notFound('Merchant not found');
+
+  const [events, breakdown, points] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, kind, points, note, order_id, community_order_id, review_id, created_at
+         FROM merchant_reputation_events WHERE merchant_id = ?
+        ORDER BY created_at DESC LIMIT 200`
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT rating, COUNT(*) AS n FROM merchant_reviews
+        WHERE merchant_id = ? AND hidden = 0 GROUP BY rating ORDER BY rating DESC`
+    ).bind(id).all<{ rating: number; n: number }>(),
+    c.env.DB.prepare(
+      'SELECT COALESCE(SUM(points), 0) AS total FROM merchant_reputation_events WHERE merchant_id = ?'
+    ).bind(id).first<{ total: number }>(),
+  ]);
+
+  const earned = badgeFor({
+    completed_orders: Number(merchant.completed_orders ?? 0),
+    rating_avg_x100: Number(merchant.rating_avg_x100 ?? 0),
+    rating_count: Number(merchant.rating_count ?? 0),
+    verified: Number(merchant.verified ?? 0),
+  });
+
+  return c.json({
+    success: true,
+    merchant,
+    earned_badge: earned,
+    badge_override: String(merchant.badge_override || ''),
+    reputation_points: Number(points?.total ?? 0),
+    breakdown: breakdown.results,
+    events: events.results,
+  });
+});
+
+/**
+ * Correct the record by adding to it.
+ *
+ * A mistaken reputation event is answered by another event, never by editing
+ * or deleting the first (§41). That is why this route only inserts: a
+ * merchant can always be shown the full sequence of what happened to their
+ * standing, including the correction and who made it.
+ */
+adminCommunityRoutes.post('/merchants/:id/reputation', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({}));
+  const points = int(body.points, 'points', { min: -500, max: 500 });
+  const note = str(body.note, 'note', { min: 3, max: 300 });
+
+  const m = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?').bind(id).first();
+  if (!m) throw notFound('Merchant not found');
+
+  await c.env.DB.prepare(
+    `INSERT INTO merchant_reputation_events (id, merchant_id, kind, points, note)
+     VALUES (?,?,'admin_adjustment',?,?)`
+  ).bind(newId('rep'), id, points, note).run();
+
+  await audit(c.env.DB, admin.id, 'admin.merchant_reputation', id, { points, note });
   return c.json({ success: true });
 });
 
