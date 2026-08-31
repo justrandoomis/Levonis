@@ -272,3 +272,34 @@ inline style.
 Social links are reduced to `http(s)` URLs **on the way in**, so a
 `javascript:` href in a store profile — stored XSS against every visitor of
 that shop — never reaches the renderer at all.
+
+### Images: uploaded, not typed
+
+`worker/lib/mediaRefs.ts`. The logo, the banner and every product picture must
+address an object **this platform issued to this merchant** —
+`community/<user id>/<id>.<ext>`, the key layout `worker/routes/uploads.ts`
+produces. Ownership is legible from the key, so no second lookup is needed.
+
+The stylesheet is not the only place a merchant string can reach a page. An
+`<img src>` a merchant controls is a request the **visitor's** browser makes
+to wherever the merchant chose:
+
+| Accepted | Refused |
+|---|---|
+| `community/<own id>/ab12cd.jpg` | `https://anywhere.example/pixel.gif` |
+| `/files/community/<own id>/ab12cd.jpg` | `//anywhere.example/pixel.gif` |
+| | `data:` and `javascript:` |
+| | `community/<another merchant>/x.jpg` |
+| | `.svg` (SVG is script) |
+| | anything with `..` or a second path segment |
+
+A bad logo or banner is a **400** — a merchant who uploaded a logo and got no
+logo deserves to be told why. A bad entry in a product gallery is **dropped
+silently**, because a merchant fixing a mistyped price should not be blocked
+by one stale reference. `tests/attachments.test.ts` attacks both.
+
+The UI is one component (`src/components/media/ImagePicker.tsx`) used by all
+three surfaces: pick, preview, replace, remove, and — for a gallery — promote
+an image to cover, since the first image is what the storefront grid shows.
+Type and size are checked in the browser as a courtesy; the server sniffs the
+bytes and is the gate.

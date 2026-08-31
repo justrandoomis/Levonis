@@ -29,6 +29,9 @@ import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { iqd, badgeLabel, merchantApi, type MerchantMe } from '../lib/merchant';
 import { GOVERNORATE_LABELS, GOVERNORATES } from '../lib/governorates';
+import {
+  AttachmentDraft, AttachmentList, uploadRequestFiles, type RequestFile,
+} from '../components/media/RequestAttachments';
 
 interface RequestRow {
   id: string;
@@ -223,6 +226,8 @@ function RequestDetail({
   const [accepting, setAccepting] = useState('');
   const [error, setError] = useState('');
   const [offering, setOffering] = useState(false);
+  const [files, setFiles] = useState<RequestFile[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
 
   const load = useCallback(() => {
     api
@@ -234,7 +239,20 @@ function RequestDetail({
       .catch(() => setOffers([]));
   }, [request.id]);
 
+  // The attachments come from the request itself, and so does the answer to
+  // "may this caller see them" — the server decides, this page renders.
+  const loadFiles = useCallback(() => {
+    api
+      .get<{ files: RequestFile[]; is_owner: boolean }>(`/api/marketplace/requests/${request.id}`)
+      .then((d) => {
+        setFiles(d.files ?? []);
+        setIsOwner(!!d.is_owner);
+      })
+      .catch(() => setFiles([]));
+  }, [request.id]);
+
   useEffect(load, [load]);
+  useEffect(loadFiles, [loadFiles]);
 
   const canOffer = !!me?.can.offers && !isCustomer && ['open', 'receiving_offers'].includes(request.state);
   const alreadyOffered = (offers ?? []).some((o) => o.state === 'pending' || o.state === 'accepted');
@@ -298,6 +316,21 @@ function RequestDetail({
             )}
           </div>
         </div>
+
+        {(files.length > 0 || isOwner) && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4">
+            <AttachmentList
+              requestId={request.id}
+              files={files}
+              /* Adding or removing is only offered while the request is still
+                 taking offers. The API refuses it after that anyway — the
+                 merchants priced against these files — but a control that
+                 will be refused should not be there to press. */
+              canEdit={isOwner && ['open', 'receiving_offers', 'draft'].includes(request.state)}
+              onChanged={loadFiles}
+            />
+          </div>
+        )}
 
         {error && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4">
@@ -462,15 +495,31 @@ function NewRequest({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   async function submit() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/api/marketplace/requests', {
+      // A file belongs to a request, so the request has to exist first. Two
+      // steps, and the second one is reported honestly: a posted request with
+      // a failed attachment is still a posted request, and telling the
+      // customer their model uploaded when it did not is how a merchant ends
+      // up quoting on nothing.
+      const created = await api.post<{ request: { id: string } }>('/api/marketplace/requests', {
         ...f,
         budget_iqd: f.budget_iqd === '' ? null : Number(f.budget_iqd),
       });
+      if (attachments.length) {
+        const failed = await uploadRequestFiles(created.request.id, attachments);
+        if (failed) {
+          alert(loc(
+            `نُشر طلبك، لكن تعذّر رفع ${failed} من الملفات. يمكنك إضافتها من صفحة الطلب.`,
+            `Your request was posted, but ${failed} file(s) did not upload. You can add them from the request page.`,
+            `داواکارییەکەت بڵاوکرایەوە، بەڵام ${failed} فایل بار نەکرا.`
+          ));
+        }
+      }
       onDone();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : loc('تعذّر الإرسال', 'Could not submit', 'نەتوانرا بنێردرێت'));
@@ -556,6 +605,10 @@ function NewRequest({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
             </option>
           ))}
         </select>
+      </F>
+
+      <F label={loc('المرفقات', 'Attachments', 'هاوپێچەکان')}>
+        <AttachmentDraft files={attachments} onChange={setAttachments} />
       </F>
 
       {error && <p className="text-red-400 text-[12.5px]">{error}</p>}

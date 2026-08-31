@@ -52,6 +52,63 @@ their offer is accepted, and not before.
 
 ---
 
+## 2b. Attachments
+
+A "make me this" request without the thing to make is half a request, so a
+customer attaches reference photos, a drawing, or the model itself:
+**JPEG, PNG, WebP, GIF, PDF, STL, 3MF, OBJ**. Six files, 8 MB for a picture
+and 40 MB for a model.
+
+### A declared type is a claim, not a fact
+
+`worker/lib/attachments.ts`. `file.type` comes from the browser and the
+extension comes from whoever named the file, so neither decides anything.
+Every format is recognised from its **bytes**, or accepted only after a
+structural check a wrong file would fail:
+
+| Format | What proves it |
+|---|---|
+| Images, PDF | magic bytes |
+| 3MF | ZIP magic **and** the name agreeing — a `.docx` is also a ZIP |
+| Binary STL | `84 + 50 × triangleCount == fileSize`; a renamed `.exe` cannot satisfy that identity |
+| ASCII STL, OBJ | valid UTF-8 whose first meaningful line is the token the format requires |
+
+Nothing but an image is ever served inline, and even an image comes back with
+`nosniff` and a sandbox CSP — so a file that somehow passed every check still
+cannot run as script. `tests/attachments.test.ts` is written as forgery
+attempts.
+
+### The key never leaves the server
+
+Attachments are stored under `requests/<user id>/`, a prefix `/files/*`
+refuses outright, so there is no URL to guess and no bucket to walk. Every
+read goes through `GET /requests/:id/files/:fileId`, which **re-derives** the
+caller's right on every request rather than baking it into a link:
+
+| Who | May read |
+|---|---|
+| The customer | always |
+| Any signed-in caller | while the request is **public and open** — a merchant cannot quote a model they may not look at |
+| The engaged merchant | after acceptance, for as long as the order lives |
+| An admin | always, for moderation |
+| Anyone else | 404 |
+
+When the request closes, the general permission closes with it, so a link
+shared earlier simply stops working. `tests/requestFiles.test.ts` asserts the
+key appears in **no** response body.
+
+### Adding and removing stops when quoting stops
+
+A merchant priced against these files. Changing them once the request has
+left `open`/`receiving_offers` would change the job under a signed contract,
+so the API refuses it and the UI does not offer the control.
+
+The row is written **after** the object lands and deleted **before** it, so
+the worst failure is an orphaned object that costs storage — never a row
+pointing at nothing.
+
+---
+
 ## 3. Offers
 
 One **live** offer per merchant per request, enforced by a partial unique
@@ -288,7 +345,8 @@ it. An admin can pin a badge; a merchant never can (§42).
 
 ### `/api/marketplace/*`
 `GET /requests` · `GET /requests/:id` · `POST /requests` · `GET /my-requests` ·
-`POST /requests/:id/cancel` · `GET /requests/:id/offers` ·
+`POST /requests/:id/cancel` ·
+`POST|GET|DELETE /requests/:id/files[/:fileId]` · `GET /requests/:id/offers` ·
 `POST /requests/:id/offers` · `PATCH /offers/:id` · `POST /offers/:id/withdraw` ·
 **`POST /offers/:id/accept`** · `GET /orders` · `GET /orders/:id` ·
 `POST /orders/:id/start|delivered|confirm|dispute|cancel`

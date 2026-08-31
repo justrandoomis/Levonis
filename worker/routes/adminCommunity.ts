@@ -391,7 +391,7 @@ adminCommunityRoutes.get('/requests/:id', async (c) => {
     c.env.DB.prepare(
       `SELECT id, file_name, content_type, size_bytes, kind, created_at
          FROM community_request_files WHERE request_id = ? ORDER BY created_at`
-    ).bind(id).all(),
+    ).bind(id).all<Record<string, unknown>>(),
     c.env.DB.prepare(
       `SELECT o.*, m.name AS merchant_name
          FROM community_orders o
@@ -408,7 +408,13 @@ adminCommunityRoutes.get('/requests/:id', async (c) => {
     success: true,
     request,
     offers: offers.results,
-    files: files.results,
+    // A route, not a key. The marketplace download handler already grants
+    // an admin access and re-checks it on every read, so moderation reuses
+    // that one authorisation instead of adding a second way in.
+    files: files.results.map((f) => ({
+      ...f,
+      url: `/api/marketplace/requests/${id}/files/${f.id}`,
+    })),
     order: order ?? null,
     escrow,
   });

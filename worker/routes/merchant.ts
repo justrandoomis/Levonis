@@ -22,6 +22,7 @@ import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { ownedMediaKey, ownedMediaUrls } from '../lib/mediaRefs';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import {
@@ -247,8 +248,20 @@ merchantRoutes.patch('/store', async (c) => {
     put('accepts_custom_requests', body.accepts_custom_requests ? 1 : 0);
   if (body.sells_direct_products !== undefined)
     put('sells_direct_products', body.sells_direct_products ? 1 : 0);
-  if (body.logo_key !== undefined) put('logo_key', str(body.logo_key, 'logo_key', { min: 0, max: 200, required: false }) || null);
-  if (body.banner_key !== undefined) put('banner_key', str(body.banner_key, 'banner_key', { min: 0, max: 200, required: false }) || null);
+  // Logo and banner must address an object THIS platform issued to THIS
+  // merchant. An arbitrary string here would put a URL the merchant chose
+  // into every visitor's browser — an off-platform tracking pixel wearing a
+  // shop's logo. Clearing is `''`; anything else that is not theirs is a 400
+  // rather than a silent drop, because a merchant who uploaded a logo and got
+  // no logo deserves to be told why.
+  for (const [field, col] of [['logo_key', 'logo_key'], ['banner_key', 'banner_key']] as const) {
+    if (body[field] === undefined) continue;
+    const raw = str(body[field], field, { min: 0, max: 200, required: false });
+    if (!raw) { put(col, null); continue; }
+    const key = ownedMediaKey(raw, ctx.store.user_id);
+    if (!key) throw badRequest(`${field} must be a file you uploaded to this store`);
+    put(col, key);
+  }
 
   // A PRESET NAME, never a colour value and never CSS. §12: nothing a
   // merchant types may become a style rule on the page.
@@ -405,7 +418,11 @@ async function readProductBody(c: Context<AppContext>, partial: boolean) {
   if (has('category')) out.category = str(body.category, 'category', { min: 0, max: 60, required: false });
   if (has('condition')) out.condition = oneOf(body.condition, 'condition', ['new', 'used', 'refurbished'] as const);
   if (has('prep_days')) out.prep_days = int(body.prep_days, 'prep_days', { min: 0, max: 365 });
-  if (has('images')) out.images = JSON.stringify(sanitizeList(body.images, 12, 300));
+  // Same rule as the store logo: a product picture is a URL a visitor's
+  // browser will fetch, so it may only address this merchant's own uploads.
+  // Filtered rather than refused — a merchant fixing a price should not be
+  // blocked because an old image reference no longer resolves.
+  if (has('images')) out.images = JSON.stringify(ownedMediaUrls(body.images, c.get('user')!.id, 8));
   if (has('options')) out.options = JSON.stringify(Array.isArray(body.options) ? body.options.slice(0, 20) : []);
   if (has('colors')) out.colors = JSON.stringify(Array.isArray(body.colors) ? body.colors.slice(0, 30) : []);
   if (has('delivery_methods')) out.delivery_methods = JSON.stringify(sanitizeList(body.delivery_methods, 10, 60));

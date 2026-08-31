@@ -28,6 +28,12 @@ import { requireAuth, badRequest, forbidden, notFound, conflict, str, int } from
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import {
+  classifyAttachment,
+  maxBytesFor,
+  safeFileName,
+  MODEL_MAX_BYTES,
+} from '../lib/attachments';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
@@ -170,16 +176,217 @@ marketplaceRoutes.get('/requests/:id', async (c) => {
 
   const files = await c.env.DB.prepare(
     'SELECT id, file_name, content_type, size_bytes, kind FROM community_request_files WHERE request_id = ?'
-  ).bind(id).all();
+  ).bind(id).all<Record<string, unknown>>();
 
   return c.json({
     success: true,
     request: publicRequest(r),
-    // R2 keys are NEVER returned. A download streams through the worker after
-    // an authorisation check, so the bucket cannot be walked by guessing.
-    files: files.results,
+    // R2 keys are NEVER returned. What a caller gets is a route on this
+    // worker, which re-derives their right to the file on every read — so a
+    // link shared after the request closes simply stops working.
+    files: files.results.map((f) => ({
+      ...f,
+      inline: String(f.content_type ?? '').startsWith('image/'),
+      url: `/api/marketplace/requests/${id}/files/${f.id}`,
+    })),
     is_owner: isOwner,
   });
+});
+
+// ------------------------------------------------------------ attachments
+
+/**
+ * Attachments for a print request.
+ *
+ * A "make me this" request without the thing to make is half a request, so a
+ * customer attaches reference photos, a PDF drawing, or the model itself.
+ * Three decisions govern the whole section:
+ *
+ * THE KEY NEVER LEAVES THE SERVER. Files are stored under `requests/<user>/`,
+ * a prefix `/files/*` refuses outright, so there is no URL to guess and no
+ * bucket to walk. Every read goes through the route below, which re-derives
+ * the caller's right to the file from the request it belongs to (§22, §67).
+ *
+ * WHO MAY READ IS DERIVED FROM THE REQUEST. The customer always; any signed-in
+ * caller while the request is public and open, because a merchant cannot quote
+ * a model they are not allowed to look at; the engaged merchant afterwards;
+ * an admin. When the request closes, the general permission closes with it.
+ *
+ * A FILE IS ROW AND OBJECT TOGETHER. The row is written after the object
+ * lands and deleted before it, so the failure mode is an orphaned object that
+ * costs storage rather than a row pointing at nothing that breaks a page.
+ */
+
+const MAX_FILES_PER_REQUEST = 6;
+
+/** Where an attachment lives. Deliberately outside every public prefix. */
+const attachmentKey = (userId: string, ext: string) => `requests/${userId}/${newId()}.${ext}`;
+
+async function requestForFiles(c: Context<AppContext>, id: string, userId: string) {
+  const r = await c.env.DB.prepare(
+    'SELECT id, customer_id, state, visibility FROM community_requests WHERE id = ?'
+  ).bind(id).first<{ id: string; customer_id: string; state: string; visibility: string }>();
+  if (!r) throw notFound('Request not found');
+  if (r.customer_id !== userId) throw notFound('Request not found');
+  return r;
+}
+
+marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
+  await rateLimit(c, 'request-file', 40, 3600);
+  const user = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const r = await requestForFiles(c, id, user.id);
+
+  // Attachments are part of what merchants priced against. Adding one after
+  // an offer was accepted would change the job under a signed contract, so
+  // the window closes when the request stops taking offers.
+  if (!REQUEST_OPEN_STATES.includes(r.state as RequestState) && r.state !== 'draft') {
+    throw conflict('This request is no longer open, so its attachments cannot change');
+  }
+
+  const existing = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM community_request_files WHERE request_id = ?'
+  ).bind(id).first<{ n: number }>();
+  if (Number(existing?.n ?? 0) >= MAX_FILES_PER_REQUEST) {
+    throw badRequest(`A request may have at most ${MAX_FILES_PER_REQUEST} attachments`);
+  }
+
+  const form = await c.req.formData().catch(() => null);
+  if (!form) throw badRequest('Expected multipart form data');
+  const file = form.get('file');
+  if (!(file instanceof File)) throw badRequest('No file uploaded');
+
+  // Read the ceiling from the DECLARED size first, so a 900 MB upload is
+  // refused before it is pulled into memory. The real size is re-checked
+  // against the real kind after classification, below.
+  if (file.size > MODEL_MAX_BYTES) {
+    throw badRequest(`File is too large (max ${Math.round(MODEL_MAX_BYTES / 1024 / 1024)} MB)`);
+  }
+
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const kind = classifyAttachment(buf, file.name);
+  if (!kind) {
+    throw badRequest(
+      'Unsupported file — attach a JPEG, PNG, WebP or GIF image, a PDF, or an STL, 3MF or OBJ model'
+    );
+  }
+  const max = maxBytesFor(kind.kind);
+  if (buf.byteLength > max) {
+    throw badRequest(`That file is too large (max ${Math.round(max / 1024 / 1024)} MB for this type)`);
+  }
+
+  const key = attachmentKey(user.id, kind.ext);
+  await c.env.BUCKET.put(key, buf, {
+    httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=0' },
+  });
+
+  const fileId = newId('crf');
+  const name = safeFileName(file.name, kind.ext);
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO community_request_files (id, request_id, file_key, file_name, content_type, size_bytes, kind)
+       VALUES (?,?,?,?,?,?,?)`
+    ).bind(fileId, id, key, name, kind.mime, buf.byteLength, kind.kind).run();
+  } catch (e) {
+    // The row is what makes the object reachable. If it cannot be written,
+    // delete the object rather than leaving a file nothing points at.
+    await c.env.BUCKET.delete(key).catch(() => {});
+    throw e;
+  }
+
+  return c.json({
+    success: true,
+    file: {
+      id: fileId,
+      file_name: name,
+      content_type: kind.mime,
+      size_bytes: buf.byteLength,
+      kind: kind.kind,
+      inline: kind.inline,
+      url: `/api/marketplace/requests/${id}/files/${fileId}`,
+    },
+  }, 201);
+});
+
+/**
+ * Stream one attachment, after re-deriving the caller's right to it.
+ *
+ * The permission is recomputed on every read rather than baked into a URL:
+ * a link shared after the request closed stops working, which is the point of
+ * not having a public key in the first place.
+ */
+marketplaceRoutes.get('/requests/:id/files/:fileId', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const fileId = str(c.req.param('fileId'), 'fileId', { min: 1, max: 60 });
+
+  const row = await c.env.DB.prepare(
+    `SELECT f.file_key, f.file_name, f.content_type, f.kind,
+            r.customer_id, r.state, r.visibility
+       FROM community_request_files f
+       JOIN community_requests r ON r.id = f.request_id
+      WHERE f.id = ? AND f.request_id = ?`
+  ).bind(fileId, id).first<{
+    file_key: string; file_name: string; content_type: string; kind: string;
+    customer_id: string; state: string; visibility: string;
+  }>();
+  if (!row) throw notFound('File not found');
+
+  const isOwner = row.customer_id === user.id;
+  const openToOffers =
+    row.visibility === 'public' && REQUEST_OPEN_STATES.includes(row.state as RequestState);
+
+  if (!isOwner && !openToOffers && user.role !== 'admin') {
+    const engaged = await c.env.DB.prepare(
+      `SELECT 1 FROM community_offers o
+         JOIN community_merchants m ON m.id = o.merchant_id
+        WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
+    ).bind(id, user.id).first();
+    if (!engaged) throw notFound('File not found');
+  }
+
+  const obj = await c.env.BUCKET.get(row.file_key);
+  if (!obj) throw notFound('File not found');
+
+  // Pictures may render in place; a model or a document is handed over as a
+  // download. Even for a picture the response is sandboxed with `nosniff`, so
+  // a file that somehow passed classification cannot be run as script.
+  const inline = row.content_type.startsWith('image/');
+  const headers = new Headers({
+    'Content-Type': row.content_type,
+    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${row.file_name}"`,
+    'Cache-Control': 'private, max-age=300',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+  });
+  headers.set('etag', obj.httpEtag);
+  return new Response(obj.body, { headers });
+});
+
+marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const fileId = str(c.req.param('fileId'), 'fileId', { min: 1, max: 60 });
+  const r = await requestForFiles(c, id, user.id);
+
+  // Same window as adding. Removing the model a merchant quoted against,
+  // after they quoted, would leave the price attached to a job nobody can see.
+  if (!REQUEST_OPEN_STATES.includes(r.state as RequestState) && r.state !== 'draft') {
+    throw conflict('This request is no longer open, so its attachments cannot change');
+  }
+
+  const row = await c.env.DB.prepare(
+    'SELECT file_key FROM community_request_files WHERE id = ? AND request_id = ?'
+  ).bind(fileId, id).first<{ file_key: string }>();
+  if (!row) throw notFound('File not found');
+
+  // Row first: while it exists the object is reachable, so removing it last
+  // can only leave an unreferenced object, never a broken reference.
+  await c.env.DB.prepare('DELETE FROM community_request_files WHERE id = ? AND request_id = ?')
+    .bind(fileId, id).run();
+  await c.env.BUCKET.delete(row.file_key).catch(() => {});
+
+  return c.json({ success: true });
 });
 
 marketplaceRoutes.post('/requests', requireAuth, async (c) => {

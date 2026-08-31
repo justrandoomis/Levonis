@@ -28,6 +28,7 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
 import { merchantApi, iqd, type MerchantMe, type MerchantProduct } from '../lib/merchant';
+import { ImagePicker, ImageGallery } from '../components/media/ImagePicker';
 
 type Tab = 'overview' | 'products' | 'orders' | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications';
 
@@ -464,6 +465,21 @@ function ProductEditor({
       />
       <Input label={loc('الفئة', 'Category', 'پۆل')} value={f.category} onChange={(v) => setF({ ...f, category: v })} />
 
+      {/* The first image is what the storefront grid shows, so "make this the
+          cover" is part of the control rather than a reordering trick the
+          merchant has to work out. */}
+      <ImageGallery
+        label={loc('صور المنتج', 'Product images', 'وێنەکانی بەرهەم')}
+        hint={loc(
+          'أول صورة هي الغلاف في المتجر. حتى 8 صور.',
+          'The first image is the cover in your shop. Up to 8 images.',
+          'یەکەم وێنە بەرگی فرۆشگایە. تا ٨ وێنە.'
+        )}
+        value={f.images}
+        max={8}
+        onChange={(images) => setF({ ...f, images })}
+      />
+
       <div>
         <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">
           {loc('الوصف', 'Description', 'وەسف')}
@@ -790,6 +806,10 @@ function SettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
     name: store.name,
     tagline: store.tagline,
     description: store.description,
+    // The server holds a key; the shape hands back a /files/ path. Either is
+    // accepted on the way in, so the form keeps whichever it was given.
+    logo_key: store.logoUrl,
+    banner_key: store.bannerUrl,
     contact_phone: store.contact_phone ?? '',
     contact_phone_public: !!store.contact_phone_public,
     accepts_custom_requests: store.accepts_custom_requests,
@@ -808,7 +828,14 @@ function SettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
     setError('');
     setSaved(false);
     try {
-      await merchantApi.updateStore(f);
+      // `null` means "remove it", and the server clears the column on an
+      // empty string. Sending null would be `undefined` after JSON and the
+      // field would simply not be updated — the logo would come back.
+      await merchantApi.updateStore({
+        ...f,
+        logo_key: f.logo_key ?? '',
+        banner_key: f.banner_key ?? '',
+      });
       setSaved(true);
       onSaved();
     } catch (e) {
@@ -820,6 +847,33 @@ function SettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
 
   return (
     <div className="space-y-4">
+      <Card title={loc('هوية المتجر', 'Store identity', 'ناسنامەی فرۆشگا')}>
+        <div className="space-y-5">
+          <ImagePicker
+            label={loc('شعار المتجر', 'Store logo', 'لۆگۆی فرۆشگا')}
+            hint={loc(
+              'مربّع. يظهر بجانب اسم متجرك في كل مكان.',
+              'Square. It appears beside your shop name everywhere.',
+              'چوارگۆشە. لەتەنیشت ناوی فرۆشگاکەت دەردەکەوێت.'
+            )}
+            shape="square"
+            value={f.logo_key}
+            onChange={(v) => setF({ ...f, logo_key: v })}
+          />
+          <ImagePicker
+            label={loc('غلاف المتجر', 'Store banner', 'بەرگی فرۆشگا')}
+            hint={loc(
+              'عريض. أعلى صفحة متجرك.',
+              'Wide. It runs across the top of your shop page.',
+              'پان. لەسەرەوەی لاپەڕەی فرۆشگاکەت.'
+            )}
+            shape="wide"
+            value={f.banner_key}
+            onChange={(v) => setF({ ...f, banner_key: v })}
+          />
+        </div>
+      </Card>
+
       <Card title={loc('معلومات المتجر', 'Store information', 'زانیاری فرۆشگا')}>
         <div className="space-y-4">
           <Input label={loc('الاسم', 'Name', 'ناو')} value={f.name} onChange={(v) => setF({ ...f, name: v })} />
