@@ -200,3 +200,107 @@ test('no workflow header still calls a live Worker a staging environment', () =>
     );
   }
 });
+
+/**
+ * A wrangler command must not name a Worker AND pass --env.
+ *
+ * WHY THIS EXISTS. Under legacy-env semantics wrangler APPENDS the env to a
+ * Worker name it was given, so `wrangler tail levonis-staging --env staging`
+ * asks Cloudflare for `levonis-staging-staging` and is answered "This Worker
+ * does not exist on your account. [code: 10007]". That is invisible unless
+ * you read the stderr of a backgrounded process: run 33424449216 passed all
+ * 33 live checks and then failed only because the log capture had silently
+ * attached to nothing.
+ *
+ * The inverted names are exactly what makes this trap easy to fall into —
+ * `levonis-staging` already looks like "levonis, staging env", so writing it
+ * next to `--env staging` reads as agreement rather than duplication. Say the
+ * Worker once: either the name (`--name levonis-staging`, no --env) or the
+ * env (`--env staging`, no name).
+ */
+const wranglerLines = (text: string): string[] =>
+  text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => !l.startsWith('#'))
+    // `nohup npx wrangler …` and `printf … | npx wrangler …` both count, so
+    // match the word anywhere on a line that is not a comment.
+    .filter((l) => /\bwrangler\s+[a-z]/.test(l));
+
+/** The subcommands that take a Worker name as their first positional. */
+const POSITIONAL_WORKER = /\bwrangler\s+(tail|deployments|triggers|versions)\b/;
+
+test('no wrangler command names a Worker and passes --env (legacy env would suffix it twice)', () => {
+  const offenders: string[] = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
+    for (const line of wranglerLines(read(file))) {
+      if (!/--env\s+\S/.test(line)) continue;
+      if (/--name\s+\S/.test(line)) {
+        offenders.push(`${file}: --name together with --env  ->  ${line}`);
+        continue;
+      }
+      const positional = line.match(
+        /\bwrangler\s+(?:tail|deployments|triggers|versions)\s+(?!-)(\S+)/
+      );
+      if (POSITIONAL_WORKER.test(line) && positional) {
+        offenders.push(`${file}: "${positional[1]}" together with --env  ->  ${line}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], `wrangler would look for <name>-<env>:\n${offenders.join('\n')}`);
+});
+
+test('the live-auth log capture attaches to the Worker that serves the apex', () => {
+  const text = read('verify-live-auth.yml');
+  const tail = wranglerLines(text).find((l) => /wrangler\s+tail\b/.test(l));
+  assert.ok(tail, 'verify-live-auth.yml no longer captures the Worker log at all');
+  assert.match(tail, /--env\s+staging\b/, `the tail must resolve env.staging (levonis-staging): ${tail}`);
+
+  // Positive proof of attachment, not just a live process: wrangler prints
+  // "Connected to <script>" ONLY under --format pretty, so json cannot be
+  // used here without giving up the one signal that names the Worker reached.
+  assert.match(tail, /--format\s+pretty\b/, `the tail needs pretty output for its banner: ${tail}`);
+  assert.match(
+    text,
+    /grep -q 'Connected to levonis-staging'/,
+    'the tail step must assert the banner names levonis-staging, not merely that the process lives'
+  );
+});
+
+test('the provider-log grep covers every way a send is refused', () => {
+  const text = read('verify-live-auth.yml');
+  // THE GREP, not the file. Every one of these phrases also appears in the
+  // comment above the command explaining why it is there, so a whole-file
+  // `includes` passes even after the pattern itself is narrowed — it did,
+  // when this was written that way.
+  const counting = text.split('\n').find((l) => /N=\$\(grep -c/.test(l));
+  assert.ok(counting, 'verify-live-auth.yml no longer counts provider errors at all');
+
+  // Each phrase is a literal the Worker itself logs: worker/routes/auth.ts
+  // sendEmail() writes the first two, forgot-password writes the third on a
+  // false return, and worker/lib/outbox.ts records the fourth in last_error.
+  for (const phrase of [
+    'provider responded',
+    'sendEmail: request failed',
+    'Password reset email send failed',
+    'resend [0-9]',
+  ]) {
+    assert.ok(
+      counting.includes(phrase),
+      `the provider-log grep does not look for "${phrase}", so that refusal would read as a clean run:\n  ${counting}`
+    );
+  }
+});
+
+test('an unobservable provider response fails the run rather than passing quietly', () => {
+  const text = read('verify-live-auth.yml');
+  assert.ok(
+    text.includes('errors=not captured'),
+    'the provider-log step must distinguish "no error" from "could not look"'
+  );
+  assert.match(
+    text,
+    /\[ "\$\{\{ steps\.providerlog\.outputs\.errors \}\}" = "0" \]/,
+    'the final gate must require a real zero — "not captured" is not evidence of delivery'
+  );
+});

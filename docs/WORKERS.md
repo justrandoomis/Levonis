@@ -62,6 +62,31 @@ and a verification email cannot be proved without an account to send them to.
 It buys nothing, touches no wallet, no order and no ledger, and everything
 else it does is a GET or a SELECT.
 
+## Naming a Worker on the wrangler command line
+
+Say the Worker **once**: either the name or the environment, never both.
+
+```
+wrangler tail --env staging            # correct — resolves env.staging.name
+wrangler deployments list --name levonis-staging   # correct — no --env
+wrangler tail levonis-staging --env staging        # WRONG
+```
+
+The last line asks Cloudflare for `levonis-staging-staging`, because under
+legacy-env semantics wrangler appends the environment to any name it is given
+(`src/utils/getLegacyScriptName.ts`: `args.name && args.env ? name-env : …`).
+Cloudflare answers *"This Worker does not exist on your account. [code:
+10007]"*.
+
+The inverted names make this easy to write by accident: `levonis-staging`
+already reads as "levonis, staging environment", so putting it next to `--env
+staging` looks like agreement rather than duplication. It is duplication.
+
+This cost a run: 33424449216 passed all 33 live checks and then failed only
+because its `wrangler tail` had attached to nothing — the error went to the
+stderr of a backgrounded process, so the run looked healthy until the gate.
+`tests/workflowNaming.test.ts` now rejects the combination in any workflow.
+
 ## Routing is not managed from this repository
 
 Neither `wrangler.jsonc` nor `studio/wrangler.jsonc` declares `routes` or

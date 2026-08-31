@@ -247,16 +247,40 @@ jobs:
         run: |
           set -e
           echo "started=no" >> "$GITHUB_OUTPUT"
-          nohup npx wrangler tail levonis-staging --env staging --format json \
-            > /tmp/tail.jsonl 2>/tmp/tail.err &
+          # NO POSITIONAL WORKER NAME HERE. Under legacy-env semantics wrangler
+          # APPENDS the env to a positional name, so
+          #   wrangler tail levonis-staging --env staging
+          # asked Cloudflare for `levonis-staging-staging` and got
+          #   "This Worker does not exist on your account. [code: 10007]"
+          # The Worker's real name already carries the suffix (wrangler.jsonc:
+          # name "levonis", env.staging.name "levonis-staging"), so `--env
+          # staging` alone resolves it verbatim — the same way `deploy --env
+          # staging` addresses it.
+          #
+          # --format pretty, not json, for one reason: wrangler prints
+          # "Successfully created tail" and "Connected to <script>" ONLY when
+          # format === "pretty" (wrangler-dist/cli.js). Under json it attaches
+          # silently, so there is no positive signal to check and, worse, the
+          # banner names the script it actually reached — which is precisely
+          # the thing that was wrong. The log messages are plain text either
+          # way, so nothing is lost for the grep below.
+          nohup npx wrangler tail --env staging --format pretty \
+            > /tmp/tail.log 2>/tmp/tail.err &
           echo $! > /tmp/tail.pid
           sleep 12
-          if kill -0 "$(cat /tmp/tail.pid)" 2>/dev/null; then
+          # Alive is not attached. `kill -0` alone would pass for a process
+          # that connected to the wrong Worker, or that printed an error and
+          # kept running — and "no provider error" from a capture that saw
+          # nothing reads exactly like a clean run. The banner is the proof,
+          # and it has to name THIS Worker.
+          strip() { sed -e 's/\x1b\[[0-9;]*m//g' "$@"; }
+          if kill -0 "$(cat /tmp/tail.pid)" 2>/dev/null \
+             && strip /tmp/tail.log /tmp/tail.err | grep -q 'Connected to levonis-staging'; then
             echo "tail attached to levonis-staging"
             echo "started=yes" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::wrangler tail did not attach — a Resend rejection will not be visible here"
-            sed -n '1,15p' /tmp/tail.err || true
+            strip /tmp/tail.err /tmp/tail.log 2>/dev/null | sed -n '1,15p' || true
           fi
 
       - name: Studio SSO, negative cases and logout liveness, live
@@ -287,16 +311,26 @@ jobs:
             echo "no capture was running; the provider's response is not observable here"
             echo "errors=not captured" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          echo "captured $(wc -l < /tmp/tail.jsonl) log line(s)"
-          # sendEmail logs "sendEmail: provider responded <status>: <body>" on a
-          # non-2xx, and outbox.ts records "resend <status>: ..." in last_error.
-          # Neither contains a token or a key; the API key is never logged.
-          N=$(grep -c 'provider responded\|resend [0-9]' /tmp/tail.jsonl 2>/dev/null || true)
+          # BOTH streams: wrangler's pretty printer sends log lines through
+          # logger.log and exception lines through logger.error, and which of
+          # the two is stdout is wrangler's business, not this workflow's.
+          sed -e 's/\x1b\[[0-9;]*m//g' /tmp/tail.log /tmp/tail.err > /tmp/tail.txt
+          echo "captured $(wc -l < /tmp/tail.txt) log line(s)"
+          # Every way a send can be refused, in the words the Worker uses:
+          #   sendEmail()  -> "sendEmail: provider responded <status>: <body>"
+          #                   "sendEmail: request failed: <message>"
+          #   forgot-password on a false return
+          #                -> "Password reset email send failed for user <id>"
+          #   outbox.ts    -> last_error "resend <status>: ..."
+          # None of them contains a token or the API key.
+          N=$(grep -c 'provider responded\|resend [0-9]\|sendEmail: request failed\|Password reset email send failed' \
+                /tmp/tail.txt 2>/dev/null || true)
           N=${N:-0}
           echo "provider-error lines: $N"
           if [ "$N" != "0" ]; then
             echo "What Resend answered:"
-            grep -o 'provider responded [^"]*\|resend [0-9][^"]*' /tmp/tail.jsonl | head -10
+            grep -o 'provider responded .*\|resend [0-9].*\|sendEmail: request failed.*\|Password reset email send failed.*' \
+              /tmp/tail.txt | head -10
             echo "::error::Resend refused at least one send — the status is above"
           else
             echo "no provider error was logged during the scenario"
