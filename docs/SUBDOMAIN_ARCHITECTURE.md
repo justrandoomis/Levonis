@@ -410,12 +410,30 @@ Locally that path is 29 passed / 0 failed; the whole chain with an admin is
 60 passed / 0 failed. No money moves in either: a cart line is not a ledger
 entry, and the order and escrow steps stay behind `ALLOW_FINANCIAL`.
 
-Two things still need an admin session and are reported blocked, never as a
-pass: **granting PLUS** and **opening a store**, and with them **the owner
-reaching their own `/admin` on their store host** — that one needs the
-owner's session, which no discovery can substitute for. The action that
-unblocks all three needs no credentials handed to anyone: grant PLUS to an
-account and open a store through the site's own admin UI, once.
+**On production it found nothing to discover**, and that is the real answer
+to why the merchant half is still unproven there:
+
+```
+BLK  a published merchant product is discoverable
+     — no active community product exists on this deployment yet
+```
+
+`GET /api/community/products` on levonis-iq.com returns an empty list. **No
+merchant store has published anything on the live site.** Credentials were
+never the blocker for most of it — there is no shop to look at. That also
+means the reserved-list expansion could not have taken any storefront offline,
+because none exists yet.
+
+So the remaining work is not code and needs no credential handed to anyone:
+**open one store on production and publish one product**, through the site's
+own admin and merchant screens. `POST /api/memberships/admin/grant` will make
+an account PLUS without a payment; onboarding and the first product are the
+merchant's own screens. Then re-run workflow 11 and the whole chain above
+becomes measurable on the live domain.
+
+One step stays blocked even then, and honestly so: **the owner reaching their
+own `/admin` on their store host** needs that owner's session, which no
+discovery can substitute for.
 
 ### 7.5.3 The Git integration: the case for keeping it, and against
 
@@ -505,7 +523,29 @@ on every run — `scripts/audit-reserved-subdomains.mjs`, tested in
   is the entire point of the phishing group.
 
 That is what makes "and any subdomain already dedicated to an existing
-service" a check rather than a promise.
+service" a check rather than a promise. Against the live zone:
+
+```
+one-label names with DNS records under levonis-iq.com: 4
+  ok   _acme-challenge  (TXT)        — not a usable slug, no merchant can claim it
+  ok   send  (MX+TXT, proxied=false) — reserved in code
+  ok   studio  (AAAA, proxied=true)  — reserved in code
+  ok   www  (CNAME, proxied=true)    — reserved in code
+audit=ok
+```
+
+Note what that list does *not* contain: `mail` has no record of its own, so
+`mail.levonis-iq.com` now resolves through the wildcard and reaches the
+Worker. It is reserved in code, so it classifies as `system` and no store can
+ever be served there. Mail delivery is unaffected — that runs on the apex's MX
+records, which the wildcard does not touch.
+
+And reserving a name is not free in the other direction either: `classifyHost`
+consults the list BEFORE looking a slug up, so a name that becomes reserved
+stops resolving to its store the moment the deploy lands. Workflow 7 therefore
+reads the live store slugs and refuses to deploy if any of them just became
+reserved (`scripts/check-live-store-slugs.mjs`) — after the migrations,
+before the deploy.
 
 ### 7.6 A forged Host header cannot reach the Worker
 
