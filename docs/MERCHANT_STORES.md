@@ -176,6 +176,46 @@ CHECK (
 An endpoint written next year that skips `cartSeller` entirely still cannot
 write a line that lies about who is selling.
 
+### Line identity: two partial indexes, and why not one key
+
+"The same line twice is one line with a bigger quantity" is enforced by two
+**partial** unique indexes (migration 0032), not by one key over both product
+columns:
+
+```sql
+CREATE UNIQUE INDEX idx_cart_levonis_line
+  ON cart_items(user_id, product_id, option_id, color_id, shipping_method_id)
+  WHERE product_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_cart_merchant_line
+  ON cart_items(user_id, community_product_id, option_id, color_id)
+  WHERE community_product_id IS NOT NULL;
+```
+
+> **NULLS ARE DISTINCT IN A SQLITE UNIQUE INDEX**, and forgetting it cost a
+> production outage. 0030 widened 0001's key to
+> `(user_id, product_id, community_product_id, option_id, color_id,
+> shipping_method_id)`. That looks like a superset. It is not: a Levonis line
+> has `community_product_id` NULL and a merchant line has `product_id` NULL,
+> so every row was unique no matter what. The constraint stopped constraining,
+> the `ON CONFLICT(...)` in `cart.ts` stopped naming any index that exists, and
+> SQLite answers that with an error — so **adding anything to a cart returned
+> 500 on the live site**.
+
+A merchant line is keyed **without** `shipping_method_id`: merchant delivery is
+settled at checkout with the one store, not chosen per line, so including it
+would make two identical lines look different whenever the column moved.
+
+0032 folds any duplicates the broken window allowed by **summing** their
+quantities rather than deleting a row — the customer put those items in their
+cart, and losing them silently is worse than a quantity they can see and edit.
+
+`tests/cartUpsert.test.ts` issues the routes' actual SQL against the actual
+migrated schema, which is the gap that let this through: every other cart test
+in the repo works on parsed structures or stubs, so none of them could see it.
+One case asserts the pre-0032 statement **still fails**, so the fix cannot be
+quietly undone.
+
 ### The conflict
 
 `400 CART_SELLER_CONFLICT`, with **both shops named** in `details` — "items

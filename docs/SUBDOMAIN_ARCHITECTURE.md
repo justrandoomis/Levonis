@@ -22,12 +22,13 @@ matches. A merchant controls the content of their own storefront. So one
 platform admin visiting one hostile shop would be enough to drive platform
 administration with their own credentials.
 
-**The mitigation: `/api/admin/*` is refused on every host except the apex.**
+**The mitigation: `/api/admin/*` is refused on every host a merchant could
+control.**
 
 ```ts
 // worker/index.ts
 app.use('/api/admin/*', async (c, next) => {
-  if (c.get('host').kind !== 'main') {
+  if (!adminAllowedOn(c.get('host'))) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   await next();
@@ -36,6 +37,30 @@ app.use('/api/admin/*', async (c, next) => {
 
 404 rather than 403, so a wrong-host caller learns the route does not exist
 here rather than that it exists elsewhere.
+
+### The condition is about the ROOT DOMAIN, not the label
+
+This guard was originally `kind !== 'main'`, and that shipped an outage.
+`foreign` covers two completely different situations, and treating them alike
+turned a configuration mistake into a total loss of platform administration:
+
+| Host | `kind` | `underRoot` | Admin |
+|---|---|---|---|
+| `levonis-iq.com`, `www.` | `main` | ✔ | **yes** |
+| `ali3d.levonis-iq.com` | `merchant` | ✔ | no |
+| `studio.levonis-iq.com` | `system` | ✔ | no |
+| `a.b.levonis-iq.com` | `foreign` | ✔ | no — one wildcard certificate covers one level |
+| `*.workers.dev`, `localhost` | `foreign` | ✘ | **yes** — operator territory, no merchant is served there |
+| any host, **root domain unset** | `foreign` | ✘ | **yes** |
+
+That last row is the one that matters. With `STORE_ROOT_DOMAIN` unset and
+`APP_ORIGIN` naming a different domain, *every* host classified as `foreign` —
+the apex included — and the old guard refused the admin API on the live site
+while protecting nobody. A security control that fails closed onto the
+operators, on a host no merchant can control, is not making anyone safer.
+
+`tests/hosts.test.ts` pins every row above, including
+*"a misconfigured root domain does not take the admin API down"*.
 
 Merchant administration is deliberately **not** under `/api/admin`. It lives
 at `/api/merchant/*`, is scoped to the caller's own store, and is a different
@@ -218,14 +243,93 @@ to the host classifier.
 
 | Name | Value | Notes |
 |---|---|---|
-| `STORE_ROOT_DOMAIN` | `levonis-iq.com` | Optional; derived from `APP_ORIGIN` when absent |
-| `APP_ORIGIN` | `https://levonis-iq.com` | Already set |
+| `STORE_ROOT_DOMAIN` | `levonis-iq.com` | **Set explicitly by the deploy.** Do not rely on the fallback |
+| `APP_ORIGIN` | `https://levonis-iq.com` | Set, but **does not currently name this domain** — see below |
 
 Both are plain vars. `wrangler deploy` **replaces plain-text vars wholesale**,
 so use workflow `7 - Deploy Staging Code`, which reads the running Worker's
 vars from the Cloudflare API and passes every one back.
 
-### 7.5 Verification
+> **STORE_ROOT_DOMAIN used to be optional. It is not any more, and the reason
+> is a production outage.** It was derived from `APP_ORIGIN`, and `APP_ORIGIN`
+> on the live Worker does not name `levonis-iq.com` — so `classifyHost`
+> returned `foreign` for every host including the apex, and the apex-only
+> admin guard refused the entire admin API on the platform's own domain. The
+> deploy now pins the value, and `adminAllowedOn` no longer fails closed onto
+> the operator (§1).
+
+> **`APP_ORIGIN` still does not name this domain**, and the deploy warns about
+> it on every run without changing it. That variable builds the links in
+> outbound password-reset and verification email, so every one of those links
+> currently points somewhere other than the live site. Repointing it is a
+> deliberate decision for the owner — it changes what real customers receive —
+> so no workflow does it automatically.
+
+### 7.5 What is actually in place today, and what is not
+
+Measured from GitHub Actions on 2026-08-31 (workflow **10 - Merchant
+Subdomains**, read-only). This section is state, not design — re-run the
+workflow rather than trusting it.
+
+| | State |
+|---|---|
+| Wildcard DNS (`*`) | ✅ **in place** — an arbitrary subdomain resolves to Cloudflare |
+| `studio.` and `mail.` | ✅ unaffected; the Studio answers 200 |
+| Worker on the apex | ✅ `levonis-staging` |
+| Wildcard Worker route | ❌ **not verified** — the API token cannot read routes |
+| **A redirect intercepts every subdomain** | ❌ **blocker** |
+
+**THE BLOCKER.** Every `*.levonis-iq.com` hostname answers `302` to
+`https://levonis-iq-com.l.ink/…`, which then 404s:
+
+```
+$ curl -sSI https://anything.levonis-iq.com/api/health
+location: https://levonis-iq-com.l.ink/api/health
+server: cloudflare
+```
+
+`l.ink` is Cloudflare's link shortener. Something in the zone — a Redirect
+Rule, a Page Rule, or the shortener app — matches every subdomain and answers
+before any Worker route can. **No merchant storefront can load until it is
+removed or narrowed**, and no §95 check that needs a subdomain can be run.
+
+It is not currently a security exposure: the redirect means `/api/admin/*` is
+unreachable on those hosts rather than served. But unreachable is not the same
+as guarded, and the verification reports it as **blocked**, never as a pass.
+
+**Two things the owner has to do**, neither of which is code:
+
+1. **Remove the wildcard redirect** in the Cloudflare dashboard
+   (Rules → Redirect Rules / Page Rules, and the link-shortener app if it is
+   enabled), so `*.levonis-iq.com` reaches the Worker.
+2. **Widen the API token** on this zone with `Zone:DNS:Edit` and
+   `Zone:Workers Routes:Edit`. It currently has `Zone:Zone:Read` and nothing
+   else at zone level, so workflow 10 can report but cannot apply, and the
+   wildcard route cannot even be read:
+
+   ```
+   cloudflare: 10000 Authentication error   (on /zones/<id>/dns_records)
+   cloudflare: 10000 Authentication error   (on /zones/<id>/workers/routes)
+   ```
+
+Then re-run workflow 10 with `confirm: APPLY`, and workflow 11 to verify.
+
+### 7.6 A forged Host header cannot reach the Worker
+
+Worth knowing before designing a test around it: **Cloudflare rewrites the
+`Host` header to the hostname it routed for.** Negotiating TLS for the apex
+and sending `Host: ali3d.levonis-iq.com` does not make the Worker classify
+the request as a merchant — it still sees `levonis-iq.com` and answers
+`kind: 'main'`.
+
+That is a security property (a forged Host cannot confuse this Worker about
+which hostname it is serving) and a testing limitation: the Worker's
+merchant-host behaviour **cannot be measured from outside** until the wildcard
+route exists. `tests/hosts.test.ts` covers it against real hostnames instead,
+and the live verification reports those checks as blocked rather than
+inventing a verdict.
+
+### 7.7 Verification
 
 ```bash
 # The main site is unaffected
