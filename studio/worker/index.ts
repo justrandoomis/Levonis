@@ -21,6 +21,7 @@ import handler from "vinext/server/app-router-entry";
 import { apiRouter } from "./api/router";
 import { scheduledCleanup } from "./api/cleanup";
 import { handleAuthRoute, isAuthRoute } from "./auth/callback";
+import { isMemoryConstrainedApple } from "./platform";
 import {
   type StudioAuthEnv,
   loadStudioSession,
@@ -88,21 +89,11 @@ const ISOLATION_HEADERS: Record<string, string> = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
 
-/** iOS and iPadOS, including iPadOS Safari's desktop-class UA — which claims
- *  Macintosh and is only told apart by having touch points. */
-export function isMemoryConstrainedApple(userAgent: string): boolean {
-  const ua = userAgent || "";
-  if (/iPhone|iPad|iPod/i.test(ua)) return true;
-  // iPadOS 13+ requesting the desktop site: "Macintosh … Version/x Safari".
-  // Real Macs match this too; sending them the single-threaded core costs
-  // some speed and costs no correctness, and there is no server-side signal
-  // that separates the two. Chrome/Firefox on macOS do not match, because
-  // WebKit is the engine with the tab budget that kills the worker.
-  if (/Macintosh/i.test(ua) && /Version\/\d+.*Safari/i.test(ua) && !/Chrome|Chromium|Firefox/i.test(ua)) {
-    return true;
-  }
-  return false;
-}
+// The platform predicate moved to ./platform so it can be tested: this file
+// imports vinext and the Cloudflare runtime, so no plain test can load it,
+// and that predicate was carrying the whole iPad mitigation untested.
+// Still exported from here — it is part of this module's public surface.
+export { isMemoryConstrainedApple };
 
 function withSecurityHeaders(response: Response, request?: Request): Response {
   const headers = new Headers(response.headers);
