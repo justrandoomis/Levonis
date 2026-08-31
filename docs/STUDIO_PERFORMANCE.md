@@ -283,6 +283,42 @@ staging database or bucket.
 
 ### 3.7 On production — https://studio.levonis-iq.com
 
+Verified twice. The first run (b62f453) passed all nine points, and an
+adversarial review of the same diff then found five regressions that those nine
+points do not exercise — a session that paints, an undo of a delete, a project
+opened from a .3mf, a desktop tab switch. All five are fixed (a5774c6,
+660f67d), and a tenth point now covers the worst of them directly.
+
+**Re-verified on 660f67d, all ten points:**
+
+| # | Point | Result |
+|---|---|---|
+| 1 | no out-of-memory message | **pass** |
+| 2 | no worker created in advance | **pass** — 0 at load, 0 after import |
+| 3 | first worker only at Slice | **pass** — 1 |
+| 4 | repeated Duplicate stays on the bed | **pass** — 9/10 off the bed at 716.5 mm before, **0/10 at 49.4 mm** after |
+| 5 | no false "Beyond the bed" | **pass** |
+| 6 | orbit / pinch / drag / gizmo modes | **pass** — worst frame 50 ms, **0 janky frames** |
+| 7 | autosave without jank or freeze | **pass** — 1201 frames, max 16.8 ms, **longest task 0 ms** |
+| 8 | slice → cancel → slice | **pass** — 1 worker each; RSS 364.8 → 368.5 → **358.9** MB |
+| 9 | this origin serves the patched build | **pass** |
+| 10 | a painted session keeps its worker | **pass** — alive before backgrounding, alive after |
+
+Point 8's third cycle ending *below* the second is the release working as
+intended rather than memory piling up.
+
+#### The regressions the nine points missed
+
+| Finding | Why the acceptance could not see it | Fix |
+|---|---|---|
+| Releasing the worker destroys the kernel's paint selector; the viewer caches the prepared-mesh identity outside the worker and never re-prepares, so `exportPaint` answers `{supported:false, facets:[], hex:''}` and a 3MF **saves and uploads with every painted facet stripped, reporting success** | the run never paints, and the 45 s idle release never fires because `triggerSlice` cancels it | entering any paint mode latches the session: no release, and the autosave signature returns null so saving is unconditional |
+| The autosave signature cannot see brush strokes at all | same | same latch |
+| `visibilitychange` release was ungated by device, so every desktop tab switch threw away the warm kernel | the run never backgrounds a desktop tab | gated on `device.memoryConstrained` |
+| Undo of a delete was read as a spawn and re-seated the restored objects | the run never undoes a delete | a returning object id is a restore — engine ids only increase |
+| A `.3mf` import re-seated the author's layout (only a ZIP leaves a pending arrangement, so `orchestrator.busy` was never the guard); the 3 s window was also a bet on parse speed, because the engine emits **one** objects event for a whole restore, not a stream | the run never opens a project, and a small fixture always beats the timer | restore paths latch instead of timing out |
+
+### 3.7.1 The original nine-point run (b62f453)
+
 `6 - Verify Studio Live` against the origin the owner actually visits, in a
 touch-emulated phone session. All nine acceptance points passed:
 
