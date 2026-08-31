@@ -128,8 +128,32 @@ async function main() {
 
   // -------------------------------------------------- 2. host classification
   section('2. a hostname becomes a decision');
+
+  // SAMPLED, NOT ASKED ONCE. A single answer cannot tell "the configuration
+  // is wrong" apart from "one edge location is still serving an older version
+  // of the Worker" — and those need completely different responses. Ten
+  // requests, with the Cloudflare colo each was answered by, makes the
+  // difference visible instead of a coin flip between two run reports.
+  const samples = [];
+  for (let i = 0; i < 10; i += 1) {
+    const r = await anon.req('GET', APEX, '/api/storefront/resolve');
+    samples.push({ kind: r.json?.kind ?? `HTTP ${r.status}`, ray: r.headers.get('cf-ray') ?? '-' });
+  }
+  const tally = samples.reduce((m, x) => ({ ...m, [x.kind]: (m[x.kind] ?? 0) + 1 }), {});
+  console.log(`  resolve over 10 requests: ${JSON.stringify(tally)}`);
+  console.log(`  colos: ${[...new Set(samples.map((x) => x.ray.split('-')[1] ?? '?'))].join(', ')}`);
+
+  const mainCount = tally.main ?? 0;
+  if (mainCount === samples.length) {
+    ok('the apex resolves as the platform', 'every request');
+  } else if (mainCount > 0) {
+    bad('the apex resolves as the platform CONSISTENTLY',
+      `only ${mainCount}/${samples.length} — the deployment is not uniform across edge locations`);
+  } else {
+    bad('the apex resolves as the platform', `never; got ${JSON.stringify(tally)}`);
+  }
+
   const apexResolve = await anon.req('GET', APEX, '/api/storefront/resolve');
-  check('the apex resolves as the platform', apexResolve.json?.kind === 'main', `kind=${apexResolve.json?.kind}`);
   check('the apex has no store attached', apexResolve.json?.store == null);
 
   const missing = await anon.req('GET', `https://no-such-store-${RUN}.${ROOT_DOMAIN}`, '/api/storefront/resolve');
