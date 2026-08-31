@@ -1,0 +1,216 @@
+# Signing in: what is configured, and where that is decided
+
+One endpoint answers the whole question:
+
+```bash
+curl -s https://levonis-iq.com/api/auth/capabilities | jq
+```
+
+```json
+{
+  "emailPassword": true,
+  "passwordReset": false,
+  "emailVerification": false,
+  "google": false,
+  "googleClientId": "",
+  "telegram": false,
+  "telegramBot": "",
+  "phoneSignIn": true,
+  "phoneOtp": false,
+  "defaultCountry": "IQ"
+}
+```
+
+The auth page renders exactly the methods this says are available. A method
+that is off is **not shown at all** — there is no disabled button and no panel
+whose content is an explanation of why it cannot work.
+
+Nothing secret is in the response. A Google client id is public by
+construction (Google puts it in the page, the redirect and every token's
+audience); everything else is a boolean.
+
+---
+
+## 1. Why this endpoint exists
+
+Both production failures had the same shape: a value that decided whether a
+button appeared, and a *different* value that decided whether pressing it
+could work.
+
+| Provider | What the browser checked | What the server checked | Failure the customer saw |
+| --- | --- | --- | --- |
+| Google | `VITE_GOOGLE_CLIENT_ID`, baked into the bundle at build time | `GOOGLE_CLIENT_ID`, a variable on the Worker | "Google sign-in is not enabled on this deployment" — on a deployment that may have been configured correctly |
+| Email | nothing | `EMAIL_API_KEY` + `EMAIL_FROM` on the Worker | "Password reset is unavailable because no mail service is configured" |
+
+There is now one source: the Worker, read at runtime. The build carries no
+provider configuration at all, so a build made on a runner without a
+repository secret can no longer produce a site that lies about its own
+capabilities.
+
+An operator gets more detail from `GET /api/admin/providers` (admin only),
+which additionally reports whether the Telegram bot actually **answered**
+and whether the staging email allowlist is on.
+
+---
+
+## 2. Google
+
+**Architecture: Identity Services ID token, verified server-side.** The
+browser gets a signed JWT from Google and posts it to `POST /api/auth/google`;
+the Worker verifies the RS256 signature against Google's published JWKS, plus
+issuer, audience, expiry and `email_verified` (`worker/lib/google.ts`).
+
+Two things follow, and both remove a category of configuration error:
+
+- **There is no client secret.** No authorization-code exchange happens, so
+  none is needed and none is stored.
+- **There is no callback / redirect URI.** Nothing to register, nothing to
+  keep in sync with a domain. The only Google Console setting that matters is
+  **Authorized JavaScript origins**.
+
+### What the owner sets
+
+| Where | Name | Value |
+| --- | --- | --- |
+| GitHub → repository secrets | `VITE_GOOGLE_CLIENT_ID` | `<id>.apps.googleusercontent.com` |
+| Google Cloud Console → OAuth client → Authorized JavaScript origins | — | `https://levonis-iq.com` |
+
+Workflow 7 writes that secret to the Worker's `GOOGLE_CLIENT_ID` variable, so
+the two halves cannot drift apart. Step-by-step console instructions, and the
+`origin_mismatch` failure mode, are in **`docs/GOOGLE_SIGNIN_FIX.md`**.
+
+> **A merchant storefront host is never an authorized origin.** A merchant
+> controls the content of their storefront; an authorized origin there would
+> let a page they wrote start a Google sign-in carrying this platform's client
+> id. Google does not accept wildcards, which helps, but the rule is the point.
+
+### Account matching
+
+`resolveGoogleIdentity` (in `worker/routes/auth.ts`, extracted so it can be
+tested without a live Google token) decides whether two identities are one
+person:
+
+1. **Known `google_sub`** → that account. Signing in twice is one account, and
+   a changed display name at Google does not fork it.
+2. **An existing account with the same address that PROVED it**
+   (`email_verified_at` set) → Google is linked to that account.
+3. **An existing account with the same address that never proved it** →
+   **refused**, with the recovery path named. Anyone can type an address into
+   a signup form, so an unverified local account is not evidence that its
+   owner and the Google identity are the same person; merging would hand that
+   account — its orders, its wallet — to whichever of the two signed up first.
+4. **Nothing matches** → a new account, with a handle derived from the address
+   that must pass the same rules a typed one does (so `admin@gmail.com` does
+   not become the handle `admin`).
+
+---
+
+## 3. Email — password reset and verification
+
+**Provider: Resend**, via `EMAIL_API_KEY` (a Worker *secret*) and `EMAIL_FROM`
+(a variable). Both must be present; either alone is off.
+
+### The bug that kept this off in production
+
+Worker **secrets are not carried forward by a deploy** the way plain-text vars
+are — they have to be uploaded. The only workflows that uploaded
+`EMAIL_API_KEY` target a Worker named `levonis`, which does not exist on this
+account (`docs/DECISIONS.md` row 52): the Worker actually serving
+levonis-iq.com is `levonis-staging`, deployed by **workflow 7**, which never
+uploaded it. So the key never reached the running site, and every reset
+refused itself — correctly, and forever.
+
+Workflow 7 now uploads it, opt-in: unset means the feature stays honestly
+disabled rather than pretending to send.
+
+### `EMAIL_ALLOWED_RECIPIENTS` — the silent outage
+
+A staging guard. When it is non-empty, every message to an address outside the
+list is **dropped**, with a console warning and an **unchanged HTTP response**
+— so a password reset reports itself as sent and never arrives. Workflow 7
+now **refuses to deploy** while it is set, and `GET /api/admin/providers`
+reports it as a warning.
+
+### What the reset flow guarantees
+
+| Rule | Where |
+| --- | --- |
+| The response is identical whether or not the account exists | `POST /api/auth/forgot-password` |
+| The token is stored as a SHA-256 hash — the database never holds the link | `password_reset_tokens.token_hash` |
+| 30-minute expiry | same |
+| Single use, enforced by a conditional UPDATE so two concurrent submissions cannot both win | `POST /api/auth/reset-password` |
+| Every existing session is destroyed on success | same |
+| Invalid, used and expired all produce the SAME wording | same |
+| The link is built on the canonical origin, never on the host the request arrived at | `worker/lib/appOrigin.ts` |
+
+That last row is the one that matters most since wildcard subdomains went
+live: a reset link built from the request host would deliver a customer's
+token to a page a merchant wrote.
+
+---
+
+## 4. Telegram
+
+`TELEGRAM_BOT_TOKEN` (secret) plus a webhook secret. `capabilities.telegram`
+is true only when the bot **answered** `getMe` — a revoked or mistyped token
+looks identical to a working one otherwise.
+
+Telegram is also how a phone number is proven. The browser never proves
+anything about a number typed into it: the person shares their own contact
+inside the private bot chat, the server verifies it, and a one-time code
+completes the flow.
+
+---
+
+## 5. Phone
+
+| | State | Why |
+| --- | --- | --- |
+| Sign IN with a phone number | **works** | The identifier field takes an email, a username or a phone; the server matches it against the account's verified `phone_e164`. |
+| Sign UP with a phone number alone | **refused** | A typed number proves nothing. Account creation on a number goes through Telegram. |
+| SMS / OTP provider | **none** | `capabilities.phoneOtp` is `false`, so no SMS flow is advertised. |
+
+There is no separate "Phone" tab any more. Signing up there always failed —
+the panel's only possible outcome was an error telling you to use Telegram —
+and signing in never needed one.
+
+### Validation
+
+`worker/lib/phone.ts` and `src/components/auth/PhoneField.tsx` both use
+**libphonenumber** metadata, so each country's real numbering plan decides.
+The previous rule was Iraq-strict plus "8–15 digits" for everywhere else,
+which accepted `+971000000000` as a UAE number.
+
+Deliberately **not** checked: whether the number is a mobile line. The bundled
+metadata cannot tell mobile from fixed line in every country (the whole US
+range is `FIXED_LINE_OR_MOBILE`), so requiring it would be strict in some
+countries and meaningless in others. Ownership is proven by Telegram
+answering, not by a number range.
+
+Country names in the picker come from `Intl.DisplayNames`, so all 245
+countries are listed in Arabic, English and Kurdish with no translation table
+to fall out of date.
+
+---
+
+## 6. Account setup and the completion prompt
+
+Signup asks for what it needs. `/welcome` asks for the rest in two steps that
+can each be skipped, and the whole wizard can be left at once — the account
+already exists and works before that page is ever rendered.
+
+**Completion is computed, never stored** (`worker/lib/profileCompletion.ts`).
+A stored boolean goes stale the first time a field is edited by a path that
+forgets to update it; a derived one cannot disagree with the fields.
+
+**Whether to show the prompt is decided server-side**, from
+`users.profile_prompt_at`. A dismissal kept in `localStorage` is per-device
+and per-browser — the same person is asked again on their phone, and again
+after clearing site data. The interval widens **3 → 7 → 30 → 90 days**, and
+the prompt never appears in the cart, at checkout, on the auth page, or on top
+of the wizard that is already asking the same questions.
+
+Fields counted: name, username, avatar, locale, country, phone, email. Birth
+date and gender are **not** — the platform does not use them, and putting them
+in the score would turn "complete your profile" into pressure to hand over
+data for nothing.

@@ -25,11 +25,55 @@ It is purely a mismatch between:
 The Worker backend never sees these requests — no server-side change can
 resolve this error.
 
+## 1b. What changed on 31 August, and why this document got shorter
+
+The client id used to live in TWO places: `VITE_GOOGLE_CLIENT_ID`, baked into
+the JavaScript bundle at build time, and `GOOGLE_CLIENT_ID`, a variable on the
+Worker that verifies the token. Either could be missing on its own, and when
+the build one was missing the site told customers "Google sign-in is not
+enabled on this deployment" — a sentence about a build pipeline, shown on a
+login screen, on a deployment that may have been configured perfectly.
+
+There is now ONE value, read at runtime from the Worker:
+
+```
+GET https://levonis-iq.com/api/auth/capabilities
+```
+
+The bundle carries no provider configuration at all. Two consequences worth
+knowing:
+
+- **Checking which client id is live no longer needs DevTools.** `curl` the
+  endpoint above (§2).
+- **Pointing the platform at a different Google project is a variable change,
+  not a rebuild.** Set `GOOGLE_CLIENT_ID` on the Worker (or the
+  `VITE_GOOGLE_CLIENT_ID` repository secret, which workflow 7 now writes to
+  that variable) and re-run workflow 7.
+
+There is **no client secret and no callback URL** in this architecture, and
+nothing here needs one. LEVONIS verifies a Google Identity Services **ID
+token** against Google's published JWKS (`worker/lib/google.ts`) — there is no
+authorization-code exchange, so there is nothing for a `redirect_uri` to
+protect. The only Google Console setting that matters is **Authorized
+JavaScript origins**.
+
 ## 2. First: confirm which `client_id` the DEPLOYED site actually sends
 
-Do **not** trust repository files or GitHub secret names for this — the
-production bundle may have been built with a different value than what you
-expect. Read it off the live site:
+One request, no DevTools:
+
+```bash
+curl -s https://levonis-iq.com/api/auth/capabilities | jq '{google, googleClientId}'
+```
+
+`googleClientId` is the value the live site hands to Google, and the value the
+Worker will require the token's audience to match — they cannot disagree any
+more, because they are the same value.
+
+If it is empty, the Google button is not rendered at all (rather than rendered
+and broken), and the fix is §5 rather than anything in the Google Console.
+
+<details>
+<summary>The old way, if you want to confirm it in the browser</summary>
 
 1. Open `https://levonis-iq.com/auth` in Chrome.
 2. Open DevTools → **Network** tab → reload the page.
@@ -43,8 +87,13 @@ expect. Read it off the live site:
 4. Note the value. Every console change below must be made on the OAuth
    client **with exactly this id** — not on whichever client looks likely.
 
-If the live page sends a *different* id than the current GitHub secret
-`VITE_GOOGLE_CLIENT_ID`, the deployed bundle is stale — see section 5.
+The bundle no longer contains the id at all, so step 3's fallback (searching
+the built JavaScript) will find nothing. That is expected.
+
+</details>
+
+Every console change below must be made on the OAuth client **with exactly
+the id the endpoint reported** — not on whichever client looks likely.
 
 ## 3. Console change (owner action)
 
@@ -63,7 +112,14 @@ In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
 
 4. An origin is **scheme + host (+ port when non-default)** only.
    `https://levonis-iq.com/auth` is invalid — never include a path.
-5. Save. Google states changes can take **from 5 minutes to a few hours** to
+5. **NEVER add a merchant storefront host** — not `ali3d.levonis-iq.com`, not
+   any other `*.levonis-iq.com` shop, and Google does not accept a wildcard
+   anyway. A merchant controls the CONTENT of their storefront; an authorized
+   origin there would let a page they wrote start a Google sign-in carrying
+   this platform's client id. Sign-in belongs on the apex, and the Worker
+   builds every token-bearing link from the canonical origin regardless of
+   which host the request arrived on (`worker/lib/appOrigin.ts`).
+6. Save. Google states changes can take **from 5 minutes to a few hours** to
    propagate; a hard reload after a few minutes usually suffices.
 
 ## 4. Authorized redirect URIs: none are needed
