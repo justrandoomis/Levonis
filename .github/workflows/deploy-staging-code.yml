@@ -197,6 +197,26 @@ jobs:
           printf 'APP_ORIGIN\t%s\n' "$APP_ORIGIN" >> /tmp/vars.keep
           mv /tmp/vars.keep /tmp/vars.tsv
 
+      # ------------------------------------------------ before, not after
+      # `classifyHost` checks the reserved list BEFORE looking a slug up, so a
+      # name that becomes reserved stops resolving to its store instantly, on
+      # deploy, with no error anywhere. The list grew from 44 names to 138 in
+      # one commit; if a merchant already trades under one of them, deploying
+      # takes their storefront offline along with every link and QR code
+      # pointing at it.
+      #
+      # One SELECT, read-only. It runs after the migrations (the table has to
+      # exist) and before the deploy (that is the whole point).
+      - name: No live store is about to be renamed out of existence
+        run: |
+          set -e
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT slug FROM merchant_stores" > /tmp/slugs.json 2>/tmp/slugs.err || {
+              echo "::warning::could not read the live store slugs"
+              sed -n '1,20p' /tmp/slugs.err || true
+            }
+          node scripts/check-live-store-slugs.mjs /tmp/slugs.json
+
       - name: Deploy, carrying every existing var forward
         run: |
           set -e

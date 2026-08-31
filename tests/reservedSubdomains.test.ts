@@ -157,3 +157,84 @@ test('a Cloudflare error payload is skipped, not read as an empty zone', () => {
   });
   assert.match(out, /audit=skipped/);
 });
+
+// ------------------------------------- the reserved list's own side effect
+//
+// `scripts/check-live-store-slugs.mjs`. Reserving a name is not free:
+// `classifyHost` consults the list BEFORE looking a slug up, so a name that
+// becomes reserved stops resolving to its store the moment the deploy lands —
+// no error, no log line, just a shop that is gone along with every link and QR
+// code pointing at it. The list grew from 44 names to 138 in one commit, which
+// is exactly the change that can do that, so the live slugs are read and
+// compared BEFORE the code that would refuse them ships.
+
+function slugCheck(payload: string): { out: string; code: number } {
+  const file = join(dir, `slugs-${payload.length}-${payload.replace(/\W/g, '').slice(0, 20)}.json`);
+  writeFileSync(file, payload);
+  try {
+    return {
+      out: execFileSync('node', ['scripts/check-live-store-slugs.mjs', file], { cwd: ROOT, encoding: 'utf8' }),
+      code: 0,
+    };
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; status?: number };
+    return { out: (e.stdout ?? '') + (e.stderr ?? ''), code: e.status ?? 1 };
+  }
+}
+
+const d1 = (...slugs: string[]) =>
+  JSON.stringify([{ results: slugs.map((slug) => ({ slug })), success: true }]);
+
+test('a live store whose name just became reserved STOPS the deploy', () => {
+  const { out, code } = slugCheck(d1('ali3d', 'shop', 'login'));
+  assert.equal(code, 1, out);
+  assert.match(out, /slugs=FAILED/);
+  assert.match(out, /FAIL shop/);
+  assert.match(out, /FAIL login/);
+  assert.match(out, /ok +ali3d/);
+  // And it does not decide for anyone what to do about it.
+  assert.match(out, /WITH the merchant's agreement/);
+});
+
+test('ordinary live slugs pass', () => {
+  const { out, code } = slugCheck(d1('ali3d', 'levoshop', 'baghdad-3d'));
+  assert.equal(code, 0, out);
+  assert.match(out, /slugs=ok/);
+});
+
+test('no stores yet is an answer, not a skip', () => {
+  const { out, code } = slugCheck(JSON.stringify([{ results: [], success: true }]));
+  assert.equal(code, 0, out);
+  assert.match(out, /live store slugs read \(json\): 0/);
+  assert.match(out, /slugs=ok/);
+});
+
+test("wrangler's banner lines before the JSON do not defeat it", () => {
+  // wrangler prints its own header to stdout ahead of --json output.
+  const { out, code } = slugCheck(`⛅️ wrangler 4.0.0\n-------------------\n${d1('shop')}`);
+  assert.equal(code, 1, out);
+  assert.match(out, /read \(json\)/);
+  assert.match(out, /FAIL shop/);
+});
+
+test('output it cannot parse is SKIPPED, never a pass', () => {
+  // An auth failure or a changed output format must not read as "no store
+  // collides" — that is precisely the report that would let the deploy
+  // through and take a shop offline.
+  for (const payload of ['Authentication error [code: 10000]', '', 'null']) {
+    const { out, code } = slugCheck(payload);
+    assert.equal(code, 0, out);
+    assert.match(out, /slugs=skipped/, JSON.stringify(payload));
+    assert.doesNotMatch(out, /slugs=ok/);
+  }
+});
+
+test('slugs readable only as text are still checked, not skipped', () => {
+  // A future wrangler could wrap the array in an object this script does not
+  // know. Reading the names out of the text is worse evidence than a parse —
+  // and far better than deploying without the check.
+  const { out, code } = slugCheck('{"unexpected":{"rows":[{"slug":"checkout"}]}}');
+  assert.equal(code, 1, out);
+  assert.match(out, /read \(text\)/);
+  assert.match(out, /FAIL checkout/);
+});
