@@ -14,12 +14,16 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   clamp01,
   isValidEmailAddress,
   emailFieldProgress,
   lengthProgress,
   combineFillProgress,
+  loginPasswordPart,
+  signinIdentifierPart,
+  INCOMPLETE_FILL_CAP,
 } from '../src/components/auth/FillButton';
 import {
   toAsciiDigitsClient,
@@ -147,6 +151,82 @@ test('an invalid form can never show a 100% bar (honest meter)', () => {
 
 test('no parts ⇒ never ready (an empty form is not a complete form)', () => {
   assert.deepEqual(combineFillProgress([]), { progress: 0, ready: false });
+});
+
+test('typing an email into the identifier never moves the meter backwards', () => {
+  // "use" is a complete username (valid at 3), but the next keystrokes of
+  // "user@example.com" put the field on the EMAIL track. The old ramp read
+  // 1.0 at three characters and 0.45 the moment "@" arrived — a backwards
+  // slosh mid-word that looks like a broken animation. The tracks now meet.
+  let prev = -1;
+  const typed = 'user@example.com';
+  for (let n = 1; n <= typed.length; n++) {
+    const part = signinIdentifierPart(typed.slice(0, n));
+    assert.ok(
+      part.progress >= prev - 1e-9,
+      `progress fell from ${prev} to ${part.progress} at "${typed.slice(0, n)}"`
+    );
+    prev = part.progress;
+  }
+  const done = signinIdentifierPart(typed);
+  assert.equal(done.valid, true);
+  assert.equal(done.progress, 1);
+
+  // The username track stays honest on its own terms: valid at 3+, and its
+  // partial display never over-reports past where the email track begins.
+  const uname = signinIdentifierPart('use');
+  assert.equal(uname.valid, true);
+  assert.ok(uname.progress <= 0.45 + 1e-9, String(uname.progress));
+  assert.equal(signinIdentifierPart('us').valid, false);
+});
+
+test('the sign-in meter fills with password length and completes only at 8', () => {
+  // The calibration complaint, pinned: with a finished email, each password
+  // character moves the bar, nothing before the 8th completes it, and the
+  // incomplete bar always stays at or below the visible cap — an
+  // almost-valid form must never wear a finished button.
+  const emailPart = {
+    progress: emailFieldProgress('user@example.com'),
+    valid: isValidEmailAddress('user@example.com'),
+  };
+  let prev = -1;
+  for (let n = 0; n <= 7; n++) {
+    const r = combineFillProgress([emailPart, loginPasswordPart('x'.repeat(n))]);
+    assert.equal(r.ready, false, `${n} password characters must not be ready`);
+    assert.ok(r.progress <= INCOMPLETE_FILL_CAP + 1e-9, `cap broken at ${n}: ${r.progress}`);
+    assert.ok(r.progress >= prev, `the meter went backwards while typing at ${n}`);
+    prev = r.progress;
+  }
+  assert.deepEqual(combineFillProgress([emailPart, loginPasswordPart('x'.repeat(8))]), {
+    progress: 1,
+    ready: true,
+  });
+});
+
+test('the sign-in password minimum matches the one the worker stores by', () => {
+  // loginPasswordPart may demand 8 only because every write path
+  // (register / reset / change / telegram-complete) enforces PASSWORD_MIN=8
+  // in worker/routes/auth.ts — if that constant moves, this must move with it.
+  const src = readFileSync(new URL('../worker/routes/auth.ts', import.meta.url), 'utf8');
+  assert.match(src, /const PASSWORD_MIN = 8;/);
+  assert.equal(loginPasswordPart('x'.repeat(7)).valid, false);
+  assert.equal(loginPasswordPart('x'.repeat(8)).valid, true);
+  assert.equal(loginPasswordPart('x'.repeat(129)).valid, false, 'above PASSWORD_MAX is not a stored password either');
+});
+
+test('an incomplete form can never fill past the visible cap', () => {
+  // One rule short of valid used to render 96% — a sliver the border radius
+  // swallows, so the button LOOKED finished while refusing the tap.
+  const r = combineFillProgress([
+    { progress: 1, valid: true },
+    { progress: 0.99, valid: false },
+  ]);
+  assert.equal(r.ready, false);
+  // An ABSOLUTE bound, not the constant itself — comparing against
+  // INCOMPLETE_FILL_CAP would pass no matter where the cap drifted, which
+  // is exactly how the first version of this test let 0.96 back in.
+  assert.ok(r.progress <= 0.9, `${r.progress} — anything above ~90% hides in the border radius and reads as done`);
+  assert.ok(INCOMPLETE_FILL_CAP <= 0.9, String(INCOMPLETE_FILL_CAP));
 });
 
 test('deleting a character regresses readiness immediately', () => {

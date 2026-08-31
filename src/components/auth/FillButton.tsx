@@ -93,6 +93,61 @@ export interface FillPart {
 }
 
 /**
+ * The most an INCOMPLETE form may ever fill the button.
+ *
+ * This used to be 0.96 — and inside a 15px border radius the missing 4% is
+ * a sliver the eye cannot find, so a form one rule short of valid rendered a
+ * button that LOOKED finished while refusing the tap. That reads as a broken
+ * animation, not as a meter. 85% leaves a gap no one can miss: the bar is
+ * clearly "almost", and it snaps to 100% only at the moment every condition
+ * is actually met.
+ */
+export const INCOMPLETE_FILL_CAP = 0.85;
+
+/**
+ * The sign-in password's meter part: fills character by character toward the
+ * platform minimum and counts as met only at 8+.
+ *
+ * DEMANDING LENGTH 8 AT SIGN-IN LOCKS NOBODY OUT. Every path that has ever
+ * STORED a password runs the same checkPassword(PASSWORD_MIN = 8) on the
+ * worker — register, reset-password, change-password, and the optional
+ * Telegram password (worker/routes/auth.ts) — so no existing account has a
+ * shorter one, and a shorter attempt could only ever come back LOGIN_FAILED.
+ * The meter saying "not yet" at 5 characters is therefore the truth, not a
+ * new rule: it is why the fill can honestly track password length here, as
+ * it always has for sign-up.
+ */
+/**
+ * The sign-in identifier's meter part. One field, two rule tracks: with an
+ * "@" it must become a valid email; without one, a username needs 3+
+ * characters (the server is the authority on the credentials either way).
+ *
+ * THE TRACKS MEET, ON PURPOSE. The username ramp plateaus at exactly 0.45 —
+ * the value the email track opens with once "@" is typed
+ * (0.3·(local≥3) + 0.15 in emailFieldProgress). The old ramp reached 1.0 at
+ * three characters, so typing "use" filled the part and the very next
+ * keystroke of an email address ("user@…") dropped it to 0.45: an honest
+ * rule change that LOOKS like the meter glitching backwards mid-word. Now
+ * typing forward never moves the bar backwards, on either track, and a
+ * complete valid username still reads full the moment everything else
+ * passes (combineFillProgress returns 1 for an all-valid form).
+ */
+export function signinIdentifierPart(raw: string): FillPart {
+  const s = raw.trim();
+  if (s.includes('@')) {
+    return { progress: emailFieldProgress(s), valid: isValidEmailAddress(s) };
+  }
+  return { progress: 0.45 * clamp01(s.length / 3), valid: s.length >= 3 };
+}
+
+export function loginPasswordPart(password: string): FillPart {
+  return {
+    progress: lengthProgress(password, 8),
+    valid: password.length >= 8 && password.length <= 128,
+  };
+}
+
+/**
  * Combine per-field parts into one button fill. `ready` is true only when
  * EVERY part passes its real validation; until then the combined progress
  * is capped at 0.96 so the bar cannot pretend to be complete.
@@ -102,7 +157,7 @@ export function combineFillProgress(parts: FillPart[]): { progress: number; read
   const ready = parts.every((p) => p.valid);
   if (ready) return { progress: 1, ready: true };
   const sum = parts.reduce((acc, p) => acc + clamp01(p.progress), 0);
-  return { progress: Math.min(0.96, sum / parts.length), ready: false };
+  return { progress: Math.min(INCOMPLETE_FILL_CAP, sum / parts.length), ready: false };
 }
 
 // -------------------------------------------------------------- component
@@ -138,8 +193,9 @@ export default function FillButton({
 }: FillButtonProps) {
   const submitting = status === 'submitting';
   const success = status === 'success';
-  // Ready ⇒ full fill. Not ready ⇒ hard visual cap below 100% (honesty).
-  const shown = ready || submitting || success ? 1 : Math.min(clamp01(progress), 0.96);
+  // Ready ⇒ full fill. Not ready ⇒ hard visual cap well below 100%, so an
+  // almost-complete form can never wear a finished button (honesty).
+  const shown = ready || submitting || success ? 1 : Math.min(clamp01(progress), INCOMPLETE_FILL_CAP);
   const pct = Math.round(shown * 100);
   const disabled = !ready || submitting || success;
   const hintId = id ? `${id}-hint` : undefined;

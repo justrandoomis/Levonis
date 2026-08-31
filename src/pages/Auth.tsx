@@ -20,6 +20,8 @@ import FillButton, {
   emailFieldProgress,
   lengthProgress,
   combineFillProgress,
+  loginPasswordPart,
+  signinIdentifierPart,
 } from '../components/auth/FillButton';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { toAsciiDigitsClient } from '../components/auth/PhoneField';
@@ -498,18 +500,20 @@ export default function Auth() {
   const emailValid = isValidEmailAddress(trimmedEmail);
   const emailProgress = emailFieldProgress(trimmedEmail);
 
-  // Sign-in identifier: an email must be a valid email; a username needs
-  // its minimum shape. (The server stays the authority on the credentials.)
-  const signinIdValid = trimmedEmail.includes('@') ? emailValid : trimmedEmail.length >= 3;
-  const signinIdProgress = trimmedEmail.includes('@') ? emailProgress : clamp01(trimmedEmail.length / 3);
-  // Existing-account password: required, but NOT held to the new-account
-  // minimum — old valid accounts must never be locked out by UI rules (§2.2).
-  const loginPwPart = { progress: password ? 1 : 0, valid: password.length > 0 };
+  // Sign-in identifier: an email must be a valid email; a username needs its
+  // minimum shape. The part's ramp is built so its two rule tracks meet —
+  // typing "@" after a username no longer drops the bar (see
+  // signinIdentifierPart).
+  const signinIdPart = signinIdentifierPart(trimmedEmail);
+  const signinIdValid = signinIdPart.valid;
+  // Existing-account password: the meter fills character by character toward
+  // the platform minimum (8) and only completes there. That excludes nobody:
+  // every path that ever stored a password enforces the same minimum on the
+  // worker, so a shorter attempt could only come back LOGIN_FAILED anyway —
+  // see loginPasswordPart for the full argument.
+  const loginPwPart = loginPasswordPart(password);
 
-  const signinEmailFill = combineFillProgress([
-    { progress: signinIdProgress, valid: signinIdValid },
-    loginPwPart,
-  ]);
+  const signinEmailFill = combineFillProgress([signinIdPart, loginPwPart]);
 
   // New-account password: minimum 8 characters of ANY kind (§2.2).
   const newPwValid = password.length >= 8 && password.length <= 128;
@@ -522,8 +526,13 @@ export default function Auth() {
 
   const usernameValid = USERNAME_SHAPE_RE.test(trimmedUsername);
   const signupEmailFill = combineFillProgress([
-    { progress: clamp01(trimmedUsername.length / 3), valid: usernameValid },
-    { progress: trimmedName ? 1 : 0, valid: trimmedName.length > 0 },
+    // A username of the right LENGTH but the wrong shape must not push the
+    // meter as if it were done; the ramp under-reports until the shape rule
+    // actually passes (an honest meter never over-reports, §2.2).
+    { progress: usernameValid ? 1 : clamp01(trimmedUsername.length / 3) * 0.75, valid: usernameValid },
+    // Ramp instead of a 0→1 step: a single keystroke must never jump the
+    // bar by a whole field's worth — that motion reads as a glitch.
+    { progress: clamp01(trimmedName.length / 3), valid: trimmedName.length > 0 },
     { progress: emailProgress, valid: emailValid },
     newPwPart,
     confirmPart,
@@ -533,7 +542,13 @@ export default function Auth() {
   const resetFill = combineFillProgress([newPwPart, confirmPart]);
 
   // First missing requirement — the not-ready button's visible reason (§2.2).
-  const signinEmailHint = !signinIdValid ? s.hintIdentifier : !password ? s.hintPasswordLogin : '';
+  const signinEmailHint = !signinIdValid
+    ? s.hintIdentifier
+    : !password
+      ? s.hintPasswordLogin
+      : !loginPwPart.valid
+        ? s.hintPassword
+        : '';
   const signupEmailHint = !usernameValid
     ? s.hintUsername
     : !trimmedName
