@@ -400,3 +400,52 @@ Not browser-tested in this pass (implemented and API-tested, pending
 Phase 3 staging verification): Google Sign-In against real Google, wallet
 deposit UI upload on a physical device, admin home-settings drag-reorder
 on touch, Kurdish translations page-by-page.
+
+## Live auth and email verification — run 33425810780, 2026-08-31
+
+`15 - Verify Live Auth` against the real origins (`https://levonis-iq.com`
+and `https://studio.levonis-iq.com`), on the two Workers that actually serve
+users. **33 checks, 0 failed.** Nothing here is a local or mocked run.
+
+Bindings, read from Cloudflare's own configuration (no value printed):
+
+| On | What | Result |
+| --- | --- | --- |
+| levonis-staging | `STUDIO_HANDOFF_SECRET` | present as `secret_text` |
+| levonis-staging | `EMAIL_API_KEY` | present as `secret_text` |
+| levonis-staging | `EMAIL_FROM` | non-empty (length checked, value never read) |
+| levonis-staging | `EMAIL_ALLOWED_RECIPIENTS` | empty — no staging drop filter |
+| levonis-staging | `APP_ORIGIN` | `https://levonis-iq.com` |
+| levonis-staging | `STUDIO_ALLOWED_DESTINATIONS` | contains the live Studio origin |
+| levonis-studio-staging | `STUDIO_HANDOFF_SECRET`, `MAIN_SITE_ORIGIN` | present, `https://levonis-iq.com` |
+
+Email, measured rather than inferred:
+
+| Check | Result |
+| --- | --- |
+| `passwordReset` on the live site | `true` |
+| `emailVerification` on the live site | `true` |
+| Verification emails accepted by Resend (`outbox.state='sent'`, written only after a 2xx) | 2 |
+| …with the link on `https://levonis-iq.com` | 2 |
+| Password-reset token minted (the reset sends immediately and writes no outbox row) | 1 |
+| Provider-refusal lines in the live Worker's own log | 0 |
+| Queued links pointing anywhere but the apex | 0 |
+
+The two paths differ and are proved differently. Verification goes through
+`enqueue()` + `processOutbox()`, so its row records `state='sent'` only after
+Resend answered 2xx and its payload carries the link — asserted with SQL
+predicates that return counts, never the payload, because the link is a live
+credential. The password reset does **not** queue: `worker/routes/auth.ts:1560`
+sends it immediately, on purpose, and writes no outbox row at all — so it is
+proved by the token row inserted just before the send, plus `wrangler tail` on
+the live Worker across the whole scenario, where a Resend refusal would appear
+verbatim. Zero such lines, from a capture proved attached by its own
+`Connected to levonis-staging` banner.
+
+Links: the reset is `${trustedOrigin(c)}/auth?reset=…` and the verification is
+`${trustedOrigin(c)}/?verify_email=…`; `worker/lib/appOrigin.ts` returns
+`APP_ORIGIN` whenever it is set, and the binding check above pins it to the
+apex.
+
+One throwaway plus-tagged account was registered. No payment, wallet, order or
+ledger was touched.
