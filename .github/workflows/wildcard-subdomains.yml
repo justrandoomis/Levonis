@@ -136,7 +136,11 @@ jobs:
           curl -sS -H "Authorization: Bearer $CF_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/levonis-staging/deployments" \
             -o /tmp/dep.json || true
-          jq -r '.result.deployments[-3:][]? | "  deployment \(.id[0:8]) at \(.created_on) by \(.author_email // "?") source=\(.source // "?")"' \
+          # Sorted explicitly: the API's order is not guaranteed, and taking
+          # the wrong end of the list is how the first attempt at this
+          # reported three deployments from before the one being diagnosed.
+          jq -r '[.result.deployments[]?] | sort_by(.created_on) | reverse | .[0:6][]
+                 | "  \(.created_on)  \(.id[0:8])  by \(.author_email // "?")  source=\(.source // "?")"' \
             /tmp/dep.json 2>/dev/null || echo "  (deployment list unavailable)"
 
       # --------------------------------------------------------------- zone
