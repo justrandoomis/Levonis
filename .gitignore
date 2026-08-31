@@ -8,3 +8,7 @@ coverage/
 !.env.example
 .dev.vars
 .wrangler/
+
+# TypeScript incremental build cache — a local artifact, not source. Now that
+# `npm run check` typechecks studio/ too, every check would otherwise dirty it.
+*.tsbuildinfo

@@ -76,7 +76,14 @@ export const EDITOR_SHADOW_CSS = `
      node_modules — a patch would vanish on the next install and take the fix
      with it. The engine's attribution stays where it belongs: LICENSE.txt and
      THIRD-PARTY-NOTICES.md ship untouched, and the G-code it writes still
-     carries its own `application` tag. */
+     carries its own "application" tag.
+
+     NOTE FOR THE NEXT EDITOR: this comment lives INSIDE a template literal.
+     A backtick here ends the string, and a dollar sign followed by a brace
+     starts an interpolation. Either one breaks the build. That is exactly
+     what happened: a backtick in this very comment failed every Studio
+     build for a day, silently, because the error was in the server pass of
+     a deploy nobody read. Plain prose only in this block. */
   .tb-logo { display: none !important; }
   .tb-btn, .tb-icon, .tb-tabs, .tb-tabs button { background: ${T.surface}; border-color: ${T.line}; border-radius: 6px; color: ${T.text}; }
   .tb-tabs button.on, .left-rail button.on { background: ${T.accent}; color: ${T.accentInk}; }

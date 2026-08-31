@@ -79,6 +79,8 @@
 
 | 54 | **إعداد تسجيل الدخول لم يكن له طريق آمن أصلًا — أُنشئ**: بعد إصلاح اسم السر في الصف 52 بقي سؤال أهمّ: *أيّ workflow يوصل الإعداد إلى العامل الحيّ؟* الجواب كان: **لا واحدة**. `7` و`8` تقرآن vars العامل الحيّة وتعيدانها كما هي — وهو ما يحمي الموجود، لكنه **لا يستطيع أبدًا إدخال متغيّر لم يكن موجودًا**، وكل متغيّرات تسجيل الدخول الأربعة من هذا النوع. و`4 - Deploy Studio Staging` ترفع السر إلى العامل الصحيح لكنها في التشغيل نفسه تكتب `--var APP_ORIGIN:<workers.dev url>`؛ وبما أن `levonis-studio-staging` هو عامل `studio.levonis-iq.com` (صف 52-أ)، فتشغيلها **يستبدل origin النطاق الحقيقي بعنوان workers.dev على موقع يعمل**. أي أن الطريق الوحيد المتاح للمالك كان يُعطِّل التحقّق من روابط العودة ليفعّل الدخول. لذلك كُسر الجمود في `7` و`8`: خطوة اختيارية واحدة في كلٍّ منهما تكتب المتغيّر فوق ما قُرئ من الـAPI **فقط إن كان الـrepository secret مضبوطًا**، وخطوة ثانية ترفع السر المشترك بعد النشر. الأربعة كلها لا تفعل شيئًا حين تكون فارغة، فسلوك اليوم لم يتغيّر بحرف. والسر يُرفع إلى العاملين من **الـsecret نفسه**، فالتطابق البايتي مضمون بالبناء لا بانتباه المالك. وصُحِّحت ترويسة الملفين: كلتاهما كانت تَعِد صراحةً بأنها «لا تقرأ ولا تكتب أيّ سر» | ✅ | .github/workflows/deploy-staging-code.yml + deploy-studio-code.yml + docs/STUDIO_AUTH.md |
 
+| 55 | **السبب الحقيقي لعدم تغيّر الاستوديو: علامة اقتباس مائلة واحدة داخل تعليق**: بعد إصلاح الصفّين 52 و54 شُغِّلت workflow 8 فعليًا — **ففشلت**. لا في النشر ولا في الأسرار، بل في البناء: `app/editor-theme.ts` **لا يُحلَّل نحويًا**. التعليق الذي يشرح لماذا نُخفي علامة المحرّك يقع **داخل قالب نصّي** (`EDITOR_SHADOW_CSS`)، وفيه العبارة `` `application` `` بعلامتين مائلتين — والأولى **تُنهي القالب**، فينكسر الملف كلّه. أي أن إصلاح العلامة التجارية (`36530a2`) **لم يُبنَ ولا مرّة منذ كُتب**؛ لم يكن الأمر «لم يُنشر» فحسب كما في الصف 52، بل «لا يمكن أن يُنشر». وهذا يفسّر التكرار الثلاثي للشكوى نفسها. **ولماذا لم يُكتشف؟** لأن `npm run check` **لا يرى `studio/` إطلاقًا**: `eslint.config.js` يتجاهل `studio/**` صراحةً، ولا يشمل أيّ tsconfig في السكربت مجلّد الاستوديو. فكانت كل جلسة تُبلّغ «0 أخطاء و612 اختبارًا ناجحًا» عن مستودع نصفه لا يُبنى. **الإصلاح ثلاثي**: (أ) أُزيلت العلامتان المائلتان وأُضيف تحذير مكتوب للمحرّر التالي داخل التعليق نفسه — وقد وقعتُ أنا في الفخّ مرّتين أثناء كتابته (المرة الثانية بـ`${`) وهو ما يثبت أن التحذير في محلّه؛ (ب) `npm run check` صار يشمل `check:studio`، **ويفشل بصراحة** إن لم تكن اعتماديات الاستوديو مثبَّتة بدل أن يتخطّى بصمت — فالفحص الذي ينجح دون أن يفحص هو بعينه العطل الذي نعالجه؛ (ج) اختباران جديدان في `studio/tests/editor-theme.test.mjs`: الأول يحلّل الملف نحويًا (كان ليمسك العطل الحقيقي)، والثاني يثبّت قاعدة إخفاء `.tb-logo` (يمسك حذفًا صامتًا لا يراه الأول). **وأُثبت كلاهما بالتجربة**: أُعيد العطل فسقط الاختبار الأول، وحُذفت القاعدة فسقط الثاني، ثم نجحا بعد الاسترجاع | ✅ | studio/app/editor-theme.ts + scripts/check-studio.mjs + package.json + studio/tests/editor-theme.test.mjs |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).
@@ -120,4 +122,10 @@ configuration cannot introduce it, and the one that can introduce it would
 overwrite the live Studio's own origin with a workers.dev URL on the way
 past. Both deploy workflows can now set it, only when the owner has set the
 matching repository secret, and both upload the shared secret from that one
-secret so the two workers cannot drift apart.
+secret so the two workers cannot drift apart. Row 55 is what running that
+deploy finally revealed, and it outranks both: the Studio has not merely
+gone unshipped, it has been unbuildable since the branding fix was written
+— one backtick, inside a prose comment, inside a template literal. It went
+unseen because `npm run check` never looked at `studio/` at all, so every
+session reported a clean bill of health for a workspace that could not
+compile. The check now covers it and fails loudly rather than skipping.
