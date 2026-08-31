@@ -1077,7 +1077,15 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // An archive import has its own multi-plate arrangement; a project restore
     // places every object at the author's own offsets. Neither is a spawn, and
     // re-seating either would throw away a layout that is already correct.
-    if (orchestrator.busy || orchestrator.hasPendingArrangement || suppressSeatingRef.current) return;
+    if (orchestrator.busy || orchestrator.hasPendingArrangement) return;
+    if (suppressSeatingRef.current) {
+      // Objects are still arriving from the restore. Hold the window open —
+      // a large 3MF can take longer to parse than the timer, and letting it
+      // expire mid-import would seat the remaining objects and destroy the
+      // author's layout for exactly the projects that need it most.
+      suppressSeating();
+      return;
+    }
 
     const result = seatNewObjects(adapter, {
       newIds: appeared,
@@ -1092,7 +1100,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     if (result.ok && result.unseatedCount) {
       setNotice(templateText(t.zipOverflow, { count: result.unseatedCount }));
     }
-  }, [adapter, orchestrator, profile.bedDepth, profile.bedWidth, t.zipOverflow]);
+  }, [adapter, orchestrator, profile.bedDepth, profile.bedWidth, suppressSeating, t.zipOverflow]);
 
   // -- engine event stream ---------------------------------------------------
   const handleEvent = useCallback((event: ViewportEvent) => {

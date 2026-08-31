@@ -596,8 +596,11 @@ test("newly spawned objects are seated in free space, and restores are left alon
   assert.match(app, /for \(const id of previous\) if \(!next\.has\(id\)\) return;/);
   // An archive import arranges itself; a project restore carries exact
   // positions. Neither may be re-seated.
-  assert.match(app, /orchestrator\.busy \|\| orchestrator\.hasPendingArrangement \|\| suppressSeatingRef\.current/);
+  assert.match(app, /orchestrator\.busy \|\| orchestrator\.hasPendingArrangement/);
   assert.match(app, /suppressSeating\(\);/);
+  // A large 3MF parses for longer than the suppression window, so objects
+  // still arriving hold it open rather than letting it expire mid-restore.
+  assert.match(app, /if \(suppressSeatingRef\.current\) \{[\s\S]{0,400}suppressSeating\(\);\s*return;\s*\}/);
   // Objects that fit nowhere are reported, never squeezed onto a full plate.
   assert.match(app, /result\.ok && result\.unseatedCount/);
   assert.match(adapter, /unseatedCount: plan\.unseated\.length/);
