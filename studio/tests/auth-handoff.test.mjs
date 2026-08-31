@@ -115,7 +115,9 @@ if (!canImportTs) {
   const { sha256Hex, randomToken } = await import("../../worker/lib/crypto.ts");
   const { handleAuthRoute } = await import("../worker/auth/callback.ts");
   const {
+    isStudioSessionStillAuthorized,
     loadStudioSession,
+    resetLivenessCacheForTests,
     sanitizeRequestHeaders,
     withUserHeader,
     safeRelativeReturnPath,
@@ -434,6 +436,147 @@ if (!canImportTs) {
     assert.equal((await (await call()).json()).active, false);
     // Restore a live session for the remaining tests.
     mainSession.cookie = `levonis_session=${await mintMainSession()}`;
+  });
+
+  // Main-site logout reaching Studio -----------------------------------------
+  //
+  // Studio mints its own 14-day session, so without this a main-site logout
+  // would leave the account signed in here for a fortnight. The introspect
+  // endpoint was built for exactly that and had NO CALLER until it was wired
+  // into the /api/* path in studio/worker/index.ts — the module comment
+  // promised main-site logout reaches Studio and nothing made it true.
+
+  test("a studio session survives while the main-site session is live", async () => {
+    resetLivenessCacheForTests();
+    const { callback } = await signInThroughHandoff("/");
+    const cookie = getCookiePair(callback, "levo_studio_session");
+    const session = await loadStudioSession(
+      new Request(`${STUDIO_ORIGIN}/api/projects`, { headers: { Cookie: cookie } }),
+      studioEnv
+    );
+    assert.ok(session, "the round trip must have produced a session");
+    assert.equal(await isStudioSessionStillAuthorized(studioEnv, session), true);
+  });
+
+  test("main-site logout revokes the studio session, and every session of that user", async () => {
+    resetLivenessCacheForTests();
+    const { callback: first } = await signInThroughHandoff("/");
+    const cookie = getCookiePair(first, "levo_studio_session");
+    // A second device for the same user: revocation must reach it too, or a
+    // second browser becomes a way to keep a revoked session alive.
+    await signInThroughHandoff("/");
+    const before = studioSessionCount();
+    assert.ok(before >= 2, `expected at least two studio sessions, saw ${before}`);
+
+    const session = await loadStudioSession(
+      new Request(`${STUDIO_ORIGIN}/api/projects`, { headers: { Cookie: cookie } }),
+      studioEnv
+    );
+    assert.ok(session);
+
+    // The user logs out of the main site: their main-site session rows go.
+    mainSqlite.prepare("DELETE FROM sessions WHERE user_id = ?").run(USER_ID);
+    resetLivenessCacheForTests();
+
+    assert.equal(await isStudioSessionStillAuthorized(studioEnv, session), false,
+      "a user with no live main-site session must not keep Studio access");
+    assert.equal(studioSessionCount(), 0,
+      "every studio session of that user must be destroyed, not just the calling one");
+
+    // Restore the fixture for the tests that follow.
+    mainSession.cookie = `levonis_session=${await mintMainSession()}`;
+    resetLivenessCacheForTests();
+  });
+
+  test("an unreachable or unconfigured main site keeps the session — it never locks anyone out", async () => {
+    resetLivenessCacheForTests();
+    const { callback } = await signInThroughHandoff("/");
+    const cookie = getCookiePair(callback, "levo_studio_session");
+    const session = await loadStudioSession(
+      new Request(`${STUDIO_ORIGIN}/api/projects`, { headers: { Cookie: cookie } }),
+      studioEnv
+    );
+    assert.ok(session);
+
+    // Unconfigured is the state production is in right now, and it answers
+    // "unknown" for everyone. Failing closed here would sign out every account
+    // on a feature that is supposed to be off.
+    const unconfigured = { ...studioEnv, MAIN_SITE_ORIGIN: "", STUDIO_HANDOFF_SECRET: "" };
+    assert.equal(await isStudioSessionStillAuthorized(unconfigured, session), true);
+    assert.equal(studioSessionCount() > 0, true, "nothing may be destroyed on an unknown verdict");
+
+    // Unreachable is the same answer for the same reason.
+    resetLivenessCacheForTests();
+    const broken = { ...studioEnv, MAIN_SITE_ORIGIN: "https://unreachable.invalid" };
+    assert.equal(await isStudioSessionStillAuthorized(broken, session), true);
+    resetLivenessCacheForTests();
+  });
+
+  test("the liveness answer is cached, so editing does not call the main site on every request", async () => {
+    resetLivenessCacheForTests();
+    const { callback } = await signInThroughHandoff("/");
+    const cookie = getCookiePair(callback, "levo_studio_session");
+    const session = await loadStudioSession(
+      new Request(`${STUDIO_ORIGIN}/api/projects`, { headers: { Cookie: cookie } }),
+      studioEnv
+    );
+    assert.ok(session);
+
+    let introspectCalls = 0;
+    const counting = new Proxy(studioEnv, {}); // env is unchanged; count at the app
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const req = input instanceof Request ? (init ? new Request(input, init) : input) : new Request(input, init);
+      if (new URL(req.url).pathname === "/api/studio/handoff/introspect") introspectCalls += 1;
+      return originalFetch(input, init);
+    };
+    try {
+      for (let i = 0; i < 5; i += 1) {
+        assert.equal(await isStudioSessionStillAuthorized(counting, session), true);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    assert.equal(introspectCalls, 1, `five checks should make one call, made ${introspectCalls}`);
+    resetLivenessCacheForTests();
+  });
+
+  test("signing back in clears a stale revoked verdict", async () => {
+    resetLivenessCacheForTests();
+    // Revoke, so the cache holds "inactive" for this user.
+    const { callback } = await signInThroughHandoff("/");
+    const cookie = getCookiePair(callback, "levo_studio_session");
+    const session = await loadStudioSession(
+      new Request(`${STUDIO_ORIGIN}/api/projects`, { headers: { Cookie: cookie } }),
+      studioEnv
+    );
+    mainSqlite.prepare("DELETE FROM sessions WHERE user_id = ?").run(USER_ID);
+    assert.equal(await isStudioSessionStillAuthorized(studioEnv, session), false);
+
+    // The user signs in again on the main site and comes back through the
+    // handoff. Without the cache being cleared on redemption, their very first
+    // API call would be revoked again by a verdict from a minute ago.
+    mainSession.cookie = `levonis_session=${await mintMainSession()}`;
+    const { callback: again } = await signInThroughHandoff("/");
+    const freshCookie = getCookiePair(again, "levo_studio_session");
+    const fresh = await loadStudioSession(
+      new Request(`${STUDIO_ORIGIN}/api/projects`, { headers: { Cookie: freshCookie } }),
+      studioEnv
+    );
+    assert.ok(fresh, "the second sign-in must produce a session");
+    assert.equal(await isStudioSessionStillAuthorized(studioEnv, fresh), true);
+    resetLivenessCacheForTests();
+  });
+
+  test("the /api path is what enforces liveness — the wiring, not just the helper", async () => {
+    // A helper nothing calls is what this whole block exists to prevent, so
+    // assert the call site itself is present in the worker entry point.
+    const entry = readFileSync(fileURLToPath(new URL("../worker/index.ts", import.meta.url)), "utf8");
+    const apiBlock = entry.slice(entry.indexOf('url.pathname.startsWith("/api/")'));
+    assert.match(apiBlock.slice(0, 800), /isStudioSessionStillAuthorized\(env, session\)/,
+      "the /api/* branch must run the liveness check");
+    assert.match(apiBlock.slice(0, 800), /session = null/,
+      "a revoked session must become a guest, not an error");
   });
 
   test("logout destroys the server-side studio session", async () => {

@@ -87,6 +87,8 @@
 
 | 58 | **الإنتاج نُشر وتُحقّق منه حيًّا على studio.levonis-iq.com — النقاط التسع كلها ناجحة**: بموافقة المالك الصريحة شُغّلت `5 - Deploy Studio Production` بالتأكيد المطلوب ونجحت بكل خطواتها الست عشرة (العامل `levonis-studio` على `levonis-studio.just-randoomis.workers.dev`؛ الـworkflow لا يربط النطاق ولا يمسّ أي DNS، وهذا مذكور في مخرجاتها نفسها). الهجرات لم تُطبَّق (المالك لم يطلبها، والحارس داخل الـworkflow يرفضها على قاعدة غير فارغة أصلًا) — فميزات الحساب على قاعدة الإنتاج تبقى معلّقة حتى تُطبَّق. **الأهم**: التحقّق الحي جرى على `https://studio.levonis-iq.com` نفسها لا على workers.dev، عبر `6 - Verify Studio Live` الجديدة في متصفح حقيقي بجلسة هاتف مع محاكاة لمس: (١) لا رسالة نفاد ذاكرة في أي مكان، (٢) صفر worker عند الفتح وصفر بعد استيراد مجسّم، (٣) worker واحد فور الضغط على Slice، (٤) عشر نسخ متتالية: **قبل ٩ من ١٠ خارج المنصة وأبعدها 716.5 مم، بعد صفر خارج المنصة وأبعدها 56.6 مم**، (٥) لا تحذير «Beyond the bed» كاذب، (٦) ثماني إيماءات (orbit/pinch/drag/gizmo) بأسوأ إطار 66.7 مللي ثانية و**صفر إطار متقطّع**، (٧) الحفظ التلقائي: 1202 إطارًا وأطول مهمة **0 مللي ثانية** — أي لا تجميد وlا canvas متوقفة، (٨) ثلاث دورات Slice: worker واحد في كل مرة والذاكرة 365.7←368.6←430.9 ميغابايت بلا تراكم، (٩) `window.__vpReleaseWorker` موجود على هذا الأصل — وهو برهان سلوكي أن النطاق يخدم البناء المرقَّع لا نسخة قديمة. **ما لم يُثبَت**: اسم العامل المربوط بالنطاق؛ استعلام نطاقات Workers على مستوى الحساب لم يُرجع شيئًا لأن التوكن مضيَّق عمدًا، ولم أطلب صلاحية أوسع | ✅ | .github/workflows/verify-studio-live.yml + studio/tests/perf-production-verify.mjs + docs/STUDIO_PERFORMANCE.md |
 
+| 59 | **ما قيل في الصف 58 إنه «لم يُثبَت» أُثبت، وتبيّن أن نصفه كان خطأً**: الصف 58 أنهى بـ«اسم العامل المربوط بالنطاق لم يُثبَت؛ استعلام نطاقات Workers لم يُرجع شيئًا لأن التوكن مضيَّق عمدًا، ولم أطلب صلاحية أوسع». **التوكن لم يكن مضيَّقًا**؛ لم أجرّب. الـworkflow الجديدة `12` قرأت الأربعة كلها من إعداد Cloudflare نفسه بالتوكن الموجود ولم تفشل واحدة: `Zone:Zone:Read` و`Zone:DNS:Read` و`Zone:Workers Routes:Read` و`Account:Workers Scripts:Read` — **فلا صلاحية إضافية مطلوبة إطلاقًا**. والنتيجة: `studio.levonis-iq.com` نطاق مخصّص على **`levonis-studio-staging`** (`env=production`) ومسار صريح `studio.levonis-iq.com/* -> levonis-studio-staging` يغلب مسار البدل `*.levonis-iq.com/* -> levonis-staging`، وسجلّ `AAAA 100:: proxied=true` وهو حجز Workers المعتاد. أي أن **`5 - Deploy Studio Production` تنشر عاملًا (`levonis-studio`) لا يخدم أي نطاق**؛ ما جعل الموقع الحيّ يحمل الإصلاح هو `4`، لا `5` — وبصمتا الجسم تؤكّدانه: النطاق و`levonis-studio-staging` يتطابقان (`1c38f9c6…`) و`levonis-studio` يختلف (`6b74c82c…`). **وقاعدة البيانات كذلك**: العامل الحيّ يربط `levonis-studio-db-staging`، وفيها الجداول الأربعة كاملة و`d1_migrations` يسجّل `0000_studio_projects.sql` — **مطبَّقة أصلًا**، بصفر صفوف. فقول الصف 58 إن ميزات الحساب «تبقى معلّقة حتى تُطبَّق الهجرات» **لا ينطبق على الموقع الحيّ**؛ الفارغة هي `levonis-studio-db` التي لا يخدمها نطاق. **والهجرة الوحيدة الموجودة** (`0000_studio_projects.sql`) إضافية بحتة: 4 CREATE TABLE و8 CREATE INDEX وصفر ALTER/DROP/INSERT/UPDATE/DELETE، بلا backfill وبلا إعادة بناء جدول — فقفلها قفل تغيير مخطط لا يتناسب مع حجم البيانات. أُعدّت `13 - Apply Studio Migrations` **ولم تُشغَّل**: `dry_run` افتراضه `true`، والتشغيل الحقيقي يحتاج العبارة المكتوبة، وقاعدة فيها صفوف تُرفض ما لم يأذن المالك صراحة. **وأول نسخة من الفحص نفسه كانت خاطئة مرّتين وأُصلحت الاثنتان**: (أ) نسخة `12` الأولى قالت «`d1_migrations` غير موجود — لم تُطبَّق هجرة قط» وهي لم تُثبت ذلك؛ `wrangler` يحلّ القاعدة عبر `wrangler.jsonc` وفيه `*-PLACEHOLDER`، فكل أمر فشل والسكربت قرأ الفشل غيابًا — وهو بالضبط ما كُتبت الـworkflow لمنعه؛ (ب) حارس «إضافية فقط» كان grep على `UPDATE|DELETE`، وكان **سيرفض الهجرة الآمنة الوحيدة** لأن كل مفتاح أجنبي فيها يقول `ON UPDATE no action ON DELETE no action` داخل `CREATE TABLE` — صار مصنّفًا يفصل الجُمل ويحكم على الفعل الذي تبدأ به. **وستة اختبارات انحدار دائمة** تُنفّذ الحُرّاس فعلًا (تُنتزع دوال `slicer-client.tsx` بمحلّل TypeScript وتُستدعى) لا تقرأ نصّها، وأُثبتت بعشر طفرات أُسقطت كلّها — إحداها كشفت أن اختبار «النسخ تبقى داخل المنصة» كان ينجح حتى بعد إزالة حدود المنصة كلّيًا، فأُعيدت كتابته بأجسام 60 مم على منصة 256 مم | ✅ | .github/workflows/audit-studio.yml + apply-studio-migrations.yml + scripts/check-migrations-additive.mjs + studio/tests/studio-regressions.test.mjs + docs/STUDIO_SSO_CONFIG.md + docs/STUDIO_IPAD_CHECKLIST.md |
+
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
 production. Row 15 is CONFIRMED (PRO free-delivery rule — never re-asked).
@@ -165,3 +167,25 @@ nine passed. The two that matter most for "is this actually the new build"
 are behavioural rather than configuration: zero workers at page load happens
 only with the warmup gating, and the release hook exists only in the patched
 bundle, so neither could be satisfied by a stale deploy.
+
+Row 59 is what happened when the two things row 58 called unproven were
+actually checked, and it corrects both. The claim that the API token was too
+narrow to read which Worker serves studio.levonis-iq.com was wrong: the token
+reads zones, DNS, Worker routes, custom domains and Worker settings, and every
+one of those calls succeeded the first time it was tried. No additional
+permission is needed. What they show is that the custom domain and an explicit
+zone route both point at levonis-studio-staging, so the workflow named "Deploy
+Studio Production" deploys a Worker that serves no domain at all — workflow 4
+is what put the fix in front of users, not workflow 5. The second correction
+matters more to the owner: the database behind the live host already has the
+full Studio schema applied, so account project save and open are not waiting on
+a migration. The empty database is the one nothing points at. A gated workflow
+to migrate it exists and has deliberately not been run. Two of this round's own
+checks were wrong before they were right — an audit that read a failed query as
+an empty database, and an additive-only guard that would have rejected the only
+safe migration in the repo because its foreign keys contain the words UPDATE and
+DELETE. Both are fixed, and the second is now a statement classifier with its
+own tests. The six regression tests added alongside them execute the guards
+rather than reading their source, and each was proved by breaking the thing it
+protects: ten mutations, ten failures. One of those mutations exposed a test
+that passed with the print bed's boundaries removed entirely.

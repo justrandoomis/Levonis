@@ -282,6 +282,76 @@ export function safeRelativeReturnPath(value: string): string {
  * 'unknown' means the check could not run (not configured / unreachable) —
  * callers decide their own failure posture and must not treat it as 'active'.
  */
+/**
+ * How long one liveness answer is reused before the main site is asked again.
+ *
+ * The check costs a Worker-to-Worker request, so doing it on every API call
+ * would put a subrequest in front of every project read. A minute is short
+ * enough that a logout reaches Studio while the person is still looking at the
+ * screen, and long enough that a busy editing session makes one call, not
+ * hundreds.
+ */
+const LIVENESS_TTL_MS = 60_000;
+/** Bounded so a long-lived isolate cannot accumulate entries without limit. */
+const LIVENESS_CACHE_MAX = 500;
+const livenessCache = new Map<string, { at: number; verdict: 'active' | 'inactive' }>();
+
+/** Drops a user's cached verdict — used on logout so the next call re-asks. */
+export function forgetMainSessionLiveness(userId: string): void {
+  livenessCache.delete(userId);
+}
+
+/** Test hook: start from a cold cache. */
+export function resetLivenessCacheForTests(): void {
+  livenessCache.clear();
+}
+
+/**
+ * Should this Studio session still be honoured?
+ *
+ * Studio mints its own 14-day session at sign-in, which means a main-site
+ * logout would otherwise leave Studio signed in for a fortnight — the gap
+ * `/api/studio/handoff/introspect` was built to close. The endpoint has
+ * existed since the handoff was written and, until now, had no caller: the
+ * module comment promised that main-site logout reaches Studio, and nothing
+ * made it true.
+ *
+ * FAILURE POSTURE, stated deliberately: only a definite `inactive` revokes.
+ * `unknown` — not configured, unreachable, a non-200, a malformed body — keeps
+ * the session. Failing closed would sign out every Studio user the moment the
+ * main site had a bad minute, and, more to the point, the handoff is currently
+ * unconfigured, which returns `unknown` for everyone: failing closed there
+ * would lock out every account on a feature that is supposed to be off.
+ *
+ * Revocation is total. A user whose main-site session is gone loses ALL their
+ * Studio sessions, not just the one that happened to make the call, so a
+ * second browser is not a way to keep a revoked session alive.
+ */
+export async function isStudioSessionStillAuthorized(
+  env: StudioAuthEnv,
+  session: StudioSession
+): Promise<boolean> {
+  const userId = session.user.id;
+  const cached = livenessCache.get(userId);
+  if (cached && Date.now() - cached.at < LIVENESS_TTL_MS) return cached.verdict === 'active';
+
+  const verdict = await verifyMainSessionLiveness(env, userId);
+  if (verdict === 'unknown') return true; // see FAILURE POSTURE above
+
+  if (livenessCache.size >= LIVENESS_CACHE_MAX) {
+    // Oldest-first eviction; Map preserves insertion order.
+    const oldest = livenessCache.keys().next();
+    if (!oldest.done) livenessCache.delete(oldest.value);
+  }
+  livenessCache.set(userId, { at: Date.now(), verdict });
+
+  if (verdict === 'inactive') {
+    await destroyUserStudioSessions(env, userId);
+    return false;
+  }
+  return true;
+}
+
 export async function verifyMainSessionLiveness(
   env: StudioAuthEnv,
   userId: string

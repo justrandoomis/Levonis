@@ -12,7 +12,7 @@
 # the exact Cloudflare error code and the exact token permission that would fix
 # it, so the smallest additional read scope can be named instead of guessed.
 # Zone, record and route identifiers are masked before they reach the log.
-name: 7 - Audit Studio Migrations and Routing (read-only)
+name: 12 - Audit Studio Migrations and Routing (read-only)
 
 on:
   workflow_dispatch:

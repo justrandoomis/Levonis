@@ -339,11 +339,51 @@ Points 2 and 9 are what prove the origin is not serving a stale bundle:
 happens only with the warmup gating. Both are behavioural, not configuration
 inspection, so neither can be satisfied by an older deploy.
 
-The account-level Workers custom-domain listing did **not** come back in that
-run — the deploy token is deliberately scoped narrowly and does not appear to
-carry account-level Workers-domains read. So the worker NAME behind that
-hostname is not established here; what is established is that whatever answers
-on it is running this build.
+### 3.8 Which Worker that actually is — corrected
+
+An earlier version of this section said the worker NAME behind
+`studio.levonis-iq.com` could not be established because the deploy token
+"does not appear to carry account-level Workers-domains read". **That was
+wrong, and it was a guess rather than a finding — the call had not been
+tried.** Workflow `12 - Audit Studio Migrations and Routing` (run
+33380828524) made every one of these read-only calls with the token the repo
+already has, and none of them failed:
+
+| Read | Permission it needs | Result |
+| --- | --- | --- |
+| `GET /zones?name=levonis-iq.com` | Zone / Zone / Read | ok, zone active |
+| `GET /zones/{zone}/dns_records?name=studio.levonis-iq.com` | Zone / DNS / Read | `AAAA 100:: proxied=true` |
+| `GET /zones/{zone}/workers/routes` | Zone / Workers Routes / Read | see below |
+| `GET /accounts/{acct}/workers/domains?hostname=…` | Account / Workers Scripts / Read | see below |
+| `GET /accounts/{acct}/workers/scripts` | Account / Workers Scripts / Read | 3 scripts |
+| `GET /accounts/{acct}/workers/scripts/{name}/settings` | Account / Workers Scripts / Read | bindings listed |
+
+**No additional permission is required.** What the configuration says:
+
+```
+custom domain  studio.levonis-iq.com -> service=levonis-studio-staging (env=production)
+zone route     studio.levonis-iq.com/*  -> levonis-studio-staging
+zone route     *.levonis-iq.com/*       -> levonis-staging
+custom domain  levonis-iq.com           -> levonis-staging
+scripts on the account: levonis-staging, levonis-studio, levonis-studio-staging
+```
+
+The exact-host route wins over the wildcard, and the custom domain names the
+same service, so `studio.levonis-iq.com` is served by **`levonis-studio-staging`**.
+
+Two consequences worth stating plainly:
+
+1. **`5 - Deploy Studio Production` deploys `levonis-studio`, which serves no
+   domain.** It ran green, but what put this build in front of users was
+   `4 - Deploy Studio Staging`. The body hashes agree: the live host and
+   `levonis-studio-staging.workers.dev` are byte-identical (`1c38f9c6…`),
+   while `levonis-studio.workers.dev` differs (`6b74c82c…`).
+2. **The database behind the live host already has the schema.**
+   `levonis-studio-staging` binds `levonis-studio-db-staging`, which holds all
+   four tables with `d1_migrations` recording `0000_studio_projects.sql` and
+   zero rows. The empty database is `levonis-studio-db`, which nothing points
+   at. So account project save/open on the live host is **not** blocked on a
+   migration, contrary to what the previous report said.
 
 ---
 

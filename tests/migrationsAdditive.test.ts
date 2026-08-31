@@ -1,7 +1,7 @@
 /**
  * What the migration gate will and will not let through.
  *
- * WHY THIS EXISTS. `8 - Apply Studio Migrations` refuses to run a migration
+ * WHY THIS EXISTS. `13 - Apply Studio Migrations` refuses to run a migration
  * that is not purely additive, and that refusal is the only thing standing
  * between a future migration and a live database. So the classifier behind it
  * is tested here rather than trusted.
@@ -102,4 +102,36 @@ test('the gate is the one the workflow actually runs', () => {
   assert.ok(block.includes('default: true'),
     `dry_run must default to true; its block is ${JSON.stringify(block)}`);
   assert.match(workflow, /APPLY-STUDIO-MIGRATIONS/);
+});
+
+/**
+ * The var-preservation greps in the "keeps vars" deploy workflows.
+ *
+ * These workflows read the live Worker's variables back from the API and
+ * re-send them, because `wrangler deploy` replaces plain-text vars wholesale.
+ * Each name that is about to be overridden is first removed from the
+ * carried-over list with `grep -v "^NAME<TAB>"`. One of the four wrote the
+ * two characters `\t` instead of a real tab, which in a BRE pattern matches a
+ * literal `t` — so `^GOOGLE_CLIENT_IDt` never matched, the old line survived,
+ * and a duplicate `--var GOOGLE_CLIENT_ID:` reached wrangler.
+ *
+ * It is pinned here because this is the workflow the owner must run to set
+ * STUDIO_ALLOWED_DESTINATIONS, and a var-handling bug in that same script is
+ * the kind that surfaces as "I set it and nothing happened".
+ */
+test('every var-preservation grep uses a real tab, not the characters \\t', () => {
+  for (const file of ['deploy-staging-code.yml', 'deploy-studio-code.yml']) {
+    const text = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
+    for (const [index, line] of text.split('\n').entries()) {
+      if (!line.includes('grep -v "^')) continue;
+      assert.ok(
+        !line.includes('\\t'),
+        `${file}:${index + 1} uses the characters \\t where a tab is required: ${line.trim()}`
+      );
+      assert.ok(
+        line.includes('\t'),
+        `${file}:${index + 1} has no tab in its pattern: ${line.trim()}`
+      );
+    }
+  }
 });

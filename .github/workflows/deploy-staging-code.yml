@@ -230,7 +230,7 @@ jobs:
             *.apps.googleusercontent.com) ;;
             *) echo "::error::VITE_GOOGLE_CLIENT_ID does not look like a Google client id (expected …apps.googleusercontent.com)"; exit 1 ;;
           esac
-          grep -v "^GOOGLE_CLIENT_ID\t" /tmp/vars.tsv > /tmp/vars.keep || true
+          grep -v "^GOOGLE_CLIENT_ID	" /tmp/vars.tsv > /tmp/vars.keep || true
           printf 'GOOGLE_CLIENT_ID\t%s\n' "$GOOGLE_CLIENT_ID" >> /tmp/vars.keep
           mv /tmp/vars.keep /tmp/vars.tsv
           echo "GOOGLE_CLIENT_ID will be set from the repository secret"

@@ -54,7 +54,12 @@
     // Declared here even though it is filled at deploy time: a name that is
     // not in this file is a name the Workers-Builds preservation pass cannot
     // see, and an unpreserved var is a wiped var.
-    "STORE_ROOT_DOMAIN": ""
+    "STORE_ROOT_DOMAIN": "",
+    // Declared for exactly the reason above. The Studio sign-in allowlist is
+    // set at deploy time from a repository secret, and being absent here is
+    // how it would be silently wiped by a build that preserves only the names
+    // this file knows — after the owner had finally set it.
+    "STUDIO_ALLOWED_DESTINATIONS": ""
   },
 
   "observability": { "enabled": true },
@@ -95,7 +100,10 @@
         "APP_ORIGIN": "",
         "EMAIL_ALLOWED_RECIPIENTS": "",
         "EMAIL_FROM": "",
-        "STORE_ROOT_DOMAIN": ""
+        "STORE_ROOT_DOMAIN": "",
+        // levonis-staging is the Worker that serves levonis-iq.com, so this
+        // is the block that matters for the live site.
+        "STUDIO_ALLOWED_DESTINATIONS": ""
       },
       "observability": { "enabled": true },
       "triggers": { "crons": ["*/15 * * * *"] }

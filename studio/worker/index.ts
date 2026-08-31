@@ -24,6 +24,7 @@ import { handleAuthRoute, isAuthRoute } from "./auth/callback";
 import { isMemoryConstrainedApple } from "./platform";
 import {
   type StudioAuthEnv,
+  isStudioSessionStillAuthorized,
   loadStudioSession,
   sanitizeRequestHeaders,
   withUserHeader,
@@ -144,7 +145,14 @@ const worker = {
     // every handler can enforce ownership; guests get null (editing without
     // an account keeps working — only account features need sign-in).
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
-      const session = await loadStudioSession(request, env);
+      let session = await loadStudioSession(request, env);
+      // Studio's own session lasts 14 days, so without this a main-site
+      // logout would leave the account signed in here for a fortnight. The
+      // answer is cached for a minute and only a definite "inactive" revokes;
+      // an unconfigured or unreachable main site keeps the session (see
+      // isStudioSessionStillAuthorized). A revoked session becomes a GUEST,
+      // not an error: editing keeps working, account features stop.
+      if (session && !(await isStudioSessionStillAuthorized(env, session))) session = null;
       return withSecurityHeaders(await apiRouter(request, env, ctx, session), request);
     }
 

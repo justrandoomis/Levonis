@@ -33,6 +33,7 @@ import {
   clearSessionCookie,
   createStudioSession,
   destroyStudioSession,
+  forgetMainSessionLiveness,
   handoffCookie,
   loadStudioSession,
   mainSiteOrigin,
@@ -195,6 +196,11 @@ async function handleCallback(request: Request, env: StudioAuthEnv, url: URL): P
   const previous = await loadStudioSession(request, env);
   if (previous) await destroyStudioSession(env, previous.sessionId);
 
+  // A successful redemption is proof the main-site session is live right now,
+  // so drop any cached verdict — otherwise a user who signs back in within the
+  // cache window would be revoked again on their first API call.
+  forgetMainSessionLiveness(redeemed.user.id);
+
   const { token, expires } = await createStudioSession(
     env,
     redeemed.user,
@@ -234,7 +240,10 @@ async function handleLogout(request: Request, env: StudioAuthEnv, url: URL): Pro
   }
 
   const session = await loadStudioSession(request, env);
-  if (session) await destroyStudioSession(env, session.sessionId);
+  if (session) {
+    await destroyStudioSession(env, session.sessionId);
+    forgetMainSessionLiveness(session.user.id);
+  }
 
   if (wantsHtmlNavigation(request)) {
     const returnTo = safeRelativeReturnPath(url.searchParams.get('return_to') || '/');

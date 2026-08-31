@@ -4,7 +4,7 @@
 # the owner approves the change there is a reviewed, gated path to make it —
 # rather than an improvised command against a live database.
 #
-# What it will apply, and what the audit (workflow 7, run 33380828524) found:
+# What it will apply, and what the audit (workflow 12, run 33380828524) found:
 #
 #   studio/drizzle/0000_studio_projects.sql — the ONLY Studio migration.
 #     4 CREATE TABLE, 8 CREATE INDEX, 0 ALTER, 0 DROP, 0 INSERT/UPDATE/DELETE.
@@ -14,6 +14,21 @@
 #     rows at all. On SQLite a CREATE TABLE takes a brief write lock for the
 #     schema change only; there is no table rebuild, so the lock does not scale
 #     with data size.
+#
+#   ONE THING THAT MATTERS MORE THAN ANY OF THAT: the Studio worker creates
+#   these same tables ITSELF, idempotently, at runtime —
+#   `ensureStudioTables` / `TABLE_SQL` in studio/worker/api/router.ts:142-201,
+#   all `CREATE TABLE IF NOT EXISTS`. So project save and open work on a
+#   database that has never been migrated. The migration is the declared
+#   source of truth; it is not what makes the feature function.
+#
+#   The corollary is the real risk here, and it is availability, not data
+#   loss: the migration's own statements for projects, project_revisions,
+#   project_files and their six indexes have NO `IF NOT EXISTS` (only
+#   studio_sessions does, hand-adjusted). So once the worker has bootstrapped
+#   a database, `wrangler d1 migrations apply` FAILS on it at the first
+#   CREATE TABLE. The pre-flight below detects that case and says so, instead
+#   of failing with an opaque SQL error.
 #
 #   State at the time of the audit:
 #     levonis-studio-db          — no user tables, no d1_migrations. UNAPPLIED.
@@ -32,7 +47,7 @@
 #      additionally sets allow_non_empty.
 # The migration files are re-scanned at run time, so a migration added later
 # that alters, drops or writes data cannot slip through this workflow.
-name: 8 - Apply Studio Migrations (approval required)
+name: 13 - Apply Studio Migrations (approval required)
 
 on:
   workflow_dispatch:
@@ -145,6 +160,34 @@ jobs:
           echo ""
           echo "wrangler's own view of what is pending:"
           npx wrangler d1 migrations list "$DB" --remote $ENVARG 2>&1 | tee /tmp/pending.txt || true
+
+      - name: Detect a database the worker already bootstrapped
+        id: bootstrap
+        env:
+          ENVARG: ${{ steps.db.outputs.env }}
+        run: |
+          set -e
+          echo "already=no" >> "$GITHUB_OUTPUT"
+          # The migration's project tables have no IF NOT EXISTS, so if the
+          # worker created them first the apply cannot succeed. Say that
+          # plainly here rather than letting wrangler fail on "table projects
+          # already exists" and leaving someone to guess why.
+          HAVE=$(jq -r '[.[0].results[].name
+                          | select(. == "projects" or . == "project_revisions" or . == "project_files")]
+                         | length' /tmp/t.json)
+          MIGRATED=$(jq -r '[.[0].results[].name | select(. == "d1_migrations")] | length' /tmp/t.json)
+          if [ "$HAVE" != "0" ] && [ "$MIGRATED" = "0" ]; then
+            echo "already=yes" >> "$GITHUB_OUTPUT"
+            echo "::error::$DB already has $HAVE of the three project tables but no d1_migrations record."
+            echo "::error::The Studio worker bootstraps these tables itself (studio/worker/api/router.ts, CREATE TABLE IF NOT EXISTS),"
+            echo "::error::and the migration's own CREATE TABLE statements have no IF NOT EXISTS — so applying it here WILL fail."
+            echo "::error::Nothing is broken: the schema is already present and the app works. If you want wrangler to consider"
+            echo "::error::the migration applied, that is a deliberate manual INSERT into d1_migrations, not something this workflow does."
+            exit 1
+          fi
+          if [ "$HAVE" != "0" ]; then
+            echo "The tables exist and d1_migrations records the migration — there is nothing pending."
+          fi
 
       - name: Refuse a database that already holds rows, unless explicitly allowed
         if: ${{ inputs.dry_run != true }}
