@@ -1,0 +1,374 @@
+# READ-ONLY audit of the LEVO Studio production database and of the Cloudflare
+# routing that makes studio.levonis-iq.com serve a Worker.
+#
+# This workflow CHANGES NOTHING. It runs no migrations, no deploys, no DNS or
+# route writes, and issues only SELECT statements and GET requests. It exists
+# because two questions were previously answered by behaviour rather than by
+# configuration:
+#   1. which Studio migrations are unapplied on the production D1, and
+#   2. which Worker actually serves studio.levonis-iq.com.
+#
+# Every Cloudflare call is allowed to fail. A failure is reported together with
+# the exact Cloudflare error code and the exact token permission that would fix
+# it, so the smallest additional read scope can be named instead of guessed.
+# Zone, record and route identifiers are masked before they reach the log.
+name: 7 - Audit Studio Migrations and Routing (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Apex zone to inspect'
+        required: false
+        default: 'levonis-iq.com'
+      host:
+        description: 'Studio hostname to prove'
+        required: false
+        default: 'studio.levonis-iq.com'
+
+concurrency: audit-studio
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DOMAIN: ${{ github.event.inputs.domain || 'levonis-iq.com' }}
+      HOST: ${{ github.event.inputs.host || 'studio.levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+
+      - name: Install (studio)
+        working-directory: studio
+        run: npm ci --no-audit --no-fund
+
+      # ------------------------------------------------------------ token
+      - name: What this token is allowed to do
+        id: token
+        continue-on-error: true
+        run: |
+          echo "result=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/user/tokens/verify" -o /tmp/verify.json || true
+          if jq -e '.success == true' /tmp/verify.json > /dev/null 2>&1; then
+            echo "token status: $(jq -r '.result.status' /tmp/verify.json)"
+            echo "result=$(jq -r '.result.status' /tmp/verify.json)" >> "$GITHUB_OUTPUT"
+          else
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/verify.json 2>/dev/null || true
+            echo "result=verify failed" >> "$GITHUB_OUTPUT"
+          fi
+          # wrangler whoami prints the token's own permission list when the
+          # token carries User:Memberships/User Details read; it is allowed to
+          # fail without failing the audit.
+          npx --prefix studio wrangler whoami 2>&1 | sed -n '1,60p' || true
+
+      # -------------------------------------------------- studio database
+      - name: Resolve the Studio production database
+        id: db
+        continue-on-error: true
+        working-directory: studio
+        env:
+          STUDIO_PROD_DB_NAME: ${{ secrets.STUDIO_PROD_DB_NAME }}
+        run: |
+          echo "name=" >> "$GITHUB_OUTPUT"
+          echo "exists=unknown" >> "$GITHUB_OUTPUT"
+          NAME="${STUDIO_PROD_DB_NAME:-levonis-studio-db}"
+          if ! npx wrangler d1 list --json > /tmp/d1.json 2>/tmp/d1.err; then
+            echo "::warning::cannot list D1 databases — the token is missing Account:D1:Read"
+            sed -n '1,20p' /tmp/d1.err || true
+            exit 0
+          fi
+          ID=$(jq -r --arg n "$NAME" '.[] | select(.name==$n) | .uuid' /tmp/d1.json)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          if [ -n "$ID" ]; then
+            echo "::add-mask::$ID"
+            echo "Studio production database \"$NAME\" exists."
+            echo "exists=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "Studio production database \"$NAME\" does NOT exist yet."
+            echo "exists=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tables present in the Studio production database (SELECT only)
+        id: tables
+        if: steps.db.outputs.exists == 'yes'
+        continue-on-error: true
+        working-directory: studio
+        run: |
+          set -e
+          echo "tables=" >> "$GITHUB_OUTPUT"
+          echo "count=unknown" >> "$GITHUB_OUTPUT"
+          npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
+            --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" \
+            > /tmp/tables.json
+          echo "Every table, including bookkeeping tables:"
+          jq -r '.[0].results[] | "  \(.name)"' /tmp/tables.json
+          # The production deploy workflow's emptiness gate excludes exactly
+          # these three prefixes, so reproduce it verbatim here.
+          GATED=$(jq -r '[.[0].results[].name
+                          | select(startswith("sqlite_") or startswith("_cf_") or startswith("d1_") | not)]
+                         | join(", ")' /tmp/tables.json)
+          N=$(jq -r '[.[0].results[].name
+                      | select(startswith("sqlite_") or startswith("_cf_") or startswith("d1_") | not)]
+                     | length' /tmp/tables.json)
+          echo ""
+          echo "Counted by the deploy gate ($N): ${GATED:-none}"
+          echo "tables=${GATED:-none}" >> "$GITHUB_OUTPUT"
+          echo "count=$N" >> "$GITHUB_OUTPUT"
+          if [ "$N" = "0" ]; then
+            echo "gate=WOULD PASS — apply_migrations=true is accepted" >> "$GITHUB_OUTPUT"
+          else
+            echo "gate=WOULD REFUSE — $N tables present" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Migrations wrangler believes are applied (SELECT only)
+        id: applied
+        if: steps.db.outputs.exists == 'yes'
+        continue-on-error: true
+        working-directory: studio
+        run: |
+          echo "applied=none" >> "$GITHUB_OUTPUT"
+          # d1_migrations is wrangler's own bookkeeping table. Absent means no
+          # migration has ever been applied through wrangler on this database.
+          if ! npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
+              --command "SELECT name, applied_at FROM d1_migrations ORDER BY id" > /tmp/applied.json 2>/tmp/applied.err; then
+            echo "d1_migrations does not exist — wrangler has never applied a migration here."
+            sed -n '1,5p' /tmp/applied.err || true
+            echo "applied=NONE (no d1_migrations table)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          LIST=$(jq -r '[.[0].results[].name] | join(", ")' /tmp/applied.json)
+          echo "applied per d1_migrations: ${LIST:-none}"
+          echo "applied=${LIST:-none}" >> "$GITHUB_OUTPUT"
+
+      - name: Rows in each Studio table (SELECT COUNT only)
+        id: rows
+        if: steps.tables.outputs.count != '0' && steps.db.outputs.exists == 'yes'
+        continue-on-error: true
+        working-directory: studio
+        run: |
+          for T in projects project_revisions project_files studio_sessions; do
+            if echo "${{ steps.tables.outputs.tables }}" | grep -qw "$T"; then
+              N=$(npx wrangler d1 execute "${{ steps.db.outputs.name }}" --remote --json \
+                    --command "SELECT COUNT(*) AS n FROM $T" | jq -r '.[0].results[0].n')
+              echo "  $T: $N rows"
+            else
+              echo "  $T: table absent"
+            fi
+          done
+
+      - name: Migrations this repo would apply, and what each one does
+        continue-on-error: true
+        run: |
+          echo "Studio migrations tracked in studio/drizzle (the only ones this"
+          echo "workflow family ever applies to levonis-studio-db):"
+          for F in studio/drizzle/*.sql; do
+            [ -e "$F" ] || continue
+            echo ""
+            echo "  $(basename "$F")"
+            echo "    CREATE TABLE        : $(grep -ciE '^[[:space:]]*CREATE TABLE' "$F" || true)"
+            echo "    CREATE INDEX        : $(grep -ciE '^[[:space:]]*CREATE( UNIQUE)? INDEX' "$F" || true)"
+            echo "    ALTER TABLE         : $(grep -ciE '^[[:space:]]*ALTER TABLE' "$F" || true)"
+            echo "    DROP                : $(grep -ciE '^[[:space:]]*DROP ' "$F" || true)"
+            echo "    INSERT/UPDATE/DELETE: $(grep -ciE '^[[:space:]]*(INSERT|UPDATE|DELETE)' "$F" || true)"
+          done
+          echo ""
+          echo "The repo-root migrations/ directory targets the STORE database"
+          echo "(levonis-db) and is never applied to Studio by any Studio workflow."
+
+      # ------------------------------------------------------------ zone
+      - name: Resolve the zone
+        id: zone
+        continue-on-error: true
+        run: |
+          echo "id=" >> "$GITHUB_OUTPUT"
+          echo "perm=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" -o /tmp/zone.json || true
+          if ! jq -e '.success == true' /tmp/zone.json > /dev/null 2>&1; then
+            echo "::warning::cannot list zones — missing Zone / Zone / Read on $DOMAIN"
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/zone.json 2>/dev/null || true
+            echo "perm=MISSING Zone:Zone:Read" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          ID=$(jq -r '.result[0].id // ""' /tmp/zone.json)
+          [ -n "$ID" ] && echo "::add-mask::$ID"
+          echo "zone $DOMAIN resolved; status=$(jq -r '.result[0].status // "?"' /tmp/zone.json)"
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "perm=ok" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------- DNS
+      - name: DNS record for the Studio hostname
+        id: dns
+        continue-on-error: true
+        env:
+          ZONE: ${{ steps.zone.outputs.id }}
+        run: |
+          echo "record=unknown" >> "$GITHUB_OUTPUT"
+          echo "perm=unknown" >> "$GITHUB_OUTPUT"
+          [ -n "$ZONE" ] || { echo "no zone id — skipping"; echo "perm=skipped (no zone)" >> "$GITHUB_OUTPUT"; exit 0; }
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?name=$HOST" -o /tmp/dns.json || true
+          if ! jq -e '.success == true' /tmp/dns.json > /dev/null 2>&1; then
+            echo "::warning::cannot read DNS — missing Zone / DNS / Read on $DOMAIN"
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/dns.json 2>/dev/null || true
+            echo "perm=MISSING Zone:DNS:Read" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "perm=ok" >> "$GITHUB_OUTPUT"
+          COUNT=$(jq -r '.result | length' /tmp/dns.json)
+          if [ "$COUNT" = "0" ]; then
+            echo "No explicit DNS record for $HOST — it is served by a wildcard or by a Worker custom domain."
+            echo "record=none (wildcard or custom domain)" >> "$GITHUB_OUTPUT"
+          else
+            jq -r '.result[] | "  \(.type)  \(.name)  content=\(.content)  proxied=\(.proxied)  comment=\(.comment // "")"' /tmp/dns.json
+            echo "record=$(jq -r '[.result[] | "\(.type) -> \(.content) proxied=\(.proxied)"] | join("; ")' /tmp/dns.json)" >> "$GITHUB_OUTPUT"
+          fi
+          echo ""
+          echo "Sibling records, for context:"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?per_page=200" -o /tmp/dnsall.json || true
+          jq -r --arg d "$DOMAIN" '.result[]? | select(.name == $d or .name == "www." + $d or .name == "*." + $d)
+                 | "  \(.type)  \(.name)  proxied=\(.proxied)"' /tmp/dnsall.json 2>/dev/null || true
+
+      # ---------------------------------------------------------- routes
+      - name: Worker routes on this zone
+        id: routes
+        continue-on-error: true
+        env:
+          ZONE: ${{ steps.zone.outputs.id }}
+        run: |
+          echo "match=unknown" >> "$GITHUB_OUTPUT"
+          echo "perm=unknown" >> "$GITHUB_OUTPUT"
+          [ -n "$ZONE" ] || { echo "no zone id — skipping"; echo "perm=skipped (no zone)" >> "$GITHUB_OUTPUT"; exit 0; }
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes" -o /tmp/routes.json || true
+          if ! jq -e '.success == true' /tmp/routes.json > /dev/null 2>&1; then
+            echo "::warning::cannot read Worker routes — missing Zone / Workers Routes / Read on $DOMAIN"
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/routes.json 2>/dev/null || true
+            echo "perm=MISSING Zone:Workers Routes:Read" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "perm=ok" >> "$GITHUB_OUTPUT"
+          echo "Routes declared on $DOMAIN:"
+          jq -r '.result[] | "  \(.pattern) -> \(.script // "(none)")"' /tmp/routes.json
+          # A route matches the Studio host if its pattern covers it. Only the
+          # two shapes that can are checked: the exact host and the wildcard.
+          MATCH=$(jq -r --arg h "$HOST" --arg d "$DOMAIN" '
+            [ .result[]
+              | select(.pattern == $h + "/*" or .pattern == $h + "/" or .pattern == "*." + $d + "/*" or .pattern == "*" + $d + "/*")
+              | "\(.pattern) -> \(.script)" ] | join("; ")' /tmp/routes.json)
+          if [ -n "$MATCH" ]; then
+            echo ""
+            echo "Route(s) covering $HOST: $MATCH"
+            echo "match=$MATCH" >> "$GITHUB_OUTPUT"
+          else
+            echo ""
+            echo "NO zone route covers $HOST — it must be attached as a Worker custom domain instead."
+            echo "match=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------- custom domains
+      - name: Worker custom domains on this account
+        id: domains
+        continue-on-error: true
+        run: |
+          echo "bound=unknown" >> "$GITHUB_OUTPUT"
+          echo "perm=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/domains?hostname=$HOST" \
+            -o /tmp/domains.json || true
+          if ! jq -e '.success == true' /tmp/domains.json > /dev/null 2>&1; then
+            echo "::warning::cannot read Worker custom domains — missing Account / Workers Scripts / Read"
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/domains.json 2>/dev/null || true
+            echo "perm=MISSING Account:Workers Scripts:Read" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "perm=ok" >> "$GITHUB_OUTPUT"
+          COUNT=$(jq -r '.result | length' /tmp/domains.json)
+          if [ "$COUNT" = "0" ]; then
+            echo "No Worker custom domain is attached to $HOST."
+            echo "bound=none" >> "$GITHUB_OUTPUT"
+          else
+            jq -r '.result[] | "  \(.hostname) -> service=\(.service) env=\(.environment)"' /tmp/domains.json
+            echo "bound=$(jq -r '[.result[] | "\(.service) (\(.environment))"] | join("; ")' /tmp/domains.json)" >> "$GITHUB_OUTPUT"
+          fi
+          echo ""
+          echo "Every custom domain on the account, for context:"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/domains" -o /tmp/alldomains.json || true
+          jq -r '.result[]? | "  \(.hostname) -> \(.service)"' /tmp/alldomains.json 2>/dev/null || true
+
+      # --------------------------------------------------------- scripts
+      - name: Worker scripts that exist on this account
+        id: scripts
+        continue-on-error: true
+        run: |
+          echo "perm=unknown" >> "$GITHUB_OUTPUT"
+          curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts" -o /tmp/scripts.json || true
+          if ! jq -e '.success == true' /tmp/scripts.json > /dev/null 2>&1; then
+            echo "::warning::cannot list Worker scripts — missing Account / Workers Scripts / Read"
+            jq -r '.errors[]? | "  cloudflare: \(.code) \(.message)"' /tmp/scripts.json 2>/dev/null || true
+            echo "perm=MISSING Account:Workers Scripts:Read" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "perm=ok" >> "$GITHUB_OUTPUT"
+          jq -r '.result[] | "  \(.id)   modified=\(.modified_on // "?")"' /tmp/scripts.json | sort
+
+      # ------------------------------------------------------ behavioural
+      - name: What the hostname actually answers with (corroboration only)
+        continue-on-error: true
+        run: |
+          echo "DNS as the internet sees it:"
+          echo "  $HOST -> $(dig +short "$HOST" | tr '\n' ' ')"
+          echo ""
+          for U in "https://$HOST" \
+                   "https://levonis-studio.just-randoomis.workers.dev" \
+                   "https://levonis-studio-staging.just-randoomis.workers.dev"; do
+            CODE=$(curl -sS -m 20 -o /tmp/body.html -w '%{http_code}' -D /tmp/h.txt "$U/" 2>/dev/null || echo "000")
+            HASH=$(sha256sum /tmp/body.html 2>/dev/null | cut -c1-16)
+            COOP=$(grep -ci '^cross-origin-opener-policy' /tmp/h.txt 2>/dev/null || echo 0)
+            echo "  $U  http=$CODE  body-sha256[0:16]=$HASH  coop=$COOP"
+          done
+          echo ""
+          echo "Identical body hashes mean the same build; they do NOT by themselves"
+          echo "identify which Worker name is bound. The configuration steps above do."
+
+      # --------------------------------------------------------- summary
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Studio audit (read-only — nothing was changed)"
+            echo ""
+            echo "### Production database"
+            echo "| Question | Answer |"
+            echo "| --- | --- |"
+            echo "| Database | ${{ steps.db.outputs.name }} (exists: ${{ steps.db.outputs.exists }}) |"
+            echo "| Tables counted by the deploy gate | ${{ steps.tables.outputs.count || 'not read' }} |"
+            echo "| Table names | ${{ steps.tables.outputs.tables || 'not read' }} |"
+            echo "| d1_migrations says applied | ${{ steps.applied.outputs.applied || 'not read' }} |"
+            echo "| apply_migrations=true would | ${{ steps.tables.outputs.gate || 'unknown' }} |"
+            echo ""
+            echo "### Cloudflare routing for ${{ env.HOST }}"
+            echo "| Check | Permission | Result |"
+            echo "| --- | --- | --- |"
+            echo "| Token verify | (none) | ${{ steps.token.outputs.result }} |"
+            echo "| Zone lookup | Zone:Zone:Read | ${{ steps.zone.outputs.perm }} |"
+            echo "| DNS record | Zone:DNS:Read | ${{ steps.dns.outputs.perm }} — ${{ steps.dns.outputs.record }} |"
+            echo "| Zone Worker routes | Zone:Workers Routes:Read | ${{ steps.routes.outputs.perm }} — ${{ steps.routes.outputs.match }} |"
+            echo "| Worker custom domains | Account:Workers Scripts:Read | ${{ steps.domains.outputs.perm }} — ${{ steps.domains.outputs.bound }} |"
+            echo "| Worker script list | Account:Workers Scripts:Read | ${{ steps.scripts.outputs.perm }} |"
+            echo ""
+            echo "No migration was applied, no DNS record written, no route bound,"
+            echo "no Worker deployed. Every database statement was a SELECT."
+          } >> "$GITHUB_STEP_SUMMARY"
