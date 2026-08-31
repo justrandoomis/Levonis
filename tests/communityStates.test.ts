@@ -30,8 +30,6 @@ import {
   cancellationPolicy,
   orderIsActive,
   orderIsSettled,
-  type RequestState,
-  type OfferState,
   type CommunityOrderState,
 } from '../worker/lib/communityStates';
 
@@ -77,6 +75,22 @@ test('an accepted offer is frozen in every direction', () => {
   assert.equal(offerIsEditable('pending'), true);
   for (const s of OFFER_STATES) {
     if (s !== 'pending') assert.equal(offerIsEditable(s), false, `${s} offers must not be editable`);
+  }
+});
+
+test('an offer leaves pending exactly once, and never comes back', () => {
+  // Every terminal offer state is genuinely terminal, checked against the
+  // table rather than listed by hand — so adding a state without deciding
+  // its transitions fails here instead of silently allowing everything.
+  for (const to of OFFER_STATES) {
+    if (to === 'pending') continue;
+    assert.equal(canMoveOffer('pending', to), true, `pending -> ${to} should be legal`);
+  }
+  for (const from of OFFER_STATES) {
+    if (from === 'pending') continue;
+    for (const to of OFFER_STATES) {
+      assert.equal(canMoveOffer(from, to), false, `${from} -> ${to} must be refused`);
+    }
   }
 });
 
