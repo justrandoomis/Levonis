@@ -61,15 +61,33 @@ test('a username never classifies as a phone; identifier is lowercased', () => {
   assert.equal(c.identifier, 'levonis_user');
 });
 
-test('NOT length-only: ten digits after +964 must start with mobile 7', () => {
-  // 13 digits total, right length for an Iraqi mobile, wrong structure.
+test("NOT length-only: Iraq's real numbering plan decides, not a digit count", () => {
+  // 13 digits after +964 is longer than anything Iraq issues.
   assert.equal(classifyLoginIdentifier('+9641234567890').phone, null);
-  assert.equal(classifyLoginIdentifier('+96412345678').phone, null);
+  // 6 digits is shorter than anything Iraq issues.
+  assert.equal(classifyLoginIdentifier('+964770123').phone, null);
 });
 
-test('the international form never carries the local leading zero (+9640…)', () => {
-  assert.equal(classifyLoginIdentifier('+96407701234567').phone, null);
-  assert.equal(classifyLoginIdentifier('009640770123456').phone, null);
+test('an Iraqi LANDLINE is a valid number now — the mobile-only rule is gone', () => {
+  // +964 1 234 5678 is a real Baghdad fixed line. The old rule rejected every
+  // Iraqi number that did not start with 7, which is what made this platform
+  // Iraq-mobile-only. Ownership is proven by Telegram answering on the
+  // number, never by its number range — and the bundled metadata cannot tell
+  // mobile from fixed line in every country anyway (the whole US range is
+  // FIXED_LINE_OR_MOBILE), so demanding "mobile" would be strict in some
+  // countries and meaningless in others.
+  assert.equal(classifyLoginIdentifier('+96412345678').phone, '+96412345678');
+});
+
+test('a national trunk zero after the country code is dropped, not rejected', () => {
+  // `+964 0 770…` is how people write their own number when they paste the
+  // local form after the country code. It means the same number, so it
+  // normalizes to the same E.164 rather than being refused — and the stored
+  // form never carries the zero, which is what the unique index depends on.
+  assert.equal(classifyLoginIdentifier('+96407701234567').phone, '+9647701234567');
+  assert.equal(classifyLoginIdentifier('009647701234567').phone, '+9647701234567');
+  // Still not a number: trunk zero or not, the digits have to be a real one.
+  assert.equal(classifyLoginIdentifier('+9640770123456').phone, null);
 });
 
 test('too-short and garbage inputs never classify as phones', () => {

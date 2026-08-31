@@ -1,24 +1,36 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import {
+  AsYouType,
+  getCountries,
+  getCountryCallingCode,
+  isValidPhoneNumber,
+  validatePhoneNumberLength,
+  type CountryCode,
+} from 'libphonenumber-js';
 
 /**
- * PhoneField — phone input with a country selector, Iraq (+964) default
- * (integrated mandate §2.1/§2.3).
+ * PhoneField — a phone input for everyone, not for Iraq.
  *
- * - Digits render LTR even inside RTL pages (the whole control is dir="ltr";
- *   the label stays in the page direction).
- * - Pasting local (07…), international (+9647…/009647…/9647…) and
- *   Arabic/Eastern-Arabic-digit forms is normalized client-side, mirroring
- *   worker/lib/phone.ts — the country code is never doubled and the local
- *   leading 0 never survives into the international form.
- * - inputmode="tel" brings up the phone keypad on iPad/phones.
+ * WHAT THIS REPLACED. The old field offered seventeen hand-picked countries
+ * and validated Iraq strictly (`7XXXXXXXXX`) while every other country got a
+ * length check: eight to fourteen digits, anything goes. So `+971 00000 0000`
+ * was accepted as a UAE number, a real number with a shorter national format
+ * was rejected, and the label said "Iraqi mobile" — which is exactly what a
+ * customer outside Iraq read before giving up.
  *
- * HONESTY: a syntactically complete number proves the SHAPE only, never
- * ownership (ownership is proven via the Telegram flow or another authorized
- * provider, server-side). For Iraq the strict mobile rule applies
- * (+964 7XX XXX XXXX): ten digits starting with 7 — an arbitrary 10-digit
- * string does NOT validate. For other countries only an E.164 plausibility
- * check is possible client-side (no libphonenumber in the build; the server
- * remains the authority) — see honest note in the slice report.
+ * Now: every country libphonenumber knows (245 of them), each country's real
+ * numbering plan deciding validity, and the country NAMES coming from the
+ * platform's own locale data rather than a translation table — so the picker
+ * is in Arabic, English or Kurdish without anyone maintaining 245 × 3 strings
+ * that would drift the moment a country is renamed.
+ *
+ * WHAT IS STILL TRUE, AND HAS TO BE SAID: a syntactically perfect number
+ * proves the SHAPE and nothing else. Ownership is proven server-side, by
+ * Telegram answering on that number. Nothing here is a credential.
+ *
+ * Direction: the whole control is `dir="ltr"` because a dial code and a
+ * national number are read left-to-right in every language; only the label
+ * follows the page direction.
  */
 
 // ------------------------------------------------------------ pure helpers
@@ -37,50 +49,48 @@ export interface Country {
   /** Dial code digits, no '+'. */
   dial: string;
   flag: string;
-  name: string;
-  nameAr: string;
 }
 
-/** Iraq first (default); a pragmatic regional list, longest-dial matching. */
-export const COUNTRIES: Country[] = [
-  { iso: 'IQ', dial: '964', flag: '🇮🇶', name: 'Iraq', nameAr: 'العراق' },
-  { iso: 'SY', dial: '963', flag: '🇸🇾', name: 'Syria', nameAr: 'سوريا' },
-  { iso: 'JO', dial: '962', flag: '🇯🇴', name: 'Jordan', nameAr: 'الأردن' },
-  { iso: 'LB', dial: '961', flag: '🇱🇧', name: 'Lebanon', nameAr: 'لبنان' },
-  { iso: 'KW', dial: '965', flag: '🇰🇼', name: 'Kuwait', nameAr: 'الكويت' },
-  { iso: 'SA', dial: '966', flag: '🇸🇦', name: 'Saudi Arabia', nameAr: 'السعودية' },
-  { iso: 'AE', dial: '971', flag: '🇦🇪', name: 'UAE', nameAr: 'الإمارات' },
-  { iso: 'QA', dial: '974', flag: '🇶🇦', name: 'Qatar', nameAr: 'قطر' },
-  { iso: 'BH', dial: '973', flag: '🇧🇭', name: 'Bahrain', nameAr: 'البحرين' },
-  { iso: 'OM', dial: '968', flag: '🇴🇲', name: 'Oman', nameAr: 'عُمان' },
-  { iso: 'TR', dial: '90', flag: '🇹🇷', name: 'Türkiye', nameAr: 'تركيا' },
-  { iso: 'IR', dial: '98', flag: '🇮🇷', name: 'Iran', nameAr: 'إيران' },
-  { iso: 'EG', dial: '20', flag: '🇪🇬', name: 'Egypt', nameAr: 'مصر' },
-  { iso: 'DE', dial: '49', flag: '🇩🇪', name: 'Germany', nameAr: 'ألمانيا' },
-  { iso: 'SE', dial: '46', flag: '🇸🇪', name: 'Sweden', nameAr: 'السويد' },
-  { iso: 'GB', dial: '44', flag: '🇬🇧', name: 'United Kingdom', nameAr: 'بريطانيا' },
-  { iso: 'US', dial: '1', flag: '🇺🇸', name: 'United States', nameAr: 'الولايات المتحدة' },
-];
+/** ISO 3166-1 alpha-2 → regional-indicator flag. Falls back to the code
+ *  itself on platforms that do not render flag emoji (Windows), which is
+ *  still a correct, readable label. */
+export function flagOf(iso: string): string {
+  if (!/^[A-Za-z]{2}$/.test(iso)) return '';
+  return String.fromCodePoint(
+    ...iso
+      .toUpperCase()
+      .split('')
+      .map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65)
+  );
+}
+
+/** Every callable country. Built once — the metadata never changes at runtime. */
+export const COUNTRIES: Country[] = getCountries()
+  .map((iso) => ({ iso: iso as string, dial: getCountryCallingCode(iso) as string, flag: flagOf(iso) }))
+  .sort((a, b) => a.iso.localeCompare(b.iso));
+
+const BY_ISO = new Map(COUNTRIES.map((c) => [c.iso, c]));
+
+/** The markets this platform actually serves, floated to the top of the list
+ *  so the common case is one tap rather than a scroll through 245 entries. */
+export const COMMON_ISO = ['IQ', 'AE', 'SA', 'KW', 'QA', 'BH', 'OM', 'JO', 'LB', 'SY', 'TR', 'IR', 'EG', 'GB', 'DE', 'SE', 'US'];
 
 export function countryByIso(iso: string): Country {
-  return COUNTRIES.find((c) => c.iso === iso) || COUNTRIES[0];
+  return BY_ISO.get(String(iso ?? '').toUpperCase()) ?? BY_ISO.get('IQ') ?? COUNTRIES[0];
 }
 
-const MAX_NATIONAL_DIGITS = 14;
+const MAX_NATIONAL_DIGITS = 15;
 
 /**
- * Normalize any typed/pasted phone text into { iso, national }:
- * - Arabic/Eastern-Arabic digits → ASCII; spaces/dashes/dots/parens dropped.
- * - "+<dial>…" / "00<dial>…" switches the country (longest dial match).
- * - A local trunk "0" is stripped (07701234567 → 7701234567).
- * - Typing the current country's dial code without "+" (9647701234567)
- *   does not double it.
+ * Normalize typed or pasted text into { iso, national }.
+ *
+ * `+…` / `00…` switches the country by longest matching dial code; a local
+ * trunk zero is dropped; typing the current country's own dial code without a
+ * plus does not double it. This mirrors what the server does with the same
+ * input, so the field never shows valid for something the server refuses.
  */
-export function normalizePhoneInput(
-  raw: string,
-  currentIso: string
-): { iso: string; national: string } {
-  let s = toAsciiDigitsClient(String(raw ?? '')).replace(/[\s\-().]/g, '');
+export function normalizePhoneInput(raw: string, currentIso: string): { iso: string; national: string } {
+  let s = toAsciiDigitsClient(String(raw ?? '')).replace(/[\s\-().‎‏]/g, '');
   if (s.startsWith('00')) s = `+${s.slice(2)}`;
 
   if (s.startsWith('+')) {
@@ -89,65 +99,73 @@ export function normalizePhoneInput(
       .sort((a, b) => b.dial.length - a.dial.length)
       .find((c) => digits.startsWith(c.dial));
     if (match) {
-      let rest = digits.slice(match.dial.length);
-      rest = rest.replace(/^0+/, ''); // +964 07… → the 0 never survives
+      const rest = digits.slice(match.dial.length).replace(/^0+/, '');
       return { iso: match.iso, national: rest.slice(0, MAX_NATIONAL_DIGITS) };
     }
     return { iso: currentIso, national: digits.slice(0, MAX_NATIONAL_DIGITS) };
   }
 
-  let digits = s.replace(/\D/g, '');
-  digits = digits.replace(/^0+/, ''); // local trunk zero
+  let digits = s.replace(/\D/g, '').replace(/^0+/, '');
   const cur = countryByIso(currentIso);
-  // Full international form typed without '+': don't double the dial code.
-  if (
-    digits.startsWith(cur.dial) &&
-    digits.length > cur.dial.length + 6
-  ) {
+  if (digits.startsWith(cur.dial) && digits.length > cur.dial.length + 6) {
     digits = digits.slice(cur.dial.length).replace(/^0+/, '');
   }
-  return { iso: currentIso, national: digits.slice(0, MAX_NATIONAL_DIGITS) };
+  return { iso: cur.iso, national: digits.slice(0, MAX_NATIONAL_DIGITS) };
 }
 
 export interface PhoneValue {
   iso: string;
   /** Dial code digits of the selected country (no '+'). */
   dial: string;
-  /** National digits as shown in the input (ASCII, no trunk 0). */
+  /** National digits (ASCII, no trunk 0) — what is stored in state. */
   national: string;
-  /** E.164 (+<dial><national>) when valid, otherwise null. */
+  /** Grouped for reading, e.g. `(202) 555-0123`. Display only. */
+  formatted: string;
+  /** E.164 when the number is real, otherwise null. */
   e164: string | null;
   valid: boolean;
-  /** 0..1 completion for the FillButton; capped below 1 while invalid. */
+  /** 0..1 completion for the progress-filling button. */
   progress: number;
 }
 
-/** Build the full PhoneValue from a country + national digits. */
+/**
+ * Build the full value from a country and national digits.
+ *
+ * Validity is libphonenumber's answer for that country, never a digit count.
+ * `progress` uses the same metadata: TOO_SHORT means keep going, TOO_LONG
+ * means it will not become valid by typing more.
+ */
 export function buildPhoneValue(iso: string, national: string): PhoneValue {
   const c = countryByIso(iso);
-  const digits = national.replace(/\D/g, '');
-  let valid: boolean;
-  let progress: number;
-  if (c.iso === 'IQ') {
-    // Strict Iraqi mobile: exactly 7XXXXXXXXX (worker/lib/phone.ts rule).
-    valid = /^7\d{9}$/.test(digits);
-    progress = clamp01Local(digits.length / 10);
-    if (digits.length > 0 && !digits.startsWith('7')) {
-      valid = false;
-      progress = Math.min(progress, 0.2); // clearly "wrong track", not "almost"
+  const digits = String(national ?? '').replace(/\D/g, '').slice(0, MAX_NATIONAL_DIGITS);
+  const e164Candidate = `+${c.dial}${digits}`;
+  const valid = digits.length > 0 && isValidPhoneNumber(e164Candidate);
+
+  let progress = 0;
+  if (digits.length > 0) {
+    if (valid) {
+      progress = 1;
+    } else {
+      const verdict = validatePhoneNumberLength(e164Candidate);
+      // TOO_SHORT: on the right track. Anything else (TOO_LONG, INVALID
+      // COUNTRY, a valid length that is not a real number) is not "almost".
+      progress = verdict === 'TOO_SHORT' ? Math.min(0.9, 0.25 + digits.length * 0.08) : 0.2;
     }
-  } else {
-    // E.164 plausibility only (≤15 digits total, ≥8 national digits).
-    const total = c.dial.length + digits.length;
-    valid = digits.length >= 8 && digits.length <= MAX_NATIONAL_DIGITS && total <= 15;
-    progress = clamp01Local(digits.length / 8);
   }
-  if (!valid) progress = Math.min(progress, 0.95);
+
+  let formatted = digits;
+  try {
+    formatted = new AsYouType(c.iso as CountryCode).input(digits) || digits;
+  } catch {
+    formatted = digits;
+  }
+
   return {
     iso: c.iso,
     dial: c.dial,
     national: digits,
-    e164: valid ? `+${c.dial}${digits}` : null,
+    formatted,
+    e164: valid ? e164Candidate : null,
     valid,
     progress,
   };
@@ -157,8 +175,21 @@ export function emptyPhoneValue(iso = 'IQ'): PhoneValue {
   return buildPhoneValue(iso, '');
 }
 
-function clamp01Local(n: number): number {
-  return n < 0 ? 0 : n > 1 ? 1 : n;
+/** Localized country names, from the platform's own locale data. */
+export function countryNames(lang: string): (iso: string) => string {
+  let dn: Intl.DisplayNames | null = null;
+  try {
+    dn = new Intl.DisplayNames([lang], { type: 'region' });
+  } catch {
+    dn = null;
+  }
+  return (iso: string) => {
+    try {
+      return dn?.of(iso) ?? iso;
+    } catch {
+      return iso;
+    }
+  };
 }
 
 // --------------------------------------------------------------- component
@@ -175,6 +206,9 @@ export interface PhoneFieldProps {
   hint?: string;
   disabled?: boolean;
   placeholder?: string;
+  /** Groups the frequently used countries at the top of the picker. */
+  commonLabel?: string;
+  allLabel?: string;
 }
 
 export default function PhoneField({
@@ -188,35 +222,48 @@ export default function PhoneField({
   hint,
   disabled,
   placeholder,
+  commonLabel,
+  allLabel,
 }: PhoneFieldProps) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const country = countryByIso(value.iso);
-  const countryName = (c: Country) => (lang === 'en' ? c.name : c.nameAr);
+
+  const { common, rest, nameOf } = useMemo(() => {
+    const nameOf = countryNames(lang);
+    const commonSet = new Set(COMMON_ISO);
+    const common = COMMON_ISO.map((iso) => BY_ISO.get(iso)).filter(Boolean) as Country[];
+    const rest = COUNTRIES.filter((c) => !commonSet.has(c.iso)).sort((a, b) =>
+      nameOf(a.iso).localeCompare(nameOf(b.iso), lang)
+    );
+    return { common, rest, nameOf };
+  }, [lang]);
 
   const handleText = (raw: string) => {
     const { iso, national } = normalizePhoneInput(raw, value.iso);
     onChange(buildPhoneValue(iso, national));
   };
 
-  const handleCountry = (iso: string) => {
-    onChange(buildPhoneValue(iso, value.national));
-  };
+  const option = (c: Country) => (
+    <option key={c.iso} value={c.iso}>
+      {c.flag} {nameOf(c.iso)} +{c.dial}
+    </option>
+  );
 
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
         {label}
       </label>
-      {/* dir=ltr: dial code and digits always read left-to-right, even on
-          the Arabic page (mandate §2.1). */}
+      {/* dir=ltr: a dial code and a national number read left-to-right in
+          every language, including on the Arabic and Kurdish pages. */}
       <div className="flex gap-2" dir="ltr">
         <div className="relative shrink-0">
-          {/* Compact closed display (flag + dial); the real, accessible
-              <select> sits on top with full localized country names. */}
+          {/* Compact closed display; the real, accessible <select> sits on
+              top at full size with localized names. */}
           <span
             aria-hidden
-            className={`flex min-h-[48px] items-center gap-1.5 rounded-xl border bg-zinc-950/70 px-3 text-[15px] text-white transition-colors ${
+            className={`flex min-h-[48px] items-center gap-1.5 rounded-xl border bg-zinc-950/70 px-3 text-[15px] text-white transition-colors duration-200 ${
               error ? 'border-red-500/70' : 'border-zinc-800'
             } ${disabled ? 'opacity-60' : ''}`}
           >
@@ -230,15 +277,12 @@ export default function PhoneField({
             id={`${id}-country`}
             aria-label={countryLabel}
             value={country.iso}
-            onChange={(e) => handleCountry(e.target.value)}
+            onChange={(e) => onChange(buildPhoneValue(e.target.value, value.national))}
             disabled={disabled}
             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           >
-            {COUNTRIES.map((c) => (
-              <option key={c.iso} value={c.iso}>
-                {c.flag} +{c.dial} — {countryName(c)}
-              </option>
-            ))}
+            <optgroup label={commonLabel ?? '—'}>{common.map(option)}</optgroup>
+            <optgroup label={allLabel ?? '—'}>{rest.map(option)}</optgroup>
           </select>
         </div>
         <input
@@ -250,24 +294,26 @@ export default function PhoneField({
           dir="ltr"
           value={value.national}
           onChange={(e) => handleText(e.target.value)}
-          placeholder={placeholder ?? (country.iso === 'IQ' ? '7XX XXX XXXX' : '')}
+          placeholder={placeholder ?? ''}
           disabled={disabled}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : hint ? hintId : undefined}
-          className={`w-full min-h-[48px] rounded-xl border bg-zinc-950/70 px-4 py-3 text-[15px] tabular-nums text-white placeholder-zinc-600 outline-none transition-colors focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60 ${
+          className={`w-full min-h-[48px] rounded-xl border bg-zinc-950/70 px-4 py-3 text-[15px] tabular-nums text-white placeholder-zinc-600 outline-none transition-colors duration-200 focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60 ${
             error ? 'border-red-500/70' : 'border-zinc-800'
           }`}
         />
       </div>
-      {error ? (
-        <p id={errorId} className="mt-1.5 text-xs font-medium text-red-400">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={hintId} className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-          {hint}
-        </p>
-      ) : null}
+      {/* One reserved line for the message: an error appearing must not push
+          the submit button down the page under the thumb that was aiming
+          for it. */}
+      <p
+        id={error ? errorId : hintId}
+        className={`mt-1.5 min-h-[16px] text-xs leading-relaxed ${
+          error ? 'font-medium text-red-400' : 'text-zinc-500'
+        }`}
+      >
+        {error || hint || ''}
+      </p>
     </div>
   );
 }

@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Edit2, Printer, Store } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import MerchantDashboard from '../components/MerchantDashboard';
 import { api, uploadFile } from '../lib/api';
+import { COUNTRIES, countryNames, flagOf } from '../components/auth/PhoneField';
 
 const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -40,7 +41,12 @@ export default function EditProfile() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
 
+  // Country names come from the platform's locale data rather than a
+  // hand-written table, so the list is in the reader's language without
+  // anyone maintaining 245 names in three of them.
+  const countryLabel = useMemo(() => countryNames(user?.locale === 'ar' ? 'ar' : user?.locale === 'ku' ? 'ckb' : 'en'), [user?.locale]);
   const [username, setUsername] = useState(user?.username || '');
+  const [country, setCountry] = useState(user?.country || '');
   const [fullName, setFullName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [website, setWebsite] = useState(user?.website || '');
@@ -70,6 +76,7 @@ export default function EditProfile() {
     if (!user || loadedUserId.current === user.id) return;
     loadedUserId.current = user.id;
     setUsername(user.username || '');
+    setCountry(user.country || '');
     setFullName(user.name || '');
     setBio(user.bio || '');
     setWebsite(user.website || '');
@@ -136,6 +143,9 @@ export default function EditProfile() {
       };
       // The server enforces the 14-day username cooldown — just attempt it.
       if (username !== (user.username || '')) body.username = username;
+      // Sent only when it changed, so an untouched field can never clear a
+      // value the person set somewhere else.
+      if (country !== (user.country || '')) body.country = country;
       await api.patch('/api/profile', body);
       await refreshUser();
       setSaved(true);
@@ -242,6 +252,30 @@ export default function EditProfile() {
               placeholder="Username"
             />
             <ChevronRight className="w-5 h-5 text-zinc-500 ml-2 shrink-0" />
+          </div>
+        </div>
+
+        {/* Country. It is here because the profile-completion prompt asks for
+            it and sends people to this page — a prompt whose CTA leads
+            somewhere the field does not exist is worse than no prompt. */}
+        <div>
+          <div className="flex justify-between items-end mb-2 ml-1">
+            <h3 className="text-gold text-[13px] font-bold">Country</h3>
+          </div>
+          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4">
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              aria-label="Country"
+              className="bg-transparent font-bold text-[16px] text-white w-full outline-none"
+            >
+              <option value="" className="bg-zinc-900">—</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.iso} value={c.iso} className="bg-zinc-900">
+                  {flagOf(c.iso)} {countryLabel(c.iso)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

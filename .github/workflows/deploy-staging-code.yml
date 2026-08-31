@@ -197,6 +197,57 @@ jobs:
           printf 'APP_ORIGIN\t%s\n' "$APP_ORIGIN" >> /tmp/vars.keep
           mv /tmp/vars.keep /tmp/vars.tsv
 
+      # GOOGLE_CLIENT_ID decides whether Google sign-in works AT ALL, and it
+      # used to be set only by workflows that target a Worker that does not
+      # exist on this account. This workflow could therefore carry an EMPTY
+      # value forward forever, and the site would keep saying "Google sign-in
+      # is not enabled" with nothing in any log to explain it.
+      #
+      # It is now settable here, from the SAME repository secret the frontend
+      # build reads, so the two halves cannot disagree. Unset: the live value
+      # is carried forward untouched, exactly as before.
+      #
+      # A Google client id is public — it is in the page, in the redirect and
+      # in every token audience — so it is a variable, not a secret. There is
+      # no GOOGLE_CLIENT_SECRET anywhere in this architecture: the Worker
+      # verifies an Identity Services ID token against Google's published
+      # JWKS, so there is no code exchange and no callback URL.
+      - name: Let the owner set the Google client id
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          set -e
+          LIVE=$(awk -F'\t' '$1=="GOOGLE_CLIENT_ID"{print $2}' /tmp/vars.tsv)
+          if [ -z "$GOOGLE_CLIENT_ID" ]; then
+            if [ -n "$LIVE" ]; then
+              echo "GOOGLE_CLIENT_ID: keeping the value already on the Worker"
+            else
+              echo "::warning::GOOGLE_CLIENT_ID is EMPTY on the Worker and no VITE_GOOGLE_CLIENT_ID secret is set — Google sign-in will report itself as unavailable"
+            fi
+            exit 0
+          fi
+          case "$GOOGLE_CLIENT_ID" in
+            *.apps.googleusercontent.com) ;;
+            *) echo "::error::VITE_GOOGLE_CLIENT_ID does not look like a Google client id (expected …apps.googleusercontent.com)"; exit 1 ;;
+          esac
+          grep -v "^GOOGLE_CLIENT_ID\t" /tmp/vars.tsv > /tmp/vars.keep || true
+          printf 'GOOGLE_CLIENT_ID\t%s\n' "$GOOGLE_CLIENT_ID" >> /tmp/vars.keep
+          mv /tmp/vars.keep /tmp/vars.tsv
+          echo "GOOGLE_CLIENT_ID will be set from the repository secret"
+
+      # EMAIL_ALLOWED_RECIPIENTS is a STAGING guard: when it is non-empty,
+      # every message to an address outside the list is dropped with a console
+      # warning and an unchanged HTTP response. On production that is a silent
+      # outage — password resets appear to be sent and never arrive.
+      - name: Refuse to leave the staging email allowlist on in production
+        run: |
+          ALLOW=$(awk -F'\t' '$1=="EMAIL_ALLOWED_RECIPIENTS"{print $2}' /tmp/vars.tsv)
+          if [ -n "$ALLOW" ]; then
+            echo "::error::EMAIL_ALLOWED_RECIPIENTS is set on this Worker. Every email to an address outside that list is silently dropped — password reset and verification would look sent and never arrive. Clear it in the Cloudflare dashboard (Workers -> levonis-staging -> Settings -> Variables) and re-run."
+            exit 1
+          fi
+          echo "email allowlist: not set (every recipient is deliverable)"
+
       # ------------------------------------------------ before, not after
       # `classifyHost` checks the reserved list BEFORE looking a slug up, so a
       # name that becomes reserved stops resolving to its store instantly, on
@@ -242,6 +293,30 @@ jobs:
             printf '%s' "$STUDIO_HANDOFF_SECRET" | npx wrangler secret put STUDIO_HANDOFF_SECRET --env staging
           else
             echo "STUDIO_HANDOFF_SECRET not set — Studio sign-in stays honestly disabled"
+          fi
+
+      # THE REASON PASSWORD RESET SAID "no email service is configured".
+      #
+      # EMAIL_API_KEY is a Worker SECRET, and secrets are not carried forward
+      # by a deploy the way plain-text vars are — they have to be uploaded.
+      # The only workflows that ever uploaded it target the Worker named
+      # `levonis`, which does not exist on this account (docs/DECISIONS.md row
+      # 52): the Worker actually serving levonis-iq.com is `levonis-staging`,
+      # deployed by THIS file. So the key was never delivered to the running
+      # site, and every password-reset and verification email refused itself.
+      #
+      # Opt-in, like the Studio secret: unset means the previous state is
+      # untouched and the feature stays honestly disabled rather than
+      # pretending to send.
+      - name: Upload the email provider key
+        env:
+          EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
+        run: |
+          if [ -n "$EMAIL_API_KEY" ]; then
+            printf '%s' "$EMAIL_API_KEY" | npx wrangler secret put EMAIL_API_KEY --env staging
+            echo "EMAIL_API_KEY uploaded — password reset and email verification can send"
+          else
+            echo "EMAIL_API_KEY not set — password reset and email verification stay honestly disabled"
           fi
 
       # The same proof the Studio deploy now carries, for the store. A green
@@ -380,6 +455,41 @@ jobs:
             "https://levonis-iq.com/api/cart/items" || echo 000)
           echo "POST /api/cart/items (signed out) -> $CODE"
           [ "$CODE" != "500" ] || { echo "::error::the cart endpoint is answering 500"; exit 1; }
+
+      # WHAT THE LIVE SITE SAYS ABOUT ITS OWN SIGN-IN METHODS.
+      #
+      # This is the check that would have caught the Google outage on the day
+      # it started. The endpoint is the single source the auth page reads, so
+      # if it says a method is off, the button is not there — and the run says
+      # so out loud instead of the owner finding out from a screenshot.
+      #
+      # Values are never printed: only whether each provider is configured.
+      - name: What the live site reports about its sign-in methods
+        run: |
+          set -e
+          BODY=$(curl -s --max-time 25 "${{ vars.APP_ORIGIN || 'https://levonis-iq.com' }}/api/auth/capabilities" || echo '{}')
+          echo "$BODY" | jq -e '.success == true' > /dev/null \
+            || { echo "::error::/api/auth/capabilities did not answer"; echo "$BODY" | head -c 300; exit 1; }
+
+          echo "| Sign-in method | Live |"            >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|"                            >> "$GITHUB_STEP_SUMMARY"
+          for k in emailPassword passwordReset emailVerification google telegram phoneSignIn phoneOtp; do
+            V=$(echo "$BODY" | jq -r ".$k")
+            echo "  $k: $V"
+            echo "| $k | $V |"                        >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          # The client id itself is public, but there is no reason to print
+          # it: what matters is that one is present and that it is a Google
+          # one. Its shape is checked, its value is not shown.
+          echo "$BODY" | jq -e '.googleClientId | test("apps\\.googleusercontent\\.com$")' > /dev/null \
+            && echo "  googleClientId: present and Google-shaped" \
+            || echo "::warning::the live site reports NO Google client id — the Google button will be hidden"
+
+          [ "$(echo "$BODY" | jq -r '.passwordReset')" = "true" ] \
+            || echo "::warning::password reset is OFF on the live site — set the EMAIL_API_KEY repository secret and re-run"
+          [ "$(echo "$BODY" | jq -r '.telegram')" = "true" ] \
+            || echo "::warning::Telegram sign-in is OFF on the live site — the bot did not answer"
 
       - name: Confirm the vars survived
         run: |

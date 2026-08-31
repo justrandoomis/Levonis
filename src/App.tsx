@@ -37,6 +37,8 @@ import Addresses from './pages/Addresses';
 import Subscription from './pages/Subscription';
 import Wallet from './pages/Wallet';
 import Auth from './pages/Auth';
+import Welcome from './pages/Welcome';
+import CompleteProfileSheet from './components/profile/CompleteProfileSheet';
 import Rewards from './pages/Rewards';
 import Referrals from './pages/Referrals';
 import Games from './pages/Games';
@@ -161,6 +163,9 @@ function AppContent() {
           corner near the nav — removed at the source, not covered up. */}
       <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-black">
         <EmailVerifyBanner />
+        {/* Asks once, on the server's schedule, never on the routes where an
+            interruption costs the person something. */}
+        <CompleteProfileSheet />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
@@ -173,6 +178,11 @@ function AppContent() {
           <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
           <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
+          {/* Account setup after signup. Everything on it is skippable and
+              the account already works without it, so it is a normal page
+              rather than a gate — it redirects home for anyone who has
+              already finished or skipped it. */}
+          <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/points" element={<Rewards />} />
           {/* Browsing the community needs a SESSION, not a finished profile. It
               used to sit behind RequireCommunityProfile, which redirected to

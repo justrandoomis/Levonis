@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
-import { publicUser, localeToApi } from '../lib/types';
+import { publicUser, localeToApi, localeToDb } from '../lib/types';
 import {
   HttpError,
   badRequest,
@@ -21,7 +21,8 @@ import { createSession, destroySession, destroyAllSessions, loadSessionUser } fr
 import { verifyGoogleIdToken } from '../lib/google';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
-import { normalizePhone, maskPhone } from '../lib/phone';
+import { normalizePhone, maskPhone, DEFAULT_COUNTRY, allCountries } from '../lib/phone';
+import { canonicalUsername, usernameRejection, suggestUsername } from '../lib/usernames';
 import {
   getBotUsername,
   sendToChat,
@@ -62,6 +63,43 @@ const PASSWORD_MAX = 128;
  * compared against 32 zero bytes.
  */
 export const DUMMY_PASSWORD_HASH = `pbkdf2$100000$${'A'.repeat(22)}$${'A'.repeat(43)}`;
+
+/**
+ * A country the person selected, or null for "they have not said".
+ *
+ * Deliberately forgiving: an unrecognised value becomes null instead of an
+ * error, because a country dropdown is not worth failing a signup over, and
+ * "unknown" is a truthful answer that the profile-completion prompt can act
+ * on later. Validated against the real ISO list rather than a length check —
+ * `ZZ` is two letters and is not a country.
+ */
+function countryCodeOrNull(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const iso = v.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(iso)) return null;
+  return allCountries().some((c) => c.iso === iso) ? iso : null;
+}
+
+/** The DB locale for whatever the client claimed, defaulting to English. */
+function localeOrDefault(v: unknown): 'ar' | 'en' | 'ku' {
+  return localeToDb(typeof v === 'string' ? v : 'en');
+}
+
+/**
+ * Run a background promise without letting its absence break the request.
+ *
+ * `c.executionCtx` throws when there is no ExecutionContext at all. Reaching
+ * for it inside an after-the-fact notice is how a completed action reports
+ * itself as failed.
+ */
+function waitUntil(c: Context<AppContext>, work: Promise<unknown>): void {
+  const swallow = () => work.catch(() => undefined);
+  try {
+    c.executionCtx.waitUntil(swallow());
+  } catch {
+    void swallow();
+  }
+}
 
 function checkPassword(pw: string): void {
   if (pw.length < PASSWORD_MIN) throw badRequest(`Password must be at least ${PASSWORD_MIN} characters`);
@@ -200,6 +238,93 @@ export function pickSignupReferralSource(
   return { kind: 'none' };
 }
 
+/**
+ * WHICH SIGN-IN METHODS ACTUALLY WORK ON THIS DEPLOYMENT.
+ *
+ * THE BUG THIS ENDPOINT EXISTS TO KILL. The Google button used to be decided
+ * by `import.meta.env.VITE_GOOGLE_CLIENT_ID` — a value baked into the
+ * JavaScript bundle at BUILD time. So the button's presence depended on
+ * whether the build runner happened to hold a repository secret, while
+ * whether the sign-in could actually succeed depended on a variable on the
+ * Worker. Two different values, set in two different places, either of which
+ * silently produced "Google sign-in is not enabled on this deployment".
+ *
+ * There is now one source of truth, read at RUNTIME from the Worker that
+ * would have to verify the token anyway. A build can no longer disagree with
+ * the deployment it is served from, and re-pointing the platform at a
+ * different Google project is a variable change rather than a rebuild.
+ *
+ * The client id is public by construction — Google puts it in the page, in
+ * the redirect and in every token audience. `GOOGLE_CLIENT_SECRET` is NOT
+ * used anywhere in this architecture and is not exposed here: LEVONIS
+ * verifies a Google Identity Services ID token against Google's published
+ * JWKS (worker/lib/google.ts), so there is no authorization-code exchange
+ * and therefore no client secret and no callback URL to protect.
+ *
+ * Nothing secret is returned. Every value below is either a public
+ * identifier or a boolean saying whether a secret is present — never its
+ * contents, and never its length.
+ */
+authRoutes.get('/capabilities', async (c) => {
+  const clientId = (c.env.GOOGLE_CLIENT_ID || '').trim();
+  const mail = !!(c.env.EMAIL_API_KEY && (c.env.EMAIL_FROM || '').trim());
+  // getBotUsername answers from an in-memory cache, then a persisted one, and
+  // returns null rather than guessing — so `telegram: true` means a bot that
+  // actually answered, not merely a token that is present.
+  const botUsername = await getBotUsername(c.env).catch(() => null);
+
+  // The auth page is read before sign-in and changes only when the
+  // deployment's configuration changes.
+  c.header('Cache-Control', 'public, max-age=60');
+  return c.json({
+    success: true,
+    // Always available: the account system is LEVONIS's own.
+    emailPassword: true,
+    // Both of these need an outbound mail provider, and they fail together.
+    passwordReset: mail,
+    emailVerification: mail,
+    google: clientId.length > 0,
+    googleClientId: clientId,
+    telegram: !!botUsername,
+    telegramBot: botUsername ?? '',
+    /**
+     * A phone number is a valid thing to SIGN IN with (it is matched against
+     * the account's verified `phone_e164`), and it is never a way to sign UP
+     * on its own — creating an account on a phone number requires proving
+     * ownership of it, which happens through Telegram. `phoneOtp` says
+     * whether an SMS provider exists to do that without Telegram. It does
+     * not, so the UI must not offer an SMS flow.
+     */
+    phoneSignIn: true,
+    phoneOtp: false,
+    defaultCountry: DEFAULT_COUNTRY,
+  });
+});
+
+/**
+ * Is this username free? Answered while somebody types, so it is rate
+ * limited and says nothing an attacker could not learn by trying to sign up.
+ *
+ * The reason is returned rather than a bare boolean: "unavailable" makes a
+ * person try variations of a name that will never be accepted, when what
+ * they need to be told is that it is too short, or that it is reserved.
+ */
+authRoutes.get('/username-available', async (c) => {
+  await rateLimit(c, 'username-check', 60, 300);
+  const raw = canonicalUsername(c.req.query('u') ?? '');
+  const rejection = usernameRejection(raw);
+  if (rejection) {
+    return c.json({ success: true, username: raw, available: false, reason: rejection });
+  }
+  const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(raw).first();
+  return c.json({
+    success: true,
+    username: raw,
+    available: !taken,
+    reason: taken ? 'taken' : null,
+  });
+});
+
 authRoutes.post('/register', async (c) => {
   await rateLimit(c, 'register', 30, 3600);
   const body = await c.req.json().catch(() => ({}));
@@ -219,24 +344,44 @@ authRoutes.post('/register', async (c) => {
   const mail = email(body.email);
   const uname = body.username ? username(body.username) : null;
   const name = str(body.name, 'name', { min: 0, max: 100, required: false });
+  // Both optional, both only ever affect what this person is shown. An
+  // unknown value is stored as "not said" rather than rejected — a signup
+  // must not fail over a country dropdown.
+  const country = countryCodeOrNull(body.country);
+  const locale = localeOrDefault(body.locale ?? body.lang);
   const password = String(body.password ?? '');
   const referralCode = referralCodeFrom(body);
   checkPassword(password);
 
+  // Checked here so the message names the ONE thing that is wrong; the
+  // UNIQUE indexes below are what actually decide, and produce the same
+  // codes when two signups race.
   const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
-  if (existing) throw conflict('An account with this email already exists');
+  if (existing) throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
   if (uname) {
     const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
-    if (taken) throw conflict('This username is taken');
+    if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
   }
 
   const id = newId('usr');
   const hash = await hashPassword(password);
-  await c.env.DB.prepare(
-    'INSERT INTO users (id, email, username, name, password_hash) VALUES (?, ?, ?, ?, ?)'
-  )
-    .bind(id, mail, uname, name, hash)
-    .run();
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO users (id, email, username, name, password_hash, country, locale) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )
+      .bind(id, mail, uname, name, hash, country, locale)
+      .run();
+  } catch (e) {
+    // THE RACE THE CHECKS ABOVE CANNOT CLOSE. Two signups a millisecond
+    // apart both read "free" and both insert; the database is what actually
+    // decides, so its refusal is translated into the same 409 the check
+    // would have produced rather than surfacing as a 500 that reads like the
+    // site is broken.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes('UNIQUE')) throw e;
+    if (msg.includes('username')) throw conflict('This username is taken', 'USERNAME_TAKEN');
+    throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
+  }
 
   await tryAttributeReferral(c.env, id, referralCode);
 
@@ -341,29 +486,32 @@ authRoutes.post('/login', async (c) => {
   return c.json({ success: true, user: publicUser(user!) });
 });
 
-authRoutes.post('/google', async (c) => {
-  await rateLimit(c, 'google', 30, 900);
-  const body = await c.req.json().catch(() => ({}));
-  const credential = str(body.credential, 'credential', { min: 20, max: 4096 });
-  const referralCode = referralCodeFrom(body);
-
-  let identity;
-  try {
-    identity = await verifyGoogleIdToken(credential, c.env.GOOGLE_CLIENT_ID);
-  } catch (e) {
-    if (!c.env.GOOGLE_CLIENT_ID) {
-      throw unavailable('Google Sign-In is not configured yet (GOOGLE_CLIENT_ID missing)', 'GOOGLE_NOT_CONFIGURED');
-    }
-    throw unauthorized(e instanceof Error ? e.message : 'Google sign-in failed');
-  }
-
+/**
+ * Match a verified Google identity to a LEVONIS account, or create one.
+ *
+ * EXTRACTED SO IT CAN BE TESTED. The rules below decide whether two people
+ * are one person, and they were only reachable through a route that first
+ * verifies an RS256 token against Google's live JWKS — which means the four
+ * cases that matter (known subject, link to a verified address, refuse an
+ * unverified one, create a new account) could not be exercised at all
+ * without a real Google token. They are now a function over a database.
+ *
+ * The caller must have ALREADY verified the identity. Nothing here checks a
+ * signature; passing an unverified identity to this function would hand an
+ * account to whoever asked for it.
+ */
+export async function resolveGoogleIdentity(
+  env: Env,
+  identity: { sub: string; email: string; name?: string },
+  referralCode = ''
+): Promise<SessionUser> {
   // Match by google_sub first (stable), then link by verified email.
-  let row = await c.env.DB.prepare('SELECT * FROM users WHERE google_sub = ?')
+  let row = await env.DB.prepare('SELECT * FROM users WHERE google_sub = ?')
     .bind(identity.sub)
     .first<SessionUser>();
 
   if (!row) {
-    const byEmail = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
+    const byEmail = await env.DB.prepare('SELECT * FROM users WHERE email = ?')
       .bind(identity.email)
       .first<SessionUser & { google_sub: string | null; email_verified_at: string | null }>();
     if (byEmail) {
@@ -389,7 +537,7 @@ authRoutes.post('/google', async (c) => {
       }
       // Conditional link: only claims an unclaimed google_sub, so two
       // concurrent sign-ins can never overwrite an existing link.
-      const linked = await c.env.DB.prepare(
+      const linked = await env.DB.prepare(
         'UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL'
       )
         .bind(identity.sub, byEmail.id)
@@ -397,44 +545,49 @@ authRoutes.post('/google', async (c) => {
       if (linked.meta.changes === 0) {
         // Someone linked a Google identity to this account in between; only
         // the same sub may proceed (a different one is the conflict above).
-        const fresh = await c.env.DB.prepare('SELECT google_sub FROM users WHERE id = ?')
+        const fresh = await env.DB.prepare('SELECT google_sub FROM users WHERE id = ?')
           .bind(byEmail.id)
           .first<{ google_sub: string | null }>();
         if (fresh?.google_sub !== identity.sub) {
           throw conflict('This email is already linked to a different Google account');
         }
       }
-      await audit(c.env.DB, byEmail.id, 'auth.google_linked', byEmail.id, {});
+      await audit(env.DB, byEmail.id, 'auth.google_linked', byEmail.id, {});
       row = byEmail;
     }
   }
 
   if (!row) {
     const id = newId('usr');
-    const base = identity.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24) || 'user';
-    // Ensure a unique username without leaking whether the base exists.
-    let uname = base;
-    for (let i = 0; i < 3; i++) {
-      const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
+    // The handle is DERIVED, so it has to pass the same rules a typed one
+    // does — including the reserved list. `admin@gmail.com` used to become
+    // the handle `admin`; `suggestUsername` returns '' for anything reserved
+    // or malformed, and a numeric suffix is added until the name is free.
+    // A null username is an acceptable outcome: the account works, and the
+    // onboarding step asks for a handle.
+    let uname: string | null = suggestUsername(identity.email) || null;
+    for (let i = 0; uname && i < 4; i++) {
+      const taken = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
       if (!taken) break;
-      uname = `${base}${Math.floor(1000 + Math.random() * 9000)}`;
+      const candidate = `${suggestUsername(identity.email).slice(0, 24)}${Math.floor(1000 + Math.random() * 9000)}`;
+      uname = usernameRejection(candidate) === null ? candidate : null;
     }
-    await c.env.DB.prepare(
+    await env.DB.prepare(
       'INSERT INTO users (id, email, username, name, google_sub) VALUES (?, ?, ?, ?, ?)'
     )
       .bind(id, identity.email, uname, identity.name || 'User', identity.sub)
       .run();
-    row = (await getFullUser(c.env.DB, id))!;
+    row = (await getFullUser(env.DB, id))!;
     // Referral attribution happens ONLY on account creation — an existing
     // account signing in with a ?ref= link must never be re-attributed.
-    await tryAttributeReferral(c.env, id, referralCode);
+    await tryAttributeReferral(env, id, referralCode);
   }
 
   // verifyGoogleIdToken only accepts identities whose email_verified claim is
   // true, so a Google sign-in proves ownership of that address: stamp THIS
   // account's own matching address as verified (first stamp wins; existing
   // stamps and other accounts are never touched — no bulk verification).
-  await c.env.DB.prepare(
+  await env.DB.prepare(
     'UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND email = ?'
   )
     .bind(new Date().toISOString(), row.id, identity.email)
@@ -443,17 +596,37 @@ authRoutes.post('/google', async (c) => {
   // Controlled initial-admin bootstrap: promote only on a VERIFIED Google
   // identity matching INITIAL_ADMIN_EMAIL, and only while no admin exists.
   if (
-    c.env.INITIAL_ADMIN_EMAIL &&
-    identity.email === c.env.INITIAL_ADMIN_EMAIL.toLowerCase().trim() &&
+    env.INITIAL_ADMIN_EMAIL &&
+    identity.email === env.INITIAL_ADMIN_EMAIL.toLowerCase().trim() &&
     row.role !== 'admin'
   ) {
-    const adminExists = await c.env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first();
+    const adminExists = await env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first();
     if (!adminExists) {
-      await c.env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(row.id).run();
-      await audit(c.env.DB, row.id, 'auth.initial_admin_bootstrap', row.id, { email: identity.email });
+      await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(row.id).run();
+      await audit(env.DB, row.id, 'auth.initial_admin_bootstrap', row.id, { email: identity.email });
     }
   }
 
+  return (await getFullUser(env.DB, row.id))!;
+}
+
+authRoutes.post('/google', async (c) => {
+  await rateLimit(c, 'google', 30, 900);
+  const body = await c.req.json().catch(() => ({}));
+  const credential = str(body.credential, 'credential', { min: 20, max: 4096 });
+  const referralCode = referralCodeFrom(body);
+
+  let identity;
+  try {
+    identity = await verifyGoogleIdToken(credential, c.env.GOOGLE_CLIENT_ID);
+  } catch (e) {
+    if (!c.env.GOOGLE_CLIENT_ID) {
+      throw unavailable('Google Sign-In is not configured yet (GOOGLE_CLIENT_ID missing)', 'GOOGLE_NOT_CONFIGURED');
+    }
+    throw unauthorized(e instanceof Error ? e.message : 'Google sign-in failed');
+  }
+
+  const row = await resolveGoogleIdentity(c.env, identity, referralCode);
   await createSession(c, row.id);
   const user = await getFullUser(c.env.DB, row.id);
   return c.json({ success: true, user: publicUser(user!) });
@@ -683,12 +856,23 @@ authRoutes.post('/reset-password', async (c) => {
   await audit(c.env.DB, row.user_id, 'auth.password_reset', row.user_id);
 
   // Best-effort security notice to the account owner, in their own locale.
-  const owner = await c.env.DB.prepare('SELECT email, locale FROM users WHERE id = ?')
-    .bind(row.user_id)
-    .first<{ email: string; locale: string }>();
-  if (owner) {
-    const notice = renderPasswordChangedEmail(localeToApi(owner.locale));
-    c.executionCtx.waitUntil(sendEmail(c.env, owner.email, notice.subject, notice.html, notice.text));
+  //
+  // BEST-EFFORT HAS TO MEAN IT. By this point the password is already
+  // changed and every session is already gone; there is no undoing it. So
+  // nothing in this block may turn a completed reset into an error the
+  // person reads as "it did not work" — including `c.executionCtx` itself,
+  // which throws outright in any context that has no ExecutionContext.
+  try {
+    const owner = await c.env.DB.prepare('SELECT email, locale FROM users WHERE id = ?')
+      .bind(row.user_id)
+      .first<{ email: string; locale: string }>();
+    if (owner) {
+      const notice = renderPasswordChangedEmail(localeToApi(owner.locale));
+      const send = sendEmail(c.env, owner.email, notice.subject, notice.html, notice.text);
+      waitUntil(c, send);
+    }
+  } catch (e) {
+    console.error('password-changed notice failed', e instanceof Error ? e.message : String(e));
   }
 
   return c.json({ success: true });

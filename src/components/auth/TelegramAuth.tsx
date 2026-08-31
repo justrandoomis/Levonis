@@ -5,6 +5,7 @@ import { api, ApiError, isNotConfigured } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import OtpBoxes from './OtpBoxes';
+import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
 
 /**
@@ -27,9 +28,12 @@ const STRINGS = {
   ar: {
     introSignin: 'سجّل الدخول برقم هاتفك الموثّق عبر تيليغرام — بدون كلمة مرور.',
     introSignup: 'أنشئ حسابك برقم هاتفك بعد توثيقه عبر تيليغرام.',
-    phoneLabel: 'رقم الهاتف (موبايل عراقي)',
-    phonePlaceholder: '07XXXXXXXXX',
-    phoneInvalid: 'أدخل رقم موبايل عراقي صحيح مثل 07XXXXXXXXX (تُقبل الأرقام العربية أيضًا).',
+    phoneLabel: 'رقم الهاتف',
+    countryLabel: 'الدولة',
+    commonCountries: 'الأكثر استخدامًا',
+    allCountries: 'كل الدول',
+    phoneHint: 'اختر دولتك ثم اكتب رقمك بدون صفر البداية. تُقبل الأرقام العربية أيضًا.',
+    phoneInvalid: 'هذا الرقم غير صحيح للدولة المختارة. تحقق من الدولة ومن الرقم.',
     continueTg: 'المتابعة عبر تيليغرام',
     starting: 'جارٍ التجهيز…',
     openTelegram: 'فتح البوت في تيليغرام',
@@ -72,9 +76,12 @@ const STRINGS = {
   en: {
     introSignin: 'Sign in with your Telegram-verified phone number — no password.',
     introSignup: 'Create your account with your phone number, verified via Telegram.',
-    phoneLabel: 'Phone number (Iraqi mobile)',
-    phonePlaceholder: '07XXXXXXXXX',
-    phoneInvalid: 'Enter a valid Iraqi mobile number like 07XXXXXXXXX (Arabic digits are accepted too).',
+    phoneLabel: 'Phone number',
+    countryLabel: 'Country',
+    commonCountries: 'Frequently used',
+    allCountries: 'All countries',
+    phoneHint: 'Pick your country, then type your number without the leading zero. Arabic digits are accepted too.',
+    phoneInvalid: 'That is not a valid number for the selected country. Check the country and the number.',
     continueTg: 'Continue with Telegram',
     starting: 'Preparing…',
     openTelegram: 'Open the bot in Telegram',
@@ -117,9 +124,12 @@ const STRINGS = {
   ckb: {
     introSignin: 'بە ژمارە تەلەفۆنە پشتڕاستکراوەکەت لە ڕێگەی تەلەگرامەوە بچۆرەژوورەوە — بەبێ وشەی نهێنی.',
     introSignup: 'هەژمارەکەت بە ژمارەی تەلەفۆنەکەت دروستبکە دوای پشتڕاستکردنەوەی لە تەلەگرام.',
-    phoneLabel: 'ژمارەی تەلەفۆن (مۆبایلی عێراقی)',
-    phonePlaceholder: '07XXXXXXXXX',
-    phoneInvalid: 'ژمارەیەکی مۆبایلی عێراقی دروست بنووسە وەک 07XXXXXXXXX (ژمارە عەرەبییەکانیش قبوڵن).',
+    phoneLabel: 'ژمارەی تەلەفۆن',
+    countryLabel: 'وڵات',
+    commonCountries: 'زۆرترین بەکارهاتوو',
+    allCountries: 'هەموو وڵاتان',
+    phoneHint: 'وڵاتەکەت هەڵبژێرە، پاشان ژمارەکەت بەبێ سفری سەرەتا بنووسە. ژمارە عەرەبییەکانیش قبوڵن.',
+    phoneInvalid: 'ئەم ژمارەیە بۆ وڵاتی هەڵبژێردراو دروست نییە. وڵات و ژمارەکە بپشکنە.',
     continueTg: 'بەردەوامبوون لە ڕێگەی تەلەگرام',
     starting: 'ئامادەکردن…',
     openTelegram: 'کردنەوەی بۆتەکە لە تەلەگرام',
@@ -219,12 +229,14 @@ function toAsciiDigits(s: string): string {
   });
 }
 
-/** Light client-side plausibility check for early feedback only — the server
- *  performs the authoritative normalization. */
-function phoneLooksValid(raw: string): boolean {
-  const s = toAsciiDigits(raw).trim().replace(/[\s\-().]/g, '');
-  const digits = s.startsWith('+') ? s.slice(1) : s.startsWith('00') ? s.slice(2) : s;
-  return /^\d{7,15}$/.test(digits);
+/**
+ * Early feedback only — the server is still the authority and re-normalizes
+ * everything it is sent. What changed: this used to be `7 to 15 digits`,
+ * which called `+971 00000 0000` a UAE number. It is now the real numbering
+ * plan for the selected country, via the shared PhoneField value.
+ */
+function phoneLooksValid(value: PhoneValue): boolean {
+  return value.valid && !!value.e164;
 }
 
 function loadStored(purpose: Purpose): StoredFlow | null {
@@ -272,7 +284,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
   const [serverState, setServerState] = useState<string>('pending');
   const [hint, setHint] = useState<string | null>(null);
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState<PhoneValue>(() => emptyPhoneValue('IQ'));
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [notConfigured, setNotConfigured] = useState(false);
@@ -419,7 +431,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
     try {
       const ref = (referralCode ?? '').trim();
       const data = await api.post<StartResp>('/api/auth/telegram/start', {
-        phone: toAsciiDigits(phone.trim()),
+        phone: phone.e164 as string,
         purpose,
         // Captured server-side at START (it survives the app switch and a
         // tab reload); an unknown code never blocks the sign-up.
@@ -543,19 +555,16 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
 
       {phase === 'phone' && !notConfigured && (
         <form onSubmit={handleStart} noValidate>
-          <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-phone">
-            {s.phoneLabel}
-          </label>
-          <input
+          <PhoneField
             id="tg-auth-phone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            dir="ltr"
+            label={s.phoneLabel}
+            countryLabel={s.countryLabel}
+            commonLabel={s.commonCountries}
+            allLabel={s.allCountries}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder={s.phonePlaceholder}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder-zinc-500 outline-none focus:border-gold transition-colors"
+            onChange={setPhone}
+            lang={lang}
+            hint={s.phoneHint}
           />
           {startError && (
             <div className="mt-2 flex items-start gap-2" role="alert">
@@ -565,7 +574,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
           )}
           <button
             type="submit"
-            disabled={starting || !phone.trim()}
+            disabled={starting || !phone.valid}
             className="mt-3 w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
           >
             {starting ? (

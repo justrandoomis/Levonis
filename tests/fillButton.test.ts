@@ -28,6 +28,7 @@ import {
   emptyPhoneValue,
   countryByIso,
   COUNTRIES,
+  COMMON_ISO,
 } from '../src/components/auth/PhoneField';
 import { normalizeOtp } from '../src/components/auth/OtpBoxes';
 import { normalizePhone, toAsciiDigits } from '../worker/lib/phone';
@@ -177,8 +178,14 @@ test('Iraq is the default country (+964)', () => {
   assert.equal(v.dial, '964');
   assert.equal(v.valid, false);
   assert.equal(v.e164, null);
-  assert.equal(COUNTRIES[0].iso, 'IQ');
   assert.equal(countryByIso('nope').iso, 'IQ');
+  // The list is now every country libphonenumber knows, sorted by ISO code,
+  // so "Iraq is first" is no longer a property of the array — it is a
+  // property of the PICKER, which floats the markets this platform serves to
+  // the top. That is the guarantee worth asserting.
+  assert.equal(COMMON_ISO[0], 'IQ');
+  assert.ok(COUNTRIES.length > 200, `only ${COUNTRIES.length} countries`);
+  assert.ok(COUNTRIES.some((c) => c.iso === 'IQ' && c.dial === '964'));
 });
 
 test('pasting local / international / 00 / Arabic-digit forms all normalize to the same number', () => {
@@ -215,9 +222,14 @@ test('pasting another country dial code switches the selected country', () => {
   assert.equal(tr.national, '5321234567');
   assert.equal(buildPhoneValue(tr.iso, tr.national).e164, '+905321234567');
 
-  const uk = normalizePhoneInput('00447700900123', 'IQ');
+  // 07700 900xxx is Ofcom's drama range — reserved as NEVER allocated, so a
+  // real numbering plan refuses it. That is the point of validating against
+  // one: the old "8 to 15 digits" rule would have accepted it.
+  assert.equal(buildPhoneValue('GB', '7700900123').valid, false);
+
+  const uk = normalizePhoneInput('00447400123456', 'IQ');
   assert.equal(uk.iso, 'GB');
-  assert.equal(buildPhoneValue(uk.iso, uk.national).e164, '+447700900123');
+  assert.equal(buildPhoneValue(uk.iso, uk.national).e164, '+447400123456');
 });
 
 test('an arbitrary 10-digit string is NOT a valid Iraqi mobile (§2.3)', () => {

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Mail, Phone as PhoneIcon, Send, Chrome } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowLeft, CheckCircle2, Mail, Send, Chrome } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
@@ -17,7 +17,8 @@ import FillButton, {
   lengthProgress,
   combineFillProgress,
 } from '../components/auth/FillButton';
-import PhoneField, { emptyPhoneValue, type PhoneValue } from '../components/auth/PhoneField';
+import { useCapabilities } from '../hooks/useCapabilities';
+import { toAsciiDigitsClient } from '../components/auth/PhoneField';
 import MethodSwitch, {
   methodPanelId,
   methodTabId,
@@ -73,7 +74,9 @@ const STRINGS = {
     methodEmail: 'البريد',
     methodPhone: 'الهاتف',
     methodTelegram: 'تيليغرام',
-    identifier: 'البريد الإلكتروني أو اسم المستخدم',
+    identifier: 'البريد الإلكتروني أو اسم المستخدم أو رقم الهاتف',
+    identifierPlaceholder: 'email@example.com',
+    googleNote: 'سنستخدم اسمك وبريدك من Google فقط. لن نصل إلى أي شيء آخر في حسابك.',
     email: 'البريد الإلكتروني',
     username: 'اسم المستخدم',
     fullName: 'الاسم',
@@ -147,7 +150,9 @@ const STRINGS = {
     methodEmail: 'Email',
     methodPhone: 'Phone',
     methodTelegram: 'Telegram',
-    identifier: 'Email or username',
+    identifier: 'Email, username or phone',
+    identifierPlaceholder: 'email@example.com',
+    googleNote: 'We only use your name and email from Google. Nothing else in your account is touched.',
     email: 'Email',
     username: 'Username',
     fullName: 'Name',
@@ -221,7 +226,9 @@ const STRINGS = {
     methodEmail: 'ئیمەیل',
     methodPhone: 'مۆبایل',
     methodTelegram: 'تێلێگرام',
-    identifier: 'ئیمەیل یان ناوی بەکارهێنەر',
+    identifier: 'ئیمەیل، ناوی بەکارهێنەر یان ژمارەی تەلەفۆن',
+    identifierPlaceholder: 'email@example.com',
+    googleNote: 'تەنها ناو و ئیمەیلەکەت لە Google بەکاردەهێنین. هیچی تر لە هەژمارەکەت دەستی لێنادرێت.',
     email: 'ئیمەیل',
     username: 'ناوی بەکارهێنەر',
     fullName: 'ناو',
@@ -290,6 +297,17 @@ const USERNAME_SHAPE_RE = /^[a-zA-Z0-9._-]{3,30}$/;
 
 const METHOD_ID_PREFIX = 'auth-method';
 
+/**
+ * Does what somebody typed into the identifier field LOOK like a phone
+ * number? Used only to decide whether to offer the Telegram route after a
+ * failed sign-in — never to validate anything, and never fed by the server,
+ * so it leaks nothing about which accounts exist.
+ */
+export function looksLikePhone(identifier: string): boolean {
+  const digits = toAsciiDigitsClient(identifier).replace(/[\s\-().+]/g, '');
+  return /^\d{7,15}$/.test(digits) && !identifier.includes('@');
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -338,7 +356,6 @@ export default function Auth() {
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState<PhoneValue>(() => emptyPhoneValue());
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -347,13 +364,38 @@ export default function Auth() {
 
   // Honest not-configured state: without a build-time client id the Google
   // button could only ever fail, so we say so instead of rendering it.
-  const rawGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || '';
-  const googleConfigured = rawGoogleClientId.length > 0 && rawGoogleClientId !== 'YOUR_GOOGLE_CLIENT_ID';
+  /**
+   * WHICH METHODS THIS DEPLOYMENT ACTUALLY HAS, asked at runtime.
+   *
+   * This used to read `import.meta.env.VITE_GOOGLE_CLIENT_ID` — a value baked
+   * into the bundle at build time — so the Google button's presence depended
+   * on the build while its ability to work depended on the Worker. When they
+   * disagreed the customer got "Google sign-in is not enabled on this
+   * deployment", which is a sentence about a build pipeline shown to someone
+   * trying to log in. One runtime answer now decides both.
+   *
+   * `null` means the answer has not arrived; email/password is rendered
+   * meanwhile because it is the platform's own and needs no configuration.
+   */
+  const caps = useCapabilities();
+  const googleConfigured = !!caps?.google;
+  const googleClientId = caps?.googleClientId ?? '';
+  const resetConfigured = caps?.passwordReset ?? false;
+  const telegramConfigured = caps?.telegram ?? false;
 
   const errMsg = (err: unknown): string =>
     err instanceof Error && err.message ? err.message : s.genericError;
 
-  const finishAuth = () => {
+  const finishAuth = (createdAccount = false) => {
+    // A brand-new account goes through setup first, carrying the intended
+    // destination with it so the person still lands where they were going.
+    // Signing IN never does — asking an existing customer to "set up their
+    // account" every time they log in is the behaviour this whole feature is
+    // meant to avoid.
+    if (createdAccount && !dest.startsWith('/api/')) {
+      navigate(`/welcome?next=${encodeURIComponent(dest)}`, { replace: true });
+      return;
+    }
     // The Studio sign-in resume leg is a WORKER route, not an SPA page:
     // react-router would only render the catch-all for it. A full navigation
     // lets the worker mint the single-use handoff code and 302 onward to the
@@ -405,10 +447,6 @@ export default function Auth() {
     clearSuccessOnEdit();
     setConfirmPassword(v);
   };
-  const onPhoneChange = (v: PhoneValue) => {
-    clearSuccessOnEdit();
-    setPhone(v);
-  };
 
   const switchMethod = (next: AuthMethod) => {
     // Values are intentionally KEPT (only messages clear) — §2.1.
@@ -440,10 +478,6 @@ export default function Auth() {
     { progress: signinIdProgress, valid: signinIdValid },
     loginPwPart,
   ]);
-  const signinPhoneFill = combineFillProgress([
-    { progress: phone.progress, valid: phone.valid },
-    loginPwPart,
-  ]);
 
   // New-account password: minimum 8 characters of ANY kind (§2.2).
   const newPwValid = password.length >= 8 && password.length <= 128;
@@ -463,22 +497,11 @@ export default function Auth() {
     confirmPart,
   ]);
 
-  // Phone sign-up: username/name optional (a phone account is not a fake
-  // email account — absent fields stay absent, §2.3).
-  const usernameOptValid = trimmedUsername === '' || usernameValid;
-  const signupPhoneFill = combineFillProgress([
-    { progress: phone.progress, valid: phone.valid },
-    { progress: trimmedUsername === '' ? 1 : clamp01(trimmedUsername.length / 3), valid: usernameOptValid },
-    newPwPart,
-    confirmPart,
-  ]);
-
   const forgotFill = combineFillProgress([{ progress: emailProgress, valid: emailValid }]);
   const resetFill = combineFillProgress([newPwPart, confirmPart]);
 
   // First missing requirement — the not-ready button's visible reason (§2.2).
   const signinEmailHint = !signinIdValid ? s.hintIdentifier : !password ? s.hintPasswordLogin : '';
-  const signinPhoneHint = !phone.valid ? s.hintPhone : !password ? s.hintPasswordLogin : '';
   const signupEmailHint = !usernameValid
     ? s.hintUsername
     : !trimmedName
@@ -490,25 +513,11 @@ export default function Auth() {
           : !confirmValid
             ? s.hintConfirm
             : '';
-  const signupPhoneHint = !phone.valid
-    ? s.hintPhone
-    : !usernameOptValid
-      ? s.hintUsername
-      : !newPwValid
-        ? s.hintPassword
-        : !confirmValid
-          ? s.hintConfirm
-          : '';
 
   // Inline errors only where they genuinely help while typing.
   const confirmMismatchError =
     confirmPassword && password && confirmPassword.length >= password.length && confirmPassword !== password
       ? s.errPasswordMismatch
-      : undefined;
-  const phoneInlineError =
-    phone.national && !phone.valid &&
-    ((phone.iso === 'IQ' && !phone.national.startsWith('7')) || phone.national.length >= 10)
-      ? s.errPhone
       : undefined;
 
   // ---------------------------------------------------------------- submits
@@ -516,10 +525,11 @@ export default function Auth() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
-    const fill = method === 'phone' ? signinPhoneFill : signinEmailFill;
-    if (!fill.ready) return; // button is disabled; belt-and-suspenders
+    if (!signinEmailFill.ready) return; // button is disabled; belt-and-suspenders
     clearMessages();
-    const identifier = method === 'phone' ? (phone.e164 as string) : trimmedEmail;
+    // One field, three kinds of identifier — the server has always matched
+    // email, username OR verified phone against this value.
+    const identifier = trimmedEmail;
     setSubmitting(true);
     try {
       // Auth-server contract: identifier = email | username | phone. The
@@ -531,6 +541,12 @@ export default function Auth() {
       finishAuth();
     } catch (err) {
       setServerError(errMsg(err));
+      // A sign-in that failed on something the person typed as a PHONE
+      // NUMBER is the one case where the next step is not "try again": an
+      // account created through Telegram may have no password at all. The
+      // offer is made from what they typed, never from anything the server
+      // revealed about whether that account exists.
+      setPhoneNeedsTelegram(telegramConfigured && looksLikePhone(trimmedEmail));
     } finally {
       setSubmitting(false);
     }
@@ -539,50 +555,31 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
-    const fill = method === 'phone' ? signupPhoneFill : signupEmailFill;
-    if (!fill.ready) return;
+    if (!signupEmailFill.ready) return;
     clearMessages();
     const referral = referralCode.trim();
     setSubmitting(true);
     try {
-      if (method === 'phone') {
-        // Enabled by the auth-server slice; until then the server's honest
-        // rejection is surfaced below — never faked around.
-        await api.post('/api/auth/register', {
-          phone: phone.e164,
-          ...(trimmedUsername ? { username: trimmedUsername } : {}),
-          ...(trimmedName ? { name: trimmedName } : {}),
-          password,
-          ...(referral ? { referralCode: referral } : {}),
-        });
-      } else {
-        await api.post('/api/auth/register', {
-          username: trimmedUsername,
-          name: trimmedName,
-          email: trimmedEmail,
-          password,
-          ...(referral ? { referralCode: referral } : {}),
-        });
-      }
+      await api.post('/api/auth/register', {
+        username: trimmedUsername,
+        name: trimmedName,
+        email: trimmedEmail,
+        password,
+        locale: lang,
+        ...(referral ? { referralCode: referral } : {}),
+      });
       await refreshUser();
       setSucceeded(true);
-      finishAuth();
+      finishAuth(true);
     } catch (err) {
-      if (
-        method === 'phone' &&
-        err instanceof ApiError &&
-        (err.code === 'PHONE_REQUIRES_VERIFICATION' ||
-          err.code === 'PHONE_REGISTER_DISABLED' ||
-          (err.status === 400 && /email/i.test(err.message)))
-      ) {
-        // §2.3: a phone is an identity key, so the server refuses to store
-        // one without ownership proof. Say exactly that and offer the real
-        // path (Telegram verification) instead of faking a success.
-        setServerError(s.phoneRegisterUnavailable);
-        setPhoneNeedsTelegram(true);
-      } else {
-        setServerError(errMsg(err));
-      }
+      setServerError(errMsg(err));
+      // The server still refuses to create an account on an unproven phone
+      // number, and it always will. The signup form no longer offers one, so
+      // this can only be reached by a client that sent one anyway — the reply
+      // is still the real path rather than a bare error.
+      setPhoneNeedsTelegram(
+        telegramConfigured && err instanceof ApiError && err.code === 'PHONE_REQUIRES_VERIFICATION'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -607,7 +604,10 @@ export default function Auth() {
         await loginWithGoogle(credential);
       }
       setSucceeded(true);
-      finishAuth();
+      // Google does not tell the browser whether the account was created or
+      // matched, and it does not need to: /welcome sends anyone who has
+      // already finished setup straight on to where they were going.
+      finishAuth(view === 'signup');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {
         setServerError(s.googleServerNotConfigured);
@@ -700,7 +700,7 @@ export default function Auth() {
   );
 
   const heading = (title: string, hint: string) => (
-    <div className="mb-5">
+    <div className="mb-4">
       <h1 className="text-[22px] font-bold text-white">{title}</h1>
       <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{hint}</p>
     </div>
@@ -709,7 +709,7 @@ export default function Auth() {
   const errorSummary = serverError ? (
     <div
       role="alert"
-      className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-[13px] font-medium text-red-300"
+      className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-[13px] font-medium text-red-300"
     >
       <p className="leading-relaxed">{serverError}</p>
       {phoneNeedsTelegram && (
@@ -738,12 +738,41 @@ export default function Auth() {
         ? 'error'
         : 'idle';
 
+  /**
+   * Only methods that can actually complete.
+   *
+   * The separate PHONE tab is gone, and that is a fix rather than a removal.
+   * Signing UP with a phone number always failed there — the server refuses
+   * to create an account on an unproven number, so the panel's only possible
+   * outcome was an error telling you to use Telegram. Signing IN with a phone
+   * never needed its own tab: the identifier field below takes an email, a
+   * username OR a phone number, which is what the server has always matched.
+   * So phone sign-in still works, phone sign-up goes through Telegram where
+   * ownership is actually proven, and there is no tab whose job is to fail.
+   *
+   * Google and Telegram appear only when this deployment has them. An
+   * unconfigured provider is not shown as a disabled button with an
+   * explanation — it is simply not offered.
+   */
   const methodOptions = [
     { id: 'email' as const, label: s.methodEmail, icon: <Mail className="h-5 w-5" /> },
-    { id: 'phone' as const, label: s.methodPhone, icon: <PhoneIcon className="h-5 w-5" /> },
-    { id: 'google' as const, label: 'Google', icon: <Chrome className="h-5 w-5" /> },
-    { id: 'telegram' as const, label: s.methodTelegram, icon: <Send className="h-5 w-5" /> },
+    ...(googleConfigured ? [{ id: 'google' as const, label: 'Google', icon: <Chrome className="h-5 w-5" /> }] : []),
+    ...(telegramConfigured
+      ? [{ id: 'telegram' as const, label: s.methodTelegram, icon: <Send className="h-5 w-5" /> }]
+      : []),
   ];
+
+  /**
+   * If the selected method stops being offered — the capabilities answer
+   * arrives and says Telegram is off, or a stale tab is restored — fall back
+   * to the one method that always exists rather than rendering an empty
+   * panel under a tab strip that no longer contains it.
+   */
+  useEffect(() => {
+    if (!methodOptions.some((o) => o.id === method)) setMethod('email');
+    // methodOptions is derived from `caps`; depending on caps keeps this to
+    // one run per capability change instead of one per render.
+  }, [caps, method]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const methodPanel = (m: AuthMethod, children: React.ReactNode) => (
     <div role="tabpanel" id={methodPanelId(METHOD_ID_PREFIX, m)} aria-labelledby={methodTabId(METHOD_ID_PREFIX, m)}>
@@ -751,22 +780,27 @@ export default function Auth() {
     </div>
   );
 
-  const googlePanel = (
-    <div className="flex flex-col items-center gap-3 pt-1">
-      {googleConfigured ? (
+  /**
+   * The provider is mounted HERE rather than around the whole app, because
+   * the client id is now fetched at runtime and there is nothing to give it
+   * at app-mount time. It is also the only place in the app that needs it.
+   * The tab does not exist at all unless `googleConfigured`, so there is no
+   * "not enabled" panel to reach.
+   */
+  const googlePanel = googleClientId ? (
+    <div className="flex min-h-[56px] flex-col items-center justify-center gap-3">
+      <GoogleOAuthProvider clientId={googleClientId}>
         <GoogleLogin
           onSuccess={(credentialResponse) => handleGoogleCredential(credentialResponse.credential)}
           onError={() => setServerError(s.googleFailed)}
           theme="filled_black"
           text={view === 'signup' ? 'signup_with' : 'signin_with'}
+          width="320"
         />
-      ) : (
-        <div className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-center text-[12px] leading-relaxed text-zinc-400">
-          {s.googleUnavailable}
-        </div>
-      )}
+      </GoogleOAuthProvider>
+      <p className="text-center text-[12px] leading-relaxed text-zinc-500">{s.googleNote}</p>
     </div>
-  );
+  ) : null;
 
   /** Animated wrapper around the active method's panel. */
   const methodArea = (children: React.ReactNode) => (
@@ -813,7 +847,9 @@ export default function Auth() {
     />
   );
 
-  const forgotRow = (
+  // Offering "forgot password" when no mail provider is configured sends a
+  // person to a screen whose only possible answer is "we cannot email you".
+  const forgotRow = !resetConfigured ? null : (
     <div className="mt-1.5 flex justify-end">
       <button
         type="button"
@@ -965,7 +1001,7 @@ export default function Auth() {
         {/* §2.6 — optional referral bar; the code survives every method
             switch and is attributed server-side only when an account is
             actually created. It NEVER blocks signup. */}
-        <div className="mb-4">
+        <div className="mb-3">
           <ReferralBar
             code={referralCode}
             onCodeChange={setReferralCode}
@@ -981,7 +1017,7 @@ export default function Auth() {
           dir={dir}
           idPrefix={METHOD_ID_PREFIX}
         />
-        <div className="mt-5">
+        <div className="mt-4">
           {errorSummary}
           {methodArea(
             method === 'email' ? (
@@ -1025,7 +1061,7 @@ export default function Auth() {
                     {passwordField('new-password')}
                     {confirmField}
                   </div>
-                  <div className="mt-7">
+                  <div className="mt-5">
                     <FillButton
                       id="signup-submit"
                       label={s.signUpCta}
@@ -1039,58 +1075,6 @@ export default function Auth() {
                   </div>
                 </form>
               )
-            ) : method === 'phone' ? (
-              methodPanel(
-                'phone',
-                <form onSubmit={handleSignUp} noValidate aria-busy={submitting}>
-                  <div className="space-y-4">
-                    <PhoneField
-                      id="signup-phone"
-                      label={s.phoneLabel}
-                      countryLabel={s.countryLabel}
-                      value={phone}
-                      onChange={onPhoneChange}
-                      lang={lang}
-                      error={phoneInlineError}
-                      hint={s.phoneOwnershipNote}
-                      disabled={submitting}
-                    />
-                    <AuthTextField
-                      id="username"
-                      label={`${s.username}${s.optionalSuffix}`}
-                      value={username}
-                      onChange={onUsernameChange}
-                      autoComplete="username"
-                      placeholder="username123"
-                      valueDir="ltr"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                    />
-                    <AuthTextField
-                      id="name"
-                      label={`${s.fullName}${s.optionalSuffix}`}
-                      value={name}
-                      onChange={onNameChange}
-                      autoComplete="name"
-                      valueDir="auto"
-                    />
-                    {passwordField('new-password')}
-                    {confirmField}
-                  </div>
-                  <div className="mt-7">
-                    <FillButton
-                      id="signup-phone-submit"
-                      label={s.signUpCta}
-                      workingLabel={s.signingUp}
-                      successLabel={s.signedUp}
-                      progress={signupPhoneFill.progress}
-                      ready={signupPhoneFill.ready}
-                      status={buttonStatus}
-                      hint={signupPhoneHint || undefined}
-                    />
-                  </div>
-                </form>
-              )
             ) : method === 'google' ? (
               methodPanel('google', googlePanel)
             ) : (
@@ -1098,18 +1082,18 @@ export default function Auth() {
                 'telegram',
                 /* TelegramAuth owns its own <form>; rendering it as its own
                    panel keeps the no-nested-forms rule trivially true. */
-                <TelegramAuth mode="signup" onSuccess={finishAuth} onSwitchMode={switchView} referralCode={referralCode} />
+                <TelegramAuth mode="signup" onSuccess={() => finishAuth(true)} onSwitchMode={switchView} referralCode={referralCode} />
               )
             )
           )}
         </div>
-        <p className="mt-4 text-center text-[12px] leading-relaxed text-zinc-500">
+        <p className="mt-3 text-center text-[12px] leading-relaxed text-zinc-500">
           {s.termsPrefix}{' '}
           <Link to="/policies" className="font-semibold text-gold hover:underline">
             {s.termsLink}
           </Link>
         </p>
-        <p className="mt-4 text-center text-[13px] text-zinc-400">
+        <p className="mt-3 text-center text-[13px] text-zinc-400">
           {s.haveAccount}{' '}
           <button
             type="button"
@@ -1134,7 +1118,7 @@ export default function Auth() {
           dir={dir}
           idPrefix={METHOD_ID_PREFIX}
         />
-        <div className="mt-5">
+        <div className="mt-4">
           {errorSummary}
           {methodArea(
             method === 'email' ? (
@@ -1149,7 +1133,7 @@ export default function Auth() {
                       onChange={onEmailChange}
                       autoComplete="username"
                       inputMode="email"
-                      placeholder="email@example.com"
+                      placeholder={s.identifierPlaceholder}
                       valueDir="ltr"
                       autoCapitalize="none"
                       spellCheck={false}
@@ -1173,51 +1157,17 @@ export default function Auth() {
                   </div>
                 </form>
               )
-            ) : method === 'phone' ? (
-              methodPanel(
-                'phone',
-                <form onSubmit={handleSignIn} noValidate aria-busy={submitting}>
-                  <div className="space-y-4">
-                    <PhoneField
-                      id="signin-phone"
-                      label={s.phoneLabel}
-                      countryLabel={s.countryLabel}
-                      value={phone}
-                      onChange={onPhoneChange}
-                      lang={lang}
-                      error={phoneInlineError}
-                      disabled={submitting}
-                    />
-                    <div>
-                      {passwordField('current-password')}
-                      {forgotRow}
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <FillButton
-                      id="signin-phone-submit"
-                      label={s.signInCta}
-                      workingLabel={s.signingIn}
-                      successLabel={s.signedIn}
-                      progress={signinPhoneFill.progress}
-                      ready={signinPhoneFill.ready}
-                      status={buttonStatus}
-                      hint={signinPhoneHint || undefined}
-                    />
-                  </div>
-                </form>
-              )
             ) : method === 'google' ? (
               methodPanel('google', googlePanel)
             ) : (
               methodPanel(
                 'telegram',
-                <TelegramAuth mode="signin" onSuccess={finishAuth} onSwitchMode={switchView} />
+                <TelegramAuth mode="signin" onSuccess={() => finishAuth(false)} onSwitchMode={switchView} />
               )
             )
           )}
         </div>
-        <p className="mt-6 text-center text-[13px] text-zinc-400">
+        <p className="mt-5 text-center text-[13px] text-zinc-400">
           {s.noAccount}{' '}
           <button
             type="button"
@@ -1244,7 +1194,7 @@ export default function Auth() {
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-0 md:max-w-[30rem]">
         <div className="m-auto w-full py-4">
           {/* Brand: LEVONIS wordmark in the site's gold, calm and balanced. */}
-          <div className="mb-6 flex flex-col items-center">
+          <div className="mb-5 flex flex-col items-center">
             <Link
               to="/"
               aria-label="LEVONIS"
@@ -1265,7 +1215,7 @@ export default function Auth() {
             <p className="mt-2 text-[12px] text-zinc-500">{s.tagline}</p>
           </div>
 
-          <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-7 md:p-8">
+          <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-6">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={screenKey}

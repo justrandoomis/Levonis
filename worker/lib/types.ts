@@ -1,4 +1,6 @@
 import type { HostInfo } from './hosts';
+import { computeCompletion } from './profileCompletion';
+import { maskPhone } from './phone';
 
 export interface Env {
   DB: D1Database;
@@ -73,6 +75,21 @@ export interface SessionUser {
   bio: string;
   website: string;
   profile_json: string;
+  /** Google account subject when this account has Google sign-in linked.
+   *  NEVER leaves the server — publicUser exposes only whether it is set. */
+  google_sub?: string | null;
+  /** ISO 3166-1 alpha-2, or null when the person has not said (0033). */
+  country: string | null;
+  /** The account's own verified phone, E.164. NULL until Telegram proves it. */
+  phone_e164: string | null;
+  /** 'new' | 'existing' | 'skipped' | 'done' — the signup wizard, not the
+   *  profile. A finished wizard with every optional step skipped is 'done'
+   *  AND an incomplete profile; they are separate questions (0033). */
+  onboarding_state: string | null;
+  /** Earliest moment the completion prompt may appear again. Server-side on
+   *  purpose: a dismissal in one browser is a dismissal everywhere (0033). */
+  profile_prompt_at: string | null;
+  profile_prompt_count: number;
   checkin_streak: number;
   last_checkin_day: string | null;
   created_at: string;
@@ -100,6 +117,11 @@ export function localeToDb(apiLocale: string): 'ar' | 'en' | 'ku' {
   return apiLocale === 'ar' ? 'ar' : 'en';
 }
 
+function completionSummary(u: SessionUser) {
+  const c = computeCompletion(u as never);
+  return { percent: c.percent, complete: c.complete, missing: c.missing };
+}
+
 /** Shape sent to the frontend — never includes password_hash or google_sub. */
 export function publicUser(u: SessionUser) {
   return {
@@ -125,6 +147,22 @@ export function publicUser(u: SessionUser) {
     bio: u.bio,
     website: u.website,
     profile: safeParse(u.profile_json, {}),
+    country: u.country ?? null,
+    // WHETHER, never WHICH. The account page needs to show "Google —
+    // connected"; the Google subject itself is an identifier for that person
+    // at Google and has no business in a JSON response.
+    has_google: !!u.google_sub,
+    // The phone is the account's own verified identity — MASKED here, because
+    // the frontend only ever needs to show "we have a number for you", and a
+    // full number sitting in a JSON response is a number that ends up in a
+    // log, a screenshot or a support ticket.
+    phone: u.phone_e164 ? maskPhone(u.phone_e164) : null,
+    has_phone: !!u.phone_e164,
+    // Signup-wizard state and profile completion travel with the user object
+    // so every surface reads the same answer. `completion` is derived from
+    // the fields on every read, never stored (see lib/profileCompletion.ts).
+    onboarding: (u.onboarding_state ?? 'new') as string,
+    completion: completionSummary(u),
     checkin_streak: u.checkin_streak,
     last_checkin_day: u.last_checkin_day,
     created_at: u.created_at,

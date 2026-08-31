@@ -47,6 +47,75 @@ adminRoutes.use('*', requireAdmin);
 
 // ---------------------------------------------------------------- overview
 
+/**
+ * Provider health — what is configured, and what is silently not.
+ *
+ * WHY AN ADMIN NEEDS MORE THAN /api/auth/capabilities. That endpoint answers
+ * "which buttons may the auth page show". This one answers "why is a feature
+ * that looks on behaving as if it is off", and it reports the two states that
+ * cause exactly that:
+ *
+ *   EMAIL_ALLOWED_RECIPIENTS — a STAGING guard. When it is non-empty every
+ *   message to an address outside the list is dropped with a console warning
+ *   and an unchanged HTTP response. On production that means password resets
+ *   report themselves as sent and never arrive, with nothing in the UI to
+ *   explain it. It is reported here as a WARNING, with the count of allowed
+ *   addresses and none of the addresses.
+ *
+ *   A TELEGRAM TOKEN THAT IS SET BUT DOES NOT ANSWER — a revoked or mistyped
+ *   token looks identical to a working one from the outside. `telegramGetMe`
+ *   asks the bot, so "configured" here means it replied.
+ *
+ * NO SECRET, NO PREFIX, NO LENGTH. Every field is a boolean, a count, or a
+ * public identifier.
+ */
+adminRoutes.get('/providers', async (c) => {
+  const allowList = (c.env.EMAIL_ALLOWED_RECIPIENTS || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const me = await telegramGetMe(c.env).catch(() => ({ ok: false, username: '' }));
+
+  return c.json({
+    success: true,
+    google: {
+      configured: !!(c.env.GOOGLE_CLIENT_ID || '').trim(),
+      // Public by construction — Google puts it in the page and in every
+      // token audience. It is here so an operator can confirm WHICH project
+      // the deployment is pointed at without opening the dashboard.
+      clientId: (c.env.GOOGLE_CLIENT_ID || '').trim(),
+      note: 'Identity Services ID tokens, verified against Google JWKS. No client secret and no callback URL exist in this architecture.',
+    },
+    email: {
+      configured: !!(c.env.EMAIL_API_KEY && (c.env.EMAIL_FROM || '').trim()),
+      hasKey: !!c.env.EMAIL_API_KEY,
+      hasFromAddress: !!(c.env.EMAIL_FROM || '').trim(),
+      restrictedToAllowlist: allowList.length > 0,
+      allowlistSize: allowList.length,
+      warning:
+        allowList.length > 0
+          ? 'EMAIL_ALLOWED_RECIPIENTS is set: mail to any address outside that list is DROPPED. Password reset and verification will look sent and never arrive.'
+          : null,
+    },
+    telegram: {
+      configured: telegramConfigured(c.env),
+      botAnswered: !!me.ok,
+      botUsername: me.ok ? me.username : '',
+      webhookSecretSet: !!c.env.TELEGRAM_WEBHOOK_SECRET,
+    },
+    phone: {
+      // A phone number signs you IN. Signing UP on one needs proof of
+      // ownership, which is Telegram's job here — there is no SMS provider.
+      signIn: true,
+      smsProvider: false,
+    },
+    origin: {
+      appOrigin: (c.env.APP_ORIGIN || '').trim(),
+      storeRootDomain: (c.env.STORE_ROOT_DOMAIN || '').trim(),
+    },
+  });
+});
+
 adminRoutes.get('/overview', async (c) => {
   const db = c.env.DB;
   const [orders, users, wallet, pendingWallet, pendingCommunity, recentOrders] = await Promise.all([

@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import type { AppContext } from './types';
+import { canonicalUsername, usernameRejection, type UsernameRejection } from './usernames';
 
 export class HttpError extends Error {
   constructor(
@@ -20,7 +21,7 @@ export const badRequest = (msg: string, code?: string, details?: Record<string, 
 export const unauthorized = (msg = 'Authentication required') => new HttpError(401, msg, 'UNAUTHORIZED');
 export const forbidden = (msg = 'Not allowed') => new HttpError(403, msg, 'FORBIDDEN');
 export const notFound = (msg = 'Not found') => new HttpError(404, msg, 'NOT_FOUND');
-export const conflict = (msg: string) => new HttpError(409, msg, 'CONFLICT');
+export const conflict = (msg: string, code = 'CONFLICT') => new HttpError(409, msg, code);
 export const tooMany = (msg = 'Too many requests, try again later') => new HttpError(429, msg, 'RATE_LIMITED');
 export const unavailable = (msg: string, code = 'NOT_CONFIGURED') => new HttpError(503, msg, code);
 
@@ -122,13 +123,32 @@ export function email(v: unknown): string {
   return s;
 }
 
-const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+/**
+ * One username rule, for every path that accepts one — signup, the account
+ * page, the Telegram completion step. The rule itself (shape, reserved
+ * handles, look-alike punctuation) lives in `lib/usernames.ts`; this wrapper
+ * only turns a rejection into the HTTP error and the message a person reads.
+ *
+ * Reserved handles are refused HERE rather than at each call site, because
+ * "somebody remembered to check" is not a guarantee: before this, an account
+ * could be created holding `support` through signup even though the account
+ * page would have refused it.
+ */
+const USERNAME_MESSAGES: Record<UsernameRejection, string> = {
+  too_short: 'Username must be at least 3 characters',
+  too_long: 'Username must be at most 30 characters',
+  bad_characters: 'Username may only contain letters, numbers, dots, dashes and underscores',
+  bad_edges: 'Username must start and end with a letter or a number',
+  repeated_punctuation: 'Username may not contain two dots, dashes or underscores in a row',
+  all_digits: 'Username must contain at least one letter',
+  reserved: 'This username is reserved',
+};
+
 export function username(v: unknown): string {
-  const s = str(v, 'username', { min: 3, max: 30 }).toLowerCase();
-  if (!USERNAME_RE.test(s)) {
-    throw badRequest('Username may only contain letters, numbers, dots, dashes and underscores (3-30 chars)');
-  }
-  return s;
+  const s = str(v, 'username', { min: 1, max: 64 }).trim().toLowerCase();
+  const rejection = usernameRejection(s);
+  if (rejection) throw badRequest(USERNAME_MESSAGES[rejection], `USERNAME_${rejection.toUpperCase()}`);
+  return canonicalUsername(s);
 }
 
 export function jsonArray(v: unknown, name: string, maxItems = 100): string {

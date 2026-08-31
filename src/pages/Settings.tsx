@@ -50,10 +50,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import {
-  ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck,
-  Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, AlertTriangle, Coins,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, AlertTriangle, Coins, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
@@ -86,7 +83,10 @@ const STRINGS = {
     sessionsRow: 'قائمة الجلسات والأجهزة',
     sessionsDisabled: 'لا يوفّر الخادم واجهة لعرض الجلسات أو إنهائها فرديًا بعد. المتاح فعليًا هو إنهاء الجلسات الأخرى عبر تغيير كلمة المرور.',
     telegram: 'تيليغرام', google: 'Google',
-    googleDisabled: 'لا يعرض الخادم حالة ربط حساب Google في بيانات المستخدم، لذلك لا نستطيع عرض «مرتبط» أو «غير مرتبط» بصدق.',
+    googleConnected: 'مرتبط',
+    googleNotConnected: 'غير مرتبط',
+    googleConnectedNote: 'يمكنك تسجيل الدخول بزر Google مباشرة.',
+    googleConnectHint: 'سجّل الخروج ثم استخدم زر Google بنفس بريدك الموثّق لربطه بحسابك.',
     unlinkNote: 'فك الربط غير متاح من هنا — لا توجد واجهة له، وبذلك لا يمكن أن تفقد آخر وسيلة دخول بالخطأ.',
     addressesRow: 'عناويني', addressesCount: 'العناوين المحفوظة: {n}',
     addressesDefault: 'العنوان الافتراضي: {label}', addressesNone: 'لا توجد عناوين محفوظة بعد.',
@@ -137,7 +137,10 @@ const STRINGS = {
     sessionsRow: 'Sessions & devices list',
     sessionsDisabled: 'The server offers no endpoint to list or revoke individual sessions yet. What really works is ending other sessions by changing your password.',
     telegram: 'Telegram', google: 'Google',
-    googleDisabled: 'The API does not expose Google link status on the user object, so this page cannot honestly show "linked" or "not linked".',
+    googleConnected: 'Connected',
+    googleNotConnected: 'Not connected',
+    googleConnectedNote: 'You can sign in with the Google button directly.',
+    googleConnectHint: 'Sign out and use the Google button with the same verified email to link it to this account.',
     unlinkNote: 'Unlinking is not offered here — there is no endpoint for it, so you cannot accidentally remove your last sign-in method.',
     addressesRow: 'My addresses', addressesCount: 'Saved addresses: {n}',
     addressesDefault: 'Default address: {label}', addressesNone: 'No saved addresses yet.',
@@ -188,7 +191,10 @@ const STRINGS = {
     sessionsRow: 'لیستی دانیشتن و ئامێرەکان',
     sessionsDisabled: 'ڕاژەکار هێشتا ڕێگەیەک بۆ پیشاندان یان بەتاڵکردنی دانیشتنی تاک دابین ناکات. ئەوەی کاردەکات کۆتاییهێنانە بە دانیشتنەکانی تر بە گۆڕینی وشەی تێپەڕ.',
     telegram: 'تێلێگرام', google: 'Google',
-    googleDisabled: 'ڕاژەکار دۆخی بەستنەوەی Google لە زانیاری بەکارهێنەردا پیشان نادات، بۆیە ناتوانین بە ڕاستی «بەستراوە» یان «نەبەستراوە» پیشان بدەین.',
+    googleConnected: 'بەستراوە',
+    googleNotConnected: 'نەبەستراوە',
+    googleConnectedNote: 'دەتوانیت ڕاستەوخۆ بە دوگمەی Google بچیتەژوورەوە.',
+    googleConnectHint: 'دەربچۆ و بە هەمان ئیمەیلی پشتڕاستکراو دوگمەی Google بەکاربهێنە بۆ بەستنەوەی.',
     unlinkNote: 'لابردنی بەستنەوە لێرە بەردەست نییە — ڕێگەیەکی نییە، بۆیە ناتوانیت بە هەڵە دوا ڕێگای چوونەژوورەوەت لەدەست بدەیت.',
     addressesRow: 'ناونیشانەکانم', addressesCount: 'ناونیشانە پاشەکەوتکراوەکان: {n}',
     addressesDefault: 'ناونیشانی بنەڕەت: {label}', addressesNone: 'هێشتا ناونیشانێک پاشەکەوت نەکراوە.',
@@ -746,14 +752,32 @@ export default function Settings() {
                 {s.secLinking}
               </h2>
               <TelegramLink />
+              {/* This row used to say "the API does not expose Google link
+                  status, so this page cannot honestly show linked or not
+                  linked" — an honest message about a gap that has now been
+                  closed. `has_google` is a boolean on the user object; the
+                  Google subject itself still never leaves the server. */}
               <div className="mt-3 bg-zinc-900/95 border border-zinc-800 rounded-3xl overflow-hidden">
-                <DisabledRow
-                  label={s.google}
-                  reason={s.googleDisabled}
-                  note={s.notAvailable}
-                  icon={<Link2 aria-hidden="true" className="w-5 h-5" />}
-                />
-                <p className="px-4 py-3 text-[12px] text-zinc-500 leading-relaxed">{s.unlinkNote}</p>
+                <div className="flex items-center gap-3 px-4 py-4">
+                  <span className="text-zinc-400" aria-hidden="true">
+                    <Link2 className="w-5 h-5" />
+                  </span>
+                  <span className="flex-1 text-[14px] font-semibold text-white">{s.google}</span>
+                  {user?.has_google ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-[12px] font-bold text-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      {s.googleConnected}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-zinc-800 px-3 py-1 text-[12px] font-semibold text-zinc-400">
+                      {s.googleNotConnected}
+                    </span>
+                  )}
+                </div>
+                <p className="px-4 pb-3 text-[12px] text-zinc-500 leading-relaxed">
+                  {user?.has_google ? s.googleConnectedNote : s.googleConnectHint}
+                </p>
+                <p className="px-4 py-3 text-[12px] text-zinc-500 leading-relaxed border-t border-zinc-800">{s.unlinkNote}</p>
               </div>
             </section>
 

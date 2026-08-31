@@ -82,6 +82,18 @@ export interface ApiUser {
   bio: string;
   website: string;
   profile: Record<string, unknown>;
+  /** ISO 3166-1 alpha-2, or null when the person has not said. */
+  country: string | null;
+  /** MASKED, e.g. `+9647******567` — the account's own verified number. */
+  phone: string | null;
+  has_phone: boolean;
+  /** Whether Google sign-in is linked. The Google subject stays server-side. */
+  has_google: boolean;
+  /** Signup-wizard state: 'new' | 'existing' | 'skipped' | 'done'. Separate
+   *  from `completion`, which is about the profile fields themselves. */
+  onboarding: string;
+  /** Derived on every read from the fields — never a stored flag. */
+  completion: { percent: number; complete: boolean; missing: string[] };
   checkin_streak: number;
   last_checkin_day: string | null;
   created_at: string;
