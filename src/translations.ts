@@ -194,6 +194,9 @@ export const translations = {
     couponsOffers: "Coupons & offers",
     productCount: "products",
     seeAll: "See all",
+    homeDiscounts: "Discounts & offers",
+    homeNewArrivals: "New arrivals",
+    forMembers: "members",
 
     // ---- Service cards. Every one of these is a page that exists and works.
     svcWarrantyTitle: "Warranty & repairs",
@@ -382,6 +385,9 @@ export const translations = {
     couponsOffers: "كوبونات وعروض",
     productCount: "منتج",
     seeAll: "عرض الكل",
+    homeDiscounts: "خصومات وعروض",
+    homeNewArrivals: "وصل حديثًا",
+    forMembers: "للمشتركين",
 
     svcWarrantyTitle: "الضمان والصيانة",
     svcWarrantyDesc: "سجّل جهازك وتابع ضمانه وافتح طلب صيانة.",
@@ -569,6 +575,9 @@ export const translations = {
     couponsOffers: "کۆپۆن و ئۆفەر",
     productCount: "بەرهەم",
     seeAll: "هەمووی ببینە",
+    homeDiscounts: "داشکاندن و ئۆفەرەکان",
+    homeNewArrivals: "بە نوێی گەیشتوون",
+    forMembers: "بۆ ئەندامان",
 
     svcWarrantyTitle: "گەرەنتی و چاککردنەوە",
     svcWarrantyDesc: "ئامێرەکەت تۆمار بکە، گەرەنتییەکەی بەدواداچوون بکە و داوای چاککردنەوە بکە.",

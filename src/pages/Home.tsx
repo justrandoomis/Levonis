@@ -1,28 +1,19 @@
 import AnimatedItem from '../components/AnimatedItem';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { Star, ChevronRight, ChevronLeft, PackageSearch } from 'lucide-react';
-import { useAuth } from '../AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
-import { api, ApiProduct, PublicSettings, HomeTaxon, formatIqd } from '../lib/api';
+import { PackageSearch } from 'lucide-react';
+import { api, ApiProduct, PublicSettings, HomeTaxon } from '../lib/api';
 import Hero from '../components/home/Hero';
 import ServicesGrid from '../components/home/ServicesGrid';
+import ProductCard from '../components/home/ProductCard';
+import SectionHeader from '../components/home/SectionHeader';
 import { ItemStrip, CategoryChips, BrandChips } from '../components/home/Strips';
 import Spinner from '../components/ui/Spinner';
-import SafeImage from '../components/ui/SafeImage';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 
 export default function Home() {
-  const navigate = useNavigate();
-
   const { t, dir, loc } = useLanguage();
-  const { user } = useAuth();
-
-  // Subscription plan comes exclusively from the server-side user record.
-  const plan = user?.membership_tier ?? 'free';
-  const planActive =
-    !!user && plan !== 'free' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
 
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [categories, setCategories] = useState<HomeTaxon[]>([]);
@@ -122,76 +113,6 @@ export default function Home() {
     };
   }, [loadMore]);
 
-  const renderProductCard = (p: ApiProduct, widthClass = 'w-[160px]') => {
-    const images = Array.isArray(p.images) ? p.images : [];
-    const firstImage = images[0] || '';
-    // §3/§12: the product name is English in every language and is never translated.
-    const name = p.name;
-
-    const proPrice = p.membership_prices?.pro ?? null;
-    const planPrice = planActive && (plan === 'plus' || plan === 'pro') ? p.membership_prices?.[plan] ?? null : null;
-    // §4: compare-at is gone. A strikethrough is shown ONLY when the viewer's
-    // own membership actually lowers the price — a real, server-resolved
-    // comparison instead of a decorative one.
-    const displayPrice = p.display_price_iqd ?? p.price_iqd;
-    const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-    const hasSale = displayPrice < regularPrice;
-    const showPlanPrice = !!planPrice && planPrice > 0 && planPrice < p.price_iqd;
-
-    return (
-      <Link to={`/product/${p.slug || p.id}`} key={p.id} className={`${widthClass} shrink-0 bg-zinc-900/50/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors`}>
-        <div className="relative aspect-square overflow-hidden bg-black">
-          <SafeImage
-            src={firstImage}
-            alt={name}
-            aspect="auto"
-            className="w-full h-full group-hover:scale-105 transition-transform duration-500"
-          />
-          {hasSale && (
-            <div className="absolute top-2 right-2 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-              SALE
-            </div>
-          )}
-        </div>
-        <div className="p-3 flex flex-col flex-1">
-          <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
-          <div className="mt-auto pt-2 flex items-center justify-between">
-            <div className="flex flex-col gap-0.5">
-              {showPlanPrice ? (
-                <>
-                   <div className="flex flex-col">
-                      <span className="text-zinc-500 text-[10px] line-through">{formatIqd(p.price_iqd)}</span>
-                      <span className="text-gold font-extrabold text-[15px] flex items-center gap-1 drop-shadow-[0_0_8px_rgba(186,163,105,0.4)]">
-                         <Star className="w-3.5 h-3.5 fill-gold" />
-                         {formatIqd(planPrice!)}
-                      </span>
-                   </div>
-                </>
-              ) : (
-                <>
-                   <div className="flex flex-col">
-                     {hasSale && (
-                       <span className="text-zinc-500 text-[10px] line-through">{formatIqd(regularPrice)}</span>
-                     )}
-                     <span className="text-white font-bold text-sm">{formatIqd(p.price_iqd)}</span>
-                   </div>
-                   {proPrice ? (
-                     <div className="flex items-center gap-1 mt-0.5">
-                        <Star className="w-2.5 h-2.5 text-zinc-500" />
-                        <span className="text-zinc-500 font-medium text-[10px]">
-                          {formatIqd(proPrice)} (للمشتركين)
-                        </span>
-                     </div>
-                   ) : null}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </Link>
-    );
-  };
-
   // The admin-configured home layout: which sections show, and IN WHICH
   // ORDER. The order was draggable in the admin panel and the storefront
   // ignored it entirely, rendering a hard-coded sequence — so reordering
@@ -222,19 +143,21 @@ export default function Home() {
     <div className="w-full pb-24 text-zinc-300 bg-black">
       <Hero banners={heroBanners} loading={initialLoading} />
 
-      <div className="relative z-30 max-w-7xl mx-auto px-4 sm:px-10 py-10 sm:py-12 bg-black rounded-t-[36px] -mt-8">
+      <div className="relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-2 bg-black rounded-t-[28px] -mt-7">
 
-        {/* Ads Marquee */}
+        {/* Ads Marquee — gold separators mark where one notice ends and the
+            next begins, which a plain gap never did once two ran together. */}
         {homeAds.length > 0 && (
-          <div className="mb-10 overflow-hidden rounded-xl bg-zinc-900/50 border border-zinc-800/50">
+          <div className="mb-8 sm:mb-10 overflow-hidden rounded-xl bg-zinc-900/40 border border-zinc-800">
             <style>{`@keyframes home-ads-marquee { from { transform: translateX(0); } to { transform: translateX(${dir === 'rtl' ? '' : '-'}50%); } }`}</style>
             <div
-              className="flex whitespace-nowrap py-2.5 w-max"
+              className="flex items-center whitespace-nowrap py-2.5 w-max motion-reduce:animate-none"
               style={{ animation: 'home-ads-marquee 25s linear infinite' }}
             >
               {[...homeAds, ...homeAds].map((ad, i) => (
-                <span key={`${ad.id}-${i}`} className="text-sm text-zinc-300 px-8 shrink-0">
-                  {ad.text}
+                <span key={`${ad.id}-${i}`} className="flex items-center text-[13px] text-zinc-300 shrink-0">
+                  <span className="px-6">{ad.text}</span>
+                  <span aria-hidden className="w-1 h-1 rounded-full bg-gold/60 shrink-0" />
                 </span>
               ))}
             </div>
@@ -300,6 +223,27 @@ export default function Home() {
             ) : null,
           },
           {
+            id: 'discounts_offers',
+            order: orderOf('discounts_offers'),
+            // This IS the admin's `discounts_offers` section: its visibility
+            // toggle was honoured before, its ORDER handle was not — the rail
+            // rendered at a hard-coded spot below everything sortable. It now
+            // rides the same ordered list as its siblings.
+            node:
+              discountedProducts.length > 0 && sectionVisible('discounts_offers') ? (
+                <section key="discounts_offers" data-home-section="discounts_offers" className="mb-10 sm:mb-12">
+                  <SectionHeader title={t('homeDiscounts')} accent="bg-rose-500" to="/products" />
+                  <div className="flex gap-3 sm:gap-4 overflow-x-auto overscroll-x-contain hide-scrollbar pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+                    {discountedProducts.map((p, index) => (
+                      <AnimatedItem key={p.id} index={index} className="snap-start shrink-0">
+                        <ProductCard p={p} widthClass="w-[164px] sm:w-[190px]" />
+                      </AnimatedItem>
+                    ))}
+                  </div>
+                </section>
+              ) : null,
+          },
+          {
             id: 'second_banner',
             order: orderOf('second_banner'),
             // The second banner slot only appears down here when the first
@@ -307,7 +251,7 @@ export default function Home() {
             // rendering it twice would show the same picture on one screen.
             node:
               bannersFor('first_banner').length > 0 && bannersFor('second_banner').length > 0 ? (
-                <section key="second_banner" data-home-section="second_banner" className="mb-12">
+                <section key="second_banner" data-home-section="second_banner" className="mb-10 sm:mb-12">
                   <div className="rounded-2xl overflow-hidden">
                     <Hero banners={bannersFor('second_banner')} loading={false} />
                   </div>
@@ -323,23 +267,23 @@ export default function Home() {
             reserved dimensions, no fake names or prices. */}
         {initialLoading && (
           <SkeletonGroup>
-            <div className="mb-12" aria-hidden="true">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-1 h-6 bg-zinc-800 rounded-full"></div>
-                <Skeleton className="h-7 w-44" />
+            <div className="mb-10 sm:mb-12" aria-hidden="true">
+              <div className="flex items-center gap-2.5 mb-4 sm:mb-5">
+                <div className="w-1 h-5 bg-zinc-800 rounded-full"></div>
+                <Skeleton className="h-6 w-40" />
               </div>
-              <div className="flex gap-4 overflow-hidden pb-4">
+              <div className="flex gap-3 sm:gap-4 overflow-hidden pb-2">
                 {Array.from({ length: 4 }, (_, i) => (
-                  <ProductCardSkeleton key={i} className="w-[180px] md:w-[200px] shrink-0" />
+                  <ProductCardSkeleton key={i} className="w-[164px] sm:w-[190px] shrink-0" />
                 ))}
               </div>
             </div>
             <div className="mb-12" aria-hidden="true">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-1 h-6 bg-zinc-800 rounded-full"></div>
-                <Skeleton className="h-7 w-52" />
+              <div className="flex items-center gap-2.5 mb-4 sm:mb-5">
+                <div className="w-1 h-5 bg-zinc-800 rounded-full"></div>
+                <Skeleton className="h-6 w-48" />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {Array.from({ length: 8 }, (_, i) => (
                   <ProductCardSkeleton key={i} />
                 ))}
@@ -353,50 +297,18 @@ export default function Home() {
           <ErrorState error={loadError} onRetry={fetchHome} />
         )}
 
-        {/* Discounted Products — this IS the admin's `discounts_offers`
-            section, whose visibility toggle the page used to ignore. */}
-        {discountedProducts.length > 0 && sectionVisible('discounts_offers') && (
-          <div data-home-section="discounts_offers" className="mb-12">
-            <div className="flex items-center justify-between gap-3 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-6 bg-rose-500 rounded-full"></div>
-                <h2 className="text-xl md:text-2xl font-bold text-white">
-                  Discounted Products
-                </h2>
-              </div>
-              <button onClick={() => navigate('/products')} className="text-zinc-400 hover:text-white transition-colors flex items-center gap-1 text-sm bg-zinc-900/80 px-3 py-1.5 rounded-full">
-                <span>more</span>
-                {dir === 'rtl' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-            </div>
+        {/* New arrivals — the infinite grid. Not an admin slot: it is the
+            catalogue itself and always closes the page. */}
+        {newProducts.length > 0 && (
+          <div data-home-section="new_arrivals" className="mb-12">
+            <SectionHeader title={t('homeNewArrivals')} accent="bg-olive" to="/products" />
 
-            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
-              {discountedProducts.map((p, index) => (
-                <AnimatedItem key={p.id} index={index} className="snap-start shrink-0">
-                  {renderProductCard(p, "w-[180px] md:w-[200px]")}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+              {newProducts.map((p, index) => (
+                <AnimatedItem key={p.id} index={index}>
+                  <ProductCard p={p} widthClass="w-full" />
                 </AnimatedItem>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Try Something New - Vertical Infinite Grid */}
-        {newProducts.length > 0 && (
-          <div className="mb-12">
-            <div className="flex items-center justify-between gap-3 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-6 bg-olive rounded-full"></div>
-                <h2 className="text-xl md:text-2xl font-bold text-white">
-                  Try something new
-                </h2>
-              </div>
-              <button onClick={() => navigate('/products')} className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center hover:bg-zinc-800 transition-colors">
-                {dir === 'rtl' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {newProducts.map((p, index) => (<AnimatedItem key={p.id} index={index}>{renderProductCard(p, "w-full")}</AnimatedItem>))}
             </div>
             {hasMore && (
               <div ref={observerTarget} className="w-full h-20 flex items-center justify-center mt-4">

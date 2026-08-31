@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Layers, ShieldCheck, Wrench, Package, Users, Gift } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
+import SectionHeader from './SectionHeader';
 
 /**
  * What LEVONIS does besides sell boxes.
@@ -76,11 +77,8 @@ export default function ServicesGrid() {
   ];
 
   return (
-    <section data-home-section="services" className="mb-12">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-1 h-6 bg-olive rounded-full" />
-        <h2 className="text-xl md:text-2xl font-bold text-white">{t('services')}</h2>
-      </div>
+    <section data-home-section="services" className="mb-10 sm:mb-12">
+      <SectionHeader title={t('services')} accent="bg-olive" />
 
       {/* One column on a phone, two on a tablet, three on a wide screen —
           §1's responsive grid, with min-w-0 so a long Kurdish title wraps

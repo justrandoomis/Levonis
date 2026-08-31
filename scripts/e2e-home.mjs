@@ -427,6 +427,19 @@ async function main() {
         JSON.stringify(m.sections)
       );
     }
+    // The discounted-products rail is `discounts_offers` and rides the SAME
+    // ordered list — it used to render at a hard-coded spot below everything
+    // sortable, so the admin's drag handle moved it nowhere. The saved order
+    // above puts it LAST; with any discounted product in the catalogue it
+    // must therefore render after both reorderable shelves.
+    const disc = m.sections.indexOf('discounts_offers');
+    if (disc !== -1 && brands !== -1 && cats !== -1) {
+      check(
+        'the discounted rail obeys the admin order too (saved last, renders last)',
+        disc > brands && disc > cats,
+        JSON.stringify(m.sections)
+      );
+    }
     await ctx.close();
   }
 
