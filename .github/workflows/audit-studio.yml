@@ -349,12 +349,21 @@ jobs:
             exit 0
           fi
           echo "Bindings on $SERVICE (names and types only — no secret values):"
-          jq -r '.result.bindings[]? | "  \(.type)  \(.name)  \(.database_name // .bucket_name // "")"' \
-            /tmp/settings.json
-          D1=$(jq -r '[.result.bindings[]? | select(.type == "d1") | .database_name] | join(", ")' /tmp/settings.json)
+          jq -r '.result.bindings[]? | "  \(.type)  \(.name)  \(.bucket_name // "")"' /tmp/settings.json
+          # A d1 binding carries the database UUID, not its name, so resolve it
+          # through the database list rather than printing "none" for a binding
+          # that plainly exists.
+          D1_ID=$(jq -r '[.result.bindings[]? | select(.type == "d1") | (.id // .database_id)] | first // ""' /tmp/settings.json)
+          if [ -z "$D1_ID" ]; then
+            echo ""
+            echo "The Worker serving $HOST has NO D1 binding."
+            echo "d1=none" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "::add-mask::$D1_ID"
+          D1_NAME=$(jq -r --arg id "$D1_ID" '.[] | select(.uuid==$id) | .name' /tmp/d1.json 2>/dev/null)
           echo ""
-          echo "D1 database bound to the Worker serving $HOST: ${D1:-none}"
-          echo "d1=${D1:-none}" >> "$GITHUB_OUTPUT"
+          echo "D1 database bound to the Worker serving $HOST: ${D1_NAME:-unresolved id}"
+          echo "d1=${D1_NAME:-unresolved id}" >> "$GITHUB_OUTPUT"
 
       # --------------------------------------------------------- scripts
       - name: Worker scripts that exist on this account

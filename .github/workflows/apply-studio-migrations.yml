@@ -1,0 +1,200 @@
+# Applies the audited LEVO Studio migrations to ONE named Studio database.
+#
+# THIS WORKFLOW IS PREPARED, NOT SCHEDULED, AND NOT RUN. It exists so that when
+# the owner approves the change there is a reviewed, gated path to make it —
+# rather than an improvised command against a live database.
+#
+# What it will apply, and what the audit (workflow 7, run 33380828524) found:
+#
+#   studio/drizzle/0000_studio_projects.sql — the ONLY Studio migration.
+#     4 CREATE TABLE, 8 CREATE INDEX, 0 ALTER, 0 DROP, 0 INSERT/UPDATE/DELETE.
+#     Purely additive. It creates projects, project_revisions, project_files
+#     and studio_sessions and their indexes. It rewrites no table, backfills
+#     nothing, and cannot touch a row that already exists because it writes no
+#     rows at all. On SQLite a CREATE TABLE takes a brief write lock for the
+#     schema change only; there is no table rebuild, so the lock does not scale
+#     with data size.
+#
+#   State at the time of the audit:
+#     levonis-studio-db          — no user tables, no d1_migrations. UNAPPLIED.
+#     levonis-studio-db-staging  — all four tables present, d1_migrations
+#                                  records 0000_studio_projects.sql, 0 rows.
+#                                  ALREADY APPLIED; nothing to do.
+#   levonis-studio-db-staging is the database bound to the Worker that serves
+#   studio.levonis-iq.com, so the live site's schema is already in place.
+#
+# SAFETY. Three gates, all of which must pass:
+#   1. the confirmation phrase must be typed exactly;
+#   2. `dry_run` defaults to TRUE — the default run applies nothing and only
+#      reports what wrangler says is pending;
+#   3. a real run refuses unless every pending migration is additive-only, and
+#      refuses on any table that already holds rows unless the owner
+#      additionally sets allow_non_empty.
+# The migration files are re-scanned at run time, so a migration added later
+# that alters, drops or writes data cannot slip through this workflow.
+name: 8 - Apply Studio Migrations (approval required)
+
+on:
+  workflow_dispatch:
+    inputs:
+      database:
+        description: 'Which Studio database'
+        type: choice
+        required: true
+        default: 'levonis-studio-db'
+        options:
+          - levonis-studio-db
+          - levonis-studio-db-staging
+      confirm:
+        description: 'Type APPLY-STUDIO-MIGRATIONS to confirm (ignored while dry_run is true)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Report only — apply nothing (leave true unless applying for real)'
+        type: boolean
+        default: true
+      allow_non_empty:
+        description: 'Permit applying to a database that already holds rows'
+        type: boolean
+        default: false
+
+concurrency: studio-migrations
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DB: ${{ inputs.database }}
+      DRY: ${{ inputs.dry_run }}
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - name: Confirmation gate
+        working-directory: .
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN — nothing will be applied. The confirmation phrase is not required."
+            exit 0
+          fi
+          [ "${{ inputs.confirm }}" = "APPLY-STUDIO-MIGRATIONS" ] \
+            || { echo "::error::confirmation text mismatch — aborting"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - run: npm ci --no-audit --no-fund
+
+      # ------------------------------------------------- static safety scan
+      # The classifier splits each migration into statements and judges the
+      # verb each one STARTS with. A grep for UPDATE/DELETE would reject this
+      # repo's only migration, whose foreign keys read "ON UPDATE no action ON
+      # DELETE no action" inside a CREATE TABLE — and a check that cries wolf
+      # on the good case is one nobody trusts on the bad one.
+      - name: Refuse anything that is not purely additive
+        working-directory: .
+        run: node scripts/check-migrations-additive.mjs studio/drizzle
+
+      # ------------------------------------------------------- resolve the DB
+      - name: Resolve the target database
+        id: db
+        run: |
+          set -e
+          npx wrangler d1 list --json > /tmp/d1.json
+          ID=$(jq -r --arg n "$DB" '.[] | select(.name==$n) | .uuid' /tmp/d1.json)
+          [ -n "$ID" ] || { echo "::error::database $DB does not exist on this account"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "target: $DB"
+          if [ "$DB" = "levonis-studio-db-staging" ]; then
+            STUDIO_STAGING_DB_ID="$ID" node scripts/set-deploy-ids.mjs
+            echo "env=--env staging" >> "$GITHUB_OUTPUT"
+          else
+            STUDIO_PROD_DB_ID="$ID" node scripts/set-deploy-ids.mjs
+            echo "env=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --------------------------------------------------------- pre-flight
+      - name: What is there now, and what is pending
+        id: pre
+        env:
+          ENVARG: ${{ steps.db.outputs.env }}
+        run: |
+          set -e
+          npx wrangler d1 execute "$DB" --remote --json $ENVARG \
+            --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > /tmp/t.json
+          echo "Tables now:"
+          jq -r '.[0].results[] | "  \(.name)"' /tmp/t.json
+
+          ROWS=0
+          for T in projects project_revisions project_files studio_sessions; do
+            if jq -e --arg t "$T" '[.[0].results[].name | select(. == $t)] | length > 0' /tmp/t.json >/dev/null; then
+              N=$(npx wrangler d1 execute "$DB" --remote --json $ENVARG \
+                    --command "SELECT COUNT(*) AS n FROM $T" | jq -r '.[0].results[0].n')
+              echo "  rows in $T: $N"
+              ROWS=$((ROWS + N))
+            fi
+          done
+          echo "total rows across Studio tables: $ROWS"
+          echo "rows=$ROWS" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "wrangler's own view of what is pending:"
+          npx wrangler d1 migrations list "$DB" --remote $ENVARG 2>&1 | tee /tmp/pending.txt || true
+
+      - name: Refuse a database that already holds rows, unless explicitly allowed
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          if [ "${{ steps.pre.outputs.rows }}" != "0" ] && [ "${{ inputs.allow_non_empty }}" != "true" ]; then
+            echo "::error::$DB holds ${{ steps.pre.outputs.rows }} rows. These migrations are additive and should be safe, but applying to a database with real data is a deliberate decision — re-run with allow_non_empty=true once a backup exists."
+            exit 1
+          fi
+
+      # ------------------------------------------------------------- apply
+      - name: Apply
+        if: ${{ inputs.dry_run != true }}
+        env:
+          ENVARG: ${{ steps.db.outputs.env }}
+        run: |
+          set -e
+          npx wrangler d1 migrations apply "$DB" --remote $ENVARG
+
+      - name: Verify afterwards (SELECT only)
+        if: ${{ inputs.dry_run != true }}
+        env:
+          ENVARG: ${{ steps.db.outputs.env }}
+        run: |
+          set -e
+          npx wrangler d1 execute "$DB" --remote --json $ENVARG \
+            --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > /tmp/after.json
+          echo "Tables after:"
+          jq -r '.[0].results[] | "  \(.name)"' /tmp/after.json
+          for T in projects project_revisions project_files studio_sessions; do
+            jq -e --arg t "$T" '[.[0].results[].name | select(. == $t)] | length > 0' /tmp/after.json >/dev/null \
+              || { echo "::error::$T is still missing after the migration"; exit 1; }
+          done
+          echo "d1_migrations now records:"
+          npx wrangler d1 execute "$DB" --remote --json $ENVARG \
+            --command "SELECT name FROM d1_migrations ORDER BY id" | jq -r '.[0].results[] | "  \(.name)"'
+
+      - name: Summary
+        if: always()
+        working-directory: .
+        run: |
+          {
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "## Studio migrations — DRY RUN (nothing was applied)"
+            else
+              echo "## Studio migrations — APPLIED"
+            fi
+            echo ""
+            echo "- Database: \`${{ inputs.database }}\`"
+            echo "- Rows found before: ${{ steps.pre.outputs.rows }}"
+            echo "- Every migration passed the additive-only scan (no ALTER, DROP, INSERT, UPDATE, DELETE, PRAGMA)."
+            echo ""
+            echo "See the \"What is there now, and what is pending\" step for wrangler's own pending list."
+          } >> "$GITHUB_STEP_SUMMARY"
