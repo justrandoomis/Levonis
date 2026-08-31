@@ -285,7 +285,50 @@ workflow rather than trusting it.
 | `APP_ORIGIN` names this domain | ❌ owner decision — emailed links point elsewhere |
 
 The §95 run (workflow 11) currently reports **10 passed, 0 failed, 15
-blocked**. Every blocked item names its reason; none is counted as a pass.
+blocked** against production. Every blocked item names its reason; none is
+counted as a pass.
+
+### The same run against a local deployment: 60 passed, 0 failed
+
+The verification takes its scheme and port from the apex, so it runs against
+`wrangler dev` with `STORE_ROOT_DOMAIN=levonis.test` and the hostnames mapped
+in `/etc/hosts`. That is a real Worker, a real D1, real HTTP and real
+subdomain hostnames — everything except Cloudflare's edge.
+
+```bash
+npm run build
+STORE_ROOT_DOMAIN=levonis.test npx wrangler dev --port 8787 \
+  --var STORE_ROOT_DOMAIN:levonis.test --var APP_ORIGIN:http://levonis.test:8787
+
+APEX=http://levonis.test:8787 SLUG=myshop RUN_ID=local \
+  ADMIN_EMAIL=... ADMIN_PASSWORD=... node scripts/e2e-subdomains.mjs
+```
+
+Proven there, with no financial movement at all:
+
+| | |
+|---|---|
+| PLUS granted by an admin | entitlement, `price_paid_iqd` 0, no wallet row |
+| merchant to a store on `myshop.levonis.test` | `kind: merchant`, the store resolves |
+| shared login | the apex session works unchanged on the storefront host |
+| `/api/admin/*` on the storefront host | **404** — the guard, on a real merchant hostname |
+| the merchant's own `/admin` | 200 for the owner on the store host |
+| store isolation | an account with no store gets `null`, not someone else's |
+| product published | visible on the storefront |
+| one cart | the same cart on both hosts; `CART_SELLER_CONFLICT` names both shops |
+| R2 | upload to logo to served; an off-platform or foreign reference refused |
+| Community | request, attachment (key never in a response), offer, one-live-offer rule |
+| Community admin | overview, board with the customer named, reputation, store-only suspension |
+
+What production adds that local cannot: Cloudflare's edge. That is precisely
+what the two owner actions above unblock.
+
+### One more thing production needs, and it is not Cloudflare
+
+Section 6 of the run signs in as an admin to grant PLUS. Two repository
+secrets — `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` — let that half run
+against the live site. It moves no money: the membership is granted, not
+bought. Without them those seven checks report blocked.
 
 **THE BLOCKER.** Every `*.levonis-iq.com` hostname answers `302` to
 `https://levonis-iq-com.l.ink/…`, which then 404s:
