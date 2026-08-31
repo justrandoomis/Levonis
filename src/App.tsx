@@ -4,6 +4,8 @@ import { StoreProvider, useStore } from './StoreContext';
 import Storefront from './pages/Storefront';
 import MerchantStart from './pages/MerchantStart';
 import MerchantDashboardPage from './pages/MerchantDashboardPage';
+import StorefrontProduct from './pages/StorefrontProduct';
+import Requests from './pages/Requests';
 import { LanguageProvider } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -84,6 +86,7 @@ function StorefrontApp() {
         <Route path="/products" element={<Storefront store={store} />} />
         <Route path="/about" element={<Storefront store={store} />} />
         <Route path="/reviews" element={<Storefront store={store} />} />
+        <Route path="/p/:productSlug" element={<StorefrontProduct />} />
         {/* Account, cart and checkout are the PLATFORM's, reached from the
             shop. They are deliberately not re-implemented per store: one
             cart, one checkout, one order history (§94). */}
@@ -184,7 +187,10 @@ function AppContent() {
           {/* The subdomain-free way into a shop. Kept working forever so
               existing links, shared messages and search results never break
               (§57); the storefront reports its canonical subdomain URL. */}
-          <Route path="/community/store/:slug/p/:productSlug" element={<Storefront />} />
+          <Route path="/community/store/:slug/p/:productSlug" element={<StorefrontProduct />} />
+          {/* The customer-request marketplace. Browsable signed out; acting
+              on it needs an account, which each control handles itself. */}
+          <Route path="/requests" element={<Requests />} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
           <Route path="/merchant" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />

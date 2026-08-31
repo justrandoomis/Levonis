@@ -29,6 +29,7 @@ import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { storefrontApi, badgeLabel, iqd, type MerchantStore, type MerchantProduct } from '../lib/merchant';
 import { GOVERNORATE_LABELS } from '../lib/governorates';
+import { useStore } from '../StoreContext';
 
 /**
  * The accent presets. A NAME maps to classes chosen here — a merchant never
@@ -275,13 +276,17 @@ function ProductsTab({ slug, open }: { slug: string; open: boolean }) {
 
 function ProductCard({ slug, product, storeOpen }: { slug: string; product: MerchantProduct; storeOpen: boolean }) {
   const { loc } = useLanguage();
+  const { store: hostStore } = useStore();
+  // On a merchant host the shop IS the site, so the product lives at /p/...
+  // On the main site it needs the store in the path. Same page either way.
+  const href = hostStore ? `/p/${product.slug}` : `/community/store/${slug}/p/${product.slug}`;
   const image = product.images[0];
   const discounted = product.original_price_iqd && product.original_price_iqd > product.price_iqd;
   const sellable = storeOpen && product.in_stock !== false;
 
   return (
     <Link
-      to={`/community/store/${slug}/p/${product.slug}`}
+      to={href}
       className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden active:scale-[0.98] transition-transform"
     >
       <div className="aspect-square bg-black/40 overflow-hidden">
