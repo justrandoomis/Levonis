@@ -254,34 +254,42 @@ jobs:
           # Give the outbox processor a moment; sends run via ctx.waitUntil.
           sleep 20
 
+          # wrangler prints its banner on stdout alongside the JSON, so the
+          # output is captured to a file and queried ONCE. Chaining two jq
+          # calls through a pipe is what produced "Cannot index object with
+          # number" on the first run and turned three real answers into empty
+          # strings that then read as zero.
           q() {
-            npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "$1" \
-              | jq -r '.[0].results'
+            npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+              --command "$1" > /tmp/q.json 2>/tmp/q.err \
+              || { echo "::error::query failed"; sed -n '1,10p' /tmp/q.err >&2; return 1; }
+            jq -r "${2:-.[0].results}" /tmp/q.json
           }
+          n() { q "$1" '.[0].results[0].n'; }
 
           # Never select the payload: it contains a live reset token and a live
           # verification token. Only counts and states leave the database.
           echo "Outbox rows for this run's address (by plus-tag, no payload read):"
           q "SELECT kind, state, substr(last_error,1,120) AS last_error, COUNT(*) AS n
               FROM outbox WHERE recipient LIKE '%+${TAG}@%' GROUP BY kind, state, last_error" \
-            | jq -r '.[] | "  \(.kind)  state=\(.state)  n=\(.n)  \(.last_error // "")"'
+            '.[0].results[] | "  \(.kind)  state=\(.state)  n=\(.n)  \(.last_error // "")"'
 
-          SENT=$(q "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%' AND state='sent'" | jq -r '.[0].n')
-          TOTAL=$(q "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%'" | jq -r '.[0].n')
+          SENT=$(n "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%' AND state='sent'")
+          TOTAL=$(n "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%'")
           echo "rows: $TOTAL, accepted by Resend: $SENT"
 
           # Which of the two is which, by the link each carries. The predicate
           # runs INSIDE SQLite and returns a count — the link never comes back.
-          RESET=$(q "SELECT COUNT(*) AS n FROM outbox
+          RESET=$(n "SELECT COUNT(*) AS n FROM outbox
                       WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
-                        AND payload LIKE '%${APEX}/auth?reset=%'" | jq -r '.[0].n')
-          VERIFY=$(q "SELECT COUNT(*) AS n FROM outbox
+                        AND payload LIKE '%${APEX}/auth?reset=%'")
+          VERIFY=$(n "SELECT COUNT(*) AS n FROM outbox
                        WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
-                         AND payload LIKE '%${APEX}/%verify%'" | jq -r '.[0].n')
-          OFFSITE=$(q "SELECT COUNT(*) AS n FROM outbox
+                         AND payload LIKE '%${APEX}/%verify%'")
+          OFFSITE=$(n "SELECT COUNT(*) AS n FROM outbox
                         WHERE recipient LIKE '%+${TAG}@%'
                           AND payload LIKE '%https://%'
-                          AND payload NOT LIKE '%${APEX}%'" | jq -r '.[0].n')
+                          AND payload NOT LIKE '%${APEX}%'")
 
           echo ""
           echo "password-reset email accepted by Resend, link on ${APEX} : $RESET"
@@ -292,6 +300,12 @@ jobs:
           echo "offsite=$OFFSITE" >> "$GITHUB_OUTPUT"
 
           FAIL=0
+          for v in RESET VERIFY OFFSITE SENT TOTAL; do
+            case "${!v}" in
+              ''|*[!0-9]*) echo "::error::the query for $v returned '${!v}', not a number — the outbox state is UNKNOWN, not empty"; FAIL=1 ;;
+            esac
+          done
+          [ "$FAIL" = "0" ] || exit 1
           [ "$RESET" -ge 1 ] || { echo "::error::no password-reset email was accepted by Resend for this run"; FAIL=1; }
           [ "$VERIFY" -ge 1 ] || { echo "::error::no verification email was accepted by Resend for this run"; FAIL=1; }
           [ "$OFFSITE" = "0" ] || { echo "::error::an email for this run carries a link outside ${APEX}"; FAIL=1; }

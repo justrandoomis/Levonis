@@ -155,6 +155,48 @@ jobs:
           mv /tmp/vars.keep /tmp/vars.tsv
           echo "STUDIO_ALLOWED_DESTINATIONS will be set on this deploy"
 
+      # EMAIL_FROM is the OTHER half of the mail switch, and the half nobody
+      # could set. /api/auth/capabilities computes
+      #   mail = !!(EMAIL_API_KEY && (EMAIL_FROM || '').trim())
+      # (worker/routes/auth.ts), and worker/lib/outbox.ts refuses to deliver
+      # with EMAIL_NOT_CONFIGURED unless BOTH are present. EMAIL_API_KEY is a
+      # secret and gets uploaded below; EMAIL_FROM is a plain var, and this
+      # workflow only ever carried existing vars FORWARD — so an empty
+      # EMAIL_FROM stayed empty no matter how many times anyone set the API
+      # key and redeployed. That is exactly the deadlock DECISIONS row 54
+      # describes, still in place for this one name.
+      #
+      # Live evidence, run 33421698858: EMAIL_API_KEY present as a secret,
+      # EMAIL_FROM present as a plain var with an empty value, capabilities
+      # reporting passwordReset=false, and both endpoints answering 503
+      # EMAIL_NOT_CONFIGURED.
+      #
+      # The address MUST be on a domain verified in the Resend account, or
+      # Resend rejects every send. That is why this is the owner's value and
+      # not a default invented here.
+      - name: Let the owner set the email sender
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+        run: |
+          set -e
+          if [ -z "$EMAIL_FROM" ]; then
+            echo "EMAIL_FROM repository secret not set — password reset and email verification stay honestly disabled"
+            echo "(capabilities will keep reporting passwordReset=false and emailVerification=false)"
+            exit 0
+          fi
+          # Accept either "user@domain" or "Name <user@domain>"; anything else
+          # is rejected here rather than at Resend, where the only symptom
+          # would be mail that silently never arrives.
+          case "$EMAIL_FROM" in
+            *"<"*"@"*"."*">"*) : ;;
+            *"@"*"."*) case "$EMAIL_FROM" in *" "*) echo "::error::EMAIL_FROM has a space but is not in the \"Name <user@domain>\" form"; exit 1 ;; esac ;;
+            *) echo "::error::EMAIL_FROM is not an email address or a \"Name <user@domain>\" pair"; exit 1 ;;
+          esac
+          grep -v "^EMAIL_FROM	" /tmp/vars.tsv > /tmp/vars.keep || true
+          printf 'EMAIL_FROM\t%s\n' "$EMAIL_FROM" >> /tmp/vars.keep
+          mv /tmp/vars.keep /tmp/vars.tsv
+          echo "EMAIL_FROM will be set on this deploy — its domain must be verified in Resend"
+
       # STORE_ROOT_DOMAIN decides what `classifyHost` calls the apex, and
       # therefore whether /api/admin/* is served at all. It was previously
       # DERIVED from APP_ORIGIN — and APP_ORIGIN on this Worker does not name
