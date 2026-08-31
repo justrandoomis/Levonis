@@ -598,9 +598,9 @@ test("newly spawned objects are seated in free space, and restores are left alon
   // positions. Neither may be re-seated.
   assert.match(app, /orchestrator\.busy \|\| orchestrator\.hasPendingArrangement/);
   assert.match(app, /suppressSeating\(\);/);
-  // A large 3MF parses for longer than the suppression window, so objects
-  // still arriving hold it open rather than letting it expire mid-restore.
-  assert.match(app, /if \(suppressSeatingRef\.current\) \{[\s\S]{0,400}suppressSeating\(\);\s*return;\s*\}/);
+  // The timed window survives only for restoreScene, which is synchronous.
+  // Project restores use the latch instead — see the dedicated test below.
+  assert.match(app, /if \(suppressSeatingRef\.current\) return;/);
   // Objects that fit nowhere are reported, never squeezed onto a full plate.
   assert.match(app, /result\.ok && result\.unseatedCount/);
   assert.match(adapter, /unseatedCount: plan\.unseated\.length/);
@@ -681,13 +681,22 @@ test("restores and project imports are never mistaken for a spawn", async () => 
   assert.match(app, /everSeenObjectIdsRef/);
   assert.match(app, /if \(everSeenObjectIdsRef\.current\.has\(id\)\) return;/);
 
-  // A 3MF carries the author's own layout and the engine restores it as it
-  // parses — after the orchestrator is already finished, so `busy` cannot be
-  // the guard.
+  // A 3MF carries the author's own layout, and the orchestrator is already
+  // finished when the engine emits it, so `busy` cannot be the guard.
   assert.ok(
-    app.includes("/\\.3mf$/i.test(file.name))) suppressSeating();"),
-    "a 3MF import must suppress the free-space seating"
+    app.includes("/\\.3mf$/i.test(file.name))) restoreInFlightRef.current = true;"),
+    "a 3MF import must arm the restore latch"
   );
+
+  // The restore guard must be a LATCH, not a timer. The engine refreshes its
+  // object list ONCE after the whole file loop, so a restored project produces
+  // exactly one objects event — a timed window is a bet on parse speed, and a
+  // real 20-40MB project loses it.
+  const engine = await readFile(engineUrl, "utf8");
+  assert.match(engine, /addObject: \(c, y, G = null\) => \{/);
+  assert.match(app, /if \(restoreInFlightRef\.current\) \{[\s\S]{0,300}restoreInFlightRef\.current = false;\s*return;/);
+  // A failed import must not leave the latch armed forever.
+  assert.match(app, /restoreInFlightRef\.current = false;\s*setImportProgress\(null\);/);
 
   // A new project forgets both sets, or the next import would look like a
   // restore of the previous project's ids.

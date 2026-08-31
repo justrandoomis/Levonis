@@ -1,7 +1,7 @@
 {
   "kind": "levo-studio-production-verify",
   "version": 1,
-  "generatedAt": "2026-08-31T08:31:43.660Z",
+  "generatedAt": "2026-08-31T09:13:09.899Z",
   "target": "http://127.0.0.1:8799/",
   "passed": true,
   "failures": [],
@@ -13,8 +13,8 @@
     "scripts": []
   },
   "pageLoad": {
-    "interactiveMs": 742,
-    "rendererRssKb": 133992,
+    "interactiveMs": 565,
+    "rendererRssKb": 135636,
     "workers": 0,
     "sliceWorkerAlive": false
   },
@@ -25,86 +25,86 @@
   "gestures": [
     {
       "name": "orbit",
-      "elapsedMs": 1670,
+      "elapsedMs": 1617,
       "frames": 83,
       "p50Ms": 16.7,
       "p95Ms": 33.4,
-      "maxMs": 116.6,
-      "jankFrames": 1,
+      "maxMs": 83.2,
+      "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "orbit-back",
-      "elapsedMs": 1622,
+      "elapsedMs": 1557,
       "frames": 81,
       "p50Ms": 16.7,
       "p95Ms": 33.4,
-      "maxMs": 66.7,
+      "maxMs": 33.4,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "pinch-zoom-in",
-      "elapsedMs": 1769,
-      "frames": 77,
-      "p50Ms": 16.8,
-      "p95Ms": 50,
-      "maxMs": 66.6,
+      "elapsedMs": 1633,
+      "frames": 76,
+      "p50Ms": 16.7,
+      "p95Ms": 49.9,
+      "maxMs": 50.1,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "pinch-zoom-out",
-      "elapsedMs": 1675,
-      "frames": 66,
+      "elapsedMs": 1595,
+      "frames": 68,
       "p50Ms": 33.3,
-      "p95Ms": 66.6,
-      "maxMs": 83.3,
+      "p95Ms": 33.5,
+      "maxMs": 66.6,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
       "name": "drag-object",
-      "elapsedMs": 3166,
-      "frames": 88,
-      "p50Ms": 33.3,
-      "p95Ms": 83.5,
-      "maxMs": 116.6,
-      "jankFrames": 1,
-      "freezeFrames": 0
-    },
-    {
-      "name": "gizmo-move",
-      "elapsedMs": 2579,
-      "frames": 81,
+      "elapsedMs": 2823,
+      "frames": 90,
       "p50Ms": 33.3,
       "p95Ms": 50,
-      "maxMs": 83.4,
+      "maxMs": 50.1,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
-      "name": "gizmo-rotate",
-      "elapsedMs": 2789,
-      "frames": 82,
+      "name": "gizmo-move",
+      "elapsedMs": 2603,
+      "frames": 81,
       "p50Ms": 33.3,
-      "p95Ms": 66.6,
+      "p95Ms": 50.1,
       "maxMs": 83.3,
       "jankFrames": 0,
       "freezeFrames": 0
     },
     {
-      "name": "gizmo-scale",
-      "elapsedMs": 2641,
+      "name": "gizmo-rotate",
+      "elapsedMs": 2650,
       "frames": 79,
-      "p50Ms": 33.4,
+      "p50Ms": 33.3,
       "p95Ms": 50.1,
       "maxMs": 66.7,
       "jankFrames": 0,
       "freezeFrames": 0
+    },
+    {
+      "name": "gizmo-scale",
+      "elapsedMs": 2628,
+      "frames": 79,
+      "p50Ms": 33.3,
+      "p95Ms": 50,
+      "maxMs": 83.3,
+      "jankFrames": 0,
+      "freezeFrames": 0
     }
   ],
-  "gestureJankFrames": 2,
+  "gestureJankFrames": 0,
   "duplicate": {
     "source": {
       "id": 1,
@@ -214,14 +214,14 @@
     "bannerText": "تمت إضافة الملفات إلى المشروع."
   },
   "autosave": {
-    "frames": 1195,
+    "frames": 1194,
     "p50Ms": 16.7,
     "p95Ms": 16.8,
     "maxMs": 50,
     "jankFrames": 0,
     "freezeFrames": 0,
     "longTasks": 1,
-    "longestTaskMs": 56
+    "longestTaskMs": 53
   },
   "sliceCycles": [
     {
@@ -229,24 +229,29 @@
       "workers": 1,
       "sliceWorkerAlive": true,
       "messages": 0,
-      "rendererRssKb": 280652
+      "rendererRssKb": 288416
     },
     {
       "cycle": 2,
       "workers": 1,
       "sliceWorkerAlive": true,
       "messages": 0,
-      "rendererRssKb": 297636
+      "rendererRssKb": 294580
     },
     {
       "cycle": 3,
       "workers": 1,
       "sliceWorkerAlive": true,
       "messages": 0,
-      "rendererRssKb": 299732
+      "rendererRssKb": 306556
     }
   ],
-  "rendererGrowthKbAcrossSlices": 19080,
+  "rendererGrowthKbAcrossSlices": 18140,
+  "paintKeepsWorker": {
+    "workerBefore": true,
+    "paintPanelOpened": true,
+    "workerAfterHidden": true
+  },
   "messages": {
     "console": [
       "info: [slicer.worker] core: st"

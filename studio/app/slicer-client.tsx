@@ -330,6 +330,26 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    */
   const sessionHasPaintRef = useRef(false);
   const suppressSeatingTimerRef = useRef<number | null>(null);
+  /**
+   * A restore is in flight and the objects it produces must not be seated.
+   *
+   * This is a LATCH, not a timer, and the difference matters. The timed window
+   * below is right for `restoreScene` — that is synchronous, so anything it
+   * emits arrives immediately. It is wrong for a project restore, and an
+   * earlier version of this file got that wrong on a stated but false premise:
+   * "the engine emits its objects events as it parses". It does not. The
+   * viewer's `loadFiles` calls its refresh ONCE, after the whole file loop
+   * (`addObject` only pushes into objectsRef and never refreshes), so a
+   * restored .3mf produces exactly ONE objects event, for the entire scene.
+   *
+   * That makes any time-based window a bet on parse speed. The parse runs in a
+   * worker, so the main thread stays idle and the timer fires exactly on time;
+   * a small fixture beats it and a real 20-40 MB project does not — and losing
+   * that bet re-seats every object and destroys the author's layout, on
+   * precisely the projects big enough to care about. So the restore paths latch
+   * instead: the next objects event is absorbed, whenever it arrives.
+   */
+  const restoreInFlightRef = useRef(false);
 
   /**
    * Holds the free-space seating off while the shell itself is placing
@@ -661,7 +681,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // would throw that layout away. The orchestrator is already finished by
     // the time the engine emits the objects (only a ZIP leaves a pending
     // arrangement behind), so `orchestrator.busy` cannot be the guard here.
-    if (rawFiles.some((file) => /\.3mf$/i.test(file.name))) suppressSeating();
+    if (rawFiles.some((file) => /\.3mf$/i.test(file.name))) restoreInFlightRef.current = true;
     const importNotices: string[] = [];
     try {
       const result = await orchestrator.importFiles(rawFiles, {
@@ -692,11 +712,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       });
       projectFilesRef.current = [...projectFilesRef.current, ...result.importedFiles];
     } catch (reason: unknown) {
+      // Nothing was restored, so nothing is coming to absorb the latch.
+      restoreInFlightRef.current = false;
       setImportProgress(null);
       setError(localizeImportError(reason));
       setStatus("error");
     }
-  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, suppressSeating, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
+  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
 
   const handlePickedFiles = useCallback((files: File[]) => {
     setNotice("");
@@ -769,7 +791,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     slicing.clearResults();
     orchestrator.clearPendingArrangement();
     // A saved project carries its own layout — restore it, do not re-seat it.
-    suppressSeating();
+    // The latch waits for the objects event however long the parse takes.
+    restoreInFlightRef.current = true;
     projectFilesRef.current = saved.files;
     setProjectId(saved.id);
     setProjectName(saved.name);
@@ -806,7 +829,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapter, orchestrator, requestedPresetKey, suppressSeating, t.engineUnavailable, t.savedLocalFull, t.savedLocalSourceOnly]);
+  }, [adapter, orchestrator, requestedPresetKey, t.engineUnavailable, t.savedLocalFull, t.savedLocalSourceOnly]);
 
   // Open an account project: download the head revision (ownership enforced
   // server-side), restore files + manifest settings, and surface a degraded
@@ -1149,14 +1172,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // places every object at the author's own offsets. Neither is a spawn, and
     // re-seating either would throw away a layout that is already correct.
     if (orchestrator.busy || orchestrator.hasPendingArrangement) return;
-    if (suppressSeatingRef.current) {
-      // Objects are still arriving from the restore. Hold the window open —
-      // a large 3MF can take longer to parse than the timer, and letting it
-      // expire mid-import would seat the remaining objects and destroy the
-      // author's layout for exactly the projects that need it most.
-      suppressSeating();
+    if (restoreInFlightRef.current) {
+      // The one objects event a restore produces. Its positions are the
+      // author's own; record the ids and leave them exactly where they are.
+      restoreInFlightRef.current = false;
       return;
     }
+    if (suppressSeatingRef.current) return;
 
     const result = seatNewObjects(adapter, {
       newIds: appeared,
@@ -1171,7 +1193,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     if (result.ok && result.unseatedCount) {
       setNotice(templateText(t.zipOverflow, { count: result.unseatedCount }));
     }
-  }, [adapter, orchestrator, profile.bedDepth, profile.bedWidth, suppressSeating, t.zipOverflow]);
+  }, [adapter, orchestrator, profile.bedDepth, profile.bedWidth, t.zipOverflow]);
 
   // -- engine event stream ---------------------------------------------------
   const handleEvent = useCallback((event: ViewportEvent) => {
@@ -1235,6 +1257,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     orchestrator.clearPendingArrangement();
     seenObjectIdsRef.current = new Set();
     everSeenObjectIdsRef.current = new Set();
+    restoreInFlightRef.current = false;
     arrangeUndoRef.current = null;
     setArrangeUndoAvailable(false);
     setObjects([]);
