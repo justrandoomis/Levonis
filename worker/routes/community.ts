@@ -6,6 +6,7 @@ import { requireAuth, notFound, forbidden, str, int, jsonArray } from '../lib/ht
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits } from '../lib/entitlements';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -49,10 +50,23 @@ communityRoutes.get('/products', async (c) => {
 });
 
 communityRoutes.get('/merchants', async (c) => {
+  const root = rootDomainFrom(c.env);
+  // The storefront half rides along so a directory card can send the visitor
+  // straight to the shop's own address; a profile-only merchant has neither
+  // slug nor URL and keeps the in-site page.
   const { results } = await c.env.DB.prepare(
-    'SELECT * FROM community_merchants ORDER BY created_at DESC LIMIT 20'
-  ).all();
-  return c.json({ success: true, merchants: results.map(merchantPublic) });
+    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug
+       FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
+      ORDER BY cm.created_at DESC LIMIT 20`
+  ).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    merchants: results.map((m) => ({
+      ...merchantPublic(m),
+      store_slug: m.store_slug ?? null,
+      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+    })),
+  });
 });
 
 communityRoutes.get('/requests', async (c) => {
@@ -156,13 +170,24 @@ communityRoutes.delete('/store/:id/follow', requireAuth, async (c) => {
 
 communityRoutes.get('/followed', requireAuth, async (c) => {
   const user = c.get('user')!;
+  const root = rootDomainFrom(c.env);
   const { results } = await c.env.DB.prepare(
-    `SELECT cm.* FROM follows f JOIN community_merchants cm ON cm.id = f.merchant_id
+    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug
+       FROM follows f
+       JOIN community_merchants cm ON cm.id = f.merchant_id
+       LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
       WHERE f.user_id = ? ORDER BY f.created_at DESC`
   )
     .bind(user.id)
-    .all();
-  return c.json({ success: true, merchants: results.map(merchantPublic) });
+    .all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    merchants: results.map((m) => ({
+      ...merchantPublic(m),
+      store_slug: m.store_slug ?? null,
+      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+    })),
+  });
 });
 
 // Merchant self-service -------------------------------------------------------

@@ -8,12 +8,13 @@
  */
 
 import { useState } from 'react';
-import { Check, Loader2, Globe, AlertTriangle } from 'lucide-react';
+import { Check, Loader2, Globe, AlertTriangle, ArrowUp, ArrowDown, Trash2, Eye, EyeOff, Plus } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
-import { merchantApi, slugMessage, type MerchantMe, type SlugRejection } from '../../../lib/merchant';
+import { merchantApi, slugMessage, type MerchantMe, type SlugRejection, type ProfileWidget } from '../../../lib/merchant';
 import { GOVERNORATES } from '../../../lib/governorates';
 import { ImagePicker } from '../../media/ImagePicker';
+import { WIDGET_ICONS, WidgetIcon } from '../profileIcons';
 import { Btn, Card, Chip, ChipListEditor, Input, Notice, TextArea, Toggle } from './ui';
 
 /** The accent presets, with an honest swatch for each. Classes only — the
@@ -68,6 +69,8 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
     business_hours: (store.business_hours ?? []).map((h) =>
       typeof h === 'string' ? { day: h, open: '', close: '' } : h
     ),
+    profile_links: (store.profile_links ?? []) as ProfileWidget[],
+    profile_facts: (store.profile_facts ?? []) as ProfileWidget[],
     policies: Object.entries(store.policies ?? {}),
     social_links: Object.entries(store.social_links ?? {}),
     delivery_fee: delivery.fee_iqd !== undefined ? String(delivery.fee_iqd) : '',
@@ -104,6 +107,8 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
         business_hours: f.business_hours.filter((h) => h.day.trim()),
         policies: Object.fromEntries(f.policies.filter(([k, v]) => k.trim() && v.trim())),
         social_links: Object.fromEntries(f.social_links.filter(([k, v]) => k.trim() && v.trim())),
+        profile_links: f.profile_links,
+        profile_facts: f.profile_facts,
         delivery_settings: {
           ...(f.delivery_fee !== '' ? { fee_iqd: Number(f.delivery_fee) || 0 } : {}),
           ...(f.delivery_free_over !== '' ? { free_over_iqd: Number(f.delivery_free_over) || 0 } : {}),
@@ -159,6 +164,29 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
             </div>
           </div>
         </div>
+      </Card>
+
+      <Card title={loc('واجهة المتجر — الروابط والبطاقات', 'Profile — links & info cards', 'ڕووکاری فرۆشگا')}>
+        <p className="text-zinc-600 text-[10.5px] mb-3">
+          {loc(
+            'ستة عناصر تظهر أعلى صفحة متجرك: ثلاثة روابط (موقعك، إنستغرام…) وثلاث بطاقات معلومات (الموقع، وقت التجهيز، الشحن…). لكل عنصر أيقونة وعنوان وقيمة، ويمكنك إخفاؤه أو إعادة ترتيبه.',
+            'Six items at the top of your shop page: three links (your site, Instagram…) and three info cards (location, prep time, shipping…). Each has an icon, a title and a value, and can be hidden or reordered.',
+            'شەش دانە لە سەرەوەی پەڕەی فرۆشگاکەت: سێ بەستەر و سێ کارتی زانیاری.'
+          )}
+        </p>
+        <WidgetGroupEditor
+          kind="link"
+          label={loc('الروابط الثلاثة', 'The three links', 'سێ بەستەرەکە')}
+          items={f.profile_links}
+          onChange={(profile_links) => setF({ ...f, profile_links })}
+        />
+        <div className="h-3" />
+        <WidgetGroupEditor
+          kind="fact"
+          label={loc('بطاقات المعلومات الثلاث', 'The three info cards', 'سێ کارتی زانیاری')}
+          items={f.profile_facts}
+          onChange={(profile_facts) => setF({ ...f, profile_facts })}
+        />
       </Card>
 
       <Card title={loc('معلومات المتجر', 'Store information', 'زانیاری فرۆشگا')}>
@@ -448,6 +476,134 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
       </Btn>
 
       <SlugCard currentSlug={store.slug} url={store.url} onChanged={onSaved} />
+    </div>
+  );
+}
+
+/**
+ * One group of three profile widgets — the reusable editor behind both the
+ * links row and the info-cards row. Per item: icon (from the fixed set),
+ * title, the value (URL for links, secondary text for cards), show/hide,
+ * and order within the group. Array order IS the display order.
+ */
+function WidgetGroupEditor({
+  kind,
+  label,
+  items,
+  onChange,
+}: {
+  kind: 'link' | 'fact';
+  label: string;
+  items: ProfileWidget[];
+  onChange: (items: ProfileWidget[]) => void;
+}) {
+  const { loc, lang } = useLanguage();
+
+  const set = (i: number, patch: Partial<ProfileWidget>) => {
+    const next = [...items];
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  };
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const next = [...items];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  return (
+    <div>
+      <p className="text-zinc-400 text-[12px] font-semibold mb-2">{label}</p>
+      <div className="space-y-2">
+        {items.map((w, i) => (
+          <div key={i} className={`rounded-xl border p-2 space-y-1.5 ${w.visible === false ? 'border-white/5 opacity-60' : 'border-white/10'} bg-black/25`}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center shrink-0">
+                <WidgetIcon name={w.icon} className="w-4 h-4 text-zinc-300" />
+              </div>
+              <select
+                value={w.icon}
+                onChange={(e) => set(i, { icon: e.target.value })}
+                className="w-24 h-8 rounded-lg bg-black/40 border border-white/10 px-1.5 text-zinc-300 text-[11px] outline-none focus:border-gold/40 shrink-0"
+                aria-label={loc('الأيقونة', 'Icon', 'ئایکۆن')}
+              >
+                {WIDGET_ICONS.map((ic) => (
+                  <option key={ic.id} value={ic.id}>
+                    {lang === 'en' ? ic.en : ic.ar}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={w.title}
+                onChange={(e) => set(i, { title: e.target.value })}
+                placeholder={loc('العنوان', 'Title', 'ناونیشان')}
+                maxLength={30}
+                className="flex-1 min-w-0 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[12px] outline-none focus:border-gold/40"
+              />
+            </div>
+            {kind === 'link' ? (
+              <input
+                value={w.url ?? ''}
+                onChange={(e) => set(i, { url: e.target.value })}
+                dir="ltr"
+                placeholder="https://…"
+                className="w-full h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[12px] outline-none focus:border-gold/40"
+              />
+            ) : (
+              <input
+                value={w.subtitle ?? ''}
+                onChange={(e) => set(i, { subtitle: e.target.value })}
+                placeholder={loc('النص الثانوي', 'Secondary text', 'دەقی لاوەکی')}
+                maxLength={40}
+                className="w-full h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[12px] outline-none focus:border-gold/40"
+              />
+            )}
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="w-7 h-7 rounded-lg border border-white/10 text-zinc-400 disabled:opacity-30 flex items-center justify-center">
+                <ArrowUp className="w-3 h-3" />
+              </button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} className="w-7 h-7 rounded-lg border border-white/10 text-zinc-400 disabled:opacity-30 flex items-center justify-center">
+                <ArrowDown className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => set(i, { visible: w.visible === false })}
+                className={`h-7 px-2 rounded-lg border text-[10.5px] font-semibold inline-flex items-center gap-1 ${
+                  w.visible === false ? 'border-amber-500/30 text-amber-400' : 'border-white/10 text-zinc-400'
+                }`}
+              >
+                {w.visible === false ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {w.visible === false ? loc('مخفي', 'Hidden', 'شاراوە') : loc('ظاهر', 'Visible', 'دیارە')}
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+                className="w-7 h-7 rounded-lg border border-red-500/30 text-red-300 flex items-center justify-center ms-auto"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {items.length < 3 && (
+        <button
+          type="button"
+          onClick={() =>
+            onChange([
+              ...items,
+              kind === 'link'
+                ? { icon: items.length === 0 ? 'globe' : items.length === 1 ? 'instagram' : 'tiktok', title: '', url: '', visible: true }
+                : { icon: items.length === 0 ? 'map-pin' : items.length === 1 ? 'clock' : 'truck', title: '', subtitle: '', visible: true },
+            ])
+          }
+          className="mt-2 h-8 px-3 rounded-lg border border-dashed border-white/15 text-zinc-400 text-[11.5px] font-semibold inline-flex items-center gap-1"
+        >
+          <Plus className="w-3 h-3" />
+          {loc('إضافة عنصر', 'Add item', 'زیادکردن')} ({items.length}/3)
+        </button>
+      )}
     </div>
   );
 }

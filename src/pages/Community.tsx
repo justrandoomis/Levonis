@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { api, ApiError, formatIqd } from '../lib/api';
+import { storeHref } from '../lib/merchant';
 import {
   ArrowLeft, ArrowRight, Search, Box, Calculator,
   MessageSquare, Plus, Store,
@@ -30,6 +31,9 @@ interface CommunityMerchant {
   avatarUrl: string | null;
   verified: boolean;
   created_at: string;
+  store_slug?: string | null;
+  /** The shop's own address — a card click is a full navigation there. */
+  store_url?: string | null;
 }
 
 interface CommunityRequest {
@@ -334,7 +338,19 @@ export default function Community() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     {filteredMerchants.map((m) => (
-                      <div key={m.id} onClick={() => navigate(`/community/store/${m.id}`)} className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 flex flex-col gap-4 cursor-pointer hover:border-olive/50 transition-colors">
+                      <div
+                        key={m.id}
+                        onClick={() => {
+                          // A shop with its own subdomain IS its own site —
+                          // hand the visitor over rather than loading it
+                          // inside the main site (the shared cookie keeps
+                          // their session across the hop).
+                          const href = storeHref(m.store_url, m.id);
+                          if (href.startsWith('http')) window.location.href = href;
+                          else navigate(href);
+                        }}
+                        className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 flex flex-col gap-4 cursor-pointer hover:border-olive/50 transition-colors"
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-zinc-800 rounded-full overflow-hidden flex items-center justify-center border border-zinc-700 shrink-0">

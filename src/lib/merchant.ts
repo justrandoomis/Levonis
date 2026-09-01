@@ -51,8 +51,45 @@ export interface MerchantStore {
   open?: boolean;
   /** Public follower count (returned by the storefront endpoints only). */
   followers?: number;
+  /** Published-product count (storefront endpoints only). */
+  product_count?: number;
+  /** Share of visible reviews at 4★+, or null with no reviews yet. */
+  positive_pct?: number | null;
+  /** Published products currently discounted (storefront endpoints only). */
+  deal_count?: number;
+  /** The merchant-arranged header rows (visible items only on public reads). */
+  profile_links?: ProfileWidget[];
+  profile_facts?: ProfileWidget[];
   created_at: string;
   merchant: StoreMerchantSummary;
+}
+
+/** One merchant-controlled header widget: a link pill or an info card. */
+export interface ProfileWidget {
+  /** A NAME from the fixed set — mapped to a component, never markup. */
+  icon: string;
+  title: string;
+  /** Info cards only. */
+  subtitle?: string;
+  /** Link pills only — http(s), validated server-side. */
+  url?: string;
+  visible: boolean;
+}
+
+/**
+ * Where a merchant card should take the visitor: the store's own subdomain
+ * when one exists (a full navigation — the shop IS its own site), the
+ * in-site page otherwise. The shared cookie keeps the session across hosts.
+ */
+export function storeHref(storeUrl: string | null | undefined, merchantId: string): string {
+  if (storeUrl && /^https?:\/\//.test(storeUrl)) {
+    try {
+      if (new URL(storeUrl).origin !== window.location.origin) return storeUrl;
+    } catch {
+      /* fall through to the in-site page */
+    }
+  }
+  return `/community/store/${merchantId}`;
 }
 
 export interface MerchantProduct {

@@ -7,49 +7,54 @@
  * here with the same component and the same data.
  *
  * VISUALLY IT IS LEVONIS. §12 and §93 are explicit that a merchant may brand
- * their shop but not escape the platform's design: the only thing a merchant
- * controls here is content — logo, banner, words, products, services,
- * showcase — plus an accent chosen from a fixed set of presets. No merchant
- * string ever becomes a style rule or raw HTML, which is why `accent` maps
- * through a lookup below and anything unrecognised falls back to the default.
+ * their shop but not escape the platform's design: the merchant controls
+ * CONTENT — cover, avatar, words, the three link pills, the three info
+ * cards, products, services, showcase — plus an accent chosen from a fixed
+ * set of presets. No merchant string ever becomes a style rule or raw HTML:
+ * `accent` maps through a lookup below, widget ICON NAMES map through a
+ * fixed component table, and anything unrecognised falls back safely.
  *
- * THE SHAPE is a social commerce profile, built for one hand on a phone:
- * identity, honest stats (rating, orders, followers — real numbers or
- * nothing), one action row, then tabs — products (grouped by the merchant's
- * own sections), services, the workshop showcase, reviews, about. A tab with
- * nothing behind it never renders.
+ * THE SHAPE follows one fixed profile skeleton, top to bottom: cover →
+ * avatar/name/verification → three honest stats → bio → the merchant's three
+ * links → their three info cards → actions (contact, follow, share) → tabs →
+ * the product grid. The merchant rearranges what fills the slots from their
+ * dashboard; the skeleton itself never moves.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  Store, Star, BadgeCheck, MapPin, Clock, ShoppingBag, Heart, MessageCircle,
-  Loader2, PackageX, Share2, Check, Printer, Layers, Hammer, ArrowLeft,
+  Store, Star, BadgeCheck, Clock, ShoppingBag, MessageCircle,
+  Loader2, PackageX, Share2, Check, Printer, Layers, Hammer, ArrowLeft, ChevronLeft,
+  MapPin, X,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import {
   storefrontApi, badgeLabel, iqd,
-  type MerchantStore, type MerchantProduct, type StoreSection, type StoreService, type ShowcaseItem,
+  type MerchantStore, type MerchantProduct, type StoreSection, type StoreService,
+  type ShowcaseItem, type ProfileWidget,
 } from '../lib/merchant';
 import { GOVERNORATE_LABELS } from '../lib/governorates';
+import { WidgetIcon } from '../components/merchant/profileIcons';
 import { useStore } from '../StoreContext';
 
 /**
  * The accent presets. A NAME maps to classes chosen here — a merchant never
- * supplies a colour, so nothing they type can reach the stylesheet.
+ * supplies a colour, so nothing they type can reach the stylesheet. `btn` is
+ * the contact button's fill; the rest tint rings, chips and the active tab.
  */
-const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: string }> = {
-  default: { ring: 'border-gold/20', chip: 'bg-olive/30 text-gold', glow: 'bg-olive/15', text: 'text-gold' },
-  olive: { ring: 'border-olive-light/40', chip: 'bg-olive/40 text-gold', glow: 'bg-olive/20', text: 'text-gold' },
-  gold: { ring: 'border-gold/40', chip: 'bg-gold/15 text-gold', glow: 'bg-gold/10', text: 'text-gold' },
-  slate: { ring: 'border-slate-500/30', chip: 'bg-slate-500/15 text-slate-200', glow: 'bg-slate-500/10', text: 'text-slate-200' },
-  plum: { ring: 'border-purple-500/30', chip: 'bg-purple-500/15 text-purple-200', glow: 'bg-purple-500/10', text: 'text-purple-200' },
-  teal: { ring: 'border-teal-500/30', chip: 'bg-teal-500/15 text-teal-200', glow: 'bg-teal-500/10', text: 'text-teal-200' },
+const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: string; btn: string }> = {
+  default: { ring: 'border-gold/30', chip: 'bg-olive/30 text-gold', glow: 'bg-olive/15', text: 'text-gold', btn: 'bg-zinc-100 text-zinc-900' },
+  olive: { ring: 'border-olive-light/40', chip: 'bg-olive/40 text-gold', glow: 'bg-olive/20', text: 'text-gold', btn: 'bg-olive text-white' },
+  gold: { ring: 'border-gold/40', chip: 'bg-gold/15 text-gold', glow: 'bg-gold/10', text: 'text-gold', btn: 'bg-gold text-zinc-900' },
+  slate: { ring: 'border-slate-500/40', chip: 'bg-slate-500/15 text-slate-200', glow: 'bg-slate-500/10', text: 'text-slate-200', btn: 'bg-slate-200 text-slate-900' },
+  plum: { ring: 'border-purple-500/40', chip: 'bg-purple-500/15 text-purple-200', glow: 'bg-purple-500/10', text: 'text-purple-200', btn: 'bg-purple-300 text-purple-950' },
+  teal: { ring: 'border-teal-500/40', chip: 'bg-teal-500/15 text-teal-200', glow: 'bg-teal-500/10', text: 'text-teal-200', btn: 'bg-teal-300 text-teal-950' },
 };
 
-type Tab = 'products' | 'services' | 'showcase' | 'reviews' | 'about';
+type Tab = 'products' | 'sections' | 'deals' | 'services' | 'showcase' | 'reviews' | 'about';
 
 /** The main site, from wherever this store is rendered. On a subdomain the
  *  messenger and the request board live on the apex; the shared cookie keeps
@@ -69,6 +74,9 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
   const [tab, setTab] = useState<Tab>(() =>
     location.pathname.endsWith('/reviews') ? 'reviews' : location.pathname.endsWith('/about') ? 'about' : 'products'
   );
+  // The section filter lives up here: the sections TAB picks one, the
+  // products tab shows it (with a clear chip).
+  const [sectionFilter, setSectionFilter] = useState('');
 
   // The optional halves of the profile, fetched once per store. A tab only
   // exists when there is something behind it.
@@ -144,12 +152,13 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
     );
   }
 
-  const govLabel = store.governorate
-    ? GOVERNORATE_LABELS[store.governorate]?.[lang === 'ckb' ? 'ckb' : lang] ?? store.governorate
-    : '';
+  const links = (store.profile_links ?? []).filter((w) => w.visible !== false).slice(0, 3);
+  const facts = factsWithFallback(store, loc, lang);
 
   const TABS: Array<{ id: Tab; label: string; show: boolean }> = [
     { id: 'products', label: loc('المنتجات', 'Products', 'بەرهەمەکان'), show: true },
+    { id: 'sections', label: loc('الأقسام', 'Sections', 'بەشەکان'), show: sections.length > 0 },
+    { id: 'deals', label: loc('العروض', 'Deals', 'ئۆفەرەکان'), show: (store.deal_count ?? 0) > 0 },
     { id: 'services', label: loc('الخدمات', 'Services', 'خزمەتگوزاری'), show: services.length > 0 },
     { id: 'showcase', label: loc('المعرض', 'Showcase', 'پیشانگا'), show: showcase.length > 0 },
     { id: 'reviews', label: loc('التقييمات', 'Reviews', 'هەڵسەنگاندن'), show: true },
@@ -160,91 +169,123 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-24">
       <div className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] ${accent.glow} rounded-full blur-[120px] pointer-events-none z-0`} />
 
-      {/* Banner + identity */}
+      {/* 1 — Cover */}
       <div className="relative z-10">
-        <div className="h-24 sm:h-36 w-full overflow-hidden bg-white/[0.03] relative">
+        <div className="h-36 sm:h-48 w-full overflow-hidden bg-white/[0.03] relative">
           {store.bannerUrl && (
             <img src={store.bannerUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
           )}
-          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/30 to-transparent" />
           {/* On the main site this page has no Header — give the visitor a way back. */}
           {!hostStore && (
             <Link
               to="/community"
-              className="absolute top-3 start-3 w-9 h-9 rounded-xl bg-black/50 backdrop-blur border border-white/10 flex items-center justify-center text-zinc-200"
+              className="absolute top-3 start-3 w-9 h-9 rounded-full bg-black/45 backdrop-blur border border-white/10 flex items-center justify-center text-zinc-200"
               aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
             >
-              <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+              <ArrowLeft className="w-4 h-4 rtl:rotate-180" strokeWidth={1.75} />
             </Link>
           )}
         </div>
 
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 -mt-8 relative">
-          <div className="flex items-end gap-3 mb-2.5">
-            <div className={`w-16 h-16 rounded-2xl bg-[#0a0a0a] border-2 ${accent.ring} overflow-hidden shrink-0 flex items-center justify-center`}>
-              {store.logoUrl ? (
-                <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <Store className="w-7 h-7 text-gold" />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 relative">
+          {/* 2 — Avatar + name + verification. Only the avatar overlaps the
+              cover; the words stay on the dark ground below it. */}
+          <div className="flex items-end gap-3.5 mb-4">
+            <div className="relative shrink-0 -mt-11">
+              <div className={`w-[84px] h-[84px] rounded-full bg-[#0a0a0a] border-2 ${accent.ring} overflow-hidden flex items-center justify-center`}>
+                {store.logoUrl ? (
+                  <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <Store className="w-8 h-8 text-gold" strokeWidth={1.5} />
+                )}
+              </div>
+              {store.merchant.verified && (
+                <span className="absolute bottom-0.5 end-0.5 w-6 h-6 rounded-full bg-[#0a0a0a] flex items-center justify-center">
+                  <BadgeCheck className="w-5 h-5 text-gold" />
+                </span>
               )}
             </div>
-            <div className="min-w-0 pb-0.5 flex-1">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-white font-bold text-[16px] truncate">{store.name}</h1>
-                {store.merchant.verified && <BadgeCheck className="w-4 h-4 text-gold shrink-0" />}
-              </div>
-              {store.tagline && <p className="text-zinc-400 text-[11.5px] truncate">{store.tagline}</p>}
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${accent.chip}`}>
-                  {badgeLabel(store.merchant.badge, loc)}
-                </span>
-                {govLabel && (
-                  <span className="flex items-center gap-0.5 text-[10.5px] text-zinc-500">
-                    <MapPin className="w-3 h-3" />
-                    {govLabel}
+            <div className="min-w-0 flex-1 pb-1 pt-2.5">
+              <h1 className="text-white font-bold text-[19px] leading-tight truncate">{store.name}</h1>
+              <p className="text-zinc-500 text-[12px] truncate" dir="ltr">@{store.slug}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {store.merchant.rating !== null ? (
+                  <span className={`inline-flex items-center gap-1 text-[12px] font-semibold ${accent.text}`} dir="ltr">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    {store.merchant.rating.toFixed(1)}
+                    <span className="opacity-70 font-normal">
+                      ({store.merchant.rating_count} {loc('تقييم', 'reviews', 'هەڵسەنگاندن')})
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-zinc-500 text-[11.5px]">{badgeLabel(store.merchant.badge, loc)}</span>
+                )}
+                {store.merchant.verified && (
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${accent.chip}`}>
+                    {loc('متجر موثّق', 'Verified store', 'فرۆشگای پشتڕاستکراو')}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Trust signals. Real numbers or nothing — a store with no reviews
-              says "new", never a fabricated 5.0. */}
-          <div className="grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.03] mb-3 divide-x divide-white/5 rtl:divide-x-reverse">
+          {/* 3 — Three honest stats */}
+          <div className="grid grid-cols-3 divide-x divide-white/10 rtl:divide-x-reverse mb-3.5">
             <ProfileStat
-              value={
-                store.merchant.rating !== null ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-gold fill-gold" />
-                    {store.merchant.rating.toFixed(1)}
-                  </span>
-                ) : (
-                  loc('جديد', 'New', 'نوێ')
-                )
-              }
-              label={
-                store.merchant.rating !== null
-                  ? loc(`${store.merchant.rating_count} تقييم`, `${store.merchant.rating_count} reviews`, `${store.merchant.rating_count} هەڵسەنگاندن`)
-                  : loc('لا تقييمات بعد', 'No reviews yet', 'هەڵسەنگاندن نییە')
-              }
+              value={store.positive_pct !== null && store.positive_pct !== undefined ? `${store.positive_pct}%` : '—'}
+              label={loc('تقييم إيجابي', 'Positive rating', 'هەڵسەنگاندنی ئەرێنی')}
             />
-            <ProfileStat
-              value={String(store.merchant.completed_orders)}
-              label={loc('طلب مكتمل', 'Completed orders', 'داواکاری تەواو')}
-            />
-            <ProfileStat
-              value={String(store.followers ?? 0)}
-              label={loc('متابع', 'Followers', 'شوێنکەوتوو')}
-            />
+            <ProfileStat value={String(store.product_count ?? 0)} label={loc('منتجات', 'Products', 'بەرهەم')} />
+            <ProfileStat value={String(store.followers ?? 0)} label={loc('متابعون', 'Followers', 'شوێنکەوتوو')} />
           </div>
 
-          {/* What the shop is about, in the merchant's own words. */}
-          {store.categories.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap mb-3">
-              {store.categories.slice(0, 6).map((cat) => (
-                <span key={cat} className="text-[10.5px] px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-zinc-400">
-                  {cat}
-                </span>
+          {/* 4 — Bio */}
+          {(store.description || store.tagline) && (
+            <p className="text-zinc-300 text-[12.5px] leading-relaxed text-center line-clamp-3 mb-4 px-2">
+              {store.description || store.tagline}
+            </p>
+          )}
+
+          {/* 5 — The merchant's three link pills */}
+          {links.length > 0 && (
+            <div className={`grid gap-2 mb-2.5 ${links.length === 1 ? 'grid-cols-1' : links.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {links.map((w, i) =>
+                w.url ? (
+                  <a
+                    key={i}
+                    href={w.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 px-2 text-zinc-300 active:scale-[0.98] transition-transform min-w-0"
+                  >
+                    <WidgetIcon name={w.icon} className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
+                    <span className="text-[11.5px] font-medium truncate" dir="ltr">{w.title}</span>
+                  </a>
+                ) : (
+                  <span
+                    key={i}
+                    className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 px-2 text-zinc-500 min-w-0"
+                  >
+                    <WidgetIcon name={w.icon} className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-[11.5px] font-medium truncate" dir="ltr">{w.title}</span>
+                  </span>
+                )
+              )}
+            </div>
+          )}
+
+          {/* 6 — The merchant's three info cards */}
+          {facts.length > 0 && (
+            <div className={`grid gap-2 mb-4 ${facts.length === 1 ? 'grid-cols-1' : facts.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {facts.map((w, i) => (
+                <div key={i} className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 flex items-center gap-2 min-w-0">
+                  <WidgetIcon name={w.icon} className="w-4 h-4 shrink-0 text-zinc-400" />
+                  <div className="min-w-0">
+                    <p className="text-zinc-200 text-[11px] font-semibold truncate leading-tight">{w.title}</p>
+                    {w.subtitle && <p className="text-zinc-500 text-[10px] truncate leading-tight">{w.subtitle}</p>}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -252,7 +293,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
           {/* A closed store says so, without saying why — that is between the
               merchant and Levonis (§51). */}
           {!store.open && (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 mb-3">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 mb-4">
               <p className="text-amber-200/90 text-[12px]">
                 {loc(
                   'هذا المتجر لا يستقبل طلبات حاليًا.',
@@ -263,19 +304,21 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             </div>
           )}
 
+          {/* 7 — Actions: contact (primary), follow (outline), share */}
           <div className="flex gap-2 mb-4">
-            <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} />
-            <MessageButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} />
+            <ContactButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} accentBtn={accent.btn} />
+            <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} />
             <ShareButton url={store.url} name={store.name} loc={loc} />
           </div>
 
+          {/* 8 — Tabs */}
           <div className="flex gap-0.5 border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
             {TABS.filter((t) => t.show).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`px-3.5 py-2 text-[12.5px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                  tab === t.id ? `border-gold ${accent.text}` : 'border-transparent text-zinc-500'
+                className={`px-3.5 py-2 text-[13px] font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                  tab === t.id ? `border-current ${accent.text}` : 'border-transparent text-zinc-500'
                 }`}
               >
                 {t.label}
@@ -285,8 +328,28 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
         </div>
       </div>
 
+      {/* 9 — Tab bodies */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 relative z-10">
-        {tab === 'products' && <ProductsTab slug={slug} open={!!store.open} sections={sections} />}
+        {tab === 'products' && (
+          <ProductsTab
+            slug={slug}
+            open={!!store.open}
+            sections={sections}
+            sectionFilter={sectionFilter}
+            onClearSection={() => setSectionFilter('')}
+            accentText={accent.text}
+          />
+        )}
+        {tab === 'sections' && (
+          <SectionsTab
+            sections={sections}
+            onPick={(id) => {
+              setSectionFilter(id);
+              setTab('products');
+            }}
+          />
+        )}
+        {tab === 'deals' && <DealsTab slug={slug} open={!!store.open} />}
         {tab === 'services' && <ServicesTab services={services} merchantId={store.merchant.id} onHost={!!hostStore} accepts={store.accepts_custom_requests} />}
         {tab === 'showcase' && <ShowcaseTab items={showcase} />}
         {tab === 'reviews' && <ReviewsTab slug={slug} />}
@@ -296,23 +359,70 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
   );
 }
 
-function ProfileStat({ value, label }: { value: React.ReactNode; label: string }) {
+function ProfileStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="py-2.5 px-1 text-center min-w-0">
-      <div className="text-white font-bold text-[13.5px]" dir="ltr">{value}</div>
-      <div className="text-zinc-500 text-[10px] truncate">{label}</div>
+    <div className="py-1 px-1 text-center min-w-0">
+      <div className="text-white font-bold text-[16px] leading-tight" dir="ltr">{value}</div>
+      <div className="text-zinc-500 text-[10.5px] truncate">{label}</div>
     </div>
   );
 }
 
+/**
+ * The info cards, with an honest fallback: until the merchant arranges their
+ * own three, the store's existing facts fill the row (location, coverage,
+ * delivery note) — real values, never invented ones.
+ */
+function factsWithFallback(
+  store: MerchantStore,
+  loc: (ar: string, en: string, ckb?: string) => string,
+  lang: string
+): ProfileWidget[] {
+  const own = (store.profile_facts ?? []).filter((w) => w.visible !== false).slice(0, 3);
+  if (own.length) return own;
+
+  const out: ProfileWidget[] = [];
+  if (store.governorate) {
+    const gov = GOVERNORATE_LABELS[store.governorate]?.[lang === 'ckb' ? 'ckb' : lang === 'en' ? 'en' : 'ar'] ?? store.governorate;
+    out.push({ icon: 'map-pin', title: gov, subtitle: loc('الموقع', 'Location', 'شوێن'), visible: true });
+  }
+  if ((store.service_areas?.length ?? 0) > 0) {
+    out.push({
+      icon: 'truck',
+      title: loc('شحن إلى', 'Ships to', 'گەیاندن بۆ'),
+      subtitle: store.service_areas.slice(0, 2).join('، '),
+      visible: true,
+    });
+  }
+  const note = (store.delivery_settings as Record<string, unknown> | undefined)?.note;
+  if (typeof note === 'string' && note) {
+    out.push({ icon: 'clock', title: loc('التوصيل', 'Delivery', 'گەیاندن'), subtitle: note, visible: true });
+  }
+  return out.slice(0, 3);
+}
+
 // --------------------------------------------------------------- products
 
-function ProductsTab({ slug, open, sections }: { slug: string; open: boolean; sections: StoreSection[] }) {
+function ProductsTab({
+  slug,
+  open,
+  sections,
+  sectionFilter,
+  onClearSection,
+  accentText,
+}: {
+  slug: string;
+  open: boolean;
+  sections: StoreSection[];
+  sectionFilter: string;
+  onClearSection: () => void;
+  accentText: string;
+}) {
   const { loc, lang } = useLanguage();
   const [products, setProducts] = useState<MerchantProduct[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
-  const [section, setSection] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -354,45 +464,55 @@ function ProductsTab({ slug, open, sections }: { slug: string; open: boolean; se
   if (!products.length) {
     return (
       <Empty
-        icon={<ShoppingBag className="w-8 h-8 text-zinc-600" />}
+        icon={<ShoppingBag className="w-8 h-8 text-zinc-600" strokeWidth={1.5} />}
         text={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە')}
       />
     );
   }
 
   // The merchant's featured picks lead; within that, newest first (the
-  // server's order). Filtering by shelf is the merchant's own grouping.
-  const visible = products
-    .filter((p) => !section || p.section_id === section)
+  // server's order). Filtering by shelf comes from the sections tab.
+  const filtered = products
+    .filter((p) => !sectionFilter || p.section_id === sectionFilter)
     .sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+  const revealed = showAll || sectionFilter ? filtered : filtered.slice(0, 6);
+  const sectionName = sectionFilter
+    ? (() => {
+        const s = sections.find((x) => x.id === sectionFilter);
+        return s ? (lang === 'en' || !s.name_ar ? s.name : s.name_ar) : '';
+      })()
+    : '';
 
   return (
     <div>
-      {sections.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 mb-3">
-          <SectionChip label={loc('الكل', 'All', 'هەموو')} active={section === ''} onClick={() => setSection('')} />
-          {sections.map((s) => (
-            <SectionChip
-              key={s.id}
-              label={lang === 'en' || !s.name_ar ? s.name : s.name_ar}
-              active={section === s.id}
-              onClick={() => setSection(s.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        {visible.map((p) => (
-          <ProductCard key={p.id} slug={slug} product={p} storeOpen={open} />
-        ))}
+      <div className="flex items-center justify-between mb-3">
+        {sectionFilter ? (
+          <button
+            onClick={onClearSection}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-white/[0.05] border border-white/10 text-zinc-200 text-[12px] font-medium"
+          >
+            <span dir="ltr">{sectionName}</span>
+            <X className="w-3.5 h-3.5 text-zinc-500" />
+          </button>
+        ) : (
+          <h2 className="text-white font-semibold text-[14px]">
+            {loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}
+          </h2>
+        )}
+        {!sectionFilter && filtered.length > 6 && (
+          <button onClick={() => setShowAll((v) => !v)} className={`text-[12px] font-medium ${accentText}`}>
+            {showAll ? loc('عرض أقل', 'Show less', 'کەمتر') : loc('عرض الكل', 'View all', 'هەموو ببینە')}
+          </button>
+        )}
       </div>
 
-      {cursor && !section && (
+      <ProductGrid slug={slug} products={revealed} storeOpen={open} />
+
+      {cursor && (showAll || sectionFilter) && (
         <button
           onClick={loadMore}
           disabled={more}
-          className="w-full h-10 mt-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12.5px] font-bold disabled:opacity-50"
+          className="w-full h-10 mt-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
         >
           {more ? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…') : loc('عرض المزيد', 'Show more', 'زیاتر')}
         </button>
@@ -401,16 +521,13 @@ function ProductsTab({ slug, open, sections }: { slug: string; open: boolean; se
   );
 }
 
-function SectionChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function ProductGrid({ slug, products, storeOpen }: { slug: string; products: MerchantProduct[]; storeOpen: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 h-8 px-3 rounded-xl text-[11.5px] font-semibold border transition-colors ${
-        active ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
-      }`}
-    >
-      {label}
-    </button>
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {products.map((p) => (
+        <ProductCard key={p.id} slug={slug} product={p} storeOpen={storeOpen} />
+      ))}
+    </div>
   );
 }
 
@@ -434,37 +551,92 @@ function ProductCard({ slug, product, storeOpen }: { slug: string; product: Merc
           <img src={image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ShoppingBag className="w-6 h-6 text-zinc-700" />
+            <ShoppingBag className="w-5 h-5 text-zinc-700" strokeWidth={1.5} />
           </div>
         )}
         {product.featured && (
-          <span className="absolute top-1.5 start-1.5 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur text-gold">
-            <Star className="w-2.5 h-2.5 fill-gold" />
-            {loc('مميّز', 'Featured', 'تایبەت')}
+          <span className="absolute top-1 start-1 w-5 h-5 rounded-full bg-black/60 backdrop-blur flex items-center justify-center">
+            <Star className="w-3 h-3 text-gold fill-gold" />
           </span>
         )}
         {discounted && (
-          <span className="absolute top-1.5 end-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/80 text-white" dir="ltr">
+          <span className="absolute top-1 end-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/85 text-white" dir="ltr">
             −{Math.round((1 - product.price_iqd / (product.original_price_iqd as number)) * 100)}%
           </span>
         )}
-      </div>
-      <div className="p-2">
-        <p className="text-white text-[11.5px] font-semibold line-clamp-2 leading-snug mb-1">{product.name}</p>
-        <div className="flex items-baseline gap-1.5" dir="ltr">
-          <span className="text-gold font-bold text-[12.5px]">{iqd(product.price_iqd)}</span>
-          {discounted && (
-            <span className="text-zinc-600 text-[10px] line-through">{iqd(product.original_price_iqd)}</span>
-          )}
-        </div>
         {!sellable && (
-          <span className="inline-block mt-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-zinc-700/40 text-zinc-400">
+          <span className="absolute bottom-1 start-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/90 text-zinc-300">
             {loc('غير متوفر', 'Unavailable', 'بەردەست نییە')}
           </span>
         )}
       </div>
+      <div className="px-1.5 py-1.5">
+        <p className="text-zinc-100 text-[11px] font-medium truncate leading-snug" dir="auto">{product.name}</p>
+        {/* One price line that never wraps — the −% badge already tells the
+            deal story on a card this narrow. */}
+        <p className="text-gold font-semibold text-[11.5px] whitespace-nowrap mt-0.5" dir="ltr">
+          {iqd(product.price_iqd)}
+        </p>
+      </div>
     </Link>
   );
+}
+
+// ---------------------------------------------------------------- sections
+
+function SectionsTab({ sections, onPick }: { sections: StoreSection[]; onPick: (id: string) => void }) {
+  const { loc, lang } = useLanguage();
+  return (
+    <div className="space-y-2">
+      {sections.map((s) => (
+        <button
+          key={s.id}
+          onClick={() => onPick(s.id)}
+          className="w-full h-12 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 flex items-center justify-between gap-2 active:scale-[0.99] transition-transform"
+        >
+          <span className="text-zinc-100 text-[13px] font-medium truncate">
+            {lang === 'en' || !s.name_ar ? s.name : s.name_ar}
+          </span>
+          <span className="flex items-center gap-1.5 shrink-0 text-zinc-500">
+            <span className="text-[11px]">
+              {s.product_count} {loc('منتج', 'products', 'بەرهەم')}
+            </span>
+            <ChevronLeft className="w-4 h-4 ltr:rotate-180" strokeWidth={1.75} />
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------- deals
+
+function DealsTab({ slug, open }: { slug: string; open: boolean }) {
+  const { loc } = useLanguage();
+  const [products, setProducts] = useState<MerchantProduct[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    storefrontApi
+      .products(slug, '?deals=1')
+      .then((d) => alive && setProducts(d.products))
+      .catch(() => alive && setProducts([]));
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
+
+  if (products === null) {
+    return (
+      <div className="py-10 flex justify-center">
+        <Loader2 className="w-5 h-5 text-gold animate-spin" />
+      </div>
+    );
+  }
+  if (!products.length) {
+    return <Empty icon={<Star className="w-8 h-8 text-zinc-600" strokeWidth={1.5} />} text={loc('لا توجد عروض حالية', 'No current deals', 'ئۆفەر نییە')} />;
+  }
+  return <ProductGrid slug={slug} products={products} storeOpen={open} />;
 }
 
 // ---------------------------------------------------------------- services
@@ -673,7 +845,7 @@ function ReviewsTab({ slug }: { slug: string }) {
   if (!data.count) {
     return (
       <Empty
-        icon={<Star className="w-8 h-8 text-zinc-600" />}
+        icon={<Star className="w-8 h-8 text-zinc-600" strokeWidth={1.5} />}
         text={loc('لا توجد تقييمات بعد', 'No reviews yet', 'هێشتا هەڵسەنگاندن نییە')}
         hint={loc(
           'التقييمات تأتي من طلبات مكتملة فقط.',
@@ -761,6 +933,18 @@ function AboutTab({ store }: { store: MerchantStore }) {
       {store.description && (
         <Section title={loc('عن المتجر', 'About the store', 'دەربارەی فرۆشگا')}>
           <p className="text-zinc-300 text-[12.5px] leading-relaxed whitespace-pre-wrap">{store.description}</p>
+        </Section>
+      )}
+
+      {(store.categories?.length ?? 0) > 0 && (
+        <Section title={loc('التخصصات', 'Specialities', 'پسپۆڕییەکان')}>
+          <div className="flex flex-wrap gap-1.5">
+            {store.categories.map((cat) => (
+              <span key={cat} className="text-[11px] px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-zinc-300">
+                {cat}
+              </span>
+            ))}
+          </div>
         </Section>
       )}
 
@@ -863,10 +1047,12 @@ function FollowButton({
   merchantId,
   signedIn,
   loc,
+  accentChip,
 }: {
   merchantId: string;
   signedIn: boolean;
   loc: (ar: string, en: string, ckb?: string) => string;
+  accentChip: string;
 }) {
   const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -911,32 +1097,34 @@ function FollowButton({
     <button
       onClick={toggle}
       disabled={busy}
-      className={`flex-1 h-10 rounded-xl font-semibold text-[12.5px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50 ${
-        following ? 'bg-olive/40 text-gold border border-gold/20' : 'bg-olive text-white'
+      className={`flex-1 h-10 rounded-full font-medium text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50 ${
+        following ? accentChip : 'border border-white/15 bg-transparent text-zinc-200'
       }`}
     >
-      <Heart className={`w-4 h-4 ${following ? 'fill-gold' : ''}`} />
-      {following ? loc('تتابعه', 'Following', 'شوێنی کەوتوویت') : loc('متابعة', 'Follow', 'شوێنکەوتن')}
+      {following ? <Check className="w-4 h-4" strokeWidth={1.75} /> : null}
+      {following ? loc('تتابعه', 'Following', 'شوێنی کەوتوویت') : loc('تابع', 'Follow', 'شوێنکەوتن')}
     </button>
   );
 }
 
 /**
- * «مراسلة» opens the REAL conversation — one tap lands in the thread, and a
- * second tap lands in the SAME thread (the server reuses the pair's DM).
- * On a store subdomain the messenger lives on the apex; the shared cookie
- * keeps the session across the hop.
+ * «تواصل مع المتجر» opens the REAL conversation — one tap lands in the
+ * thread, and a second tap lands in the SAME thread (the server reuses the
+ * pair's DM). On a store subdomain the messenger lives on the apex; the
+ * shared cookie keeps the session across the hop.
  */
-function MessageButton({
+function ContactButton({
   merchantId,
   signedIn,
   onHost,
   loc,
+  accentBtn,
 }: {
   merchantId: string;
   signedIn: boolean;
   onHost: boolean;
   loc: (ar: string, en: string, ckb?: string) => string;
+  accentBtn: string;
 }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -962,10 +1150,10 @@ function MessageButton({
     <button
       onClick={open}
       disabled={busy}
-      className="flex-1 h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-semibold text-[12.5px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
+      className={`flex-[1.4] h-10 rounded-full font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 ${accentBtn}`}
     >
-      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-      {loc('مراسلة', 'Message', 'نامە')}
+      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" strokeWidth={1.75} />}
+      {loc('تواصل مع المتجر', 'Contact the store', 'پەیوەندی بە فرۆشگا')}
     </button>
   );
 }
@@ -1003,10 +1191,10 @@ function ShareButton({
   return (
     <button
       onClick={share}
-      className="w-10 h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 flex items-center justify-center shrink-0 active:scale-[0.95] transition-transform"
+      className="w-10 h-10 rounded-full border border-white/15 bg-transparent text-zinc-300 flex items-center justify-center shrink-0 active:scale-[0.95] transition-transform"
       aria-label={loc('مشاركة المتجر', 'Share the store', 'هاوبەشکردن')}
     >
-      {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
+      {copied ? <Check className="w-4 h-4 text-emerald-400" strokeWidth={1.75} /> : <Share2 className="w-4 h-4" strokeWidth={1.75} />}
     </button>
   );
 }

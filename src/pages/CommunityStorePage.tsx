@@ -35,7 +35,26 @@ export default function CommunityStorePage() {
     storefrontApi
       .store(id)
       .catch(() => storefrontApi.storeById(id))
-      .then((d) => alive && setStore(d.store))
+      .then((d) => {
+        if (!alive) return;
+        // A shop with its own address IS its own site: hand the visitor over
+        // to the subdomain rather than embedding the shop in the main site.
+        // The shared cookie keeps their session across the hop. Without a
+        // configured root domain the URL is this same path, so we render
+        // in place instead of looping.
+        const url = d.store?.url ?? '';
+        if (/^https?:\/\//.test(url)) {
+          try {
+            if (new URL(url).origin !== window.location.origin) {
+              window.location.replace(url);
+              return;
+            }
+          } catch {
+            /* malformed — render in place */
+          }
+        }
+        setStore(d.store);
+      })
       .catch(() => {
         /* no store row — the legacy page below owns this case, not-found included */
       })

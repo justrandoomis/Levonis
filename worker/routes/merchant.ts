@@ -66,6 +66,8 @@ function storePublicShape(ctx: StoreContext, rootDomain: string | null) {
     policies: safeParse(s.policies, {}),
     delivery_settings: safeParse(s.delivery_settings, {}),
     social_links: safeParse(s.social_links, {}),
+    profile_links: safeParse(s.profile_links, []),
+    profile_facts: safeParse(s.profile_facts, []),
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
     status: s.status,
@@ -281,6 +283,11 @@ merchantRoutes.patch('/store', async (c) => {
   if (body.business_hours !== undefined) put('business_hours', JSON.stringify(sanitizeHours(body.business_hours)));
   if (body.policies !== undefined) put('policies', JSON.stringify(sanitizeMap(body.policies, 12, 2000)));
   if (body.social_links !== undefined) put('social_links', JSON.stringify(sanitizeLinks(body.social_links)));
+  // The two profile-header rows: three link pills, three info cards. Icon is
+  // a NAME from a fixed set the frontend maps to its own components; the url
+  // is http(s) or dropped. Order is the array order the merchant saved.
+  if (body.profile_links !== undefined) put('profile_links', JSON.stringify(sanitizeWidgets(body.profile_links, 'link')));
+  if (body.profile_facts !== undefined) put('profile_facts', JSON.stringify(sanitizeWidgets(body.profile_facts, 'fact')));
   // The store's own delivery pricing, reduced to the two numbers checkout
   // reads (storeOrders.ts) plus a free-text note. Anything else is dropped.
   if (body.delivery_settings !== undefined) put('delivery_settings', JSON.stringify(sanitizeDelivery(body.delivery_settings)));
@@ -327,6 +334,51 @@ function sanitizeMap(v: unknown, maxKeys: number, maxLen: number): Record<string
   for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
     if (n++ >= maxKeys) break;
     if (typeof val === 'string') out[k.slice(0, 40)] = val.slice(0, maxLen);
+  }
+  return out;
+}
+
+/**
+ * The icon vocabulary of the profile widgets. A closed list, because an icon
+ * name reaches the DOM as a component choice — an open string would be a
+ * component-injection vector waiting for a clever payload.
+ */
+export const WIDGET_ICONS = [
+  'link', 'globe', 'instagram', 'facebook', 'youtube', 'tiktok', 'telegram', 'whatsapp',
+  'phone', 'map-pin', 'clock', 'package', 'truck', 'shield', 'star', 'printer',
+  'layers', 'hammer', 'zap', 'award',
+] as const;
+
+interface ProfileWidget {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  url?: string;
+  visible: boolean;
+}
+
+function sanitizeWidgets(v: unknown, kind: 'link' | 'fact'): ProfileWidget[] {
+  if (!Array.isArray(v)) return [];
+  const out: ProfileWidget[] = [];
+  for (const raw of v) {
+    if (out.length >= 3) break;
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const icon = typeof r.icon === 'string' && (WIDGET_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'link';
+    const title = typeof r.title === 'string' ? r.title.trim().slice(0, 30) : '';
+    if (!title) continue;
+    const item: ProfileWidget = { icon, title, visible: r.visible !== false };
+    if (kind === 'fact') {
+      item.subtitle = typeof r.subtitle === 'string' ? r.subtitle.trim().slice(0, 40) : '';
+    } else {
+      try {
+        const u = new URL(String(r.url ?? ''));
+        if (u.protocol === 'http:' || u.protocol === 'https:') item.url = u.toString();
+      } catch {
+        /* not a URL — the pill is saved but renders inert until fixed */
+      }
+    }
+    out.push(item);
   }
   return out;
 }

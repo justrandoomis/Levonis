@@ -60,6 +60,9 @@ export interface StoreRow {
   policies: string;
   delivery_settings: string;
   social_links: string;
+  /** 0037 — the two merchant-arranged profile-header rows (JSON arrays). */
+  profile_links: string;
+  profile_facts: string;
   accepts_custom_requests: number;
   sells_direct_products: number;
   status: string;

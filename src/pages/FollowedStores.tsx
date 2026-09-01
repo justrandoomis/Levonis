@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { storeHref } from '../lib/merchant';
 import { ArrowLeft, ArrowRight, Store, BadgeCheck } from 'lucide-react';
 
 interface FollowedMerchant {
@@ -11,6 +12,9 @@ interface FollowedMerchant {
   avatarUrl: string | null;
   verified: boolean;
   created_at: string;
+  store_slug?: string | null;
+  /** The shop's own address — a card click is a full navigation there. */
+  store_url?: string | null;
 }
 
 export default function FollowedStores() {
@@ -92,7 +96,13 @@ export default function FollowedStores() {
           stores.map((store) => (
             <div
               key={store.id}
-              onClick={() => navigate(`/community/store/${store.id}`)}
+              onClick={() => {
+                // The shop's own subdomain when it has one; the in-site page
+                // otherwise. The shared cookie keeps the session either way.
+                const href = storeHref(store.store_url, store.id);
+                if (href.startsWith('http')) window.location.href = href;
+                else navigate(href);
+              }}
               className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 transition-colors"
             >
               <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">

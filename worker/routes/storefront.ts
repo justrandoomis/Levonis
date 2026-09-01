@@ -48,6 +48,10 @@ function publicStore(ctx: StoreContext, rootDomain: string | null) {
     business_hours: safeParse(s.business_hours, []),
     policies: safeParse(s.policies, {}),
     social_links: safeParse(s.social_links, {}),
+    // The merchant-arranged header rows. Hidden items are the merchant's
+    // drafts — a visitor never receives them at all.
+    profile_links: safeParse<Array<{ visible?: boolean }>>(s.profile_links, []).filter((w) => w?.visible !== false),
+    profile_facts: safeParse<Array<{ visible?: boolean }>>(s.profile_facts, []).filter((w) => w?.visible !== false),
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
     open: storeIsOpen(ctx),
@@ -102,6 +106,37 @@ async function followerCount(db: D1Database, merchantId: string): Promise<number
 }
 
 /**
+ * The profile's stats row, computed from real rows: followers, published
+ * products, and the share of visible reviews at 4★+. `positive_pct` is null
+ * with no reviews — a store with none says "new", never a fabricated 100%.
+ */
+async function storeStats(db: D1Database, ctx: StoreContext) {
+  const [followers, products, positive, deals] = await Promise.all([
+    followerCount(db, String(ctx.merchant.id)),
+    db.prepare(
+      `SELECT COUNT(*) AS n FROM community_products
+        WHERE store_id = ? AND lifecycle = 'active' AND status = 'active'`
+    ).bind(ctx.store.id).first<{ n: number }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS total, SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) AS good
+         FROM merchant_reviews WHERE merchant_id = ? AND hidden = 0`
+    ).bind(ctx.merchant.id).first<{ total: number; good: number }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS n FROM community_products
+        WHERE store_id = ? AND lifecycle = 'active' AND status = 'active'
+          AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd`
+    ).bind(ctx.store.id).first<{ n: number }>(),
+  ]);
+  const total = Number(positive?.total ?? 0);
+  return {
+    followers,
+    product_count: products?.n ?? 0,
+    positive_pct: total ? Math.round((Number(positive?.good ?? 0) / total) * 100) : null,
+    deal_count: deals?.n ?? 0,
+  };
+}
+
+/**
  * Which store is this hostname, if any.
  *
  * The SPA calls this once on boot. Returning `store: null` for the main site
@@ -125,7 +160,7 @@ storefrontRoutes.get('/resolve', async (c) => {
   return c.json({
     success: true,
     kind: 'merchant',
-    store: { ...publicStore(ctx, root), followers: await followerCount(c.env.DB, String(ctx.merchant.id)) },
+    store: { ...publicStore(ctx, root), ...(await storeStats(c.env.DB, ctx)) },
   });
 });
 
@@ -136,7 +171,7 @@ storefrontRoutes.get('/:slug', async (c) => {
     success: true,
     store: {
       ...publicStore(ctx, rootDomainFrom(c.env)),
-      followers: await followerCount(c.env.DB, String(ctx.merchant.id)),
+      ...(await storeStats(c.env.DB, ctx)),
     },
   });
 });
@@ -217,6 +252,7 @@ storefrontRoutes.get('/:slug/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 60, def: 24 });
   const cursor = c.req.query('cursor') || '';
   const category = c.req.query('category') || '';
+  const dealsOnly = c.req.query('deals') === '1' ? 1 : 0;
 
   // Only what the merchant published. draft, hidden and archived products are
   // invisible here — the WHERE clause is the enforcement, not a filter the
@@ -225,9 +261,10 @@ storefrontRoutes.get('/:slug/products', async (c) => {
     `SELECT * FROM community_products
       WHERE store_id = ? AND lifecycle = 'active' AND status = 'active'
         AND (? = '' OR category = ?)
+        AND (? = 0 OR (original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd))
         AND (? = '' OR created_at < ?)
       ORDER BY created_at DESC LIMIT ?`
-  ).bind(ctx.store.id, category, category, cursor, cursor, limit).all();
+  ).bind(ctx.store.id, category, category, dealsOnly, cursor, cursor, limit).all();
 
   return c.json({
     success: true,
@@ -339,7 +376,7 @@ storefrontRoutes.get('/by-id/:storeId', async (c) => {
     success: true,
     store: {
       ...publicStore(ctx, rootDomainFrom(c.env)),
-      followers: await followerCount(c.env.DB, String(ctx.merchant.id)),
+      ...(await storeStats(c.env.DB, ctx)),
     },
   });
 });
