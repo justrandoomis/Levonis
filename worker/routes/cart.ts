@@ -882,3 +882,41 @@ cartRoutes.get('/scope', async (c) => {
 cartRoutes.get('/merchant', async (c) => {
   return c.json({ success: true, ...(await loadMerchantCart(c)) });
 });
+
+/**
+ * Change a merchant line's quantity. The platform PATCH cannot serve these
+ * lines — it validates against the Levonis catalogue resolver, which a
+ * community product deliberately never enters (§15) — so the merchant cart
+ * gets its own two verbs with the same ownership rule: the WHERE clause.
+ */
+cartRoutes.patch('/merchant-items/:id', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const qty = int(body.qty, 'qty', { min: 1, max: 99 });
+
+  const line = await c.env.DB.prepare(
+    `SELECT ci.id, p.stock, p.track_stock, p.lifecycle, p.status
+       FROM cart_items ci JOIN community_products p ON p.id = ci.community_product_id
+      WHERE ci.id = ? AND ci.user_id = ? AND ci.seller_type = 'merchant'`
+  ).bind(id, user.id).first<Record<string, unknown>>();
+  if (!line) throw notFound('Cart item not found');
+  if (line.lifecycle !== 'active' || line.status !== 'active') {
+    throw badRequest('This product is no longer available', 'UNAVAILABLE');
+  }
+  if (line.track_stock && Number(line.stock) < qty) {
+    throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', { available: Number(line.stock) });
+  }
+
+  await c.env.DB.prepare('UPDATE cart_items SET qty = ? WHERE id = ? AND user_id = ?')
+    .bind(qty, id, user.id).run();
+  return c.json({ success: true, ...(await loadMerchantCart(c)) });
+});
+
+cartRoutes.delete('/merchant-items/:id', async (c) => {
+  const user = c.get('user')!;
+  await c.env.DB.prepare(
+    `DELETE FROM cart_items WHERE id = ? AND user_id = ? AND seller_type = 'merchant'`
+  ).bind(c.req.param('id'), user.id).run();
+  return c.json({ success: true, ...(await loadMerchantCart(c)) });
+});

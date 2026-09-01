@@ -931,7 +931,7 @@ async function main() {
     }
   }
 
-  return finish(admin, shopperTxnId);
+  return finish(admin, shopper, shopperTxnId);
 }
 
 /**
@@ -942,13 +942,27 @@ async function main() {
  * and the net effect of this run on the balance sheet is zero. Nothing is
  * deleted: the membership, the orders and the escrow stay on the record.
  */
-async function finish(admin, ...txnIds) {
+async function finish(admin, shopper, ...txnIds) {
   section('11. putting the float back');
+  // The adjustment endpoint takes an EXPLICIT direction and amount — a bare
+  // "reverse this" would hide what actually moved. Part of the float was
+  // spent inside the run (the wallet order committed its hold), so what goes
+  // back is the shopper's REMAINING spendable balance, read from the same
+  // API a person would read it from, debited against the original credit.
   for (const id of txnIds.filter(Boolean)) {
+    const wallet = await shopper.req('GET', APEX, '/api/wallet');
+    const remaining = Number(wallet.json?.balances?.usd_cents_available ?? 0);
+    if (remaining <= 0) {
+      check(`the credit ${String(id).slice(0, 12)} needs no reversal (float fully spent in-run)`, true, '');
+      continue;
+    }
     const res = await admin.req('POST', APEX, `/api/wallet/admin/transactions/${id}/adjustment`, {
+      direction: 'debit',
+      amountCents: remaining,
       reason: 'e2e verification float returned',
+      eventKey: `e2e-float-${RUN}-${String(id).slice(-6)}`,
     });
-    check(`the credit ${String(id).slice(0, 12)} is reversed`, res.status < 400,
+    check(`the credit ${String(id).slice(0, 12)} is reversed (${remaining} cents back)`, res.status < 400,
       `status ${res.status} ${res.json?.error ?? ''}`);
   }
   if (!txnIds.filter(Boolean).length) console.log('  (nothing to reverse)');

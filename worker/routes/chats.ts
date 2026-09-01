@@ -65,21 +65,29 @@ chatRoutes.post('/open', async (c) => {
 
   if (body.orderId !== undefined) {
     const orderId = str(body.orderId, 'orderId', { min: 1, max: 60 });
-    const order = await c.env.DB.prepare('SELECT id, user_id FROM orders WHERE id = ?')
+    const order = await c.env.DB.prepare(
+      `SELECT o.id, o.user_id, m.user_id AS merchant_user_id
+         FROM orders o LEFT JOIN community_merchants m ON m.id = o.merchant_id
+        WHERE o.id = ?`
+    )
       .bind(orderId)
-      .first<{ id: string; user_id: string }>();
+      .first<{ id: string; user_id: string; merchant_user_id: string | null }>();
     if (!order) throw notFound('Order not found');
     const isAdmin = user.role === 'admin';
-    if (!isAdmin && order.user_id !== user.id) throw forbidden('This is not your order');
+    // The order's owner, an admin — or, for a merchant-store order, the
+    // merchant who has to fulfil it. A seller who cannot ask "which colour
+    // did you mean?" can only guess, and guessing ships the wrong thing.
+    const isSeller = order.merchant_user_id !== null && order.merchant_user_id === user.id;
+    if (!isAdmin && !isSeller && order.user_id !== user.id) throw forbidden('This is not your order');
 
     const existing = await c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?')
       .bind(orderId)
       .first<{ id: string }>();
     if (existing) {
-      // An admin opening an existing thread joins it — the first admin to
-      // reply is rarely the one who reads it next, and a thread nobody else
-      // can open is a thread that gets abandoned.
-      if (isAdmin) {
+      // An admin or the order's seller opening an existing thread joins it —
+      // the first admin to reply is rarely the one who reads it next, and a
+      // thread nobody else can open is a thread that gets abandoned.
+      if (isAdmin || isSeller) {
         await c.env.DB
           .prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
           .bind(existing.id, user.id)

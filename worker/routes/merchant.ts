@@ -106,6 +106,8 @@ function productShape(p: Record<string, unknown>) {
     prep_days: p.prep_days,
     status: p.status,
     lifecycle: p.lifecycle,
+    section_id: p.section_id ?? null,
+    featured: !!p.featured,
     sold_count: p.sold_count,
     view_count: p.view_count,
     created_at: p.created_at,
@@ -270,12 +272,18 @@ merchantRoutes.patch('/store', async (c) => {
   for (const [key, col] of [
     ['categories', 'categories'],
     ['service_areas', 'service_areas'],
-    ['business_hours', 'business_hours'],
   ] as const) {
     if (body[key] !== undefined) put(col, JSON.stringify(sanitizeList(body[key], 40, 60)));
   }
+  // Hours are {day, open, close} rows, not bare strings — the old string
+  // sanitizer silently dropped every structured row the editor sent, so a
+  // merchant who filled their hours saved an empty list.
+  if (body.business_hours !== undefined) put('business_hours', JSON.stringify(sanitizeHours(body.business_hours)));
   if (body.policies !== undefined) put('policies', JSON.stringify(sanitizeMap(body.policies, 12, 2000)));
   if (body.social_links !== undefined) put('social_links', JSON.stringify(sanitizeLinks(body.social_links)));
+  // The store's own delivery pricing, reduced to the two numbers checkout
+  // reads (storeOrders.ts) plus a free-text note. Anything else is dropped.
+  if (body.delivery_settings !== undefined) put('delivery_settings', JSON.stringify(sanitizeDelivery(body.delivery_settings)));
 
   // The merchant's own pause switch. It can never lift an admin suspension:
   // that state is not reachable from here at all.
@@ -320,6 +328,33 @@ function sanitizeMap(v: unknown, maxKeys: number, maxLen: number): Record<string
     if (n++ >= maxKeys) break;
     if (typeof val === 'string') out[k.slice(0, 40)] = val.slice(0, maxLen);
   }
+  return out;
+}
+
+function sanitizeHours(v: unknown): Array<{ day: string; open: string; close: string }> {
+  if (!Array.isArray(v)) return [];
+  const time = (x: unknown) => (typeof x === 'string' && /^\d{1,2}:\d{2}$/.test(x.trim()) ? x.trim() : '');
+  return v
+    .map((row) => {
+      if (typeof row === 'string') return { day: row.trim().slice(0, 60), open: '', close: '' };
+      if (!row || typeof row !== 'object') return null;
+      const r = row as Record<string, unknown>;
+      const day = typeof r.day === 'string' ? r.day.trim().slice(0, 60) : '';
+      return day ? { day, open: time(r.open), close: time(r.close) } : null;
+    })
+    .filter((r): r is { day: string; open: string; close: string } => !!r && !!r.day)
+    .slice(0, 14);
+}
+
+function sanitizeDelivery(v: unknown): Record<string, unknown> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+  const raw = v as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  const fee = Number(raw.fee_iqd);
+  const freeOver = Number(raw.free_over_iqd);
+  if (Number.isFinite(fee) && fee >= 0) out.fee_iqd = Math.floor(Math.min(fee, 1_000_000));
+  if (Number.isFinite(freeOver) && freeOver > 0) out.free_over_iqd = Math.floor(Math.min(freeOver, 1_000_000_000));
+  if (typeof raw.note === 'string' && raw.note.trim()) out.note = raw.note.trim().slice(0, 200);
   return out;
 }
 
@@ -428,13 +463,28 @@ async function readProductBody(c: Context<AppContext>, partial: boolean) {
   if (has('delivery_methods')) out.delivery_methods = JSON.stringify(sanitizeList(body.delivery_methods, 10, 60));
   if (has('lifecycle'))
     out.lifecycle = oneOf(body.lifecycle, 'lifecycle', ['draft', 'active', 'hidden', 'sold_out', 'archived'] as const);
+  if (has('featured')) out.featured = body.featured ? 1 : 0;
+  // The section is checked against THIS store's sections at write time (the
+  // caller's ctx is not available here) — see assertOwnSection in the routes.
+  if (has('section_id'))
+    out.section_id = body.section_id ? str(body.section_id, 'section_id', { min: 1, max: 60 }) : null;
   return out;
+}
+
+/** A section id in a product body must name one of the caller's OWN sections. */
+async function assertOwnSection(c: Context<AppContext>, storeId: string, sectionId: unknown) {
+  if (typeof sectionId !== 'string' || !sectionId) return;
+  const row = await c.env.DB.prepare(
+    'SELECT id FROM merchant_store_sections WHERE id = ? AND store_id = ?'
+  ).bind(sectionId, storeId).first();
+  if (!row) throw badRequest('That section does not belong to your store', 'SECTION_NOT_FOUND');
 }
 
 merchantRoutes.post('/products', async (c) => {
   await rateLimit(c, 'merchant-product-create', 60, 3600);
   const ctx = await requireSellingPrivileges(c);
   const fields = await readProductBody(c, false);
+  await assertOwnSection(c, ctx.store.id, fields.section_id);
 
   const id = newId('cp');
   const base = suggestSlug(String(fields.name)) || 'item';
@@ -448,8 +498,9 @@ merchantRoutes.post('/products', async (c) => {
     `INSERT INTO community_products
        (id, merchant_id, store_id, slug, name, name_ar, description, description_ar, images,
         price_iqd, original_price_iqd, sku, stock, track_stock, category, condition,
-        options, colors, delivery_methods, prep_days, status, lifecycle, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        options, colors, delivery_methods, prep_days, status, lifecycle,
+        section_id, featured, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).bind(
     id, ctx.merchant.id, ctx.store.id, slug,
     fields.name, fields.name_ar ?? '', fields.description ?? '', fields.description_ar ?? '',
@@ -458,7 +509,8 @@ merchantRoutes.post('/products', async (c) => {
     fields.category ?? '', fields.condition ?? 'new',
     fields.options ?? '[]', fields.colors ?? '[]', fields.delivery_methods ?? '[]',
     fields.prep_days ?? 0,
-    lifecycle === 'active' ? 'active' : 'hidden', lifecycle, ts, ts
+    lifecycle === 'active' ? 'active' : 'hidden', lifecycle,
+    fields.section_id ?? null, fields.featured ?? 0, ts, ts
   ).run();
 
   await audit(c.env.DB, ctx.store.user_id, 'merchant.product_created', id, { store: ctx.store.id });
@@ -477,6 +529,7 @@ merchantRoutes.patch('/products/:id', async (c) => {
   const id = c.req.param('id');
   const fields = await readProductBody(c, true);
   if (!Object.keys(fields).length) throw badRequest('Nothing to update');
+  await assertOwnSection(c, ctx.store.id, fields.section_id);
 
   const sets = Object.keys(fields).map((k) => `${k} = ?`);
   const vals = Object.values(fields);
@@ -744,8 +797,11 @@ merchantRoutes.get('/orders/:id', async (c) => {
   const ctx = await requireStoreOwner(c);
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
 
+  // u.phone_e164, not u.phone — 0013 renamed the account's own number, and
+  // this endpoint had never been called by a UI until now, so the stale
+  // column name sat here unnoticed and 500'd on first real use.
   const order = await c.env.DB.prepare(
-    `SELECT o.*, u.name AS customer_name, u.phone AS customer_phone
+    `SELECT o.*, u.name AS customer_name, u.phone_e164 AS customer_phone
        FROM orders o JOIN users u ON u.id = o.user_id
       WHERE o.id = ? AND o.merchant_id = ?`
   ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
@@ -768,10 +824,16 @@ merchantRoutes.get('/orders/:id', async (c) => {
       total_iqd: order.total_iqd,
       platform_fee_iqd: order.platform_fee_iqd,
       merchant_receivable_iqd: order.merchant_receivable_iqd,
+      coupon_code: order.coupon_code ?? '',
+      coupon_discount_iqd: order.coupon_discount_iqd ?? 0,
       payment_method_id: order.payment_method_id,
       due_on_delivery_iqd: order.due_on_delivery_iqd,
       customer_name: order.customer_name,
-      customer_phone: order.customer_phone,
+      // The number to call for THIS delivery: the one on the address the
+      // customer chose at checkout, falling back to their account phone.
+      customer_phone:
+        (safeParse<Record<string, unknown>>(order.address_snapshot, {}).phone as string | undefined) ||
+        order.customer_phone,
       address: safeParse(order.address_snapshot, {}),
     },
     items: items.results,
@@ -1034,5 +1096,458 @@ merchantRoutes.get('/analytics', async (c) => {
     rating: ctx.merchant.rating_count ? ctx.merchant.rating_avg_x100 / 100 : null,
     rating_count: ctx.merchant.rating_count,
     balance: await merchantBalance(c.env.DB, ctx.merchant.id),
+  });
+});
+
+// ---------------------------------------------------------------- sections
+//
+// The shelves of the shop. Organising the catalogue is not a new commercial
+// commitment, so a lapsed-PLUS merchant may still tidy their store —
+// requireStoreOwner, not requireSellingPrivileges (§48).
+
+function sectionShape(s: Record<string, unknown>) {
+  return {
+    id: s.id,
+    name: s.name,
+    name_ar: s.name_ar,
+    sort_order: s.sort_order,
+    active: !!s.active,
+    product_count: s.product_count ?? undefined,
+    created_at: s.created_at,
+  };
+}
+
+merchantRoutes.get('/sections', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.*, (SELECT COUNT(*) FROM community_products p
+                   WHERE p.section_id = s.id AND p.lifecycle != 'archived') AS product_count
+       FROM merchant_store_sections s WHERE s.store_id = ?
+      ORDER BY s.sort_order, s.created_at`
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({ success: true, sections: results.map(sectionShape) });
+});
+
+merchantRoutes.post('/sections', async (c) => {
+  await rateLimit(c, 'merchant-section', 60, 3600);
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const count = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM merchant_store_sections WHERE store_id = ?'
+  ).bind(ctx.store.id).first<{ n: number }>();
+  if ((count?.n ?? 0) >= 30) throw badRequest('A store can hold at most 30 sections');
+
+  const id = newId('sec');
+  await c.env.DB.prepare(
+    `INSERT INTO merchant_store_sections (id, store_id, name, name_ar, sort_order, active)
+     VALUES (?,?,?,?,?,1)`
+  ).bind(
+    id, ctx.store.id,
+    str(body.name, 'name', { min: 1, max: 60 }),
+    str(body.name_ar, 'name_ar', { min: 0, max: 60, required: false }),
+    int(body.sort_order, 'sort_order', { min: 0, max: 999, def: 0 })
+  ).run();
+  const row = await c.env.DB.prepare('SELECT * FROM merchant_store_sections WHERE id = ?').bind(id).first();
+  return c.json({ success: true, section: sectionShape(row as Record<string, unknown>) }, 201);
+});
+
+merchantRoutes.patch('/sections/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (body.name !== undefined) { sets.push('name = ?'); vals.push(str(body.name, 'name', { min: 1, max: 60 })); }
+  if (body.name_ar !== undefined) { sets.push('name_ar = ?'); vals.push(str(body.name_ar, 'name_ar', { min: 0, max: 60, required: false })); }
+  if (body.sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(int(body.sort_order, 'sort_order', { min: 0, max: 999 })); }
+  if (body.active !== undefined) { sets.push('active = ?'); vals.push(body.active ? 1 : 0); }
+  if (!sets.length) throw badRequest('Nothing to update');
+  vals.push(c.req.param('id'), ctx.store.id);
+  const res = await c.env.DB.prepare(
+    `UPDATE merchant_store_sections SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`
+  ).bind(...vals).run();
+  if (!res.meta.changes) throw notFound('Section not found');
+  return c.json({ success: true });
+});
+
+merchantRoutes.delete('/sections/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const id = c.req.param('id');
+  // Products survive their section: they become ungrouped, never deleted.
+  const res = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE community_products SET section_id = NULL
+        WHERE section_id = ? AND store_id = ?`
+    ).bind(id, ctx.store.id),
+    c.env.DB.prepare(
+      'DELETE FROM merchant_store_sections WHERE id = ? AND store_id = ?'
+    ).bind(id, ctx.store.id),
+  ]);
+  if (!res[1].meta.changes) throw notFound('Section not found');
+  return c.json({ success: true });
+});
+
+// ---------------------------------------------------------------- services
+//
+// Advertising a service invites new work, so CREATING or re-activating one
+// requires selling privileges; editing words or switching one off does not.
+
+function serviceShape(s: Record<string, unknown>) {
+  return {
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    kind: s.kind,
+    price_from_iqd: s.price_from_iqd,
+    price_unit: s.price_unit,
+    materials: safeParse(s.materials, []),
+    imageUrl: s.image_key ? `/files/${s.image_key}` : null,
+    active: !!s.active,
+    sort_order: s.sort_order,
+    created_at: s.created_at,
+  };
+}
+
+const SERVICE_KINDS = ['print_service', 'design', 'finishing', 'scanning', 'repair', 'other'] as const;
+
+async function readServiceBody(c: Context<AppContext>, userId: string, partial: boolean) {
+  const body = await c.req.json().catch(() => ({}));
+  const out: Record<string, unknown> = {};
+  const has = (k: string) => body[k] !== undefined;
+  if (!partial || has('title')) out.title = str(body.title, 'title', { min: 2, max: 90 });
+  if (has('description')) out.description = str(body.description, 'description', { min: 0, max: 2000, required: false });
+  if (has('kind')) out.kind = oneOf(body.kind, 'kind', SERVICE_KINDS);
+  if (has('price_from_iqd'))
+    out.price_from_iqd = body.price_from_iqd === null || body.price_from_iqd === ''
+      ? null
+      : int(body.price_from_iqd, 'price_from_iqd', { min: 0, max: 1_000_000_000 });
+  if (has('price_unit')) out.price_unit = str(body.price_unit, 'price_unit', { min: 0, max: 40, required: false });
+  if (has('materials')) out.materials = JSON.stringify(sanitizeList(body.materials, 20, 40));
+  if (has('sort_order')) out.sort_order = int(body.sort_order, 'sort_order', { min: 0, max: 999 });
+  if (has('active')) out.active = body.active ? 1 : 0;
+  if (has('image_key')) {
+    const raw = str(body.image_key, 'image_key', { min: 0, max: 200, required: false });
+    if (!raw) out.image_key = null;
+    else {
+      const key = ownedMediaKey(raw, userId);
+      if (!key) throw badRequest('image_key must be a file you uploaded to this store');
+      out.image_key = key;
+    }
+  }
+  return out;
+}
+
+merchantRoutes.get('/services', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM merchant_services WHERE store_id = ? ORDER BY sort_order, created_at'
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({ success: true, services: results.map(serviceShape) });
+});
+
+merchantRoutes.post('/services', async (c) => {
+  await rateLimit(c, 'merchant-service', 60, 3600);
+  const ctx = await requireSellingPrivileges(c);
+  const count = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM merchant_services WHERE store_id = ?'
+  ).bind(ctx.store.id).first<{ n: number }>();
+  if ((count?.n ?? 0) >= 40) throw badRequest('A store can list at most 40 services');
+
+  const f = await readServiceBody(c, ctx.store.user_id, false);
+  const id = newId('svc');
+  const ts = nowIso();
+  await c.env.DB.prepare(
+    `INSERT INTO merchant_services
+       (id, store_id, merchant_id, title, description, kind, price_from_iqd, price_unit,
+        materials, image_key, active, sort_order, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    id, ctx.store.id, ctx.merchant.id,
+    f.title, f.description ?? '', f.kind ?? 'print_service',
+    f.price_from_iqd ?? null, f.price_unit ?? '', f.materials ?? '[]',
+    f.image_key ?? null, f.active ?? 1, f.sort_order ?? 0, ts, ts
+  ).run();
+  await audit(c.env.DB, ctx.store.user_id, 'merchant.service_created', id, { store: ctx.store.id });
+  const row = await c.env.DB.prepare('SELECT * FROM merchant_services WHERE id = ?').bind(id).first();
+  return c.json({ success: true, service: serviceShape(row as Record<string, unknown>) }, 201);
+});
+
+merchantRoutes.patch('/services/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const f = await readServiceBody(c, ctx.store.user_id, true);
+  if (!Object.keys(f).length) throw badRequest('Nothing to update');
+  // Switching a service back ON is a new invitation to the public — that one
+  // transition needs selling privileges, the rest is bookkeeping.
+  if (f.active === 1) await requireSellingPrivileges(c);
+  const sets = Object.keys(f).map((k) => `${k} = ?`);
+  const vals = Object.values(f);
+  sets.push('updated_at = ?');
+  vals.push(nowIso(), c.req.param('id'), ctx.store.id);
+  const res = await c.env.DB.prepare(
+    `UPDATE merchant_services SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`
+  ).bind(...vals).run();
+  if (!res.meta.changes) throw notFound('Service not found');
+  return c.json({ success: true });
+});
+
+merchantRoutes.delete('/services/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const res = await c.env.DB.prepare(
+    'DELETE FROM merchant_services WHERE id = ? AND store_id = ?'
+  ).bind(c.req.param('id'), ctx.store.id).run();
+  if (!res.meta.changes) throw notFound('Service not found');
+  return c.json({ success: true });
+});
+
+// ---------------------------------------------------------------- showcase
+//
+// The workshop wall: printers, materials, finished works. Pure content.
+
+function showcaseShape(s: Record<string, unknown>) {
+  return {
+    id: s.id,
+    kind: s.kind,
+    title: s.title,
+    details: s.details,
+    imageUrl: s.image_key ? `/files/${s.image_key}` : null,
+    sort_order: s.sort_order,
+    active: !!s.active,
+    created_at: s.created_at,
+  };
+}
+
+merchantRoutes.get('/showcase', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM merchant_showcase WHERE store_id = ? ORDER BY kind, sort_order, created_at'
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({ success: true, items: results.map(showcaseShape) });
+});
+
+merchantRoutes.post('/showcase', async (c) => {
+  await rateLimit(c, 'merchant-showcase', 120, 3600);
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const count = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM merchant_showcase WHERE store_id = ?'
+  ).bind(ctx.store.id).first<{ n: number }>();
+  if ((count?.n ?? 0) >= 60) throw badRequest('A store can show at most 60 showcase items');
+
+  let imageKey: string | null = null;
+  if (body.image_key) {
+    imageKey = ownedMediaKey(String(body.image_key), ctx.store.user_id);
+    if (!imageKey) throw badRequest('image_key must be a file you uploaded to this store');
+  }
+  const id = newId('shw');
+  await c.env.DB.prepare(
+    `INSERT INTO merchant_showcase (id, store_id, kind, title, details, image_key, sort_order, active)
+     VALUES (?,?,?,?,?,?,?,1)`
+  ).bind(
+    id, ctx.store.id,
+    oneOf(body.kind, 'kind', ['printer', 'material', 'work'] as const),
+    str(body.title, 'title', { min: 1, max: 90 }),
+    str(body.details, 'details', { min: 0, max: 1000, required: false }),
+    imageKey,
+    int(body.sort_order, 'sort_order', { min: 0, max: 999, def: 0 })
+  ).run();
+  const row = await c.env.DB.prepare('SELECT * FROM merchant_showcase WHERE id = ?').bind(id).first();
+  return c.json({ success: true, item: showcaseShape(row as Record<string, unknown>) }, 201);
+});
+
+merchantRoutes.patch('/showcase/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (body.title !== undefined) { sets.push('title = ?'); vals.push(str(body.title, 'title', { min: 1, max: 90 })); }
+  if (body.details !== undefined) { sets.push('details = ?'); vals.push(str(body.details, 'details', { min: 0, max: 1000, required: false })); }
+  if (body.kind !== undefined) { sets.push('kind = ?'); vals.push(oneOf(body.kind, 'kind', ['printer', 'material', 'work'] as const)); }
+  if (body.sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(int(body.sort_order, 'sort_order', { min: 0, max: 999 })); }
+  if (body.active !== undefined) { sets.push('active = ?'); vals.push(body.active ? 1 : 0); }
+  if (body.image_key !== undefined) {
+    const raw = String(body.image_key ?? '');
+    if (!raw) { sets.push('image_key = ?'); vals.push(null); }
+    else {
+      const key = ownedMediaKey(raw, ctx.store.user_id);
+      if (!key) throw badRequest('image_key must be a file you uploaded to this store');
+      sets.push('image_key = ?');
+      vals.push(key);
+    }
+  }
+  if (!sets.length) throw badRequest('Nothing to update');
+  vals.push(c.req.param('id'), ctx.store.id);
+  const res = await c.env.DB.prepare(
+    `UPDATE merchant_showcase SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`
+  ).bind(...vals).run();
+  if (!res.meta.changes) throw notFound('Showcase item not found');
+  return c.json({ success: true });
+});
+
+merchantRoutes.delete('/showcase/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const res = await c.env.DB.prepare(
+    'DELETE FROM merchant_showcase WHERE id = ? AND store_id = ?'
+  ).bind(c.req.param('id'), ctx.store.id).run();
+  if (!res.meta.changes) throw notFound('Showcase item not found');
+  return c.json({ success: true });
+});
+
+// ---------------------------------------------------------------- coupons
+//
+// The merchant's own discount codes. A coupon changes what customers pay, so
+// creating or re-activating one needs selling privileges; pausing one never
+// does. The codes are validated ONLY inside the store checkout — nothing here
+// touches the platform's membership coupons.
+
+function couponShape(cp: Record<string, unknown>) {
+  return {
+    id: cp.id,
+    code: cp.code,
+    kind: cp.kind,
+    value: cp.value,
+    min_total_iqd: cp.min_total_iqd,
+    max_uses: cp.max_uses,
+    used_count: cp.used_count,
+    active: !!cp.active,
+    starts_at: cp.starts_at,
+    ends_at: cp.ends_at,
+    created_at: cp.created_at,
+  };
+}
+
+function normalizeCouponCode(v: unknown): string {
+  const code = String(v ?? '').trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9-]{2,29}$/.test(code)) {
+    throw badRequest('A code is 3–30 characters: letters, numbers and hyphens', 'BAD_COUPON_CODE');
+  }
+  return code;
+}
+
+function couponDates(body: Record<string, unknown>) {
+  const out: { starts_at: string | null; ends_at: string | null } = { starts_at: null, ends_at: null };
+  for (const k of ['starts_at', 'ends_at'] as const) {
+    const v = body[k];
+    if (typeof v === 'string' && v) {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) throw badRequest(`${k} is not a valid date`);
+      out[k] = d.toISOString();
+    }
+  }
+  return out;
+}
+
+merchantRoutes.get('/coupons', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM merchant_coupons WHERE store_id = ? ORDER BY created_at DESC LIMIT 100'
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({ success: true, coupons: results.map(couponShape) });
+});
+
+merchantRoutes.post('/coupons', async (c) => {
+  await rateLimit(c, 'merchant-coupon', 30, 3600);
+  const ctx = await requireSellingPrivileges(c);
+  const body = await c.req.json().catch(() => ({}));
+
+  const code = normalizeCouponCode(body.code);
+  const kind = oneOf(body.kind, 'kind', ['fixed_iqd', 'percent'] as const);
+  const value = int(body.value, 'value', { min: 1, max: kind === 'percent' ? 90 : 100_000_000 });
+  const dates = couponDates(body);
+
+  const id = newId('mcp');
+  const ts = nowIso();
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO merchant_coupons
+         (id, store_id, merchant_id, code, kind, value, min_total_iqd, max_uses,
+          active, starts_at, ends_at, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,1,?,?,?,?)`
+    ).bind(
+      id, ctx.store.id, ctx.merchant.id, code, kind, value,
+      int(body.min_total_iqd, 'min_total_iqd', { min: 0, max: 1_000_000_000, def: 0 }),
+      body.max_uses ? int(body.max_uses, 'max_uses', { min: 1, max: 1_000_000 }) : null,
+      dates.starts_at, dates.ends_at, ts, ts
+    ).run();
+  } catch (e) {
+    if (String(e).includes('UNIQUE')) throw conflict('You already have a coupon with that code');
+    throw e;
+  }
+  await audit(c.env.DB, ctx.store.user_id, 'merchant.coupon_created', id, { code, kind, value });
+  const row = await c.env.DB.prepare('SELECT * FROM merchant_coupons WHERE id = ?').bind(id).first();
+  return c.json({ success: true, coupon: couponShape(row as Record<string, unknown>) }, 201);
+});
+
+merchantRoutes.patch('/coupons/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (body.active !== undefined) {
+    if (body.active) await requireSellingPrivileges(c);
+    sets.push('active = ?');
+    vals.push(body.active ? 1 : 0);
+  }
+  if (body.min_total_iqd !== undefined) {
+    sets.push('min_total_iqd = ?');
+    vals.push(int(body.min_total_iqd, 'min_total_iqd', { min: 0, max: 1_000_000_000 }));
+  }
+  if (body.max_uses !== undefined) {
+    sets.push('max_uses = ?');
+    vals.push(body.max_uses ? int(body.max_uses, 'max_uses', { min: 1, max: 1_000_000 }) : null);
+  }
+  if (body.starts_at !== undefined || body.ends_at !== undefined) {
+    const dates = couponDates(body);
+    if (body.starts_at !== undefined) { sets.push('starts_at = ?'); vals.push(dates.starts_at); }
+    if (body.ends_at !== undefined) { sets.push('ends_at = ?'); vals.push(dates.ends_at); }
+  }
+  // Code, kind and value are immutable: a coupon someone saved to use later
+  // must still mean what it said. Wrong terms → deactivate, make a new one.
+  if (!sets.length) throw badRequest('Nothing to update');
+  sets.push('updated_at = ?');
+  vals.push(nowIso(), c.req.param('id'), ctx.store.id);
+  const res = await c.env.DB.prepare(
+    `UPDATE merchant_coupons SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`
+  ).bind(...vals).run();
+  if (!res.meta.changes) throw notFound('Coupon not found');
+  return c.json({ success: true });
+});
+
+merchantRoutes.delete('/coupons/:id', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  // A used coupon is deactivated, not erased: orders reference its code.
+  const used = await c.env.DB.prepare(
+    'SELECT used_count FROM merchant_coupons WHERE id = ? AND store_id = ?'
+  ).bind(c.req.param('id'), ctx.store.id).first<{ used_count: number }>();
+  if (!used) throw notFound('Coupon not found');
+  if (used.used_count > 0) {
+    await c.env.DB.prepare(
+      'UPDATE merchant_coupons SET active = 0, updated_at = ? WHERE id = ? AND store_id = ?'
+    ).bind(nowIso(), c.req.param('id'), ctx.store.id).run();
+    return c.json({ success: true, deactivated: true });
+  }
+  await c.env.DB.prepare(
+    'DELETE FROM merchant_coupons WHERE id = ? AND store_id = ?'
+  ).bind(c.req.param('id'), ctx.store.id).run();
+  return c.json({ success: true, deactivated: false });
+});
+
+// ------------------------------------------------------------ custom orders
+//
+// The community-order side of the dashboard reads /api/marketplace/orders
+// directly — the lifecycle lives there. What the dashboard needs from HERE is
+// only the count of actionable ones, for the overview badge.
+merchantRoutes.get('/custom-orders/summary', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const row = await c.env.DB.prepare(
+    `SELECT
+       SUM(CASE WHEN state = 'funded' THEN 1 ELSE 0 END) AS to_start,
+       SUM(CASE WHEN state = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+       SUM(CASE WHEN state = 'merchant_marked_delivered' THEN 1 ELSE 0 END) AS awaiting_customer
+       FROM community_orders WHERE merchant_id = ?`
+  ).bind(ctx.merchant.id).first<Record<string, number>>();
+  return c.json({
+    success: true,
+    to_start: Number(row?.to_start ?? 0),
+    in_progress: Number(row?.in_progress ?? 0),
+    awaiting_customer: Number(row?.awaiting_customer ?? 0),
   });
 });

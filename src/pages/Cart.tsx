@@ -19,6 +19,7 @@ import {
   normalizeSupportRef,
   type SupportRefState,
 } from './Referrals';
+import MerchantCartView from '../components/merchant/MerchantCartView';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -117,6 +118,9 @@ export default function Cart() {
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // One cart, one seller (§14): the server says whose cart this is, and a
+  // merchant-store cart gets its own rendering with the shop's own terms.
+  const [merchantScope, setMerchantScope] = useState<boolean | null>(null);
   // Action errors (qty/variant updates) show as a dismissible banner over the
   // existing content; a failed INITIAL load is a distinct full state below.
   const [error, setError] = useState('');
@@ -215,6 +219,17 @@ export default function Cart() {
   useEffect(() => {
     loadCart();
   }, [loadCart]);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ scope: { seller_type?: string } | null }>('/api/cart/scope')
+      .then((d) => alive && setMerchantScope(d.scope?.seller_type === 'merchant'))
+      .catch(() => alive && setMerchantScope(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // A ?ref= that lands on the cart URL itself is captured here; a product
   // link captures its own on the product page. Neither one ever REPLACES an
@@ -471,6 +486,11 @@ export default function Cart() {
 
   // §3/§12: the product name is English in every language and is never translated.
   const itemName = (item: CartItem) => item.name;
+
+  // A merchant-store cart is the same table with a different seller — and a
+  // different screen, priced by /api/cart/merchant and checked out through
+  // /api/store-orders instead of the platform resolver.
+  if (merchantScope) return <MerchantCartView />;
 
   return (
     <div className="w-full pt-16 pb-48 text-zinc-300 min-h-screen bg-black flex flex-col font-sans">

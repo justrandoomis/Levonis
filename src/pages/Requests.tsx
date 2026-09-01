@@ -27,7 +27,7 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
-import { iqd, badgeLabel, merchantApi, type MerchantMe } from '../lib/merchant';
+import { iqd, badgeLabel, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
 import { GOVERNORATE_LABELS, GOVERNORATES } from '../lib/governorates';
 import {
   AttachmentDraft, AttachmentList, uploadRequestFiles, type RequestFile,
@@ -71,7 +71,7 @@ interface OfferRow {
   } | null;
 }
 
-type View = 'board' | 'mine' | 'new';
+type View = 'board' | 'mine' | 'orders' | 'new';
 
 export default function Requests() {
   const { loc } = useLanguage();
@@ -103,24 +103,25 @@ export default function Requests() {
           )}
         </p>
 
-        <div className="flex gap-1.5 mb-5">
-          {(['board', 'mine'] as View[]).map((v) => (
+        <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
+          {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
+             ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
+             ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
+            ] as Array<[View, string]>).map(([v, label]) => (
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`px-4 min-h-[40px] rounded-2xl text-[12.5px] font-semibold border transition-colors ${
+              className={`shrink-0 px-4 min-h-[40px] rounded-2xl text-[12.5px] font-semibold border transition-colors ${
                 view === v ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
               }`}
             >
-              {v === 'board'
-                ? loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')
-                : loc('طلباتي', 'My requests', 'داواکاریەکانم')}
+              {label}
             </button>
           ))}
           {user && (
             <button
               onClick={() => setView('new')}
-              className="ms-auto px-4 min-h-[40px] rounded-2xl bg-olive text-white text-[12.5px] font-semibold flex items-center gap-1.5"
+              className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-white text-[12.5px] font-semibold flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
               {loc('طلب جديد', 'New', 'نوێ')}
@@ -130,6 +131,8 @@ export default function Requests() {
 
         {view === 'new' ? (
           <NewRequest onDone={() => setView('mine')} onCancel={() => setView('board')} />
+        ) : view === 'orders' ? (
+          <MyCommunityOrders />
         ) : (
           <RequestList mine={view === 'mine'} onOpen={setOpen} />
         )}
@@ -770,5 +773,164 @@ function StateChip({ state }: { state: string }) {
     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[state] ?? map.open}`}>
       {label[state] ?? state}
     </span>
+  );
+}
+
+/**
+ * The customer's funded custom orders — the half of the escrow lifecycle
+ * that belongs to the buyer. Confirming receipt is the ONLY thing that
+ * releases the merchant's money (§33), which is why that button asks twice.
+ */
+function MyCommunityOrders() {
+  const { loc } = useLanguage();
+  const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
+  const [busy, setBusy] = useState('');
+
+  const load = useCallback(() => {
+    communityOrdersApi
+      .list()
+      .then((d) => setOrders(d.orders.filter((o) => o.role === 'customer')))
+      .catch(() => setOrders([]));
+  }, []);
+  useEffect(load, [load]);
+
+  if (orders === null) {
+    return (
+      <div className="py-12 flex justify-center">
+        <Loader2 className="w-5 h-5 text-gold animate-spin" />
+      </div>
+    );
+  }
+
+  if (!orders.length) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-zinc-400 text-[13px]">
+          {loc('لا توجد طلبات قيد التنفيذ', 'No custom orders in progress', 'هیچ داواکاریەکی تایبەت نییە')}
+        </p>
+        <p className="text-zinc-600 text-[11.5px] mt-1.5">
+          {loc(
+            'عندما تقبل عرض تاجر على طلبك، يظهر تنفيذه هنا خطوة بخطوة.',
+            'When you accept a merchant’s offer, its progress shows here step by step.',
+            'کاتێک ئۆفەرێک قبوڵ دەکەیت لێرە دەردەکەوێت.'
+          )}
+        </p>
+      </div>
+    );
+  }
+
+  const stateLabel = (s: string) =>
+    s === 'funded'
+      ? loc('مموّل — التاجر سيبدأ قريبًا', 'Funded — the merchant will start soon', 'پارە دراوە')
+      : s === 'in_progress'
+        ? loc('قيد التنفيذ', 'In progress', 'جێبەجێ دەکرێت')
+        : s === 'merchant_marked_delivered'
+          ? loc('التاجر سلّم — بانتظار تأكيدك', 'Delivered — awaiting your confirmation', 'چاوەڕوانی پشتڕاستکردنەوەتە')
+          : s === 'completed'
+            ? loc('مكتمل', 'Completed', 'تەواو')
+            : s === 'disputed'
+              ? loc('نزاع — بيد ليفونيس', 'Disputed — with Levonis', 'ناکۆکی')
+              : s === 'cancelled'
+                ? loc('ملغي ومسترجع', 'Cancelled and refunded', 'هەڵوەشێنراوە')
+                : s;
+
+  return (
+    <div className="space-y-3">
+      {orders.map((o) => (
+        <div key={o.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <p className="text-white text-[13px] font-semibold flex-1 min-w-0 truncate">{o.request_title}</p>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 shrink-0">
+              {stateLabel(o.state)}
+            </span>
+          </div>
+          <p className="text-zinc-500 text-[11.5px] mb-2">
+            {o.merchant_name} · <span className="text-white font-semibold" dir="ltr">{iqd(o.price_iqd)}</span>
+            {' '}
+            {loc('(محجوز لدى ليفونيس)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}
+          </p>
+
+          {o.state === 'merchant_marked_delivered' && (
+            <div className="space-y-2">
+              <button
+                disabled={busy === o.id}
+                onClick={async () => {
+                  if (!confirm(loc(
+                    'هل استلمت العمل فعلًا؟ التأكيد يحوّل المبلغ للتاجر ولا يمكن التراجع عنه.',
+                    'Did you actually receive the work? Confirming releases the money to the merchant and cannot be undone.',
+                    'کارەکەت وەرگرت؟ پشتڕاستکردنەوە پارەکە دەداتە بازرگان.'
+                  ))) return;
+                  setBusy(o.id);
+                  try {
+                    await communityOrdersApi.confirm(o.id);
+                    load();
+                  } catch (e) {
+                    if (e instanceof ApiError) alert(e.message);
+                  } finally {
+                    setBusy('');
+                  }
+                }}
+                className="w-full min-h-[42px] rounded-xl bg-olive text-white font-bold text-[13px] disabled:opacity-40"
+              >
+                {loc('استلمت العمل — حوّل المبلغ للتاجر', 'I received it — release the funds', 'وەرمگرت — پارەکە بدە')}
+              </button>
+              {o.auto_complete_at && (
+                <p className="text-zinc-600 text-[10.5px] text-center">
+                  {loc('يتأكد تلقائيًا في', 'Auto-confirms on', 'خۆکارانە لە')} {new Date(o.auto_complete_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          )}
+
+          {(o.state === 'funded' || o.state === 'in_progress' || o.state === 'merchant_marked_delivered') && (
+            <div className="flex gap-2 mt-2">
+              {o.state === 'funded' && (
+                <button
+                  disabled={busy === o.id}
+                  onClick={async () => {
+                    if (!confirm(loc('إلغاء الطلب واسترجاع المبلغ كاملًا؟', 'Cancel and get a full refund?', 'هەڵوەشاندنەوە و گەڕاندنەوەی پارە؟'))) return;
+                    setBusy(o.id);
+                    try {
+                      await communityOrdersApi.cancel(o.id);
+                      load();
+                    } catch (e) {
+                      if (e instanceof ApiError) alert(e.message);
+                    } finally {
+                      setBusy('');
+                    }
+                  }}
+                  className="flex-1 min-h-[36px] rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-[11.5px] font-bold disabled:opacity-40"
+                >
+                  {loc('إلغاء واسترجاع', 'Cancel & refund', 'هەڵوەشاندنەوە')}
+                </button>
+              )}
+              <button
+                disabled={busy === o.id}
+                onClick={async () => {
+                  const description = prompt(loc(
+                    'صف المشكلة (١٠ أحرف على الأقل). سيُجمّد المبلغ حتى تفصل إدارة ليفونيس.',
+                    'Describe the problem (at least 10 characters). The money freezes until Levonis decides.',
+                    'کێشەکە باس بکە.'
+                  ));
+                  if (!description || description.trim().length < 10) return;
+                  setBusy(o.id);
+                  try {
+                    await communityOrdersApi.dispute(o.id, description.trim());
+                    load();
+                  } catch (e) {
+                    if (e instanceof ApiError) alert(e.message);
+                  } finally {
+                    setBusy('');
+                  }
+                }}
+                className="flex-1 min-h-[36px] rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11.5px] font-bold disabled:opacity-40"
+              >
+                {loc('فتح نزاع', 'Open a dispute', 'ناکۆکی تۆمار بکە')}
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

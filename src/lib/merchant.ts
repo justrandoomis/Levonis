@@ -49,6 +49,8 @@ export interface MerchantStore {
   status: string;
   status_reason?: string;
   open?: boolean;
+  /** Public follower count (returned by the storefront endpoints only). */
+  followers?: number;
   created_at: string;
   merchant: StoreMerchantSummary;
 }
@@ -74,12 +76,75 @@ export interface MerchantProduct {
   prep_days: number;
   status?: string;
   lifecycle?: string;
+  section_id?: string | null;
+  featured?: boolean;
   sold_count: number;
   view_count?: number;
   /** Public shape reports availability, never the exact count. */
   in_stock?: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface StoreSection {
+  id: string;
+  name: string;
+  name_ar: string;
+  sort_order?: number;
+  active?: boolean;
+  product_count?: number;
+}
+
+export interface StoreService {
+  id: string;
+  title: string;
+  description: string;
+  kind: string;
+  price_from_iqd: number | null;
+  price_unit: string;
+  materials: string[];
+  imageUrl: string | null;
+  active?: boolean;
+  sort_order?: number;
+}
+
+export interface ShowcaseItem {
+  id: string;
+  kind: 'printer' | 'material' | 'work';
+  title: string;
+  details: string;
+  imageUrl: string | null;
+  active?: boolean;
+  sort_order?: number;
+}
+
+export interface MerchantCoupon {
+  id: string;
+  code: string;
+  kind: 'fixed_iqd' | 'percent';
+  value: number;
+  min_total_iqd: number;
+  max_uses: number | null;
+  used_count: number;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
+export interface CommunityOrderRow {
+  id: string;
+  state: string;
+  price_iqd: number;
+  merchant_receivable_iqd: number;
+  created_at: string;
+  delivered_at: string | null;
+  completed_at: string | null;
+  auto_complete_at: string | null;
+  request_title: string;
+  merchant_name: string;
+  store_slug: string | null;
+  role: 'customer' | 'merchant';
 }
 
 /** Everything the server says this account may do in the community. */
@@ -152,6 +217,60 @@ export const merchantApi = {
   setNotifications: (body: Record<string, boolean>) =>
     api.patch<{ preferences: Record<string, boolean>; forced: string[] }>('/api/merchant/notifications', body),
   subscription: () => api.get<Record<string, unknown>>('/api/merchant/subscription'),
+  changeSlug: (slug: string) =>
+    api.post<{ slug: string; changed: boolean }>('/api/merchant/store/slug', { slug }),
+
+  sections: () => api.get<{ sections: StoreSection[] }>('/api/merchant/sections'),
+  createSection: (body: Record<string, unknown>) =>
+    api.post<{ section: StoreSection }>('/api/merchant/sections', body),
+  updateSection: (id: string, body: Record<string, unknown>) =>
+    api.patch(`/api/merchant/sections/${id}`, body),
+  deleteSection: (id: string) => api.delete(`/api/merchant/sections/${id}`),
+
+  services: () => api.get<{ services: StoreService[] }>('/api/merchant/services'),
+  createService: (body: Record<string, unknown>) =>
+    api.post<{ service: StoreService }>('/api/merchant/services', body),
+  updateService: (id: string, body: Record<string, unknown>) =>
+    api.patch(`/api/merchant/services/${id}`, body),
+  deleteService: (id: string) => api.delete(`/api/merchant/services/${id}`),
+
+  showcase: () => api.get<{ items: ShowcaseItem[] }>('/api/merchant/showcase'),
+  createShowcase: (body: Record<string, unknown>) =>
+    api.post<{ item: ShowcaseItem }>('/api/merchant/showcase', body),
+  updateShowcase: (id: string, body: Record<string, unknown>) =>
+    api.patch(`/api/merchant/showcase/${id}`, body),
+  deleteShowcase: (id: string) => api.delete(`/api/merchant/showcase/${id}`),
+
+  coupons: () => api.get<{ coupons: MerchantCoupon[] }>('/api/merchant/coupons'),
+  createCoupon: (body: Record<string, unknown>) =>
+    api.post<{ coupon: MerchantCoupon }>('/api/merchant/coupons', body),
+  updateCoupon: (id: string, body: Record<string, unknown>) =>
+    api.patch(`/api/merchant/coupons/${id}`, body),
+  deleteCoupon: (id: string) => api.delete<{ deactivated: boolean }>(`/api/merchant/coupons/${id}`),
+
+  customOrdersSummary: () =>
+    api.get<{ to_start: number; in_progress: number; awaiting_customer: number }>(
+      '/api/merchant/custom-orders/summary'
+    ),
+};
+
+/** The community-order lifecycle (request → offer → escrow), either side. */
+export const communityOrdersApi = {
+  list: () => api.get<{ orders: CommunityOrderRow[] }>('/api/marketplace/orders'),
+  get: (id: string) =>
+    api.get<{
+      order: Record<string, unknown>;
+      role: 'customer' | 'merchant';
+      escrow: Record<string, unknown> | null;
+      can: Record<string, boolean>;
+    }>(`/api/marketplace/orders/${id}`),
+  start: (id: string) => api.post(`/api/marketplace/orders/${id}/start`),
+  delivered: (id: string) =>
+    api.post<{ auto_complete_at: string | null }>(`/api/marketplace/orders/${id}/delivered`),
+  confirm: (id: string) => api.post(`/api/marketplace/orders/${id}/confirm`),
+  dispute: (id: string, description: string) =>
+    api.post<{ complaint_id: string }>(`/api/marketplace/orders/${id}/dispute`, { description }),
+  cancel: (id: string) => api.post<{ refunded: boolean }>(`/api/marketplace/orders/${id}/cancel`),
 };
 
 export const storefrontApi = {
@@ -172,6 +291,60 @@ export const storefrontApi = {
       distribution: Record<string, number>;
       reviews: Array<Record<string, unknown>>;
     }>(`/api/storefront/${slug}/reviews`),
+  sections: (slug: string) => api.get<{ sections: StoreSection[] }>(`/api/storefront/${slug}/sections`),
+  services: (slug: string) => api.get<{ services: StoreService[] }>(`/api/storefront/${slug}/services`),
+  showcase: (slug: string) => api.get<{ items: ShowcaseItem[] }>(`/api/storefront/${slug}/showcase`),
+};
+
+/** The merchant cart + store checkout, priced entirely server-side. */
+export interface MerchantCartLine {
+  cart_item_id: string;
+  product_id: string;
+  name: string;
+  name_ar: string;
+  images: string[];
+  qty: number;
+  option_id: string;
+  color_id: string;
+  unit_price_iqd: number;
+  original_price_iqd: number | null;
+  line_total_iqd: number;
+  prep_days: number;
+  available: boolean;
+  stock: number | null;
+}
+
+export interface MerchantCartData {
+  scope: { seller_type: string; merchant_id?: string; store_id?: string } | null;
+  store: { id: string; slug: string; name: string; merchant_id: string } | null;
+  items: MerchantCartLine[];
+  subtotal_iqd: number;
+}
+
+export interface StoreQuote {
+  store_name: string;
+  store_slug: string;
+  lines: Array<{ cart_item_id: string; name: string; image: string; qty: number; unit_price_iqd: number; line_total_iqd: number }>;
+  subtotal_iqd: number;
+  delivery_iqd: number;
+  coupon_code: string;
+  discount_iqd: number;
+  total_iqd: number;
+}
+
+export const storeCheckoutApi = {
+  cart: () => api.get<MerchantCartData>('/api/cart/merchant'),
+  scope: () =>
+    api.get<{ scope: { seller_type: string } | null; store: Record<string, unknown> | null; count: number }>(
+      '/api/cart/scope'
+    ),
+  setQty: (cartItemId: string, qty: number) =>
+    api.patch<MerchantCartData>(`/api/cart/merchant-items/${cartItemId}`, { qty }),
+  removeLine: (cartItemId: string) => api.delete<MerchantCartData>(`/api/cart/merchant-items/${cartItemId}`),
+  quote: (couponCode = '') =>
+    api.post<{ quote: StoreQuote }>('/api/store-orders/quote', couponCode ? { couponCode } : {}),
+  place: (body: { addressId: string; payWithWallet: boolean; idempotencyKey: string; couponCode?: string }) =>
+    api.post<{ order: Record<string, unknown>; replay?: boolean }>('/api/store-orders', body),
 };
 
 /**

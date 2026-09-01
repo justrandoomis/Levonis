@@ -1,0 +1,521 @@
+/**
+ * Store identity and setup — the «ابنِ متجرك» screen.
+ *
+ * Everything a merchant may legitimately shape about their shop, in one
+ * place: images, words, colours (presets only, §12), coverage, delivery
+ * pricing, hours, policies, links, and the address. Every field maps 1:1 to
+ * a column the server validates; nothing here is decorative.
+ */
+
+import { useState } from 'react';
+import { Check, Loader2, Globe, AlertTriangle } from 'lucide-react';
+import { useLanguage } from '../../../LanguageContext';
+import { ApiError } from '../../../lib/api';
+import { merchantApi, slugMessage, type MerchantMe, type SlugRejection } from '../../../lib/merchant';
+import { GOVERNORATES } from '../../../lib/governorates';
+import { ImagePicker } from '../../media/ImagePicker';
+import { Btn, Card, Chip, ChipListEditor, Input, Notice, TextArea, Toggle } from './ui';
+
+/** The accent presets, with an honest swatch for each. Classes only — the
+ *  merchant picks a NAME; no colour value they type can reach a style rule. */
+const ACCENT_SWATCHES: Array<{ id: string; cls: string; ar: string; en: string }> = [
+  { id: 'default', cls: 'bg-[#BAA369]', ar: 'ليفونيس', en: 'Levonis' },
+  { id: 'olive', cls: 'bg-[#6b7d43]', ar: 'زيتوني', en: 'Olive' },
+  { id: 'gold', cls: 'bg-yellow-500', ar: 'ذهبي', en: 'Gold' },
+  { id: 'slate', cls: 'bg-slate-400', ar: 'رمادي', en: 'Slate' },
+  { id: 'plum', cls: 'bg-purple-400', ar: 'بنفسجي', en: 'Plum' },
+  { id: 'teal', cls: 'bg-teal-400', ar: 'فيروزي', en: 'Teal' },
+];
+
+const POLICY_PRESETS: Array<[string, string, string]> = [
+  ['الشحن والتوصيل', 'Shipping & delivery', 'گەیاندن'],
+  ['الاسترجاع والاستبدال', 'Returns & exchange', 'گەڕاندنەوە'],
+  ['الضمان', 'Warranty', 'گەرەنتی'],
+  ['الدفع', 'Payment', 'پارەدان'],
+];
+
+const DAY_PRESETS: Array<[string, string]> = [
+  ['السبت - الخميس', 'Sat – Thu'],
+  ['كل الأيام', 'Every day'],
+  ['السبت', 'Saturday'],
+  ['الأحد', 'Sunday'],
+  ['الاثنين', 'Monday'],
+  ['الثلاثاء', 'Tuesday'],
+  ['الأربعاء', 'Wednesday'],
+  ['الخميس', 'Thursday'],
+  ['الجمعة', 'Friday'],
+];
+
+export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
+  const { loc, lang } = useLanguage();
+  const store = me.store!;
+  const delivery = (store.delivery_settings ?? {}) as Record<string, unknown>;
+
+  const [f, setF] = useState({
+    name: store.name,
+    tagline: store.tagline,
+    description: store.description,
+    logo_key: store.logoUrl,
+    banner_key: store.bannerUrl,
+    accent: store.accent,
+    governorate: store.governorate ?? '',
+    contact_phone: store.contact_phone ?? '',
+    contact_phone_public: !!store.contact_phone_public,
+    accepts_custom_requests: store.accepts_custom_requests,
+    sells_direct_products: store.sells_direct_products,
+    categories: store.categories ?? [],
+    service_areas: store.service_areas ?? [],
+    business_hours: (store.business_hours ?? []).map((h) =>
+      typeof h === 'string' ? { day: h, open: '', close: '' } : h
+    ),
+    policies: Object.entries(store.policies ?? {}),
+    social_links: Object.entries(store.social_links ?? {}),
+    delivery_fee: delivery.fee_iqd !== undefined ? String(delivery.fee_iqd) : '',
+    delivery_free_over: delivery.free_over_iqd !== undefined ? String(delivery.free_over_iqd) : '',
+    delivery_note: typeof delivery.note === 'string' ? delivery.note : '',
+    open: store.status === 'active',
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  const suspended = store.status === 'suspended';
+
+  async function save() {
+    setSaving(true);
+    setError('');
+    setSaved(false);
+    try {
+      await merchantApi.updateStore({
+        name: f.name,
+        tagline: f.tagline,
+        description: f.description,
+        logo_key: f.logo_key ?? '',
+        banner_key: f.banner_key ?? '',
+        accent: f.accent,
+        governorate: f.governorate,
+        contact_phone: f.contact_phone,
+        contact_phone_public: f.contact_phone_public,
+        accepts_custom_requests: f.accepts_custom_requests,
+        sells_direct_products: f.sells_direct_products,
+        categories: f.categories,
+        service_areas: f.service_areas,
+        // Rows the merchant left half-empty are simply not sent.
+        business_hours: f.business_hours.filter((h) => h.day.trim()),
+        policies: Object.fromEntries(f.policies.filter(([k, v]) => k.trim() && v.trim())),
+        social_links: Object.fromEntries(f.social_links.filter(([k, v]) => k.trim() && v.trim())),
+        delivery_settings: {
+          ...(f.delivery_fee !== '' ? { fee_iqd: Number(f.delivery_fee) || 0 } : {}),
+          ...(f.delivery_free_over !== '' ? { free_over_iqd: Number(f.delivery_free_over) || 0 } : {}),
+          ...(f.delivery_note ? { note: f.delivery_note } : {}),
+        },
+        open: f.open,
+      });
+      setSaved(true);
+      onSaved();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <Card title={loc('هوية المتجر', 'Store identity', 'ناسنامەی فرۆشگا')}>
+        <div className="space-y-4">
+          <ImagePicker
+            label={loc('الشعار', 'Logo', 'لۆگۆ')}
+            hint={loc('مربّع — يظهر بجانب اسمك في كل مكان.', 'Square — appears beside your name everywhere.', 'چوارگۆشە.')}
+            shape="square"
+            value={f.logo_key}
+            onChange={(v) => setF({ ...f, logo_key: v })}
+          />
+          <ImagePicker
+            label={loc('الغلاف', 'Banner', 'بەرگ')}
+            hint={loc('عريض — أعلى صفحة متجرك.', 'Wide — the top of your shop page.', 'پان.')}
+            shape="wide"
+            value={f.banner_key}
+            onChange={(v) => setF({ ...f, banner_key: v })}
+          />
+          <div>
+            <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
+              {loc('لون المتجر', 'Store colour', 'ڕەنگی فرۆشگا')}
+            </label>
+            <div className="flex gap-1.5 flex-wrap">
+              {ACCENT_SWATCHES.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setF({ ...f, accent: a.id })}
+                  className={`h-9 ps-2 pe-3 rounded-xl border text-[11.5px] font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                    f.accent === a.id ? 'border-gold/60 bg-white/[0.06] text-white' : 'border-white/10 bg-white/[0.02] text-zinc-400'
+                  }`}
+                >
+                  <span className={`w-4 h-4 rounded-full ${a.cls}`} />
+                  {loc(a.ar, a.en)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card title={loc('معلومات المتجر', 'Store information', 'زانیاری فرۆشگا')}>
+        <div className="space-y-3">
+          <Input label={loc('الاسم', 'Name', 'ناو')} value={f.name} onChange={(v) => setF({ ...f, name: v })} />
+          <Input
+            label={loc('وصف مختصر', 'Tagline', 'وەسفی کورت')}
+            value={f.tagline}
+            onChange={(v) => setF({ ...f, tagline: v })}
+            hint={loc('سطر واحد تحت اسم متجرك.', 'One line under your shop name.', 'یەک دێڕ.')}
+          />
+          <TextArea
+            label={loc('عن المتجر', 'About', 'دەربارە')}
+            value={f.description}
+            onChange={(v) => setF({ ...f, description: v })}
+            rows={4}
+          />
+          <div>
+            <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
+              {loc('المحافظة', 'Governorate', 'پارێزگا')}
+            </label>
+            <select
+              value={f.governorate}
+              onChange={(e) => setF({ ...f, governorate: e.target.value })}
+              className="w-full h-10 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] outline-none focus:border-gold/40"
+            >
+              <option value="">{loc('— اختر —', '— choose —', '—')}</option>
+              {GOVERNORATES.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {lang === 'ckb' ? g.ckb : lang === 'en' ? g.en : g.ar}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Input
+            label={loc('رقم التواصل', 'Contact phone', 'ژمارەی پەیوەندی')}
+            value={f.contact_phone}
+            onChange={(v) => setF({ ...f, contact_phone: v })}
+            ltr
+          />
+          <Toggle
+            label={loc('إظهار الرقم للزبائن', 'Show the number publicly', 'ژمارە بە گشتی')}
+            on={f.contact_phone_public}
+            onChange={(v) => setF({ ...f, contact_phone_public: v })}
+          />
+          <ChipListEditor
+            label={loc('تخصصات المتجر', 'Store categories', 'پۆلەکان')}
+            values={f.categories}
+            onChange={(categories) => setF({ ...f, categories })}
+            placeholder={loc('طباعة FDM، ريزن، تصميم… ثم Enter', 'FDM printing, resin, design… then Enter', '…')}
+          />
+          <ChipListEditor
+            label={loc('مناطق التغطية', 'Service areas', 'ناوچەکانی گەیاندن')}
+            values={f.service_areas}
+            onChange={(service_areas) => setF({ ...f, service_areas })}
+            placeholder={loc('بغداد، أربيل، كل العراق… ثم Enter', 'Baghdad, Erbil, all of Iraq… then Enter', '…')}
+          />
+        </div>
+      </Card>
+
+      <Card title={loc('التوصيل', 'Delivery', 'گەیاندن')}>
+        <div className="grid grid-cols-2 gap-2 mb-2.5">
+          <Input
+            label={loc('أجرة التوصيل (د.ع)', 'Delivery fee (IQD)', 'کرێی گەیاندن')}
+            value={f.delivery_fee}
+            type="number"
+            ltr
+            onChange={(v) => setF({ ...f, delivery_fee: v })}
+            hint={loc('فارغ أو 0 = مجاني', 'Empty or 0 = free', 'بەتاڵ = بەخۆڕایی')}
+          />
+          <Input
+            label={loc('مجاني فوق (د.ع)', 'Free over (IQD)', 'بەخۆڕایی سەروو')}
+            value={f.delivery_free_over}
+            type="number"
+            ltr
+            onChange={(v) => setF({ ...f, delivery_free_over: v })}
+          />
+        </div>
+        <Input
+          label={loc('ملاحظة للزبون (اختياري)', 'Note for customers (optional)', 'تێبینی')}
+          value={f.delivery_note}
+          onChange={(v) => setF({ ...f, delivery_note: v })}
+          placeholder={loc('مثال: التوصيل خلال ٢-٤ أيام', 'e.g. delivery within 2–4 days', '…')}
+        />
+      </Card>
+
+      <Card title={loc('ساعات العمل', 'Business hours', 'کاتژمێرەکانی کار')}>
+        <div className="space-y-2">
+          {f.business_hours.map((h, i) => (
+            <div key={i} className="flex gap-1.5 items-center">
+              <input
+                list="day-presets"
+                value={h.day}
+                onChange={(e) => {
+                  const next = [...f.business_hours];
+                  next[i] = { ...h, day: e.target.value };
+                  setF({ ...f, business_hours: next });
+                }}
+                placeholder={loc('اليوم', 'Day', 'ڕۆژ')}
+                className="flex-1 min-w-0 h-10 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[12.5px] outline-none focus:border-gold/40"
+              />
+              <input
+                type="time"
+                value={h.open}
+                onChange={(e) => {
+                  const next = [...f.business_hours];
+                  next[i] = { ...h, open: e.target.value };
+                  setF({ ...f, business_hours: next });
+                }}
+                dir="ltr"
+                className="w-24 h-10 rounded-xl bg-black/40 border border-white/10 px-2 text-white text-[12px] outline-none focus:border-gold/40"
+              />
+              <input
+                type="time"
+                value={h.close}
+                onChange={(e) => {
+                  const next = [...f.business_hours];
+                  next[i] = { ...h, close: e.target.value };
+                  setF({ ...f, business_hours: next });
+                }}
+                dir="ltr"
+                className="w-24 h-10 rounded-xl bg-black/40 border border-white/10 px-2 text-white text-[12px] outline-none focus:border-gold/40"
+              />
+              <button
+                type="button"
+                onClick={() => setF({ ...f, business_hours: f.business_hours.filter((_, j) => j !== i) })}
+                className="w-8 h-8 rounded-lg text-zinc-500 hover:text-red-300 shrink-0"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <datalist id="day-presets">
+            {DAY_PRESETS.map(([ar, en]) => (
+              <option key={en} value={lang === 'en' ? en : ar} />
+            ))}
+          </datalist>
+          <Btn
+            kind="ghost"
+            small
+            onClick={() => setF({ ...f, business_hours: [...f.business_hours, { day: '', open: '09:00', close: '18:00' }] })}
+          >
+            + {loc('إضافة سطر', 'Add row', 'دێڕ زیاد بکە')}
+          </Btn>
+        </div>
+      </Card>
+
+      <Card title={loc('سياسات المتجر', 'Store policies', 'سیاسەتەکان')}>
+        <div className="space-y-2.5">
+          <div className="flex gap-1.5 flex-wrap">
+            {POLICY_PRESETS.map(([ar, en, ckb]) => {
+              const key = loc(ar, en, ckb);
+              const exists = f.policies.some(([k]) => k === key);
+              return (
+                <Chip
+                  key={en}
+                  label={`+ ${key}`}
+                  active={false}
+                  disabled={exists}
+                  onClick={() => setF({ ...f, policies: [...f.policies, [key, '']] })}
+                />
+              );
+            })}
+          </div>
+          {f.policies.map(([k, v], i) => (
+            <div key={i} className="rounded-xl bg-black/30 border border-white/5 p-2.5 space-y-1.5">
+              <div className="flex gap-1.5 items-center">
+                <input
+                  value={k}
+                  onChange={(e) => {
+                    const next = [...f.policies];
+                    next[i] = [e.target.value, v];
+                    setF({ ...f, policies: next });
+                  }}
+                  placeholder={loc('عنوان السياسة', 'Policy title', 'ناونیشان')}
+                  className="flex-1 min-w-0 h-9 rounded-lg bg-black/40 border border-white/10 px-2.5 text-white text-[12.5px] font-semibold outline-none focus:border-gold/40"
+                />
+                <button
+                  type="button"
+                  onClick={() => setF({ ...f, policies: f.policies.filter((_, j) => j !== i) })}
+                  className="w-8 h-8 rounded-lg text-zinc-500 hover:text-red-300 shrink-0"
+                >
+                  ×
+                </button>
+              </div>
+              <textarea
+                value={v}
+                rows={2}
+                onChange={(e) => {
+                  const next = [...f.policies];
+                  next[i] = [k, e.target.value];
+                  setF({ ...f, policies: next });
+                }}
+                placeholder={loc('نص السياسة كما يقرؤه الزبون', 'The policy as customers read it', 'دەق')}
+                className="w-full rounded-lg bg-black/40 border border-white/10 px-2.5 py-2 text-white text-[12.5px] outline-none focus:border-gold/40 resize-none"
+              />
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title={loc('روابط التواصل', 'Social links', 'بەستەرەکان')}>
+        <div className="space-y-2">
+          {f.social_links.map(([k, v], i) => (
+            <div key={i} className="flex gap-1.5 items-center">
+              <input
+                value={k}
+                onChange={(e) => {
+                  const next = [...f.social_links];
+                  next[i] = [e.target.value, v];
+                  setF({ ...f, social_links: next });
+                }}
+                placeholder={loc('المنصة', 'Platform', 'پلاتفۆرم')}
+                className="w-28 h-10 rounded-xl bg-black/40 border border-white/10 px-2.5 text-white text-[12.5px] outline-none focus:border-gold/40 shrink-0"
+              />
+              <input
+                value={v}
+                dir="ltr"
+                onChange={(e) => {
+                  const next = [...f.social_links];
+                  next[i] = [k, e.target.value];
+                  setF({ ...f, social_links: next });
+                }}
+                placeholder="https://…"
+                className="flex-1 min-w-0 h-10 rounded-xl bg-black/40 border border-white/10 px-2.5 text-white text-[12.5px] outline-none focus:border-gold/40"
+              />
+              <button
+                type="button"
+                onClick={() => setF({ ...f, social_links: f.social_links.filter((_, j) => j !== i) })}
+                className="w-8 h-8 rounded-lg text-zinc-500 hover:text-red-300 shrink-0"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <Btn kind="ghost" small onClick={() => setF({ ...f, social_links: [...f.social_links, ['Instagram', '']] })}>
+            + {loc('إضافة رابط', 'Add link', 'بەستەر زیاد بکە')}
+          </Btn>
+          <p className="text-zinc-600 text-[10.5px]">
+            {loc('روابط http/https فقط — أي شيء آخر يُهمل.', 'http/https links only — anything else is dropped.', 'تەنها http/https.')}
+          </p>
+        </div>
+      </Card>
+
+      <Card title={loc('ما يقدّمه متجرك', 'What your store offers', 'ئەوەی فرۆشگاکەت پێشکەشی دەکات')}>
+        <div className="space-y-2.5">
+          <Toggle
+            label={loc('منتجات جاهزة للبيع', 'Ready-made products', 'بەرهەمی ئامادە')}
+            on={f.sells_direct_products}
+            onChange={(v) => setF({ ...f, sells_direct_products: v })}
+          />
+          <Toggle
+            label={loc('طلبات مخصصة (طباعة حسب الطلب)', 'Custom requests (print on demand)', 'داواکاری تایبەت')}
+            on={f.accepts_custom_requests}
+            onChange={(v) => setF({ ...f, accepts_custom_requests: v })}
+          />
+        </div>
+      </Card>
+
+      <Card title={loc('حالة المتجر', 'Store status', 'دۆخی فرۆشگا')}>
+        {suspended ? (
+          <Notice
+            text={loc(
+              'المتجر موقوف من إدارة ليفونيس ولا يمكن إعادة فتحه من هنا. تواصل مع الدعم.',
+              'This store is suspended by Levonis and cannot be re-opened from here. Contact support.',
+              'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە.'
+            )}
+          />
+        ) : (
+          <Toggle
+            label={
+              f.open
+                ? loc('المتجر مفتوح ويستقبل الطلبات', 'Open and taking orders', 'کراوەیە')
+                : loc('المتجر متوقّف مؤقتًا', 'Temporarily paused', 'ڕاگیراوە')
+            }
+            on={f.open}
+            onChange={(v) => setF({ ...f, open: v })}
+          />
+        )}
+      </Card>
+
+      {error && <p className="text-red-400 text-[12px]">{error}</p>}
+
+      <Btn onClick={save} disabled={saving} full>
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
+        {saved ? loc('تم الحفظ', 'Saved', 'پاشەکەوت کرا') : loc('حفظ التغييرات', 'Save changes', 'پاشەکەوتکردن')}
+      </Btn>
+
+      <SlugCard currentSlug={store.slug} url={store.url} onChanged={onSaved} />
+    </div>
+  );
+}
+
+/** Changing the store address — controlled, checked live, parked-not-released. */
+function SlugCard({ currentSlug, url, onChanged }: { currentSlug: string; url: string; onChanged: () => void }) {
+  const { loc } = useLanguage();
+  const [slug, setSlug] = useState(currentSlug);
+  const [check, setCheck] = useState<{ ok: boolean; reason: SlugRejection | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function verify(v: string) {
+    setSlug(v);
+    setCheck(null);
+    setError('');
+    const clean = v.trim().toLowerCase();
+    if (!clean || clean === currentSlug) return;
+    try {
+      const r = await merchantApi.checkSlug(clean);
+      setCheck({ ok: r.ok, reason: r.reason });
+    } catch {
+      /* typing continues */
+    }
+  }
+
+  async function apply() {
+    if (!confirm(loc(
+      'تغيير عنوان المتجر؟ العنوان القديم يبقى محجوزًا لك فترة ثم يتحرر — حدّث روابطك المطبوعة.',
+      'Change the store address? The old one stays parked for a while, then frees up — update your printed links.',
+      'ناونیشان بگۆڕدرێت؟'
+    ))) return;
+    setBusy(true);
+    setError('');
+    try {
+      await merchantApi.changeSlug(slug.trim().toLowerCase());
+      onChanged();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const changed = slug.trim().toLowerCase() !== currentSlug;
+
+  return (
+    <Card title={loc('عنوان المتجر', 'Store address', 'ناونیشانی فرۆشگا')}>
+      <p className="text-zinc-500 text-[11.5px] mb-2 flex items-center gap-1.5" dir="ltr">
+        <Globe className="w-3.5 h-3.5 shrink-0" />
+        <span className="truncate">{url.replace(/^https?:\/\//, '')}</span>
+      </p>
+      <div className="flex gap-2">
+        <Input value={slug} onChange={verify} ltr placeholder="my-store" />
+        <Btn onClick={apply} disabled={busy || !changed || (check !== null && !check.ok)}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : loc('تغيير', 'Change', 'گۆڕین')}
+        </Btn>
+      </div>
+      {check && !check.ok && (
+        <p className="text-amber-400 text-[11px] mt-1.5 flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" />
+          {slugMessage(check.reason, loc)}
+        </p>
+      )}
+      {check?.ok && changed && (
+        <p className="text-emerald-400 text-[11px] mt-1.5">{loc('العنوان متاح', 'Available', 'بەردەستە')}</p>
+      )}
+      {error && <p className="text-red-400 text-[11px] mt-1.5">{error}</p>}
+    </Card>
+  );
+}

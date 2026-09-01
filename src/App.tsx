@@ -25,6 +25,7 @@ import Orders from './pages/Orders';
 import Warranty from './pages/Warranty';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import StoreCheckout from './pages/StoreCheckout';
 import Community from './pages/Community';
 import MerchantStore from './pages/MerchantStore';
 import FollowedStores from './pages/FollowedStores';
@@ -94,6 +95,7 @@ function StorefrontApp() {
             cart, one checkout, one order history (§94). */}
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+        <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
@@ -115,7 +117,7 @@ function AppContent() {
     return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
   }
   if (store || unknownStore) return <StorefrontApp />;
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/games', '/leaderboards', '/support'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
     return (
@@ -131,6 +133,7 @@ function AppContent() {
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/addresses" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+            <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
             <Route path="/games" element={<ProtectedRoute><Games /></ProtectedRoute>} />
             <Route path="/leaderboards" element={<ProtectedRoute><Leaderboards /></ProtectedRoute>} />
             <Route path="/support" element={<Support />} />

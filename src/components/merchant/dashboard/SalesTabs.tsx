@@ -1,0 +1,578 @@
+/**
+ * The selling side of the dashboard: store orders (with the full fulfilment
+ * detail — address, phone, items, chat), custom community orders (the
+ * request → offer → escrow lifecycle), and the store's own coupons.
+ *
+ * Money semantics are the server's: delivery flips the payout to available,
+ * a community order pays only when the CUSTOMER confirms, and every state
+ * button below is exactly one legal transition of those machines.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ChevronDown, Copy, Loader2, MapPin, MessageCircle, Phone, Plus, Tag, Trash2,
+  ExternalLink, Hammer, Check,
+} from 'lucide-react';
+import { useLanguage } from '../../../LanguageContext';
+import { api, ApiError } from '../../../lib/api';
+import { useStore } from '../../../StoreContext';
+import {
+  merchantApi, communityOrdersApi, iqd,
+  type CommunityOrderRow, type MerchantCoupon,
+} from '../../../lib/merchant';
+import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, useMainSiteHref, type Loc } from './ui';
+
+// ------------------------------------------------------------ store orders
+
+const ORDER_FLOW: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: [],
+  cancelled: [],
+};
+
+const STATUS_FILTERS = ['', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
+
+export function statusLabel(k: string, loc: Loc): string {
+  switch (k) {
+    case 'pending': return loc('جديد', 'New', 'نوێ');
+    case 'confirmed': return loc('مؤكد', 'Confirmed', 'پشتڕاستکراو');
+    case 'processing': return loc('قيد التجهيز', 'Preparing', 'ئامادەکردن');
+    case 'shipped': return loc('تم الشحن', 'Shipped', 'نێردرا');
+    case 'delivered': return loc('تم التسليم', 'Delivered', 'گەیشت');
+    case 'cancelled': return loc('ملغي', 'Cancelled', 'هەڵوەشێنراوە');
+    default: return k;
+  }
+}
+
+export function StatusChip({ status }: { status: string }) {
+  const { loc } = useLanguage();
+  const map: Record<string, string> = {
+    pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    confirmed: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
+    processing: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
+    shipped: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
+    delivered: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    cancelled: 'bg-red-500/10 text-red-300 border-red-500/20',
+  };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[status] ?? map.pending}`}>
+      {statusLabel(status, loc)}
+    </span>
+  );
+}
+
+export function OrdersTab() {
+  const { loc } = useLanguage();
+  const [orders, setOrders] = useState<Record<string, unknown>[] | null>(null);
+  const [filter, setFilter] = useState('');
+  const [busy, setBusy] = useState('');
+  const [openId, setOpenId] = useState('');
+
+  const load = useCallback(() => {
+    merchantApi
+      .orders(filter ? `?status=${filter}` : '')
+      .then((d) => setOrders(d.orders))
+      .catch(() => setOrders([]));
+  }, [filter]);
+  useEffect(load, [load]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 pb-0.5">
+        {STATUS_FILTERS.map((s) => (
+          <span key={s || 'all'} className="shrink-0">
+            <Chip
+              label={s === '' ? loc('الكل', 'All', 'هەموو') : statusLabel(s, loc)}
+              active={filter === s}
+              onClick={() => setFilter(s)}
+            />
+          </span>
+        ))}
+      </div>
+
+      {orders === null ? (
+        <Spinner />
+      ) : !orders.length ? (
+        <Empty text={loc('لا توجد طلبات', 'No orders', 'داواکاری نییە')} />
+      ) : (
+        orders.map((o) => {
+          const id = String(o.id);
+          const status = String(o.status);
+          const next = ORDER_FLOW[status] ?? [];
+          const open = openId === id;
+          return (
+            <div key={id} className="rounded-2xl border border-white/10 bg-white/[0.03]">
+              <button
+                type="button"
+                onClick={() => setOpenId(open ? '' : id)}
+                className="w-full p-3 text-start"
+              >
+                <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <div className="min-w-0">
+                    <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{id}</p>
+                    <p className="text-zinc-500 text-[11px]">
+                      {String(o.customer_name)} · {String(o.item_count)} {loc('منتج', 'items', 'بەرهەم')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <StatusChip status={status} />
+                    <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[11.5px]">
+                  <span className="text-zinc-500">
+                    {loc('الإجمالي', 'Total', 'کۆ')}: <span className="text-white font-semibold" dir="ltr">{iqd(Number(o.total_iqd))}</span>
+                  </span>
+                  <span className="text-zinc-500">
+                    {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(Number(o.merchant_receivable_iqd))}</span>
+                  </span>
+                </div>
+              </button>
+
+              {open && <OrderDetail id={id} />}
+
+              {next.length > 0 && (
+                <div className="flex gap-2 flex-wrap px-3 pb-3">
+                  {next.map((s) => (
+                    <Btn
+                      key={s}
+                      small
+                      kind={s === 'cancelled' ? 'danger' : 'primary'}
+                      disabled={busy === id}
+                      onClick={async () => {
+                        if (s === 'cancelled' && !confirm(loc('إلغاء الطلب؟', 'Cancel this order?', 'هەڵوەشاندنەوە؟'))) return;
+                        setBusy(id);
+                        try {
+                          await merchantApi.setOrderStatus(id, s);
+                          load();
+                        } catch (e) {
+                          if (e instanceof ApiError) alert(e.message);
+                        } finally {
+                          setBusy('');
+                        }
+                      }}
+                    >
+                      {statusLabel(s, loc)}
+                    </Btn>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/** The fulfilment sheet: who, where, what — and the door to the order chat. */
+function OrderDetail({ id }: { id: string }) {
+  const { loc } = useLanguage();
+  const navigate = useNavigate();
+  const { store: hostStore } = useStore();
+  const [data, setData] = useState<Awaited<ReturnType<typeof merchantApi.order>> | null>(null);
+  const [chatBusy, setChatBusy] = useState(false);
+
+  useEffect(() => {
+    merchantApi.order(id).then(setData).catch(() => {});
+  }, [id]);
+
+  if (!data) return <Spinner />;
+  const o = data.order;
+  const addr = (o.address as Record<string, unknown>) ?? {};
+  // The snapshot is the addresses-table row: governorate, area, the free-text
+  // address line and an optional landmark.
+  const addrText = [addr.governorate, addr.area, addr.address, addr.landmark]
+    .filter(Boolean)
+    .join('، ');
+  const phone = String(o.customer_phone ?? '');
+
+  async function openChat() {
+    setChatBusy(true);
+    try {
+      const r = await api.post<{ chatId: string }>('/api/chats/open', { orderId: id });
+      // On a store subdomain the messenger lives on the main site — the
+      // shared cookie keeps the session across the hop.
+      if (hostStore) window.location.href = `https://levonis-iq.com/chat/${r.chatId}`;
+      else navigate(`/chat/${r.chatId}`);
+    } catch (e) {
+      if (e instanceof ApiError) alert(e.message);
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
+  return (
+    <div className="px-3 pb-3 space-y-2.5">
+      <div className="rounded-xl bg-black/30 border border-white/5 p-2.5 space-y-1.5">
+        {phone && (
+          <div className="flex items-center justify-between gap-2 text-[12px]">
+            <span className="text-zinc-400 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5" />
+              <a href={`tel:${phone}`} className="text-gold font-semibold" dir="ltr">{phone}</a>
+            </span>
+            <button
+              onClick={() => navigator.clipboard?.writeText(phone).catch(() => {})}
+              className="text-zinc-500 p-1"
+              aria-label={loc('نسخ', 'Copy', 'کۆپی')}
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {addrText && (
+          <div className="flex items-start justify-between gap-2 text-[12px]">
+            <span className="text-zinc-300 flex items-start gap-1.5">
+              <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-zinc-500" />
+              {addrText}
+            </span>
+            <button
+              onClick={() => navigator.clipboard?.writeText(addrText).catch(() => {})}
+              className="text-zinc-500 p-1 shrink-0"
+              aria-label={loc('نسخ', 'Copy', 'کۆپی')}
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {data.items.map((it) => (
+          <div key={String(it.id)} className="flex items-center gap-2.5 text-[12px]">
+            <div className="w-9 h-9 rounded-lg bg-black/40 overflow-hidden shrink-0">
+              {!!it.image_snapshot && <img src={String(it.image_snapshot)} alt="" className="w-full h-full object-cover" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-zinc-200 truncate">{String(it.name_snapshot)}</p>
+              {!!it.option_snapshot && <p className="text-zinc-600 text-[10.5px]" dir="ltr">{String(it.option_snapshot)}</p>}
+            </div>
+            <span className="text-zinc-500 shrink-0" dir="ltr">×{String(it.qty)}</span>
+            <span className="text-zinc-300 font-semibold shrink-0" dir="ltr">{iqd(Number(it.line_total_iqd))}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl bg-black/30 border border-white/5 p-2.5 text-[11.5px] space-y-1">
+        <Row label={loc('المنتجات', 'Items', 'بەرهەمەکان')} value={iqd(Number(o.subtotal_iqd))} />
+        {Number(o.coupon_discount_iqd ?? 0) > 0 && (
+          <Row label={`${loc('كوبون', 'Coupon', 'کۆبۆن')} ${String(o.coupon_code ?? '')}`} value={`− ${iqd(Number(o.coupon_discount_iqd))}`} />
+        )}
+        <Row label={loc('التوصيل', 'Delivery', 'گەیاندن')} value={iqd(Number(o.shipping_iqd))} />
+        <Row label={loc('الإجمالي', 'Total', 'کۆی گشتی')} value={iqd(Number(o.total_iqd))} strong />
+        <Row label={loc('عمولة المنصة', 'Platform fee', 'کۆمیشن')} value={`− ${iqd(Number(o.platform_fee_iqd))}`} />
+        <Row label={loc('صافي أرباحك', 'Your share', 'بەشی تۆ')} value={iqd(Number(o.merchant_receivable_iqd))} gold />
+        <Row
+          label={loc('الدفع', 'Payment', 'پارەدان')}
+          value={o.payment_method_id === 'wallet' ? loc('محفظة (مدفوع)', 'Wallet (paid)', 'جزدان') : loc('عند الاستلام', 'Cash on delivery', 'لە گەیاندن')}
+        />
+      </div>
+
+      <Btn kind="ghost" small onClick={openChat} disabled={chatBusy}>
+        {chatBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
+        {loc('محادثة حول الطلب', 'Chat about this order', 'گفتوگۆ لەسەر داواکاری')}
+      </Btn>
+    </div>
+  );
+}
+
+function Row({ label, value, strong, gold }: { label: string; value: string; strong?: boolean; gold?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-zinc-500">{label}</span>
+      <span className={`${gold ? 'text-gold font-bold' : strong ? 'text-white font-bold' : 'text-zinc-300'}`} dir="ltr">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// --------------------------------------------------------- community orders
+
+function communityStateLabel(k: string, loc: Loc): string {
+  switch (k) {
+    case 'funded': return loc('مموّل — بانتظار البدء', 'Funded — awaiting start', 'پارە دراوە');
+    case 'in_progress': return loc('قيد التنفيذ', 'In progress', 'لە جێبەجێکردندایە');
+    case 'merchant_marked_delivered': return loc('بانتظار تأكيد الزبون', 'Awaiting customer confirmation', 'چاوەڕوانی کڕیار');
+    case 'completed': return loc('مكتمل — تم تحويل المبلغ', 'Completed — funds released', 'تەواو');
+    case 'disputed': return loc('نزاع — بيد ليفونيس', 'Disputed — with Levonis', 'ناکۆکی');
+    case 'cancelled': return loc('ملغي', 'Cancelled', 'هەڵوەشێنراوە');
+    case 'refunded': return loc('مسترجع', 'Refunded', 'گەڕێنراوەتەوە');
+    case 'accepted': return loc('مقبول', 'Accepted', 'پەسەندکراو');
+    default: return k;
+  }
+}
+
+/**
+ * The merchant side of custom orders. The money is IN ESCROW: starting and
+ * delivering are the merchant's moves, but only the customer's confirmation
+ * releases the funds — the buttons say exactly that.
+ */
+export function CustomOrdersTab() {
+  const { loc } = useLanguage();
+  const mainHref = useMainSiteHref();
+  const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
+  const [busy, setBusy] = useState('');
+
+  const load = useCallback(() => {
+    communityOrdersApi
+      .list()
+      .then((d) => setOrders(d.orders.filter((o) => o.role === 'merchant')))
+      .catch(() => setOrders([]));
+  }, []);
+  useEffect(load, [load]);
+
+  if (orders === null) return <Spinner />;
+
+  return (
+    <div className="space-y-3">
+      <a
+        href={mainHref('/requests')}
+        className="w-full h-10 rounded-xl border border-gold/30 bg-gold/10 text-gold font-bold text-[12.5px] flex items-center justify-center gap-2"
+      >
+        <Hammer className="w-4 h-4" />
+        {loc('تصفح طلبات الزبائن وقدّم عروضك', 'Browse customer requests and make offers', 'داواکاریەکان ببینە و ئۆفەر بدە')}
+        <ExternalLink className="w-3.5 h-3.5" />
+      </a>
+
+      {!orders.length && (
+        <Empty
+          text={loc('لا توجد طلبات مخصصة بعد', 'No custom orders yet', 'هێشتا داواکاری تایبەت نییە')}
+          hint={loc(
+            'عندما يقبل زبون عرضك على طلبه، يظهر هنا كطلب مموّل جاهز للتنفيذ.',
+            'When a customer accepts your offer, it appears here funded and ready to start.',
+            'کاتێک کڕیار ئۆفەرەکەت قبوڵ دەکات لێرە دەردەکەوێت.'
+          )}
+        />
+      )}
+
+      {orders.map((o) => (
+        <div key={o.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <p className="text-white text-[12.5px] font-semibold flex-1 min-w-0 truncate">{o.request_title}</p>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 shrink-0">
+              {communityStateLabel(o.state, loc)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-[11.5px] mb-2">
+            <span className="text-zinc-500">
+              {loc('قيمة الاتفاق', 'Deal value', 'بەهای ڕێککەوتن')}: <span className="text-white font-semibold" dir="ltr">{iqd(o.price_iqd)}</span>
+            </span>
+            <span className="text-zinc-500">
+              {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(o.merchant_receivable_iqd)}</span>
+            </span>
+          </div>
+
+          {o.state === 'funded' && (
+            <Btn
+              small
+              disabled={busy === o.id}
+              onClick={async () => {
+                setBusy(o.id);
+                try {
+                  await communityOrdersApi.start(o.id);
+                  load();
+                } catch (e) {
+                  if (e instanceof ApiError) alert(e.message);
+                } finally {
+                  setBusy('');
+                }
+              }}
+            >
+              {loc('ابدأ العمل', 'Start work', 'دەست پێ بکە')}
+            </Btn>
+          )}
+          {o.state === 'in_progress' && (
+            <Btn
+              small
+              disabled={busy === o.id}
+              onClick={async () => {
+                if (!confirm(loc(
+                  'تأكيد التسليم؟ المبلغ يبقى محجوزًا حتى يؤكد الزبون الاستلام.',
+                  'Mark delivered? The money stays held until the customer confirms.',
+                  'گەیاندن پشتڕاست بکرێتەوە؟'
+                ))) return;
+                setBusy(o.id);
+                try {
+                  await communityOrdersApi.delivered(o.id);
+                  load();
+                } catch (e) {
+                  if (e instanceof ApiError) alert(e.message);
+                } finally {
+                  setBusy('');
+                }
+              }}
+            >
+              <Check className="w-3.5 h-3.5" />
+              {loc('سلّمت العمل', 'I delivered the work', 'کارەکەم گەیاند')}
+            </Btn>
+          )}
+          {o.state === 'merchant_marked_delivered' && (
+            <p className="text-zinc-500 text-[11px]">
+              {loc(
+                'المبلغ يُحوَّل لك فور تأكيد الزبون.',
+                'The funds are released to you the moment the customer confirms.',
+                'پارەکە دوای پشتڕاستکردنەوەی کڕیار دەگاتە تۆ.'
+              )}
+              {o.auto_complete_at &&
+                ` ${loc('التأكيد التلقائي', 'Auto-confirm', 'پشتڕاستکردنەوەی خۆکار')}: ${new Date(o.auto_complete_at).toLocaleDateString()}`}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------- coupons
+
+export function CouponsTab({ canSell }: { canSell: boolean }) {
+  const { loc } = useLanguage();
+  const [items, setItems] = useState<MerchantCoupon[] | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [f, setF] = useState({ code: '', kind: 'percent' as 'percent' | 'fixed_iqd', value: '', min: '', maxUses: '' });
+
+  const load = useCallback(() => {
+    merchantApi.coupons().then((d) => setItems(d.coupons)).catch(() => setItems([]));
+  }, []);
+  useEffect(load, [load]);
+
+  if (items === null) return <Spinner />;
+
+  async function create() {
+    setBusy('new');
+    setError('');
+    try {
+      await merchantApi.createCoupon({
+        code: f.code,
+        kind: f.kind,
+        value: Number(f.value) || 0,
+        min_total_iqd: Number(f.min) || 0,
+        max_uses: f.maxUses ? Number(f.maxUses) : null,
+      });
+      setF({ code: '', kind: 'percent', value: '', min: '', maxUses: '' });
+      setCreating(false);
+      load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'error');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {canSell ? (
+        !creating && (
+          <Btn onClick={() => setCreating(true)} full>
+            <Plus className="w-4 h-4" />
+            {loc('كوبون جديد', 'New coupon', 'کۆبۆنی نوێ')}
+          </Btn>
+        )
+      ) : (
+        <Notice text={loc('لا يمكن إنشاء كوبونات جديدة الآن.', 'New coupons cannot be created right now.', 'ناتوانرێت کۆبۆنی نوێ دروست بکرێت.')} />
+      )}
+
+      {creating && (
+        <Card title={loc('كوبون جديد', 'New coupon', 'کۆبۆنی نوێ')}>
+          <div className="space-y-2.5">
+            <Input
+              label={loc('الكود', 'Code', 'کۆد')}
+              value={f.code}
+              onChange={(v) => setF({ ...f, code: v.toUpperCase() })}
+              placeholder="WELCOME10"
+              ltr
+            />
+            <div className="flex gap-1.5">
+              <Chip label={loc('نسبة %', 'Percent %', '٪')} active={f.kind === 'percent'} onClick={() => setF({ ...f, kind: 'percent' })} />
+              <Chip label={loc('مبلغ ثابت', 'Fixed amount', 'بڕی جێگیر')} active={f.kind === 'fixed_iqd'} onClick={() => setF({ ...f, kind: 'fixed_iqd' })} />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                label={f.kind === 'percent' ? loc('الخصم %', 'Discount %', '٪') : loc('الخصم د.ع', 'Discount IQD', 'د.ع')}
+                value={f.value}
+                type="number"
+                ltr
+                onChange={(v) => setF({ ...f, value: v })}
+              />
+              <Input label={loc('حد أدنى للطلب', 'Min order', 'کەمترین')} value={f.min} type="number" ltr onChange={(v) => setF({ ...f, min: v })} />
+              <Input label={loc('عدد الاستخدامات', 'Max uses', 'ژمارە')} value={f.maxUses} type="number" ltr onChange={(v) => setF({ ...f, maxUses: v })} />
+            </div>
+            {error && <p className="text-red-400 text-[11.5px]">{error}</p>}
+            <div className="flex gap-2">
+              <Btn onClick={create} disabled={busy === 'new' || !f.code || !f.value} full>
+                {busy === 'new' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
+                {loc('إنشاء', 'Create', 'دروستکردن')}
+              </Btn>
+              <Btn kind="ghost" onClick={() => setCreating(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</Btn>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!items.length && !creating && (
+        <Empty
+          text={loc('لا توجد كوبونات', 'No coupons yet', 'کۆبۆن نییە')}
+          hint={loc('الكوبون يعمل فقط في سلة متجرك أنت.', 'A coupon works only in your own store’s checkout.', 'کۆبۆن تەنها لە فرۆشگای خۆتدا کاردەکات.')}
+        />
+      )}
+
+      {items.map((cp) => (
+        <div key={cp.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-white font-bold text-[13px] tracking-wide" dir="ltr">{cp.code}</span>
+            <span className="text-gold font-bold text-[12.5px]" dir="ltr">
+              {cp.kind === 'percent' ? `${cp.value}%` : iqd(cp.value)}
+            </span>
+          </div>
+          <p className="text-zinc-500 text-[11px] mb-2">
+            {cp.min_total_iqd > 0 && `${loc('حد أدنى', 'Min', 'کەمترین')} ${iqd(cp.min_total_iqd)} · `}
+            {loc('استُخدم', 'Used', 'بەکارهاتووە')} {cp.used_count}
+            {cp.max_uses !== null && ` / ${cp.max_uses}`}
+            {!cp.active && ` · ${loc('موقوف', 'inactive', 'ناچالاک')}`}
+          </p>
+          <div className="flex gap-2">
+            <Toggle
+              label={cp.active ? loc('فعّال', 'Active', 'چالاک') : loc('موقوف', 'Inactive', 'ناچالاک')}
+              on={cp.active}
+              disabled={busy === cp.id || (!cp.active && !canSell)}
+              onChange={async (v) => {
+                setBusy(cp.id);
+                try {
+                  await merchantApi.updateCoupon(cp.id, { active: v });
+                  load();
+                } catch (e) {
+                  if (e instanceof ApiError) alert(e.message);
+                } finally {
+                  setBusy('');
+                }
+              }}
+            />
+            <button
+              onClick={async () => {
+                if (!confirm(loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟'))) return;
+                setBusy(cp.id);
+                try {
+                  await merchantApi.deleteCoupon(cp.id);
+                  load();
+                } finally {
+                  setBusy('');
+                }
+              }}
+              disabled={busy === cp.id}
+              className="w-8 h-8 rounded-lg border border-red-500/30 text-red-300 disabled:opacity-40 flex items-center justify-center shrink-0 self-center"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

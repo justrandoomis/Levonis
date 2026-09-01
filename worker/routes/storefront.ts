@@ -89,7 +89,16 @@ function publicProduct(p: Record<string, unknown>) {
     // able to read a shop's inventory levels off its public pages.
     in_stock: !p.track_stock || Number(p.stock) > 0,
     sold_count: p.sold_count,
+    section_id: p.section_id ?? null,
+    featured: !!p.featured,
   };
+}
+
+/** How many people follow this shop — public, same as the community page. */
+async function followerCount(db: D1Database, merchantId: string): Promise<number> {
+  const row = await db.prepare('SELECT COUNT(*) AS n FROM follows WHERE merchant_id = ?')
+    .bind(merchantId).first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 /**
@@ -113,13 +122,92 @@ storefrontRoutes.get('/resolve', async (c) => {
     // which would make a typo silently look like the platform's own homepage.
     return c.json({ success: false, kind: 'merchant', store: null, error: 'No such store' }, 404);
   }
-  return c.json({ success: true, kind: 'merchant', store: publicStore(ctx, root) });
+  return c.json({
+    success: true,
+    kind: 'merchant',
+    store: { ...publicStore(ctx, root), followers: await followerCount(c.env.DB, String(ctx.merchant.id)) },
+  });
 });
 
 storefrontRoutes.get('/:slug', async (c) => {
   const ctx = await storeBySlug(c.env.DB, str(c.req.param('slug'), 'slug', { min: 1, max: 64 }));
   if (!ctx) throw notFound('Store not found');
-  return c.json({ success: true, store: publicStore(ctx, rootDomainFrom(c.env)) });
+  return c.json({
+    success: true,
+    store: {
+      ...publicStore(ctx, rootDomainFrom(c.env)),
+      followers: await followerCount(c.env.DB, String(ctx.merchant.id)),
+    },
+  });
+});
+
+/**
+ * The shop's own shelves, for the storefront's section chips. Active only,
+ * and only sections that actually hold a published product — an empty shelf
+ * is the merchant's business, not the visitor's.
+ */
+storefrontRoutes.get('/:slug/sections', async (c) => {
+  const ctx = await storeBySlug(c.env.DB, str(c.req.param('slug'), 'slug', { min: 1, max: 64 }));
+  if (!ctx) throw notFound('Store not found');
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.id, s.name, s.name_ar, s.sort_order,
+            (SELECT COUNT(*) FROM community_products p
+              WHERE p.section_id = s.id AND p.lifecycle = 'active' AND p.status = 'active') AS product_count
+       FROM merchant_store_sections s
+      WHERE s.store_id = ? AND s.active = 1
+      ORDER BY s.sort_order, s.created_at`
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    sections: results
+      .filter((s) => Number(s.product_count) > 0)
+      .map((s) => ({ id: s.id, name: s.name, name_ar: s.name_ar, product_count: s.product_count })),
+  });
+});
+
+/** The services this shop advertises. Prices here are honest floors, not quotes. */
+storefrontRoutes.get('/:slug/services', async (c) => {
+  const ctx = await storeBySlug(c.env.DB, str(c.req.param('slug'), 'slug', { min: 1, max: 64 }));
+  if (!ctx) throw notFound('Store not found');
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, title, description, kind, price_from_iqd, price_unit, materials, image_key
+       FROM merchant_services WHERE store_id = ? AND active = 1
+      ORDER BY sort_order, created_at LIMIT 40`
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    services: results.map((s) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      kind: s.kind,
+      price_from_iqd: s.price_from_iqd,
+      price_unit: s.price_unit,
+      materials: safeParse(s.materials, []),
+      imageUrl: s.image_key ? `/files/${s.image_key}` : null,
+    })),
+  });
+});
+
+/** Printers, materials and finished works — the workshop on display. */
+storefrontRoutes.get('/:slug/showcase', async (c) => {
+  const ctx = await storeBySlug(c.env.DB, str(c.req.param('slug'), 'slug', { min: 1, max: 64 }));
+  if (!ctx) throw notFound('Store not found');
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, kind, title, details, image_key
+       FROM merchant_showcase WHERE store_id = ? AND active = 1
+      ORDER BY kind, sort_order, created_at LIMIT 60`
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    items: results.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      title: s.title,
+      details: s.details,
+      imageUrl: s.image_key ? `/files/${s.image_key}` : null,
+    })),
+  });
 });
 
 storefrontRoutes.get('/:slug/products', async (c) => {
