@@ -303,8 +303,11 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             </div>
           </div>
 
-          {/* 3 — Three honest stats, split by short centered hairlines */}
-          <div className="flex items-center mb-3.5">
+          {/* 3 — Three honest stats, split by short centered hairlines.
+              The skeleton rows below carry explicit dir attributes: the
+              reference geometry is permanent, and switching the UI language
+              must never mirror the page. */}
+          <div dir="rtl" className="flex items-center mb-3.5">
             <ProfileStat
               value={store.positive_pct !== null && store.positive_pct !== undefined ? `${store.positive_pct}%` : '—'}
               label={loc('تقييم إيجابي', 'Positive rating', 'هەڵسەنگاندنی ئەرێنی')}
@@ -317,7 +320,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
 
           {/* 4 — Bio */}
           {(store.description || store.tagline) && (
-            <p className="text-zinc-300 text-[13px] leading-snug text-center line-clamp-2 mb-4 px-2">
+            <p dir="auto" className="text-zinc-300 text-[13px] leading-snug text-center line-clamp-2 mb-4 px-2">
               {store.description || store.tagline}
             </p>
           )}
@@ -347,7 +350,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
           {/* 6 — The merchant's three info cards: borderless filled tiles,
               content centered, the icon on the row's leading side. */}
           {facts.length > 0 && (
-            <div className={`grid gap-3 mb-4 ${facts.length === 1 ? 'grid-cols-1' : facts.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div dir="rtl" className={`grid gap-3 mb-4 ${facts.length === 1 ? 'grid-cols-1' : facts.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
               {facts.map((w, i) => (
                 <div key={i} className="rounded-[10px] bg-white/[0.05] px-2 py-2.5 flex items-center justify-center gap-2 min-w-0">
                   <WidgetIcon name={w.icon} className="w-4 h-4 shrink-0 text-zinc-400" />
@@ -377,7 +380,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
           {/* 7 — Actions, exactly two as drawn: the white contact button on
               the right, and the outlined follow pill on the left with the
               share link living inside the pill's far-left end. */}
-          <div className="flex gap-4 mb-4">
+          <div dir="rtl" className="flex gap-4 mb-4">
             <ContactButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} accentBtn={accent.btn} />
             <div className="relative flex-[1.08] min-w-0">
               <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} />
@@ -387,7 +390,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
 
           {/* 8 — Tabs: spread across the width, white when active over an
               accent-colored underline. */}
-          <div className="flex border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
+          <div dir="rtl" className="flex border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
             {TABS.filter((t) => t.show).map((t) => (
               <button
                 key={t.id}
@@ -635,7 +638,7 @@ function ProductsTab({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div dir="rtl" className="flex items-center justify-between mb-3">
         {sectionFilter ? (
           <button
             onClick={onClearSection}
@@ -685,7 +688,7 @@ function ProductGrid({
   onToggleSave: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+    <div dir="rtl" className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
       {products.map((p) => (
         <ProductCard
           key={p.id}
@@ -775,7 +778,7 @@ function ProductCard({
 function SectionsTab({ sections, onPick }: { sections: StoreSection[]; onPick: (id: string) => void }) {
   const { loc, lang } = useLanguage();
   return (
-    <div className="space-y-2">
+    <div dir="rtl" className="space-y-2">
       {sections.map((s) => (
         <button
           key={s.id}
