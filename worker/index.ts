@@ -41,6 +41,7 @@ import { storefrontRoutes } from './routes/storefront';
 import { marketplaceRoutes } from './routes/marketplace';
 import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
+import { communityFavoriteRoutes } from './routes/communityFavorites';
 import { adminCommunityRoutes } from './routes/adminCommunity';
 import { bundlesRoutes, adminBundlesRoutes } from './routes/bundles';
 
@@ -153,6 +154,7 @@ app.route('/api/marketplace', marketplaceRoutes);
 app.route('/api/store-orders', storeOrderRoutes);
 // Customer-side reviews and store follows.
 app.route('/api/community-reviews', communityReviewRoutes);
+app.route('/api/community-favorites', communityFavoriteRoutes);
 app.route('/files', fileRoutes);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.

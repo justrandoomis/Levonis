@@ -316,7 +316,7 @@ merchantRoutes.patch('/store', async (c) => {
   return c.json({ success: true, store: storePublicShape(fresh!, rootDomainFrom(c.env)) });
 });
 
-const ACCENTS = ['default', 'olive', 'gold', 'slate', 'plum', 'teal'] as const;
+const ACCENTS = ['default', 'olive', 'gold', 'slate', 'plum', 'teal', 'blue'] as const;
 
 function sanitizeList(v: unknown, maxItems: number, maxLen: number): string[] {
   if (!Array.isArray(v)) return [];

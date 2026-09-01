@@ -24,15 +24,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  Store, Star, BadgeCheck, Clock, ShoppingBag, MessageCircle,
-  Loader2, PackageX, Share2, Check, Printer, Layers, Hammer, ArrowLeft, ChevronLeft,
-  MapPin, X,
+  Store, Star, BadgeCheck, Clock, ShoppingBag, MessageCircle, MessageCircleMore,
+  Loader2, PackageX, Check, Printer, Layers, Hammer, ArrowLeft, ChevronLeft,
+  MapPin, X, Heart, MoreHorizontal, Link2,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import {
-  storefrontApi, badgeLabel, iqd,
+  storefrontApi, communityFavoritesApi, badgeLabel, iqd,
   type MerchantStore, type MerchantProduct, type StoreSection, type StoreService,
   type ShowcaseItem, type ProfileWidget,
 } from '../lib/merchant';
@@ -45,16 +45,17 @@ import { useStore } from '../StoreContext';
  * supplies a colour, so nothing they type can reach the stylesheet. `btn` is
  * the contact button's fill; the rest tint rings, chips and the active tab.
  */
-const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: string; btn: string }> = {
-  default: { ring: 'border-gold/30', chip: 'bg-olive/30 text-gold', glow: 'bg-olive/15', text: 'text-gold', btn: 'bg-zinc-100 text-zinc-900' },
-  olive: { ring: 'border-olive-light/40', chip: 'bg-olive/40 text-gold', glow: 'bg-olive/20', text: 'text-gold', btn: 'bg-olive text-white' },
-  gold: { ring: 'border-gold/40', chip: 'bg-gold/15 text-gold', glow: 'bg-gold/10', text: 'text-gold', btn: 'bg-gold text-zinc-900' },
-  slate: { ring: 'border-slate-500/40', chip: 'bg-slate-500/15 text-slate-200', glow: 'bg-slate-500/10', text: 'text-slate-200', btn: 'bg-slate-200 text-slate-900' },
-  plum: { ring: 'border-purple-500/40', chip: 'bg-purple-500/15 text-purple-200', glow: 'bg-purple-500/10', text: 'text-purple-200', btn: 'bg-purple-300 text-purple-950' },
-  teal: { ring: 'border-teal-500/40', chip: 'bg-teal-500/15 text-teal-200', glow: 'bg-teal-500/10', text: 'text-teal-200', btn: 'bg-teal-300 text-teal-950' },
+const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: string; btn: string; line: string }> = {
+  default: { ring: 'border-gold/30', chip: 'bg-olive/30 text-gold', glow: 'bg-olive/15', text: 'text-gold', btn: 'bg-zinc-100 text-zinc-900', line: 'border-gold' },
+  olive: { ring: 'border-olive-light/40', chip: 'bg-olive/40 text-gold', glow: 'bg-olive/20', text: 'text-gold', btn: 'bg-olive text-white', line: 'border-gold' },
+  gold: { ring: 'border-gold/40', chip: 'bg-gold/15 text-gold', glow: 'bg-gold/10', text: 'text-gold', btn: 'bg-gold text-zinc-900', line: 'border-gold' },
+  slate: { ring: 'border-slate-500/40', chip: 'bg-slate-500/15 text-slate-200', glow: 'bg-slate-500/10', text: 'text-slate-200', btn: 'bg-slate-200 text-slate-900', line: 'border-slate-300' },
+  plum: { ring: 'border-purple-500/40', chip: 'bg-purple-500/15 text-purple-200', glow: 'bg-purple-500/10', text: 'text-purple-200', btn: 'bg-purple-300 text-purple-950', line: 'border-purple-300' },
+  teal: { ring: 'border-teal-500/40', chip: 'bg-teal-500/15 text-teal-200', glow: 'bg-teal-500/10', text: 'text-teal-200', btn: 'bg-teal-300 text-teal-950', line: 'border-teal-300' },
+  blue: { ring: 'border-sky-500/40', chip: 'bg-sky-500/15 text-sky-300', glow: 'bg-sky-500/10', text: 'text-sky-400', btn: 'bg-zinc-100 text-zinc-900', line: 'border-sky-400' },
 };
 
-type Tab = 'products' | 'sections' | 'deals' | 'services' | 'showcase' | 'reviews' | 'about';
+type Tab = 'products' | 'sections' | 'deals' | 'services' | 'showcase' | 'about';
 
 /** The main site, from wherever this store is rendered. On a subdomain the
  *  messenger and the request board live on the apex; the shared cookie keeps
@@ -71,8 +72,9 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
   const [store, setStore] = useState<MerchantStore | null>(injected ?? null);
   const [loading, setLoading] = useState(!injected);
   const [notFound, setNotFound] = useState(false);
+  // Old /reviews deep-links land on «عن المتجر», where the reviews now live.
   const [tab, setTab] = useState<Tab>(() =>
-    location.pathname.endsWith('/reviews') ? 'reviews' : location.pathname.endsWith('/about') ? 'about' : 'products'
+    location.pathname.endsWith('/reviews') || location.pathname.endsWith('/about') ? 'about' : 'products'
   );
   // The section filter lives up here: the sections TAB picks one, the
   // products tab shows it (with a clear chip).
@@ -84,7 +86,47 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
   const [services, setServices] = useState<StoreService[]>([]);
   const [showcase, setShowcase] = useState<ShowcaseItem[]>([]);
 
+  // The hearts. Public product lists carry no per-user state (§59), so a
+  // signed-in visitor's saved set is fetched once from the authed side and
+  // intersected here — the same split the follow button uses.
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
   const slug = store?.slug ?? routeSlug ?? '';
+
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    communityFavoritesApi
+      .ids()
+      .then((d) => alive && setSavedIds(new Set(d.product_ids)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  function toggleSave(productId: string) {
+    if (!user) {
+      window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    const wasSaved = savedIds.has(productId);
+    setSavedIds((s) => {
+      const n = new Set(s);
+      if (wasSaved) n.delete(productId);
+      else n.add(productId);
+      return n;
+    });
+    (wasSaved ? communityFavoritesApi.remove(productId) : communityFavoritesApi.add(productId)).catch(() => {
+      // The server disagreed — put the heart back the way it really is.
+      setSavedIds((s) => {
+        const n = new Set(s);
+        if (wasSaved) n.add(productId);
+        else n.delete(productId);
+        return n;
+      });
+    });
+  }
 
   useEffect(() => {
     if (injected) {
@@ -161,7 +203,6 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
     { id: 'deals', label: loc('العروض', 'Deals', 'ئۆفەرەکان'), show: (store.deal_count ?? 0) > 0 },
     { id: 'services', label: loc('الخدمات', 'Services', 'خزمەتگوزاری'), show: services.length > 0 },
     { id: 'showcase', label: loc('المعرض', 'Showcase', 'پیشانگا'), show: showcase.length > 0 },
-    { id: 'reviews', label: loc('التقييمات', 'Reviews', 'هەڵسەنگاندن'), show: true },
     { id: 'about', label: loc('عن المتجر', 'About', 'دەربارە'), show: true },
   ];
 
@@ -176,106 +217,119 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             <img src={store.bannerUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/30 to-transparent" />
-          {/* On the main site this page has no Header — give the visitor a way back. */}
-          {!hostStore && (
-            <Link
-              to="/community"
-              className="absolute top-3 start-3 w-9 h-9 rounded-full bg-black/45 backdrop-blur border border-white/10 flex items-center justify-center text-zinc-200"
+          {/* The reference pins the way back to the physical top-LEFT as a
+              bare glyph, and the options dots to the top-RIGHT — fixed
+              corners, not writing-direction ones. */}
+          {hostStore ? (
+            <a
+              href={`${MAIN_SITE}/community`}
+              className="absolute top-3 left-3 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
             >
-              <ArrowLeft className="w-4 h-4 rtl:rotate-180" strokeWidth={1.75} />
+              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+            </a>
+          ) : (
+            <Link
+              to="/community"
+              className="absolute top-3 left-3 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+              aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+            >
+              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
             </Link>
           )}
+          <StoreMenu url={store.url} name={store.name} loc={loc} />
         </div>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 relative">
-          {/* 2 — Avatar + name + verification. Only the avatar overlaps the
-              cover; the words stay on the dark ground below it. */}
-          <div className="flex items-end gap-3.5 mb-4">
-            <div className="relative shrink-0 -mt-11">
-              <div className={`w-[84px] h-[84px] rounded-full bg-[#0a0a0a] border-2 ${accent.ring} overflow-hidden flex items-center justify-center`}>
+          {/* 2 — Avatar + name + verification. The identity block is
+              LEFT-anchored exactly like the reference — the avatar on the
+              left edge overlapping the cover's last rows, the words in a
+              left-aligned column beside it — regardless of the UI language. */}
+          <div dir="ltr" className="flex items-start gap-4 mb-3.5 -mt-[18px] text-left">
+            <div className="relative shrink-0">
+              <div className={`w-[72px] h-[72px] rounded-full bg-[#0a0a0a] border-2 ${accent.ring} overflow-hidden flex items-center justify-center`}>
                 {store.logoUrl ? (
                   <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <Store className="w-8 h-8 text-gold" strokeWidth={1.5} />
+                  <Store className="w-7 h-7 text-gold" strokeWidth={1.5} />
                 )}
               </div>
               {store.merchant.verified && (
-                <span className="absolute bottom-0.5 end-0.5 w-6 h-6 rounded-full bg-[#0a0a0a] flex items-center justify-center">
-                  <BadgeCheck className="w-5 h-5 text-gold" />
+                <BadgeCheck className="absolute -bottom-0.5 -right-0.5 w-5 h-5 text-white fill-sky-500" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 pt-2.5">
+              <h1 className="text-white font-bold text-[17px] leading-tight truncate" dir="auto">{store.name}</h1>
+              <p className="text-zinc-400 text-[12px] truncate">@{store.slug}</p>
+              {store.merchant.rating !== null ? (
+                <span className="inline-flex items-center gap-1 text-[12.5px] mt-1">
+                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span className="text-white font-semibold">{store.merchant.rating.toFixed(1)}</span>
+                  <span className="text-zinc-500">({store.merchant.rating_count})</span>
+                  <span className="text-amber-400/80">({loc('تقييم', 'reviews', 'هەڵسەنگاندن')})</span>
+                </span>
+              ) : (
+                <span className="block text-zinc-500 text-[11.5px] mt-1">{badgeLabel(store.merchant.badge, loc)}</span>
+              )}
+              {store.merchant.verified && (
+                <span className={`block w-fit mt-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full ${accent.chip}`}>
+                  {loc('متجر موثّق', 'Verified store', 'فرۆشگای پشتڕاستکراو')}
                 </span>
               )}
             </div>
-            <div className="min-w-0 flex-1 pb-1 pt-2.5">
-              <h1 className="text-white font-bold text-[19px] leading-tight truncate">{store.name}</h1>
-              <p className="text-zinc-500 text-[12px] truncate" dir="ltr">@{store.slug}</p>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {store.merchant.rating !== null ? (
-                  <span className={`inline-flex items-center gap-1 text-[12px] font-semibold ${accent.text}`} dir="ltr">
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    {store.merchant.rating.toFixed(1)}
-                    <span className="opacity-70 font-normal">
-                      ({store.merchant.rating_count} {loc('تقييم', 'reviews', 'هەڵسەنگاندن')})
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-zinc-500 text-[11.5px]">{badgeLabel(store.merchant.badge, loc)}</span>
-                )}
-                {store.merchant.verified && (
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${accent.chip}`}>
-                    {loc('متجر موثّق', 'Verified store', 'فرۆشگای پشتڕاستکراو')}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* 3 — Three honest stats */}
-          <div className="grid grid-cols-3 divide-x divide-white/10 rtl:divide-x-reverse mb-3.5">
+          {/* 3 — Three honest stats, split by short centered hairlines */}
+          <div className="flex items-center mb-3.5">
             <ProfileStat
               value={store.positive_pct !== null && store.positive_pct !== undefined ? `${store.positive_pct}%` : '—'}
               label={loc('تقييم إيجابي', 'Positive rating', 'هەڵسەنگاندنی ئەرێنی')}
             />
+            <div className="h-6 w-px bg-white/10 shrink-0" />
             <ProfileStat value={String(store.product_count ?? 0)} label={loc('منتجات', 'Products', 'بەرهەم')} />
+            <div className="h-6 w-px bg-white/10 shrink-0" />
             <ProfileStat value={String(store.followers ?? 0)} label={loc('متابعون', 'Followers', 'شوێنکەوتوو')} />
           </div>
 
           {/* 4 — Bio */}
           {(store.description || store.tagline) && (
-            <p className="text-zinc-300 text-[12.5px] leading-relaxed text-center line-clamp-3 mb-4 px-2">
+            <p className="text-zinc-300 text-[13px] leading-snug text-center line-clamp-2 mb-4 px-2">
               {store.description || store.tagline}
             </p>
           )}
 
-          {/* 5 — The merchant's three link pills. A pill without a valid URL
-              is not rendered to visitors at all — a dead control is noise;
-              the dashboard editor still shows it for fixing. */}
+          {/* 5 — The merchant's three link pills: thin outlined stadiums, the
+              icon leading the (LTR) address text on the left, as drawn. A
+              pill without a valid URL is not rendered to visitors at all —
+              a dead control is noise; the dashboard editor still shows it
+              for fixing. */}
           {links.length > 0 && (
-            <div className={`grid gap-2 mb-2.5 ${links.length === 1 ? 'grid-cols-1' : links.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div dir="ltr" className={`grid gap-3 mb-3 px-1.5 ${links.length === 1 ? 'grid-cols-1' : links.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
               {links.map((w, i) => (
                 <a
                   key={i}
                   href={w.url}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 px-2 text-zinc-300 active:scale-[0.98] transition-transform min-w-0"
+                  className="h-7 rounded-full border border-white/15 bg-transparent flex items-center justify-center gap-1.5 px-2.5 text-zinc-200 active:scale-[0.98] transition-transform min-w-0"
                 >
-                  <WidgetIcon name={w.icon} className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
-                  <span className="text-[11.5px] font-medium truncate" dir="auto">{linkPillLabel(w)}</span>
+                  <WidgetIcon name={w.icon} className="w-3 h-3 shrink-0 text-zinc-400" />
+                  <span className="text-[12px] font-medium truncate" dir="auto">{linkPillLabel(w)}</span>
                 </a>
               ))}
             </div>
           )}
 
-          {/* 6 — The merchant's three info cards */}
+          {/* 6 — The merchant's three info cards: borderless filled tiles,
+              content centered, the icon on the row's leading side. */}
           {facts.length > 0 && (
-            <div className={`grid gap-2 mb-4 ${facts.length === 1 ? 'grid-cols-1' : facts.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div className={`grid gap-3 mb-4 ${facts.length === 1 ? 'grid-cols-1' : facts.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
               {facts.map((w, i) => (
-                <div key={i} className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 flex items-center gap-2 min-w-0">
+                <div key={i} className="rounded-[10px] bg-white/[0.05] px-2 py-2.5 flex items-center justify-center gap-2 min-w-0">
                   <WidgetIcon name={w.icon} className="w-4 h-4 shrink-0 text-zinc-400" />
                   <div className="min-w-0">
-                    <p className="text-zinc-200 text-[11px] font-semibold truncate leading-tight">{w.title}</p>
-                    {w.subtitle && <p className="text-zinc-500 text-[10px] truncate leading-tight">{w.subtitle}</p>}
+                    <p className="text-zinc-100 text-[12.5px] font-medium truncate leading-tight">{w.title}</p>
+                    {w.subtitle && <p className="text-zinc-500 text-[11px] truncate leading-tight">{w.subtitle}</p>}
                   </div>
                 </div>
               ))}
@@ -296,21 +350,26 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             </div>
           )}
 
-          {/* 7 — Actions: contact (primary), follow (outline), share */}
-          <div className="flex gap-2 mb-4">
+          {/* 7 — Actions, exactly two as drawn: the white contact button on
+              the right, and the outlined follow pill on the left with the
+              share link living inside the pill's far-left end. */}
+          <div className="flex gap-4 mb-4">
             <ContactButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} accentBtn={accent.btn} />
-            <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} />
-            <ShareButton url={store.url} name={store.name} loc={loc} />
+            <div className="relative flex-[1.08] min-w-0">
+              <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} />
+              <SharePin url={store.url} name={store.name} loc={loc} />
+            </div>
           </div>
 
-          {/* 8 — Tabs */}
-          <div className="flex gap-0.5 border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
+          {/* 8 — Tabs: spread across the width, white when active over an
+              accent-colored underline. */}
+          <div className="flex border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
             {TABS.filter((t) => t.show).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`px-3.5 py-2 text-[13px] font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                  tab === t.id ? `border-current ${accent.text}` : 'border-transparent text-zinc-500'
+                className={`flex-1 px-2.5 py-2.5 text-[13px] font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                  tab === t.id ? `text-white ${accent.line}` : 'border-transparent text-zinc-500'
                 }`}
               >
                 {t.label}
@@ -330,6 +389,8 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             sectionFilter={sectionFilter}
             onClearSection={() => setSectionFilter('')}
             accentText={accent.text}
+            savedIds={savedIds}
+            onToggleSave={toggleSave}
           />
         )}
         {tab === 'sections' && (
@@ -341,11 +402,18 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             }}
           />
         )}
-        {tab === 'deals' && <DealsTab slug={slug} open={!!store.open} />}
+        {tab === 'deals' && <DealsTab slug={slug} open={!!store.open} savedIds={savedIds} onToggleSave={toggleSave} />}
         {tab === 'services' && <ServicesTab services={services} merchantId={store.merchant.id} onHost={!!hostStore} accepts={store.accepts_custom_requests} />}
         {tab === 'showcase' && <ShowcaseTab items={showcase} />}
-        {tab === 'reviews' && <ReviewsTab slug={slug} />}
-        {tab === 'about' && <AboutTab store={store} />}
+        {tab === 'about' && (
+          <div className="space-y-4">
+            <AboutTab store={store} />
+            <div>
+              <h2 className="text-white font-bold text-[15px] mb-3">{loc('التقييمات', 'Reviews', 'هەڵسەنگاندنەکان')}</h2>
+              <ReviewsTab slug={slug} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -353,10 +421,24 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
 
 function ProfileStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="py-1 px-1 text-center min-w-0">
-      <div className="text-white font-bold text-[16px] leading-tight" dir="ltr">{value}</div>
-      <div className="text-zinc-500 text-[10.5px] truncate">{label}</div>
+    <div className="flex-1 py-1 px-1 text-center min-w-0">
+      <div className="text-white font-bold text-[14px] leading-tight" dir="ltr">{value}</div>
+      <div className="text-zinc-500 text-[11px] truncate">{label}</div>
     </div>
+  );
+}
+
+/**
+ * The profile's price line, written the way the reference writes it:
+ * the dinar marker «ع.» immediately left of the western digits. The flex
+ * row makes that ordering deterministic — bidi resolution never gets a say.
+ */
+function DinarPrice({ amount, className = '' }: { amount: number; className?: string }) {
+  return (
+    <span className={`inline-flex flex-row items-baseline ${className}`} dir="ltr">
+      <span>ع.</span>
+      <span>{Number(amount).toLocaleString('en-US')}</span>
+    </span>
   );
 }
 
@@ -426,6 +508,8 @@ function ProductsTab({
   sectionFilter,
   onClearSection,
   accentText,
+  savedIds,
+  onToggleSave,
 }: {
   slug: string;
   open: boolean;
@@ -433,6 +517,8 @@ function ProductsTab({
   sectionFilter: string;
   onClearSection: () => void;
   accentText: string;
+  savedIds: Set<string>;
+  onToggleSave: (id: string) => void;
 }) {
   const { loc, lang } = useLanguage();
   const [products, setProducts] = useState<MerchantProduct[] | null>(null);
@@ -532,18 +618,18 @@ function ProductsTab({
             <X className="w-3.5 h-3.5 text-zinc-500" />
           </button>
         ) : (
-          <h2 className="text-white font-semibold text-[14px]">
-            {loc('منتجات المتجر', 'Store products', 'بەرهەمەکانی فرۆشگا')}
+          <h2 className="text-white font-bold text-[16px]">
+            {loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}
           </h2>
         )}
         {!sectionFilter && (sorted.length > 6 || cursor) && (
-          <button onClick={() => setShowAll((v) => !v)} className={`text-[12px] font-medium ${accentText}`}>
+          <button onClick={() => setShowAll((v) => !v)} className={`text-[13px] font-medium ${accentText}`}>
             {showAll ? loc('عرض أقل', 'Show less', 'کەمتر') : loc('عرض الكل', 'View all', 'هەموو ببینە')}
           </button>
         )}
       </div>
 
-      <ProductGrid slug={slug} products={revealed} storeOpen={open} />
+      <ProductGrid slug={slug} products={revealed} storeOpen={open} savedIds={savedIds} onToggleSave={onToggleSave} />
 
       {cursor && (showAll || sectionFilter) && (
         <button
@@ -558,17 +644,48 @@ function ProductsTab({
   );
 }
 
-function ProductGrid({ slug, products, storeOpen }: { slug: string; products: MerchantProduct[]; storeOpen: boolean }) {
+function ProductGrid({
+  slug,
+  products,
+  storeOpen,
+  savedIds,
+  onToggleSave,
+}: {
+  slug: string;
+  products: MerchantProduct[];
+  storeOpen: boolean;
+  savedIds: Set<string>;
+  onToggleSave: (id: string) => void;
+}) {
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
       {products.map((p) => (
-        <ProductCard key={p.id} slug={slug} product={p} storeOpen={storeOpen} />
+        <ProductCard
+          key={p.id}
+          slug={slug}
+          product={p}
+          storeOpen={storeOpen}
+          saved={savedIds.has(p.id)}
+          onToggleSave={onToggleSave}
+        />
       ))}
     </div>
   );
 }
 
-function ProductCard({ slug, product, storeOpen }: { slug: string; product: MerchantProduct; storeOpen: boolean }) {
+function ProductCard({
+  slug,
+  product,
+  storeOpen,
+  saved,
+  onToggleSave,
+}: {
+  slug: string;
+  product: MerchantProduct;
+  storeOpen: boolean;
+  saved: boolean;
+  onToggleSave: (id: string) => void;
+}) {
   const { loc } = useLanguage();
   const { store: hostStore } = useStore();
   // On a merchant host the shop IS the site, so the product lives at /p/...
@@ -581,7 +698,7 @@ function ProductCard({ slug, product, storeOpen }: { slug: string; product: Merc
   return (
     <Link
       to={href}
-      className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden active:scale-[0.98] transition-transform"
+      className="rounded-[10px] bg-white/[0.04] overflow-hidden active:scale-[0.98] transition-transform"
     >
       <div className="aspect-square bg-black/40 overflow-hidden relative">
         {image ? (
@@ -591,13 +708,20 @@ function ProductCard({ slug, product, storeOpen }: { slug: string; product: Merc
             <ShoppingBag className="w-5 h-5 text-zinc-700" strokeWidth={1.5} />
           </div>
         )}
-        {product.featured && (
-          <span className="absolute top-1 start-1 w-5 h-5 rounded-full bg-black/60 backdrop-blur flex items-center justify-center">
-            <Star className="w-3 h-3 text-gold fill-gold" />
-          </span>
-        )}
+        {/* The heart lives on the image's physical top-left, as drawn. */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleSave(product.id);
+          }}
+          className="absolute top-1.5 left-1.5 w-[22px] h-[22px] rounded-full bg-[#10161f]/85 flex items-center justify-center"
+          aria-label={saved ? loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن') : loc('حفظ المنتج', 'Save product', 'پاشەکەوتکردن')}
+        >
+          <Heart className={`w-3 h-3 ${saved ? 'text-rose-500 fill-rose-500' : 'text-white'}`} strokeWidth={2} />
+        </button>
         {discounted && (
-          <span className="absolute top-1 end-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/85 text-white" dir="ltr">
+          <span className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/85 text-white" dir="ltr">
             −{Math.round((1 - product.price_iqd / (product.original_price_iqd as number)) * 100)}%
           </span>
         )}
@@ -607,12 +731,12 @@ function ProductCard({ slug, product, storeOpen }: { slug: string; product: Merc
           </span>
         )}
       </div>
-      <div className="px-1.5 py-1.5">
-        <p className="text-zinc-100 text-[11px] font-medium truncate leading-snug" dir="auto">{product.name}</p>
+      <div className="p-2">
+        <p className="text-zinc-300 text-[12.5px] truncate leading-snug" dir="auto">{product.name}</p>
         {/* One price line that never wraps — the −% badge already tells the
             deal story on a card this narrow. */}
-        <p className="text-gold font-semibold text-[11.5px] whitespace-nowrap mt-0.5" dir="ltr">
-          {iqd(product.price_iqd)}
+        <p className="text-zinc-400 text-[12px] whitespace-nowrap mt-0.5">
+          <DinarPrice amount={product.price_iqd} />
         </p>
       </div>
     </Link>
@@ -648,7 +772,17 @@ function SectionsTab({ sections, onPick }: { sections: StoreSection[]; onPick: (
 
 // ------------------------------------------------------------------- deals
 
-function DealsTab({ slug, open }: { slug: string; open: boolean }) {
+function DealsTab({
+  slug,
+  open,
+  savedIds,
+  onToggleSave,
+}: {
+  slug: string;
+  open: boolean;
+  savedIds: Set<string>;
+  onToggleSave: (id: string) => void;
+}) {
   const { loc } = useLanguage();
   const [products, setProducts] = useState<MerchantProduct[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -695,7 +829,7 @@ function DealsTab({ slug, open }: { slug: string; open: boolean }) {
   }
   return (
     <div className="space-y-3">
-      <ProductGrid slug={slug} products={products} storeOpen={open} />
+      <ProductGrid slug={slug} products={products} storeOpen={open} savedIds={savedIds} onToggleSave={onToggleSave} />
       {cursor && (
         <button
           onClick={loadMore}
@@ -1167,11 +1301,11 @@ function FollowButton({
     <button
       onClick={toggle}
       disabled={busy}
-      className={`flex-1 h-10 rounded-full font-medium text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50 ${
+      className={`w-full h-[30px] rounded-full font-medium text-[13px] flex items-center justify-center gap-1.5 px-9 active:scale-[0.98] transition-all disabled:opacity-50 ${
         following ? accentChip : 'border border-white/15 bg-transparent text-zinc-200'
       }`}
     >
-      {following ? <Check className="w-4 h-4" strokeWidth={1.75} /> : null}
+      {following ? <Check className="w-3.5 h-3.5" strokeWidth={1.75} /> : null}
       {following ? loc('تتابعه', 'Following', 'شوێنی کەوتوویت') : loc('تابع', 'Follow', 'شوێنکەوتن')}
     </button>
   );
@@ -1220,16 +1354,26 @@ function ContactButton({
     <button
       onClick={open}
       disabled={busy}
-      className={`flex-[1.4] h-10 rounded-full font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 ${accentBtn}`}
+      className={`flex-1 h-[30px] rounded-xl font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 ${accentBtn}`}
     >
-      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" strokeWidth={1.75} />}
+      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircleMore className="w-3.5 h-3.5" strokeWidth={1.75} />}
       {loc('تواصل مع المتجر', 'Contact the store', 'پەیوەندی بە فرۆشگا')}
     </button>
   );
 }
 
-/** Share the shop: the system sheet where it exists, the clipboard elsewhere. */
-function ShareButton({
+/** The store's address, absolute — falls back to where the visitor already is. */
+function absoluteStoreUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : window.location.href;
+}
+
+/**
+ * The chain-link pinned inside the follow pill's far-left end, as the
+ * reference draws it. It is its own control layered over the pill: tapping
+ * the glyph shares the shop (system sheet, clipboard fallback) without
+ * touching the follow state.
+ */
+function SharePin({
   url,
   name,
   loc,
@@ -1241,16 +1385,17 @@ function ShareButton({
   const [copied, setCopied] = useState(false);
 
   async function share() {
+    const target = absoluteStoreUrl(url);
     try {
       if (navigator.share) {
-        await navigator.share({ title: name, url });
+        await navigator.share({ title: name, url: target });
         return;
       }
     } catch {
       return; // the user closed the sheet — not a reason to also copy
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(target);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -1261,11 +1406,78 @@ function ShareButton({
   return (
     <button
       onClick={share}
-      className="w-10 h-10 rounded-full border border-white/15 bg-transparent text-zinc-300 flex items-center justify-center shrink-0 active:scale-[0.95] transition-transform"
+      className="absolute left-0 top-0 h-[30px] w-9 rounded-full flex items-center justify-center text-zinc-300 active:scale-[0.9] transition-transform"
       aria-label={loc('مشاركة المتجر', 'Share the store', 'هاوبەشکردن')}
     >
-      {copied ? <Check className="w-4 h-4 text-emerald-400" strokeWidth={1.75} /> : <Share2 className="w-4 h-4" strokeWidth={1.75} />}
+      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} /> : <Link2 className="w-3.5 h-3.5" strokeWidth={1.75} />}
     </button>
+  );
+}
+
+/** The «…» over the cover: share and copy-link, both real. */
+function StoreMenu({
+  url,
+  name,
+  loc,
+}: {
+  url: string;
+  name: string;
+  loc: (ar: string, en: string, ckb?: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    const target = absoluteStoreUrl(url);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: name, url: target });
+        setOpen(false);
+        return;
+      }
+    } catch {
+      setOpen(false);
+      return;
+    }
+    copy();
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(absoluteStoreUrl(url));
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+        setOpen(false);
+      }, 1200);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  return (
+    <div className="absolute top-3 right-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-[30px] h-[30px] rounded-full border border-white/20 bg-white/5 backdrop-blur flex items-center justify-center text-white"
+        aria-label={loc('خيارات المتجر', 'Store options', 'هەڵبژاردەکان')}
+      >
+        <MoreHorizontal className="w-4 h-4" strokeWidth={1.75} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div className="absolute top-[34px] right-0 z-30 w-44 rounded-xl border border-white/10 bg-[#131417] shadow-2xl overflow-hidden">
+            <button onClick={share} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10">
+              {loc('مشاركة المتجر', 'Share the store', 'هاوبەشکردنی فرۆشگا')}
+            </button>
+            <button onClick={copy} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 border-t border-white/5">
+              {copied ? loc('تم النسخ ✓', 'Copied ✓', 'کۆپی کرا ✓') : loc('نسخ الرابط', 'Copy the link', 'کۆپی بەستەر')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

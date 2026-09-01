@@ -458,6 +458,7 @@ export default function Profile() {
             { key: 'shipping', icon: Package, label: loc('الشحن', 'Shipping', 'گەیاندن'), onClick: () => go('/orders?status=to_ship') },
             { key: 'favorites', icon: Star, label: loc('المفضلة', 'Favorites', 'دڵخوازەکان'), onClick: showFavoritesTab },
             { key: 'stores', icon: Store, label: loc('متاجري', 'My stores', 'فرۆشگاکانم'), onClick: () => go('/followed-stores') },
+            { key: 'saved', icon: Heart, label: loc('المحفوظات', 'Saved', 'پاشەکەوتەکان'), onClick: () => go('/saved-items') },
             { key: 'history', icon: Clock, label: loc('الطلبات السابقة', 'Order history', 'داواکارییە پێشووەکان'), onClick: () => go('/orders') },
           ].map((a) => (
             <button

@@ -26,6 +26,7 @@ const ACCENT_SWATCHES: Array<{ id: string; cls: string; ar: string; en: string }
   { id: 'slate', cls: 'bg-slate-400', ar: 'رمادي', en: 'Slate' },
   { id: 'plum', cls: 'bg-purple-400', ar: 'بنفسجي', en: 'Plum' },
   { id: 'teal', cls: 'bg-teal-400', ar: 'فيروزي', en: 'Teal' },
+  { id: 'blue', cls: 'bg-sky-400', ar: 'أزرق', en: 'Blue' },
 ];
 
 const POLICY_PRESETS: Array<[string, string, string]> = [

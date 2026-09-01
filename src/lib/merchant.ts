@@ -339,6 +339,30 @@ export const storefrontApi = {
   showcase: (slug: string) => api.get<{ items: ShowcaseItem[] }>(`/api/storefront/${slug}/showcase`),
 };
 
+/** One saved store product, as the saved-items list renders it. */
+export interface SavedProduct {
+  product_id: string;
+  slug: string;
+  name: string;
+  name_ar: string | null;
+  image: string | null;
+  price_iqd: number;
+  original_price_iqd: number | null;
+  in_stock: boolean;
+  saved_at: string;
+  store_slug: string;
+  store_name: string;
+  store_url: string | null;
+}
+
+/** The storefront heart — per-user, so it lives outside /api/storefront. */
+export const communityFavoritesApi = {
+  list: () => api.get<{ items: SavedProduct[] }>('/api/community-favorites'),
+  ids: () => api.get<{ product_ids: string[] }>('/api/community-favorites/ids'),
+  add: (productId: string) => api.put<{ favorite: boolean }>(`/api/community-favorites/${productId}`),
+  remove: (productId: string) => api.delete<{ favorite: boolean }>(`/api/community-favorites/${productId}`),
+};
+
 /** The merchant cart + store checkout, priced entirely server-side. */
 export interface MerchantCartLine {
   cart_item_id: string;

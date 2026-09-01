@@ -29,6 +29,7 @@ import StoreCheckout from './pages/StoreCheckout';
 import Community from './pages/Community';
 import CommunityStorePage from './pages/CommunityStorePage';
 import FollowedStores from './pages/FollowedStores';
+import SavedProducts from './pages/SavedProducts';
 import Chats from './pages/Chats';
 import Chat from './pages/Chat';
 import Tools from './pages/Tools';
@@ -211,6 +212,7 @@ function AppContent() {
           <Route path="/merchant" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/followed-stores" element={<ProtectedRoute><FollowedStores /></ProtectedRoute>} />
+          <Route path="/saved-items" element={<ProtectedRoute><SavedProducts /></ProtectedRoute>} />
           {/* §8 — /chats is NOT gated: the two permanent support entries (the
               automated assistant and the real ticket flow) must be reachable
               before signing in. The page itself renders an honest signed-out
