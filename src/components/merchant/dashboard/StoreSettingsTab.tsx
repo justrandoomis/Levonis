@@ -88,6 +88,22 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
     setSaving(true);
     setError('');
     setSaved(false);
+    // The server drops title-less widgets outright; failing loudly here beats
+    // a silent disappearance after a successful-looking save.
+    const halfFilled = [...f.profile_links, ...f.profile_facts].some(
+      (w) => !w.title.trim() && ((w.url ?? '').trim() || (w.subtitle ?? '').trim())
+    );
+    if (halfFilled) {
+      setError(
+        loc(
+          'كل رابط أو بطاقة تحتاج إلى عنوان قبل الحفظ.',
+          'Each link or info card needs a title before saving.',
+          'هەر بەستەرێک یان کارتێک پێویستی بە ناونیشانە پێش پاشەکەوتکردن.'
+        )
+      );
+      setSaving(false);
+      return;
+    }
     try {
       await merchantApi.updateStore({
         name: f.name,
@@ -107,8 +123,9 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
         business_hours: f.business_hours.filter((h) => h.day.trim()),
         policies: Object.fromEntries(f.policies.filter(([k, v]) => k.trim() && v.trim())),
         social_links: Object.fromEntries(f.social_links.filter(([k, v]) => k.trim() && v.trim())),
-        profile_links: f.profile_links,
-        profile_facts: f.profile_facts,
+        // Rows the merchant never titled are simply not sent.
+        profile_links: f.profile_links.filter((w) => w.title.trim()),
+        profile_facts: f.profile_facts.filter((w) => w.title.trim()),
         delivery_settings: {
           ...(f.delivery_fee !== '' ? { fee_iqd: Number(f.delivery_fee) || 0 } : {}),
           ...(f.delivery_free_over !== '' ? { free_over_iqd: Number(f.delivery_free_over) || 0 } : {}),

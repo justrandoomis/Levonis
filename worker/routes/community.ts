@@ -55,7 +55,7 @@ communityRoutes.get('/merchants', async (c) => {
   // straight to the shop's own address; a profile-only merchant has neither
   // slug nor URL and keeps the in-site page.
   const { results } = await c.env.DB.prepare(
-    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug
+    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status
        FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
       ORDER BY cm.created_at DESC LIMIT 20`
   ).all<Record<string, unknown>>();
@@ -64,7 +64,13 @@ communityRoutes.get('/merchants', async (c) => {
     merchants: results.map((m) => ({
       ...merchantPublic(m),
       store_slug: m.store_slug ?? null,
-      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+      // A suspended store is not advertised as a destination; the card falls
+      // back to the in-site page. Paused shops keep their address — the page
+      // itself says they are closed.
+      store_url:
+        m.store_slug && m.store_status !== 'suspended'
+          ? storeUrl(String(m.store_slug), root, String(m.store_id))
+          : null,
     })),
   });
 });
@@ -172,7 +178,7 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
   const user = c.get('user')!;
   const root = rootDomainFrom(c.env);
   const { results } = await c.env.DB.prepare(
-    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug
+    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status
        FROM follows f
        JOIN community_merchants cm ON cm.id = f.merchant_id
        LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
@@ -185,7 +191,10 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
     merchants: results.map((m) => ({
       ...merchantPublic(m),
       store_slug: m.store_slug ?? null,
-      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+      store_url:
+        m.store_slug && m.store_status !== 'suspended'
+          ? storeUrl(String(m.store_slug), root, String(m.store_id))
+          : null,
     })),
   });
 });

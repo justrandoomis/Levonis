@@ -49,9 +49,18 @@ function publicStore(ctx: StoreContext, rootDomain: string | null) {
     policies: safeParse(s.policies, {}),
     social_links: safeParse(s.social_links, {}),
     // The merchant-arranged header rows. Hidden items are the merchant's
-    // drafts — a visitor never receives them at all.
+    // drafts — a visitor never receives them at all. `configured` lets the
+    // frontend tell "never arranged" (show the honest fallback) apart from
+    // "deliberately emptied" (show nothing) without leaking the drafts.
     profile_links: safeParse<Array<{ visible?: boolean }>>(s.profile_links, []).filter((w) => w?.visible !== false),
     profile_facts: safeParse<Array<{ visible?: boolean }>>(s.profile_facts, []).filter((w) => w?.visible !== false),
+    profile_facts_configured: safeParse<unknown[]>(s.profile_facts, []).length > 0,
+    // Only the customer-facing half of the delivery settings; the fee numbers
+    // are checkout's business and are priced there from the database.
+    delivery_settings: (() => {
+      const note = safeParse<Record<string, unknown>>(s.delivery_settings, {}).note;
+      return typeof note === 'string' && note ? { note } : {};
+    })(),
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
     open: storeIsOpen(ctx),
@@ -252,19 +261,22 @@ storefrontRoutes.get('/:slug/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 60, def: 24 });
   const cursor = c.req.query('cursor') || '';
   const category = c.req.query('category') || '';
+  const section = c.req.query('section') || '';
   const dealsOnly = c.req.query('deals') === '1' ? 1 : 0;
 
   // Only what the merchant published. draft, hidden and archived products are
   // invisible here — the WHERE clause is the enforcement, not a filter the
-  // caller can drop.
+  // caller can drop. The section filter is a server query so a shelf's whole
+  // contents are reachable, not just whatever slice one page happened to hold.
   const { results } = await c.env.DB.prepare(
     `SELECT * FROM community_products
       WHERE store_id = ? AND lifecycle = 'active' AND status = 'active'
         AND (? = '' OR category = ?)
+        AND (? = '' OR section_id = ?)
         AND (? = 0 OR (original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd))
         AND (? = '' OR created_at < ?)
       ORDER BY created_at DESC LIMIT ?`
-  ).bind(ctx.store.id, category, category, dealsOnly, cursor, cursor, limit).all();
+  ).bind(ctx.store.id, category, category, section, section, dealsOnly, cursor, cursor, limit).all();
 
   return c.json({
     success: true,

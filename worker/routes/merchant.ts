@@ -373,9 +373,13 @@ function sanitizeWidgets(v: unknown, kind: 'link' | 'fact'): ProfileWidget[] {
     } else {
       try {
         const u = new URL(String(r.url ?? ''));
-        if (u.protocol === 'http:' || u.protocol === 'https:') item.url = u.toString();
+        const href = u.toString();
+        // Same 300-char ceiling as sanitizeLinks: an uncapped stored URL is
+        // replayed to every visitor of a public, unauthenticated endpoint.
+        if ((u.protocol === 'http:' || u.protocol === 'https:') && href.length <= 300) item.url = href;
       } catch {
-        /* not a URL — the pill is saved but renders inert until fixed */
+        /* not a URL — the item is kept for the editor; the public page skips
+           url-less pills entirely until the merchant fixes it */
       }
     }
     out.push(item);

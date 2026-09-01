@@ -46,6 +46,8 @@ export default function CommunityStorePage() {
         if (/^https?:\/\//.test(url)) {
           try {
             if (new URL(url).origin !== window.location.origin) {
+              // Keep the loader on screen until the browser actually leaves —
+              // dropping it would flash the legacy page mid-handover.
               window.location.replace(url);
               return;
             }
@@ -54,11 +56,12 @@ export default function CommunityStorePage() {
           }
         }
         setStore(d.store);
+        setLoading(false);
       })
       .catch(() => {
         /* no store row — the legacy page below owns this case, not-found included */
-      })
-      .finally(() => alive && setLoading(false));
+        if (alive) setLoading(false);
+      });
     return () => {
       alive = false;
     };

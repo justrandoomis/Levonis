@@ -152,7 +152,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
     );
   }
 
-  const links = (store.profile_links ?? []).filter((w) => w.visible !== false).slice(0, 3);
+  const links = (store.profile_links ?? []).filter((w) => w.visible !== false && w.url).slice(0, 3);
   const facts = factsWithFallback(store, loc, lang);
 
   const TABS: Array<{ id: Tab; label: string; show: boolean }> = [
@@ -247,31 +247,23 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             </p>
           )}
 
-          {/* 5 — The merchant's three link pills */}
+          {/* 5 — The merchant's three link pills. A pill without a valid URL
+              is not rendered to visitors at all — a dead control is noise;
+              the dashboard editor still shows it for fixing. */}
           {links.length > 0 && (
             <div className={`grid gap-2 mb-2.5 ${links.length === 1 ? 'grid-cols-1' : links.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-              {links.map((w, i) =>
-                w.url ? (
-                  <a
-                    key={i}
-                    href={w.url}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                    className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 px-2 text-zinc-300 active:scale-[0.98] transition-transform min-w-0"
-                  >
-                    <WidgetIcon name={w.icon} className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
-                    <span className="text-[11.5px] font-medium truncate" dir="ltr">{w.title}</span>
-                  </a>
-                ) : (
-                  <span
-                    key={i}
-                    className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 px-2 text-zinc-500 min-w-0"
-                  >
-                    <WidgetIcon name={w.icon} className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-[11.5px] font-medium truncate" dir="ltr">{w.title}</span>
-                  </span>
-                )
-              )}
+              {links.map((w, i) => (
+                <a
+                  key={i}
+                  href={w.url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 px-2 text-zinc-300 active:scale-[0.98] transition-transform min-w-0"
+                >
+                  <WidgetIcon name={w.icon} className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
+                  <span className="text-[11.5px] font-medium truncate" dir="auto">{linkPillLabel(w)}</span>
+                </a>
+              ))}
             </div>
           )}
 
@@ -369,6 +361,26 @@ function ProfileStat({ value, label }: { value: string; label: string }) {
 }
 
 /**
+ * What a link pill SAYS must not contradict where it GOES. A free-text title
+ * («تابعنا على إنستغرام») shows as written; a title that reads like an
+ * address but names a different host than the real destination is replaced
+ * by the destination's own host — a platform-branded page must not lend its
+ * trust to «instagram.com/…» pointing somewhere else.
+ */
+function linkPillLabel(w: ProfileWidget): string {
+  if (!w.url) return w.title;
+  let host = '';
+  try {
+    host = new URL(w.url).host.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return w.title;
+  }
+  const looksLikeAddress = /^[^\s]+\.[^\s]{2,}/.test(w.title.trim());
+  if (looksLikeAddress && host && !w.title.toLowerCase().includes(host)) return host;
+  return w.title;
+}
+
+/**
  * The info cards, with an honest fallback: until the merchant arranges their
  * own three, the store's existing facts fill the row (location, coverage,
  * delivery note) — real values, never invented ones.
@@ -378,8 +390,12 @@ function factsWithFallback(
   loc: (ar: string, en: string, ckb?: string) => string,
   lang: string
 ): ProfileWidget[] {
-  const own = (store.profile_facts ?? []).filter((w) => w.visible !== false).slice(0, 3);
-  if (own.length) return own;
+  // Once the merchant has arranged this row at all, their arrangement is
+  // final — hiding every card means an intentionally empty row, and the
+  // fallback must not resurrect what they removed.
+  if (store.profile_facts_configured) {
+    return (store.profile_facts ?? []).filter((w) => w.visible !== false).slice(0, 3);
+  }
 
   const out: ProfileWidget[] = [];
   if (store.governorate) {
@@ -424,10 +440,15 @@ function ProductsTab({
   const [more, setMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
+  // The shelf filter is a SERVER query — one loaded page must never decide
+  // what a whole section appears to contain.
+  const sectionParam = sectionFilter ? `?section=${encodeURIComponent(sectionFilter)}` : '';
+
   useEffect(() => {
     let alive = true;
+    setProducts(null);
     storefrontApi
-      .products(slug)
+      .products(slug, sectionParam)
       .then((d) => {
         if (!alive) return;
         setProducts(d.products);
@@ -437,13 +458,16 @@ function ProductsTab({
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [slug, sectionParam]);
 
   async function loadMore() {
     if (!cursor) return;
     setMore(true);
     try {
-      const d = await storefrontApi.products(slug, `?cursor=${encodeURIComponent(cursor)}`);
+      const d = await storefrontApi.products(
+        slug,
+        `${sectionParam || '?'}${sectionParam ? '&' : ''}cursor=${encodeURIComponent(cursor)}`
+      );
       setProducts((p) => [...(p ?? []), ...d.products]);
       setCursor(d.next_cursor);
     } catch {
@@ -461,27 +485,40 @@ function ProductsTab({
     );
   }
 
-  if (!products.length) {
-    return (
-      <Empty
-        icon={<ShoppingBag className="w-8 h-8 text-zinc-600" strokeWidth={1.5} />}
-        text={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە')}
-      />
-    );
-  }
-
-  // The merchant's featured picks lead; within that, newest first (the
-  // server's order). Filtering by shelf comes from the sections tab.
-  const filtered = products
-    .filter((p) => !sectionFilter || p.section_id === sectionFilter)
-    .sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
-  const revealed = showAll || sectionFilter ? filtered : filtered.slice(0, 6);
   const sectionName = sectionFilter
     ? (() => {
         const s = sections.find((x) => x.id === sectionFilter);
         return s ? (lang === 'en' || !s.name_ar ? s.name : s.name_ar) : '';
       })()
     : '';
+
+  if (!products.length) {
+    return (
+      <div>
+        {sectionFilter && (
+          <button
+            onClick={onClearSection}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-white/[0.05] border border-white/10 text-zinc-200 text-[12px] font-medium mb-3"
+          >
+            <span dir="auto">{sectionName}</span>
+            <X className="w-3.5 h-3.5 text-zinc-500" />
+          </button>
+        )}
+        <Empty
+          icon={<ShoppingBag className="w-8 h-8 text-zinc-600" strokeWidth={1.5} />}
+          text={
+            sectionFilter
+              ? loc('لا توجد منتجات في هذا القسم حاليًا', 'No products in this section right now', 'لەم بەشە بەرهەم نییە')
+              : loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە')
+          }
+        />
+      </div>
+    );
+  }
+
+  // The merchant's featured picks lead; within that, the server's order.
+  const sorted = [...products].sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+  const revealed = showAll || sectionFilter ? sorted : sorted.slice(0, 6);
 
   return (
     <div>
@@ -491,15 +528,15 @@ function ProductsTab({
             onClick={onClearSection}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-white/[0.05] border border-white/10 text-zinc-200 text-[12px] font-medium"
           >
-            <span dir="ltr">{sectionName}</span>
+            <span dir="auto">{sectionName}</span>
             <X className="w-3.5 h-3.5 text-zinc-500" />
           </button>
         ) : (
           <h2 className="text-white font-semibold text-[14px]">
-            {loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}
+            {loc('منتجات المتجر', 'Store products', 'بەرهەمەکانی فرۆشگا')}
           </h2>
         )}
-        {!sectionFilter && filtered.length > 6 && (
+        {!sectionFilter && (sorted.length > 6 || cursor) && (
           <button onClick={() => setShowAll((v) => !v)} className={`text-[12px] font-medium ${accentText}`}>
             {showAll ? loc('عرض أقل', 'Show less', 'کەمتر') : loc('عرض الكل', 'View all', 'هەموو ببینە')}
           </button>
@@ -614,17 +651,37 @@ function SectionsTab({ sections, onPick }: { sections: StoreSection[]; onPick: (
 function DealsTab({ slug, open }: { slug: string; open: boolean }) {
   const { loc } = useLanguage();
   const [products, setProducts] = useState<MerchantProduct[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let alive = true;
     storefrontApi
       .products(slug, '?deals=1')
-      .then((d) => alive && setProducts(d.products))
+      .then((d) => {
+        if (!alive) return;
+        setProducts(d.products);
+        setCursor(d.next_cursor);
+      })
       .catch(() => alive && setProducts([]));
     return () => {
       alive = false;
     };
   }, [slug]);
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const d = await storefrontApi.products(slug, `?deals=1&cursor=${encodeURIComponent(cursor)}`);
+      setProducts((prev) => [...(prev ?? []), ...d.products]);
+      setCursor(d.next_cursor);
+    } catch {
+      /* keep what we have */
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   if (products === null) {
     return (
@@ -636,7 +693,20 @@ function DealsTab({ slug, open }: { slug: string; open: boolean }) {
   if (!products.length) {
     return <Empty icon={<Star className="w-8 h-8 text-zinc-600" strokeWidth={1.5} />} text={loc('لا توجد عروض حالية', 'No current deals', 'ئۆفەر نییە')} />;
   }
-  return <ProductGrid slug={slug} products={products} storeOpen={open} />;
+  return (
+    <div className="space-y-3">
+      <ProductGrid slug={slug} products={products} storeOpen={open} />
+      {cursor && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="w-full h-9 rounded-xl border border-zinc-800 text-[12px] text-zinc-300 hover:border-zinc-700 disabled:opacity-50"
+        >
+          {loadingMore ? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…') : loc('عرض المزيد', 'Show more', 'زیاتر ببینە')}
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------- services

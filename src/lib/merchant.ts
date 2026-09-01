@@ -60,6 +60,10 @@ export interface MerchantStore {
   /** The merchant-arranged header rows (visible items only on public reads). */
   profile_links?: ProfileWidget[];
   profile_facts?: ProfileWidget[];
+  /** True once the merchant has arranged the facts row at least once —
+   *  distinguishes "never configured" (honest fallback) from "deliberately
+   *  emptied" (show nothing), without leaking hidden drafts. */
+  profile_facts_configured?: boolean;
   created_at: string;
   merchant: StoreMerchantSummary;
 }
