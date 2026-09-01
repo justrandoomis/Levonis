@@ -319,9 +319,27 @@ storefrontRoutes.get('/:slug/reviews', async (c) => {
  * Compatibility: the pre-subdomain route (§57).
  * Existing links, shared messages and search results must not break, so the
  * id-based path keeps working and reports the canonical subdomain URL.
+ *
+ * The id here is ACCEPTED AS EITHER the store id or the merchant id, because
+ * the legacy links in the wild carry both: the community directory and the
+ * followed-stores list navigate by merchant id, while chat share-cards carry
+ * a store id. One store per merchant makes the double meaning unambiguous.
  */
 storefrontRoutes.get('/by-id/:storeId', async (c) => {
-  const ctx = await storeById(c.env.DB, c.req.param('storeId'));
+  const id = str(c.req.param('storeId'), 'storeId', { min: 1, max: 64 });
+  let ctx = await storeById(c.env.DB, id);
+  if (!ctx) {
+    const row = await c.env.DB.prepare(
+      'SELECT id FROM merchant_stores WHERE merchant_id = ?'
+    ).bind(id).first<{ id: string }>();
+    if (row) ctx = await storeById(c.env.DB, row.id);
+  }
   if (!ctx) throw notFound('Store not found');
-  return c.json({ success: true, store: publicStore(ctx, rootDomainFrom(c.env)) });
+  return c.json({
+    success: true,
+    store: {
+      ...publicStore(ctx, rootDomainFrom(c.env)),
+      followers: await followerCount(c.env.DB, String(ctx.merchant.id)),
+    },
+  });
 });

@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Store, Star, BadgeCheck, MapPin, Clock, ShoppingBag, Heart, MessageCircle,
   Loader2, PackageX, Share2, Check, Printer, Layers, Hammer, ArrowLeft,
@@ -265,23 +265,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
 
           <div className="flex gap-2 mb-4">
             <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} />
-            {hostStore ? (
-              <a
-                href={`${MAIN_SITE}/chats?merchant=${store.merchant.id}`}
-                className="flex-1 h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-semibold text-[12.5px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-              >
-                <MessageCircle className="w-4 h-4" />
-                {loc('مراسلة', 'Message', 'نامە')}
-              </a>
-            ) : (
-              <Link
-                to={`/chats?merchant=${store.merchant.id}`}
-                className="flex-1 h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-semibold text-[12.5px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-              >
-                <MessageCircle className="w-4 h-4" />
-                {loc('مراسلة', 'Message', 'نامە')}
-              </Link>
-            )}
+            <MessageButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} />
             <ShareButton url={store.url} name={store.name} loc={loc} />
           </div>
 
@@ -506,8 +490,23 @@ function ServicesTab({
   accepts: boolean;
 }) {
   const { loc } = useLanguage();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const requestsHref = onHost ? `${MAIN_SITE}/requests` : '/requests';
-  const chatHref = onHost ? `${MAIN_SITE}/chats?merchant=${merchantId}` : `/chats?merchant=${merchantId}`;
+
+  async function openChat() {
+    if (!user) {
+      window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    try {
+      const r = await api.post<{ chatId: string }>('/api/chats/open', { merchantId });
+      if (onHost) window.location.href = `${MAIN_SITE}/chat/${r.chatId}`;
+      else navigate(`/chat/${r.chatId}`);
+    } catch (e) {
+      if (e instanceof ApiError) alert(e.message);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -564,13 +563,13 @@ function ServicesTab({
             {loc('اطلب عرض سعر', 'Request a quote', 'داوای نرخ بکە')}
           </a>
         )}
-        <a
-          href={chatHref}
+        <button
+          onClick={openChat}
           className={`h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 ${accepts ? '' : 'col-span-2'}`}
         >
           <MessageCircle className="w-3.5 h-3.5" />
           {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
-        </a>
+        </button>
       </div>
       {accepts && (
         <p className="text-zinc-600 text-[10.5px] text-center">
@@ -751,7 +750,7 @@ function ReviewsTab({ slug }: { slug: string }) {
 // ------------------------------------------------------------------ about
 
 function AboutTab({ store }: { store: MerchantStore }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const policies = useMemo(() => Object.entries(store.policies ?? {}), [store.policies]);
   const socials = useMemo(() => Object.entries(store.social_links ?? {}), [store.social_links]);
   const delivery = (store.delivery_settings ?? {}) as Record<string, unknown>;
@@ -844,6 +843,16 @@ function AboutTab({ store }: { store: MerchantStore }) {
           </div>
         </Section>
       )}
+
+      {store.created_at && (
+        <p className="text-zinc-600 text-[11px] text-center pt-1">
+          {loc('على ليفونيس منذ', 'On Levonis since', 'لەسەر LEVONIS لە')}{' '}
+          {new Date(store.created_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-IQ', {
+            year: 'numeric',
+            month: 'long',
+          })}
+        </p>
+      )}
     </div>
   );
 }
@@ -908,6 +917,55 @@ function FollowButton({
     >
       <Heart className={`w-4 h-4 ${following ? 'fill-gold' : ''}`} />
       {following ? loc('تتابعه', 'Following', 'شوێنی کەوتوویت') : loc('متابعة', 'Follow', 'شوێنکەوتن')}
+    </button>
+  );
+}
+
+/**
+ * «مراسلة» opens the REAL conversation — one tap lands in the thread, and a
+ * second tap lands in the SAME thread (the server reuses the pair's DM).
+ * On a store subdomain the messenger lives on the apex; the shared cookie
+ * keeps the session across the hop.
+ */
+function MessageButton({
+  merchantId,
+  signedIn,
+  onHost,
+  loc,
+}: {
+  merchantId: string;
+  signedIn: boolean;
+  onHost: boolean;
+  loc: (ar: string, en: string, ckb?: string) => string;
+}) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  async function open() {
+    if (!signedIn) {
+      window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await api.post<{ chatId: string }>('/api/chats/open', { merchantId });
+      if (onHost) window.location.href = `${MAIN_SITE}/chat/${r.chatId}`;
+      else navigate(`/chat/${r.chatId}`);
+    } catch (e) {
+      if (e instanceof ApiError) alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={open}
+      disabled={busy}
+      className="flex-1 h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-semibold text-[12.5px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
+    >
+      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+      {loc('مراسلة', 'Message', 'نامە')}
     </button>
   );
 }

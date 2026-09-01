@@ -276,6 +276,8 @@ export const communityOrdersApi = {
 export const storefrontApi = {
   resolve: () => api.get<{ kind: string; store: MerchantStore | null }>('/api/storefront/resolve'),
   store: (slug: string) => api.get<{ store: MerchantStore }>(`/api/storefront/${slug}`),
+  /** Legacy-link resolution: accepts a store id OR a merchant id (§57). */
+  storeById: (id: string) => api.get<{ store: MerchantStore }>(`/api/storefront/by-id/${encodeURIComponent(id)}`),
   products: (slug: string, params = '') =>
     api.get<{ products: MerchantProduct[]; next_cursor: string | null }>(
       `/api/storefront/${slug}/products${params}`

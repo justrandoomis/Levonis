@@ -27,7 +27,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import StoreCheckout from './pages/StoreCheckout';
 import Community from './pages/Community';
-import MerchantStore from './pages/MerchantStore';
+import CommunityStorePage from './pages/CommunityStorePage';
 import FollowedStores from './pages/FollowedStores';
 import Chats from './pages/Chats';
 import Chat from './pages/Chat';
@@ -196,7 +196,10 @@ function AppContent() {
               write it performs (POST /api/community/requests) is enforced
               server-side by requireAuth alone. */}
           <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
-          <Route path="/community/store/:id" element={<MerchantStore />} />
+          {/* Resolves slug / store id / merchant id to the SAME storefront
+              profile the subdomain serves; profile-only merchants from the
+              pre-store era fall through to the legacy page inside. */}
+          <Route path="/community/store/:id" element={<CommunityStorePage />} />
           {/* The subdomain-free way into a shop. Kept working forever so
               existing links, shared messages and search results never break
               (§57); the storefront reports its canonical subdomain URL. */}

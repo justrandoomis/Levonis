@@ -112,7 +112,19 @@ chatRoutes.post('/open', async (c) => {
     return c.json({ success: true, chatId, orderId });
   }
 
-  const otherUserId = str(body.userId, 'userId', { min: 1, max: 60 });
+  // A storefront may open the conversation by MERCHANT id, so the public
+  // store payload never has to carry the merchant's account id at all.
+  let otherUserId: string;
+  if (body.merchantId !== undefined && body.userId === undefined) {
+    const merchantId = str(body.merchantId, 'merchantId', { min: 1, max: 60 });
+    const m = await c.env.DB.prepare('SELECT user_id FROM community_merchants WHERE id = ?')
+      .bind(merchantId)
+      .first<{ user_id: string }>();
+    if (!m) throw notFound('Store not found');
+    otherUserId = m.user_id;
+  } else {
+    otherUserId = str(body.userId, 'userId', { min: 1, max: 60 });
+  }
   if (otherUserId === user.id) throw badRequest('You cannot chat with yourself');
   const other = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(otherUserId).first();
   if (!other) throw notFound('User not found');
