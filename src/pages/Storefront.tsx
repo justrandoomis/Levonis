@@ -21,7 +21,7 @@
  * dashboard; the skeleton itself never moves.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Store, Star, BadgeCheck, Clock, ShoppingBag, MessageCircle, MessageCircleMore,
@@ -88,8 +88,11 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
 
   // The hearts. Public product lists carry no per-user state (§59), so a
   // signed-in visitor's saved set is fetched once from the authed side and
-  // intersected here — the same split the follow button uses.
+  // intersected here — the same split the follow button uses. One request
+  // per product may be in flight at a time; its desired state is recorded
+  // so a hydration response that raced a tap cannot wipe the tap out.
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const pendingSaves = useRef(new Map<string, boolean>());
 
   const slug = store?.slug ?? routeSlug ?? '';
 
@@ -98,7 +101,18 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
     let alive = true;
     communityFavoritesApi
       .ids()
-      .then((d) => alive && setSavedIds(new Set(d.product_ids)))
+      .then((d) => {
+        if (!alive) return;
+        setSavedIds(() => {
+          const n = new Set(d.product_ids);
+          // A toggle that raced this response is the newer truth.
+          for (const [id, want] of pendingSaves.current) {
+            if (want) n.add(id);
+            else n.delete(id);
+          }
+          return n;
+        });
+      })
       .catch(() => {});
     return () => {
       alive = false;
@@ -110,22 +124,32 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
       window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
+    // Like the follow button's busy flag: a second tap while the first
+    // request is still flying is dropped, so PUT and DELETE can never be
+    // in flight together and land out of order.
+    if (pendingSaves.current.has(productId)) return;
     const wasSaved = savedIds.has(productId);
+    const want = !wasSaved;
+    pendingSaves.current.set(productId, want);
     setSavedIds((s) => {
       const n = new Set(s);
-      if (wasSaved) n.delete(productId);
-      else n.add(productId);
+      if (want) n.add(productId);
+      else n.delete(productId);
       return n;
     });
-    (wasSaved ? communityFavoritesApi.remove(productId) : communityFavoritesApi.add(productId)).catch(() => {
-      // The server disagreed — put the heart back the way it really is.
-      setSavedIds((s) => {
-        const n = new Set(s);
-        if (wasSaved) n.add(productId);
-        else n.delete(productId);
-        return n;
+    (want ? communityFavoritesApi.add(productId) : communityFavoritesApi.remove(productId))
+      .catch(() => {
+        // The server disagreed — put the heart back the way it really is.
+        setSavedIds((s) => {
+          const n = new Set(s);
+          if (wasSaved) n.add(productId);
+          else n.delete(productId);
+          return n;
+        });
+      })
+      .finally(() => {
+        pendingSaves.current.delete(productId);
       });
-    });
   }
 
   useEffect(() => {
@@ -379,8 +403,11 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
         </div>
       </div>
 
-      {/* 9 — Tab bodies */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 relative z-10">
+      {/* 9 — Tab bodies. z-0, deliberately below the header's z-10 subtree:
+          the ... menu's close-backdrop lives inside that subtree, and being
+          a sibling stacking context at the same level would paint this whole
+          block over it — taps meant to dismiss the menu would open products. */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 relative z-0">
         {tab === 'products' && (
           <ProductsTab
             slug={slug}
