@@ -17,6 +17,7 @@
  */
 
 import { safeParse } from './types';
+import { safeLink } from './homeContent';
 import { badRequest } from './http';
 import { newId } from './crypto';
 import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields } from './pricing';
@@ -86,6 +87,34 @@ export interface ContentBlockV2 {
   url: string; // embed URL for video_embed, image URL for image
   media_key: string; // R2 key when internal
 }
+
+/**
+ * One step of the structured usage/setup guide (owner's mandate: «طريقة
+ * الاستخدام … بنقاط وكل نقطه فيها وصف وعنوان وله صور ومقطع فيديو» plus links
+ * to the official docs, e.g. wiki.bambulab.com/en/a1). `kind` splits التركيب
+ * والتنصيب (setup) from الاستخدام (usage) so the page can show installation
+ * first. Text is authored once and shown verbatim (like how_to_use); every
+ * URL is sanitized to http(s)/relative at write time — a stored guide can
+ * never carry a script URL into an href/src.
+ */
+export interface UsageStepV2 {
+  id: string;
+  kind: 'setup' | 'usage';
+  title: string; // <=200
+  body: string; // <=2000
+  images: string[]; // <=6, sanitized URLs
+  video_url: string; // '' or a sanitized URL (direct file or YouTube/Vimeo page)
+  link_url: string; // '' or a sanitized URL to the official doc for this step
+  order: number;
+}
+
+export interface UsageGuideV2 {
+  /** One official-manual link for the whole product ('' = none). */
+  official_url: string;
+  steps: UsageStepV2[];
+}
+
+export const EMPTY_USAGE_GUIDE: UsageGuideV2 = { official_url: '', steps: [] };
 
 export interface TranslationStatusEntry {
   status: 'approved' | 'imported' | 'stale' | 'missing';
@@ -159,6 +188,8 @@ export interface ProductDoc {
   payment_options: string[];
   hashtags: string[];
   how_to_use: string;
+  /** Structured setup/usage steps; how_to_use stays the plain-text fallback. */
+  usage_guide: UsageGuideV2;
   // Legacy read-only passthrough (v1 data preserved, not edited in v2 UI):
   legacy: {
     brand_text: string;
@@ -447,6 +478,44 @@ function safeParseArr(raw: unknown): unknown[] {
   return safeParse<unknown[]>(raw, []);
 }
 
+/**
+ * Structured usage/setup guide, from a stored JSON string or a request body
+ * object. Every URL passes safeLink — http(s) or a single-`/` relative path,
+ * anything else becomes '' — so a guide can never smuggle `javascript:` into
+ * an href/src. Steps with no title AND no body are dropped (an empty card
+ * teaches nothing); steps are capped at 40 and images at 6 per step.
+ */
+export function upgradeUsageGuide(raw: unknown): UsageGuideV2 {
+  const obj =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : safeParse<Record<string, unknown>>(typeof raw === 'string' ? raw : 'null', null as never) ?? null;
+  if (!obj || typeof obj !== 'object') return { ...EMPTY_USAGE_GUIDE, steps: [] };
+  const stepsRaw = Array.isArray(obj.steps) ? obj.steps : [];
+  const steps: UsageStepV2[] = stepsRaw
+    .slice(0, 40)
+    .map((item, i) => {
+      const st = (item ?? {}) as Record<string, unknown>;
+      const images = (Array.isArray(st.images) ? st.images : [])
+        .map((u) => safeLink(u))
+        .filter(Boolean)
+        .slice(0, 6);
+      return {
+        id: ensureId(st.id, 'ustep'),
+        kind: (st.kind === 'setup' ? 'setup' : 'usage') as UsageStepV2['kind'],
+        title: s(st.title, 200).trim(),
+        body: s(st.body, 2000),
+        images,
+        video_url: safeLink(st.video_url),
+        link_url: safeLink(st.link_url),
+        order: typeof st.order === 'number' ? (st.order as number) : i,
+      };
+    })
+    .filter((st) => st.title || st.body)
+    .sort((a, b) => a.order - b.order);
+  return { official_url: safeLink(obj.official_url), steps };
+}
+
 // ---------------------------------------------------------------- row → doc
 
 export function parseProductRow(row: Record<string, unknown>): ProductDoc {
@@ -492,6 +561,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     payment_options: safeParse<string[]>(row.payment_options, []),
     hashtags: safeParse<string[]>(row.hashtags, []),
     how_to_use: s(row.how_to_use, 20000),
+    usage_guide: upgradeUsageGuide(row.usage_guide),
     legacy: {
       brand_text: s(row.brand, 200),
       categories: s(row.categories, 500),
@@ -720,6 +790,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     payment_options: Array.isArray(body.payment_options) ? (body.payment_options as string[]).slice(0, 20).map((x) => s(x, 60)) : [],
     hashtags: Array.isArray(body.hashtags) ? (body.hashtags as string[]).slice(0, 30).map((x) => s(x, 60)) : [],
     how_to_use: s(body.how_to_use, 20000),
+    usage_guide: upgradeUsageGuide(body.usage_guide),
     legacy: {
       brand_text: s((body.legacy as Record<string, unknown>)?.brand_text ?? body.brand, 200),
       categories: s((body.legacy as Record<string, unknown>)?.categories ?? body.categories, 500),
@@ -778,6 +849,8 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     payment_options: JSON.stringify(doc.payment_options),
     hashtags: JSON.stringify(doc.hashtags),
     how_to_use: doc.how_to_use,
+    usage_guide:
+      doc.usage_guide.official_url || doc.usage_guide.steps.length ? JSON.stringify(doc.usage_guide) : null,
   };
 }
 
@@ -838,6 +911,7 @@ export function projectPublic(doc: ProductDoc) {
     payment_options: doc.payment_options,
     hashtags: doc.hashtags,
     how_to_use: doc.how_to_use,
+    usage_guide: doc.usage_guide,
     created_at: doc.created_at,
   };
 }
@@ -849,5 +923,5 @@ export const PRODUCT_COLUMNS = [
   'direct_surcharge_iqd','stock','low_stock_threshold','brand_id','category_id','sub_category_id',
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','content_blocks','translation_meta','is_featured',
-  'display_order','payment_options','hashtags','how_to_use',
+  'display_order','payment_options','hashtags','how_to_use','usage_guide',
 ] as const;

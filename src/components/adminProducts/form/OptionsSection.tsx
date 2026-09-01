@@ -20,11 +20,11 @@
  * admin — and the server refuses to write it either way (§11).
  */
 
-import React, { useRef, useState } from 'react';
-import { Trash2, GripVertical, ImagePlus, RefreshCw, X } from 'lucide-react';
-import { uploadFile } from '../../../lib/api';
+import React from 'react';
+import { Trash2, GripVertical } from 'lucide-react';
 import {
   Field,
+  ImgSlot,
   Grid,
   Money,
   Qty,
@@ -426,81 +426,6 @@ function AutoStockNote({ rel }: { rel: RelationsState }) {
         مصدر واحد فقط هو الحقيقة — لا تُجمع الأرقام بين المستويات. One authoritative source; levels are never summed.
       </p>
     </div>
-  );
-}
-
-/** Compact per-value / per-colour image slot: thumbnail when set, an upload
- *  button when not. The storefront shows this image the moment the customer
- *  taps the choice it belongs to. */
-function ImgSlot({
-  url,
-  label,
-  onChange,
-}: {
-  url: string;
-  label: string;
-  onChange: (url: string | null) => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(false);
-
-  const pick = async (file: File | undefined) => {
-    if (!file) return;
-    setErr(false);
-    setBusy(true);
-    try {
-      const res = await uploadFile(file, 'product');
-      onChange(res.url);
-    } catch {
-      setErr(true);
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  return (
-    <span className="relative shrink-0">
-      <input
-        ref={fileRef}
-        type="file"
-        dir="ltr"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        className="hidden"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(e) => pick(e.target.files?.[0])}
-      />
-      {url ? (
-        <span className="relative block w-10 h-10">
-          <img src={url} alt={label} className="w-10 h-10 rounded-lg object-cover border border-zinc-700" />
-          <button
-            type="button"
-            aria-label={`إزالة ${label}`}
-            onClick={() => onChange(null)}
-            className="absolute -top-1.5 -end-1.5 w-4 h-4 rounded-full bg-zinc-900 border border-zinc-600 text-zinc-300 hover:text-red-400 grid place-items-center"
-          >
-            <X className="w-2.5 h-2.5" />
-          </button>
-        </span>
-      ) : (
-        <button
-          type="button"
-          aria-label={label}
-          title={label}
-          disabled={busy}
-          onClick={() => fileRef.current?.click()}
-          className={`w-10 h-10 rounded-lg border grid place-items-center transition-colors disabled:opacity-60 ${
-            err
-              ? 'border-red-500/50 text-red-400'
-              : 'border-dashed border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500'
-          }`}
-        >
-          {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-        </button>
-      )}
-    </span>
   );
 }
 

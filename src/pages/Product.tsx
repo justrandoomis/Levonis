@@ -42,7 +42,7 @@ import { useAuth } from '../AuthContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package,
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
-  AlertTriangle, Store, ZoomIn, Image as ImageIcon,
+  AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench,
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import ReviewSection from '../components/reviews/ReviewSection';
@@ -80,7 +80,8 @@ const STRINGS = {
     warrantyFee: 'رسوم الضمان', waivedPro: 'معفاة لعضوية PRO', lineTotal: 'إجمالي البنود',
     description: 'وصف المنتج', noDescription: 'لا يوجد وصف لهذا المنتج بعد',
     specs: 'المواصفات التقنية', media: 'الصور والفيديو', reviews: 'التقييمات',
-    howToUse: 'طريقة الاستخدام',
+    howToUse: 'طريقة الاستخدام', inTheBox: 'محتويات العلبة', setupTitle: 'التركيب والتنصيب',
+    officialGuide: 'الدليل الرسمي', watchVideo: 'مشاهدة الفيديو', stepDoc: 'الشرح الرسمي لهذه الخطوة',
     serverChecks: 'يُعاد التحقق من السعر والتوفر على الخادم عند السلة وعند تأكيد الطلب.',
     // machine reasons → honest text
     OUT_OF_STOCK: 'نفد المخزون حاليًا.',
@@ -123,7 +124,8 @@ const STRINGS = {
     warrantyFee: 'Warranty fee', waivedPro: 'Waived for PRO', lineTotal: 'Line total',
     description: 'Description', noDescription: 'No description for this product yet',
     specs: 'Specifications', media: 'Photos & video', reviews: 'Reviews',
-    howToUse: 'How to use',
+    howToUse: 'How to use', inTheBox: 'In the box', setupTitle: 'Setup & installation',
+    officialGuide: 'Official guide', watchVideo: 'Watch the video', stepDoc: 'Official doc for this step',
     serverChecks: 'Price and availability are re-checked on the server at cart and at checkout.',
     OUT_OF_STOCK: 'Out of stock right now.',
     PREORDER_NOT_ENABLED: 'Pre-order is not enabled for this product.',
@@ -165,7 +167,8 @@ const STRINGS = {
     warrantyFee: 'کرێی گەرەنتی', waivedPro: 'بۆ PRO بەخشراوە', lineTotal: 'کۆی گشتی',
     description: 'باسکردن', noDescription: 'هێشتا باسکردنێک بۆ ئەم بەرهەمە نییە',
     specs: 'تایبەتمەندییە تەکنیکییەکان', media: 'وێنە و ڤیدیۆ', reviews: 'پێداچوونەوەکان',
-    howToUse: 'شێوازی بەکارهێنان',
+    howToUse: 'شێوازی بەکارهێنان', inTheBox: 'ناو سندوقەکە', setupTitle: 'دامەزراندن و ڕێکخستن',
+    officialGuide: 'ڕێبەری فەرمی', watchVideo: 'ڤیدیۆکە ببینە', stepDoc: 'بەڵگەنامەی فەرمی ئەم هەنگاوە',
     serverChecks: 'نرخ و بەردەستی لەسەر ڕاژەکار دووبارە پشکنین دەکرێن لە سەبەتە و لە کاتی داواکاری.',
     OUT_OF_STOCK: 'ئێستا لە کۆگا نییە.',
     PREORDER_NOT_ENABLED: 'پێشداواکاری بۆ ئەم بەرهەمە چالاک نەکراوە.',
@@ -228,6 +231,14 @@ interface ProductDetail {
   spec_groups?: SpecGroup[]; specifications?: Array<{ key: string; value: string }>;
   description_images?: string[]; description_videos?: string[];
   how_to_use?: string; brand?: string; stock?: number | null;
+  spec_fields?: Record<string, string>;
+  usage_guide?: {
+    official_url: string;
+    steps: Array<{
+      id: string; kind: 'setup' | 'usage'; title: string; body: string;
+      images: string[]; video_url: string; link_url: string; order: number;
+    }>;
+  };
   merchant?: { id: string; name: string; verified: boolean };
   display_price_iqd?: number;
 }
@@ -798,6 +809,20 @@ export default function Product() {
   const specGroups = (product.spec_groups ?? []).filter((g) => (g.rows ?? []).length > 0);
   const legacySpecs = product.specifications ?? [];
   const descriptionImages = product.description_images ?? [];
+  // «محتويات العلبة»: the in_the_box spec field is authored one item per
+  // line and shown as REAL bullets (the owner's «بنقاط»). Leading dash/dot
+  // markers people naturally type are stripped so bullets never double up.
+  const boxItems = (product.spec_fields?.in_the_box ?? '')
+    .split(/\r?\n/)
+    .map((t) => t.trim().replace(/^[-•·*]\s*/, ''))
+    .filter(Boolean);
+  const guideSteps = product.usage_guide?.steps ?? [];
+  const setupSteps = guideSteps.filter((st) => st.kind === 'setup');
+  const usageSteps = guideSteps.filter((st) => st.kind !== 'setup');
+  const officialUrl = product.usage_guide?.official_url || '';
+  // Direct media files play inline; page URLs (YouTube etc.) open as links —
+  // an <iframe> for arbitrary stored URLs is not worth its attack surface.
+  const isDirectVideo = (u: string) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u);
   const descriptionVideos = product.description_videos ?? [];
 
   const mode = availability?.mode ?? (source === 'community' ? 'unavailable' : 'direct_sale');
@@ -1436,9 +1461,124 @@ export default function Product() {
                 )}
               </Section>
 
-              {product.how_to_use ? (
+              {boxItems.length > 0 ? (
+                <Section title={s.inTheBox} icon={<Box aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
+                  <ul className="space-y-1.5">
+                    {boxItems.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-300 leading-relaxed">
+                        <span aria-hidden="true" className="mt-2 w-1.5 h-1.5 rounded-full bg-gold shrink-0" />
+                        <span dir="auto" className="min-w-0">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              ) : null}
+
+              {guideSteps.length > 0 || product.how_to_use ? (
                 <Section title={s.howToUse} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
-                  <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{product.how_to_use}</p>
+                  {officialUrl ? (
+                    <a
+                      href={officialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mb-3 min-h-9 px-3 rounded-lg border border-gold/40 bg-gold/10 text-gold text-[13px] font-bold hover:bg-gold/20 transition-colors"
+                    >
+                      <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
+                      {s.officialGuide}
+                    </a>
+                  ) : null}
+                  {guideSteps.length > 0 ? (
+                    <div className="space-y-4">
+                      {[
+                        { steps: setupSteps, title: s.setupTitle, icon: <Wrench aria-hidden="true" className="w-4 h-4 text-amber-300" /> },
+                        { steps: usageSteps, title: s.howToUse, icon: <Settings2 aria-hidden="true" className="w-4 h-4 text-zinc-400" /> },
+                      ]
+                        .filter((grp) => grp.steps.length > 0)
+                        .map((grp) => (
+                          <div key={grp.title} className="min-w-0">
+                            {/* One kind alone skips the redundant sub-heading. */}
+                            {setupSteps.length > 0 && usageSteps.length > 0 ? (
+                              <h4 className="flex items-center gap-1.5 text-[13px] font-bold text-white mb-2">
+                                {grp.icon}
+                                {grp.title}
+                              </h4>
+                            ) : null}
+                            <ol className="space-y-2.5">
+                              {grp.steps.map((st, i) => (
+                                <li key={st.id || i} className="rounded-xl border border-zinc-800/70 bg-zinc-900/50 p-3 min-w-0">
+                                  <div className="flex items-start gap-2.5 min-w-0">
+                                    <span
+                                      aria-hidden="true"
+                                      className="shrink-0 w-6 h-6 rounded-lg grid place-items-center text-[11px] font-black bg-gold/15 text-gold"
+                                    >
+                                      {i + 1}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      {st.title ? (
+                                        <h5 dir="auto" className="text-[13px] font-bold text-white leading-snug">{st.title}</h5>
+                                      ) : null}
+                                      {st.body ? (
+                                        <p dir="auto" className="mt-1 text-[13px] text-zinc-300 leading-relaxed whitespace-pre-line">
+                                          {st.body}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  {st.images.length > 0 ? (
+                                    <div className="mt-2.5 grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                                      {st.images.map((img, k) => (
+                                        <SafeImage
+                                          key={k}
+                                          src={img}
+                                          alt={st.title || ''}
+                                          aspect="square"
+                                          fit="cover"
+                                          className="rounded-lg border border-zinc-800"
+                                          bgClassName="bg-zinc-900"
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                  {st.video_url && isDirectVideo(st.video_url) ? (
+                                    <div className="mt-2.5 aspect-video rounded-lg overflow-hidden bg-black border border-zinc-800">
+                                      <video src={st.video_url} controls preload="none" className="w-full h-full object-contain" />
+                                    </div>
+                                  ) : null}
+                                  {(st.video_url && !isDirectVideo(st.video_url)) || st.link_url ? (
+                                    <div className="mt-2.5 flex flex-wrap gap-2">
+                                      {st.video_url && !isDirectVideo(st.video_url) ? (
+                                        <a
+                                          href={st.video_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-200 text-[12px] font-bold hover:border-zinc-500 transition-colors"
+                                        >
+                                          <PlayCircle aria-hidden="true" className="w-3.5 h-3.5" />
+                                          {s.watchVideo}
+                                        </a>
+                                      ) : null}
+                                      {st.link_url ? (
+                                        <a
+                                          href={st.link_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-200 text-[12px] font-bold hover:border-zinc-500 transition-colors"
+                                        >
+                                          <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
+                                          {s.stepDoc}
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{product.how_to_use}</p>
+                  )}
                 </Section>
               ) : null}
 

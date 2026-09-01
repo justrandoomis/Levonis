@@ -84,8 +84,17 @@ export const DEVICES: TemplateFamilyDef = {
       t('weight', 'الوزن', 'Weight', 'text', { unit: 'kg' }),
       t('connectivity', 'الاتصال', 'Connectivity'),
       t('compatibility', 'التوافق', 'Compatibility'),
+      t('display', 'الشاشة', 'Display'),
+      t('camera', 'الكاميرا', 'Camera', 'select', { options: ['Yes', 'No', 'Optional'] }),
+      t('noise_level', 'مستوى الضجيج', 'Noise level', 'number', { unit: 'dB' }),
+      t('slicer_software', 'برامج التقطيع المدعومة', 'Slicer software'),
+      t('assembly', 'الحالة عند التسليم', 'Assembly', 'select', {
+        options: ['Pre-assembled', 'Partially assembled', 'Kit'],
+      }),
       t('warranty', 'الضمان', 'Warranty', 'text', { unit: 'months' }),
-      t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline'),
+      t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline', {
+        hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
+      }),
     ],
   },
   sections: {
@@ -100,6 +109,9 @@ export const DEVICES: TemplateFamilyDef = {
         t('enclosed', 'هيكل مغلق', 'Enclosed', 'select', { options: ['Yes', 'No'] }),
         t('auto_leveling', 'التسوية التلقائية', 'Auto leveling', 'select', { options: ['Yes', 'No'] }),
         t('multi_color', 'دعم تعدد الألوان', 'Multi-colour support'),
+        t('motion_system', 'نظام الحركة', 'Motion system', 'text', { hint_ar: 'مثال: CoreXY أو Bed slinger' }),
+        t('filament_diameter', 'قطر الفلامنت', 'Filament diameter', 'text', { unit: 'mm' }),
+        t('max_flow_rate', 'أقصى معدل تدفق', 'Max flow rate', 'number', { unit: 'mm³/s' }),
       ],
     },
     'resin-printers': {
@@ -113,25 +125,32 @@ export const DEVICES: TemplateFamilyDef = {
         t('layer_height_range', 'مدى ارتفاع الطبقة', 'Layer height range', 'text', { unit: 'mm' }),
         t('light_source', 'مصدر الضوء', 'Light source'),
         t('exposure_time', 'زمن التعريض', 'Exposure time', 'text', { unit: 's' }),
+        t('uv_power', 'قدرة الضوء UV', 'UV power', 'text', { unit: 'W' }),
+        t('release_film', 'فيلم الفصل', 'Release film'),
       ],
     },
-    'fdm-printer-accessories': {
-      id: 'acc_fdm',
-      label_ar: 'ملحق FDM',
-      label_en: 'FDM accessory',
+    // The parent «ملحقات الطابعات» section: an accessory picked at the parent
+    // level (before FDM/Resin narrowing) still gets accessory fields — the
+    // owner's rule that the section RESPONDS to the branch, not just the leaf.
+    'printer-accessories': {
+      id: 'acc_common',
+      label_ar: 'بيانات الملحق',
+      label_en: 'Accessory details',
       fields: [
         t('fits_models', 'يناسب الموديلات', 'Fits models'),
         t('install_type', 'طريقة التركيب', 'Installation'),
+        t('material', 'الخامة', 'Material'),
+        t('use_case', 'الاستخدام', 'Use case'),
       ],
     },
+    // fits_models / install_type moved UP into acc_common: a leaf branch
+    // includes its parent's group too, and the same field id twice in one
+    // branch would mean a duplicated CSV column and a doubled form field.
     'resin-printer-accessories': {
       id: 'acc_resin',
       label_ar: 'ملحق Resin',
       label_en: 'Resin accessory',
-      fields: [
-        t('fits_models', 'يناسب الموديلات', 'Fits models'),
-        t('capacity', 'السعة', 'Capacity', 'text', { unit: 'L' }),
-      ],
+      fields: [t('capacity', 'السعة', 'Capacity', 'text', { unit: 'L' })],
     },
   },
 };
@@ -159,6 +178,15 @@ export const MATERIALS: TemplateFamilyDef = {
       t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm' }),
       t('finish', 'الخامة / التشطيب', 'Finish'),
       t('quantity_per_pack', 'الكمية داخل العبوة', 'Quantity per pack', 'number'),
+      t('operating_temp', 'حرارة التشغيل', 'Operating temperature', 'text', { unit: '°C' }),
+      t('storage', 'شروط التخزين', 'Storage'),
+      t('certifications', 'الشهادات', 'Certifications'),
+      // Shared with devices ON PURPOSE: a filament box and a printer box both
+      // have contents, and both templates should declare the field so imports
+      // treat it as sheet-authoritative for either family.
+      t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline', {
+        hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
+      }),
     ],
   },
   sections: {
@@ -222,6 +250,20 @@ export const MATERIALS: TemplateFamilyDef = {
         t('thread', 'القلاووظ', 'Thread'),
         t('length', 'الطول', 'Length', 'text', { unit: 'mm' }),
         t('material', 'الخامة', 'Material'),
+      ],
+    },
+    // The seeded «اكسسوارات» section (cat_accessories, materials family):
+    // general accessories get their own detail group so an accessory product
+    // is never asked filament questions.
+    accessories: {
+      id: 'acc_general',
+      label_ar: 'بيانات الإكسسوار',
+      label_en: 'Accessory details',
+      fields: [
+        t('fits_models', 'يناسب الموديلات', 'Fits models'),
+        t('install_type', 'طريقة التركيب', 'Installation'),
+        t('accessory_material', 'الخامة', 'Material'),
+        t('use_case', 'الاستخدام', 'Use case'),
       ],
     },
   },

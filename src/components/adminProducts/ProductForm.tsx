@@ -62,6 +62,7 @@ import {
   type SaleType,
 } from './form/model';
 import { OptionsSection } from './form/OptionsSection';
+import { UsageGuideSection } from './form/UsageGuideSection';
 import PricePreview from './PricePreview';
 import { ImagesSection } from './form/ImagesSection';
 
@@ -821,25 +822,28 @@ export default function ProductForm({
         <ImagesSection rel={rel} setRel={setRel} errors={showErrors ? errors : {}} />
       </SectionCard>
 
-      {/* 7 ───────────────────────────── template specs, warranty, labels */}
+      {/* 7 ── template specs (responsive to the section & branch — a Bambu
+             A1 asks printer questions, a filament asks material questions,
+             an accessory its own) + the structured usage/setup guide. */}
       <SectionCard
         n={7}
         ar="المواصفات والمحتوى الإضافي"
         en="Specifications & extras"
-        count={Object.keys(doc.spec_fields ?? {}).length}
-        summary={
+        count={Object.keys(doc.spec_fields ?? {}).length + doc.usage_guide.steps.length}
+        summary={summarize([
           tplGroups.length === 0
             ? 'اختر قسمًا لعرض حقول القالب'
-            : `${tplGroups.reduce((n, g) => n + g.fields.length, 0)} حقل`
-        }
+            : `${tplGroups.reduce((n, g) => n + g.fields.length, 0)} حقل`,
+          doc.usage_guide.steps.length ? `${doc.usage_guide.steps.length} خطوة دليل` : undefined,
+        ])}
         {...section(7)}
       >
         {tplGroups.length === 0 ? (
-          <p className="text-[12px] text-zinc-500">
+          <p className="text-[12px] text-zinc-500 mb-3">
             حقول المواصفات تتبع القسم والقالب. اختر القسم الرئيسي في القسم رقم 1 لتظهر هنا.
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 mb-4">
             {tplGroups.map((g) => (
               <div key={g.id} className="min-w-0">
                 <h4 className="text-[13px] font-bold text-zinc-300 mb-2 truncate">
@@ -889,14 +893,28 @@ export default function ProductForm({
                 </Grid>
               </div>
             ))}
-            <Field ar="طريقة الاستخدام" en="How to use (English)" span>
-              <TextArea
-                value={doc.how_to_use}
-                onChange={(e) => setDoc((d) => ({ ...d, how_to_use: e.target.value }))}
-              />
-            </Field>
           </div>
         )}
+
+        {/* The structured guide — and the legacy free text BELOW it, always
+            editable (it used to vanish for template-less products). */}
+        <UsageGuideSection
+          guide={doc.usage_guide}
+          onChange={(next) => setDoc((d) => ({ ...d, usage_guide: next }))}
+        />
+        <div className="mt-4">
+          <Field
+            ar="طريقة الاستخدام (نص حر)"
+            en="How to use (free text)"
+            hint="يُعرض للزبون فقط عندما لا توجد خطوات في الدليل أعلاه"
+            span
+          >
+            <TextArea
+              value={doc.how_to_use}
+              onChange={(e) => setDoc((d) => ({ ...d, how_to_use: e.target.value }))}
+            />
+          </Field>
+        </div>
       </SectionCard>
 
       {/* 8 ────────────────────────────────────────────── preview and save */}

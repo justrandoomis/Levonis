@@ -118,6 +118,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // pricing — IQD integers; null = inherit/none, 0 = explicit zero
   f('price_iqd', 'iqd', 'pricing', 'السعر الأساسي بالدينار — regular base price, REQUIRED integer', { required: true, min: 0, max: IQD_MAX }),
   f('pro_price_iqd', 'iqd', 'pricing', 'سعر PRO الصريح — explicit PRO price; __NULL__ = no explicit price (store policy applies, default: no discount)', { nullable: true, min: 0, max: IQD_MAX }),
+  f('prime_price_iqd', 'iqd', 'pricing', 'سعر PRIME الصريح — explicit PRIME price; __NULL__ = none (regular applies)', { nullable: true, min: 0, max: IQD_MAX }),
   f('original_price_iqd', 'iqd', 'pricing', 'السعر قبل الخصم — compare-at price; shown only when above the selling price; __NULL__ = none', { nullable: true, min: 0, max: IQD_MAX }),
   f('product_cost_iqd', 'iqd', 'pricing', 'الكلفة (داخلي) — internal cost, NEVER exposed publicly; __NULL__ = unknown', { nullable: true, min: 0, max: IQD_MAX }),
   // classification
@@ -168,6 +169,7 @@ const GROUP_SPECS: GroupSpec[] = [
       f('active', 'bool', 'options', 'فعال — active'),
       f('regular_price_iqd', 'iqd', 'options', 'يستبدل السعر الأساسي — REPLACES the base regular price; __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للخيار — __NULL__ = inherit per-field (option → base)', { nullable: true, min: 0, max: IQD_MAX }),
+      f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للخيار — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
       f('compare_at_iqd', 'iqd', 'options', 'سعر المقارنة للخيار — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'options', 'كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
     ],
@@ -187,6 +189,7 @@ const GROUP_SPECS: GroupSpec[] = [
       f('active', 'bool', 'colors', 'فعال — active'),
       f('regular_price_iqd', 'iqd', 'colors', 'يستبدل السعر (لون ← خيار ← أساسي) — REPLACES; __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('pro_price_iqd', 'iqd', 'colors', 'سعر PRO للون — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
+      f('prime_price_iqd', 'iqd', 'colors', 'سعر PRIME للون — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
       f('compare_at_iqd', 'iqd', 'colors', 'سعر المقارنة للون — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'colors', 'كلفة اللون (داخلي) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
     ],
@@ -1088,7 +1091,21 @@ export function toDocBody(
         prime_price_iqd: existing.prime_price_iqd,
         product_cost_iqd: existing.product_cost_iqd,
         selling_type: existing.selling_type,
+        // Fields the TXT registry has no keys for are CARRIED, not rebuilt —
+        // otherwise every template update silently wiped them (multi sale
+        // types collapsed to the scalar, spec fields and the section
+        // placement vanished, and the newer direct premium / usage guide
+        // would have been erased the day they were written).
+        sale_types: existing.sale_types,
+        direct_surcharge_iqd: existing.direct_surcharge_iqd,
         stock: existing.stock,
+        low_stock_threshold: existing.low_stock_threshold,
+        category_id: existing.category_id,
+        sub_category_id: existing.sub_category_id,
+        template_family: existing.template_family,
+        sku: existing.sku,
+        spec_fields: existing.spec_fields,
+        usage_guide: existing.usage_guide,
         brand_id: existing.brand_id,
         is_featured: existing.is_featured,
         display_order: existing.display_order,

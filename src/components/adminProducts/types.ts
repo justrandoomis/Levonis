@@ -61,6 +61,7 @@ export function blankDoc(): EditorDoc {
     payment_options: [],
     hashtags: [],
     how_to_use: '',
+    usage_guide: { official_url: '', steps: [] },
     catalog_ids: [],
   };
 }
@@ -83,6 +84,7 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] 
     translation_meta: p.translation_meta ?? {},
     payment_options: p.payment_options ?? [],
     hashtags: p.hashtags ?? [],
+    usage_guide: p.usage_guide ?? { official_url: '', steps: [] },
     catalog_ids: p.catalog_ids ?? [],
   } as EditorDoc;
 }

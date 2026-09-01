@@ -93,6 +93,22 @@ export interface TransportOfferV2 {
   active: boolean;
 }
 
+export interface UsageStepV2 {
+  id: string;
+  kind: 'setup' | 'usage';
+  title: string;
+  body: string;
+  images: string[];
+  video_url: string;
+  link_url: string;
+  order: number;
+}
+
+export interface UsageGuideV2 {
+  official_url: string;
+  steps: UsageStepV2[];
+}
+
 export interface ContentBlockV2 {
   id: string;
   kind: 'text' | 'image' | 'video_embed';
@@ -156,6 +172,8 @@ export interface ProductDocV2 {
   payment_options: string[];
   hashtags: string[];
   how_to_use: string;
+  /** Structured setup/usage steps; how_to_use stays the plain-text fallback. */
+  usage_guide: UsageGuideV2;
   catalog_ids?: string[];
   created_at?: string;
   updated_at?: string;

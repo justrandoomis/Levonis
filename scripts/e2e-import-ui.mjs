@@ -173,11 +173,20 @@ async function main() {
     });
     check(`${width}px — no element inside the panel spills past the viewport`, wide <= 2, `spill=${wide}px`);
 
-    const tallEnough = await page.evaluate(() => {
-      const btns = [...document.querySelectorAll('[data-panel="import-v2"] button')];
-      return btns.length ? Math.min(...btns.map((b) => b.getBoundingClientRect().height)) : 0;
+    // Same rule as e2e-product-form: INPUTS/SELECTS keep the 40px floor,
+    // BUTTONS sit at the owner's 36px scale (the density mandate shrank
+    // every admin button; 44/40px buttons were the pre-mandate standard).
+    const tall = await page.evaluate(() => {
+      const inRoot = (sel) => [...document.querySelectorAll(`[data-panel="import-v2"] ${sel}`)];
+      const min = (els) => (els.length ? Math.min(...els.map((b) => b.getBoundingClientRect().height)) : Infinity);
+      return { buttons: min(inRoot('button')), fields: min(inRoot('input:not([type="file"]),select')) };
     });
-    check(`${width}px — every control is at least 40px tall`, tallEnough >= 40, `min=${Math.round(tallEnough)}px`);
+    check(`${width}px — buttons at least 36px tall`, tall.buttons >= 36, `min=${Math.round(tall.buttons)}px`);
+    check(
+      `${width}px — inputs/selects at least 40px tall`,
+      tall.fields === Infinity || tall.fields >= 40,
+      `min=${Math.round(tall.fields)}px`
+    );
 
     await page.screenshot({ path: path.join(OUT, `import-${width}.png`) });
 

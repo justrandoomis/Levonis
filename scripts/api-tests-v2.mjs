@@ -124,9 +124,16 @@ async function main() {
   const plans = r.data?.plans ?? [];
   const plus1 = plans.find((p) => p.id === 'plus_1mo');
   const pro12 = plans.find((p) => p.id === 'pro_12mo');
-  check('plans from DB: PLUS unpriced, PRO 499000', !!plus1 && plus1.price_iqd === null && pro12?.price_iqd === 499000, JSON.stringify(plans).slice(0, 200));
+  // The owner PRICED the PLUS tier after this suite was written (task #19),
+  // so "PLUS unpriced" stopped being the truth. The durable invariant is:
+  // plans come from the DB and purchasable mirrors priced-ness exactly.
+  check('plans from DB: PRO 499000, purchasable === priced for every plan',
+    !!plus1 && pro12?.price_iqd === 499000 && plans.every((p) => p.purchasable === (p.price_iqd !== null && p.price_iqd !== undefined)),
+    JSON.stringify(plans).slice(0, 200));
   r = await buyer.post('/api/memberships/subscribe', { planId: 'plus_1mo', idempotencyKey: `k-${rnd}-1` });
-  check('unpriced plan purchase rejected (PLAN_UNPRICED)', r.status === 400 && (r.data?.code === 'PLAN_UNPRICED' || /غير متاحة|unpriced/i.test(r.data?.error ?? '')), JSON.stringify(r.data).slice(0, 140));
+  check('priced-plan purchase without balance rejected',
+    r.status === 400 && (r.data?.code === 'PLAN_UNPRICED' || r.data?.code === 'INSUFFICIENT_BALANCE' || /رصيد|balance|غير متاحة|unpriced/i.test(r.data?.error ?? '')),
+    JSON.stringify(r.data).slice(0, 140));
   r = await buyer.post('/api/memberships/subscribe', { planId: 'pro_12mo', idempotencyKey: `k-${rnd}-2` });
   check('PRO purchase without balance rejected', r.status === 400, JSON.stringify(r.data).slice(0, 120));
 
@@ -200,9 +207,12 @@ async function main() {
 
   console.log('\n— extraction v2 gates');
   r = await buyer.post('/api/admin/extract-v2', { url: 'https://example.com/x' });
-  check('extract-v2 admin-only', r.status === 403);
+  check('extract-v2 gone for non-admins too', r.status === 404 || r.status === 403);
+  // The extraction feature was REMOVED outright (a later mandate); the
+  // endpoints answering 404 is pinned by e2e-product-form and
+  // tests/migrations.test.ts — no URL ever gets fetched, SSRF included.
   r = await admin.post('/api/admin/extract-v2', { url: 'http://127.0.0.1/x' });
-  check('extract-v2 SSRF blocked', r.status === 400);
+  check('extract-v2 removed (404 — nothing is ever fetched)', r.status === 404);
 
   console.log('\n— community PLUS gate');
   const freeUser = new Client();
