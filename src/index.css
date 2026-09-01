@@ -27,6 +27,13 @@ html, body, #root {
   --color-gold: #BAA369;
   --color-gold-light: #ffe55c;
   --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
+  /* Tailwind v4's preflight sets the <html> font to var(--default-font-family,
+     <system stack>) — defining --font-sans alone only creates the `font-sans`
+     UTILITY, it does NOT change the page default. Without this line the whole
+     site silently rendered in the platform font and Cairo appeared only where
+     a component happened to carry `font-sans`. This makes Cairo the actual
+     sitewide default (the owner's explicit ask). */
+  --default-font-family: var(--font-sans);
 }
 
 @utility pb-safe {

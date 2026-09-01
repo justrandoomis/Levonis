@@ -94,10 +94,19 @@ interface FacetRow {
   active: boolean;
 }
 
+// «باقة» is gone from this list on the owner's order: bundles are now their
+// own admin-composed entity (the الباقات tab), not a per-product checkbox.
+// The backend still accepts the legacy 'bundle' value so old rows load.
 const SALE_TYPES: Array<{ id: SaleType; ar: string; en: string; sub: string }> = [
   { id: 'direct_sale', ar: 'بيع مباشر', en: 'Direct sale', sub: 'يُشحن من المخزون' },
   { id: 'pre_order', ar: 'طلب مسبق', en: 'Pre-order', sub: 'يُطلب ثم يُشحن' },
-  { id: 'bundle', ar: 'باقة', en: 'Bundle', sub: 'مجموعة منتجات' },
+];
+
+/** The three pre-order journeys, with the owner's wording. */
+const TRANSPORTS: Array<{ method: 'air' | 'sea' | 'land'; ar: string; en: string }> = [
+  { method: 'land', ar: 'بري', en: 'Land' },
+  { method: 'air', ar: 'جوي', en: 'Air' },
+  { method: 'sea', ar: 'بحري', en: 'Sea' },
 ];
 
 export default function ProductForm({
@@ -128,6 +137,15 @@ export default function ProductForm({
   const [facets, setFacets] = useState<FacetRow[]>([]);
   const [tplGroups, setTplGroups] = useState<TemplateGroup[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
+  // Hashtags always existed on the doc (round-tripped by every save) — this
+  // is their first actual INPUT: draft text, committed on Enter/comma/blur.
+  const [hashtagDraft, setHashtagDraft] = useState('');
+  const commitHashtag = () => {
+    const tag = hashtagDraft.replace(/^#/, '').trim().replace(/\s+/g, '-').slice(0, 40);
+    setHashtagDraft('');
+    if (!tag) return;
+    setDoc((d) => (d.hashtags.includes(tag) ? d : { ...d, hashtags: [...d.hashtags, tag] }));
+  };
 
   const [open, setOpen] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -394,21 +412,23 @@ export default function ProductForm({
         </Banner>
       )}
 
-      {/* 1 ─────────────────────────────────────── section, template, brand */}
+      {/* 1 ──────────────── classification: section → sub-section → brand →
+          hashtags, in that exact order (the owner's «اعد ترتيبه»). The
+          derived template and the facet filters follow as secondary rows. */}
       <SectionCard
         n={1}
-        ar="القسم والقالب والعلامة"
-        en="Section, template, brand"
+        ar="التصنيف: القسم والعلامة والهاشتاقات"
+        en="Classification"
         summary={summarize([
           catalogs.find((c) => c.id === doc.category_id)?.name_en ?? 'بلا قسم',
-          doc.template_family ?? undefined,
           brands.find((b) => b.id === doc.brand_id)?.name_en,
+          doc.hashtags.length ? `#${doc.hashtags.length}` : undefined,
         ])}
         error={showErrors && !!errors.category_id}
         {...section(1)}
       >
         <Grid cols={2}>
-          <Field ar="القسم الرئيسي" en="Main section" required error={err('category_id')}>
+          <Field ar="١· القسم الرئيسي" en="Main section" required error={err('category_id')}>
             <Select
               value={doc.category_id ?? ''}
               onChange={(e) =>
@@ -423,7 +443,7 @@ export default function ProductForm({
               ))}
             </Select>
           </Field>
-          <Field ar="القسم الفرعي" en="Sub-section" hint={doc.category_id ? undefined : 'اختر القسم الرئيسي أولًا'}>
+          <Field ar="٢· القسم الفرعي" en="Sub-section" hint={doc.category_id ? undefined : 'اختر القسم الرئيسي أولًا'}>
             <Select
               value={doc.sub_category_id ?? ''}
               disabled={!doc.category_id || children.length === 0}
@@ -437,23 +457,10 @@ export default function ProductForm({
               ))}
             </Select>
           </Field>
-          <Field
-            ar="القالب"
-            en="Template"
-            hint="يُشتق من القسم"
-            tip="القالب يحدد حقول المواصفات وأعمدة الاستيراد. يأتي من إعداد القسم في شجرة الأقسام."
-          >
-            <TextInput value={doc.template_family ?? ''} readOnly placeholder="—" />
-          </Field>
-          <Field ar="العلامة التجارية" en="Brand">
-            <div className="space-y-1.5 min-w-0">
-              <TextInput
-                value={brandSearch}
-                onChange={(e) => setBrandSearch(e.target.value)}
-                placeholder="بحث…"
-                aria-label="بحث عن علامة"
-              />
+          <Field ar="٣· العلامة التجارية" en="Brand">
+            <div className="flex gap-1.5 min-w-0">
               <Select
+                className="flex-1"
                 value={doc.brand_id ?? ''}
                 onChange={(e) => setDoc((d) => ({ ...d, brand_id: e.target.value || null }))}
               >
@@ -464,7 +471,63 @@ export default function ProductForm({
                   </option>
                 ))}
               </Select>
+              <TextInput
+                className="!w-28 shrink-0"
+                value={brandSearch}
+                onChange={(e) => setBrandSearch(e.target.value)}
+                placeholder="بحث…"
+                aria-label="بحث عن علامة"
+              />
             </div>
+          </Field>
+          <Field
+            ar="٤· الهاشتاقات"
+            en="Hashtags"
+            hint="Enter أو فاصلة لإضافة وسم"
+            tip="وسوم حرّة تُستخدم في البحث والاكتشاف. تُحفظ مع المنتج كما تكتبها."
+          >
+            <div className="min-w-0">
+              <TextInput
+                value={hashtagDraft}
+                onChange={(e) => setHashtagDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    commitHashtag();
+                  }
+                }}
+                onBlur={commitHashtag}
+                placeholder="#tag"
+              />
+              {doc.hashtags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {doc.hashtags.map((h) => (
+                    <span
+                      key={h}
+                      className="inline-flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-full px-2 h-6 text-[11px] text-zinc-200"
+                    >
+                      <span dir="ltr">#{h}</span>
+                      <button
+                        type="button"
+                        aria-label={`حذف ${h}`}
+                        className="text-zinc-500 hover:text-red-400"
+                        onClick={() => setDoc((d) => ({ ...d, hashtags: d.hashtags.filter((x) => x !== h) }))}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Field>
+          <Field
+            ar="القالب"
+            en="Template"
+            hint="يُشتق من القسم"
+            tip="القالب يحدد حقول المواصفات وأعمدة الاستيراد. يأتي من إعداد القسم في شجرة الأقسام."
+          >
+            <TextInput value={doc.template_family ?? ''} readOnly placeholder="—" />
           </Field>
         </Grid>
 
@@ -609,7 +672,7 @@ export default function ProductForm({
         {...section(4)}
       >
         {showErrors && errors.sale_types && <Banner kind="error">{errors.sale_types}</Banner>}
-        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))] mb-3">
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))] mb-2">
           {SALE_TYPES.map((t) => (
             <CheckCard
               key={t.id}
@@ -621,10 +684,100 @@ export default function ProductForm({
           ))}
         </div>
         <p className="text-[11px] text-zinc-500 mb-3">
-          يمكن تفعيل أكثر من نوع معًا. الافتراضي للعميل: بيع مباشر عند توفر المخزون، وإلا الطلب المسبق.
+          يمكن تفعيل النوعين معًا. الافتراضي للعميل: بيع مباشر عند توفر المخزون، وإلا الطلب المسبق.
         </p>
+
+        {/* Availability pricing — the owner's model: immediacy has a price
+            the way each journey has one. Direct +X, and each pre-order
+            transport its own commission. The CUSTOMER only ever sees final
+            numbers; these inputs are the admin's side of that promise. */}
+        {doc.sale_types.includes('direct_sale') && (
+          <div className="mb-3 min-w-0">
+            <Grid cols={3}>
+              <Field
+                ar="زيادة البيع المباشر"
+                en="Direct premium"
+                hint="تُضاف على السعر عند الشراء الفوري من المخزون. فارغ = بلا زيادة"
+                tip="مثال: السعر ١٠٠ ألف والزيادة ٥٠ ألفًا — يرى الزبون ١٥٠ ألفًا كسعر نهائي للبيع المباشر، ولا تُعرض له الزيادة كبند منفصل."
+              >
+                <Money
+                  value={doc.direct_surcharge_iqd}
+                  onChange={(v) => setDoc((d) => ({ ...d, direct_surcharge_iqd: v }))}
+                  placeholder="بلا زيادة"
+                />
+              </Field>
+            </Grid>
+          </div>
+        )}
+        {doc.sale_types.includes('pre_order') && (
+          <div className="mb-3 min-w-0">
+            <div className="text-[12px] font-bold text-zinc-300 mb-1.5">
+              طرق الطلب المسبق وزياداتها{' '}
+              <span className="text-[10px] font-medium text-zinc-500">Pre-order transports</span>
+            </div>
+            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]">
+              {TRANSPORTS.map((t) => {
+                const offer = doc.preorder_transports.find((o) => o.method === t.method);
+                const active = offer?.active === true;
+                return (
+                  <div
+                    key={t.method}
+                    className={`rounded-lg border p-2.5 min-w-0 ${
+                      active ? 'bg-[#6B46FF]/5 border-[#6B46FF]/40' : 'bg-zinc-800/30 border-zinc-700'
+                    }`}
+                  >
+                    <Toggle
+                      checked={active}
+                      onChange={(on) =>
+                        setDoc((d) => {
+                          const rest = d.preorder_transports.filter((o) => o.method !== t.method);
+                          const current = d.preorder_transports.find((o) => o.method === t.method);
+                          return {
+                            ...d,
+                            preorder_transports: [
+                              ...rest,
+                              { method: t.method, commission_iqd: current?.commission_iqd ?? null, active: on },
+                            ],
+                          };
+                        })
+                      }
+                      label={t.ar}
+                      sub={t.en}
+                    />
+                    {active && (
+                      <div className="mt-1.5">
+                        <Money
+                          value={offer?.commission_iqd ?? null}
+                          onChange={(v) =>
+                            setDoc((d) => ({
+                              ...d,
+                              preorder_transports: d.preorder_transports.map((o) =>
+                                o.method === t.method ? { ...o, commission_iqd: v } : o
+                              ),
+                            }))
+                          }
+                          placeholder="الافتراضي العام"
+                        />
+                        <p className="text-[10px] text-zinc-500 mt-1">الزيادة بالدينار. فارغ = القيمة الافتراضية من الإعدادات</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <Grid cols={3}>
-          <Field ar="مخزون المنتج" en="Base stock" hint={rel.inventory_mode === 'BASE' ? 'المصدر المعتمد' : 'غير مستخدم في هذا الوضع'}>
+          <Field
+            ar="مخزون المنتج"
+            en="Base stock"
+            hint={
+              rel.inventory_mode === 'BASE'
+                ? 'المصدر المعتمد حاليًا'
+                : 'مرجع عام — التوفر يُحسب من مخزون الخيارات/الألوان تلقائيًا'
+            }
+          >
             <Qty value={doc.stock} onChange={(v) => setDoc((d) => ({ ...d, stock: v }))} />
           </Field>
           <Field ar="حد التنبيه" en="Low-stock">

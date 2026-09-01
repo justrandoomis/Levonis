@@ -128,6 +128,9 @@ export interface ProductDocV2 {
   /** §6: multi-select sale types. */
   sale_types: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   preorder_transports: TransportOfferV2[];
+  /** Availability premium for direct (from-stock) fulfilment; the customer
+   *  sees only the final price. NULL/0 = none. */
+  direct_surcharge_iqd: number | null;
   stock: number | null;
   low_stock_threshold: number | null;
   brand_id: string | null;

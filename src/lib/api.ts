@@ -119,10 +119,21 @@ export interface ApiProduct {
   prime_price_iqd?: number | null;
   pro_price_iqd?: number | null;
   /** What this viewer actually pays, and the regular price it is compared
-   *  against. Compare-at (§4) no longer exists. */
+   *  against. Compare-at (§4) no longer exists. The display price is the
+   *  CHEAPEST way to buy the product — the minimum tier-resolved price
+   *  across the base row and every active option/colour. */
   display_price_iqd?: number;
   display_applied_tier?: 'regular' | 'pro' | 'prime';
   display_regular_iqd?: number;
+  /** Cheapest explicit PRIME / PRO price across levels; null = none exists.
+   *  Feed the card's faint tier-teaser lines. */
+  display_prime_iqd?: number | null;
+  display_pro_iqd?: number | null;
+  /** True when variants differ in price — the card may say «يبدأ من». */
+  display_from?: boolean;
+  /** Availability premium charged on direct (from-stock) lines; folded into
+   *  the quote's final price server-side, shown only as the final number. */
+  direct_surcharge_iqd?: number | null;
   product_cost_iqd?: number | null;
   membership_prices: { plus?: number; pro?: number };
   payment_options: string[];

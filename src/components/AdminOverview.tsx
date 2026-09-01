@@ -129,30 +129,30 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
   ) => (
     <div
       onClick={onClick}
-      className={`bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-[2rem] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex items-center gap-4 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
+      className={`bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-xl p-3 shadow-[0_4px_16px_rgba(0,0,0,0.25)] flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
     >
-      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
       <div className="min-w-0">
-        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">{label}</div>
-        <div className="text-xl font-black text-white truncate">{loading ? '…' : value}</div>
+        <div className="text-[9px] font-black uppercase tracking-wider text-zinc-500 mb-0.5">{label}</div>
+        <div className="text-[15px] font-black text-white truncate">{loading ? '…' : value}</div>
       </div>
     </div>
   );
 
   return (
-    <div className="space-y-6 text-white pb-12 font-sans" dir={dir}>
+    <div className="space-y-4 text-white pb-10 font-sans" dir={dir}>
 
       {/* Top Bar */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 bg-zinc-900/90 border border-zinc-800 p-4 sm:p-5 rounded-3xl shadow-2xl backdrop-blur-xl">
-        <div className="flex items-center gap-4 w-full lg:w-auto">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#c5a059] via-[#e6c27a] to-[#708238] flex items-center justify-center shadow-lg shadow-[#c5a059]/30 shrink-0 font-black text-xl text-white">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-3 bg-zinc-900/90 border border-zinc-800 p-3 rounded-2xl shadow-xl backdrop-blur-xl">
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#c5a059] via-[#e6c27a] to-[#708238] flex items-center justify-center shadow-lg shadow-[#c5a059]/30 shrink-0 font-black text-sm text-white">
             L
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+            <h1 className="text-base font-black text-white flex items-center gap-2">
               {dir === 'rtl' ? 'لوحة القيادة والإحصائيات' : 'Executive Overview Dashboard'}
             </h1>
-            <p className="text-xs text-zinc-400 font-medium">
+            <p className="text-[11px] text-zinc-400 font-medium">
               {dir === 'rtl' ? 'إحصائيات حقيقية من قاعدة البيانات' : 'Live figures straight from the database'}
             </p>
           </div>
@@ -162,7 +162,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           <button
             onClick={fetchOverviewData}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-2xl text-zinc-300 hover:text-white transition-all shadow-sm active:scale-95 disabled:opacity-50 text-xs font-bold"
+            className="flex items-center gap-1.5 px-3 py-1.5 min-h-9 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white transition-all shadow-sm active:scale-95 disabled:opacity-50 text-[11px] font-bold"
             title={dir === 'rtl' ? 'تحديث البيانات' : 'Refresh Data'}
           >
             <Zap className="w-4 h-4 text-[#708238]" />
@@ -172,13 +172,15 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-3xl p-5 text-sm font-medium">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[13px] font-medium">
           {error}
         </div>
       )}
 
-      {/* Stat cards — all values come from GET /api/admin/overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      {/* Stat cards — all values come from GET /api/admin/overview.
+          iPad portrait (768-1024) gets 3 columns and landscape 4: the old
+          2-column xl-gated grid stacked 11 cards into six huge rows there. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
         {statCard(
           dir === 'rtl' ? 'إجمالي الإيرادات' : 'Total Revenue',
           formatIqd(stats.revenue_iqd),
@@ -251,12 +253,12 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 lg:gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
         {/* Pending wallet requests — real list with working actions */}
-        <div className="bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-[2rem] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300">
+        <div className="bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests'}
             </h3>
             {onNavigateTab && (
@@ -278,7 +280,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           ) : (
             <div className="space-y-3">
               {pendingWalletRequests.map((req) => (
-                <div key={req.id} className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
+                <div key={req.id} className="p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-lg">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-bold text-white text-sm truncate flex items-center gap-2">
@@ -319,9 +321,9 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         </div>
 
         {/* Recent orders — real list */}
-        <div className="bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-[2rem] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300">
+        <div className="bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'أحدث الطلبات' : 'Recent Orders'}
             </h3>
             {onNavigateTab && (
@@ -345,7 +347,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
               {recentOrders.map((o) => (
                 <div
                   key={o.id}
-                  className="flex items-center justify-between gap-3 p-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl"
+                  className="flex items-center justify-between gap-3 p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-lg"
                 >
                   <div className="min-w-0">
                     <div className="font-mono text-xs text-zinc-300 truncate">{o.id}</div>

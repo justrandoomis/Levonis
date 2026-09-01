@@ -2,8 +2,11 @@
  * Primitives for the rebuilt product form — mandate §1.
  *
  * The sizing rules are not decoration, they are the acceptance criteria:
- *   - a control is 44px tall (h-11) and its text is 14–16px: big enough to
- *     tap on an iPad, small enough that a section fits on one screen;
+ *   - a control is 40px tall (h-10) and its text is 13–14px. 40px is the
+ *     floor the §12 suite enforces (every input/select >= 40px at five
+ *     widths); the owner reviewed the 44px version on an iPad and asked for
+ *     smaller controls and smaller text everywhere, so the panel sits at the
+ *     floor, not above it. Buttons are not inputs and may go to 36px;
  *   - a textarea starts at a usable height and STOPS growing (max-h + scroll),
  *     so one long description cannot push the save bar off the page;
  *   - every grid track is minmax(0,1fr) and every flex child that holds text
@@ -18,27 +21,27 @@
 import React, { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, Info } from 'lucide-react';
 
-/** 44px control, 14px text, never wider than its track. */
+/** 40px control (the §12 floor), 13px text, never wider than its track. */
 export const field =
-  'w-full min-w-0 h-11 bg-zinc-800/40 border border-zinc-700 rounded-lg px-3 text-sm text-white ' +
+  'w-full min-w-0 h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white ' +
   'placeholder:text-zinc-600 focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none ' +
   'transition-colors disabled:opacity-50';
 
 /** Same, for a multi-line value that must not grow without bound. */
 export const area =
-  'w-full min-w-0 min-h-[96px] max-h-[240px] overflow-y-auto bg-zinc-800/40 border border-zinc-700 rounded-lg ' +
-  'px-3 py-2 text-sm leading-relaxed text-white placeholder:text-zinc-600 focus:border-[#6B46FF] ' +
+  'w-full min-w-0 min-h-[88px] max-h-[240px] overflow-y-auto bg-zinc-800/40 border border-zinc-700 rounded-lg ' +
+  'px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-zinc-600 focus:border-[#6B46FF] ' +
   'focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-colors resize-y';
 
 export const btn =
-  'inline-flex items-center justify-center gap-1.5 h-11 px-3.5 rounded-lg text-sm font-bold transition-colors ' +
+  'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-bold transition-colors ' +
   'disabled:opacity-50 disabled:cursor-not-allowed shrink-0';
 export const btnPrimary = `${btn} bg-[#6B46FF] hover:bg-[#5a3ae0] text-white`;
 export const btnGhost = `${btn} bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700`;
 export const btnDanger = `${btn} bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30`;
-/** A small square icon button that still meets the 44px touch target. */
+/** A small square icon button, matched to the 36px button row. */
 export const iconBtn =
-  'inline-flex items-center justify-center w-11 h-11 rounded-lg text-zinc-400 hover:text-white ' +
+  'inline-flex items-center justify-center w-9 h-9 rounded-lg text-zinc-400 hover:text-white ' +
   'hover:bg-zinc-800 transition-colors shrink-0';
 
 /**
@@ -83,9 +86,9 @@ export function Field({
   const id = useId();
   return (
     <div className={`min-w-0 ${span ? 'md:col-span-2 xl:col-span-3' : ''}`}>
-      <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
-        <label htmlFor={id} className="text-[13px] font-bold text-zinc-300 truncate">
-          {ar} <span className="text-[11px] font-medium text-zinc-500">{en}</span>
+      <div className="flex items-center gap-1.5 mb-1 min-w-0">
+        <label htmlFor={id} className="text-[12px] font-bold text-zinc-300 truncate">
+          {ar} <span className="text-[10px] font-medium text-zinc-500">{en}</span>
           {required && <span className="text-red-400 ms-1">*</span>}
         </label>
         {tip && (
@@ -209,7 +212,7 @@ export function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`flex items-center justify-between gap-3 w-full min-w-0 h-11 px-3 rounded-lg border text-sm text-start transition-colors ${
+      className={`flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border text-[13px] text-start transition-colors ${
         checked ? 'bg-[#6B46FF]/10 border-[#6B46FF]/50 text-white' : 'bg-zinc-800/40 border-zinc-700 text-zinc-300'
       }`}
     >
@@ -246,7 +249,7 @@ export function CheckCard({
       role="checkbox"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`min-w-0 text-start rounded-lg border p-3 transition-colors ${
+      className={`min-w-0 text-start rounded-lg border p-2.5 transition-colors ${
         checked
           ? 'bg-[#6B46FF]/10 border-[#6B46FF]/60'
           : 'bg-zinc-800/30 border-zinc-700 hover:border-zinc-600'
@@ -264,9 +267,9 @@ export function CheckCard({
             </svg>
           )}
         </span>
-        <span className="text-sm font-bold text-white truncate">{title}</span>
+        <span className="text-[13px] font-bold text-white truncate">{title}</span>
       </span>
-      {sub && <span className="block mt-1 text-[11px] text-zinc-500 truncate">{sub}</span>}
+      {sub && <span className="block mt-0.5 text-[10px] text-zinc-500 truncate">{sub}</span>}
     </button>
   );
 }
@@ -313,24 +316,24 @@ export function SectionCard({
         data-section-toggle={n}
         aria-expanded={open}
         onClick={onToggle}
-        className="w-full min-w-0 flex items-center gap-2.5 px-3 h-12 text-start hover:bg-zinc-800/30 transition-colors"
+        className="w-full min-w-0 flex items-center gap-2 px-2.5 h-10 text-start hover:bg-zinc-800/30 transition-colors"
       >
         <span
-          className={`shrink-0 w-6 h-6 rounded-md grid place-items-center text-[11px] font-black ${
+          className={`shrink-0 w-5 h-5 rounded-md grid place-items-center text-[10px] font-black ${
             open ? 'bg-[#6B46FF] text-white' : 'bg-zinc-800 text-zinc-400'
           }`}
         >
           {n}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-bold text-white truncate">
+          <span className="block text-[12px] font-bold text-white truncate">
             {ar}
             {/* The English secondary is dropped on a phone: at 360-390px it
                 pushed the Arabic title into an ellipsis, and the number plus
                 the Arabic title already identify the section. */}
-            <span className="hidden sm:inline text-[11px] font-medium text-zinc-500"> {en}</span>
+            <span className="hidden sm:inline text-[10px] font-medium text-zinc-500"> {en}</span>
           </span>
-          {!open && summary && <span className="block text-[11px] text-zinc-500 truncate">{summary}</span>}
+          {!open && summary && <span className="block text-[10px] text-zinc-500 truncate">{summary}</span>}
         </span>
         {count !== undefined && count > 0 && (
           <span className="shrink-0 min-w-6 h-5 px-1.5 rounded-full bg-zinc-800 text-[11px] font-bold text-zinc-300 grid place-items-center">
@@ -364,8 +367,8 @@ export function Repeater({
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-        <h4 className="text-[13px] font-bold text-zinc-300 truncate">{title}</h4>
-        <button type="button" onClick={onAdd} className={`${btnGhost} h-9 px-2.5 text-[12px]`}>
+        <h4 className="text-[12px] font-bold text-zinc-300 truncate">{title}</h4>
+        <button type="button" onClick={onAdd} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
           + {addLabel}
         </button>
       </div>

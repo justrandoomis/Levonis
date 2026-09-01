@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import AdminCoupons from '../components/adminCoupons/AdminCoupons';
 import AdminDelivery from '../components/adminDelivery/AdminDelivery';
 import AdminCommunity from '../components/adminCommunity/AdminCommunity';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import AdminProducts from '../components/AdminProducts';
+import AdminBundles from '../components/AdminBundles';
 import AdminAds from '../components/AdminAds';
 import AdminHomeSettings from '../components/AdminHomeSettings';
 import AdminOverview from '../components/AdminOverview';
@@ -25,6 +26,7 @@ type AdminTab =
   | 'overview'
   | 'orders'
   | 'products'
+  | 'bundles'
   | 'home_settings'
   | 'users'
   | 'wallet_requests'
@@ -166,7 +168,7 @@ function AdminOrders() {
           const next = e.target.value as ApiOrder['status'];
           if (next) handleStatusChange(o, next);
         }}
-        className="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-2 min-h-[44px] focus:outline-none focus:ring-1 focus:ring-olive disabled:opacity-50 w-full sm:w-auto"
+        className="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-2 min-h-10 focus:outline-none focus:ring-1 focus:ring-olive disabled:opacity-50 w-full sm:w-auto"
       >
         <option value="" disabled>
           {updatingId === o.id
@@ -191,7 +193,7 @@ function AdminOrders() {
       // Solid, not a 15%-opacity tint. This is the one control the owner comes
       // to this screen for, and on a dark card the tinted version read as
       // disabled next to a full-width status dropdown.
-      className="min-h-[44px] px-5 rounded-xl bg-olive text-white text-xs font-bold hover:bg-olive-light transition-colors whitespace-nowrap shadow-sm"
+      className="min-h-9 px-3.5 rounded-lg bg-olive text-white text-xs font-bold hover:bg-olive-light transition-colors whitespace-nowrap shadow-sm"
     >
       {loc('تجهيز', 'Prepare', 'ئامادەکردن')}
     </button>
@@ -203,7 +205,7 @@ function AdminOrders() {
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 min-w-0">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-black text-white">{loc('الطلبات', 'Orders', 'داواکارییەکان')}</h2>
+          <h2 className="text-lg font-black text-white">{loc('الطلبات', 'Orders', 'داواکارییەکان')}</h2>
           <div className="flex items-center gap-2 shrink-0">
             {/* Stickers for the orders not yet dispatched. "New" is decided
                 on the SERVER (stage received or confirmed) — printing a
@@ -215,7 +217,7 @@ function AdminOrders() {
               target="_blank"
               rel="noopener noreferrer"
               data-print-new-labels
-              className="inline-flex items-center gap-2 min-h-[44px] px-3.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-200 hover:text-white text-[13px] font-bold transition-colors whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 min-h-9 px-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-200 hover:text-white text-[13px] font-bold transition-colors whitespace-nowrap"
               title={loc('طباعة ستيكرات الطلبات الجديدة', 'Print labels for new orders', 'چاپکردنی ستیکەری داواکارییە نوێیەکان')}
             >
               <Tag className="w-4 h-4" aria-hidden />
@@ -248,7 +250,7 @@ function AdminOrders() {
                   setStatusFilter(f);
                   setPage(0);
                 }}
-                className={`px-3 min-h-[44px] rounded-lg text-xs font-bold capitalize transition-colors whitespace-nowrap shrink-0 ${
+                className={`px-2.5 min-h-9 rounded-lg text-xs font-bold capitalize transition-colors whitespace-nowrap shrink-0 ${
                   statusFilter === f ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
@@ -315,7 +317,7 @@ function AdminOrders() {
       </div>
 
       {/* -------------------------------------------- tablet and up: TABLE */}
-      <div className="hidden sm:block bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden min-w-0">
+      <div className="hidden sm:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden min-w-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[820px]">
             <thead>
@@ -330,7 +332,7 @@ function AdminOrders() {
                   loc('تغيير', 'Change', 'گۆڕین'),
                   loc('تجهيز', 'Prepare', 'ئامادەکردن'),
                 ].map((h) => (
-                  <th key={h} className="py-4 px-5 text-xs font-bold text-zinc-400 uppercase tracking-wider whitespace-nowrap">
+                  <th key={h} className="py-2.5 px-3 text-[11px] font-bold text-zinc-400 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -339,27 +341,27 @@ function AdminOrders() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
-                  <td className="py-4 px-5 font-mono text-xs text-zinc-300" dir="ltr">{o.id}</td>
-                  <td className="py-4 px-5 text-sm text-zinc-300">{o.email || o.username || o.user_id || '—'}</td>
-                  <td className="py-4 px-5 text-sm text-zinc-400">{o.items?.length ?? 0}</td>
-                  <td className="py-4 px-5 text-sm font-bold text-white whitespace-nowrap" dir="ltr">
+                  <td className="py-2.5 px-3 font-mono text-[11px] text-zinc-300" dir="ltr">{o.id}</td>
+                  <td className="py-2.5 px-3 text-[13px] text-zinc-300">{o.email || o.username || o.user_id || '—'}</td>
+                  <td className="py-2.5 px-3 text-[13px] text-zinc-400">{o.items?.length ?? 0}</td>
+                  <td className="py-2.5 px-3 text-[13px] font-bold text-white whitespace-nowrap" dir="ltr">
                     {formatIqd(o.total_iqd)}
                   </td>
-                  <td className="py-4 px-5 text-xs text-zinc-500 whitespace-nowrap">
+                  <td className="py-2.5 px-3 text-[11px] text-zinc-500 whitespace-nowrap">
                     {new Date(o.created_at).toLocaleDateString()}
                   </td>
-                  <td className="py-4 px-5">
+                  <td className="py-2.5 px-3">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${STATUS_COLORS[o.status]}`}>
                       {statusLabel(o.status)}
                     </span>
                   </td>
-                  <td className="py-4 px-5">
+                  <td className="py-2.5 px-3">
                     <StatusSelect o={o} />
                     {rowError?.id === o.id && (
                       <div className="text-[11px] text-red-400 mt-1 max-w-[220px]">{rowError.message}</div>
                     )}
                   </td>
-                  <td className="py-4 px-5">
+                  <td className="py-2.5 px-3">
                     <PrepareButton o={o} />
                   </td>
                 </tr>
@@ -391,7 +393,7 @@ function AdminOrders() {
             data-orders-prev
             disabled={page === 0 || loading}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
-            className="min-h-[44px] px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-sm font-bold text-zinc-300 disabled:opacity-40 hover:text-white transition-colors"
+            className="min-h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-[13px] font-bold text-zinc-300 disabled:opacity-40 hover:text-white transition-colors"
           >
             {loc('السابق', 'Previous', 'پێشوو')}
           </button>
@@ -403,7 +405,7 @@ function AdminOrders() {
             data-orders-next
             disabled={page + 1 >= pages || loading}
             onClick={() => setPage((p) => p + 1)}
-            className="min-h-[44px] px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-sm font-bold text-zinc-300 disabled:opacity-40 hover:text-white transition-colors"
+            className="min-h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-[13px] font-bold text-zinc-300 disabled:opacity-40 hover:text-white transition-colors"
           >
             {loc('التالي', 'Next', 'دواتر')}
           </button>
@@ -434,6 +436,7 @@ export default function Admin() {
     { id: 'orders', icon: ClipboardList, label: dir === 'rtl' ? 'الطلبات' : 'Orders' },
     { id: 'wallet_requests', icon: Bell, label: 'Wallet Requests' },
     { id: 'products', icon: Package, label: t('adminProducts') },
+    { id: 'bundles', icon: Boxes, label: dir === 'rtl' ? 'الباقات' : 'Bundles' },
     { id: 'home_settings', icon: LayoutList, label: dir === 'rtl' ? 'اعدادات الرئيسية' : 'Home Settings' },
     { id: 'users', icon: Users, label: t('adminUsers') },
     { id: 'wallet_settings', icon: Wallet, label: 'Wallet Settings' },
@@ -455,7 +458,7 @@ export default function Admin() {
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-3xl p-6 md:p-8 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
 
         {activeTab === 'overview' && (
           <AdminOverview onNavigateTab={(tab) => setActiveTab(tab as AdminTab)} />
@@ -468,6 +471,8 @@ export default function Admin() {
         {activeTab === 'products' && (
           <AdminProducts />
         )}
+
+        {activeTab === 'bundles' && <AdminBundles />}
         {activeTab === 'ads' && (
           <AdminAds />
         )}

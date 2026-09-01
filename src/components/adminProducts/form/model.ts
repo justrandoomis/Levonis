@@ -273,9 +273,26 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
 
 /** The PUT payload. Sort orders are re-derived from array position, so drag
  *  reordering IS the stored order and no stale index can survive. */
+/**
+ * The inventory source is DERIVED, never hand-picked (the owner's rule:
+ * «المخزون يعتمد على الخيار او اللون المختار تلقائيًا وليس يدويًا من قبل
+ * الادمن»). The most specific level that actually carries a stock number
+ * wins: any colour stock → COLOR, else any option-value stock → OPTION,
+ * else the product's base number (BASE). A product already living on
+ * combinations keeps VARIANT_COMBINATION — tearing that down implicitly
+ * would zero real reservations. The server model (one authoritative level,
+ * levels never summed) is untouched; only WHO chooses the level changed.
+ */
+export function deriveInventoryMode(rel: RelationsState): InventoryMode {
+  if (rel.inventory_mode === 'VARIANT_COMBINATION' && rel.variants.length > 0) return 'VARIANT_COMBINATION';
+  if (rel.colors.some((c) => c.stock !== null)) return 'COLOR';
+  if (rel.groups.some((g) => g.values.some((v) => v.stock !== null))) return 'OPTION';
+  return 'BASE';
+}
+
 export function relationsToWire(rel: RelationsState) {
   return {
-    inventory_mode: rel.inventory_mode,
+    inventory_mode: deriveInventoryMode(rel),
     groups: rel.groups.map((g, gi) => ({
       id: g.id,
       name_en: g.name_en,

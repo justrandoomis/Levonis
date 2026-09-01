@@ -128,6 +128,11 @@ export interface ProductDoc {
   /** §6: a product may offer several sale types at once. Never empty. */
   sale_types: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   preorder_transports: TransportOffer[];
+  /** Availability premium for DIRECT fulfilment (ships from stock now),
+   *  priced by the admin alongside the per-transport commissions. NULL/0 =
+   *  none. Folded into unit_subtotal by the resolver on direct lines only —
+   *  the customer sees the final price, never the premium as a line item. */
+  direct_surcharge_iqd: number | null;
   stock: number | null;
   /** Warn level for the BASE stock row; null = no warning configured. */
   low_stock_threshold: number | null;
@@ -464,6 +469,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     selling_type: row.selling_type === 'pre_order' || row.selling_type === 'bundle' ? row.selling_type : 'direct_sale',
     sale_types: normalizeSaleTypes(row.sale_types, String(row.selling_type ?? 'direct_sale')),
     preorder_transports: upgradeTransports(row.preorder_transports),
+    direct_surcharge_iqd: num(row.direct_surcharge_iqd),
     stock: num(row.stock),
     low_stock_threshold: num(row.low_stock_threshold),
     brand_id: typeof row.brand_id === 'string' && row.brand_id ? row.brand_id : null,
@@ -688,6 +694,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     selling_type: sellingType as ProductDoc['selling_type'],
     sale_types: normalizeSaleTypes(body.sale_types, sellingType as string),
     preorder_transports: transports,
+    direct_surcharge_iqd: optionalPrice(body.direct_surcharge_iqd, 'direct_surcharge_iqd'),
     stock: stock as number | null,
     low_stock_threshold: optionalPrice(body.low_stock_threshold, 'low_stock_threshold'),
     brand_id: typeof body.brand_id === 'string' && body.brand_id ? (body.brand_id as string) : null,
@@ -749,6 +756,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     selling_type: doc.sale_types[0] ?? doc.selling_type,
     sale_types: JSON.stringify(doc.sale_types),
     preorder_transports: JSON.stringify(doc.preorder_transports),
+    direct_surcharge_iqd: doc.direct_surcharge_iqd,
     stock: doc.stock,
     low_stock_threshold: doc.low_stock_threshold,
     brand_id: doc.brand_id,
@@ -807,6 +815,8 @@ export function projectPublic(doc: ProductDoc) {
     selling_type: doc.selling_type,
     sale_types: doc.sale_types,
     preorder_transports: doc.preorder_transports.filter((t) => t.active),
+    // A price component (availability premium), not a cost — safe to show.
+    direct_surcharge_iqd: doc.direct_surcharge_iqd,
     stock: doc.stock,
     low_stock_threshold: doc.low_stock_threshold,
     brand_id: doc.brand_id,
@@ -836,7 +846,7 @@ export const PRODUCT_COLUMNS = [
   'id','slug','status','doc_version','content_rev','name','name_ar','name_ku',
   'description','description_ar','description_ku','price_iqd','pro_price_iqd',
   'prime_price_iqd','product_cost_iqd','selling_type','sale_types','preorder_transports',
-  'stock','low_stock_threshold','brand_id','category_id','sub_category_id',
+  'direct_surcharge_iqd','stock','low_stock_threshold','brand_id','category_id','sub_category_id',
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','content_blocks','translation_meta','is_featured',
   'display_order','payment_options','hashtags','how_to_use',

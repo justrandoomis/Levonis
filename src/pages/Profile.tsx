@@ -45,7 +45,8 @@ interface MembershipMine {
 
 export default function Profile() {
   const [suggestedProducts, setSuggestedProducts] = useState<ApiProduct[]>([]);
-  const [bundles, setBundles] = useState<ApiProduct[]>([]);
+  // Bundle ENTITIES from /api/bundles (members-only; the server gates).
+  const [bundles, setBundles] = useState<Array<{ id: string; name: string; image: string; total_display_iqd: number; items: Array<{ qty: number; product: { images?: string[] } }> }>>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [orderCounts, setOrderCounts] = useState<Record<string, number>>({});
@@ -107,12 +108,14 @@ export default function Profile() {
   }, []);
 
   useEffect(() => {
-    if (!isPro) { setBundles([]); return; }
+    // Any active paid tier sees bundles now (PLUS/PRIME/PRO) — the server
+    // route re-checks the entitlement, this only skips a pointless call.
+    if (!planActive) { setBundles([]); return; }
     api
-      .get<{ products: ApiProduct[] }>('/api/products?type=bundle&limit=4')
-      .then((res) => setBundles(res.products || []))
+      .get<{ entitled: boolean; bundles: Array<{ id: string; name: string; image: string; total_display_iqd: number; items: Array<{ qty: number; product: { images?: string[] } }> }> }>('/api/bundles')
+      .then((res) => setBundles(res.entitled ? (res.bundles || []).slice(0, 4) : []))
       .catch(() => setBundles([]));
-  }, [isPro]);
+  }, [planActive]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -549,27 +552,27 @@ export default function Profile() {
         </div>
         )}
 
-        {/* Fifth Card: Limited Time Pro Discounts (Bundles) */}
-        {isPro && (
+        {/* Fifth Card: member bundles (PLUS/PRIME/PRO — server-gated) */}
+        {planActive && (
           <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white">
             <div className="flex justify-between items-center mb-3">
               <h2 className="font-bold text-[14px] flex items-center gap-1 text-[#ff0036]">
-                <span className="italic font-black text-base">PRO BUNDLE</span>
+                <span className="italic font-black text-base">BUNDLES</span>
                 <span className="text-black dark:text-white ml-1 text-[13px]">{loc('مركز الخصومات الحصرية', 'Exclusive Discounts', 'داشکاندنە تایبەتەکان')}</span>
               </h2>
               <button type="button" className="text-[11px] text-zinc-500 min-h-[44px] px-2 -mx-2 hover:text-zinc-700 dark:hover:text-zinc-300 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg" onClick={() => navigate('/bundles')}>{loc('المزيد', 'More', 'زیاتر')} {dir === 'rtl' ? '‹' : '›'}</button>
             </div>
             <div className="flex gap-2.5 overflow-x-auto hide-scrollbar pb-1">
               {bundles.length > 0 ? bundles.map((bundle) => (
-                <button key={bundle.id} type="button" onClick={() => navigate(`/product/${bundle.slug}`)} className="min-w-[85px] w-[85px] bg-[#fff0f2] dark:bg-[#331118] border border-[#ffb3c1] dark:border-[#801a2c] rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+                <button key={bundle.id} type="button" onClick={() => navigate('/bundles')} className="min-w-[85px] w-[85px] bg-[#fff0f2] dark:bg-[#331118] border border-[#ffb3c1] dark:border-[#801a2c] rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
                   <div className="w-full aspect-square bg-zinc-200 dark:bg-zinc-800 rounded mb-1.5 overflow-hidden">
-                    {bundle.images?.[0] && (
-                      <img referrerPolicy="no-referrer" src={bundle.images[0]} alt={bundle.name} className="w-full h-full object-cover" />
+                    {(bundle.image || bundle.items?.[0]?.product?.images?.[0]) && (
+                      <img referrerPolicy="no-referrer" src={bundle.image || bundle.items[0].product.images![0]} alt={bundle.name} className="w-full h-full object-cover" />
                     )}
                   </div>
                   <span className="text-[9px] font-bold text-black dark:text-white line-clamp-2 leading-tight mb-1">{bundle.name}</span>
                   <div className="text-[#ff0036] font-bold flex items-baseline gap-0.5 mt-auto">
-                    <span className="text-[12px] leading-none">{formatIqd(bundle.price_iqd || 0)}</span>
+                    <span className="text-[12px] leading-none">{formatIqd(bundle.total_display_iqd || 0)}</span>
                   </div>
                 </button>
               )) : (

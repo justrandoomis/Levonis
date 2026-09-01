@@ -103,6 +103,12 @@ export interface PricingProduct {
   selling_type: string;
   /** Multi-select sale types: 'direct_sale' | 'pre_order' | 'bundle'. */
   sale_types?: string[];
+  /** Availability premium for DIRECT fulfilment (from-stock, ships now).
+   *  The owner prices immediacy the way transports price their journey:
+   *  e.g. base 100k — direct +50k, land +15k, air +25k, sea +0. NULL/0 =
+   *  no premium. Applies only to a direct line (no transport selected);
+   *  a pre-order line pays its transport commission instead, never both. */
+  direct_surcharge_iqd?: number | null;
   options: OptionV2[];
   colors: ColorV2[];
   preorder_transports: TransportOffer[];
@@ -118,8 +124,10 @@ export interface ResolvedPrice {
   cost_iqd: number | null; // admin only — strip before public serialization
   price_source: 'color' | 'option' | 'base';
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
+  /** Direct-fulfilment premium actually charged on this line (null = none). */
+  direct: { surcharge_iqd: number } | null;
   warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
-  unit_subtotal_iqd: number; // applied + effective commission + warranty fee
+  unit_subtotal_iqd: number; // applied + effective commission + direct surcharge + warranty fee
   errors: string[]; // non-empty = selection invalid, reject server-side
 }
 
@@ -233,6 +241,19 @@ export function resolveUnitPrice(input: {
     errors.push('TRANSPORT_NOT_APPLICABLE');
   }
 
+  // Direct-fulfilment premium: only when this line is actually fulfilled
+  // from stock — direct sale enabled and no transport chosen. A pre-order
+  // line pays its transport commission instead; the two never stack. The
+  // customer is shown only the FINAL price (mandate: «يظهر له السعر النهائي
+  // فقط مع الزياده»), so the premium folds into unit_subtotal_iqd exactly
+  // like the commission and is never waived by membership.
+  let direct: ResolvedPrice['direct'] = null;
+  const directEnabled = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const directSurcharge = product.direct_surcharge_iqd ?? null;
+  if (!method && directEnabled && typeof directSurcharge === 'number' && Number.isInteger(directSurcharge) && directSurcharge > 0) {
+    direct = { surcharge_iqd: directSurcharge };
+  }
+
   // Warranty fee — added on top of the resolved price; never waived by tier.
   let warranty: ResolvedPrice['warranty'] = null;
   if (input.warrantyPlanId) {
@@ -252,7 +273,8 @@ export function resolveUnitPrice(input: {
 
   const commissionEffective = transport && !transport.waived ? transport.commission_iqd : 0;
   const warrantyFee = warranty ? warranty.fee_iqd : 0;
-  const unitSubtotal = appliedIqd + commissionEffective + warrantyFee;
+  const directFee = direct ? direct.surcharge_iqd : 0;
+  const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
 
   return {
     regular_iqd: regularIqd,
@@ -263,6 +285,7 @@ export function resolveUnitPrice(input: {
     cost_iqd: cost.value ?? null,
     price_source: regular.source,
     transport,
+    direct,
     warranty,
     unit_subtotal_iqd: unitSubtotal,
     errors,

@@ -182,8 +182,12 @@ export const benefits = {
   /** PLUS+PRO: eligibility for PLUS-only coupons where the owner configures them. */
   exclusiveCoupons: (t: TierStatus) =>
     t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'exclusiveCoupons'),
-  /** PLUS+PRO: exclusive sections (bundles, random filament, special offers). */
-  exclusiveSections: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'exclusiveSections'),
+  /** PLUS+PRIME+PRO: exclusive sections (bundles, random filament, special
+   *  offers). PRIME was added by the owner's bundles mandate: «هذه الميزه
+   *  تظهر لمشتركين فقط البلس والبريميوم والبرو» — every paid tier sees the
+   *  bundles section; PRIME still gets no merchant/selling rights. */
+  exclusiveSections: (t: TierStatus) =>
+    t.active && (t.tier === 'plus' || t.tier === 'prime' || t.tier === 'pro') && notGated(t, 'exclusiveSections'),
   /** PRO: explicit/policy product discounts (resolver applies pricing). */
   proPricing: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proPricing'),
   /** PRO: free last-mile delivery on all orders. */

@@ -365,7 +365,7 @@ export function communityAvailability(): SaleAvailability {
 }
 
 /** Viewer tier comes ONLY from the server-side session/memberships ledger. */
-async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
+export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
   const user = c.get('user');
   const [tierInfo, settings] = await Promise.all([
     user ? effectiveTier(c.env, user) : Promise.resolve({ tier: 'free' as Tier, active: false }),
@@ -444,26 +444,61 @@ export function productPublic(
   return opts.includeInternal ? adminShape(doc) : publicShape(doc);
 }
 
-/** Public shape + the viewer-tier resolved display price (base selection). */
-function publicWithDisplayPrice(
+/**
+ * Public shape + the viewer-tier resolved display price.
+ *
+ * THE CARD PRICE IS THE CHEAPEST WAY TO BUY THE PRODUCT, not the base row's
+ * price (the owner's rule: «يعرض السعر الأساسي للمنتج — الذي يكون غالبًا أقل
+ * سعر للخيار أو اللون»). Every active option and colour is resolved through
+ * the SAME resolver that prices checkout — per-field inheritance, PRO
+ * policy, PRIME clamps — and the minimum applied price wins; its own
+ * regular price rides along so a member's strikethrough compares the same
+ * variant, never two different ones. display_prime/pro_iqd are the cheapest
+ * member prices across levels, for the card's faint tier teasers; null =
+ * that tier has no explicit price anywhere on the product.
+ */
+export function publicWithDisplayPrice(
   row: Record<string, unknown>,
   ctx: PricingCtx,
   view?: ProductRelationsView
 ): Record<string, unknown> {
   const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
   const out = publicShape(doc);
-  const resolved = resolveUnitPrice({
-    product: doc,
-    tier: ctx.tier,
-    tierActive: ctx.tierActive,
-    proPolicy: ctx.proPolicy,
-    transportDefaults: ctx.transportDefaults,
-  });
+  const levels: Array<{ optionId?: string; colorId?: string }> = [{}];
+  for (const o of doc.options) if (o.active !== false) levels.push({ optionId: o.id });
+  for (const col of doc.colors) if (col.active !== false) levels.push({ colorId: col.id });
+  let best: ResolvedPrice | null = null;
+  let maxApplied = 0;
+  let primeMin: number | null = null;
+  let proMin: number | null = null;
+  for (const sel of levels) {
+    // Selection-validity errors (a colour linked to an unchosen option, a
+    // pre-order product with no transport picked) do not disturb the price
+    // arithmetic — only the numbers are read here, never the errors.
+    const r = resolveUnitPrice({
+      product: doc,
+      optionId: sel.optionId ?? null,
+      colorId: sel.colorId ?? null,
+      tier: ctx.tier,
+      tierActive: ctx.tierActive,
+      proPolicy: ctx.proPolicy,
+      transportDefaults: ctx.transportDefaults,
+    });
+    if (!best || r.applied_iqd < best.applied_iqd) best = r;
+    if (r.applied_iqd > maxApplied) maxApplied = r.applied_iqd;
+    if (r.prime_iqd !== null) primeMin = primeMin === null ? r.prime_iqd : Math.min(primeMin, r.prime_iqd);
+    if (r.pro_iqd !== null) proMin = proMin === null ? r.pro_iqd : Math.min(proMin, r.pro_iqd);
+  }
+  const resolved = best!;
   out.display_price_iqd = resolved.applied_iqd;
   out.display_applied_tier = resolved.applied_tier;
   // §4: no compare-at. The regular price is exposed so a member can see what
   // their membership saved — a real comparison, not a fabricated one.
   out.display_regular_iqd = resolved.regular_iqd;
+  out.display_prime_iqd = primeMin;
+  out.display_pro_iqd = proMin;
+  // True when variants genuinely differ in price — the card may say «يبدأ من».
+  out.display_from = maxApplied > resolved.applied_iqd;
   return out;
 }
 
@@ -704,17 +739,23 @@ productRoutes.post('/:slug/quote', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
 
-  const doc = parseProductRow(row);
+  // The relational tables are the truth for options/colours/stock — exactly
+  // as the detail endpoint reads them. Quoting from the bare row made every
+  // option saved through the current admin form (whose structure lives ONLY
+  // in the tables) answer OPTION_NOT_FOUND, and per-colour stock invisible.
+  const relations = await loadRelationsView(c.env.DB, String(row.id), row.inventory_mode);
+  const doc = applyRelations(parseProductRow(row), relations);
   const ctx = await pricingCtx(c); // tier ONLY from the session, never the body
 
   const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
   const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
+  const transportMethod = typeof body.transportMethod === 'string' ? body.transportMethod : null;
 
   const resolved = resolveUnitPrice({
     product: doc,
     optionId,
     colorId,
-    transportMethod: typeof body.transportMethod === 'string' ? body.transportMethod : null,
+    transportMethod,
     warrantyPlanId: typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null,
     tier: ctx.tier,
     tierActive: ctx.tierActive,
@@ -729,12 +770,21 @@ productRoutes.post('/:slug/quote', async (c) => {
       qty,
       line_total_iqd: resolved.unit_subtotal_iqd * qty,
     },
-    // Availability for THIS selection — changing option/color re-checks it.
+    // Availability for THIS selection — changing option/color re-checks it,
+    // against the REAL inventory snapshot and colour links, and asking for a
+    // transport is asking for the pre-order journey (same rule as the cart).
     availability: saleAvailability(doc, {
       optionId,
       colorId,
       qty,
       transportDefaults: ctx.transportDefaults,
+      inventory: snapshotFrom(relations, {
+        stock: doc.stock,
+        reserved: Number(row.stock_reserved ?? 0),
+        low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+      }),
+      links: relations.links,
+      preferredType: transportMethod ? 'pre_order' : null,
     }),
     viewer_tier: { tier: ctx.tier, active: ctx.tierActive },
   });

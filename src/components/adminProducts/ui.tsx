@@ -15,25 +15,27 @@ import type { TransStatus } from './types';
 export const ACCENT = '#6B46FF';
 
 export const inputCls =
-  'w-full bg-zinc-800/30 border border-zinc-700 rounded-xl p-3 text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all';
+  'w-full min-h-10 bg-zinc-800/30 border border-zinc-700 rounded-lg px-2.5 py-2 text-[13px] text-white focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-all';
 
-// Admin density (§6.2): one consistent scale — a 44px minimum touch target
-// kept for iPad, without page-wide transform:scale or arbitrary font shrinking.
+// Admin density: the owner reviewed the 44px scale on an iPad and asked for
+// smaller buttons and smaller text across the panel. Inputs keep the 40px
+// floor (the §12 suite asserts every input/select >= 40px); buttons drop to
+// 36px, which is still a comfortable tap target.
 export const btnPrimary =
-  'inline-flex items-center justify-center gap-2 min-h-11 bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-sm px-4 py-2.5 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-1.5 min-h-9 bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-[13px] px-3 py-1.5 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 export const btnSecondary =
-  'inline-flex items-center justify-center gap-2 min-h-11 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm px-4 py-2.5 rounded-xl font-bold transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-1.5 min-h-9 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[13px] px-3 py-1.5 rounded-lg font-bold transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed';
 export const btnGhostDanger =
   'p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors';
 
 /** Arabic-first field label with a small English secondary. */
 export function L({ ar, en, hint }: { ar: string; en: string; hint?: string }) {
   return (
-    <div className="mb-2">
-      <span className="block text-sm font-bold text-zinc-300">
-        {ar} <span className="text-[11px] font-medium text-zinc-500 mx-1">{en}</span>
+    <div className="mb-1.5">
+      <span className="block text-[12px] font-bold text-zinc-300">
+        {ar} <span className="text-[10px] font-medium text-zinc-500 mx-1">{en}</span>
       </span>
-      {hint && <span className="block text-[11px] text-zinc-500 mt-0.5">{hint}</span>}
+      {hint && <span className="block text-[10px] text-zinc-500 mt-0.5">{hint}</span>}
     </div>
   );
 }
@@ -59,10 +61,10 @@ export function Section({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-3 sm:px-4 py-3 bg-zinc-800/20 border-b border-zinc-800/50 flex items-center justify-between gap-3 text-start min-h-11"
+        className="w-full px-2.5 sm:px-3 py-2 bg-zinc-800/20 border-b border-zinc-800/50 flex items-center justify-between gap-3 text-start min-h-10"
       >
-        <span className="font-bold text-white text-sm min-w-0">
-          {ar} <span className="text-xs font-medium text-zinc-500 mx-1">{en}</span>
+        <span className="font-bold text-white text-[13px] min-w-0">
+          {ar} <span className="text-[10px] font-medium text-zinc-500 mx-1">{en}</span>
         </span>
         <span className="flex items-center gap-2 shrink-0">
           {badge}

@@ -1,21 +1,28 @@
 /**
- * Section 5 — options, colours and their links (mandate §7).
+ * Section 5 — options, colours and their links (mandate §7), reorganized on
+ * the owner's review («غير مرتبه ومخربطه وهوسه» — busy and confusing):
  *
- * The link UI is the heart of it: a colour lists SMALL CHECKBOXES for every
- * option value in the product, grouped by option group, and the helper line
- * states the rule the server enforces — OR inside a group, AND across groups.
- * A colour with no boxes ticked shows with every option, which is the
- * behaviour §7 asks for and is stated on screen rather than left to be
- * discovered.
+ *  - THE INVENTORY SOURCE IS AUTOMATIC. The four-button "مصدر المخزون"
+ *    picker is gone: stock inputs are simply always there — on the product
+ *    (section 4), on every option value and on every colour — and the most
+ *    specific level that carries numbers wins (deriveInventoryMode). The
+ *    strip at the top STATES which level is in force instead of asking the
+ *    admin to choose it. The server model is untouched: one authoritative
+ *    level, levels never summed.
+ *  - Every option value and colour can carry ITS OWN IMAGE (a compact
+ *    upload slot) — the storefront shows it when the customer taps that
+ *    choice.
+ *  - The colour row uses a REAL colour picker next to the hex text, not a
+ *    bare text field.
  *
- * Stock and prices appear at the level the product's inventory mode makes
- * authoritative, so an admin is not asked to fill a number that will never be
- * read. Cost is only rendered for a financial admin — and the server refuses
- * to write it either way (§11).
+ * The link matrix keeps its wording («اربط اللون بخيارات محددة…») — the §12
+ * evidence screenshots anchor on it. Cost is only rendered for a financial
+ * admin — and the server refuses to write it either way (§11).
  */
 
-import React from 'react';
-import { Trash2, GripVertical } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Trash2, GripVertical, ImagePlus, RefreshCw, X } from 'lucide-react';
+import { uploadFile } from '../../../lib/api';
 import {
   Field,
   Grid,
@@ -29,12 +36,12 @@ import {
   field as fieldCls,
 } from './formUi';
 import {
+  deriveInventoryMode,
   emptyPrices,
   localId,
   type FormColor,
   type FormGroup,
   type FormValue,
-  type InventoryMode,
   type RelationsState,
 } from './model';
 
@@ -49,21 +56,25 @@ export function OptionsSection({
   canSeeCost: boolean;
   errors: Record<string, string>;
 }) {
-  const mode = rel.inventory_mode;
-  const optionStock = mode === 'OPTION';
-  const colorStock = mode === 'COLOR';
+  // Every mutation re-derives the inventory source, so the explainer strip,
+  // the section summary and the saved wire all tell the same story.
+  const setRelAuto = (fn: (r: RelationsState) => RelationsState) =>
+    setRel((r) => {
+      const next = fn(r);
+      return { ...next, inventory_mode: deriveInventoryMode(next) };
+    });
 
   const addGroup = () =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       groups: [...r.groups, { id: localId('og'), name_en: '', sort: r.groups.length, active: true, values: [] }],
     }));
 
   const patchGroup = (id: string, patch: Partial<FormGroup>) =>
-    setRel((r) => ({ ...r, groups: r.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
+    setRelAuto((r) => ({ ...r, groups: r.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
 
   const removeGroup = (id: string) =>
-    setRel((r) => {
+    setRelAuto((r) => {
       const gone = new Set((r.groups.find((g) => g.id === id)?.values ?? []).map((v) => v.id));
       return {
         ...r,
@@ -79,7 +90,7 @@ export function OptionsSection({
     });
 
   const addValue = (groupId: string) =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       groups: r.groups.map((g) =>
         g.id === groupId
@@ -105,7 +116,7 @@ export function OptionsSection({
     }));
 
   const patchValue = (groupId: string, id: string, patch: Partial<FormValue>) =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       groups: r.groups.map((g) =>
         g.id === groupId ? { ...g, values: g.values.map((v) => (v.id === id ? { ...v, ...patch } : v)) } : g
@@ -113,7 +124,7 @@ export function OptionsSection({
     }));
 
   const removeValue = (groupId: string, id: string) =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       groups: r.groups.map((g) => (g.id === groupId ? { ...g, values: g.values.filter((v) => v.id !== id) } : g)),
       colors: r.colors.map((c) => ({ ...c, option_value_ids: c.option_value_ids.filter((x) => x !== id) })),
@@ -121,7 +132,7 @@ export function OptionsSection({
     }));
 
   const addColor = () =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       colors: [
         ...r.colors,
@@ -142,10 +153,10 @@ export function OptionsSection({
     }));
 
   const patchColor = (id: string, patch: Partial<FormColor>) =>
-    setRel((r) => ({ ...r, colors: r.colors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
+    setRelAuto((r) => ({ ...r, colors: r.colors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
 
   const removeColor = (id: string) =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       colors: r.colors.filter((c) => c.id !== id),
       variants: r.variants.filter((v) => v.color_id !== id),
@@ -153,7 +164,7 @@ export function OptionsSection({
     }));
 
   const toggleLink = (colorId: string, valueId: string) =>
-    setRel((r) => ({
+    setRelAuto((r) => ({
       ...r,
       colors: r.colors.map((c) =>
         c.id === colorId
@@ -169,20 +180,14 @@ export function OptionsSection({
 
   return (
     <div className="min-w-0 space-y-4">
-      <InventoryModePicker
-        mode={mode}
-        onChange={(m) => setRel((r) => ({ ...r, inventory_mode: m }))}
-        hasGroups={rel.groups.length > 0}
-        hasColors={rel.colors.length > 0}
-        error={errors.inventory_mode}
-      />
+      <AutoStockNote rel={rel} />
 
       {/* ---------------------------------------------------- option groups */}
       <Repeater
         title="مجموعات الخيارات / Option groups"
         addLabel="مجموعة"
         onAdd={addGroup}
-        empty="لا توجد مجموعات. أضف مجموعة مثل «المقاس» أو «الباقة»."
+        empty="لا توجد مجموعات. أضف مجموعة مثل «المقاس» أو «السعة»."
       >
         {rel.groups.map((g) => (
           <div key={g.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
@@ -203,6 +208,11 @@ export function OptionsSection({
               {g.values.map((v) => (
                 <div key={v.id} className="min-w-0 rounded-lg bg-zinc-800/30 border border-zinc-800 p-2.5">
                   <div className="flex items-center gap-2 min-w-0">
+                    <ImgSlot
+                      url={v.image}
+                      label={`صورة الخيار ${v.name_en || ''}`}
+                      onChange={(url) => patchValue(g.id, v.id, { image: url ?? '' })}
+                    />
                     <TextInput
                       value={v.name_en}
                       onChange={(e) => patchValue(g.id, v.id, { name_en: e.target.value })}
@@ -213,7 +223,7 @@ export function OptionsSection({
                       value={v.sku_part}
                       onChange={(e) => patchValue(g.id, v.id, { sku_part: e.target.value })}
                       placeholder="SKU part"
-                      className="max-w-[110px]"
+                      className="max-w-[100px]"
                       aria-label="SKU part"
                     />
                     <button
@@ -232,20 +242,16 @@ export function OptionsSection({
                   )}
                   <div className="mt-2">
                     <Grid cols={3}>
-                      {optionStock && (
-                        <>
-                          <Field ar="المخزون" en="Stock">
-                            <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} />
-                          </Field>
-                          <Field ar="حد التنبيه" en="Low-stock">
-                            <Qty
-                              value={v.low_stock_threshold}
-                              onChange={(n) => patchValue(g.id, v.id, { low_stock_threshold: n })}
-                              placeholder="بدون / none"
-                            />
-                          </Field>
-                        </>
-                      )}
+                      <Field ar="المخزون" en="Stock" hint="فارغ = لا يُحسب من هذا الخيار">
+                        <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} />
+                      </Field>
+                      <Field ar="حد التنبيه" en="Low-stock">
+                        <Qty
+                          value={v.low_stock_threshold}
+                          onChange={(n) => patchValue(g.id, v.id, { low_stock_threshold: n })}
+                          placeholder="بدون / none"
+                        />
+                      </Field>
                       <PriceCells
                         prices={v}
                         canSeeCost={canSeeCost}
@@ -262,7 +268,7 @@ export function OptionsSection({
                   </div>
                 </div>
               ))}
-              <button type="button" onClick={() => addValue(g.id)} className={`${btnGhost} h-9 px-2.5 text-[12px]`}>
+              <button type="button" onClick={() => addValue(g.id)} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
                 + قيمة / value
               </button>
             </div>
@@ -275,10 +281,15 @@ export function OptionsSection({
         {rel.colors.map((c) => (
           <div key={c.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <span
-                className="w-9 h-9 rounded-lg border border-zinc-700 shrink-0"
-                style={{ background: /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c.hex) ? c.hex : '#000' }}
-                aria-hidden="true"
+              {/* A real colour picker: the swatch IS the input. The hex text
+                  beside it stays for paste-in exact values. */}
+              <input
+                type="color"
+                dir="ltr"
+                value={/^#[0-9a-fA-F]{6}$/.test(c.hex) ? c.hex : '#000000'}
+                onChange={(e) => patchColor(c.id, { hex: e.target.value })}
+                aria-label="اختيار اللون"
+                className="w-10 h-10 rounded-lg border border-zinc-700 bg-zinc-800/40 p-1 shrink-0 cursor-pointer"
               />
               <TextInput
                 value={c.name_en}
@@ -293,7 +304,12 @@ export function OptionsSection({
                 onChange={(e) => patchColor(c.id, { hex: e.target.value })}
                 placeholder="#000000"
                 aria-label="HEX"
-                className={`${fieldCls} max-w-[110px]`}
+                className={`${fieldCls} max-w-[100px]`}
+              />
+              <ImgSlot
+                url={c.image}
+                label={`صورة اللون ${c.name_en || ''}`}
+                onChange={(url) => patchColor(c.id, { image: url ?? '' })}
               />
               <button type="button" onClick={() => removeColor(c.id)} className={iconBtn} aria-label="حذف اللون">
                 <Trash2 className="w-4 h-4" />
@@ -307,20 +323,16 @@ export function OptionsSection({
 
             <div className="mt-2">
               <Grid cols={3}>
-                {colorStock && (
-                  <>
-                    <Field ar="المخزون" en="Stock">
-                      <Qty value={c.stock} onChange={(n) => patchColor(c.id, { stock: n })} />
-                    </Field>
-                    <Field ar="حد التنبيه" en="Low-stock">
-                      <Qty
-                        value={c.low_stock_threshold}
-                        onChange={(n) => patchColor(c.id, { low_stock_threshold: n })}
-                        placeholder="بدون / none"
-                      />
-                    </Field>
-                  </>
-                )}
+                <Field ar="المخزون" en="Stock" hint="فارغ = لا يُحسب من هذا اللون">
+                  <Qty value={c.stock} onChange={(n) => patchColor(c.id, { stock: n })} />
+                </Field>
+                <Field ar="حد التنبيه" en="Low-stock">
+                  <Qty
+                    value={c.low_stock_threshold}
+                    onChange={(n) => patchColor(c.id, { low_stock_threshold: n })}
+                    placeholder="بدون / none"
+                  />
+                </Field>
                 <PriceCells prices={c} canSeeCost={canSeeCost} onChange={(patch) => patchColor(c.id, patch)} />
                 <Field ar="مفعّل" en="Active">
                   <Toggle
@@ -382,10 +394,113 @@ export function OptionsSection({
         ))}
       </Repeater>
 
-      {mode === 'VARIANT_COMBINATION' && (
+      {rel.inventory_mode === 'VARIANT_COMBINATION' && (
         <VariantsEditor rel={rel} setRel={setRel} canSeeCost={canSeeCost} errors={errors} />
       )}
     </div>
+  );
+}
+
+/**
+ * States which stock level is in force — the admin no longer picks one.
+ * Wording mirrors what the customer experiences: three stocks (product,
+ * option, colour) and the most specific one that has numbers answers.
+ */
+function AutoStockNote({ rel }: { rel: RelationsState }) {
+  const mode = rel.inventory_mode;
+  const text =
+    mode === 'VARIANT_COMBINATION'
+      ? 'هذا المنتج يعتمد مخزون التركيبات (إعداد سابق) — عدّل الأرقام في جدول التركيبات أدناه.'
+      : mode === 'COLOR'
+        ? 'التوفر يُحسب الآن من مخزون الألوان — لأنك أدخلت أرقامًا على مستوى اللون، وهو الأدق.'
+        : mode === 'OPTION'
+          ? 'التوفر يُحسب الآن من مخزون الخيارات — أدخل رقمًا على لونٍ ما لينتقل الحساب إلى الألوان.'
+          : 'التوفر يُحسب الآن من مخزون المنتج (قسم «البيع والتوفر») — أدخل أرقامًا على الخيارات أو الألوان لينتقل الحساب إليها تلقائيًا.';
+  return (
+    <div className="min-w-0 rounded-lg border border-zinc-700 bg-zinc-800/30 px-2.5 py-2">
+      <p className="text-[12px] text-zinc-300 font-bold mb-0.5">
+        المخزون تلقائي <span className="text-[10px] font-medium text-zinc-500">Automatic inventory source</span>
+      </p>
+      <p className="text-[11px] text-zinc-400 leading-snug">{text}</p>
+      <p className="text-[10px] text-zinc-600 mt-0.5">
+        مصدر واحد فقط هو الحقيقة — لا تُجمع الأرقام بين المستويات. One authoritative source; levels are never summed.
+      </p>
+    </div>
+  );
+}
+
+/** Compact per-value / per-colour image slot: thumbnail when set, an upload
+ *  button when not. The storefront shows this image the moment the customer
+ *  taps the choice it belongs to. */
+function ImgSlot({
+  url,
+  label,
+  onChange,
+}: {
+  url: string;
+  label: string;
+  onChange: (url: string | null) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setErr(false);
+    setBusy(true);
+    try {
+      const res = await uploadFile(file, 'product');
+      onChange(res.url);
+    } catch {
+      setErr(true);
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  return (
+    <span className="relative shrink-0">
+      <input
+        ref={fileRef}
+        type="file"
+        dir="ltr"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(e) => pick(e.target.files?.[0])}
+      />
+      {url ? (
+        <span className="relative block w-10 h-10">
+          <img src={url} alt={label} className="w-10 h-10 rounded-lg object-cover border border-zinc-700" />
+          <button
+            type="button"
+            aria-label={`إزالة ${label}`}
+            onClick={() => onChange(null)}
+            className="absolute -top-1.5 -end-1.5 w-4 h-4 rounded-full bg-zinc-900 border border-zinc-600 text-zinc-300 hover:text-red-400 grid place-items-center"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          aria-label={label}
+          title={label}
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+          className={`w-10 h-10 rounded-lg border grid place-items-center transition-colors disabled:opacity-60 ${
+            err
+              ? 'border-red-500/50 text-red-400'
+              : 'border-dashed border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500'
+          }`}
+        >
+          {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -416,59 +531,6 @@ function PriceCells({
         </Field>
       )}
     </>
-  );
-}
-
-const MODES: Array<{ id: InventoryMode; ar: string; en: string; why: string }> = [
-  { id: 'BASE', ar: 'المنتج', en: 'BASE', why: 'رقم واحد للمنتج كله' },
-  { id: 'OPTION', ar: 'الخيارات', en: 'OPTION', why: 'لكل قيمة خيار مخزونها' },
-  { id: 'COLOR', ar: 'الألوان', en: 'COLOR', why: 'لكل لون مخزونه' },
-  { id: 'VARIANT_COMBINATION', ar: 'التركيبات', en: 'VARIANT', why: 'لكل تركيبة خيار+لون' },
-];
-
-function InventoryModePicker({
-  mode,
-  onChange,
-  hasGroups,
-  hasColors,
-  error,
-}: {
-  mode: InventoryMode;
-  onChange: (m: InventoryMode) => void;
-  hasGroups: boolean;
-  hasColors: boolean;
-  error?: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[13px] font-bold text-zinc-300 mb-1.5">
-        مصدر المخزون <span className="text-[11px] font-medium text-zinc-500">Inventory source</span>
-      </div>
-      <div className="grid gap-2 [grid-template-columns:repeat(2,minmax(0,1fr))] md:[grid-template-columns:repeat(4,minmax(0,1fr))]">
-        {MODES.map((m) => {
-          const impossible = (m.id === 'OPTION' && !hasGroups) || (m.id === 'COLOR' && !hasColors);
-          return (
-            <button
-              key={m.id}
-              type="button"
-              disabled={impossible}
-              onClick={() => onChange(m.id)}
-              className={`min-w-0 text-start rounded-lg border p-2.5 transition-colors disabled:opacity-40 ${
-                mode === m.id ? 'bg-[#6B46FF]/10 border-[#6B46FF]/60' : 'bg-zinc-800/30 border-zinc-700'
-              }`}
-            >
-              <span className="block text-[13px] font-bold text-white truncate">{m.ar}</span>
-              <span className="block text-[11px] text-zinc-500 truncate">{m.why}</span>
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-1.5 text-[11px] text-zinc-500">
-        مصدر واحد فقط هو الحقيقة — لا تُجمع الأرقام بين المستويات.
-        <span className="text-zinc-600"> One authoritative source; levels are never summed.</span>
-      </p>
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
-    </div>
   );
 }
 
@@ -547,7 +609,7 @@ function VariantsEditor({
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2 mb-2">
         <h4 className="text-[13px] font-bold text-zinc-300 truncate">التركيبات / Combinations</h4>
-        <button type="button" onClick={generate} className={`${btnGhost} h-9 px-2.5 text-[12px]`}>
+        <button type="button" onClick={generate} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
           توليد التركيبات
         </button>
       </div>

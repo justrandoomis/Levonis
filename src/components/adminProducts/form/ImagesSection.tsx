@@ -173,15 +173,42 @@ export function ImagesSection({
       const next = r.images.slice();
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
-      return { ...r, images: next.map((i, idx) => ({ ...i, sort_order: idx })) };
+      return { ...r, images: regroup(next) };
     });
 
-  const linkTargets = [
-    ...rel.groups.flatMap((g) =>
-      g.values.map((v) => ({ value: `o:${v.id}`, label: `${g.name_en || 'Group'} / ${v.name_en || v.id}` }))
-    ),
-    ...rel.colors.map((c) => ({ value: `c:${c.id}`, label: `Colour / ${c.name_en || c.id}` })),
-  ];
+  const valueNames = new Map(
+    rel.groups.flatMap((g) => g.values.map((v) => [v.id, `${g.name_en || 'Group'} / ${v.name_en || v.id}`] as const))
+  );
+  const colorNames = new Map(rel.colors.map((c) => [c.id, c.name_en || c.id] as const));
+  const hasTargets = valueNames.size > 0 || colorNames.size > 0;
+
+  // The owner's display order — general product images first, then the
+  // option-linked ones, then the colour-linked ones — partitions the ONE
+  // underlying array; relative order inside each part is preserved and
+  // sort_order follows the array, so the storefront receives the same story
+  // this section shows.
+  const scopeOf = (i: FormImage) => (i.option_value_id ? 1 : i.color_id ? 2 : 0);
+  const regroup = (list: FormImage[]) =>
+    [...list]
+      .sort((a, b) => scopeOf(a) - scopeOf(b) || list.indexOf(a) - list.indexOf(b))
+      .map((i, idx) => ({ ...i, sort_order: idx }));
+
+  const setLink = (id: string, v: string) =>
+    setRel((r) => ({
+      ...r,
+      images: regroup(
+        r.images.map((i) =>
+          i.id === id
+            ? {
+                ...i,
+                option_value_id: v.startsWith('o:') ? v.slice(2) : null,
+                color_id: v.startsWith('c:') ? v.slice(2) : null,
+                variant_id: null,
+              }
+            : i
+        )
+      ),
+    }));
 
   return (
     <div className="min-w-0">
@@ -268,14 +295,26 @@ export function ImagesSection({
       {rel.images.length === 0 ? (
         <p className="text-[12px] text-zinc-500">لا صور بعد.</p>
       ) : (
-        <div
-          // 196px is not arbitrary: §1 sets controls at 44-48px, and the row
-          // below holds four of them plus gaps and the card padding. A
-          // narrower card would either clip a touch target or force one under
-          // 44px, which is exactly what this panel used to do.
-          className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(196px,1fr))] min-w-0"
-        >
-          {rel.images.map((img, idx) => (
+        [
+          { scope: 0, ar: 'صور المنتج العامة', en: 'General', hint: 'تظهر دائمًا في معرض المنتج' },
+          { scope: 1, ar: 'صور الخيارات', en: 'Option images', hint: 'تتقدم المعرض عند اختيار الخيار المرتبط' },
+          { scope: 2, ar: 'صور الألوان', en: 'Colour images', hint: 'تتقدم المعرض عند اختيار اللون المرتبط' },
+        ] as const
+      ).map((grp) => {
+        const members = rel.images.filter((i) => scopeOf(i) === grp.scope);
+        if (members.length === 0) return null;
+        return (
+          <div key={grp.scope} className="min-w-0 mb-3">
+            <div className="flex items-baseline gap-2 mb-1.5 min-w-0">
+              <h4 className="text-[12px] font-bold text-zinc-300">
+                {grp.ar} <span className="text-[10px] font-medium text-zinc-500">{grp.en}</span>
+              </h4>
+              <span className="text-[10px] text-zinc-600 truncate">{grp.hint}</span>
+            </div>
+            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))] min-w-0">
+              {members.map((img) => {
+                const idx = rel.images.indexOf(img);
+                return (
             <div
               key={img.id}
               draggable
@@ -305,32 +344,29 @@ export function ImagesSection({
                     رئيسية
                   </span>
                 )}
+                {(img.option_value_id || img.color_id) && (
+                  <span className="absolute top-1 end-1 max-w-[70%] truncate bg-zinc-950/85 border border-zinc-700 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                    {img.option_value_id
+                      ? `خيار: ${valueNames.get(img.option_value_id) ?? ''}`
+                      : `لون: ${colorNames.get(img.color_id!) ?? ''}`}
+                  </span>
+                )}
               </div>
               <div className="p-1.5 space-y-1.5 min-w-0">
                 <div className="flex items-center gap-0.5 min-w-0">
                   <button
                     type="button"
                     onClick={() => setPrimary(img.id)}
-                    className={`${iconBtn} w-11 h-11`}
+                    className={iconBtn}
                     aria-label="اجعلها رئيسية"
                     title="اجعلها رئيسية"
                   >
                     <Star className={`w-4 h-4 ${img.is_primary ? 'fill-[#6B46FF] text-[#6B46FF]' : ''}`} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => move(idx, idx - 1)}
-                    className={`${iconBtn} w-11 h-11`}
-                    aria-label="للأعلى"
-                  >
+                  <button type="button" onClick={() => move(idx, idx - 1)} className={iconBtn} aria-label="للأعلى">
                     <ArrowUp className="w-4 h-4" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => move(idx, idx + 1)}
-                    className={`${iconBtn} w-11 h-11`}
-                    aria-label="للأسفل"
-                  >
+                  <button type="button" onClick={() => move(idx, idx + 1)} className={iconBtn} aria-label="للأسفل">
                     <ArrowDown className="w-4 h-4" />
                   </button>
                   <button
@@ -338,7 +374,7 @@ export function ImagesSection({
                     onClick={() => {
                       if (window.confirm('حذف هذه الصورة؟')) remove(img.id);
                     }}
-                    className={`${iconBtn} w-11 h-11 hover:text-red-400`}
+                    className={`${iconBtn} hover:text-red-400`}
                     aria-label="حذف"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -348,38 +384,48 @@ export function ImagesSection({
                   value={img.alt_en}
                   onChange={(e) => patch(img.id, { alt_en: e.target.value })}
                   placeholder="Alt text (English)"
-                  className="h-11 text-[13px]"
                   aria-label="Alt text"
                 />
-                {linkTargets.length > 0 && (
+                {hasTargets && (
                   <Select
-                    className="h-11 text-[13px]"
-                    aria-label="ربط الصورة"
+                    aria-label="تظهر مع"
                     value={
                       img.option_value_id ? `o:${img.option_value_id}` : img.color_id ? `c:${img.color_id}` : ''
                     }
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      patch(img.id, {
-                        option_value_id: v.startsWith('o:') ? v.slice(2) : null,
-                        color_id: v.startsWith('c:') ? v.slice(2) : null,
-                        variant_id: null,
-                      });
-                    }}
+                    onChange={(e) => setLink(img.id, e.target.value)}
                   >
-                    <option value="">غير مرتبطة / unlinked</option>
-                    {linkTargets.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
+                    {/* «غير مرتبطة» read as jargon — this names what actually
+                        happens: the image is part of the product's general
+                        gallery, or it belongs to one choice. */}
+                    <option value="">صورة عامة للمنتج / general</option>
+                    {valueNames.size > 0 && (
+                      <optgroup label="تخص خيارًا — تظهر عند اختياره">
+                        {[...valueNames].map(([id, label]) => (
+                          <option key={id} value={`o:${id}`}>
+                            خيار: {label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {colorNames.size > 0 && (
+                      <optgroup label="تخص لونًا — تظهر عند اختياره">
+                        {[...colorNames].map(([id, label]) => (
+                          <option key={id} value={`c:${id}`}>
+                            لون: {label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </Select>
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -42,6 +42,7 @@ import { marketplaceRoutes } from './routes/marketplace';
 import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
 import { adminCommunityRoutes } from './routes/adminCommunity';
+import { bundlesRoutes, adminBundlesRoutes } from './routes/bundles';
 
 const app = new Hono<AppContext>();
 
@@ -99,6 +100,10 @@ app.use('/api/admin/*', async (c, next) => {
 
 app.route('/api/auth', authRoutes);
 app.route('/api/products', productRoutes);
+// Members-only bundles section; mounted before the '/api' misc catch-all so
+// nothing there can ever shadow it. Same for its admin CRUD below.
+app.route('/api/bundles', bundlesRoutes);
+app.route('/api/admin/bundles', adminBundlesRoutes);
 app.route('/api/home', homeRoutes);
 app.route('/api/cart', cartRoutes);
 app.route('/api/orders', orderRoutes);

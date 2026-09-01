@@ -371,6 +371,12 @@ export function publicRelations(view: ProductRelationsView) {
     if (arr) arr.push(l);
     else linksByColor.set(l.color_id, [l]);
   }
+  // What a customer may know about a level's stock: the sellable remainder,
+  // never the raw counters. NULL = untracked at that level. Meaningful only
+  // when inventory_mode makes that level authoritative — the client gates
+  // its chips on the mode this same payload carries.
+  const availableOf = (stock: number | null, reserved: number | null | undefined) =>
+    stock === null ? null : Math.max(0, stock - (reserved ?? 0));
   return {
     inventory_mode: view.inventory_mode,
     option_groups: view.groups
@@ -386,6 +392,7 @@ export function publicRelations(view: ProductRelationsView) {
             name_en: v.name_en,
             image: v.image,
             sort: v.sort,
+            available: availableOf(v.stock, v.reserved),
             regular_price_iqd: v.regular_price_iqd,
             prime_price_iqd: v.prime_price_iqd,
             pro_price_iqd: v.pro_price_iqd,
@@ -405,6 +412,7 @@ export function publicRelations(view: ProductRelationsView) {
           group_id: l.group_id,
           option_value_id: l.option_value_id,
         })),
+        available: availableOf(x.stock, x.reserved),
         regular_price_iqd: x.regular_price_iqd,
         prime_price_iqd: x.prime_price_iqd,
         pro_price_iqd: x.pro_price_iqd,

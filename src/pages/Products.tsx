@@ -1,27 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { useAuth } from '../AuthContext';
-import { ArrowRight, ArrowLeft, Star, PackageSearch } from 'lucide-react';
-import { api, ApiProduct, formatIqd } from '../lib/api';
+import { ArrowRight, ArrowLeft, PackageSearch } from 'lucide-react';
+import { api, ApiProduct } from '../lib/api';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
+import CardPrice from '../components/CardPrice';
 
 export default function Products() {
   const { t, dir, loc } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const queryParams = new URLSearchParams(location.search);
   const search = queryParams.get('search') || '';
   const category = queryParams.get('category') || '';
-
-  // Subscription plan comes exclusively from the server-side user record.
-  const plan = user?.membership_tier ?? 'free';
-  const planActive =
-    !!user && plan !== 'free' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,17 +96,13 @@ export default function Products() {
               const firstImage = (Array.isArray(p.images) ? p.images : [])[0] || '';
               // §3/§12: the product name is English in every language and is never translated.
               const name = p.name;
-
-              const proPrice = p.membership_prices?.pro ?? null;
-              const planPrice =
-                planActive && (plan === 'plus' || plan === 'pro') ? p.membership_prices?.[plan] ?? null : null;
-              // §4: compare-at is gone. A strikethrough is shown ONLY when the viewer's
-    // own membership actually lowers the price — a real, server-resolved
-    // comparison instead of a decorative one.
-    const displayPrice = p.display_price_iqd ?? p.price_iqd;
-    const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-    const hasSale = displayPrice < regularPrice;
-              const showPlanPrice = !!planPrice && planPrice > 0 && planPrice < p.price_iqd;
+              // §4: compare-at is gone; the SALE badge appears only when the
+              // server's tier-resolved display price genuinely undercuts the
+              // regular one. Price rendering itself is CardPrice — one block
+              // shared with the home rails and the bundles grid.
+              const displayPrice = p.display_price_iqd ?? p.price_iqd;
+              const regularPrice = p.display_regular_iqd ?? p.price_iqd;
+              const hasSale = displayPrice < regularPrice;
 
               return (
                 <Link to={`/product/${p.slug || p.id}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
@@ -131,37 +121,8 @@ export default function Products() {
                   </div>
                   <div className="p-3 flex flex-col flex-1">
                     <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
-                    <div className="mt-auto pt-2 flex items-center justify-between">
-                      <div className="flex flex-col gap-0.5">
-                        {showPlanPrice ? (
-                          <>
-                             <div className="flex flex-col">
-                                <span className="text-zinc-500 text-[10px] line-through">{formatIqd(p.price_iqd)}</span>
-                                <span className="text-gold font-extrabold text-[15px] flex items-center gap-1 drop-shadow-[0_0_8px_rgba(186,163,105,0.4)]">
-                                   <Star className="w-3.5 h-3.5 fill-gold" />
-                                   {formatIqd(planPrice!)}
-                                </span>
-                             </div>
-                          </>
-                        ) : (
-                          <>
-                             <div className="flex flex-col">
-                               {hasSale && (
-                                 <span className="text-zinc-500 text-[10px] line-through">{formatIqd(regularPrice)}</span>
-                               )}
-                               <span className="text-white font-bold text-sm">{formatIqd(p.price_iqd)}</span>
-                             </div>
-                             {proPrice ? (
-                               <div className="flex items-center gap-1 mt-0.5">
-                                  <Star className="w-2.5 h-2.5 text-zinc-500" />
-                                  <span className="text-zinc-500 font-medium text-[10px]">
-                                    {formatIqd(proPrice)} (للمشتركين)
-                                  </span>
-                               </div>
-                             ) : null}
-                          </>
-                        )}
-                      </div>
+                    <div className="mt-auto pt-2">
+                      <CardPrice p={p} />
                     </div>
                   </div>
                 </Link>

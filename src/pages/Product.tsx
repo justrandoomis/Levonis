@@ -71,6 +71,8 @@ const STRINGS = {
     addToCart: 'أضف إلى السلة', adding: 'جارٍ الإضافة…', added: 'تمت الإضافة إلى السلة',
     viewCart: 'عرض السلة', signInToBuy: 'سجّل الدخول للشراء',
     directSale: 'بيع مباشر', preorderMode: 'طلب مسبق', unavailable: 'غير متوفر',
+    fulfilment: 'طريقة التوفر', fulfilDirectSub: 'يصلك فورًا من المخزون', fulfilPreorderSub: 'يُطلب لك ثم يُشحن',
+    levelOut: 'نفد', levelLeft: 'بقي {n}', levelAvail: 'متوفر {n}',
     inStock: 'متوفر', lowStock: 'بقي {n} فقط', stockProductScope: 'الكمية مسجّلة على مستوى المنتج وليست لكل خيار',
     untracked: 'التوفر غير مرتبط بعدّاد مخزون',
     qtyCapped: 'المتاح الآن {n} فقط — لم نضف الباقي كطلب مسبق',
@@ -112,6 +114,8 @@ const STRINGS = {
     addToCart: 'Add to cart', adding: 'Adding…', added: 'Added to your cart',
     viewCart: 'View cart', signInToBuy: 'Sign in to buy',
     directSale: 'Direct sale', preorderMode: 'Pre-order', unavailable: 'Unavailable',
+    fulfilment: 'Availability', fulfilDirectSub: 'Ships now from stock', fulfilPreorderSub: 'Ordered for you, then shipped',
+    levelOut: 'Out', levelLeft: '{n} left', levelAvail: '{n} available',
     inStock: 'In stock', lowStock: 'Only {n} left', stockProductScope: 'Stock is tracked per product, not per option',
     untracked: 'Availability is not tied to a stock counter',
     qtyCapped: 'Only {n} available now — the rest was not turned into a pre-order',
@@ -152,6 +156,8 @@ const STRINGS = {
     addToCart: 'زیادکردن بۆ سەبەتە', adding: 'زیاد دەکرێت…', added: 'زیادکرا بۆ سەبەتەکەت',
     viewCart: 'بینینی سەبەتە', signInToBuy: 'بچۆ ژوورەوە بۆ کڕین',
     directSale: 'فرۆشتنی ڕاستەوخۆ', preorderMode: 'پێشداواکاری', unavailable: 'بەردەست نییە',
+    fulfilment: 'شێوازی بەردەستبوون', fulfilDirectSub: 'یەکسەر لە کۆگاوە دەگات', fulfilPreorderSub: 'بۆت داوا دەکرێت پاشان دەنێردرێت',
+    levelOut: 'نەماوە', levelLeft: '{n} ماوە', levelAvail: '{n} بەردەستە',
     inStock: 'بەردەستە', lowStock: 'تەنها {n} ماوە', stockProductScope: 'بڕ لەسەر ئاستی بەرهەم تۆمار کراوە، نەک بۆ هەر هەڵبژاردەیەک',
     untracked: 'بەردەستی بە ژمێرەری کۆگا نەبەستراوە',
     qtyCapped: 'تەنها {n} بەردەستە ئێستا — ئەوەی ماوە نەکرا بە پێشداواکاری',
@@ -212,6 +218,10 @@ interface ProductDetail {
   description?: string; description_ar?: string; description_en?: string; description_ckb?: string;
   price_iqd: number; pro_price_iqd?: number | null; prime_price_iqd?: number | null;
   selling_type?: string;
+  /** Availability premium on direct (from-stock) lines — used ONLY to show
+   *  the direct pill's FINAL price before a quote lands; the charged number
+   *  is always the server quote. */
+  direct_surcharge_iqd?: number | null;
   media?: MediaItem[]; images?: string[];
   options?: OptionItem[]; colors?: ColorItem[];
   warranty_plans?: WarrantyPlanItem[];
@@ -220,6 +230,21 @@ interface ProductDetail {
   how_to_use?: string; brand?: string; stock?: number | null;
   merchant?: { id: string; name: string; verified: boolean };
   display_price_iqd?: number;
+}
+
+/** The relational structure (worker publicRelations): per-level sellable
+ *  counts and image↔choice bindings the legacy JSON shape cannot express. */
+interface RelationsPayload {
+  inventory_mode: 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION' | string;
+  option_groups: Array<{
+    id: string; name_en: string; sort: number;
+    values: Array<{ id: string; name_en: string; image: string; sort: number; available: number | null }>;
+  }>;
+  colors: Array<{ id: string; name_en: string; hex: string; image: string; sort: number; available: number | null }>;
+  images: Array<{
+    id: string; url: string; alt_en: string; sort_order: number; is_primary: boolean;
+    option_value_id: string | null; color_id: string | null; variant_id: string | null;
+  }>;
 }
 
 interface TransportView { method: string; commission_iqd: number | null; configured: boolean }
@@ -237,6 +262,8 @@ interface Availability {
     option_id: string | null; color_id: string | null;
     complete: boolean; errors: string[];
   };
+  /** §6: every sale type the product offers, with whether it can be used. */
+  modes?: Array<{ type: 'direct_sale' | 'pre_order'; usable: boolean; reason: string | null }>;
   preorder: { enabled: boolean; usable: boolean; reason: string | null; transports: TransportView[] };
   qty_ok: boolean;
 }
@@ -245,6 +272,7 @@ interface Quote {
   regular_iqd: number; pro_iqd: number | null; prime_iqd: number | null; applied_iqd: number;
   applied_tier: 'regular' | 'pro' | 'prime'; price_source: string;
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
+  direct?: { surcharge_iqd: number } | null;
   warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
   unit_subtotal_iqd: number; errors: string[]; qty: number; line_total_iqd: number;
 }
@@ -253,14 +281,15 @@ interface DetailResponse {
   product: ProductDetail;
   source: ProductSource;
   favorite: boolean;
+  relations?: RelationsPayload | null;
   availability?: Availability;
-  viewer_tier?: { tier: 'free' | 'plus' | 'pro'; active: boolean };
+  viewer_tier?: { tier: 'free' | 'plus' | 'pro' | 'prime'; active: boolean };
 }
 
 interface QuoteResponse {
   quote: Quote;
   availability: Availability;
-  viewer_tier?: { tier: 'free' | 'plus' | 'pro'; active: boolean };
+  viewer_tier?: { tier: 'free' | 'plus' | 'pro' | 'prime'; active: boolean };
 }
 
 // ------------------------------------------------------------------ helpers
@@ -383,6 +412,7 @@ export default function Product() {
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [source, setSource] = useState<ProductSource>('catalog');
+  const [relations, setRelations] = useState<RelationsPayload | null>(null);
   const [baseAvailability, setBaseAvailability] = useState<Availability | null>(null);
   const [viewerTier, setViewerTier] = useState<{ tier: string; active: boolean } | null>(null);
   const [favorite, setFavorite] = useState(false);
@@ -398,6 +428,11 @@ export default function Product() {
   const [transportMethod, setTransportMethod] = useState('');
   const [warrantyPlanId, setWarrantyPlanId] = useState('');
   const [qty, setQty] = useState(1);
+  // When BOTH direct sale and pre-order are genuinely usable, the buyer picks
+  // the fulfilment (each shows its FINAL price). Sending a transport is what
+  // makes the server treat the line as pre-order, so this flag only decides
+  // which controls render — the price always comes back from the quote.
+  const [wantPreorder, setWantPreorder] = useState(false);
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [liveAvailability, setLiveAvailability] = useState<Availability | null>(null);
@@ -441,6 +476,7 @@ export default function Product() {
         setProduct(data.product);
         setSource(data.source);
         setFavorite(data.favorite);
+        setRelations(data.relations ?? null);
         setBaseAvailability(data.availability ?? null);
         setViewerTier(data.viewer_tier ?? null);
         setLiveAvailability(null);
@@ -451,6 +487,7 @@ export default function Product() {
         setWarrantyPlanId('');
         setActionError('');
         setNotice('');
+        setWantPreorder(false);
 
         // Deterministic pre-selection ONLY where a single possibility exists.
         const opts = data.product.options ?? [];
@@ -532,6 +569,12 @@ export default function Product() {
   useEffect(() => {
     if (colorId && !colorsForOption.some((c) => c.id === colorId)) setColorId('');
   }, [colorsForOption, colorId]);
+
+  // Choosing an option or colour jumps the gallery to its images (the
+  // selection-aware gallery puts them first).
+  useEffect(() => {
+    setGalleryIndex(0);
+  }, [optionId, colorId]);
 
   const maxQty = Math.max(1, availability?.stock.max_qty ?? 1);
   useEffect(() => {
@@ -706,9 +749,51 @@ export default function Product() {
   const description = pick(
     lang as Lang, product.description_ar, product.description_en, product.description_ckb, product.description
   );
-  const gallery = galleryOf(product);
+  // Selection-aware gallery: the images bound to the CHOSEN colour lead,
+  // then the chosen option's, then the general product images; images bound
+  // to OTHER choices sink to the end. The value/colour's own `image` field
+  // joins the gallery too — «كل الصوره ترتبط بالخيار او اللون عند اختياره».
+  const gallery = (() => {
+    const base = galleryOf(product);
+    const rImages = relations?.images ?? [];
+    const optionObj = optionId ? (product.options ?? []).find((o) => o.id === optionId) : null;
+    const colorObj = colorId ? (product.colors ?? []).find((c) => c.id === colorId) : null;
+    if (!rImages.length && !optionObj?.image && !colorObj?.image) return base;
+    const linkOf = new Map(rImages.map((i) => [i.url, i]));
+    const extras: MediaItem[] = [];
+    if (colorObj?.image && !base.some((m) => m.url === colorObj.image)) extras.push({ url: colorObj.image });
+    if (optionObj?.image && !base.some((m) => m.url === optionObj.image)) extras.push({ url: optionObj.image });
+    const score = (m: MediaItem): number => {
+      const l = linkOf.get(m.url);
+      if (colorId && (l?.color_id === colorId || m.url === colorObj?.image)) return 0;
+      if (optionId && (l?.option_value_id === optionId || m.url === optionObj?.image)) return 1;
+      if (l?.color_id || l?.option_value_id) return 3;
+      return 2;
+    };
+    return [...extras, ...base]
+      .map((m, i) => ({ m, i, s: score(m) }))
+      .sort((a, b) => a.s - b.s || a.i - b.i)
+      .map((x) => x.m);
+  })();
   const activeMedia = gallery[Math.min(galleryIndex, Math.max(0, gallery.length - 1))];
   const options = product.options ?? [];
+
+  // Per-level sellable counts (server-derived, never raw counters) — shown
+  // on the pills ONLY when that level is the authoritative inventory source,
+  // so a number the engine would ignore is never presented as stock.
+  const invMode = relations?.inventory_mode ?? 'BASE';
+  const availByValue = new Map<string, number | null>(
+    (relations?.option_groups ?? []).flatMap((g) => g.values.map((v) => [v.id, v.available] as const))
+  );
+  const availByColor = new Map<string, number | null>(
+    (relations?.colors ?? []).map((c) => [c.id, c.available] as const)
+  );
+  const levelChip = (n: number | null | undefined): { text: string; cls: string } | null => {
+    if (n === null || n === undefined) return null;
+    if (n <= 0) return { text: s.levelOut, cls: 'text-red-300' };
+    if (n <= 5) return { text: s.levelLeft.replace('{n}', String(n)), cls: 'text-amber-300' };
+    return { text: s.levelAvail.replace('{n}', String(n)), cls: 'text-emerald-300' };
+  };
   const warrantyPlans = product.warranty_plans ?? [];
   const specGroups = (product.spec_groups ?? []).filter((g) => (g.rows ?? []).length > 0);
   const legacySpecs = product.specifications ?? [];
@@ -750,6 +835,28 @@ export default function Product() {
       : mode === 'direct_sale'
         ? { label: s.directSale, cls: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30', icon: <Package className="w-3.5 h-3.5" /> }
         : { label: s.unavailable, cls: 'bg-red-500/10 text-red-300 border-red-500/30', icon: <AlertTriangle className="w-3.5 h-3.5" /> };
+
+  // Fulfilment choice (owner's model): when direct sale AND pre-order are
+  // both genuinely usable the buyer picks one, and every choice shows its
+  // FINAL price — never "+X". The numbers here are previews built from the
+  // same server-resolved parts (applied price, per-method commission with
+  // the PRO waiver, the direct premium); the charged price is always the
+  // server quote that follows the pick.
+  const modesArr = availability?.modes ?? [];
+  const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
+  const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
+  const bothUsable = directUsable && preUsable;
+  const showTransports = (bothUsable ? wantPreorder : mode === 'preorder') && (availability?.preorder.transports.length ?? 0) > 0;
+  const appliedBase = quote && quote.errors.length === 0 ? quote.applied_iqd : product.display_price_iqd ?? product.price_iqd;
+  const directFinal = appliedBase + (product.direct_surcharge_iqd ?? 0);
+  const transportFinal = (t: TransportView): number | null =>
+    t.configured ? appliedBase + (isPro ? 0 : t.commission_iqd ?? 0) : null;
+  const preorderFromFinal = (() => {
+    const finals = (availability?.preorder.transports ?? [])
+      .map(transportFinal)
+      .filter((n): n is number => n !== null);
+    return finals.length ? Math.min(...finals) : null;
+  })();
 
   // ------------------------------------------------------------ sub-renders
   const priceBlock = (
@@ -846,19 +953,32 @@ export default function Product() {
             {options.map((opt) => {
               const selected = optionId === opt.id;
               const label = pickName(opt.name_en, opt.name, opt.name_ar) || opt.id;
+              const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
               return (
                 <button
                   key={opt.id}
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setOptionId(selected ? '' : opt.id)}
-                  className={`min-h-[44px] px-4 rounded-xl border text-sm font-bold transition-colors ${
+                  className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 text-sm font-bold transition-colors ${
                     selected
                       ? 'border-gold bg-gold/15 text-gold'
                       : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
                   }`}
                 >
-                  {label}
+                  {opt.image ? (
+                    <img
+                      src={opt.image}
+                      alt=""
+                      aria-hidden="true"
+                      className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : null}
+                  <span className="min-w-0 text-start">
+                    <span className="block truncate max-w-[10rem]">{label}</span>
+                    {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
+                  </span>
                 </button>
               );
             })}
@@ -878,6 +998,7 @@ export default function Product() {
             {colorsForOption.map((col) => {
               const selected = colorId === col.id;
               const label = pickName(col.name_en, col.name, col.name_ar) || col.id;
+              const chip = invMode === 'COLOR' ? levelChip(availByColor.get(col.id)) : null;
               return (
                 <button
                   key={col.id}
@@ -890,12 +1011,25 @@ export default function Product() {
                       : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
                   }`}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="w-5 h-5 rounded-full border border-zinc-600 shrink-0"
-                    style={{ backgroundColor: col.hex || '#3f3f46' }}
-                  />
-                  <span className="truncate max-w-[9rem]">{label}</span>
+                  {col.image ? (
+                    <img
+                      src={col.image}
+                      alt=""
+                      aria-hidden="true"
+                      className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="w-5 h-5 rounded-full border border-zinc-600 shrink-0"
+                      style={{ backgroundColor: col.hex || '#3f3f46' }}
+                    />
+                  )}
+                  <span className="min-w-0 text-start">
+                    <span className="block truncate max-w-[9rem]">{label}</span>
+                    {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
+                  </span>
                 </button>
               );
             })}
@@ -903,7 +1037,62 @@ export default function Product() {
         </fieldset>
       ) : null}
 
-      {mode === 'preorder' && (availability?.preorder.transports.length ?? 0) > 0 ? (
+      {bothUsable ? (
+        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
+            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+            {s.fulfilment}
+          </legend>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              aria-pressed={!wantPreorder}
+              onClick={() => {
+                setWantPreorder(false);
+                setTransportMethod('');
+              }}
+              className={`min-h-[44px] px-3 py-2.5 rounded-xl border flex items-start text-sm text-start transition-colors ${
+                !wantPreorder
+                  ? 'border-gold bg-gold/15 text-gold font-bold'
+                  : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
+              }`}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block">{s.directSale}</span>
+                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
+                <span className="block tabular-nums text-[14px] font-bold mt-1">{formatIqd(directFinal)}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={wantPreorder}
+              onClick={() => {
+                setWantPreorder(true);
+                const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
+                if (usable.length === 1) setTransportMethod(usable[0].method);
+              }}
+              className={`min-h-[44px] px-3 py-2.5 rounded-xl border flex items-start text-sm text-start transition-colors ${
+                wantPreorder
+                  ? 'border-gold bg-gold/15 text-gold font-bold'
+                  : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
+              }`}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block">{s.preorderMode}</span>
+                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilPreorderSub}</span>
+                {preorderFromFinal !== null ? (
+                  <span className="block tabular-nums text-[14px] font-bold mt-1">
+                    <span className="text-[10px] font-medium text-zinc-400 me-1">{s.from}</span>
+                    {formatIqd(preorderFromFinal)}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {showTransports ? (
         <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
@@ -912,6 +1101,7 @@ export default function Product() {
           <div className="mt-2 flex flex-col gap-2">
             {availability!.preorder.transports.map((t) => {
               const selected = transportMethod === t.method;
+              const final = transportFinal(t);
               return (
                 <button
                   key={t.method}
@@ -928,8 +1118,9 @@ export default function Product() {
                   }`}
                 >
                   <span>{transportLabel(s, t.method)}</span>
-                  <span className="tabular-nums text-[13px]">
-                    {t.configured ? `+${formatIqd(t.commission_iqd ?? 0)}` : s.transportUnset}
+                  {/* The FINAL unit price for this journey — never "+X". */}
+                  <span className="tabular-nums text-[13px] font-bold">
+                    {final !== null ? formatIqd(final) : s.transportUnset}
                   </span>
                 </button>
               );
@@ -1216,7 +1407,12 @@ export default function Product() {
                   <>{s.officialStore} · Levonis</>
                 )}
               </p>
-              {availability?.stock.tracked && (options.length > 0 || (product.colors ?? []).length > 0) ? (
+              {/* Only honest when the counter really is product-wide: with
+                  OPTION/COLOR inventory the pills carry their own counts. */}
+              {availability?.stock.tracked &&
+              (availability.stock.scope === 'product' || availability.stock.scope === 'base') &&
+              invMode === 'BASE' &&
+              (options.length > 0 || (product.colors ?? []).length > 0) ? (
                 <p className="mt-1 text-[12px] text-zinc-500">{s.stockProductScope}</p>
               ) : null}
             </div>
