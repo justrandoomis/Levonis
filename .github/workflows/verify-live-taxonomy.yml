@@ -137,17 +137,27 @@ jobs:
           printf '    %s\n' $assets
           found=0
           for a in $assets; do
-            body=$(curl -s --compressed --max-time 60 "$APEX$a")
-            bytes=$(printf '%s' "$body" | wc -c)
-            if printf '%s' "$body" | grep -q 'data-tax-tab'; then
+            # Written to a FILE, never piped into grep: `grep -q` stops at the
+            # first match, the writer takes SIGPIPE, and `pipefail` then reads
+            # a successful match as a failed pipeline. That is what made this
+            # check report a screen that was in fact deployed as missing.
+            curl -s --compressed --max-time 60 -o /tmp/asset.js "$APEX$a"
+            bytes=$(wc -c < /tmp/asset.js)
+            if grep -q 'data-tax-tab' /tmp/asset.js; then
               echo "  ok   $a carries the taxonomy screen ($bytes bytes)"
               found=1
-              # The screen is not enough on its own: the marker below is the
-              # quick-add the product form grew in the same round.
-              if printf '%s' "$body" | grep -q 'data-quick-add-open'; then
+              # The screen alone is not the round: this marker is the
+              # quick-add the product form grew with it.
+              if grep -q 'data-quick-add-open' /tmp/asset.js; then
                 echo "  ok   $a carries the product form's quick-add too"
               else
                 echo "  FAIL $a has the screen but not the quick-add"
+                exit 1
+              fi
+              if grep -q 'lookups-toggle' /tmp/asset.js; then
+                echo "  ok   $a carries the import panel's accepted-values box"
+              else
+                echo "  FAIL $a has the screen but not the accepted-values box"
                 exit 1
               fi
               break
