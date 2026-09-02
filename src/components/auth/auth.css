@@ -1,41 +1,76 @@
 /*
  * Scoped styles for the /auth screen (src/pages/Auth.tsx).
  *
- * Design language: a premium hardware-control surface for a 3D-printing
- * platform. Near-black ground, machined charcoal panels, one gold accent,
- * a quiet filament-green secondary, and a background that reads as "a part
- * is being manufactured behind the glass" — never louder than the form.
+ * Design language: a technical blueprint. The page is a CAD viewport —
+ * major/minor drafting grid, stroke-only isometric drawings of the machine
+ * (printer, spool, hotend section, a parts strip), tiny mono annotations —
+ * and the form sits on a thin, lighter panel with two registration ticks.
+ * Palette: charcoal grounds, dark olive for "done"/secondary lines, one warm
+ * gold for the accent and the live dimensions, a technical red for details
+ * and error states. No glass, no glow, no gradients.
  *
- * Everything animated here moves by transform/opacity only, and every
- * animation collapses to a finished static frame under
- * prefers-reduced-motion.
+ * Motion is opacity/transform only, slow, and collapses to a finished static
+ * frame under prefers-reduced-motion.
+ *
+ * Every class name a logic component or a verification script depends on is
+ * kept: .lv-card, .lv-field__*, .lv-fillbtn*, .lv-social, .lv-google,
+ * .lv-divider, .lv-brand__*, .lv-refbar*, .lv-otp*, .lv-btn-gold.
  */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 .lv-auth {
-  /* Machined-surface palette (page-scoped; brand gold comes from @theme). */
-  --lv-void: #050506;        /* page ground */
-  --lv-carbon: #0b0b0d;      /* card */
-  --lv-well: #101013;        /* inputs, secondary buttons */
-  --lv-line: #232327;        /* hairline borders */
-  --lv-line-strong: #303036;
-  --lv-gold: var(--color-gold, #baa369);
-  --lv-gold-bright: #d8c08a; /* gradient top / hover */
-  --lv-gold-deep: #8f7b47;   /* gradient bottom */
-  --lv-filament: #7e8f4f;    /* the green of loaded filament — sparingly */
-  --lv-ink: #fafaf7;
-  --plx-x: 0;                /* pointer parallax, set by AuthShell (desktop) */
+  --lv-ground: #0b0c0a;
+  --lv-ground-2: #101210;
+  --lv-panel: #161815;
+  --lv-panel-line: #272b25;
+  --lv-line-strong: #3a3f37;
+  --lv-line-hover: #4a5046;
+  --lv-olive: #6f7d4c;
+  --lv-olive-deep: #3d4630;
+  --lv-olive-text: #a6b283;
+  --lv-olive-soft: #151a11;
+  --lv-olive-line: #2d3a24;
+  --lv-gold: #c9ad6a;
+  --lv-gold-deep: #9a8349;
+  --lv-gold-text: #d8bf7f;
+  --lv-gold-soft: rgba(201, 173, 106, 0.1);
+  --lv-red: #a4443a;
+  --lv-red-text: #e69386;
+  --lv-red-soft: #231412;
+  --lv-red-line: #4a2620;
+  --lv-text-1: #f1f0ea;
+  --lv-text-2: #b4b6ae;
+  --lv-text-3: #878b82;
+  --lv-placeholder: #7d8178;
+  --lv-focus-ring: #c9ad6a;
+  --lv-cta-ink: #14120a;
+  --lv-cta-base: #1b1e19;
+  /* names older recipes still read */
+  --lv-void: var(--lv-ground);
+  --lv-carbon: var(--lv-panel);
+  --lv-well: var(--lv-ground-2);
+  --lv-line: var(--lv-panel-line);
+  --lv-gold-bright: var(--lv-gold-text);
+  --lv-filament: var(--lv-olive);
+  --lv-ink: var(--lv-text-1);
+  --plx-x: 0; /* pointer parallax, −1..1, set by AuthShell on fine pointers */
   --plx-y: 0;
-  background: var(--lv-void);
+  --lv-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: dark;
+  background: var(--lv-ground);
+  color: var(--lv-text-1);
+  -webkit-font-smoothing: antialiased;
 }
 
 .lv-mono {
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-feature-settings: 'tnum' 1;
 }
 
 /* =====================================================================
- * Background — layered, subtle, 3D-printing specific.
- * Layer order: glows < build-plate grid < print build (SVG) < particles.
+ * Background — the CAD viewport. Layers: grid < drawings < HUD chrome.
+ * The drawings never mirror (each figure is direction: ltr); only their
+ * PLACEMENT uses logical insets, so RTL puts them on the other side.
  * ===================================================================== */
 
 .lv-bg {
@@ -46,313 +81,769 @@
   z-index: 0;
 }
 
-/* Soft ambient light: warm gold high in the inline-start corner, a breath
-   of filament green low in the opposite one. Pre-blurred gradients — no
-   filter cost, no banding on OLED blacks. */
-.lv-bg__glow {
-  position: absolute;
-  inset: -20%;
-  transform: translate3d(calc(var(--plx-x) * -12px), calc(var(--plx-y) * -8px), 0);
-  background:
-    radial-gradient(42% 30% at 18% 6%, rgba(186, 163, 105, 0.10), transparent 70%),
-    radial-gradient(36% 26% at 88% 96%, rgba(126, 143, 79, 0.08), transparent 72%),
-    radial-gradient(70% 55% at 50% 110%, rgba(15, 18, 8, 0.55), transparent 75%);
+/* Parallax layers ease toward the pointer over ~1.2s — a drawing table
+   settling, never a cursor-chasing effect. */
+.lv-bg__gridwrap,
+.lv-bg__scene,
+.lv-hud {
+  transition: transform 1.2s var(--lv-ease-out);
 }
-
-/* Build-plate grid: fine 1px cells with a brighter major line every 5th —
-   the floor of a CNC/printer build volume, fading out toward the edges so
-   it never fights the card. Outer div carries parallax, inner the drift. */
 .lv-bg__gridwrap {
   position: absolute;
   inset: 0;
-  transform: translate3d(calc(var(--plx-x) * 5px), calc(var(--plx-y) * 4px), 0);
-  mask-image: radial-gradient(120% 90% at 50% 42%, #000 30%, transparent 78%);
-  -webkit-mask-image: radial-gradient(120% 90% at 50% 42%, #000 30%, transparent 78%);
+  transform: translate3d(calc(var(--plx-x) * 2px), calc(var(--plx-y) * 2px), 0);
 }
+/* Minor 24px, major 120px (= 5 minors), olive-tinted majors. Static. */
 .lv-bg__grid {
   position: absolute;
-  inset: -220px;
+  inset: -120px;
   background-image:
-    linear-gradient(to right, rgba(250, 250, 247, 0.028) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(250, 250, 247, 0.028) 1px, transparent 1px),
-    linear-gradient(to right, rgba(216, 192, 138, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(216, 192, 138, 0.05) 1px, transparent 1px);
-  background-size: 44px 44px, 44px 44px, 220px 220px, 220px 220px;
-  animation: lv-grid-drift 90s linear infinite;
+    linear-gradient(to right, rgba(241, 240, 234, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(241, 240, 234, 0.03) 1px, transparent 1px),
+    linear-gradient(to right, rgba(166, 178, 131, 0.085) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(166, 178, 131, 0.085) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
 }
-@keyframes lv-grid-drift {
-  to {
-    transform: translate3d(220px, 220px, 0);
-  }
-}
-
-/* ------------------------------------------------ the part being printed */
-
-.lv-print {
+.lv-bg__scene {
   position: absolute;
-  top: max(2.25rem, env(safe-area-inset-top));
-  inset-inline-start: 50%;
-  width: min(64vw, 300px);
-  translate: -50% 0;
-  transform: translate3d(calc(var(--plx-x) * 9px), calc(var(--plx-y) * 7px), 0);
-  /* On phones the build sits behind the wordmark: quiet enough to read
-     through, alive enough to notice. Desktop moves it into open space. */
-  opacity: 0.35;
-}
-[dir='rtl'] .lv-print {
-  translate: 50% 0;
-}
-@media (min-width: 1024px) {
-  .lv-print {
-    top: 50%;
-    inset-inline-start: 7vw;
-    width: min(30vw, 460px);
-    translate: 0 -50%;
-    opacity: 0.75;
-  }
-  [dir='rtl'] .lv-print {
-    translate: 0 -50%;
-  }
-}
-/* The fixture ticks only make sense where the build volume stands free —
-   on phones they poke out beside the brand as stray marks. */
-@media (max-width: 1023.98px) {
-  .lv-print__tick {
-    display: none;
-  }
+  inset: 0;
+  transform: translate3d(calc(var(--plx-x) * 4px), calc(var(--plx-y) * 4px), 0);
 }
 
-/* One 16s manufacturing cycle: layers rise 0→72%, dwell, then the finished
-   part dims and the cycle restarts. The mask rect grows bottom-up; the
-   toolhead tracks the active layer and retracts when the build completes. */
-.lv-print__mask-rect {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: lv-print-build 16s linear infinite;
-}
-@keyframes lv-print-build {
-  0% { transform: scaleY(0.001); }
-  72% { transform: scaleY(1); }
-  100% { transform: scaleY(1); }
-}
-.lv-print__cycle {
-  animation: lv-print-cycle 16s linear infinite;
-}
-@keyframes lv-print-cycle {
-  0% { opacity: 0.9; }
-  72% { opacity: 1; }
-  93% { opacity: 1; }
-  100% { opacity: 0.25; }
-}
-/* Toolhead: carried up with the build, oscillating across the layer. */
-.lv-print__head {
-  animation: lv-print-headz 16s linear infinite;
-}
-@keyframes lv-print-headz {
-  0% { transform: translateY(0); opacity: 1; }
-  72% { transform: translateY(-235px); opacity: 1; }
-  76% { transform: translateY(-235px); opacity: 0; }
-  100% { transform: translateY(-235px); opacity: 0; }
-}
-.lv-print__head-x {
-  animation: lv-print-headx 1.3s ease-in-out infinite alternate;
-}
-@keyframes lv-print-headx {
-  from { transform: translateX(-52px); }
-  to { transform: translateX(52px); }
-}
-
-/* Viewfinder ticks framing the build volume — fixture, not decoration. */
-.lv-print__tick {
+.lv-cad {
   position: absolute;
-  width: 14px;
-  height: 14px;
-  border: 1px solid rgba(250, 250, 247, 0.14);
+  margin: 0;
+  color: var(--lv-olive-text);
+  opacity: var(--o, 0.5);
 }
-.lv-print__tick--tl { top: -8px; inset-inline-start: -10px; border-width: 1px 0 0 1px; }
-.lv-print__tick--tr { top: -8px; inset-inline-end: -10px; border-width: 1px 1px 0 0; }
-.lv-print__tick--bl { bottom: -8px; inset-inline-start: -10px; border-width: 0 0 1px 1px; }
-.lv-print__tick--br { bottom: -8px; inset-inline-end: -10px; border-width: 0 1px 1px 0; }
-[dir='rtl'] .lv-print__tick--tl { border-width: 1px 1px 0 0; }
-[dir='rtl'] .lv-print__tick--tr { border-width: 1px 0 0 1px; }
-[dir='rtl'] .lv-print__tick--bl { border-width: 0 1px 1px 0; }
-[dir='rtl'] .lv-print__tick--br { border-width: 0 0 1px 1px; }
-
-/* Machine readout under the build volume. Always LTR: it is telemetry. */
-.lv-print__hud {
-  position: absolute;
-  bottom: -1.7rem;
-  inset-inline-start: -2px;
+/* The drawing itself never mirrors — only the figure's placement is logical. */
+.lv-cad__art {
+  display: block;
   direction: ltr;
-  font-size: 10px;
+}
+.lv-cad__art > svg,
+.lv-cad > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.lv-cad__leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* Annotations: mono, tiny, LTR; live dimensions in gold. */
+.lv-note {
+  position: absolute;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.14em;
-  color: rgba(250, 250, 247, 0.34);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--lv-text-3);
+  white-space: nowrap;
+  direction: ltr;
+}
+.lv-note--live {
+  color: var(--lv-gold-text);
+}
+.lv-note--sm {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.lv-note--red {
+  color: var(--lv-red-text);
+  opacity: 0.8;
+}
+
+/* Phones (≤767): only the printer, tucked behind the empty side of the brand
+   row, plus the readout and a small triad at the bottom. */
+.lv-cad--printer {
+  --o: 0.22;
+  top: -14px;
+  inset-inline-end: -26px;
+  width: 184px;
+}
+.lv-cad--spool,
+.lv-cad--hotend,
+.lv-cad--parts,
+.lv-note--callout,
+.lv-cad--printer .lv-cad__leaders {
+  display: none;
+}
+
+/* The two tiny motions: a bead that settles on the nozzle position over
+   20s, and the spool breathing over 24s. Opacity/transform only. */
+.lv-bead {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--lv-gold-text);
+  opacity: 0;
+  animation: lv-bead 20s ease-in-out infinite;
+}
+@keyframes lv-bead {
+  0% { transform: translate(-50%, -50%); opacity: 0; }
+  10% { opacity: 0.9; }
+  85% { opacity: 0.9; }
+  100% { transform: translate(-50%, calc(-50% + 5px)); opacity: 0; }
+}
+.lv-cad--spool {
+  animation: lv-breathe 24s ease-in-out infinite;
+}
+@keyframes lv-breathe {
+  0%, 100% { opacity: var(--o); }
+  50% { opacity: calc(var(--o) + 0.1); }
+}
+/* A dimension line that draws itself over 18s and rests drawn. */
+.lv-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lv-draw 18s var(--lv-ease-out) infinite;
+}
+@keyframes lv-draw {
+  0% { stroke-dashoffset: 1; }
+  30% { stroke-dashoffset: 0; }
+  85% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 1; }
+}
+
+/* HUD chrome in the viewport corners. Placement mirrors in RTL, content is LTR. */
+.lv-hud {
+  position: absolute;
+  direction: ltr;
+  color: var(--lv-text-3);
+  font-size: 11px;
+  line-height: 1.55;
+  letter-spacing: 0.06em;
+  transform: translate3d(calc(var(--plx-x) * 1px), calc(var(--plx-y) * 1px), 0);
+}
+.lv-hud b {
+  font-weight: 500;
+  color: var(--lv-gold-text);
+}
+.lv-hud--tl { top: max(16px, env(safe-area-inset-top)); left: 16px; display: none; }
+.lv-hud--tr { top: 20px; right: 20px; width: 150px; display: none; }
+.lv-hud--bl { bottom: max(12px, env(safe-area-inset-bottom)); left: 16px; font-size: 10px; }
+.lv-hud--bl .lv-hud__sub { display: none; }
+.lv-hud--br {
+  bottom: max(10px, env(safe-area-inset-bottom));
+  right: 12px;
+  width: 76px;
+  color: var(--lv-olive-text);
+  opacity: 0.6;
+}
+.lv-hud--br .lv-tb { display: none; }
+.lv-hud--br .lv-note { color: var(--lv-olive-text); }
+.lv-tb {
+  border-collapse: collapse;
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+.lv-tb td {
+  border: 1px solid var(--lv-panel-line);
+  padding: 4px 8px;
   white-space: nowrap;
 }
-.lv-print__hud b {
-  font-weight: 500;
-  color: rgba(216, 192, 138, 0.55);
+.lv-tb td:first-child,
+.lv-tb td:nth-child(3) { color: var(--lv-text-3); }
+.lv-tb td:nth-child(2),
+.lv-tb td:nth-child(4) { color: var(--lv-text-2); }
+
+@media (min-width: 768px) {
+  .lv-cad--printer { --o: 0.4; top: auto; bottom: 36px; inset-inline-end: auto; inset-inline-start: -16px; width: 250px; }
+  .lv-cad--hotend { --o: 0.5; display: block; top: 17vh; inset-inline-end: 4vw; width: 108px; }
+  .lv-hud--tl { display: block; left: 20px; }
+  .lv-hud--tr { display: block; width: 120px; opacity: 0.6; color: var(--lv-olive-text); }
+  .lv-hud--tr .lv-note { color: var(--lv-olive-text); }
+  .lv-hud--bl { left: 20px; font-size: 11px; }
+  .lv-hud--br { right: 20px; bottom: 20px; width: auto; opacity: 1; color: var(--lv-text-3); }
+  .lv-hud--br .lv-tb { display: table; }
+  .lv-hud--br .lv-cad--mini { display: none; }
+}
+@media (min-width: 1024px) {
+  .lv-cad--printer { --o: 0.55; top: 53%; bottom: auto; inset-inline-start: 5vw; width: clamp(360px, 30vw, 470px); transform: translateY(-50%); }
+  .lv-cad--printer .lv-cad__leaders,
+  .lv-note--callout { display: block; }
+  .lv-cad--spool { --o: 0.3; display: block; top: -36px; inset-inline-start: -30px; width: 250px; }
+  .lv-cad--hotend { --o: 0.6; top: 18vh; inset-inline-end: 8vw; width: 128px; }
+  .lv-cad--parts { --o: 0.5; display: block; bottom: 11vh; inset-inline-end: 4vw; width: clamp(300px, 27vw, 400px); }
+  .lv-hud--tl { display: none; }
+  .lv-hud--tr { width: 150px; right: 28px; top: 24px; opacity: 0.7; }
+  .lv-hud--bl { left: 28px; bottom: 26px; }
+  .lv-hud--bl .lv-hud__sub { display: block; }
+  .lv-hud--br { right: 28px; bottom: 26px; }
+}
+@media (min-width: 1440px) {
+  .lv-cad--printer { inset-inline-start: 7vw; }
+  .lv-cad--hotend { inset-inline-end: 10vw; }
+  .lv-cad--parts { inset-inline-end: 6vw; }
+}
+/* Short desktop windows: keep the bottom cluster off the card. */
+@media (min-width: 1024px) and (max-height: 760px) {
+  .lv-cad--parts { width: 300px; bottom: 64px; }
+  .lv-cad--hotend { width: 100px; }
+  .lv-cad--printer { width: 360px; }
+}
+[dir='rtl'] .lv-hud--tr { right: auto; left: 20px; }
+[dir='rtl'] .lv-hud--tl { left: auto; right: 20px; }
+[dir='rtl'] .lv-hud--bl { left: auto; right: 16px; text-align: right; }
+[dir='rtl'] .lv-hud--br { right: auto; left: 12px; }
+@media (min-width: 768px) {
+  [dir='rtl'] .lv-hud--bl { right: 20px; }
+  [dir='rtl'] .lv-hud--br { left: 20px; }
+}
+@media (min-width: 1024px) {
+  [dir='rtl'] .lv-hud--tr { left: 28px; }
+  [dir='rtl'] .lv-hud--bl { right: 28px; }
+  [dir='rtl'] .lv-hud--br { left: 28px; }
 }
 
-/* ------------------------------------------------------ filament motes */
+/* =====================================================================
+ * Column: entrance, brand row, language switch, card
+ * ===================================================================== */
 
-.lv-bg__dots span {
-  position: absolute;
-  bottom: -4vh;
-  inset-inline-start: var(--x);
-  width: var(--s);
-  height: var(--s);
-  border-radius: 9999px;
-  background: var(--c);
-  opacity: 0;
-  animation: lv-rise var(--t) linear infinite;
-  animation-delay: var(--d);
-  will-change: transform, opacity;
+.lv-enter {
+  animation: lv-rise 0.5s var(--lv-ease-out) both;
+}
+.lv-enter--2 {
+  animation-delay: 0.06s;
 }
 @keyframes lv-rise {
-  0% { transform: translate3d(0, 0, 0); opacity: 0; }
-  12% { opacity: var(--o, 0.3); }
-  82% { opacity: var(--o, 0.3); }
-  100% { transform: translate3d(var(--wx, 8px), -88vh, 0); opacity: 0; }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
-/* =====================================================================
- * Brand
- * ===================================================================== */
-
+.lv-brand {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 14px;
+}
+.lv-brand__link {
+  display: flex;
+  flex-direction: column;
+  min-height: 44px;
+  justify-content: flex-end;
+  text-decoration: none;
+  color: inherit;
+}
 .lv-brand__mark {
-  font-size: 24px;
-  font-weight: 900;
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
   line-height: 1;
-  color: var(--lv-gold);
-  letter-spacing: 0.34em;
-  padding-inline-start: 0.34em; /* optically recenters tracked type */
-  text-shadow: 0 0 18px rgba(186, 163, 105, 0.18);
+  letter-spacing: 0.3em;
+  color: var(--lv-gold-text);
+  direction: ltr;
 }
 .lv-brand__seam {
+  display: block;
+  width: 22px;
   height: 1px;
-  width: 7.5rem;
-  margin-top: 0.6rem;
-  background: linear-gradient(to right, transparent, rgba(216, 192, 138, 0.75), transparent);
+  margin-top: 8px;
+  background: var(--lv-olive);
 }
 .lv-brand__eyebrow {
-  margin-top: 0.55rem;
-  direction: ltr;
-  font-size: 9px;
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.32em;
-  padding-inline-start: 0.32em;
-  color: rgba(250, 250, 247, 0.38);
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  color: var(--lv-text-3);
+  direction: ltr;
+}
+@media (max-width: 359px) {
+  .lv-brand__eyebrow { font-size: 9px; letter-spacing: 0.12em; }
 }
 
-/* =====================================================================
- * Card — a machined panel, integrated with the ground it sits on.
- * ===================================================================== */
+/* Language switch: three mono chips in the brand row's free side. */
+.lv-lang {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--lv-panel-line);
+  border-radius: 8px;
+  background: rgba(22, 24, 21, 0.85);
+  direction: ltr;
+}
+.lv-lang__btn {
+  min-width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--lv-text-3);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.lv-lang__btn:hover { color: var(--lv-text-1); }
+.lv-lang__btn[aria-pressed='true'] {
+  color: var(--lv-text-1);
+  background: var(--lv-ground-2);
+  box-shadow: inset 0 0 0 1px var(--lv-line-strong);
+}
+.lv-lang__btn:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: -2px;
+}
 
+/* Card: lighter, thinner, one light shadow; two registration ticks in olive. */
 .lv-card {
   position: relative;
-  border-radius: 22px;
-  border: 1px solid var(--lv-line);
-  background: linear-gradient(180deg, #0d0d10 0%, var(--lv-carbon) 22%, var(--lv-carbon) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
-    0 1px 0 rgba(0, 0, 0, 0.6),
-    0 28px 70px -30px rgba(0, 0, 0, 0.9);
+  background: var(--lv-panel);
+  border: 1px solid var(--lv-panel-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px -18px rgba(0, 0, 0, 0.55);
 }
-/* The one gold detail the panel is allowed: a hairline seam along its top
-   edge, like a light catching a chamfer. */
-.lv-card::before {
+.lv-card::before,
+.lv-card::after {
   content: '';
   position: absolute;
-  top: -1px;
-  inset-inline: 22px;
-  height: 1px;
-  background: linear-gradient(to right, transparent, rgba(216, 192, 138, 0.55), transparent);
+  width: 10px;
+  height: 10px;
+  border: 0 solid var(--lv-olive);
+  opacity: 0.7;
+  pointer-events: none;
+}
+.lv-card::before {
+  top: -7px;
+  inset-inline-start: -7px;
+  border-block-start-width: 1px;
+  border-inline-start-width: 1px;
+}
+.lv-card::after {
+  bottom: -7px;
+  inset-inline-end: -7px;
+  border-block-end-width: 1px;
+  border-inline-end-width: 1px;
 }
 
 /* =====================================================================
- * Inputs (AuthTextField)
+ * Headings, links, small text
  * ===================================================================== */
 
-.lv-field__label {
+.lv-head {
+  margin-bottom: 18px;
+}
+.lv-eyebrow {
   display: block;
-  margin-bottom: 0.45rem;
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--lv-text-3);
+  direction: ltr;
+}
+[dir='rtl'] .lv-eyebrow {
+  text-align: right;
+}
+.lv-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--lv-text-1);
+}
+.lv-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--lv-text-2);
+}
+
+.lv-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 2px;
   font-size: 13px;
   font-weight: 600;
-  color: #c9c9cf;
+  color: var(--lv-gold-text);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.lv-link:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--lv-gold-deep);
+  text-underline-offset: 3px;
+}
+.lv-link:focus-visible,
+.lv-textbtn:focus-visible,
+.lv-back:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.lv-link--sm { font-size: 12px; min-height: 40px; }
+.lv-textbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lv-text-2);
+  transition: color 0.15s ease;
+}
+.lv-textbtn:hover:not(:disabled) { color: var(--lv-text-1); }
+.lv-textbtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.lv-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin: -6px 0 4px;
+  margin-inline-start: -4px;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lv-text-2);
+  transition: color 0.15s ease;
+}
+.lv-back:hover { color: var(--lv-text-1); }
+.lv-back svg { width: 15px; height: 15px; }
+[dir='rtl'] .lv-back svg { transform: scaleX(-1); }
+.lv-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.lv-foot {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--lv-text-2);
+}
+.lv-foot--tight { margin-top: 10px; }
+.lv-terms {
+  margin: 14px 2px 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--lv-text-3);
+}
+.lv-terms .lv-link { min-height: 0; font-size: 12px; }
+.lv-note-google {
+  margin: 10px 2px 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--lv-text-3);
+}
+.lv-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 4px;
+}
+.lv-center__icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--lv-olive-line);
+  background: var(--lv-olive-soft);
+  color: var(--lv-olive-text);
+}
+.lv-center__icon svg { width: 20px; height: 20px; }
+.lv-center .lv-sub { max-width: 20rem; margin-bottom: 20px; }
+
+/* =====================================================================
+ * Stepper (signup): three 2px segments, the step name, an LTR counter
+ * ===================================================================== */
+
+.lv-stepper {
+  margin: -4px 0 18px;
+}
+.lv-stepper__rail {
+  display: flex;
+  gap: 6px;
+}
+.lv-stepper__seg {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--lv-line-strong);
+  transition: background-color 0.3s ease;
+}
+.lv-stepper__seg.is-done { background: var(--lv-olive); }
+.lv-stepper__seg.is-active { background: var(--lv-gold); }
+.lv-stepper__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 8px;
+}
+.lv-stepper__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lv-text-2);
+}
+.lv-stepper__count {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--lv-text-3);
+  direction: ltr;
+}
+.lv-stepper__count b {
+  font-weight: 500;
+  color: var(--lv-gold-text);
+}
+
+/* Review block (signup step 3) */
+.lv-review {
+  border: 1px solid var(--lv-panel-line);
+  border-radius: 8px;
+  background: var(--lv-ground-2);
+  overflow: hidden;
+}
+.lv-review__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 12px;
+}
+.lv-review__row + .lv-review__row {
+  border-top: 1px solid var(--lv-panel-line);
+}
+.lv-review__key {
+  flex: none;
+  width: 34%;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lv-text-3);
+}
+.lv-review__val {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--lv-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lv-review__val--empty { color: var(--lv-text-3); }
+.lv-review__edit {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 40px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lv-gold-text);
+  transition: background-color 0.15s ease;
+}
+.lv-review__edit:hover { background: var(--lv-gold-soft); }
+.lv-review__edit:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: -2px;
+}
+
+/* =====================================================================
+ * Fields (AuthTextField, selects, phone, referral, username)
+ * ===================================================================== */
+
+.lv-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lv-field__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--lv-text-2);
 }
 .lv-field__frame {
   position: relative;
-  border-radius: 14px;
 }
 .lv-field__input {
   width: 100%;
-  min-height: 54px;
-  border-radius: 14px;
-  border: 1px solid var(--lv-line);
-  background: var(--lv-well);
-  padding-block: 0.8rem;
-  padding-inline: 1rem;
-  font-size: 16px; /* ≥16px: iOS Safari must not zoom the form on focus */
-  color: var(--lv-ink);
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: var(--lv-ground-2);
+  padding: 0 12px;
+  font-size: 16px; /* ≥16px: iOS Safari must not zoom the page on focus */
+  color: var(--lv-text-1);
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 .lv-field__input::placeholder {
-  color: #55555e;
+  color: var(--lv-placeholder);
+  opacity: 1;
 }
 .lv-field__input:hover:not(:disabled) {
-  border-color: var(--lv-line-strong);
+  border-color: var(--lv-line-hover);
 }
 .lv-field__input:focus {
-  border-color: rgba(216, 192, 138, 0.65);
-  box-shadow: 0 0 0 3px rgba(186, 163, 105, 0.16);
-  background: #121215;
+  border-color: var(--lv-focus-ring);
+  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
 }
 .lv-field__input:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 .lv-field__input.has-icon {
-  padding-inline-start: 2.9rem;
+  padding-inline-start: 38px;
 }
-.lv-field__input.has-reveal {
-  padding-inline-end: 3.25rem;
+.lv-field__input.has-reveal,
+.lv-field__input.has-trail {
+  padding-inline-end: 46px;
 }
 .lv-field__input.is-error {
-  border-color: rgba(239, 68, 68, 0.65);
+  border-color: var(--lv-red);
+}
+.lv-field__input.is-error:focus {
+  box-shadow: 0 0 0 3px rgba(164, 68, 58, 0.16);
+}
+.lv-field__input.is-ok {
+  border-color: var(--lv-olive-deep);
 }
 .lv-field__icon {
   position: absolute;
-  inset-inline-start: 0.95rem;
+  inset-inline-start: 12px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
-  color: #62626b;
+  color: var(--lv-text-3);
   pointer-events: none;
-  transition: color 0.18s ease;
+  transition: color 0.16s ease;
 }
+.lv-field__icon svg { width: 16px; height: 16px; }
 .lv-field__frame:focus-within .lv-field__icon {
-  color: var(--lv-gold);
+  color: var(--lv-gold-text);
 }
 .lv-field__reveal {
   position: absolute;
-  inset-inline-end: 0.3rem;
+  inset-inline-end: 3px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 10px;
-  color: #71717a;
-  transition: color 0.15s ease;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  color: var(--lv-text-3);
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
-.lv-field__reveal:hover { color: #fff; }
+.lv-field__reveal svg { width: 17px; height: 17px; }
+.lv-field__reveal:hover {
+  color: var(--lv-text-1);
+  background: rgba(241, 240, 234, 0.04);
+}
 .lv-field__reveal:focus-visible {
-  outline: 2px solid var(--lv-gold);
+  outline: 2px solid var(--lv-focus-ring);
   outline-offset: -2px;
+}
+/* Trailing status glyph (username availability). */
+.lv-field__trail {
+  position: absolute;
+  inset-inline-end: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  pointer-events: none;
+  color: var(--lv-text-3);
+}
+.lv-field__trail svg { width: 15px; height: 15px; }
+.lv-field__trail.is-ok { color: var(--lv-olive-text); }
+.lv-field__trail.is-bad { color: var(--lv-red-text); }
+.lv-field__error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--lv-red-text);
+}
+/* One reserved help line so a message never pushes the CTA under a thumb. */
+.lv-field__help {
+  margin: 6px 0 0;
+  min-height: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lv-text-3);
+}
+.lv-field__help.is-ok { color: var(--lv-olive-text); }
+.lv-field__help.is-bad { color: var(--lv-red-text); font-weight: 500; }
+
+/* Native select with the field chrome and a drawn chevron. */
+.lv-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 38px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23878b82' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+  background-position: right 14px center;
+  cursor: pointer;
+}
+[dir='rtl'] .lv-select {
+  background-position: left 14px center;
+}
+.lv-select option {
+  background: var(--lv-panel);
+  color: var(--lv-text-1);
+}
+
+/* Phone (PhoneField): country display + national number, always LTR. */
+.lv-phone {
+  display: flex;
+  gap: 8px;
+}
+.lv-phone__country {
+  position: relative;
+  flex: none;
+}
+.lv-phone__display {
+  display: flex;
+  height: 46px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: var(--lv-ground-2);
+  padding: 0 12px;
+  font-size: 15px;
+  color: var(--lv-text-1);
+  transition: border-color 0.16s ease;
+}
+.lv-phone__display.is-error { border-color: var(--lv-red); }
+.lv-phone__display.is-disabled { opacity: 0.55; }
+.lv-phone__display svg { width: 13px; height: 13px; color: var(--lv-text-3); }
+.lv-phone__country:focus-within .lv-phone__display {
+  border-color: var(--lv-focus-ring);
+  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+}
+.lv-phone__select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.lv-phone__input {
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -364,22 +855,22 @@
 .lv-auth input:-webkit-autofill:hover,
 .lv-auth input:-webkit-autofill:focus,
 .lv-auth input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #101013 inset !important;
-  box-shadow: 0 0 0 1000px #101013 inset !important;
-  -webkit-text-fill-color: #fafaf7 !important;
-  caret-color: #fafaf7;
+  -webkit-box-shadow: 0 0 0 1000px #101210 inset !important;
+  box-shadow: 0 0 0 1000px #101210 inset !important;
+  -webkit-text-fill-color: #f1f0ea !important;
+  caret-color: #f1f0ea;
   transition: background-color 9999999s ease-out;
 }
 .lv-auth input:autofill {
-  box-shadow: 0 0 0 1000px #101013 inset;
-  -webkit-text-fill-color: #fafaf7;
-  caret-color: #fafaf7;
+  box-shadow: 0 0 0 1000px #101210 inset;
+  -webkit-text-fill-color: #f1f0ea;
+  caret-color: #f1f0ea;
 }
 
 /* =====================================================================
- * FillButton (§2.2) — unchanged contract, machined-gold skin.
- * The background fills with REAL form-completion progress; a clipped
- * second label keeps contrast on both regions. Transform-only.
+ * FillButton — unchanged contract, instrument skin. Charcoal base, a flat
+ * gold sweep from the inline-start edge with a 1px darker leading edge;
+ * dark text clipped to the filled region so contrast never drops mid-fill.
  * ===================================================================== */
 
 .lv-fillbtn {
@@ -387,85 +878,79 @@
   overflow: hidden;
   display: block;
   width: 100%;
-  min-height: 56px;
-  border-radius: 15px;
-  border: 1px solid rgba(186, 163, 105, 0.34);
-  background: #131316;
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: var(--lv-cta-base);
   isolation: isolate;
   cursor: pointer;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+  transition: border-color 0.2s ease, transform 0.12s ease;
 }
 .lv-fillbtn:disabled {
   cursor: not-allowed;
 }
 .lv-fillbtn:not(:disabled):active {
-  transform: scale(0.98);
+  transform: translateY(1px);
 }
 .lv-fillbtn:focus-visible {
-  outline: 2px solid var(--lv-gold);
+  outline: 2px solid var(--lv-focus-ring);
   outline-offset: 2px;
 }
-
-/* Gold fill layer: scaleX(progress) from the inline-start edge. */
 .lv-fillbtn__fill {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(180deg, var(--lv-gold-bright) 0%, var(--lv-gold) 55%, var(--lv-gold-deep) 130%);
+  background: var(--lv-gold);
   transform: scaleX(var(--lv-fill-scale, 0));
   transform-origin: 0% 50%;
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease;
   will-change: transform;
 }
 [dir='rtl'] .lv-fillbtn__fill {
   transform-origin: 100% 50%;
 }
-/* A specular line along the filled surface's top edge. */
 .lv-fillbtn__fill::after {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  background: rgba(255, 248, 230, 0.55);
+  top: 0;
+  bottom: 0;
+  inset-inline-end: 0;
+  width: 1px;
+  background: rgba(20, 18, 10, 0.45);
 }
-
 .lv-fillbtn__layer {
   position: relative;
   z-index: 1;
   display: flex;
-  min-height: 56px;
+  height: 100%;
   width: 100%;
   align-items: center;
   justify-content: center;
-  gap: 0.625rem;
-  padding-inline: 1rem;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.3;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
 }
 .lv-fillbtn__layer--base {
-  color: #d4d4d8;
+  color: var(--lv-text-1);
 }
-/* Dark text clipped to the filled region — contrast never drops mid-fill. */
 .lv-fillbtn__layer--fill {
   position: absolute;
   inset: 0;
   z-index: 2;
-  color: #121006;
+  color: var(--lv-cta-ink);
   clip-path: inset(0 calc(100% - var(--lv-fill-pct, 0%)) 0 0);
   transition: clip-path 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 [dir='rtl'] .lv-fillbtn__layer--fill {
   clip-path: inset(0 0 0 calc(100% - var(--lv-fill-pct, 0%)));
 }
-
-/* Forward arrow: LTR "→" mirrors to "←" in RTL. Same box as the spinner,
-   so swapping them never shifts the label. */
 .lv-fillbtn__arrow {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 15px;
+  height: 15px;
   flex: none;
   transition: transform 0.18s ease;
 }
@@ -478,184 +963,260 @@
 [dir='rtl'] .lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__arrow {
   transform: scaleX(-1) translateX(2px);
 }
-
 .lv-fillbtn.is-ready {
-  border-color: rgba(216, 192, 138, 0.9);
-  box-shadow:
-    0 10px 30px -12px rgba(186, 163, 105, 0.5),
-    inset 0 0 0 1px rgba(255, 240, 200, 0.06);
+  border-color: var(--lv-gold-deep);
 }
 .lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__fill {
-  filter: brightness(1.07);
+  background: var(--lv-gold-text);
 }
 .lv-fillbtn.is-error {
-  border-color: rgba(239, 68, 68, 0.6);
-  animation: lv-nudge 0.26s ease;
-}
-@keyframes lv-nudge {
-  0%, 100% { transform: translateX(0); }
-  30% { transform: translateX(-4px); }
-  60% { transform: translateX(4px); }
+  border-color: var(--lv-red);
 }
 /* Success is a REAL server answer, not an assumption. */
 .lv-fillbtn[data-status='success'] {
-  border-color: rgba(16, 185, 129, 0.7);
-  box-shadow: 0 8px 28px -10px rgba(16, 185, 129, 0.45);
+  border-color: var(--lv-olive);
 }
 /* NOTE: the not-ready button is NOT dimmed. §2.2 forbids lowering the
-   label's contrast; incompleteness is signalled by the missing gold
-   border/glow and the visible requirement hint — never by washed text. */
-
+   label's contrast; incompleteness is the missing gold border and the
+   visible requirement hint — never washed text. */
 .lv-fillbtn__hint {
-  margin-top: 0.5rem;
+  margin: 8px 2px 0;
   font-size: 12px;
-  line-height: 1.6;
-  color: #a1a1aa;
-  text-align: center;
+  line-height: 1.55;
+  color: var(--lv-text-3);
 }
-
+/* Loading: three dots fading in sequence — nothing spins. */
 .lv-fillbtn__spinner {
-  width: 1.05rem;
-  height: 1.05rem;
+  position: relative;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
   flex: none;
-  border-radius: 9999px;
-  border: 2px solid rgba(10, 10, 10, 0.25);
-  border-top-color: #0a0a0a;
-  animation: lv-spin 0.8s linear infinite;
+  margin: 0 8px;
+  animation: lv-dots 1.2s ease-in-out infinite 0.2s;
 }
-.lv-fillbtn__layer--base .lv-fillbtn__spinner {
-  border-color: rgba(255, 255, 255, 0.25);
-  border-top-color: #fff;
+.lv-fillbtn__spinner::before,
+.lv-fillbtn__spinner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: lv-dots 1.2s ease-in-out infinite;
+}
+.lv-fillbtn__spinner::before { left: -7px; }
+.lv-fillbtn__spinner::after { left: 7px; animation-delay: 0.4s; }
+@keyframes lv-dots {
+  0%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
 }
 .lv-fillbtn__check {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 15px;
+  height: 15px;
   flex: none;
 }
-@keyframes lv-spin {
-  to { transform: rotate(360deg); }
-}
 
-/* Plain gold action (reset-done / dead-link screens): same skin as a fully
-   filled FillButton, without the meter machinery. */
+/* Plain gold action (reset-done / dead-link screens). */
 .lv-btn-gold {
   display: flex;
   width: 100%;
-  min-height: 54px;
+  height: 46px;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  border-radius: 15px;
-  border: 1px solid rgba(216, 192, 138, 0.9);
-  background: linear-gradient(180deg, var(--lv-gold-bright) 0%, var(--lv-gold) 55%, var(--lv-gold-deep) 130%);
-  color: #121006;
-  font-size: 15px;
-  font-weight: 700;
-  box-shadow: 0 10px 30px -12px rgba(186, 163, 105, 0.5);
-  transition: filter 0.15s ease, transform 0.12s ease;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-gold-deep);
+  background: var(--lv-gold);
+  color: var(--lv-cta-ink);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.15s ease, transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.lv-btn-gold:hover { filter: brightness(1.07); }
-.lv-btn-gold:active { transform: scale(0.98); }
+.lv-btn-gold:hover { background: var(--lv-gold-text); }
+.lv-btn-gold:active { transform: translateY(1px); }
 .lv-btn-gold:focus-visible {
-  outline: 2px solid var(--lv-gold);
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: 2px;
+}
+/* Quiet secondary action (Telegram phases, blocked/expired). */
+.lv-btn-quiet {
+  display: flex;
+  width: 100%;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: transparent;
+  color: var(--lv-text-1);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.lv-btn-quiet svg { width: 16px; height: 16px; flex: none; color: var(--lv-gold-text); }
+.lv-btn-quiet:hover:not(:disabled) {
+  border-color: var(--lv-line-hover);
+  background: rgba(241, 240, 234, 0.025);
+}
+.lv-btn-quiet:active:not(:disabled) { transform: translateY(1px); }
+.lv-btn-quiet:disabled { opacity: 0.5; cursor: not-allowed; }
+.lv-btn-quiet:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
   outline-offset: 2px;
 }
 
 /* =====================================================================
- * Divider + secondary (provider) actions
+ * Divider + providers
  * ===================================================================== */
 
 .lv-divider {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  margin-block: 1.1rem;
+  gap: 12px;
+  margin: 18px 0 12px;
 }
 .lv-divider::before,
 .lv-divider::after {
   content: '';
-  height: 1px;
   flex: 1;
-  background: linear-gradient(to right, transparent, var(--lv-line-strong));
-}
-.lv-divider::after {
-  background: linear-gradient(to left, transparent, var(--lv-line-strong));
+  height: 1px;
+  background: var(--lv-panel-line);
 }
 .lv-divider__label {
   font-size: 12px;
-  font-weight: 600;
-  color: #6b6b74;
+  font-weight: 500;
+  color: var(--lv-text-3);
 }
-
+.lv-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .lv-social {
   display: flex;
   width: 100%;
-  min-height: 52px;
+  height: 46px;
   align-items: center;
   justify-content: center;
-  gap: 0.65rem;
-  border-radius: 14px;
-  border: 1px solid var(--lv-line);
-  background: var(--lv-well);
-  color: #e6e6ea;
+  gap: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: transparent;
+  color: var(--lv-text-1);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .lv-social:hover:not(:disabled) {
-  border-color: var(--lv-line-strong);
-  background: #141417;
+  border-color: var(--lv-line-hover);
+  background: rgba(241, 240, 234, 0.025);
 }
 .lv-social:active:not(:disabled) {
-  transform: scale(0.985);
+  transform: translateY(1px);
 }
 .lv-social:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .lv-social:focus-visible {
-  outline: 2px solid var(--lv-gold);
+  outline: 2px solid var(--lv-focus-ring);
   outline-offset: 2px;
 }
 .lv-social__icon {
   display: flex;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 18px;
+  height: 18px;
   align-items: center;
   justify-content: center;
   flex: none;
 }
+.lv-social__icon svg { width: 18px; height: 18px; }
 
 /* The Google identity button is Google's own iframe (the credential flow
-   requires it). It gets a socketed well matching the Telegram button, with a
-   fixed height so the async iframe load never shifts layout — and so the row
-   still reads as a control, not a hole, in the moment before Google's script
-   arrives. */
+   requires it). Same outline as .lv-social, recessed ground so the iframe
+   reads as seated; fixed height so the async load never shifts layout. */
 .lv-google {
   position: relative;
   display: flex;
-  min-height: 52px;
+  min-height: 46px;
   align-items: center;
   justify-content: center;
-  padding: 5px;
-  border-radius: 14px;
-  border: 1px solid var(--lv-line);
-  background: var(--lv-well);
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: var(--lv-ground-2);
 }
 .lv-google.is-busy {
-  opacity: 0.55;
+  opacity: 0.5;
   pointer-events: none;
 }
 
 /* =====================================================================
- * OtpBoxes (§2.4) — six linked one-digit boxes, always LTR digit order.
+ * Notices
+ * ===================================================================== */
+
+.lv-alert,
+.lv-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-red-line);
+  background: var(--lv-red-soft);
+  color: var(--lv-red-text);
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.lv-alert p,
+.lv-notice p { margin: 0; min-width: 0; }
+.lv-alert svg,
+.lv-notice svg { width: 15px; height: 15px; flex: none; margin-top: 3px; }
+.lv-notice--ok {
+  border-color: var(--lv-olive-line);
+  background: var(--lv-olive-soft);
+  color: var(--lv-olive-text);
+}
+.lv-notice--warn {
+  border-color: rgba(154, 131, 73, 0.45);
+  background: rgba(201, 173, 106, 0.08);
+  color: var(--lv-gold-text);
+}
+.lv-notice--info {
+  border-color: var(--lv-panel-line);
+  background: var(--lv-ground-2);
+  color: var(--lv-text-2);
+  font-weight: 400;
+}
+.lv-notice--info svg { color: var(--lv-gold-text); }
+.lv-notice--tight { margin: 12px 0 0; }
+.lv-alert .lv-btn-quiet {
+  width: auto;
+  height: 40px;
+  margin-top: 8px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--lv-gold-text);
+  border-color: var(--lv-gold-deep);
+}
+
+/* =====================================================================
+ * OtpBoxes — six linked one-digit boxes, always LTR digit order.
  * ===================================================================== */
 
 .lv-otp {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
   justify-content: center;
 }
 .lv-otp__box {
@@ -664,38 +1225,72 @@
   min-width: 0;
   text-align: center;
   font-size: 20px;
-  font-weight: 700;
-  font-family: inherit;
-  color: #fff;
-  background: var(--lv-well);
-  border: 1px solid var(--lv-line);
-  border-radius: 0.75rem;
+  font-weight: 600;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  color: var(--lv-text-1);
+  background: var(--lv-ground-2);
+  border: 1px solid var(--lv-line-strong);
+  border-radius: 8px;
   outline: none;
   caret-color: var(--lv-gold);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .lv-otp__box:focus {
-  border-color: rgba(216, 192, 138, 0.7);
-  box-shadow: 0 0 0 3px rgba(186, 163, 105, 0.16);
+  border-color: var(--lv-focus-ring);
+  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
 }
 .lv-otp__box.is-filled {
-  border-color: rgba(186, 163, 105, 0.5);
+  border-color: var(--lv-gold-deep);
 }
 .lv-otp__box.is-error {
-  border-color: rgba(239, 68, 68, 0.7);
+  border-color: var(--lv-red);
 }
 .lv-otp__box:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 @media (max-width: 359px) {
-  .lv-otp { gap: 0.375rem; }
+  .lv-otp { gap: 6px; }
   .lv-otp__box { width: 2.5rem; height: 3rem; }
 }
 
 /* =====================================================================
- * ReferralBar (§2.6) — smooth expander.
+ * ReferralBar — smooth expander
  * ===================================================================== */
 
+.lv-refbar__toggle {
+  display: flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-panel-line);
+  background: transparent;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lv-text-2);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.lv-refbar__toggle:hover:not(:disabled) {
+  border-color: var(--lv-line-hover);
+  color: var(--lv-text-1);
+}
+.lv-refbar__toggle:disabled { opacity: 0.55; }
+.lv-refbar__toggle:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: 2px;
+}
+.lv-refbar__toggle svg { width: 15px; height: 15px; }
+.lv-refbar__toggle-icon { color: var(--lv-gold-text); }
+.lv-refbar__chev {
+  color: var(--lv-text-3);
+  transition: transform 0.2s ease;
+}
+.lv-refbar__toggle[aria-expanded='true'] .lv-refbar__chev {
+  transform: rotate(180deg);
+}
 .lv-refbar__panel {
   display: grid;
   grid-template-rows: 0fr;
@@ -713,28 +1308,215 @@
 .lv-refbar__panel.is-open .lv-refbar__inner {
   visibility: visible;
 }
+.lv-refbar__found {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 46px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-olive-line);
+  background: var(--lv-olive-soft);
+  padding: 4px 4px 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lv-olive-text);
+}
+[dir='rtl'] .lv-refbar__found { padding: 4px 12px 4px 4px; }
+.lv-refbar__found-text {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.lv-refbar__found-text svg { width: 15px; height: 15px; flex: none; }
+.lv-refbar__found-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-refbar__clear {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--lv-olive-text);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.lv-refbar__clear svg { width: 15px; height: 15px; }
+.lv-refbar__clear:hover { color: var(--lv-red-text); background: var(--lv-red-soft); }
+.lv-refbar__clear:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: -2px;
+}
 
 /* =====================================================================
- * Reduced motion: a clean static scene. The build appears finished, the
- * toolhead is parked, nothing drifts, rises or nudges.
+ * Telegram panel skin (TelegramAuth keeps its state; only classes changed)
+ * ===================================================================== */
+
+.lv-tg__intro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.lv-tg__badge {
+  display: flex;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--lv-panel-line);
+  background: var(--lv-ground-2);
+  color: var(--lv-gold-text);
+}
+.lv-tg__badge svg { width: 17px; height: 17px; }
+.lv-tg__intro p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--lv-text-2);
+}
+.lv-tg__masked {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--lv-text-1);
+  direction: ltr;
+  text-align: start;
+}
+.lv-tg__hint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--lv-text-2);
+}
+.lv-tg__small {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--lv-text-3);
+}
+.lv-tg__waiting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--lv-text-2);
+}
+.lv-tg__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.lv-tg__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lv-tg__inline-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 500;
+  color: var(--lv-red-text);
+}
+.lv-tg__inline-alert svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
+.lv-tg__inline-alert p { margin: 0; }
+.lv-tg__ref {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lv-text-2);
+}
+.lv-tg__ref b {
+  font-weight: 600;
+  color: var(--lv-gold-text);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.lv-tg__otp-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--lv-text-3);
+}
+/* Three-dot wait used outside the FillButton (Telegram waiting state). */
+.lv-dots {
+  position: relative;
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  flex: none;
+  margin: 0 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: lv-dots 1.2s ease-in-out infinite 0.2s;
+}
+.lv-dots::before,
+.lv-dots::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: lv-dots 1.2s ease-in-out infinite;
+}
+.lv-dots::before { left: -7px; }
+.lv-dots::after { left: 7px; animation-delay: 0.4s; }
+
+/* =====================================================================
+ * Reduced motion: a static frame.
  * ===================================================================== */
 @media (prefers-reduced-motion: reduce) {
-  .lv-bg__grid { animation: none; }
-  .lv-bg__dots { display: none; }
-  .lv-print__mask-rect { animation: none; transform: scaleY(1); }
-  .lv-print__cycle { animation: none; opacity: 1; }
-  .lv-print__head { animation: none; opacity: 0; }
-  .lv-print__head-x { animation: none; }
+  .lv-cad--spool,
+  .lv-bead,
+  .lv-draw,
+  .lv-enter,
+  .lv-fillbtn__spinner,
+  .lv-fillbtn__spinner::before,
+  .lv-fillbtn__spinner::after,
+  .lv-dots,
+  .lv-dots::before,
+  .lv-dots::after {
+    animation: none !important;
+  }
+  .lv-bead { opacity: 0.8; transform: translate(-50%, -50%); }
+  .lv-draw { stroke-dashoffset: 0; }
+  .lv-enter { opacity: 1; transform: none; }
+  .lv-fillbtn__spinner,
+  .lv-fillbtn__spinner::before,
+  .lv-fillbtn__spinner::after,
+  .lv-dots,
+  .lv-dots::before,
+  .lv-dots::after { opacity: 0.7; }
+  .lv-bg__gridwrap,
+  .lv-bg__scene,
+  .lv-hud,
   .lv-fillbtn__fill,
   .lv-fillbtn__layer--fill,
   .lv-field__input,
-  .lv-field__icon { transition: none; }
-  .lv-fillbtn.is-error { animation: none; }
+  .lv-field__icon,
+  .lv-fillbtn__arrow,
+  .lv-social,
+  .lv-fillbtn,
+  .lv-refbar__panel,
+  .lv-refbar__inner,
+  .lv-refbar__chev,
+  .lv-stepper__seg,
+  .lv-otp__box { transition: none; }
   .lv-fillbtn:not(:disabled):active,
   .lv-btn-gold:active,
+  .lv-btn-quiet:active:not(:disabled),
   .lv-social:active:not(:disabled) { transform: none; }
-  .lv-fillbtn__spinner { animation-duration: 1.6s; }
-  .lv-fillbtn__arrow { transition: none; }
-  .lv-refbar__panel, .lv-refbar__inner { transition: none; }
-  .lv-otp__box { transition: none; }
 }
+
+.lv-field__help.is-warn { color: var(--lv-gold-text); font-weight: 500; }

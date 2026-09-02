@@ -3,9 +3,11 @@ import { Eye, EyeOff } from 'lucide-react';
 
 /**
  * Labeled input for the /auth screen: a REAL <label> above the input,
- * inline error wired via aria-describedby, an optional leading icon, and an
- * optional show/hide toggle for passwords (44px touch target). Paste is
- * never blocked and nothing here interferes with password managers.
+ * inline error wired via aria-describedby, an optional leading icon, an
+ * optional trailing status glyph with a reserved help line (username
+ * availability), and an optional show/hide toggle for passwords (40px
+ * target inside a 46px field). Paste is never blocked and nothing here
+ * interferes with password managers.
  *
  * 16px value text is deliberate: anything smaller makes iOS Safari zoom the
  * whole page when the field is focused.
@@ -35,6 +37,14 @@ export interface AuthTextFieldProps {
   icon?: React.ReactNode;
   /** Accessible labels for the password reveal toggle. */
   revealLabels?: { show: string; hide: string };
+  /** A reserved one-line message under the field (never shifts layout). */
+  help?: string;
+  /** Tone of the help line and of the trailing glyph. */
+  helpTone?: 'neutral' | 'ok' | 'bad';
+  /** Trailing status glyph at the inline end (decorative). */
+  trail?: React.ReactNode;
+  /** Whether the value is announced as valid (green hairline). */
+  ok?: boolean;
 }
 
 export default function AuthTextField({
@@ -55,13 +65,20 @@ export default function AuthTextField({
   disabled,
   icon,
   revealLabels,
+  help,
+  helpTone = 'neutral',
+  trail,
+  ok,
 }: AuthTextFieldProps) {
   const [revealed, setRevealed] = useState(false);
   const isPassword = type === 'password';
   const inputType = isPassword ? (revealed ? 'text' : 'password') : type;
   const errorId = `${id}-error`;
+  const helpId = `${id}-help`;
   // Passwords render LTR by default so the toggle, padding and caret agree.
   const dirValue = valueDir ?? (isPassword ? 'ltr' : undefined);
+  const describedBy = error ? errorId : help !== undefined ? helpId : undefined;
+  const tone = helpTone === 'ok' ? ' is-ok' : helpTone === 'bad' ? ' is-bad' : '';
 
   return (
     <div>
@@ -91,10 +108,10 @@ export default function AuthTextField({
           spellCheck={spellCheck}
           disabled={disabled}
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-describedby={describedBy}
           className={`lv-field__input${icon ? ' has-icon' : ''}${isPassword ? ' has-reveal' : ''}${
-            error ? ' is-error' : ''
-          }`}
+            trail ? ' has-trail' : ''
+          }${error ? ' is-error' : ''}${ok && !error ? ' is-ok' : ''}`}
         />
         {isPassword && (
           <button
@@ -104,15 +121,24 @@ export default function AuthTextField({
             aria-pressed={revealed}
             className="lv-field__reveal"
           >
-            {revealed ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            {revealed ? <EyeOff /> : <Eye />}
           </button>
         )}
+        {!isPassword && trail && (
+          <span aria-hidden className={`lv-field__trail${tone}`}>
+            {trail}
+          </span>
+        )}
       </div>
-      {error && (
-        <p id={errorId} className="mt-1.5 text-xs font-medium text-red-400">
+      {error ? (
+        <p id={errorId} className="lv-field__error">
           {error}
         </p>
-      )}
+      ) : help !== undefined ? (
+        <p id={helpId} className={`lv-field__help${tone}`} aria-live="polite">
+          {help}
+        </p>
+      ) : null}
     </div>
   );
 }

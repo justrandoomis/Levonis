@@ -1,22 +1,23 @@
 import React, { useEffect, useRef } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { useReducedMotion } from 'motion/react';
+import { useLanguage } from '../../LanguageContext';
 import AuthBackground from './AuthBackground';
 import AuthBrand from './AuthBrand';
 import AuthCard from './AuthCard';
 import './auth.css';
 
 /**
- * AuthShell — the /auth stage: near-black ground, the manufacturing scene
- * behind, one centered column with the brand and the machined card.
+ * AuthShell — the /auth stage: the CAD viewport behind, one centered column
+ * with the brand row (wordmark + language switch) and the panel.
  *
- * Owns three page-level behaviours so the screens don't have to:
+ * Owns the page-level behaviours so the screens don't have to:
  *  - safe-area padding + its own scroll region (the app shell around
- *    full-screen routes is overflow-hidden)
- *  - the load choreography: brand settles first, then the card rises
- *  - pointer parallax on desktop (pointer: fine) — two CSS custom
- *    properties written per animation frame; every layer in
- *    AuthBackground derives its own depth from them. Disabled under
- *    prefers-reduced-motion and never active on touch screens.
+ *    full-screen routes is overflow-hidden), CTAs stay in-flow so the
+ *    software keyboard scrolls to them instead of covering them
+ *  - the entrance: brand, then the panel, opacity + 8px — CSS only
+ *  - a slow pointer parallax on fine pointers: two custom properties
+ *    written per frame, every background layer eases toward them over
+ *    ~1.2s (auth.css). Off under prefers-reduced-motion, never on touch.
  */
 export default function AuthShell({ dir, children }: { dir: 'ltr' | 'rtl'; children: React.ReactNode }) {
   const reduced = !!useReducedMotion();
@@ -48,28 +49,48 @@ export default function AuthShell({ dir, children }: { dir: 'ltr' | 'rtl'; child
   }, [reduced]);
 
   return (
-    <div ref={rootRef} dir={dir} className="lv-auth relative min-h-0 w-full flex-1 overflow-hidden font-sans text-white">
-      <AuthBackground reduced={reduced} />
+    <div ref={rootRef} dir={dir} className="lv-auth relative min-h-0 w-full flex-1 overflow-hidden font-sans">
+      <AuthBackground />
       <div className="absolute inset-0 z-10 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto flex min-h-full w-full max-w-[26rem] flex-col px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-          <div className="m-auto w-full py-3">
-            <motion.div
-              initial={{ opacity: 0, y: reduced ? 0 : -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduced ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
-            >
+        <div className="mx-auto flex min-h-full w-full max-w-[26rem] flex-col px-3 pt-[max(1.125rem,env(safe-area-inset-top))] pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] min-[360px]:px-4">
+          <div className="m-auto w-full py-2">
+            <div className="lv-brand lv-enter">
               <AuthBrand />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: reduced ? 0 : 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduced ? 0 : 0.5, delay: reduced ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
-            >
+              <LanguageSwitch />
+            </div>
+            <div className="lv-enter lv-enter--2">
               <AuthCard>{children}</AuthCard>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** AR / EN / KU — the page has no header, so the switch lives in the brand row. */
+function LanguageSwitch() {
+  const { lang, setLang } = useLanguage();
+  const options: Array<['ar' | 'en' | 'ckb', string, string]> = [
+    ['ar', 'AR', 'العربية'],
+    ['en', 'EN', 'English'],
+    ['ckb', 'KU', 'کوردی'],
+  ];
+  return (
+    <div className="lv-lang lv-mono" role="group" aria-label="Language">
+      {options.map(([code, short, name]) => (
+        <button
+          key={code}
+          type="button"
+          className="lv-lang__btn"
+          aria-pressed={lang === code}
+          aria-label={name}
+          lang={code === 'ckb' ? 'ckb' : code}
+          onClick={() => setLang(code)}
+        >
+          {short}
+        </button>
+      ))}
     </div>
   );
 }

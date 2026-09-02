@@ -112,9 +112,10 @@ Screenshots → `docs/evidence/integrated/`:
 | File | What it evidences |
 | --- | --- |
 | `auth-methods.png` | 4 method tabs in ONE row, exactly 1 mounted `tabpanel`, 1 visible form — not the long column §2.1 forbids |
-| `auth-fill-partial.png` | sign-up part-way: fill grew **0 % → 20 % → 40 % → 60 %** (username, then name, then a partial e-mail) and the button is still disabled |
-| `auth-fill-ready.png` | every rule satisfied: `--lv-fill-pct: 100%`, `data-ready="true"`, `disabled === false` |
+| `auth-fill-partial.png` | sign-up step 1 part-way: the step's own meter grew with the e-mail, then the username, then the password, and the button is still disabled (the blueprint redesign split sign-up into three screens with ONE register call) |
+| `auth-fill-ready.png` | every rule of the step satisfied: `--lv-fill-pct: 100%`, `data-ready="true"`, `disabled === false` |
 | `auth-fill-regressed.png` | one character deleted from the confirmation → below 100 %, `data-ready="false"` immediately |
+| `auth-review-step.png` | step 3: the review of the typed e-mail and handle, with zero `POST /register` before it — the steps only validate locally |
 | `auth-referral-bar.png` | `/auth?ref=<username>` auto-opens the bar with the server-resolved referrer name, before any account exists |
 | `auth-otp-paste.png` | six linked boxes; one paste of `"123 456"` fills all six; verify button 0/6 → 6/6 then enabled; Backspace regresses to 5/6 and disables |
 | `referrals-page.png` | `/referrals` renders as a real route (not the catch-all): the unique `@username`, the `/auth?ref=` invite link with copy/share, and the plain-language difference between a SIGN-UP invite and a PURCHASE support code |

@@ -253,11 +253,13 @@ async function main() {
   const formCount = await page.$$eval('form', (els) => els.filter((f) => f.offsetParent !== null).length);
   check('UI-01 the page shows a single visible form (no long column of every method)',
     formCount === 1, `visible forms=${formCount}`);
-  await shot(page, 'auth-methods.png', '/auth at 390×844 — one tab row, one visible method form');
+  await shot(page, 'auth-methods.png', '/auth at 390×844 — the blueprint sign-in: one visible form, providers only when capabilities offer them');
 
   // Fill progress: it must GROW with valid input and REGRESS on deletion.
-  // The SIGN-UP e-mail path is the strictest one (username + name + e-mail +
-  // password + confirmation), so it proves "100% only when EVERY rule passes".
+  // The SIGN-UP path is the strictest one. Since the blueprint redesign it is
+  // three screens with ONE register call: step 1 (email + username + password
+  // + confirmation) carries its own honest meter, step 2 (name + country) its
+  // own, and the review step's button answers for every rule at once.
   const toSignup = await page.$('button:has-text("أنشئ حسابًا")');
   check('UI-01 the page offers an explicit switch to account creation', !!toSignup);
   await switchToSignup(page);
@@ -274,32 +276,32 @@ async function main() {
   const readReady = () => visibleFill('ready');
 
   const pct0 = await readPct();
-  await page.fill('#username', `uifill${rnd}`);
-  const pct1 = await readPct();
-  await page.fill('#name', 'UI Fill Tester');
-  const pct2 = await readPct();
   await page.click('#email');
   await page.keyboard.type('user@example.co', { delay: 10 });
+  const pct1 = await readPct();
+  await page.fill('#username', `uifill${rnd}`);
+  const pct2 = await readPct();
+  await page.fill('#new-password', 'ui-pass-12345');
   const pct3 = await readPct();
   const readyBeforeAll = await readReady();
   console.log(`      measured fill: ${pct0}% → ${pct1}% → ${pct2}% → ${pct3}% (ready=${readyBeforeAll})`);
   check('AUTH-01 the fill GROWS as each requirement is completed',
     pct0 === 0 && pct1 > pct0 && pct2 > pct1 && pct3 > pct2 && pct3 < 100,
     `pct ${pct0} → ${pct1} → ${pct2} → ${pct3}`);
-  check('AUTH-01 an incomplete form never reaches 100% and never enables the button',
+  check('AUTH-01 an incomplete step never reaches 100% and never enables the button',
     pct3 < 100 && readyBeforeAll === 'false', `pct=${pct3} ready=${readyBeforeAll}`);
-  await shot(page, 'auth-fill-partial.png', 'sign-up form partially completed — the button is filled part-way and still disabled');
+  await shot(page, 'auth-fill-partial.png', 'sign-up step 1 partially completed — the button is filled part-way and still disabled');
 
-  await page.keyboard.type('m', { delay: 10 });
-  await page.fill('#new-password', 'ui-pass-12345');
+  await page.keyboard.press('Tab');
+  await page.fill('#email', 'user@example.com');
   await page.fill('#confirm-password', 'ui-pass-12345');
   const pctReady = await readPct();
   const readyFlag = await readReady();
   const disabledWhenReady = await visibleFill('disabled');
-  check('AUTH-01 100% and an enabled button only once EVERY rule passes',
+  check('AUTH-01 100% and an enabled button only once EVERY rule of the step passes',
     pctReady === 100 && readyFlag === 'true' && disabledWhenReady === false,
     `pct=${pctReady} ready=${readyFlag} disabled=${disabledWhenReady}`);
-  await shot(page, 'auth-fill-ready.png', 'every sign-up rule satisfied — fill at 100%, data-ready=true, button enabled');
+  await shot(page, 'auth-fill-ready.png', 'every step-1 rule satisfied — fill at 100%, data-ready=true, button enabled');
 
   await page.click('#confirm-password');
   await page.keyboard.press('End');
@@ -309,6 +311,28 @@ async function main() {
   check('AUTH-01 deleting one character regresses readiness IMMEDIATELY',
     pctBack < 100 && readyBack === 'false', `pct=${pctBack} ready=${readyBack}`);
   await shot(page, 'auth-fill-regressed.png', 'one character deleted from the confirmation — fill drops below 100% and the button disables again');
+
+  // The steps only validate locally: the ONE register call happens on the
+  // review step, and nothing is posted before it.
+  const registerPosts = [];
+  page.on('request', (rq) => { if (rq.url().includes('/api/auth/register') && rq.method() === 'POST') registerPosts.push(rq.url()); });
+  await page.keyboard.type('5', { delay: 10 }); // restore the confirmation
+  await page.click('#signup-next-1');
+  await page.waitForSelector('#name', { timeout: 10000 });
+  const step2Ready0 = await readReady();
+  await page.fill('#name', 'UI Fill Tester');
+  const step2Ready1 = await readReady();
+  check('AUTH-01 step 2 (name + country) carries its own honest meter',
+    step2Ready0 === 'false' && step2Ready1 === 'true', `before=${step2Ready0} after=${step2Ready1}`);
+  await page.click('#signup-next-2');
+  await page.waitForSelector('#signup-submit', { timeout: 10000 });
+  const reviewText = (await page.textContent('.lv-review')) || '';
+  check('AUTH-01 the review step shows the typed email and handle before anything is sent',
+    reviewText.includes('user@example.com') && reviewText.includes(`uifill${rnd}`) && registerPosts.length === 0,
+    `review="${reviewText.replace(/\s+/g, ' ').slice(0, 120)}" posts=${registerPosts.length}`);
+  check('AUTH-01 the final button is ready only because every rule already passed',
+    (await readReady()) === 'true' && (await readPct()) === 100);
+  await shot(page, 'auth-review-step.png', 'sign-up step 3 — the review before the single register request');
 
   // A ?ref= on the sign-up URL must be visible BEFORE the account is created.
   await page.goto(`${BASE}/auth?ref=${refUsername}`, { waitUntil: 'networkidle' });

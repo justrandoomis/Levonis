@@ -217,48 +217,35 @@ async function main() {
     const labelCount = await page.locator('.lv-auth label').count();
     check('real <label> elements above inputs', labelCount >= 2, `labels=${labelCount}`);
     check('LEVONIS wordmark rendered', (await page.getByText('LEVONIS', { exact: true }).count()) >= 1);
-    // The integrated mandate (§2.1) reorganised /auth: the four methods are a
-    // TAB ROW, and only the selected method's form is mounted — the old long
-    // column that showed every method at once is exactly what it forbids. The
-    // slots below are therefore SELECTED first; the assertions themselves are
-    // unchanged (a real control or an honest state, never a dead fake button).
-    const selectMethod = async (label) => {
-      await page.locator(`[role="tab"]:has-text("${label}")`).first().click({ force: true });
-      await page.waitForTimeout(250);
-    };
-    check('the four methods are one tab row, not four stacked forms',
-      (await page.locator('[role="tab"]').count()) === 4 && (await page.locator('[role="tabpanel"]').count()) === 1);
-    // Google slot: either the real GSI button (configured) or the honest
-    // unavailable notice (unconfigured build) — never a dead fake button.
-    await selectMethod('Google');
+    // Since the blueprint redesign there are no method tabs: email/password
+    // is the primary form, and Google/Telegram sit under the «أو» seam ONLY
+    // when the deployment's capabilities offer them — an honest absence,
+    // never a dead fake button.
+    const uiCaps = await page.evaluate(() => fetch('/api/auth/capabilities').then((r) => r.json()).catch(() => ({})));
+    check('primary email/password form is visible immediately (no tab step)',
+      (await page.locator('#identifier').count()) === 1 && (await page.locator('#signin-submit').count()) === 1);
     const googleIframe = await page.locator('iframe[src*="accounts.google.com"]').count();
-    const googleHonest = await page.getByText('معرّف العميل غير مضبوط', { exact: false }).count();
-    check('google method slot present (real button OR honest state)', googleIframe > 0 || googleHonest > 0,
-      `iframe=${googleIframe} honest=${googleHonest}`);
-    // Telegram slot: phone entry with a real label.
-    await selectMethod('تيليغرام');
-    const tgPhone = page.locator('#tg-auth-phone');
-    check('telegram method slot with labeled phone input', (await tgPhone.count()) === 1);
-    // Regression guard: TelegramAuth's <form> must NOT be nested inside the
-    // signin form (browsers drop nested form tags, which would make the
-    // Telegram submit button submit the credentials form instead).
-    const tgFormOwnsButton = await page.evaluate(() => {
-      const phone = document.getElementById('tg-auth-phone');
-      const form = phone && phone.closest('form');
-      return !!form && !form.querySelector('#identifier') && !!form.querySelector('button[type=submit]');
-    });
-    check('telegram flow owns its own form (no nested-form fallout)', tgFormOwnsButton);
+    check('google slot present only when configured (real GSI button, never a fake)',
+      uiCaps.google ? googleIframe > 0 : googleIframe === 0, `iframe=${googleIframe} caps.google=${!!uiCaps.google}`);
+    const tgButton = page.locator('button.lv-social', { hasText: 'تيليغرام' });
+    if (uiCaps.telegram) {
+      await tgButton.first().click({ force: true });
+      const tgPhone = page.locator('#tg-auth-phone');
+      await tgPhone.waitFor({ timeout: 10000 });
+      check('telegram method slot with labeled phone input', (await tgPhone.count()) === 1);
+      // Regression guard: TelegramAuth's <form> must NOT be nested inside the
+      // signin form (browsers drop nested form tags, which would make the
+      // Telegram submit button submit the credentials form instead).
+      const tgFormOwnsButton = await page.evaluate(() => {
+        const phone = document.getElementById('tg-auth-phone');
+        const form = phone && phone.closest('form');
+        return !!form && !form.querySelector('#identifier') && !!form.querySelector('button[type=submit]');
+      });
+      check('telegram flow owns its own form (no nested-form fallout)', tgFormOwnsButton);
+    } else {
+      check('telegram entry is honestly absent when capabilities report no bot', (await tgButton.count()) === 0);
+    }
     await shot('a-auth-ar-rtl.png');
-
-    // Honest 503: submit a syntactically valid phone; the local server has
-    // no bot token, so the ONLY honest outcome is the explicit
-    // not-configured notice (asserted against the real response).
-    await tgPhone.fill('07701234567');
-    await page.getByRole('button', { name: 'المتابعة عبر تيليغرام' }).click();
-    const honestTg = page.getByText('غير مُفعّل بعد', { exact: false });
-    await honestTg.waitFor({ timeout: 10000 });
-    check('telegram honest not-configured state shown (real 503)', (await honestTg.count()) >= 1);
-    await shot('a2-auth-telegram-honest-503.png');
 
     // ============================== (b) home bottom area — no green glow
     console.log('\n— (b) home bottom corners: near-black, no green glow');

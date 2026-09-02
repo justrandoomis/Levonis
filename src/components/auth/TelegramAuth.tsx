@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { api, ApiError, isNotConfigured } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -538,18 +538,18 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
   ]);
 
   return (
-    <div className="w-full text-white" dir={lang === 'en' ? 'ltr' : 'rtl'}>
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center shrink-0">
-          <Send className="w-5 h-5 text-gold" />
+    <div className="w-full" dir={lang === 'en' ? 'ltr' : 'rtl'}>
+      <div className="lv-tg__intro">
+        <div className="lv-tg__badge">
+          <Send />
         </div>
-        <p className="text-zinc-400 text-[13px]">{mode === 'signup' ? s.introSignup : s.introSignin}</p>
+        <p>{mode === 'signup' ? s.introSignup : s.introSignin}</p>
       </div>
 
       {notConfigured && (
-        <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 mb-3" role="status">
-          <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-[13px] text-amber-200">{s.notConfigured}</p>
+        <div className="lv-notice lv-notice--warn" role="status">
+          <AlertCircle />
+          <p>{s.notConfigured}</p>
         </div>
       )}
 
@@ -567,58 +567,58 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
             hint={s.phoneHint}
           />
           {startError && (
-            <div className="mt-2 flex items-start gap-2" role="alert">
-              <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <p className="text-[13px] text-red-300">{startError}</p>
+            <div className="lv-tg__inline-alert" role="alert">
+              <AlertCircle />
+              <p>{startError}</p>
             </div>
           )}
           <button
             type="submit"
             disabled={starting || !phone.valid}
-            className="mt-3 w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
+            className="lv-btn-quiet mt-4"
           >
             {starting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> {s.starting}
+                <span className="lv-dots" aria-hidden /> {s.starting}
               </>
             ) : (
               <>
-                <Send className="w-4 h-4" /> {s.continueTg}
+                <Send /> {s.continueTg}
               </>
             )}
           </button>
-          <p className="mt-2 text-[11px] text-zinc-500">{s.validFor}</p>
+          <p className="lv-tg__small">{s.validFor}</p>
         </form>
       )}
 
       {phase === 'waiting' && flow && (
         <div>
-          <p className="text-[13px] text-zinc-300 mb-3" dir="ltr">
+          <p className="lv-tg__masked" dir="ltr">
             {flow.phone_masked}
           </p>
           <a
             href={flow.deep_link}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
+            className="lv-btn-quiet"
           >
-            <ExternalLink className="w-4 h-4" /> {s.openTelegram}
+            <ExternalLink /> {s.openTelegram}
           </a>
-          <p className="mt-3 text-[13px] text-zinc-400">{s.openHint}</p>
+          <p className="lv-tg__hint">{s.openHint}</p>
 
           {serverState === 'contact_received' ? (
-            <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3" role="status">
-              <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-[13px] text-amber-200">{s.mismatchRetry}</p>
+            <div className="lv-notice lv-notice--warn lv-notice--tight" role="status">
+              <AlertCircle />
+              <p>{s.mismatchRetry}</p>
             </div>
           ) : serverState === 'send_failed' ? (
-            <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3" role="status">
-              <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-[13px] text-amber-200">{s.sendFailed}</p>
+            <div className="lv-notice lv-notice--warn lv-notice--tight" role="status">
+              <AlertCircle />
+              <p>{s.sendFailed}</p>
             </div>
           ) : (
-            <div className="mt-3 flex items-center gap-2 text-zinc-400 text-[13px]" role="status" aria-live="polite">
-              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            <div className="lv-tg__waiting" role="status" aria-live="polite">
+              <span className="lv-dots" aria-hidden />
               <span>{s.waitingShare}</span>
             </div>
           )}
@@ -626,7 +626,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
           <button
             type="button"
             onClick={reset}
-            className="mt-4 min-h-[44px] text-[13px] text-zinc-400 hover:text-white underline underline-offset-4 transition-colors"
+            className="lv-textbtn mt-2"
           >
             {s.restart}
           </button>
@@ -635,9 +635,9 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
 
       {phase === 'otp' && flow && (
         <form onSubmit={handleComplete} noValidate>
-          <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 mb-3" role="status">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-            <p className="text-[13px] text-emerald-300">
+          <div className="lv-notice lv-notice--ok" role="status">
+            <CheckCircle2 />
+            <p>
               {s.codeSent} <span dir="ltr">{flow.phone_masked}</span>
             </p>
           </div>
@@ -646,7 +646,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
               digits and Backspace navigation all handled by OtpBoxes. Six
               digits mean READY TO SEND, never "verified": only the server's
               answer to /telegram/complete decides that. */}
-          <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-code-0">
+          <label className="lv-field__label" htmlFor="tg-auth-code-0">
             {s.codeLabel}
           </label>
           <OtpBoxes
@@ -657,12 +657,12 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
             disabled={completing}
             autoFocus
           />
-          <p className="mt-1.5 text-center text-[12px] text-zinc-500">{s.otpHint}</p>
+          <p className="lv-tg__otp-hint">{s.otpHint}</p>
 
           {purpose === 'signup' && (
-            <div className="mt-3 space-y-3">
+            <div className="lv-fields mt-4">
               <div>
-                <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-name">
+                <label className="lv-field__label" htmlFor="tg-auth-name">
                   {s.nameLabel}
                 </label>
                 <input
@@ -672,11 +672,11 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
                   maxLength={100}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder-zinc-500 outline-none focus:border-gold transition-colors"
+                  className="lv-field__input"
                 />
               </div>
               <div>
-                <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-username">
+                <label className="lv-field__label" htmlFor="tg-auth-username">
                   {s.usernameLabel}
                 </label>
                 <input
@@ -689,19 +689,19 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
                   dir="ltr"
                   value={uname}
                   onChange={(e) => setUname(e.target.value.toLowerCase())}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder-zinc-500 outline-none focus:border-gold transition-colors"
+                  className="lv-field__input"
                 />
-                <p className="mt-1 text-[11px] text-zinc-500">{s.usernameHint}</p>
+                <p className="lv-field__help">{s.usernameHint}</p>
               </div>
               {/* §2.1 — the ONLY route by which a phone + password account is
                   created. Optional on purpose: leaving it empty keeps the pure
                   Telegram-OTP account, and the verify button never waits on a
                   field this path does not require. */}
               <div>
-                <label className="block text-[13px] text-zinc-400 mb-1.5" htmlFor="tg-auth-password">
+                <label className="lv-field__label" htmlFor="tg-auth-password">
                   {s.passwordLabel}
                 </label>
-                <div className="relative">
+                <div className="lv-field__frame" dir="ltr">
                   <input
                     id="tg-auth-password"
                     type={showPassword ? 'text' : 'password'}
@@ -711,37 +711,37 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
                     onChange={(e) => setPassword(e.target.value)}
                     aria-invalid={passwordTouchedInvalid || undefined}
                     aria-describedby="tg-auth-password-hint"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 pe-12 text-[15px] text-white placeholder-zinc-500 outline-none focus:border-gold transition-colors"
+                    className="lv-field__input has-reveal"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={showPassword ? s.passwordHide : s.passwordShow}
                     aria-pressed={showPassword}
-                    className="absolute inset-y-0 end-0 flex min-h-[44px] w-12 items-center justify-center text-zinc-400 transition-colors hover:text-white"
+                    className="lv-field__reveal"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <EyeOff /> : <Eye />}
                   </button>
                 </div>
                 <p
                   id="tg-auth-password-hint"
-                  className={`mt-1 text-[11px] ${passwordTouchedInvalid ? 'text-red-400' : 'text-zinc-500'}`}
+                  className={`lv-field__help${passwordTouchedInvalid ? ' is-bad' : ''}`}
                 >
                   {passwordTouchedInvalid ? s.passwordTooShort : s.passwordHint}
                 </p>
               </div>
               {(referralCode ?? '').trim() && (
-                <p className="text-[12px] text-zinc-400">
-                  {s.referralApplied} <span dir="ltr" className="font-bold text-gold">{(referralCode ?? '').trim()}</span>
+                <p className="lv-tg__ref">
+                  {s.referralApplied} <b>{(referralCode ?? '').trim()}</b>
                 </p>
               )}
             </div>
           )}
 
           {otpError && (
-            <div className="mt-2 flex items-start gap-2" role="alert">
-              <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <p className="text-[13px] text-red-300">{otpError}</p>
+            <div className="lv-tg__inline-alert" role="alert">
+              <AlertCircle />
+              <p>{otpError}</p>
             </div>
           )}
 
@@ -749,7 +749,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
               the instant one is deleted. `ready` is real validation only: six
               digits, plus a valid password WHEN one is being typed. The
               animation never enables the button. */}
-          <div className="mt-3">
+          <div className="mt-4">
             <FillButton
               id="tg-auth-verify"
               label={s.verify}
@@ -761,26 +761,26 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
             />
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="lv-tg__row">
             <button
               type="button"
               onClick={handleResend}
               disabled={resending || resendIn > 0}
-              className="min-h-[44px] text-[13px] text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed underline underline-offset-4 transition-colors flex items-center gap-1.5"
+              className="lv-textbtn"
             >
-              {resending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {resending ? <span className="lv-dots" aria-hidden /> : <RefreshCw className="w-3.5 h-3.5" />}
               {resendIn > 0 ? s.resendIn.replace('{s}', String(resendIn)) : s.resend}
             </button>
             <button
               type="button"
               onClick={reset}
-              className="min-h-[44px] text-[13px] text-zinc-500 hover:text-white transition-colors"
+              className="lv-textbtn"
             >
               {s.restart}
             </button>
           </div>
           {resendNotice && (
-            <p className="mt-1 text-[12px] text-zinc-400" role="status" aria-live="polite">
+            <p className="lv-tg__small" role="status" aria-live="polite">
               {resendNotice}
             </p>
           )}
@@ -789,16 +789,16 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
 
       {phase === 'blocked' && (
         <div>
-          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3" role="alert">
-            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-            <p className="text-[13px] text-amber-200">{blockedText}</p>
+          <div className="lv-notice lv-notice--warn" role="alert">
+            <AlertCircle />
+            <p>{blockedText}</p>
           </div>
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="lv-tg__stack">
             {hint === 'use_login' && (
               <button
                 type="button"
                 onClick={() => switchTo('signin')}
-                className="w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors"
+                className="lv-btn-quiet"
               >
                 {s.goLogin}
               </button>
@@ -807,7 +807,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
               <button
                 type="button"
                 onClick={() => switchTo('signup')}
-                className="w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors"
+                className="lv-btn-quiet"
               >
                 {s.goSignup}
               </button>
@@ -815,7 +815,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
             <button
               type="button"
               onClick={reset}
-              className="min-h-[44px] text-[13px] text-zinc-400 hover:text-white underline underline-offset-4 transition-colors"
+              className="lv-textbtn"
             >
               {s.restart}
             </button>
@@ -825,24 +825,24 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
 
       {phase === 'expired' && (
         <div>
-          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3" role="alert">
-            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-            <p className="text-[13px] text-amber-200">{s.expired}</p>
+          <div className="lv-notice lv-notice--warn" role="alert">
+            <AlertCircle />
+            <p>{s.expired}</p>
           </div>
           <button
             type="button"
             onClick={reset}
-            className="mt-3 w-full min-h-[48px] bg-[#111111] text-gold border border-gold/20 hover:bg-black/90 rounded-[14px] px-4 py-3.5 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
+            className="lv-btn-quiet"
           >
-            <RefreshCw className="w-4 h-4" /> {s.restart}
+            <RefreshCw /> {s.restart}
           </button>
         </div>
       )}
 
       {phase === 'done' && (
-        <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3" role="status">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-          <p className="text-[13px] text-emerald-300">{mode === 'signup' ? s.doneSignup : s.doneSignin}</p>
+        <div className="lv-notice lv-notice--ok" role="status">
+          <CheckCircle2 />
+          <p>{mode === 'signup' ? s.doneSignup : s.doneSignin}</p>
         </div>
       )}
     </div>

@@ -140,16 +140,13 @@ export default function ReferralBar({ code, onCodeChange, fromLink, disabled }: 
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-950/50 px-3.5 text-[13px] font-semibold text-zinc-300 transition-colors hover:border-gold/40 hover:text-gold disabled:opacity-60"
+        className="lv-refbar__toggle"
       >
         <span className="inline-flex items-center gap-2">
-          <Gift className="h-4 w-4 text-gold" aria-hidden />
+          <Gift className="lv-refbar__toggle-icon" aria-hidden />
           {s.toggle}
         </span>
-        <ChevronDown
-          aria-hidden
-          className={`h-4 w-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
+        <ChevronDown aria-hidden className="lv-refbar__chev" />
       </button>
 
       {/* Collapsed content is visibility:hidden via CSS (removed from the
@@ -158,24 +155,24 @@ export default function ReferralBar({ code, onCodeChange, fromLink, disabled }: 
         <div className="lv-refbar__inner">
           <div className="pt-3">
             {status === 'found' && info ? (
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-gold/30 bg-gold/10 px-3.5 py-2.5">
-                <span className="inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-gold">
-                  <Gift className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="truncate">{s.invited(info.name, info.code)}</span>
+              <div className="lv-refbar__found">
+                <span className="lv-refbar__found-text">
+                  <Gift aria-hidden />
+                  <span>{s.invited(info.name, info.code)}</span>
                 </span>
                 <button
                   type="button"
                   onClick={clear}
                   aria-label={s.remove}
                   disabled={disabled}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gold/80 transition-colors hover:bg-gold/15 hover:text-gold"
+                  className="lv-refbar__clear"
                 >
-                  <X className="h-4 w-4" aria-hidden />
+                  <X aria-hidden />
                 </button>
               </div>
             ) : (
               <>
-                <label htmlFor={inputId} className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
+                <label htmlFor={inputId} className="lv-field__label">
                   {s.label}
                 </label>
                 <input
@@ -192,18 +189,20 @@ export default function ReferralBar({ code, onCodeChange, fromLink, disabled }: 
                   disabled={disabled}
                   placeholder="username"
                   aria-describedby={`${inputId}-status`}
-                  className="w-full min-h-[48px] rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-[15px] text-white placeholder-zinc-600 outline-none transition-colors focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60"
+                  className="lv-field__input"
                 />
-                <p id={`${inputId}-status`} className="mt-1.5 text-xs leading-relaxed" aria-live="polite">
-                  {status === 'checking' ? (
-                    <span className="text-zinc-400">{s.checking}</span>
-                  ) : status === 'notfound' ? (
-                    <span className="font-medium text-red-400">{s.notFound}</span>
-                  ) : status === 'checkfailed' ? (
-                    <span className="font-medium text-amber-300">{s.checkFailed}</span>
-                  ) : (
-                    <span className="text-zinc-500">{s.optionalNote}</span>
-                  )}
+                <p
+                  id={`${inputId}-status`}
+                  className={`lv-field__help${status === 'notfound' ? ' is-bad' : status === 'checkfailed' ? ' is-warn' : ''}`}
+                  aria-live="polite"
+                >
+                  {status === 'checking'
+                    ? s.checking
+                    : status === 'notfound'
+                      ? s.notFound
+                      : status === 'checkfailed'
+                        ? s.checkFailed
+                        : s.optionalNote}
                 </p>
               </>
             )}

@@ -252,24 +252,22 @@ export default function PhoneField({
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
+      <label htmlFor={id} className="lv-field__label">
         {label}
       </label>
       {/* dir=ltr: a dial code and a national number read left-to-right in
           every language, including on the Arabic and Kurdish pages. */}
-      <div className="flex gap-2" dir="ltr">
-        <div className="relative shrink-0">
+      <div className="lv-phone" dir="ltr">
+        <div className="lv-phone__country">
           {/* Compact closed display; the real, accessible <select> sits on
               top at full size with localized names. */}
           <span
             aria-hidden
-            className={`flex min-h-[48px] items-center gap-1.5 rounded-xl border bg-zinc-950/70 px-3 text-[15px] text-white transition-colors duration-200 ${
-              error ? 'border-red-500/70' : 'border-zinc-800'
-            } ${disabled ? 'opacity-60' : ''}`}
+            className={`lv-phone__display${error ? ' is-error' : ''}${disabled ? ' is-disabled' : ''}`}
           >
             <span className="text-base leading-none">{country.flag}</span>
             <span className="font-semibold tabular-nums">+{country.dial}</span>
-            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-zinc-500" fill="currentColor" aria-hidden>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
               <path d="M5.3 7.7a1 1 0 0 1 1.4 0L10 11l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z" />
             </svg>
           </span>
@@ -279,7 +277,7 @@ export default function PhoneField({
             value={country.iso}
             onChange={(e) => onChange(buildPhoneValue(e.target.value, value.national))}
             disabled={disabled}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            className="lv-phone__select"
           >
             <optgroup label={commonLabel ?? '—'}>{common.map(option)}</optgroup>
             <optgroup label={allLabel ?? '—'}>{rest.map(option)}</optgroup>
@@ -298,9 +296,7 @@ export default function PhoneField({
           disabled={disabled}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : hint ? hintId : undefined}
-          className={`w-full min-h-[48px] rounded-xl border bg-zinc-950/70 px-4 py-3 text-[15px] tabular-nums text-white placeholder-zinc-600 outline-none transition-colors duration-200 focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60 ${
-            error ? 'border-red-500/70' : 'border-zinc-800'
-          }`}
+          className={`lv-field__input lv-phone__input${error ? ' is-error' : ''}`}
         />
       </div>
       {/* One reserved line for the message: an error appearing must not push
@@ -308,9 +304,7 @@ export default function PhoneField({
           for it. */}
       <p
         id={error ? errorId : hintId}
-        className={`mt-1.5 min-h-[16px] text-xs leading-relaxed ${
-          error ? 'font-medium text-red-400' : 'text-zinc-500'
-        }`}
+        className={`lv-field__help${error ? ' is-bad' : ''}`}
       >
         {error || hint || ''}
       </p>

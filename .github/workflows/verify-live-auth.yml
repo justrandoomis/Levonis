@@ -299,6 +299,27 @@ jobs:
           set -o pipefail
           node scripts/e2e-live-auth.mjs 2>&1 | tee /tmp/scenario.log
 
+      # The SCREEN itself, in a real browser against the real origin: the
+      # blueprint /auth at phone and desktop widths, the providers the
+      # capabilities advertise (Google's own iframe, the Telegram entry and
+      # its phone panel), the forgot link only when mail is configured, the
+      # three-step sign-up opening without posting anything, and a REAL
+      # sign-in with this run's identity through the form. Playwright is
+      # installed for this job only (--no-save), so the repository's
+      # dependencies do not change; it signs out at the end.
+      - name: The /auth screen in a real browser, live
+        id: ui
+        continue-on-error: true
+        env:
+          TEST_EMAIL: ${{ steps.identity.outputs.addr }}
+          TEST_PASSWORD: ${{ steps.identity.outputs.pass }}
+          OUT_DIR: /tmp/live-auth-ui
+        run: |
+          set -o pipefail
+          npm i --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node scripts/e2e-live-auth-ui.mjs 2>&1 | tee /tmp/live-auth-ui.log
+
       - name: What the provider said, from the Worker's own log
         id: providerlog
         if: always()
@@ -446,6 +467,7 @@ jobs:
             echo "| levonis-studio-staging · STUDIO_HANDOFF_SECRET | ${{ steps.studiobind.outputs.secret }} |"
             echo "| levonis-studio-staging · MAIN_SITE_ORIGIN | ${{ steps.studiobind.outputs.main_origin }} |"
             echo "| Scenario (SSO, negatives, logout liveness) | ${{ steps.scenario.outcome }} |"
+            echo "| The /auth screen in a real browser (widths, providers, stepper, real sign-in) | ${{ steps.ui.outcome }} |"
             echo "| Verification email accepted by Resend (outbox state=sent) | ${{ steps.outbox.outputs.verify }} |"
             echo "| Password-reset token minted (immediate send, no outbox row) | ${{ steps.outbox.outputs.reset }} |"
             echo "| Provider-error lines in the Worker log | ${{ steps.providerlog.outputs.errors }} |"
@@ -463,12 +485,15 @@ jobs:
           path: |
             /tmp/scenario.log
             /tmp/live-auth-results.json
+            /tmp/live-auth-ui.log
+            /tmp/live-auth-ui/*.png
           if-no-files-found: warn
 
       - name: Fail the run if anything failed
         if: always()
         run: |
           [ "${{ steps.scenario.outcome }}" = "success" ] || { echo "::error::the live scenario failed"; exit 1; }
+          [ "${{ steps.ui.outcome }}" = "success" ] || { echo "::error::the live /auth screen check failed"; exit 1; }
           [ "${{ steps.outbox.outcome }}" = "success" ] || { echo "::error::the email delivery check failed"; exit 1; }
           [ "${{ steps.mainbind.outcome }}" = "success" ] || { echo "::error::the main Worker binding check failed"; exit 1; }
           [ "${{ steps.studiobind.outcome }}" = "success" ] || { echo "::error::the Studio Worker binding check failed"; exit 1; }

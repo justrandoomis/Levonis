@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowLeft, AtSign, CheckCircle2, Lock, Mail, Send, UserRound } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, AtSign, Check, CheckCircle2, Info, Lock, Mail, MailCheck, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -24,30 +24,38 @@ import FillButton, {
   signinIdentifierPart,
 } from '../components/auth/FillButton';
 import { useCapabilities } from '../hooks/useCapabilities';
-import { toAsciiDigitsClient } from '../components/auth/PhoneField';
+import { COUNTRIES, COMMON_ISO, countryNames, flagOf, toAsciiDigitsClient } from '../components/auth/PhoneField';
 import ReferralBar from '../components/auth/ReferralBar';
+import { useUsernameAvailability } from '../components/auth/useUsernameAvailability';
+import { onboardingStrings, usernameReasonLabel } from '../components/onboarding/strings';
 
 /**
- * /auth — the door into LEVONIS, styled as the control surface of a premium
- * 3D-printing machine (AuthShell owns the manufacturing scene behind it).
+ * /auth — the door into LEVONIS, drawn as a technical blueprint: the CAD
+ * viewport behind (AuthShell/AuthBackground), one thin panel in front.
  *
- * Organization: email/password is the PRIMARY interface, visible immediately
- * — no method tabs. Google and Telegram are secondary actions under an "أو"
- * seam; tapping Telegram swaps the card to the Telegram-verified phone flow
- * (the only route that can prove number ownership), with a way back.
- * Non-sensitive values (email, username, name) survive every swap;
- * passwords/OTP never touch localStorage/analytics/logs.
+ * Organization: email/password is the PRIMARY interface, visible
+ * immediately — no method tabs. Google and Telegram are secondary actions
+ * under an "أو" seam; tapping Telegram swaps the panel to the
+ * Telegram-verified phone flow (the only route that can prove number
+ * ownership), with a way back. Creating an account is a light three-step
+ * flow inside the same panel — sign-in details, then name and country,
+ * then a review — and ONE request: the steps only validate locally, the
+ * single POST /api/auth/register happens on the last one. Non-sensitive
+ * values survive every step/panel switch; passwords never touch
+ * localStorage/analytics/logs.
  *
- * FillButton (§2.2): the submit button's background fills with REAL
- * validation progress and enables only when every rule passes — never on
- * text length alone and never because an animation finished. Enter submits
- * when (and only when) the button is ready.
+ * FillButton (§2.2): every step's button fills with REAL validation
+ * progress and enables only when every rule of that step passes — never on
+ * text length alone and never because an animation finished.
  *
  * Server contracts (unchanged by the redesign):
  * - POST /api/auth/login    { identifier (email|username|phone), password }
  *   (the legacy `email` field carries the same value for the current server)
- * - POST /api/auth/register { username, name, email, password, referralCode? }
+ * - POST /api/auth/register { username, name, email, password, locale,
+ *   country?, referralCode? } — country is an ISO-2 the server already
+ *   accepts (unknown → null, never an error)
  * - POST /api/auth/google   { credential, referralCode? }  (GIS credential)
+ * - GET  /api/auth/username-available?u=…  (live handle check, informational)
  * - GET  /api/auth/referrer-info?ref=…  (ReferralBar — 404 = honest
  *   "code not found", continuing without a code is always allowed)
  * - POST /api/auth/forgot-password { email, lang } · POST /api/auth/reset-password
@@ -58,10 +66,10 @@ import ReferralBar from '../components/auth/ReferralBar';
 
 const STRINGS = {
   ar: {
-    signInTitle: 'تسجيل الدخول',
-    signInHint: 'أدخل بياناتك للمتابعة إلى حسابك.',
+    signInTitle: 'أهلًا بعودتك',
+    signInHint: 'سجّل الدخول للمتابعة إلى حسابك.',
     signUpTitle: 'إنشاء حساب',
-    signUpHint: 'أنشئ حسابك الجديد في ليفونيس.',
+    signUpHint: 'ثلاث خطوات قصيرة، وطلب واحد في النهاية.',
     forgotTitle: 'إعادة تعيين كلمة المرور',
     forgotHint: 'أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.',
     resetTitle: 'اختر كلمة مرور جديدة',
@@ -132,12 +140,26 @@ const STRINGS = {
     errResetLink: 'رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.',
     errTooMany: 'محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.',
     errNetwork: 'تعذّر الاتصال. تحقّق من اتصالك وحاول مرة أخرى.',
+    // three-step signup
+    steps: 'خطوات إنشاء الحساب',
+    step1Name: 'بيانات الدخول',
+    step2Name: 'عنك',
+    step3Name: 'المراجعة والإنشاء',
+    step1Hint: 'بريدك واسم المستخدم وكلمة المرور.',
+    step2Hint: 'اسمك ودولتك — يظهران في ملفك.',
+    step3Hint: 'راجع بياناتك ثم أنشئ الحساب.',
+    next: 'متابعة',
+    optional: 'اختياري',
+    edit: 'تعديل',
+    referralLabel: 'كود الإحالة',
+    verifyNote: 'سنرسل رابط تفعيل إلى بريدك بعد إنشاء الحساب.',
+    hintUsernameTaken: 'اختر اسم مستخدم آخر',
   },
   en: {
-    signInTitle: 'Sign in',
-    signInHint: 'Enter your details to continue.',
+    signInTitle: 'Welcome back',
+    signInHint: 'Sign in to continue to your account.',
     signUpTitle: 'Create account',
-    signUpHint: 'Create your new LEVONIS account.',
+    signUpHint: 'Three short steps, one request at the end.',
     forgotTitle: 'Reset password',
     forgotHint: "Enter your email address and we'll send you a reset link.",
     resetTitle: 'Choose a new password',
@@ -208,12 +230,25 @@ const STRINGS = {
     errResetLink: 'That reset link is invalid or has expired. Request a new one.',
     errTooMany: 'Too many attempts. Wait a moment and try again.',
     errNetwork: 'Could not reach the server. Check your connection and try again.',
+    steps: 'Account creation steps',
+    step1Name: 'Sign-in details',
+    step2Name: 'About you',
+    step3Name: 'Review & create',
+    step1Hint: 'Your email, username and password.',
+    step2Hint: 'Your name and country — shown on your profile.',
+    step3Hint: 'Check your details, then create the account.',
+    next: 'Continue',
+    optional: 'Optional',
+    edit: 'Edit',
+    referralLabel: 'Referral code',
+    verifyNote: "We'll email you a verification link after the account is created.",
+    hintUsernameTaken: 'Choose a different username',
   },
   ckb: {
-    signInTitle: 'چوونەژوورەوە',
-    signInHint: 'زانیارییەکانت بنووسە بۆ بەردەوامبوون.',
+    signInTitle: 'بەخێربێیتەوە',
+    signInHint: 'بچۆرە ژوورەوە بۆ بەردەوامبوون بۆ هەژمارەکەت.',
     signUpTitle: 'دروستکردنی هەژمار',
-    signUpHint: 'هەژمارە نوێیەکەت لە LEVONIS دروست بکە.',
+    signUpHint: 'سێ هەنگاوی کورت، و یەک داواکاری لە کۆتاییدا.',
     forgotTitle: 'ڕێکخستنەوەی وشەی نهێنی',
     forgotHint: 'ئیمەیلەکەت بنووسە، بەستەری ڕێکخستنەوەت بۆ دەنێرین.',
     resetTitle: 'وشەی نهێنی نوێ هەڵبژێرە',
@@ -284,15 +319,52 @@ const STRINGS = {
     errResetLink: 'ئەم بەستەرەی ڕێکخستنەوە نادروستە یان بەسەرچووە. بەستەرێکی نوێ داوا بکە.',
     errTooMany: 'هەوڵی زۆر. کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدە.',
     errNetwork: 'نەتوانرا پەیوەندی بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدە.',
+    steps: 'هەنگاوەکانی دروستکردنی هەژمار',
+    step1Name: 'زانیاری چوونەژوورەوە',
+    step2Name: 'دەربارەی تۆ',
+    step3Name: 'پێداچوونەوە و دروستکردن',
+    step1Hint: 'ئیمەیل، ناوی بەکارهێنەر و وشەی نهێنی.',
+    step2Hint: 'ناو و وڵاتەکەت — لە پرۆفایلەکەت دەردەکەون.',
+    step3Hint: 'زانیارییەکانت بپشکنە، پاشان هەژمارەکە دروست بکە.',
+    next: 'بەردەوامبوون',
+    optional: 'ئارەزوومەندانە',
+    edit: 'دەستکاری',
+    referralLabel: 'کۆدی بانگهێشت',
+    verifyNote: 'دوای دروستکردنی هەژمار بەستەری پشتڕاستکردنەوە بۆ ئیمەیلەکەت دەنێرین.',
+    hintUsernameTaken: 'ناوی بەکارهێنەرێکی تر هەڵبژێرە',
   },
 };
 
 type AuthView = 'signin' | 'signup' | 'forgot';
 /** What the card is currently showing inside a view. */
 type AuthPanel = 'form' | 'telegram';
+/** The three signup screens (one request, on the last one). */
+type SignupStep = 1 | 2 | 3;
 
-/** Client mirror of worker/lib/http.ts USERNAME_RE (server lowercases). */
+/** Client mirror of the server's username shape (worker/lib/usernames.ts; the server lowercases). */
 const USERNAME_SHAPE_RE = /^[a-zA-Z0-9._-]{3,30}$/;
+
+/** Drafting-sheet labels above each screen's title. Technical, LTR, never translated. */
+const SHEET = {
+  signin: 'SIGN-IN',
+  signup: 'CREATE ACCOUNT',
+  forgot: 'PASSWORD RESET',
+  reset: 'NEW PASSWORD',
+  telegram: 'TELEGRAM',
+} as const;
+
+/** Server codes that belong to step 1's fields: the review step hands the person back there. */
+const STEP1_CODES = new Set([
+  'EMAIL_TAKEN',
+  'USERNAME_TAKEN',
+  'USERNAME_RESERVED',
+  'USERNAME_TOO_SHORT',
+  'USERNAME_TOO_LONG',
+  'USERNAME_BAD_CHARACTERS',
+  'USERNAME_BAD_EDGES',
+  'USERNAME_REPEATED_PUNCTUATION',
+  'USERNAME_ALL_DIGITS',
+]);
 
 /**
  * Does what somebody typed into the identifier field LOOK like a phone
@@ -312,15 +384,16 @@ export default function Auth() {
   const { loginWithGoogle, refreshUser } = useAuth();
   const { lang, dir } = useLanguage();
   const s = STRINGS[lang];
-  // Respect the OS "reduce motion" setting everywhere on this screen — the
-  // step transitions become plain cross-fades and the stagger collapses.
+  const ob = onboardingStrings(lang);
+  // Respect the OS "reduce motion" setting: the screen switch becomes a
+  // plain cross-fade with no travel.
   const reduceMotion = useReducedMotion();
-  const slide = reduceMotion ? 0 : 6;
+  const slide = reduceMotion ? 0 : 4;
 
   const resetToken = searchParams.get('reset') || '';
   // Friend-invite referral code from ?ref=CODE — user-editable in the
-  // ReferralBar (§2.6), page-level so it survives view/panel switches and
-  // later URL cleanups. The user's explicitly chosen code wins.
+  // ReferralBar (§2.6), page-level so it survives view/panel/step switches
+  // and later URL cleanups. The user's explicitly chosen code wins.
   const [referralCode, setReferralCode] = useState(() => searchParams.get('ref') || '');
   const [refFromLink] = useState(() => !!searchParams.get('ref'));
   // ?next= return destination, captured once for the same reason.
@@ -331,10 +404,11 @@ export default function Auth() {
   const dest = sanitizeNextPath(stateFrom ?? nextFromQuery);
 
   // §2.6: someone who followed an invite link is here to CREATE an account,
-  // so the sign-up step (the only one that carries the referral bar) opens
+  // so the sign-up view (the only one that carries the referral bar) opens
   // first and the inviter's name is resolved before they finish registering.
   const [view, setView] = useState<AuthView>(() => (searchParams.get('ref') ? 'signup' : 'signin'));
   const [panel, setPanel] = useState<AuthPanel>('form');
+  const [step, setStep] = useState<SignupStep>(1);
   const [submitting, setSubmitting] = useState(false);
   // Which action is in flight. The form CTA and the Google slot are both on
   // screen now, so a Google roundtrip must never animate the form button.
@@ -349,12 +423,13 @@ export default function Auth() {
   const [forgotMessage, setForgotMessage] = useState('');
   const [emailNotConfigured, setEmailNotConfigured] = useState(false);
 
-  // Field values are PAGE-level so switching panel/view never loses
+  // Field values are PAGE-level so switching panel/view/step never loses
   // non-sensitive input. Passwords live only in memory here — never in
   // localStorage/analytics/logs.
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [country, setCountry] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -376,6 +451,7 @@ export default function Auth() {
   const googleClientId = caps?.googleClientId ?? '';
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
+  const emailVerificationConfigured = caps?.emailVerification ?? false;
 
   /**
    * If the open Telegram panel stops being offered — the capabilities answer
@@ -401,7 +477,11 @@ export default function Auth() {
     USERNAME_TAKEN: s.errUsernameTaken,
     USERNAME_RESERVED: s.errUsernameReserved,
     USERNAME_TOO_SHORT: s.errUsernameShort,
+    USERNAME_TOO_LONG: usernameReasonLabel(ob, 'too_long'),
     USERNAME_BAD_CHARACTERS: s.errUsernameChars,
+    USERNAME_BAD_EDGES: usernameReasonLabel(ob, 'bad_edges'),
+    USERNAME_REPEATED_PUNCTUATION: usernameReasonLabel(ob, 'repeated_punctuation'),
+    USERNAME_ALL_DIGITS: usernameReasonLabel(ob, 'all_digits'),
     EMAIL_NOT_CONFIGURED: s.errMailOff,
     GOOGLE_NOT_CONFIGURED: s.googleServerNotConfigured,
     EMAIL_NOT_VERIFIED: s.errGoogleNeedsVerify,
@@ -453,12 +533,18 @@ export default function Auth() {
   const switchView = (next: AuthView) => {
     clearMessages();
     setPanel('form');
+    setStep(1);
     setView(next);
   };
 
   const openTelegram = () => {
     clearMessages();
     setPanel('telegram');
+  };
+
+  const goToStep = (next: SignupStep) => {
+    setServerError('');
+    setStep(next);
   };
 
   // Editing ANY field leaves a previous success state behind: the meter and
@@ -524,21 +610,30 @@ export default function Auth() {
     valid: confirmValid,
   };
 
-  const usernameValid = USERNAME_SHAPE_RE.test(trimmedUsername);
-  const signupEmailFill = combineFillProgress([
+  // The handle: shape first (client mirror of the server rule), then the
+  // server's own availability answer while typing — informational, except
+  // that a name the server has ALREADY refused cannot be "ready".
+  const usernameShapeValid = USERNAME_SHAPE_RE.test(trimmedUsername);
+  const availability = useUsernameAvailability(trimmedUsername, view === 'signup' && usernameShapeValid);
+  const usernameValid = usernameShapeValid && availability.state !== 'unavailable';
+  const usernamePart = {
     // A username of the right LENGTH but the wrong shape must not push the
     // meter as if it were done; the ramp under-reports until the shape rule
     // actually passes (an honest meter never over-reports, §2.2).
-    { progress: usernameValid ? 1 : clamp01(trimmedUsername.length / 3) * 0.75, valid: usernameValid },
-    // Ramp instead of a 0→1 step: a single keystroke must never jump the
-    // bar by a whole field's worth — that motion reads as a glitch.
-    { progress: clamp01(trimmedName.length / 3), valid: trimmedName.length > 0 },
-    { progress: emailProgress, valid: emailValid },
-    newPwPart,
-    confirmPart,
-  ]);
+    progress: usernameValid ? 1 : clamp01(trimmedUsername.length / 3) * 0.75,
+    valid: usernameValid,
+  };
+  // Ramp instead of a 0→1 step: a single keystroke must never jump the
+  // bar by a whole field's worth — that motion reads as a glitch.
+  const namePart = { progress: clamp01(trimmedName.length / 3), valid: trimmedName.length > 0 };
+  const emailPart = { progress: emailProgress, valid: emailValid };
 
-  const forgotFill = combineFillProgress([{ progress: emailProgress, valid: emailValid }]);
+  // Each step's button answers for ITS fields; the last one for all of them.
+  const step1Fill = combineFillProgress([emailPart, usernamePart, newPwPart, confirmPart]);
+  const step2Fill = combineFillProgress([namePart]);
+  const signupEmailFill = combineFillProgress([emailPart, usernamePart, namePart, newPwPart, confirmPart]);
+
+  const forgotFill = combineFillProgress([emailPart]);
   const resetFill = combineFillProgress([newPwPart, confirmPart]);
 
   // First missing requirement — the not-ready button's visible reason (§2.2).
@@ -549,23 +644,35 @@ export default function Auth() {
       : !loginPwPart.valid
         ? s.hintPassword
         : '';
-  const signupEmailHint = !usernameValid
-    ? s.hintUsername
-    : !trimmedName
-      ? s.hintName
-      : !emailValid
-        ? s.hintEmail
+  const step1Hint = !emailValid
+    ? s.hintEmail
+    : !usernameShapeValid
+      ? s.hintUsername
+      : availability.state === 'unavailable'
+        ? s.hintUsernameTaken
         : !newPwValid
           ? s.hintPassword
           : !confirmValid
             ? s.hintConfirm
             : '';
+  const step2Hint = !trimmedName ? s.hintName : '';
+  const signupEmailHint = step1Hint || step2Hint;
 
   // Inline errors only where they genuinely help while typing.
   const confirmMismatchError =
     confirmPassword && password && confirmPassword.length >= password.length && confirmPassword !== password
       ? s.errPasswordMismatch
       : undefined;
+  const usernameHelp =
+    availability.state === 'checking'
+      ? ob.usernameChecking
+      : availability.state === 'free'
+        ? ob.usernameFree
+        : availability.state === 'unavailable'
+          ? usernameReasonLabel(ob, availability.reason)
+          : s.hintUsername;
+  const usernameTone: 'neutral' | 'ok' | 'bad' =
+    availability.state === 'free' ? 'ok' : availability.state === 'unavailable' ? 'bad' : 'neutral';
 
   // ---------------------------------------------------------------- submits
 
@@ -600,6 +707,20 @@ export default function Auth() {
     }
   };
 
+  // Steps 1 and 2 only validate locally; nothing leaves the browser until
+  // the review step's single register call. A per-step request would
+  // create half-accounts and burn the register bucket.
+  const handleStep1 = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!step1Fill.ready) return;
+    goToStep(2);
+  };
+  const handleStep2 = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!step2Fill.ready) return;
+    goToStep(3);
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -615,6 +736,7 @@ export default function Auth() {
         email: trimmedEmail,
         password,
         locale: lang,
+        ...(country ? { country } : {}),
         ...(referral ? { referralCode: referral } : {}),
       });
       await refreshUser();
@@ -622,13 +744,9 @@ export default function Auth() {
       finishAuth(true);
     } catch (err) {
       setServerError(errMsg(err));
-      // The server still refuses to create an account on an unproven phone
-      // number, and it always will. The signup form no longer offers one, so
-      // this can only be reached by a client that sent one anyway — the reply
-      // is still the real path rather than a bare error.
-      setPhoneNeedsTelegram(
-        telegramConfigured && err instanceof ApiError && err.code === 'PHONE_REQUIRES_VERIFICATION'
-      );
+      // A refusal about the email or the handle is answered on the step
+      // that owns those fields, with the error visible there.
+      if (err instanceof ApiError && err.code && STEP1_CODES.has(err.code)) setStep(1);
     } finally {
       setSubmitting(false);
     }
@@ -646,17 +764,18 @@ export default function Auth() {
     setSubmitting(true);
     try {
       if (referral) {
-        // The server attributes the referral only when this sign-in CREATES
-        // a new account; existing accounts are never re-attributed.
+        // Same server route the context uses, plus the referral code the
+        // person chose (server-resolved; unknown codes never block).
         await api.post('/api/auth/google', { credential, referralCode: referral });
         await refreshUser();
       } else {
         await loginWithGoogle(credential);
       }
       setSucceeded(true);
-      // Google does not tell the browser whether the account was created or
-      // matched, and it does not need to: /welcome sends anyone who has
-      // already finished setup straight on to where they were going.
+      // The register/login distinction is the server's; the view only says
+      // which onboarding the person expected. Google can create an account
+      // on the sign-in view too, in which case the worker's response is the
+      // authority and /welcome self-skips for existing accounts.
       finishAuth(view === 'signup');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {
@@ -677,13 +796,11 @@ export default function Auth() {
     setVia('form');
     setSubmitting(true);
     try {
-      // lang tells the server which language to write the reset email in.
       await api.post<{ message?: string }>('/api/auth/forgot-password', { email: trimmedEmail, lang });
       setForgotMessage(s.forgotSent);
       setSucceeded(true);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'EMAIL_NOT_CONFIGURED')) {
-        // Honest disabled state: the server has no email service configured.
         setEmailNotConfigured(true);
       } else {
         setServerError(errMsg(err));
@@ -697,33 +814,30 @@ export default function Auth() {
     e.preventDefault();
     if (submitting) return;
     if (!resetFill.ready) return;
-    setServerError('');
+    clearMessages();
     setVia('form');
     setSubmitting(true);
     try {
-      // The reset token is consumed ONLY here, on explicit submit — the page
-      // never verifies (and therefore never burns) the token on load.
+      // The token is consumed ONLY here, on submit — opening the link never
+      // spends it, so a preview fetch by a mail client cannot burn it.
       await api.post('/api/auth/reset-password', { token: resetToken, password });
       setPassword('');
       setConfirmPassword('');
       setResetDone(true);
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'TOKEN_USED') {
-        setResetTokenError('used');
-      } else if (err instanceof ApiError && err.code === 'TOKEN_EXPIRED') {
-        setResetTokenError('expired');
-      } else {
-        setServerError(errMsg(err));
-      }
+      if (err instanceof ApiError && err.code === 'TOKEN_USED') setResetTokenError('used');
+      else if (err instanceof ApiError && err.code === 'TOKEN_EXPIRED') setResetTokenError('expired');
+      else setServerError(errMsg(err));
     } finally {
       setSubmitting(false);
     }
   };
 
   const switchToForgotForm = () => {
-    // Leaves the dead-token screen for the forgot form: clear the token from
-    // the URL and open the "send me a new link" flow.
-    setSearchParams({}, { replace: true });
+    // Leave the dead reset link behind so a refresh does not resurrect it.
+    const next = new URLSearchParams(searchParams);
+    next.delete('reset');
+    setSearchParams(next, { replace: true });
     setResetTokenError('');
     setResetDone(false);
     clearMessages();
@@ -731,73 +845,64 @@ export default function Auth() {
   };
 
   const backToLoginFromReset = () => {
-    setSearchParams({}, { replace: true });
-    setResetTokenError('');
+    const next = new URLSearchParams(searchParams);
+    next.delete('reset');
+    setSearchParams(next, { replace: true });
     setResetDone(false);
-    clearMessages();
-    setView('signin');
+    setResetTokenError('');
+    switchView('signin');
   };
 
-  // -------------------------------------------------------- motion recipes
-  // One orchestrated entrance per screen: title, then fields, CTA, seam,
-  // providers, footer — 50ms apart. Collapses to nothing under reduced
-  // motion. The outer AnimatePresence still cross-fades between screens.
+  // ------------------------------------------------------------ chrome
 
-  const listV = {
-    hidden: {},
-    show: { transition: { staggerChildren: reduceMotion ? 0 : 0.05 } },
-  };
-  const itemV = {
-    hidden: { opacity: 0, y: reduceMotion ? 0 : 10 },
-    show: { opacity: 1, y: 0, transition: { duration: reduceMotion ? 0 : 0.3, ease: 'easeOut' as const } },
-  };
+  const stepHeadingRef = useRef<HTMLSpanElement>(null);
+  const firstStepRender = useRef(true);
+  // Moving between steps announces the new step and parks focus on its
+  // name, so a screen reader hears where it is and Tab reaches the first
+  // field next.
+  useEffect(() => {
+    if (firstStepRender.current) {
+      firstStepRender.current = false;
+      return;
+    }
+    // The previous screen is still exiting when `step` changes (mode="wait");
+    // the new stepper mounts after the swap, so the focus waits for it.
+    const t = window.setTimeout(() => stepHeadingRef.current?.focus({ preventScroll: true }), 240);
+    return () => window.clearTimeout(t);
+  }, [step]);
 
-  // ---------------------------------------------------------- shared pieces
-
-  const backLink = (onClick: () => void, label: string = s.backToSignIn) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className="-ms-2 mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
-    >
-      <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
-      {label}
+  const backLink = (onClick: () => void, label: string = s.backLabel) => (
+    <button type="button" onClick={onClick} className="lv-back">
+      <ArrowLeft aria-hidden />
+      <span>{label}</span>
     </button>
   );
 
-  const heading = (title: string, hint: string) => (
-    <div className="mb-5">
-      <h1 className="text-[24px] font-extrabold leading-tight text-white">{title}</h1>
-      <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{hint}</p>
+  const heading = (sheet: string, title: string, hint?: string) => (
+    <div className="lv-head">
+      <span className="lv-eyebrow lv-mono" aria-hidden>
+        {sheet}
+      </span>
+      <h1 className="lv-title">{title}</h1>
+      {hint && <p className="lv-sub">{hint}</p>}
     </div>
   );
 
   const errorSummary = serverError ? (
-    <div
-      role="alert"
-      className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-[13px] font-medium text-red-300"
-    >
-      <p className="leading-relaxed">{serverError}</p>
-      {phoneNeedsTelegram && (
-        /* The server refused to create a phone account without ownership
-           proof — hand the user the real path instead of a dead end. */
-        <button
-          type="button"
-          onClick={openTelegram}
-          className="mt-2.5 inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-3.5 text-[13px] font-bold text-gold transition-colors hover:bg-gold/20"
-        >
-          <Send className="h-4 w-4" aria-hidden />
-          {s.continueWithTelegram}
-        </button>
-      )}
+    <div className="lv-alert" role="alert">
+      <X aria-hidden />
+      <div style={{ minWidth: 0 }}>
+        <p>{serverError}</p>
+        {phoneNeedsTelegram && (
+          <button type="button" onClick={openTelegram} className="lv-btn-quiet">
+            <TelegramIcon />
+            {s.continueWithTelegram}
+          </button>
+        )}
+      </div>
     </div>
   ) : null;
 
-  const revealLabels = { show: s.showPassword, hide: s.hidePassword };
-
-  // incomplete/ready → idle, then submitting → success | error (§2.2). Only
-  // the FORM's own roundtrips drive the form CTA; a Google roundtrip dims
-  // the Google slot instead.
   const buttonStatus: FillButtonStatus =
     submitting && via === 'form'
       ? 'submitting'
@@ -806,23 +911,19 @@ export default function Auth() {
         : serverError && via === 'form'
           ? 'error'
           : 'idle';
-
   const googleBusy = submitting && via === 'google';
 
-  const passwordField = (
-    autoComplete: 'current-password' | 'new-password',
-    label: string = s.password
-  ) => (
+  const passwordField = (autoComplete: 'current-password' | 'new-password', label = s.password) => (
     <AuthTextField
-      id={autoComplete === 'new-password' ? 'new-password' : 'current-password'}
+      id={autoComplete}
       label={label}
       type="password"
       value={password}
       onChange={onPasswordChange}
       autoComplete={autoComplete}
-      minLength={autoComplete === 'new-password' ? 8 : undefined}
-      icon={<Lock className="h-[18px] w-[18px]" />}
-      revealLabels={revealLabels}
+      icon={<Lock />}
+      revealLabels={{ show: s.showPassword, hide: s.hidePassword }}
+      disabled={submitting}
     />
   );
 
@@ -834,72 +935,104 @@ export default function Auth() {
       value={confirmPassword}
       onChange={onConfirmChange}
       autoComplete="new-password"
-      minLength={8}
+      icon={<Lock />}
+      revealLabels={{ show: s.showPassword, hide: s.hidePassword }}
       error={confirmMismatchError}
-      icon={<Lock className="h-[18px] w-[18px]" />}
-      revealLabels={revealLabels}
+      disabled={submitting}
     />
   );
 
-  // Offering "forgot password" when no mail provider is configured sends a
-  // person to a screen whose only possible answer is "we cannot email you".
-  const forgotRow = !resetConfigured ? null : (
-    <div className="mt-1 flex justify-end">
-      <button
-        type="button"
-        onClick={() => switchView('forgot')}
-        className="inline-flex min-h-[44px] items-center px-1 text-[12px] font-medium text-zinc-400 transition-colors hover:text-gold"
-      >
+  // Only offered when the deployment can actually send the mail.
+  const forgotRow = resetConfigured ? (
+    <div className="lv-row">
+      <button type="button" onClick={() => switchView('forgot')} className="lv-link lv-link--sm">
         {s.forgotLink}
       </button>
     </div>
-  );
+  ) : null;
 
   /**
-   * The secondary sign-in actions: an "أو" seam, then Google (its official
-   * credential button, staged) and Telegram as full-width quiet buttons.
-   * Providers this deployment does not have simply do not appear.
+   * The provider seam. Google is Google's own iframe (the credential flow
+   * needs it), Telegram is a quiet outline button; both sit under the
+   * primary form, never above it, and only when the deployment offers them.
    */
   const providerBlock =
     googleConfigured || telegramConfigured ? (
       <>
-        <motion.div variants={itemV}>
-          <AuthDivider label={s.orLabel} />
-        </motion.div>
-        <div className="space-y-2.5">
+        <AuthDivider label={s.orLabel} />
+        <div className="lv-providers">
           {googleConfigured && (
-            <motion.div variants={itemV}>
+            <div>
               <GoogleAuthButton
-                onCredential={handleGoogleCredential}
-                onError={() => setServerError(s.googleFailed)}
                 view={view === 'signup' ? 'signup' : 'signin'}
                 busy={googleBusy}
+                onCredential={handleGoogleCredential}
+                onError={() => setServerError(s.googleFailed)}
               />
-              <span className="sr-only" role="status">
-                {googleBusy ? s.googleWorking : ''}
-              </span>
-            </motion.div>
+              {googleBusy && (
+                <span className="sr-only" role="status">
+                  {s.googleWorking}
+                </span>
+              )}
+            </div>
           )}
           {telegramConfigured && (
-            <motion.div variants={itemV}>
-              <SocialAuthButton
-                icon={<TelegramIcon />}
-                label={s.continueWithTelegram}
-                onClick={openTelegram}
-                disabled={submitting}
-              />
-            </motion.div>
+            <SocialAuthButton
+              icon={<TelegramIcon />}
+              label={s.continueWithTelegram}
+              onClick={openTelegram}
+              disabled={submitting}
+            />
           )}
         </div>
-        {googleConfigured && (
-          <motion.div variants={itemV}>
-            <p className="mt-2.5 text-center text-[11px] leading-relaxed text-zinc-600">{s.googleNote}</p>
-          </motion.div>
-        )}
+        {googleConfigured && <p className="lv-note-google">{s.googleNote}</p>}
       </>
     ) : null;
 
-  // ---------------------------------------------------------------- screens
+  // Country list: the frequently used ones first, then everything in the
+  // reader's language — the same recipe /welcome uses.
+  const countryOptions = (() => {
+    const nameOf = countryNames(lang);
+    const commonSet = new Set(COMMON_ISO);
+    const common = COMMON_ISO.map((iso) => COUNTRIES.find((c) => c.iso === iso)).filter(Boolean) as typeof COUNTRIES;
+    const rest = COUNTRIES.filter((c) => !commonSet.has(c.iso)).sort((a, b) =>
+      nameOf(a.iso).localeCompare(nameOf(b.iso), lang)
+    );
+    return { common, rest, nameOf };
+  })();
+  const countryLabel = country ? `${flagOf(country)} ${countryOptions.nameOf(country)}` : '';
+
+  const stepper = (
+    <div className="lv-stepper" role="group" aria-label={s.steps}>
+      <div className="lv-stepper__rail" aria-hidden>
+        {[1, 2, 3].map((n) => (
+          <span key={n} className={`lv-stepper__seg${n < step ? ' is-done' : n === step ? ' is-active' : ''}`} />
+        ))}
+      </div>
+      <div className="lv-stepper__meta">
+        <span ref={stepHeadingRef} tabIndex={-1} className="lv-stepper__name" aria-live="polite" style={{ outline: 'none' }}>
+          {step === 1 ? s.step1Name : step === 2 ? s.step2Name : s.step3Name}
+        </span>
+        <span className="lv-stepper__count lv-mono">
+          <b>0{step}</b> / 03
+        </span>
+      </div>
+    </div>
+  );
+
+  const reviewRow = (key: string, value: string, target: SignupStep, ltr = false) => (
+    <div className="lv-review__row">
+      <span className="lv-review__key">{key}</span>
+      <span className={`lv-review__val${value ? '' : ' lv-review__val--empty'}`} dir={ltr ? 'ltr' : 'auto'}>
+        {value || '—'}
+      </span>
+      <button type="button" className="lv-review__edit" onClick={() => goToStep(target)}>
+        {s.edit}
+      </button>
+    </div>
+  );
+
+  // ------------------------------------------------------------- screens
 
   let screenKey: string;
   let screen: React.ReactNode;
@@ -908,10 +1041,12 @@ export default function Auth() {
     if (resetDone) {
       screenKey = 'reset-done';
       screen = (
-        <div className="flex flex-col items-center pt-2 text-center">
-          <CheckCircle2 className="mb-4 h-12 w-12 text-gold" />
-          <h1 className="mb-1.5 text-[20px] font-bold text-white">{s.resetDoneTitle}</h1>
-          <p className="mb-7 max-w-xs text-[13px] leading-relaxed text-zinc-400">{s.resetDoneBody}</p>
+        <div className="lv-center">
+          <span className="lv-center__icon" aria-hidden>
+            <CheckCircle2 />
+          </span>
+          <h1 className="lv-title">{s.resetDoneTitle}</h1>
+          <p className="lv-sub">{s.resetDoneBody}</p>
           <button type="button" onClick={backToLoginFromReset} className="lv-btn-gold">
             {s.signInCta}
           </button>
@@ -920,21 +1055,16 @@ export default function Auth() {
     } else if (resetTokenError) {
       screenKey = 'reset-dead';
       screen = (
-        /* Dead-token screen: used vs expired, each with a way forward. */
-        <div className="flex flex-col items-center pt-2 text-center">
-          <h1 className="mb-1.5 text-[20px] font-bold text-white">
-            {resetTokenError === 'used' ? s.resetUsedTitle : s.resetExpiredTitle}
-          </h1>
-          <p className="mb-7 max-w-xs text-[13px] leading-relaxed text-zinc-400">{s.resetDeadBody}</p>
+        <div className="lv-center">
+          <span className="lv-center__icon" aria-hidden>
+            <Mail />
+          </span>
+          <h1 className="lv-title">{resetTokenError === 'used' ? s.resetUsedTitle : s.resetExpiredTitle}</h1>
+          <p className="lv-sub">{s.resetDeadBody}</p>
           <button type="button" onClick={switchToForgotForm} className="lv-btn-gold">
             {s.requestNewLink}
           </button>
-          <button
-            type="button"
-            onClick={backToLoginFromReset}
-            className="mt-4 inline-flex min-h-[44px] items-center justify-center gap-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
-          >
-            <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+          <button type="button" onClick={backToLoginFromReset} className="lv-link" style={{ marginTop: 8 }}>
             {s.backToSignIn}
           </button>
         </div>
@@ -942,14 +1072,14 @@ export default function Auth() {
     } else {
       screenKey = 'reset';
       screen = (
-        <form onSubmit={handleReset} noValidate aria-busy={submitting}>
-          {heading(s.resetTitle, s.resetHint)}
+        <form onSubmit={handleReset} noValidate aria-busy={submitting && via === 'form'}>
+          {heading(SHEET.reset, s.resetTitle, s.resetHint)}
           {errorSummary}
-          <div className="space-y-4">
+          <div className="lv-fields">
             {passwordField('new-password', s.newPassword)}
             {confirmField}
           </div>
-          <div className="mt-6">
+          <div style={{ marginTop: 16 }}>
             <FillButton
               id="reset-submit"
               label={s.setPasswordCta}
@@ -957,59 +1087,54 @@ export default function Auth() {
               progress={resetFill.progress}
               ready={resetFill.ready}
               status={buttonStatus}
-              hint={!newPwValid ? s.hintPassword : !confirmValid ? s.hintConfirm : undefined}
+              hint={!newPwValid ? s.hintPassword : !confirmValid ? s.hintConfirm : ''}
             />
           </div>
-          <div className="mt-3 flex justify-center">
-            <button
-              type="button"
-              onClick={backToLoginFromReset}
-              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 text-[13px] font-medium text-zinc-400 transition-colors hover:text-white"
-            >
-              <ArrowLeft className={`h-4 w-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+          <p className="lv-foot">
+            <button type="button" onClick={backToLoginFromReset} className="lv-link">
               {s.backToSignIn}
             </button>
-          </div>
+          </p>
         </form>
       );
     }
   } else if (view === 'forgot') {
     screenKey = 'forgot';
     screen = (
-      <form onSubmit={handleForgot} noValidate aria-busy={submitting}>
+      <form onSubmit={handleForgot} noValidate aria-busy={submitting && via === 'form'}>
         {backLink(() => switchView('signin'))}
-        {heading(s.forgotTitle, s.forgotHint)}
+        {heading(SHEET.forgot, s.forgotTitle, s.forgotHint)}
         {emailNotConfigured && (
-          /* Honest disabled state — the email service is not configured on
-             the server, so no reset link can be sent yet. */
-          <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-[13px] font-medium text-amber-300">
-            {s.emailNotConfigured}
+          <div className="lv-notice lv-notice--warn" role="status">
+            <Info aria-hidden />
+            <p>{s.emailNotConfigured}</p>
           </div>
         )}
         {forgotMessage && (
-          <div
-            role="status"
-            className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-[13px] font-medium text-emerald-300"
-          >
-            {forgotMessage}
+          <div className="lv-notice lv-notice--ok" role="status">
+            <MailCheck aria-hidden />
+            <p>{forgotMessage}</p>
           </div>
         )}
         {errorSummary}
-        <AuthTextField
-          id="email"
-          label={s.email}
-          type="email"
-          value={email}
-          onChange={onEmailChange}
-          autoComplete="email"
-          inputMode="email"
-          placeholder="email@example.com"
-          valueDir="ltr"
-          autoCapitalize="none"
-          spellCheck={false}
-          icon={<Mail className="h-[18px] w-[18px]" />}
-        />
-        <div className="mt-6">
+        <div className="lv-fields">
+          <AuthTextField
+            id="email"
+            label={s.email}
+            type="email"
+            value={email}
+            onChange={onEmailChange}
+            autoComplete="email"
+            inputMode="email"
+            placeholder="email@example.com"
+            valueDir="ltr"
+            autoCapitalize="none"
+            spellCheck={false}
+            icon={<Mail />}
+            disabled={submitting}
+          />
+        </div>
+        <div style={{ marginTop: 16 }}>
           <FillButton
             id="forgot-submit"
             label={s.sendResetCta}
@@ -1018,92 +1143,179 @@ export default function Auth() {
             progress={forgotFill.progress}
             ready={forgotFill.ready}
             status={buttonStatus}
-            hint={!emailValid ? s.hintEmail : undefined}
+            hint={!emailValid ? s.hintEmail : ''}
           />
         </div>
       </form>
     );
   } else if (view === 'signup') {
-    screenKey = `signup:${panel}`;
-    screen =
-      panel === 'telegram' && telegramConfigured ? (
+    screenKey = `signup:${panel}:${panel === 'form' ? step : 0}`;
+    if (panel === 'telegram') {
+      screen = (
         <div>
-          {backLink(() => setPanel('form'), s.backLabel)}
-          {heading(s.signUpTitle, s.signUpHint)}
+          {backLink(() => setPanel('form'))}
+          {heading(SHEET.telegram, s.signUpTitle)}
           {errorSummary}
-          {/* TelegramAuth owns its own <form>; rendering it alone in the
-              panel keeps the no-nested-forms rule trivially true. */}
-          <TelegramAuth
-            mode="signup"
-            onSuccess={() => finishAuth(true)}
-            onSwitchMode={switchView}
-            referralCode={referralCode}
-          />
+          {/* TelegramAuth renders its own <form>s; it is never nested in the credentials form. */}
+          <TelegramAuth mode="signup" onSuccess={() => finishAuth(true)} onSwitchMode={switchView} referralCode={referralCode} />
         </div>
-      ) : (
-        <motion.div variants={listV} initial="hidden" animate="show">
-          <motion.div variants={itemV}>{backLink(() => switchView('signin'))}</motion.div>
-          <motion.div variants={itemV}>{heading(s.signUpTitle, s.signUpHint)}</motion.div>
-          {/* §2.6 — optional referral bar; the code survives every panel
-              switch and is attributed server-side only when an account is
-              actually created. It NEVER blocks signup. */}
-          <motion.div variants={itemV} className="mb-4">
-            <ReferralBar
-              code={referralCode}
-              onCodeChange={setReferralCode}
-              fromLink={refFromLink}
-              disabled={submitting}
-            />
-          </motion.div>
+      );
+    } else if (step === 1) {
+      screen = (
+        <div>
+          {backLink(() => switchView('signin'))}
+          {heading(SHEET.signup, s.signUpTitle, s.step1Hint)}
+          {stepper}
+          {/* The referral bar sits OUTSIDE the form: it is not a field of the
+              account and must never gate the button. */}
+          <div style={{ marginBottom: 14 }}>
+            <ReferralBar code={referralCode} onCodeChange={setReferralCode} fromLink={refFromLink} disabled={submitting} />
+          </div>
+          {errorSummary}
+          <form onSubmit={handleStep1} noValidate>
+            <div className="lv-fields">
+              <AuthTextField
+                id="email"
+                label={s.email}
+                type="email"
+                value={email}
+                onChange={onEmailChange}
+                autoComplete="email"
+                inputMode="email"
+                placeholder="email@example.com"
+                valueDir="ltr"
+                autoCapitalize="none"
+                spellCheck={false}
+                icon={<Mail />}
+              />
+              <AuthTextField
+                id="username"
+                label={s.username}
+                value={username}
+                onChange={onUsernameChange}
+                autoComplete="username"
+                placeholder="username123"
+                valueDir="ltr"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={30}
+                icon={<AtSign />}
+                help={usernameHelp}
+                helpTone={usernameTone}
+                ok={availability.state === 'free'}
+                trail={
+                  availability.state === 'checking' ? (
+                    <span className="lv-dots" />
+                  ) : availability.state === 'free' ? (
+                    <Check />
+                  ) : availability.state === 'unavailable' ? (
+                    <X />
+                  ) : null
+                }
+              />
+              {passwordField('new-password')}
+              {confirmField}
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <FillButton
+                id="signup-next-1"
+                label={s.next}
+                workingLabel={s.next}
+                progress={step1Fill.progress}
+                ready={step1Fill.ready}
+                hint={step1Hint}
+              />
+            </div>
+          </form>
+          {providerBlock}
+          <p className="lv-foot">
+            {s.haveAccount}{' '}
+            <button type="button" onClick={() => switchView('signin')} className="lv-link">
+              {s.signInAction}
+            </button>
+          </p>
+        </div>
+      );
+    } else if (step === 2) {
+      screen = (
+        <div>
+          {backLink(() => goToStep(1))}
+          {heading(SHEET.signup, s.signUpTitle, s.step2Hint)}
+          {stepper}
+          {errorSummary}
+          <form onSubmit={handleStep2} noValidate>
+            <div className="lv-fields">
+              <AuthTextField
+                id="name"
+                label={s.fullName}
+                value={name}
+                onChange={onNameChange}
+                autoComplete="name"
+                valueDir="auto"
+                maxLength={100}
+                icon={<UserRound />}
+              />
+              <div>
+                <label htmlFor="country" className="lv-field__label">
+                  {ob.country} <span style={{ fontWeight: 400, color: 'var(--lv-text-3)' }}>· {s.optional}</span>
+                </label>
+                <select
+                  id="country"
+                  name="country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="lv-field__input lv-select"
+                  autoComplete="country"
+                >
+                  <option value="">{ob.countryPlaceholder}</option>
+                  {countryOptions.common.map((c) => (
+                    <option key={c.iso} value={c.iso}>
+                      {flagOf(c.iso)} {countryOptions.nameOf(c.iso)}
+                    </option>
+                  ))}
+                  {countryOptions.rest.map((c) => (
+                    <option key={c.iso} value={c.iso}>
+                      {flagOf(c.iso)} {countryOptions.nameOf(c.iso)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <FillButton
+                id="signup-next-2"
+                label={s.next}
+                workingLabel={s.next}
+                progress={step2Fill.progress}
+                ready={step2Fill.ready}
+                hint={step2Hint}
+              />
+            </div>
+          </form>
+        </div>
+      );
+    } else {
+      screen = (
+        <div>
+          {backLink(() => goToStep(2))}
+          {heading(SHEET.signup, s.signUpTitle, s.step3Hint)}
+          {stepper}
           {errorSummary}
           <form onSubmit={handleSignUp} noValidate aria-busy={submitting && via === 'form'}>
-            <div className="space-y-4">
-              <motion.div variants={itemV}>
-                <AuthTextField
-                  id="username"
-                  label={s.username}
-                  value={username}
-                  onChange={onUsernameChange}
-                  autoComplete="username"
-                  placeholder="username123"
-                  minLength={3}
-                  valueDir="ltr"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  icon={<AtSign className="h-[18px] w-[18px]" />}
-                />
-              </motion.div>
-              <motion.div variants={itemV}>
-                <AuthTextField
-                  id="name"
-                  label={s.fullName}
-                  value={name}
-                  onChange={onNameChange}
-                  autoComplete="name"
-                  valueDir="auto"
-                  icon={<UserRound className="h-[18px] w-[18px]" />}
-                />
-              </motion.div>
-              <motion.div variants={itemV}>
-                <AuthTextField
-                  id="email"
-                  label={s.email}
-                  type="email"
-                  value={email}
-                  onChange={onEmailChange}
-                  autoComplete="email"
-                  inputMode="email"
-                  placeholder="email@example.com"
-                  valueDir="ltr"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  icon={<Mail className="h-[18px] w-[18px]" />}
-                />
-              </motion.div>
-              <motion.div variants={itemV}>{passwordField('new-password')}</motion.div>
-              <motion.div variants={itemV}>{confirmField}</motion.div>
+            <div className="lv-review">
+              {reviewRow(s.email, trimmedEmail, 1, true)}
+              {reviewRow(s.username, trimmedUsername ? `@${trimmedUsername}` : '', 1, true)}
+              {reviewRow(s.fullName, trimmedName, 2)}
+              {reviewRow(ob.country, countryLabel, 2)}
+              {referralCode.trim() && reviewRow(s.referralLabel, referralCode.trim(), 1, true)}
             </div>
-            <motion.div variants={itemV} className="mt-6">
+            {emailVerificationConfigured && (
+              <div className="lv-notice lv-notice--info lv-notice--tight" role="note">
+                <MailCheck aria-hidden />
+                <p>{s.verifyNote}</p>
+              </div>
+            )}
+            <div style={{ marginTop: 16 }}>
               <FillButton
                 id="signup-submit"
                 label={s.signUpCta}
@@ -1112,68 +1324,57 @@ export default function Auth() {
                 progress={signupEmailFill.progress}
                 ready={signupEmailFill.ready}
                 status={buttonStatus}
-                hint={signupEmailHint || undefined}
+                hint={signupEmailHint}
               />
-            </motion.div>
-          </form>
-          {providerBlock}
-          <motion.div variants={itemV}>
-            <p className="mt-4 text-center text-[12px] leading-relaxed text-zinc-500">
+            </div>
+            <p className="lv-terms">
               {s.termsPrefix}{' '}
-              <Link to="/policies" className="font-semibold text-gold hover:underline">
+              <Link to="/policies" className="lv-link">
                 {s.termsLink}
               </Link>
             </p>
-            <p className="mt-1 text-center text-[13px] text-zinc-400">
-              {s.haveAccount}{' '}
-              <button
-                type="button"
-                onClick={() => switchView('signin')}
-                className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
-              >
-                {s.signInAction}
-              </button>
-            </p>
-          </motion.div>
-        </motion.div>
+          </form>
+        </div>
       );
+    }
   } else {
     screenKey = `signin:${panel}`;
-    screen =
-      panel === 'telegram' && telegramConfigured ? (
+    if (panel === 'telegram') {
+      screen = (
         <div>
-          {backLink(() => setPanel('form'), s.backLabel)}
-          {heading(s.signInTitle, s.signInHint)}
+          {backLink(() => setPanel('form'))}
+          {heading(SHEET.telegram, s.signInTitle)}
           {errorSummary}
           <TelegramAuth mode="signin" onSuccess={() => finishAuth(false)} onSwitchMode={switchView} />
         </div>
-      ) : (
-        <motion.div variants={listV} initial="hidden" animate="show">
-          <motion.div variants={itemV}>{heading(s.signInTitle, s.signInHint)}</motion.div>
+      );
+    } else {
+      screen = (
+        <div>
+          {heading(SHEET.signin, s.signInTitle, s.signInHint)}
           {errorSummary}
           <form onSubmit={handleSignIn} noValidate aria-busy={submitting && via === 'form'}>
-            <div className="space-y-4">
-              <motion.div variants={itemV}>
-                <AuthTextField
-                  id="identifier"
-                  label={s.identifier}
-                  value={email}
-                  onChange={onEmailChange}
-                  autoComplete="username"
-                  inputMode="email"
-                  placeholder={s.identifierPlaceholder}
-                  valueDir="ltr"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  icon={<UserRound className="h-[18px] w-[18px]" />}
-                />
-              </motion.div>
-              <motion.div variants={itemV}>
+            <div className="lv-fields">
+              <AuthTextField
+                id="identifier"
+                label={s.identifier}
+                value={email}
+                onChange={onEmailChange}
+                autoComplete="username"
+                inputMode="email"
+                placeholder={s.identifierPlaceholder}
+                valueDir="ltr"
+                autoCapitalize="none"
+                spellCheck={false}
+                icon={<UserRound />}
+                disabled={submitting}
+              />
+              <div>
                 {passwordField('current-password')}
                 {forgotRow}
-              </motion.div>
+              </div>
             </div>
-            <motion.div variants={itemV} className="mt-5">
+            <div style={{ marginTop: forgotRow ? 8 : 16 }}>
               <FillButton
                 id="signin-submit"
                 label={s.signInCta}
@@ -1182,49 +1383,39 @@ export default function Auth() {
                 progress={signinEmailFill.progress}
                 ready={signinEmailFill.ready}
                 status={buttonStatus}
-                hint={signinEmailHint || undefined}
+                hint={signinEmailHint}
               />
-            </motion.div>
+            </div>
           </form>
           {providerBlock}
-          <motion.div variants={itemV}>
-            <p className="mt-5 text-center text-[13px] text-zinc-400">
-              {s.noAccount}{' '}
-              <button
-                type="button"
-                onClick={() => switchView('signup')}
-                className="inline-flex min-h-[44px] items-center px-1 align-middle font-bold text-gold hover:underline"
-              >
-                {s.signUpAction}
-              </button>
-            </p>
-          </motion.div>
-        </motion.div>
+          <p className="lv-foot">
+            {s.noAccount}{' '}
+            <button type="button" onClick={() => switchView('signup')} className="lv-link">
+              {s.signUpAction}
+            </button>
+          </p>
+        </div>
       );
+    }
   }
 
-  // ------------------------------------------------------------------ page
-
-  /**
-   * The provider is mounted ONCE for the whole page and only when there is a
-   * real client id to give it. Not around the app (that is what forced a
-   * build-time value in the first place), and not inside the animated panel:
-   * `@react-oauth/google` injects and removes Google's script on mount and
-   * unmount, so putting it in the panel would tear the script down and
-   * re-add it on every screen switch.
-   */
+  // The Google provider is mounted ONCE for the page, only when a client id
+  // is configured, and never inside the animated screen (remounting the GIS
+  // iframe on every switch would flicker and re-request the script).
   const withGoogle = (node: React.ReactNode) =>
     googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{node}</GoogleOAuthProvider> : node;
 
   return withGoogle(
     <AuthShell dir={dir}>
+      {/* mode="wait": exactly one screen — and one <form> — is mounted at a
+          time. The switch itself is a 160ms cross-fade with 4px of travel. */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={screenKey}
           initial={{ opacity: 0, y: slide }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -slide }}
-          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          transition={{ duration: reduceMotion ? 0 : 0.16, ease: 'easeOut' }}
         >
           {screen}
         </motion.div>

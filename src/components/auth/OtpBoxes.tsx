@@ -136,7 +136,7 @@ export default function OtpBoxes({
         ))}
       </div>
       {error && (
-        <p id={errorId} className="mt-1.5 text-center text-xs font-medium text-red-400">
+        <p id={errorId} className="lv-field__error" style={{ textAlign: 'center' }}>
           {error}
         </p>
       )}
