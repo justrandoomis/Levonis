@@ -76,6 +76,23 @@ jobs:
           exit $fail
 
       # ---------------------------------------------------------- database
+      # wrangler.jsonc carries a PLACEHOLDER database id in the repository, so
+      # every job that talks to D1 resolves the real one first — exactly what
+      # the deploy workflow does before it applies a migration.
+      - name: Resolve the staging database id into wrangler.jsonc
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs --env staging
+
       - name: Migration 0041 is applied to the database the live Worker uses
         id: schema
         run: |
