@@ -100,9 +100,18 @@ export function parseCsv(text: string): string[][] {
 
 const needsQuote = (s: string) => /[",\r\n]/.test(s);
 
+/** Spreadsheet apps treat a leading = + - @ or tab as a FORMULA, so a cell a
+ *  user typed («=HYPERLINK(...)») would execute on whoever opens the export.
+ *  The standard defence: prefix such cells with a single quote — Excel then
+ *  shows the text as typed. Applied here so every CSV we serve is covered. */
+const defuse = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
+
 export function toCsv(rows: string[][]): string {
   return rows
-    .map((r) => r.map((c) => (needsQuote(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(','))
+    .map((r) => r.map((cell) => {
+      const c = defuse(cell);
+      return needsQuote(c) ? `"${c.replace(/"/g, '""')}"` : c;
+    }).join(','))
     .join('\r\n');
 }
 

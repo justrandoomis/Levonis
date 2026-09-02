@@ -120,7 +120,7 @@ function StatCard({
         <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${t.icon}`}>{icon}</span>
         <span className="text-zinc-400 text-[10.5px] font-semibold truncate">{label}</span>
       </div>
-      <div className="text-white font-bold text-[19px] leading-tight" dir="ltr">{value}</div>
+      <div className="text-white font-bold text-[19px] leading-tight"><span dir="ltr">{value}</span></div>
       <div className="text-zinc-500 text-[10px] truncate mb-1">{sub}</div>
       <Spark series={series} className={t.spark} />
     </div>
@@ -169,6 +169,9 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
   const [insightsFor, setInsightsFor] = useState<MerchantProduct | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [menuFor, setMenuFor] = useState('');
+  // The row menu is FIXED-positioned from its trigger's rect: rendered inside
+  // the table it would be clipped by the overflow-x scroll container.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -205,7 +208,12 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
   const pMin = priceMin !== '' ? Number(priceMin) || 0 : band?.min;
   const pMax = priceMax !== '' ? Number(priceMax) || 0 : band?.max;
 
+  // A sequence token drops responses that arrive after a newer request left —
+  // the debounced search and the immediate filters routinely overlap.
+  const seqRef = useRef(0);
+
   const loadRows = useCallback(() => {
+    const seq = ++seqRef.current;
     merchantApi
       .productsPaged({
         page, limit, q, section, lifecycle, stock: stockF,
@@ -216,10 +224,19 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
         sort,
       })
       .then((d) => {
+        if (seq !== seqRef.current) return;
+        // Deleting the last row of the last page must not strand the
+        // merchant on an empty page with the pagination gone.
+        const maxPage = Math.max(1, Math.ceil(d.total / limit));
+        if (page > maxPage) {
+          setPage(maxPage);
+          return;
+        }
         setRows(d.products);
         setTotal(d.total);
       })
       .catch(() => {
+        if (seq !== seqRef.current) return;
         setRows([]);
         setTotal(0);
       });
@@ -283,15 +300,32 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
 
   async function exportCsv() {
     setToolsOpen(false);
-    const res = await fetch('/api/merchant/products/export.csv', { credentials: 'same-origin' });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'products.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await fetch('/api/merchant/products/export.csv', { credentials: 'same-origin' });
+      if (!res.ok) {
+        alert(loc('تعذّر التصدير — حاول مجددًا.', 'Export failed — try again.', 'هەناردە سەرنەکەوت.'));
+        return;
+      }
+      const truncatedAt = res.headers.get('X-Levonis-Truncated');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'products.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      if (truncatedAt) {
+        alert(
+          loc(
+            `الملف يحمل أول 2000 منتج من أصل ${truncatedAt}.`,
+            `The file carries the first 2000 of ${truncatedAt} products.`,
+            `2000 لە ${truncatedAt}`
+          )
+        );
+      }
+    } catch {
+      alert(loc('تعذّر التصدير — حاول مجددًا.', 'Export failed — try again.', 'هەناردە سەرنەکەوت.'));
+    }
   }
 
   const storefrontUrl = (p: MerchantProduct) =>
@@ -307,6 +341,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
     setCategory(''); setFeaturedOnly(false); setDealsOnly(false); setPage(1);
   };
 
+  const anyFilter = !!(q || section || lifecycle || stockF || category || days || featuredOnly || dealsOnly || pMin !== undefined || pMax !== undefined);
   const weekly = stats?.weekly ?? [];
   const t = stats?.totals;
   const activePct = t && t.total > 0 ? Math.round((t.active / t.total) * 100) : 0;
@@ -346,8 +381,8 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
             </button>
             {toolsOpen && (
               <>
-                <div className="fixed inset-0 z-20" onClick={() => setToolsOpen(false)} />
-                <div className="absolute top-11 start-0 z-30 w-52 rounded-xl border border-white/10 bg-[#131417] shadow-2xl overflow-hidden">
+                <div className="fixed inset-0 z-[135]" onClick={() => setToolsOpen(false)} />
+                <div className="absolute top-11 start-0 z-[140] w-52 rounded-xl border border-white/10 bg-[#131417] shadow-2xl overflow-hidden">
                   <button onClick={exportCsv} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 flex items-center gap-2">
                     <FileDown className="w-3.5 h-3.5 text-zinc-400" />
                     {loc('تصدير المنتجات CSV', 'Export products CSV', 'هەناردەی CSV')}
@@ -583,7 +618,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
         <Spinner />
       ) : rows.length === 0 ? (
         <Empty
-          text={total === 0 && !q && !section && !lifecycle ? loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە') : loc('لا نتائج مطابقة للتصفية', 'Nothing matches these filters', 'هیچ ئەنجامێک نییە')}
+          text={anyFilter || total > 0 ? loc('لا نتائج مطابقة للتصفية', 'Nothing matches these filters', 'هیچ ئەنجامێک نییە') : loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە')}
         />
       ) : view === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -599,7 +634,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
               </div>
               <div className="p-2">
                 <p className="text-white text-[12px] font-semibold truncate" dir="auto">{p.name}</p>
-                <p className="text-zinc-300 text-[11.5px] mt-0.5" dir="ltr">{dinar(p.price_iqd)}</p>
+                <p className="text-zinc-300 text-[11.5px] mt-0.5"><span dir="ltr">{dinar(p.price_iqd)}</span></p>
                 <div className="flex items-center justify-between mt-1.5">
                   <LifecycleChip lifecycle={p.lifecycle ?? 'active'} />
                   <div className="flex gap-1">
@@ -664,15 +699,15 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                           <p className="text-zinc-500 text-[10.5px] truncate max-w-[150px]" dir="auto">
                             {[p.category, firstColor(p)].filter(Boolean).join(' • ') || conditionLabel(p.condition, loc)}
                           </p>
-                          <p className="text-zinc-600 text-[10px]" dir="ltr">#{p.id.slice(-6).toUpperCase()}</p>
+                          <p className="text-zinc-600 text-[10px]"><span dir="ltr">#{p.id.slice(-6).toUpperCase()}</span></p>
                         </div>
                       </div>
                     </td>
                     <td className="px-2 py-2.5">
-                      <p className="text-white text-[12.5px] font-bold whitespace-nowrap" dir="ltr">{dinar(p.price_iqd)}</p>
+                      <p className="text-white text-[12.5px] font-bold whitespace-nowrap"><span dir="ltr">{dinar(p.price_iqd)}</span></p>
                       {discounted && (
-                        <p className="flex items-center gap-1.5 whitespace-nowrap" dir="ltr">
-                          <span className="text-zinc-500 text-[10.5px] line-through">{Number(p.original_price_iqd).toLocaleString('en-US')}</span>
+                        <p className="flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="text-zinc-500 text-[10.5px] line-through" dir="ltr">{Number(p.original_price_iqd).toLocaleString('en-US')}</span>
                           <span className="text-[9.5px] font-bold px-1 py-0.5 rounded bg-red-500/15 text-red-400">
                             -{Math.round((1 - p.price_iqd / (p.original_price_iqd as number)) * 100)}%
                           </span>
@@ -682,12 +717,12 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                     <td className="px-2 py-2.5"><StockCell p={p} loc={loc} /></td>
                     <td className="px-2 py-2.5"><LifecycleChip lifecycle={p.lifecycle ?? 'active'} /></td>
                     <td className="px-2 py-2.5">
-                      <p className="text-white text-[12.5px] font-bold" dir="ltr">{p.sold_count ?? 0}</p>
+                      <p className="text-white text-[12.5px] font-bold"><span dir="ltr">{p.sold_count ?? 0}</span></p>
                       <p className="text-zinc-500 text-[10px]">{loc('مبيع', 'sold', 'فرۆشراو')}</p>
                     </td>
                     <td className="px-2 py-2.5">
                       <p className="text-zinc-200 text-[11.5px] whitespace-nowrap">{relTime(p.updated_at || p.created_at, loc)}</p>
-                      <p className="text-zinc-500 text-[10px]" dir="ltr">{absDate(p.updated_at || p.created_at)}</p>
+                      <p className="text-zinc-500 text-[10px]"><span dir="ltr">{absDate(p.updated_at || p.created_at)}</span></p>
                     </td>
                     <td className="px-2 py-2.5">
                       <div className="flex items-center gap-1">
@@ -703,14 +738,31 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                         <IconBtn onClick={() => setInsightsFor(p)} label={loc('تحليلات', 'Insights', 'شیکاری')}>
                           <BarChart3 className="w-3.5 h-3.5" />
                         </IconBtn>
-                        <div className="relative">
-                          <IconBtn onClick={() => setMenuFor(menuFor === p.id ? '' : p.id)} label={loc('المزيد', 'More', 'زیاتر')}>
+                        <div>
+                          <IconBtn
+                            onClick={(e) => {
+                              if (menuFor === p.id) {
+                                setMenuFor('');
+                                return;
+                              }
+                              const r = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({
+                                top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 240)),
+                                right: Math.max(8, window.innerWidth - r.right),
+                              });
+                              setMenuFor(p.id);
+                            }}
+                            label={loc('المزيد', 'More', 'زیاتر')}
+                          >
                             <MoreHorizontal className="w-3.5 h-3.5" />
                           </IconBtn>
-                          {menuFor === p.id && (
+                          {menuFor === p.id && menuPos && (
                             <>
-                              <div className="fixed inset-0 z-20" onClick={() => setMenuFor('')} />
-                              <div className="absolute top-9 end-0 z-30 w-48 rounded-xl border border-white/10 bg-[#131417] shadow-2xl overflow-hidden">
+                              <div className="fixed inset-0 z-[135]" onClick={() => setMenuFor('')} />
+                              <div
+                                style={{ top: menuPos.top, right: menuPos.right }}
+                                className="fixed z-[140] w-48 rounded-xl border border-white/10 bg-[#131417] shadow-2xl overflow-hidden"
+                              >
                                 {(p.lifecycle ?? 'active') === 'active' ? (
                                   <MenuItem
                                     icon={<EyeOff className="w-3.5 h-3.5" />}
@@ -807,7 +859,7 @@ function IconBtn({
   children, onClick, disabled, label, danger,
 }: {
   children: React.ReactNode;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   label: string;
   danger?: boolean;
@@ -889,7 +941,7 @@ function StockCell({ p, loc, compact }: { p: MerchantProduct; loc: Loc; compact?
   }
   return (
     <div>
-      <p className={`text-[12.5px] font-bold ${out ? 'text-red-400' : 'text-white'}`} dir="ltr">{p.stock ?? 0}</p>
+      <p className={`text-[12.5px] font-bold ${out ? 'text-red-400' : 'text-white'}`}><span dir="ltr">{p.stock ?? 0}</span></p>
       <p className={`text-[10px] ${out ? 'text-red-400/80' : 'text-zinc-500'}`}>
         {out ? loc('نفد المخزون', 'out of stock', 'تەواو بوو') : loc('متوفر', 'in stock', 'بەردەست')}
       </p>
@@ -898,8 +950,10 @@ function StockCell({ p, loc, compact }: { p: MerchantProduct; loc: Loc; compact?
 }
 
 function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  // Above the floating BottomNav (z-[120]) — a modal the nav can poke
+  // through is not modal.
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-10 pb-16">
+    <div className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto p-4 pt-10 pb-16">
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg">{children}</div>
     </div>
@@ -958,7 +1012,7 @@ function InsightRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
       <p className="text-zinc-500 text-[10.5px] mb-0.5">{label}</p>
-      <p className="text-white text-[13px] font-bold" dir="ltr">{value}</p>
+      <p className="text-white text-[13px] font-bold"><span dir="ltr">{value}</span></p>
     </div>
   );
 }

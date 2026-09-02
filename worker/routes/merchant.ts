@@ -846,11 +846,18 @@ const PRODUCT_CSV_HEADER = [
 /** The whole catalogue as a spreadsheet — BOM for Excel-friendly Arabic. */
 merchantRoutes.get('/products/export.csv', async (c) => {
   const ctx = await requireStoreOwner(c);
-  const { results } = await c.env.DB.prepare(
-    `SELECT p.*, s.name AS section_name FROM community_products p
-       LEFT JOIN merchant_store_sections s ON s.id = p.section_id
-      WHERE p.merchant_id = ? ORDER BY p.created_at DESC LIMIT 2000`
-  ).bind(ctx.merchant.id).all<Record<string, unknown>>();
+  const [{ results }, count] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT p.*, s.name AS section_name FROM community_products p
+         LEFT JOIN merchant_store_sections s ON s.id = p.section_id
+        WHERE p.merchant_id = ? ORDER BY p.created_at DESC LIMIT 2000`
+    ).bind(ctx.merchant.id).all<Record<string, unknown>>(),
+    c.env.DB.prepare('SELECT COUNT(*) AS n FROM community_products WHERE merchant_id = ?')
+      .bind(ctx.merchant.id)
+      .first<{ n: number }>(),
+  ]);
+  // A silent cut would read as "that's the whole catalogue" — say so instead.
+  const truncated = (count?.n ?? 0) > (results ?? []).length;
 
   const rows: string[][] = [
     [...PRODUCT_CSV_HEADER, 'sold_count', 'view_count', 'id', 'slug', 'created_at', 'updated_at'],
@@ -872,6 +879,7 @@ merchantRoutes.get('/products/export.csv', async (c) => {
       'Content-Disposition': 'attachment; filename="products.csv"',
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
+      ...(truncated ? { 'X-Levonis-Truncated': String(count?.n ?? 0) } : {}),
     },
   });
 });
@@ -897,7 +905,12 @@ merchantRoutes.post('/products/import', async (c) => {
   if (col('name') === -1 || col('price_iqd') === -1) {
     throw badRequest('The file must carry name and price_iqd columns', 'CSV_HEADER');
   }
-  const dataRows = grid.slice(1).filter((r) => r.some((cell) => cell.trim() !== ''));
+  // Keep each row's ORIGINAL file line number so an error report points at
+  // the line the merchant actually sees in their spreadsheet.
+  const dataRows = grid
+    .slice(1)
+    .map((r, i) => ({ r, line: i + 2 }))
+    .filter(({ r }) => r.some((cell) => cell.trim() !== ''));
   if (dataRows.length > 200) throw badRequest('Up to 200 rows per import', 'CSV_TOO_BIG');
 
   const sections = await c.env.DB.prepare(
@@ -915,10 +928,8 @@ merchantRoutes.post('/products/import', async (c) => {
   };
   const report: Array<{ row: number; name: string; ok: boolean; error?: string }> = [];
   const valid: Array<Record<string, unknown>> = [];
-  for (let i = 0; i < dataRows.length; i++) {
-    const r = dataRows[i];
+  for (const { r, line: rowNo } of dataRows) {
     const name = cell(r, 'name');
-    const rowNo = i + 2;
     try {
       if (name.length < 2 || name.length > 120) throw new Error('name must be 2-120 characters');
       const price = Number(cell(r, 'price_iqd'));
