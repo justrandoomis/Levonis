@@ -7,8 +7,11 @@
  * One violet accent does four jobs (primary CTA, focus, selection, active
  * chip); semantic colours are desaturated for dark and sit on 14% tinted
  * beds with lifted text. Contrast (WCAG, against surface-1 #1f1f24):
- * text-1 15.1:1 · text-2 7.3:1 · text-3 4.8:1 · white on accent 5.2:1
+ * text-1 15.1:1 · text-2 6.9:1 · text-3 5.8:1 · white on accent 5.2:1
  * (hover 4.6, pressed 6.1) · accent text 8.0:1 · every badge ≥ 6.3:1.
+ * text-3 is the dimmest text token and it also sits on surface-2 (5.3:1)
+ * and surface-3 (4.8:1) — placeholders, kbd hints, highlighted list rows —
+ * so it is pitched to clear AA on surface-3, not just on the card.
  */
 .ap {
   color-scheme: dark;
@@ -27,7 +30,7 @@
 
   --ap-text-1: #eceef2;
   --ap-text-2: #a3a8b6;
-  --ap-text-3: #848a99;
+  --ap-text-3: #9399a8;
 
   --ap-accent: #6558e0;
   --ap-accent-hover: #6e62ea;
@@ -66,7 +69,7 @@
 .ap select.ap-select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23848a99' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239399a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat;
   background-size: 12px 12px;
   background-position: right 12px center;

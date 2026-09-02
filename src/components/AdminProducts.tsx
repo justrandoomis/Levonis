@@ -239,16 +239,24 @@ export default function AdminProducts() {
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
   const quickRef = useRef<HTMLInputElement>(null);
+  const menuTriggerRef = useRef<HTMLElement | null>(null);
+  const headerBtnRef = useRef<HTMLButtonElement>(null);
   const seqRef = useRef(0);
 
-  // ⌘K / Ctrl+K opens the quick-find, like the reference top bar.
+  // ⌘K / Ctrl+K opens the quick-find, like the reference top bar. Matched on
+  // the physical key so an Arabic or Kurdish layout (where e.key is 'ن')
+  // still works; ignored while a dialog owns the page, and a no-op (without
+  // swallowing the browser's own Ctrl+K) while the editor has the strip
+  // unmounted.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        quickRef.current?.focus();
-        quickRef.current?.select();
-      }
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.code !== 'KeyK' && e.key.toLowerCase() !== 'k') return;
+      const input = quickRef.current;
+      if (!input || document.querySelector('[aria-modal="true"]')) return;
+      e.preventDefault();
+      input.focus();
+      input.select();
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
@@ -473,6 +481,7 @@ export default function AdminProducts() {
               top: Math.min(r.bottom + 6, Math.max(60, window.innerHeight - 220)),
               right: Math.min(Math.max(8, window.innerWidth - r.right), Math.max(8, window.innerWidth - 232)),
             });
+            menuTriggerRef.current = e.currentTarget;
             setMenuFor(p.id);
           }}
           className={T.btnIcon}
@@ -482,9 +491,12 @@ export default function AdminProducts() {
           <MoreHorizontal className="w-3.5 h-3.5" />
         </button>
         {menuFor === p.id && menuPos && (
-          <>
-            <div className="fixed inset-0 z-[135]" onClick={() => setMenuFor('')} />
-            <div style={{ top: menuPos.top, right: menuPos.right }} className={T.menu} role="menu">
+          <MenuPanel
+            style={{ top: menuPos.top, right: menuPos.right }}
+            className={T.menu}
+            onClose={() => setMenuFor('')}
+            returnTo={menuTriggerRef}
+          >
               {p.status === 'active' ? (
                 <MenuItem
                   icon={<EyeOff className="w-3.5 h-3.5" />}
@@ -527,8 +539,7 @@ export default function AdminProducts() {
                   }}
                 />
               )}
-            </div>
-          </>
+          </MenuPanel>
         )}
       </div>
     </div>
@@ -577,17 +588,17 @@ export default function AdminProducts() {
           </button>
           <div className="relative">
             <button
+              ref={headerBtnRef}
               onClick={() => setHeaderMenu((v) => !v)}
               className={T.btnIconLg}
               aria-label={loc('إجراءات إضافية', 'More actions', 'زیاتر')}
               aria-expanded={headerMenu}
+              aria-haspopup="menu"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
             {headerMenu && (
-              <>
-                <div className="fixed inset-0 z-[135]" onClick={() => setHeaderMenu(false)} />
-                <div className={T.menuAnchored} role="menu">
+              <MenuPanel className={T.menuAnchored} onClose={() => setHeaderMenu(false)} returnTo={headerBtnRef}>
                   <MenuItem
                     icon={<RefreshCw className="w-3.5 h-3.5" />}
                     label={loc('تحديث البيانات', 'Refresh data', 'نوێکردنەوە')}
@@ -604,8 +615,7 @@ export default function AdminProducts() {
                     onClick={() => { setHeaderMenu(false); resetFilters(); }}
                     disabled={!anyFilter}
                   />
-                </div>
-              </>
+              </MenuPanel>
             )}
           </div>
         </div>
@@ -754,7 +764,7 @@ export default function AdminProducts() {
               className={`${T.input} w-28`}
               dir="ltr"
             />
-            <button onClick={resetFilters} className={`${T.btnGhost.replace('h-9 ', '')} h-8 text-[12px]`}>
+            <button onClick={resetFilters} className={T.btnGhostSm}>
               <X className="w-3 h-3" />
               {loc('إعادة التعيين', 'Reset', 'ڕێکخستنەوە')}
             </button>
@@ -792,16 +802,17 @@ export default function AdminProducts() {
           <div className={T.segmented.base} role="group" aria-label={loc('طريقة العرض', 'View', 'شێوازی پیشاندان')}>
             {(
               [
-                ['grid', <LayoutGrid key="g" className="w-3.5 h-3.5" />],
-                ['list', <List key="l" className="w-3.5 h-3.5" />],
-                ['compact', <AlignJustify key="c" className="w-3.5 h-3.5" />],
-              ] as Array<[View, React.ReactNode]>
-            ).map(([v, icon]) => (
+                ['grid', <LayoutGrid key="g" className="w-3.5 h-3.5" />, loc('شبكة', 'Grid', 'تۆڕ')],
+                ['list', <List key="l" className="w-3.5 h-3.5" />, loc('جدول', 'Table', 'خشتە')],
+                ['compact', <AlignJustify key="c" className="w-3.5 h-3.5" />, loc('مضغوط', 'Compact', 'چڕ')],
+              ] as Array<[View, React.ReactNode, string]>
+            ).map(([v, icon, name]) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
                 className={T.segmented.item}
-                aria-label={v}
+                aria-label={name}
+                title={name}
                 aria-pressed={view === v}
               >
                 {icon}
@@ -813,9 +824,9 @@ export default function AdminProducts() {
 
       <ErrorBanner text={loadErr} />
       {notice && (
-        <div className="rounded-[var(--ap-radius-md)] border border-[var(--ap-info-border)] bg-[var(--ap-info-bg)] text-[var(--ap-info)] px-3 py-2.5 mb-3 text-[13px] flex items-start justify-between gap-3">
-          <span>{notice}</span>
-          <button onClick={() => setNotice(null)} className="shrink-0 opacity-70 hover:opacity-100" aria-label="close">
+        <div className="rounded-[var(--ap-radius-md)] border border-[var(--ap-info-border)] bg-[var(--ap-info-bg)] text-[var(--ap-info)] ps-3 pe-1.5 py-1.5 mb-3 text-[13px] flex items-center justify-between gap-3" role="status">
+          <span className="py-1">{notice}</span>
+          <button onClick={() => setNotice(null)} className={T.btnIconGhost} aria-label={loc('إغلاق', 'Close', 'داخستن')}>
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -858,7 +869,7 @@ export default function AdminProducts() {
                       <Star className="w-3 h-3 text-[var(--ap-accent-text)] fill-current" />
                     </span>
                   )}
-                  <span className="absolute top-2 end-2"><Badge status={p.status} /></span>
+                  <span className={`absolute top-2 end-2 ${T.badgeBed}`}><Badge status={p.status} /></span>
                 </div>
                 <div className="p-3">
                   <p className="text-[13px] font-semibold truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</p>
@@ -886,7 +897,11 @@ export default function AdminProducts() {
                 <Thumb p={p} size="w-8 h-8" />
                 <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</span>
                 <span className="hidden sm:inline text-[12px] text-[var(--ap-text-3)] shrink-0" dir="ltr">{p.sku || `#${p.id.slice(-6).toUpperCase()}`}</span>
-                <span className={`hidden md:inline text-[12px] shrink-0 ${s.key === 'out' ? 'text-[var(--ap-danger)]' : 'text-[var(--ap-text-2)]'}`}>
+                <span
+                  className={`hidden md:inline text-[12px] shrink-0 ${s.key === 'out' ? 'text-[var(--ap-danger)] font-semibold' : s.key === 'low' ? 'text-[var(--ap-warning)] font-semibold' : 'text-[var(--ap-text-2)]'}`}
+                  title={`${t.stock}: ${stockLabel(s)}`}
+                  aria-label={`${t.stock}: ${s.available === null ? t.untracked : `${s.available} — ${stockLabel(s)}`}`}
+                >
                   {s.available === null ? '—' : <span dir="ltr">{s.available}</span>}
                 </span>
                 <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
@@ -1087,8 +1102,8 @@ function StatTile({
       <div className="mt-2.5 text-[22px] font-bold leading-7 tracking-tight text-[var(--ap-text-1)]">
         <span dir="ltr">{value}</span>
       </div>
-      <div className="mt-1.5 text-[11.5px] text-[var(--ap-text-3)] truncate">{sub}</div>
-      <div className="mt-3 -mb-1 opacity-90">
+      <div className="mt-1.5 text-[11.5px] leading-snug text-[var(--ap-text-3)] line-clamp-2">{sub}</div>
+      <div className="mt-auto pt-3 -mb-1 opacity-90">
         <Spark series={series} className={c.spark} />
       </div>
     </div>
@@ -1116,6 +1131,9 @@ function QuickFind({
   const [rows, setRows] = useState<ListingItem[]>([]);
   const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
+  // The term the current rows answer, and whether that answer was an error —
+  // so "no matches" is only ever said about a search that actually ran.
+  const [settled, setSettled] = useState<{ term: string; failed: boolean } | null>(null);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -1123,6 +1141,7 @@ function QuickFind({
     const s = ++seq.current;
     if (!term) {
       setRows([]);
+      setSettled(null);
       setBusy(false);
       return;
     }
@@ -1133,9 +1152,12 @@ function QuickFind({
           if (s !== seq.current) return;
           setRows(d.products);
           setIdx(0);
+          setSettled({ term, failed: false });
         })
         .catch(() => {
-          if (s === seq.current) setRows([]);
+          if (s !== seq.current) return;
+          setRows([]);
+          setSettled({ term, failed: true });
         })
         .finally(() => {
           if (s === seq.current) setBusy(false);
@@ -1152,7 +1174,10 @@ function QuickFind({
     onPick(p);
   };
 
-  const showList = open && q.trim().length > 0;
+  const term = q.trim();
+  const showList = open && term.length > 0;
+  const hasRows = showList && rows.length > 0;
+  const optionId = (i: number) => `ap-quickfind-opt-${i}`;
 
   return (
     <div className="relative flex-1 min-w-[220px] max-w-xl">
@@ -1160,7 +1185,14 @@ function QuickFind({
       <input
         ref={inputRef}
         value={q}
-        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        onChange={(e) => {
+          const v = e.target.value;
+          setQ(v);
+          setOpen(true);
+          // Flagged in the same batch as the keystroke, so the first paint
+          // after typing never shows "no matches" for a search not yet run.
+          if (v.trim()) setBusy(true);
+        }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onKeyDown={(e) => {
@@ -1172,44 +1204,117 @@ function QuickFind({
         placeholder={placeholder}
         aria-label={label}
         role="combobox"
+        aria-autocomplete="list"
+        aria-haspopup="listbox"
         aria-expanded={showList}
-        aria-controls="ap-quickfind-list"
+        aria-controls={hasRows ? 'ap-quickfind-list' : undefined}
+        aria-activedescendant={hasRows ? optionId(idx) : undefined}
         className={`${T.input.replace('h-10 ', '')} h-9 w-full ps-9 pe-12`}
       />
       <span className="absolute top-1/2 -translate-y-1/2 end-2 hidden sm:inline-flex pointer-events-none">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--ap-text-3)]" /> : <kbd className={T.kbd} dir="ltr">⌘K</kbd>}
       </span>
       {showList && (
-        <div id="ap-quickfind-list" role="listbox" className={`${T.surfaceRaised} absolute top-full mt-1.5 inset-x-0 z-[130] overflow-hidden py-1`}>
-          {rows.length === 0 && !busy ? (
-            <div className="px-3 py-3 text-[12.5px] text-[var(--ap-text-3)]">{loc('لا نتائج', 'No matches', 'هیچ ئەنجامێک')}</div>
+        <div className={`${T.surfaceRaised} absolute top-full mt-1.5 inset-x-0 z-[130] overflow-hidden py-1`}>
+          {rows.length === 0 ? (
+            <div className="px-3 py-3 text-[12.5px] text-[var(--ap-text-3)]" role="status">
+              {settled?.term === term && settled.failed
+                ? loc('تعذّر البحث، حاول مجددًا', 'Search failed, try again', 'گەڕان شکستی هێنا')
+                : settled?.term === term && !busy
+                  ? loc('لا نتائج', 'No matches', 'هیچ ئەنجامێک')
+                  : loc('جارٍ البحث…', 'Searching…', 'گەڕان…')}
+            </div>
           ) : (
-            rows.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                role="option"
-                aria-selected={i === idx}
-                onMouseDown={(e) => e.preventDefault()}
-                onMouseEnter={() => setIdx(i)}
-                onClick={() => pick(p)}
-                className={`w-full flex items-center gap-3 px-3 h-11 text-start ${i === idx ? 'bg-[var(--ap-surface-3)]' : ''}`}
-              >
-                <span className={`${T.thumb} w-7 h-7 flex items-center justify-center`}>
-                  {p.image ? <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" /> : <ImageOff className="w-3 h-3 text-[var(--ap-text-3)]" />}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-[13px] font-medium truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</span>
-                  <span className="block text-[11px] text-[var(--ap-text-3)] truncate" dir="ltr">{p.sku || p.slug} · {formatIqd(p.price_iqd || 0)}</span>
-                </span>
-                <Badge status={p.status} />
-                {i === idx && <CornerDownLeft className="w-3.5 h-3.5 text-[var(--ap-text-3)] shrink-0" />}
-              </button>
-            ))
+            <div id="ap-quickfind-list" role="listbox" aria-label={label}>
+              {rows.map((p, i) => (
+                <button
+                  key={p.id}
+                  id={optionId(i)}
+                  type="button"
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={i === idx}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setIdx(i)}
+                  onClick={() => pick(p)}
+                  className={`w-full flex items-center gap-3 px-3 h-11 text-start ${i === idx ? 'bg-[var(--ap-surface-3)]' : ''}`}
+                >
+                  <span className={`${T.thumb} w-7 h-7 flex items-center justify-center`}>
+                    {p.image ? <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" /> : <ImageOff className="w-3 h-3 text-[var(--ap-text-3)]" />}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-medium truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</span>
+                    <span className="block text-[11px] text-[var(--ap-text-3)] truncate">
+                      <span dir="ltr">{p.sku || p.slug} · {formatIqd(p.price_iqd || 0)}</span>
+                    </span>
+                  </span>
+                  <Badge status={p.status} />
+                  {i === idx && <CornerDownLeft className="w-3.5 h-3.5 text-[var(--ap-text-3)] shrink-0" />}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+const menuItemsOf = (root: HTMLElement | null) =>
+  Array.from(root?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? []);
+
+/**
+ * A role="menu" panel that keeps the promise the role makes to assistive
+ * tech: focus lands on the first item as it opens, ↑↓ / Home / End walk the
+ * enabled items, Escape closes and returns focus to the trigger, Tab closes
+ * and lets focus continue from the trigger. Clicking the backdrop closes.
+ */
+function MenuPanel({
+  className, style, onClose, returnTo, children,
+}: {
+  className: string;
+  style?: React.CSSProperties;
+  onClose: () => void;
+  returnTo: React.RefObject<HTMLElement | null>;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    menuItemsOf(ref.current)[0]?.focus();
+  }, []);
+  return (
+    <>
+      <div className="fixed inset-0 z-[135]" onClick={onClose} />
+      <div
+        ref={ref}
+        style={style}
+        className={className}
+        role="menu"
+        onKeyDown={(e) => {
+          const list = menuItemsOf(ref.current);
+          const at = list.indexOf(document.activeElement as HTMLButtonElement);
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (list.length === 0) return;
+            const step = e.key === 'ArrowDown' ? 1 : -1;
+            list[(at + step + list.length) % list.length].focus();
+          } else if (e.key === 'Home' || e.key === 'End') {
+            e.preventDefault();
+            (e.key === 'Home' ? list[0] : list[list.length - 1])?.focus();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+            returnTo.current?.focus();
+          } else if (e.key === 'Tab') {
+            onClose();
+            returnTo.current?.focus();
+          }
+        }}
+      >
+        {children}
+      </div>
+    </>
   );
 }
 
