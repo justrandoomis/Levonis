@@ -576,7 +576,7 @@ adminProductsRoutes.get('/', async (c) => {
   const [list, count] = await Promise.all([
     c.env.DB.prepare(
       `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd, stock,
-              stock_reserved, is_featured, brand_id, images, created_at, updated_at, doc_version,
+              stock_reserved, low_stock_threshold, is_featured, brand_id, images, created_at, updated_at, doc_version,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
                         WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold
@@ -609,6 +609,7 @@ adminProductsRoutes.get('/', async (c) => {
         pro_price_iqd: (r.pro_price_iqd as number | null) ?? null,
         stock: (r.stock as number | null) ?? null,
         stock_reserved: Number(r.stock_reserved ?? 0),
+        low_stock_threshold: (r.low_stock_threshold as number | null) ?? null,
         sold: Number(r.sold ?? 0),
         is_featured: !!r.is_featured,
         brand_id: (r.brand_id as string | null) ?? null,

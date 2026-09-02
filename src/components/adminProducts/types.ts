@@ -110,6 +110,7 @@ export interface ListingItem {
   /** Units sold across non-cancelled orders (list projection only). */
   sold: number;
   stock_reserved?: number;
+  low_stock_threshold?: number | null;
 }
 
 export interface ListingResponse {

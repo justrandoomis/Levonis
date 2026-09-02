@@ -1,9 +1,11 @@
 /**
  * Admin products (v2) — the owner's reference management screen on
- * /api/admin/products-v2: breadcrumb + title + actions, five tinted stat
- * cards with real sparkline series, a server-side filter bar (search,
- * status, brand, catalog, stock, price band, recency, featured), sortable
- * numbered pagination with an exact total, and three view modes.
+ * /api/admin/products-v2: a compact top strip (breadcrumb + ⌘K quick-find),
+ * title + actions, five stat cards with real sparkline series, a
+ * server-side filter card (search, section, status, stock, price band,
+ * recency, advanced: brand / manual price range / featured), a toolbar
+ * (range, page size, sort, view switch), three view modes and numbered
+ * pagination with an exact total.
  *
  * EVERY NUMBER IS REAL. Stats come from /products-v2/stats (weekly buckets
  * over created_at; sales from actual order lines, gross gated to financial
@@ -11,26 +13,30 @@
  * heavy editor body and the template import tools stay code-split via
  * React.lazy, and the import dialog carries the whole import/EXPORT surface.
  *
+ * Visual system: adminProducts/theme.css (.ap tokens) + adminProducts/theme.ts
+ * (class recipes). Text buttons are 36px, icon buttons 32px; selects keep
+ * the 40px floor the §12 suites assert.
+ *
  * LOAD-BEARING HOOKS (browser verification scripts depend on these at every
  * width): rows wrapped in [data-product-id] with a [data-action="edit"]
- * control in EVERY view mode; the toolbar keeps
+ * control in EVERY view mode; the header keeps
  * [data-testid="admin-import-open"]; the tab itself stays component state.
- *
- * §6.2 density: one consistent scale, min-w-0 columns, CSS logical
- * properties, wide content scrolls in its own overflow-x-auto container.
  */
 
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Plus, Edit2, Trash2, Search, RefreshCw, Upload, Star, LayoutGrid, List,
+  Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
   AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
   Copy, ChevronRight, ChevronLeft, Package, PackageX, ShoppingBag, Check, Pencil,
+  CalendarDays, Loader2, CornerDownLeft, ImageOff,
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import type { ListingItem, ListingResponse, DeleteResponse } from './adminProducts/types';
-import { StatusChip, Modal, ErrorBanner, btnSecondary, fmtDate } from './adminProducts/ui';
-import { StatCard } from './ui/statCards';
+import { Modal, ErrorBanner, fmtDate } from './adminProducts/ui';
+import { Spark } from './ui/statCards';
+import * as T from './adminProducts/theme';
+import './adminProducts/theme.css';
 
 // The rebuilt eight-section form (product-form mandate §1). The previous
 // ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
@@ -74,6 +80,8 @@ const STRINGS = {
     tabLegacy: 'القالب النصي القديم (TXT)',
     newProduct: 'منتج جديد',
     searchPlaceholder: 'بحث في المنتجات...',
+    quickFind: 'ابحث عن منتج...',
+    quickFindLabel: 'انتقال سريع إلى منتج',
     search: 'بحث',
     empty: 'لا منتجات بعد.',
     noMatch: 'لا نتائج مطابقة للتصفية.',
@@ -101,6 +109,8 @@ const STRINGS = {
     tabLegacy: 'Legacy TXT template',
     newProduct: 'New product',
     searchPlaceholder: 'Search products…',
+    quickFind: 'Find a product…',
+    quickFindLabel: 'Jump to a product',
     search: 'Search',
     empty: 'No products yet.',
     noMatch: 'Nothing matches these filters.',
@@ -128,6 +138,8 @@ const STRINGS = {
     tabLegacy: 'قاڵبی کۆنی TXT',
     newProduct: 'بەرهەمی نوێ',
     searchPlaceholder: 'گەڕان لە بەرهەمەکان...',
+    quickFind: 'بەرهەمێک بدۆزەرەوە...',
+    quickFindLabel: 'چوونە سەر بەرهەم',
     search: 'گەڕان',
     empty: 'هێشتا بەرهەم نییە.',
     noMatch: 'هیچ ئەنجامێک نییە.',
@@ -147,8 +159,8 @@ const STRINGS = {
 
 function LazyFallback({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 text-zinc-400 py-12" role="status">
-      <RefreshCw className="w-5 h-5 animate-spin" /> {label}
+    <div className="flex items-center justify-center gap-2 text-[var(--ap-text-2)] py-12" role="status">
+      <Loader2 className="w-4 h-4 animate-spin" /> {label}
     </div>
   );
 }
@@ -164,6 +176,15 @@ function relTime(iso: string | null | undefined, loc: Loc): string {
   const d = Math.floor(h / 24);
   if (d < 30) return loc(`منذ ${d} يوم`, `${d}d ago`, `${d} ڕۆژ`);
   return loc(`منذ ${Math.floor(d / 30)} شهر`, `${Math.floor(d / 30)}mo ago`, `${Math.floor(d / 30)} مانگ`);
+}
+
+type StockState = { key: 'untracked' | 'out' | 'low' | 'in'; available: number | null };
+function stockState(p: ListingItem): StockState {
+  if (p.stock === null) return { key: 'untracked', available: null };
+  const available = p.stock - (p.stock_reserved ?? 0);
+  if (available <= 0) return { key: 'out', available };
+  if (available <= (p.low_stock_threshold ?? 5)) return { key: 'low', available };
+  return { key: 'in', available };
 }
 
 export default function AdminProducts() {
@@ -216,15 +237,17 @@ export default function AdminProducts() {
   const [notice, setNotice] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState('');
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [headerMenu, setHeaderMenu] = useState(false);
+  const quickRef = useRef<HTMLInputElement>(null);
   const seqRef = useRef(0);
 
-  // ⌘K / Ctrl+K puts the cursor in the search box, like the reference.
+  // ⌘K / Ctrl+K opens the quick-find, like the reference top bar.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        searchRef.current?.focus();
+        quickRef.current?.focus();
+        quickRef.current?.select();
       }
     };
     window.addEventListener('keydown', h);
@@ -387,10 +410,9 @@ export default function AdminProducts() {
   const weekly = stats?.weekly ?? [];
   const activePct = stats && stats.totals.total > 0 ? Math.round((stats.totals.active / stats.totals.total) * 100) : 0;
 
-  const selectCls =
-    'h-10 rounded-lg bg-black/40 border border-zinc-700/60 px-2.5 text-zinc-200 text-[12px] outline-none focus:border-[#6B46FF]/60 min-w-0';
-
   const brandName = (b: { name_ar?: string; name?: string }) => b.name_ar || b.name || '';
+  const filterSel = `${T.select} max-w-[10.5rem]`;
+  const brandById = new Map(brands.map((b) => [b.id, brandName(b)] as const));
 
   // ------------------------------------------------------------ editor mode
 
@@ -408,13 +430,19 @@ export default function AdminProducts() {
 
   // ------------------------------------------------------------ list mode
 
+  const stockLabel = (s: StockState) =>
+    s.key === 'untracked' ? t.untracked
+    : s.key === 'out' ? loc('نفد المخزون', 'out of stock', 'تەواو بوو')
+    : s.key === 'low' ? loc('منخفض', 'low stock', 'کەم')
+    : loc('متوفر', 'in stock', 'بەردەست');
+
   const rowActions = (p: ListingItem, compact = false) => (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
       {!compact && (
         <button
           onClick={() => handleDelete(p)}
           disabled={deletingId === p.id}
-          className="w-8 h-8 rounded-lg border border-red-500/25 bg-red-500/10 text-red-400 flex items-center justify-center disabled:opacity-50"
+          className={T.btnIconDanger}
           title={t.del}
           aria-label={t.del}
         >
@@ -424,7 +452,7 @@ export default function AdminProducts() {
       <button
         data-action="edit"
         onClick={() => setEditing({ open: true, id: p.id })}
-        className="w-8 h-8 rounded-lg border border-zinc-700/60 bg-white/[0.03] text-zinc-400 hover:text-white flex items-center justify-center"
+        className={T.btnIcon}
         title={t.edit}
         aria-label={t.edit}
       >
@@ -442,23 +470,21 @@ export default function AdminProducts() {
             // far left, and a panel anchored only by its right edge would
             // hang off-screen.
             setMenuPos({
-              top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 220)),
-              right: Math.min(Math.max(8, window.innerWidth - r.right), Math.max(8, window.innerWidth - 216)),
+              top: Math.min(r.bottom + 6, Math.max(60, window.innerHeight - 220)),
+              right: Math.min(Math.max(8, window.innerWidth - r.right), Math.max(8, window.innerWidth - 232)),
             });
             setMenuFor(p.id);
           }}
-          className="w-8 h-8 rounded-lg border border-zinc-700/60 bg-white/[0.03] text-zinc-400 hover:text-white flex items-center justify-center"
+          className={menuFor === p.id ? T.btnIconActive : T.btnIcon}
           aria-label={loc('المزيد', 'More', 'زیاتر')}
+          aria-expanded={menuFor === p.id}
         >
           <MoreHorizontal className="w-3.5 h-3.5" />
         </button>
         {menuFor === p.id && menuPos && (
           <>
             <div className="fixed inset-0 z-[135]" onClick={() => setMenuFor('')} />
-            <div
-              style={{ top: menuPos.top, right: menuPos.right }}
-              className="fixed z-[140] w-52 rounded-xl border border-zinc-700/60 bg-[#131417] shadow-2xl overflow-hidden"
-            >
+            <div style={{ top: menuPos.top, right: menuPos.right }} className={T.menu} role="menu">
               {p.status === 'active' ? (
                 <MenuItem
                   icon={<EyeOff className="w-3.5 h-3.5" />}
@@ -490,6 +516,17 @@ export default function AdminProducts() {
                   navigator.clipboard?.writeText(productUrl(p)).catch(() => {});
                 }}
               />
+              {compact && (
+                <MenuItem
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  label={t.del}
+                  danger
+                  onClick={() => {
+                    setMenuFor('');
+                    handleDelete(p);
+                  }}
+                />
+              )}
             </div>
           </>
         )}
@@ -497,115 +534,157 @@ export default function AdminProducts() {
     </div>
   );
 
+  const nameOf = (p: ListingItem) => p.name_ar || p.name_en || p.slug;
+  const metaOf = (p: ListingItem) => {
+    const parts: string[] = [];
+    const b = p.brand_id ? brandById.get(p.brand_id) : '';
+    if (b) parts.push(b);
+    if (p.name_en && p.name_ar) parts.push(p.name_en);
+    return parts.join(' • ');
+  };
+
   return (
-    <div className="min-w-0">
-      {/* breadcrumb + title + actions */}
-      <div className="text-zinc-500 text-[11.5px] mb-1">
-        <span className="text-zinc-300 font-semibold">{t.breadcrumbA}</span>
-        <span className="mx-1.5">/</span>
-        {t.breadcrumbB}
+    <div className={T.AP} dir={dir}>
+      {/* ---------------------------------------------------------- top strip */}
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        <nav className="text-[12px] text-[var(--ap-text-3)] flex items-center gap-1.5 shrink-0" aria-label="breadcrumb">
+          <span className="text-[var(--ap-text-1)] font-semibold">{t.breadcrumbA}</span>
+          <span className="text-[var(--ap-text-3)]">/</span>
+          <span>{t.breadcrumbB}</span>
+        </nav>
+        <QuickFind
+          inputRef={quickRef}
+          placeholder={t.quickFind}
+          label={t.quickFindLabel}
+          onPick={(p) => setEditing({ open: true, id: p.id })}
+          loc={loc}
+          nameOf={nameOf}
+        />
       </div>
-      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <h2 className="text-white font-bold text-[21px] leading-tight">{t.title}</h2>
-          <p className="text-zinc-500 text-[12px] mt-0.5">{t.subtitle}</p>
+
+      {/* ------------------------------------------------- title + actions */}
+      <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
+        <div className="min-w-0">
+          <h2 className="text-[22px] font-bold leading-tight tracking-tight text-[var(--ap-text-1)]">{t.title}</h2>
+          <p className="text-[12.5px] text-[var(--ap-text-3)] mt-1">{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setEditing({ open: true, id: null })}
-            className="h-10 px-4 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[12.5px] font-bold flex items-center gap-1.5 transition-colors"
-          >
+          <button onClick={() => setEditing({ open: true, id: null })} className={T.btnPrimary}>
             <Plus className="w-4 h-4" strokeWidth={2.25} /> {t.newProduct}
           </button>
-          <button data-testid="admin-import-open" onClick={() => setImportOpen(true)} className={btnSecondary}>
-            <Upload className="w-4 h-4" /> {t.import}
+          <button data-testid="admin-import-open" onClick={() => setImportOpen(true)} className={T.btnSecondary}>
+            <Upload className="w-4 h-4" strokeWidth={1.9} /> {t.import}
           </button>
-          <button
-            onClick={reloadAll}
-            className="h-10 w-10 rounded-lg border border-zinc-700/60 bg-white/[0.03] text-zinc-300 flex items-center justify-center"
-            aria-label={loc('تحديث البيانات', 'Refresh', 'نوێکردنەوە')}
-          >
-            <RefreshCw className="w-4 h-4" strokeWidth={1.75} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setHeaderMenu((v) => !v)}
+              className={`${headerMenu ? T.btnIconActive : T.btnIcon} !h-9 !w-9`}
+              aria-label={loc('إجراءات إضافية', 'More actions', 'زیاتر')}
+              aria-expanded={headerMenu}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {headerMenu && (
+              <>
+                <div className="fixed inset-0 z-[135]" onClick={() => setHeaderMenu(false)} />
+                <div className={T.menuAnchored} role="menu">
+                  <MenuItem
+                    icon={<RefreshCw className="w-3.5 h-3.5" />}
+                    label={loc('تحديث البيانات', 'Refresh data', 'نوێکردنەوە')}
+                    onClick={() => { setHeaderMenu(false); reloadAll(); }}
+                  />
+                  <MenuItem
+                    icon={<Download className="w-3.5 h-3.5" />}
+                    label={loc('تصدير المنتجات (CSV)', 'Export products (CSV)', 'هەناردە (CSV)')}
+                    onClick={() => { setHeaderMenu(false); setImportTab('new'); setImportOpen(true); }}
+                  />
+                  <MenuItem
+                    icon={<X className="w-3.5 h-3.5" />}
+                    label={loc('إعادة تعيين التصفية', 'Reset filters', 'ڕێکخستنەوەی فلتەر')}
+                    onClick={() => { setHeaderMenu(false); resetFilters(); }}
+                    disabled={!anyFilter}
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* stat cards — real aggregates; platform products have no view counter */}
+      {/* ------------------------------------------------------- stat cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-          <StatCard
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5 [&>:nth-child(5)]:col-span-2 lg:[&>:nth-child(5)]:col-span-1">
+          <StatTile
             tint="purple"
-            icon={<ShoppingBag className="w-3.5 h-3.5" />}
+            icon={<ShoppingBag className="w-4 h-4" />}
             label={loc('المبيعات (30 يومًا)', 'Sales (30 days)', 'فرۆش (٣٠ ڕۆژ)')}
             value={stats.sales_30d.units.toLocaleString('en-US')}
             sub={loc(`عبر ${stats.sales_30d.orders} طلب`, `across ${stats.sales_30d.orders} orders`, `${stats.sales_30d.orders} داواکاری`)}
             series={stats.sales_daily.map((d) => d.units)}
           />
-          <StatCard
+          <StatTile
             tint="blue"
-            icon={<Package className="w-3.5 h-3.5" />}
+            icon={<Package className="w-4 h-4" />}
             label={loc('إجمالي المنتجات', 'Total products', 'کۆی بەرهەمەکان')}
-            value={String(stats.totals.total)}
+            value={stats.totals.total.toLocaleString('en-US')}
             sub={loc('منتج في متجرك', 'products in your store', 'بەرهەم')}
             series={weekly.map((w) => w.added)}
           />
-          <StatCard
+          <StatTile
             tint="green"
-            icon={<Check className="w-3.5 h-3.5" />}
+            icon={<Check className="w-4 h-4" />}
             label={loc('منتجات نشطة', 'Active products', 'چالاک')}
-            value={String(stats.totals.active)}
+            value={stats.totals.active.toLocaleString('en-US')}
             sub={loc(`${activePct}% من إجمالي المنتجات`, `${activePct}% of all products`, `${activePct}%`)}
             series={weekly.map((w) => w.active_added)}
           />
-          <StatCard
+          <StatTile
             tint="amber"
-            icon={<Pencil className="w-3.5 h-3.5" />}
+            icon={<Pencil className="w-4 h-4" />}
             label={loc('مسودات', 'Drafts', 'ڕەشنووس')}
-            value={String(stats.totals.draft)}
+            value={stats.totals.draft.toLocaleString('en-US')}
             sub={loc('بانتظار الإكمال', 'waiting to be finished', 'چاوەڕوانی تەواوکردن')}
             series={weekly.map((w) => w.draft_added)}
           />
-          <StatCard
+          <StatTile
             tint="red"
-            icon={<PackageX className="w-3.5 h-3.5" />}
+            icon={<PackageX className="w-4 h-4" />}
             label={loc('مخفية', 'Hidden', 'شاراوە')}
-            value={String(stats.totals.hidden)}
+            value={stats.totals.hidden.toLocaleString('en-US')}
             sub={loc(`ونفد المخزون: ${stats.totals.out_of_stock}`, `out of stock: ${stats.totals.out_of_stock}`, `تەواو بوو: ${stats.totals.out_of_stock}`)}
             series={weekly.map((w) => w.hidden_added)}
           />
         </div>
       )}
 
-      {/* filter bar */}
-      <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-2.5 space-y-2 mb-3">
+      {/* ------------------------------------------------------ filter card */}
+      <div className={`${T.surface} p-3 mb-3`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[170px]">
-            <Search className="w-3.5 h-3.5 text-zinc-500 absolute top-1/2 -translate-y-1/2 start-2.5" />
+          <div className="relative flex-1 basis-[240px] min-w-[200px]">
+            <Search className="w-4 h-4 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
             <input
-              ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.searchPlaceholder}
               aria-label={t.search}
-              className="w-full h-10 rounded-lg bg-black/40 border border-zinc-700/60 ps-8 pe-8 text-white text-[12.5px] outline-none focus:border-[#6B46FF]/60"
+              className={`${T.input} w-full ps-9 pe-3`}
             />
-            <kbd className="absolute top-1/2 -translate-y-1/2 end-2 text-[9.5px] text-zinc-600 border border-zinc-700/60 rounded px-1 py-0.5 hidden sm:block" dir="ltr">⌘K</kbd>
           </div>
           {catalogs.length > 0 && (
-            <select value={catalog} onChange={(e) => { setCatalog(e.target.value); setPage(1); }} className={selectCls}>
+            <select value={catalog} onChange={(e) => { setCatalog(e.target.value); setPage(1); }} className={filterSel}>
               <option value="">{loc('كل الأقسام', 'All sections', 'هەموو بەشەکان')}</option>
               {catalogs.map((cat) => (
                 <option key={cat.id} value={cat.id}>{brandName(cat)}</option>
               ))}
             </select>
           )}
-          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls}>
+          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={filterSel}>
             <option value="">{loc('كل الحالات', 'All statuses', 'هەموو دۆخەکان')}</option>
             <option value="active">{loc('نشط', 'Active', 'چالاک')}</option>
             <option value="draft">{loc('مسودة', 'Draft', 'ڕەشنووس')}</option>
             <option value="hidden">{loc('مخفي', 'Hidden', 'شاراوە')}</option>
           </select>
-          <select value={stockF} onChange={(e) => { setStockF(e.target.value); setPage(1); }} className={selectCls}>
+          <select value={stockF} onChange={(e) => { setStockF(e.target.value); setPage(1); }} className={filterSel}>
             <option value="">{loc('كل المخزون', 'All stock', 'هەموو کۆگا')}</option>
             <option value="in">{loc('متوفر', 'In stock', 'بەردەست')}</option>
             <option value="low">{loc('منخفض', 'Low', 'کەم')}</option>
@@ -615,7 +694,7 @@ export default function AdminProducts() {
           <select
             value={priceBand}
             onChange={(e) => { setPriceBand(e.target.value); setPriceMin(''); setPriceMax(''); setPage(1); }}
-            className={selectCls}
+            className={filterSel}
           >
             <option value="">{loc('كل الأسعار', 'All prices', 'هەموو نرخەکان')}</option>
             <option value="b1">{loc('أقل من 25,000', 'Under 25,000', '< 25,000')}</option>
@@ -623,34 +702,36 @@ export default function AdminProducts() {
             <option value="b3">100,000 - 500,000</option>
             <option value="b4">{loc('أكثر من 500,000', 'Over 500,000', '> 500,000')}</option>
           </select>
-          <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={selectCls}>
-            <option value="">{loc('اختر الفترة', 'Any period', 'هەموو ماوەکان')}</option>
-            <option value="7">{loc('آخر 7 أيام', 'Last 7 days', '٧ ڕۆژ')}</option>
-            <option value="30">{loc('آخر 30 يومًا', 'Last 30 days', '٣٠ ڕۆژ')}</option>
-            <option value="90">{loc('آخر 90 يومًا', 'Last 90 days', '٩٠ ڕۆژ')}</option>
-          </select>
+          <div className="relative">
+            <CalendarDays className="w-3.5 h-3.5 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 end-8 pointer-events-none" />
+            <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={`${filterSel} !pe-14`}>
+              <option value="">{loc('اختر الفترة', 'Any period', 'هەموو ماوەکان')}</option>
+              <option value="7">{loc('آخر 7 أيام', 'Last 7 days', '٧ ڕۆژ')}</option>
+              <option value="30">{loc('آخر 30 يومًا', 'Last 30 days', '٣٠ ڕۆژ')}</option>
+              <option value="90">{loc('آخر 90 يومًا', 'Last 90 days', '٩٠ ڕۆژ')}</option>
+            </select>
+          </div>
           <button
             onClick={() => setAdvanced((v) => !v)}
-            className={`h-10 px-3 rounded-lg border text-[12px] font-semibold flex items-center gap-1.5 ${
-              advanced ? 'border-[#6B46FF]/60 text-[#a78bfa] bg-[#6B46FF]/10' : 'border-zinc-700/60 text-zinc-300 bg-white/[0.03]'
-            }`}
+            className={`${advanced ? T.btnSecondary : T.btnGhost} !h-10 ms-auto border ${advanced ? '!border-[var(--ap-accent-border)] !text-[var(--ap-accent-text)] !bg-[var(--ap-accent-soft)]' : 'border-[var(--ap-border)]'}`}
+            aria-pressed={advanced}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             {loc('تصفية متقدمة', 'Advanced', 'فلتەری پێشکەوتوو')}
           </button>
         </div>
         {advanced && (
-          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-zinc-800/60">
+          <div className="flex items-center gap-2 flex-wrap pt-3 mt-3 border-t border-[var(--ap-hairline)]">
             <button
               onClick={() => { setFeaturedOnly((v) => !v); setPage(1); }}
-              className={`h-8 px-3 rounded-full border text-[11.5px] font-semibold ${
-                featuredOnly ? 'border-[#6B46FF]/60 text-[#a78bfa] bg-[#6B46FF]/10' : 'border-zinc-700/60 text-zinc-400'
-              }`}
+              className={featuredOnly ? T.chipActive : T.chip}
+              aria-pressed={featuredOnly}
             >
+              <Star className={`w-3 h-3 ${featuredOnly ? 'fill-current' : ''}`} />
               {loc('مميز فقط', 'Featured only', 'تەنیا تایبەت')}
             </button>
             {brands.length > 0 && (
-              <select value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }} className={selectCls}>
+              <select value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }} className={T.select}>
                 <option value="">{loc('كل العلامات', 'All brands', 'هەموو براندەکان')}</option>
                 {brands.map((b) => (
                   <option key={b.id} value={b.id}>{brandName(b)}</option>
@@ -662,7 +743,7 @@ export default function AdminProducts() {
               onChange={(e) => { setPriceMin(e.target.value.replace(/[^\d]/g, '')); setPriceBand(''); setPage(1); }}
               placeholder={loc('السعر من', 'Price from', 'نرخ لە')}
               inputMode="numeric"
-              className="h-10 w-24 rounded-lg bg-black/40 border border-zinc-700/60 px-2.5 text-white text-[12px] outline-none"
+              className={`${T.input} w-28`}
               dir="ltr"
             />
             <input
@@ -670,10 +751,10 @@ export default function AdminProducts() {
               onChange={(e) => { setPriceMax(e.target.value.replace(/[^\d]/g, '')); setPriceBand(''); setPage(1); }}
               placeholder={loc('إلى', 'to', 'بۆ')}
               inputMode="numeric"
-              className="h-10 w-24 rounded-lg bg-black/40 border border-zinc-700/60 px-2.5 text-white text-[12px] outline-none"
+              className={`${T.input} w-28`}
               dir="ltr"
             />
-            <button onClick={resetFilters} className="h-8 px-3 rounded-lg text-[12px] text-zinc-400 border border-zinc-700/60 flex items-center gap-1">
+            <button onClick={resetFilters} className={`${T.btnGhost} !h-8 text-[12px]`}>
               <X className="w-3 h-3" />
               {loc('إعادة التعيين', 'Reset', 'ڕێکخستنەوە')}
             </button>
@@ -681,16 +762,17 @@ export default function AdminProducts() {
         )}
       </div>
 
-      {/* toolbar */}
+      {/* ---------------------------------------------------------- toolbar */}
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-zinc-400 text-[11.5px]">
+          <span className="text-[12px] text-[var(--ap-text-2)]">
             {loc(`عرض ${from} - ${to} من ${total} ${t.unit}`, `Showing ${from}-${to} of ${total}`, `${from}-${to} لە ${total}`)}
           </span>
           <select
             value={String(limit)}
             onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-            className="h-10 rounded-lg bg-black/40 border border-zinc-700/60 px-2 text-zinc-300 text-[11.5px] outline-none"
+            className={`${T.select} !text-[12px]`}
+            aria-label={loc('حجم الصفحة', 'Page size', 'قەبارەی پەڕە')}
           >
             {PAGE_SIZES.map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -698,7 +780,7 @@ export default function AdminProducts() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={selectCls}>
+          <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={`${T.select} !text-[12px]`} aria-label={loc('الترتيب', 'Sort', 'ڕیزکردن')}>
             <option value="updated">{loc('آخر تحديث', 'Last updated', 'دوایین نوێکردنەوە')}</option>
             <option value="newest">{loc('الأحدث', 'Newest', 'نوێترین')}</option>
             <option value="oldest">{loc('الأقدم', 'Oldest', 'کۆنترین')}</option>
@@ -707,7 +789,7 @@ export default function AdminProducts() {
             <option value="sales">{loc('الأكثر مبيعًا', 'Best selling', 'زۆرترین فرۆش')}</option>
             <option value="stock">{loc('المخزون الأقل', 'Lowest stock', 'کەمترین کۆگا')}</option>
           </select>
-          <div className="flex rounded-lg border border-zinc-700/60 overflow-hidden">
+          <div className={T.segmented.base} role="group" aria-label={loc('طريقة العرض', 'View', 'شێوازی پیشاندان')}>
             {(
               [
                 ['grid', <LayoutGrid key="g" className="w-3.5 h-3.5" />],
@@ -718,8 +800,9 @@ export default function AdminProducts() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`w-8 h-8 flex items-center justify-center ${view === v ? 'bg-white/10 text-white' : 'text-zinc-500'}`}
+                className={view === v ? T.segmented.active : T.segmented.inactive}
                 aria-label={v}
+                aria-pressed={view === v}
               >
                 {icon}
               </button>
@@ -730,131 +813,157 @@ export default function AdminProducts() {
 
       <ErrorBanner text={loadErr} />
       {notice && (
-        <div className="bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-xl p-3 mb-3 text-sm">
-          {notice}
+        <div className="rounded-[var(--ap-radius-md)] border border-[var(--ap-info-border)] bg-[var(--ap-info-bg)] text-[var(--ap-info)] px-3 py-2.5 mb-3 text-[13px] flex items-start justify-between gap-3">
+          <span>{notice}</span>
+          <button onClick={() => setNotice(null)} className="shrink-0 opacity-70 hover:opacity-100" aria-label="close">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* rows */}
+      {/* ------------------------------------------------------------- rows */}
       {loading && items.length === 0 ? (
         <LazyFallback label={t.loading} />
       ) : items.length === 0 && !loadErr ? (
-        <div className="text-center py-10 text-zinc-500 bg-zinc-800/20 rounded-xl border border-zinc-800/50">
-          {anyFilter || total > 0 ? t.noMatch : t.empty}
+        <div className={`${T.surface} text-center py-14 px-4`}>
+          <div className="w-11 h-11 rounded-[12px] bg-[var(--ap-surface-3)] border border-[var(--ap-border)] flex items-center justify-center mx-auto mb-3">
+            <Package className="w-5 h-5 text-[var(--ap-text-3)]" />
+          </div>
+          <p className="text-[13.5px] font-semibold text-[var(--ap-text-1)]">{anyFilter || total > 0 ? t.noMatch : t.empty}</p>
+          {anyFilter ? (
+            <button onClick={resetFilters} className={`${T.btnGhost} mt-3`}>
+              <X className="w-3.5 h-3.5" />
+              {loc('إعادة تعيين التصفية', 'Reset filters', 'ڕێکخستنەوە')}
+            </button>
+          ) : total === 0 ? (
+            <button onClick={() => setEditing({ open: true, id: null })} className={`${T.btnPrimary} mt-3`}>
+              <Plus className="w-4 h-4" /> {t.newProduct}
+            </button>
+          ) : null}
         </div>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          {items.map((p) => (
-            <div key={p.id} data-product-id={p.id} className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 overflow-hidden">
-              <div className="aspect-square bg-zinc-900 relative">
-                {p.image && <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />}
-                {p.is_featured && (
-                  <span className="absolute top-1.5 start-1.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
-                    <Star className="w-3 h-3 text-[#a78bfa] fill-[#a78bfa]" />
-                  </span>
-                )}
-              </div>
-              <div className="p-2">
-                <p className="text-white text-[12px] font-semibold truncate" dir="auto">{p.name_ar || p.name_en || p.slug}</p>
-                <p className="text-zinc-300 text-[11.5px] mt-0.5"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></p>
-                <div className="flex items-center justify-between mt-1.5">
-                  <StatusChip status={p.status} />
-                  {rowActions(p, true)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {items.map((p) => {
+            const s = stockState(p);
+            return (
+              <div key={p.id} data-product-id={p.id} className={`${T.surface} overflow-hidden group`}>
+                <div className="aspect-square bg-[var(--ap-surface-3)] relative flex items-center justify-center">
+                  {p.image ? (
+                    <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageOff className="w-6 h-6 text-[var(--ap-text-3)]" />
+                  )}
+                  {p.is_featured && (
+                    <span className="absolute top-2 start-2 w-6 h-6 rounded-full bg-[rgba(10,11,15,0.7)] backdrop-blur flex items-center justify-center">
+                      <Star className="w-3 h-3 text-[var(--ap-accent-text)] fill-current" />
+                    </span>
+                  )}
+                  <span className="absolute top-2 end-2"><Badge status={p.status} /></span>
+                </div>
+                <div className="p-3">
+                  <p className="text-[13px] font-semibold truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</p>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <span className="text-[13px] font-bold text-[var(--ap-text-1)]"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></span>
+                    <span className={`text-[11px] ${s.key === 'out' ? 'text-[var(--ap-danger)]' : s.key === 'low' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-3)]'}`}>
+                      {s.available === null ? t.untracked : <><span dir="ltr">{s.available}</span> {stockLabel(s)}</>}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-2.5 pt-2.5 border-t border-[var(--ap-hairline)]">
+                    <span className="text-[11px] text-[var(--ap-text-3)]"><span dir="ltr">{p.sold ?? 0}</span> {loc('مبيع', 'sold', 'فرۆشراو')}</span>
+                    {rowActions(p, true)}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : view === 'compact' ? (
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 divide-y divide-zinc-800/50">
-          {items.map((p) => (
-            <div key={p.id} data-product-id={p.id} className="flex items-center gap-2.5 px-2.5 py-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-900 overflow-hidden shrink-0">
-                {p.image && <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />}
+        <div className={`${T.surface} divide-y divide-[var(--ap-hairline)]`}>
+          {items.map((p) => {
+            const s = stockState(p);
+            return (
+              <div key={p.id} data-product-id={p.id} className={`flex items-center gap-3 px-3 h-12 ${T.tableRow}`}>
+                <Thumb p={p} size="w-8 h-8" />
+                <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</span>
+                <span className="hidden sm:inline text-[12px] text-[var(--ap-text-3)] shrink-0" dir="ltr">{p.sku || `#${p.id.slice(-6).toUpperCase()}`}</span>
+                <span className={`hidden md:inline text-[12px] shrink-0 ${s.key === 'out' ? 'text-[var(--ap-danger)]' : 'text-[var(--ap-text-2)]'}`}>
+                  {s.available === null ? '—' : <span dir="ltr">{s.available}</span>}
+                </span>
+                <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
+                <Badge status={p.status} />
+                {rowActions(p, true)}
               </div>
-              <span className="text-white text-[12px] font-medium truncate flex-1 min-w-0" dir="auto">
-                {p.name_ar || p.name_en || p.slug}
-              </span>
-              <span className="text-zinc-300 text-[11.5px] shrink-0" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
-              <StatusChip status={p.status} />
-              {rowActions(p, true)}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse">
+        <div className={`${T.surface} overflow-x-auto`}>
+          <table className="w-full min-w-[760px] border-collapse">
             <thead>
-              <tr className="text-zinc-500 text-[11px] border-b border-zinc-800/60">
-                <th className="text-start font-semibold px-3 py-2.5">{loc('المنتج', 'Product', 'بەرهەم')}</th>
-                <th className="text-start font-semibold px-2 py-2.5">{t.price}</th>
-                <th className="text-start font-semibold px-2 py-2.5">{t.stock}</th>
-                <th className="text-start font-semibold px-2 py-2.5">{loc('الحالة', 'Status', 'دۆخ')}</th>
-                <th className="text-start font-semibold px-2 py-2.5">{loc('المبيعات', 'Sales', 'فرۆش')}</th>
-                <th className="text-start font-semibold px-2 py-2.5">{t.updated}</th>
-                <th className="text-start font-semibold px-2 py-2.5">{loc('إجراءات', 'Actions', 'کردارەکان')}</th>
+              <tr className={T.tableHead}>
+                <th className="text-start font-semibold px-4 py-2.5">{loc('المنتج', 'Product', 'بەرهەم')}</th>
+                <th className="text-start font-semibold px-3 py-2.5">{t.price}</th>
+                <th className="text-start font-semibold px-3 py-2.5">{t.stock}</th>
+                <th className="text-start font-semibold px-3 py-2.5">{loc('الحالة', 'Status', 'دۆخ')}</th>
+                <th className="text-start font-semibold px-3 py-2.5">{loc('المبيعات', 'Sales', 'فرۆش')}</th>
+                <th className="text-start font-semibold px-3 py-2.5">{t.updated}</th>
+                <th className="text-end font-semibold px-4 py-2.5">{loc('إجراءات', 'Actions', 'کردارەکان')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/50">
+            <tbody className="divide-y divide-[var(--ap-hairline)]">
               {items.map((p) => {
-                const available = p.stock === null ? null : p.stock - (p.stock_reserved ?? 0);
+                const s = stockState(p);
+                const meta = metaOf(p);
                 return (
-                  <tr key={p.id} data-product-id={p.id} className="hover:bg-white/[0.02]">
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-11 h-11 rounded-lg bg-zinc-900 overflow-hidden shrink-0 border border-zinc-800">
-                          {p.image && <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />}
-                        </div>
+                  <tr key={p.id} data-product-id={p.id} className={T.tableRow}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Thumb p={p} size="w-12 h-12" />
                         <div className="min-w-0">
-                          <p className="text-white text-[12.5px] font-semibold truncate max-w-[190px]" dir="auto">
-                            {p.is_featured && <Star className="w-3 h-3 text-[#a78bfa] fill-[#a78bfa] inline me-1 -mt-0.5" />}
-                            {p.name_ar || p.name_en || p.slug}
+                          <p className="text-[13.5px] font-semibold truncate max-w-[220px] text-[var(--ap-text-1)]" dir="auto">
+                            {p.is_featured && <Star className="w-3 h-3 text-[var(--ap-accent-text)] fill-current inline me-1 -mt-0.5" />}
+                            {nameOf(p)}
                           </p>
-                          {p.name_en && p.name_ar && (
-                            <p className="text-zinc-500 text-[10.5px] truncate max-w-[190px] text-end" dir="ltr">{p.name_en}</p>
+                          {meta && (
+                            <p className="text-[12px] text-[var(--ap-text-2)] truncate max-w-[220px] mt-0.5" dir="auto">{meta}</p>
                           )}
-                          <p className="text-zinc-600 text-[10px]">
+                          <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5">
                             <span dir="ltr">{p.sku ? p.sku : `#${p.id.slice(-6).toUpperCase()}`}</span>
                             {p.doc_version < 2 && (
-                              <span className="ms-1.5 text-[9px] font-bold text-zinc-500 bg-zinc-800 px-1 py-0.5 rounded border border-zinc-700" title={t.v1Hint}>v1</span>
+                              <span className={`${T.kbd} ms-1.5 !h-4 !text-[9px]`} title={t.v1Hint}>v1</span>
                             )}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 py-2.5">
-                      <p className="text-white text-[12.5px] font-bold whitespace-nowrap"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></p>
+                    <td className="px-3 py-3">
+                      <p className="text-[13.5px] font-bold whitespace-nowrap text-[var(--ap-text-1)]"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></p>
                       {p.pro_price_iqd !== null && (
-                        <p className="text-zinc-500 text-[10px] whitespace-nowrap">
-                          PRO: <span dir="ltr">{formatIqd(p.pro_price_iqd)}</span>
+                        <p className="text-[11px] text-[var(--ap-text-3)] whitespace-nowrap mt-0.5">
+                          PRO <span dir="ltr">{formatIqd(p.pro_price_iqd)}</span>
                         </p>
                       )}
                     </td>
-                    <td className="px-2 py-2.5">
-                      {available === null ? (
-                        <div>
-                          <p className="text-zinc-300 text-[12.5px] font-bold">—</p>
-                          <p className="text-zinc-500 text-[10px]">{t.untracked}</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className={`text-[12.5px] font-bold ${available <= 0 ? 'text-red-400' : 'text-white'}`}><span dir="ltr">{available}</span></p>
-                          <p className={`text-[10px] ${available <= 0 ? 'text-red-400/80' : 'text-zinc-500'}`}>
-                            {available <= 0 ? loc('نفد المخزون', 'out of stock', 'تەواو بوو') : loc('متوفر', 'in stock', 'بەردەست')}
-                          </p>
-                        </div>
-                      )}
+                    <td className="px-3 py-3">
+                      <p className={`text-[13.5px] font-bold ${s.key === 'out' ? 'text-[var(--ap-danger)]' : s.key === 'low' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-1)]'}`}>
+                        {s.available === null ? '—' : <span dir="ltr">{s.available}</span>}
+                      </p>
+                      <p className={`text-[11px] mt-0.5 ${s.key === 'out' ? 'text-[var(--ap-danger)]' : s.key === 'low' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-3)]'}`}>
+                        {stockLabel(s)}
+                      </p>
                     </td>
-                    <td className="px-2 py-2.5"><StatusChip status={p.status} /></td>
-                    <td className="px-2 py-2.5">
-                      <p className="text-white text-[12.5px] font-bold"><span dir="ltr">{p.sold ?? 0}</span></p>
-                      <p className="text-zinc-500 text-[10px]">{loc('مبيع', 'sold', 'فرۆشراو')}</p>
+                    <td className="px-3 py-3"><Badge status={p.status} /></td>
+                    <td className="px-3 py-3">
+                      <p className="text-[13.5px] font-bold text-[var(--ap-text-1)]"><span dir="ltr">{p.sold ?? 0}</span></p>
+                      <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5">{loc('مبيع', 'sold', 'فرۆشراو')}</p>
                     </td>
-                    <td className="px-2 py-2.5">
-                      <p className="text-zinc-200 text-[11.5px] whitespace-nowrap">{relTime(p.updated_at, loc)}</p>
-                      <p className="text-zinc-500 text-[10px]"><span dir="ltr">{fmtDate(p.updated_at)}</span></p>
+                    <td className="px-3 py-3">
+                      <p className="text-[12.5px] text-[var(--ap-text-1)] whitespace-nowrap">{relTime(p.updated_at, loc)}</p>
+                      <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5"><span dir="ltr">{fmtDate(p.updated_at)}</span></p>
                     </td>
-                    <td className="px-2 py-2.5">{rowActions(p)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end">{rowActions(p)}</div>
+                    </td>
                   </tr>
                 );
               })}
@@ -863,23 +972,28 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* pagination */}
+      {/* ------------------------------------------------------- pagination */}
       {pages > 1 && (
-        <div className="flex items-center justify-center gap-1.5 mt-4">
-          <PageBtn onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-            <ChevronRight className="w-3.5 h-3.5 ltr:rotate-180" />
-          </PageBtn>
-          {Array.from({ length: pages }, (_, i) => i + 1)
-            .filter((n) => n === 1 || n === pages || Math.abs(n - page) <= 1)
-            .map((n, i, arr) => (
-              <span key={n} className="flex items-center gap-1.5">
-                {i > 0 && arr[i - 1] !== n - 1 && <span className="text-zinc-600 text-[11px]">…</span>}
-                <PageBtn onClick={() => setPage(n)} active={n === page}>{n}</PageBtn>
-              </span>
-            ))}
-          <PageBtn onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}>
-            <ChevronLeft className="w-3.5 h-3.5 ltr:rotate-180" />
-          </PageBtn>
+        <div className="flex items-center justify-between gap-2 flex-wrap mt-4">
+          <span className="text-[12px] text-[var(--ap-text-3)]">
+            {loc(`صفحة ${page} من ${pages}`, `Page ${page} of ${pages}`, `پەڕە ${page} لە ${pages}`)}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <PageBtn onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+              <ChevronRight className="w-3.5 h-3.5 ltr:rotate-180" />
+            </PageBtn>
+            {Array.from({ length: pages }, (_, i) => i + 1)
+              .filter((n) => n === 1 || n === pages || Math.abs(n - page) <= 1)
+              .map((n, i, arr) => (
+                <span key={n} className="flex items-center gap-1.5">
+                  {i > 0 && arr[i - 1] !== n - 1 && <span className="text-[var(--ap-text-3)] text-[11px] px-0.5">…</span>}
+                  <PageBtn onClick={() => setPage(n)} active={n === page}>{n}</PageBtn>
+                </span>
+              ))}
+            <PageBtn onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}>
+              <ChevronLeft className="w-3.5 h-3.5 ltr:rotate-180" />
+            </PageBtn>
+          </div>
         </div>
       )}
 
@@ -926,21 +1040,191 @@ export default function AdminProducts() {
   );
 }
 
+
+// ----------------------------------------------------------------- pieces
+
+function Thumb({ p, size }: { p: ListingItem; size: string }) {
+  return (
+    <div className={`${T.thumb} ${size} flex items-center justify-center`}>
+      {p.image ? (
+        <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <ImageOff className="w-4 h-4 text-[var(--ap-text-3)]" />
+      )}
+    </div>
+  );
+}
+
+function Badge({ status }: { status: string }) {
+  const { loc } = useLanguage();
+  const key = status === 'active' ? 'active' : status === 'hidden' ? 'hidden' : 'draft';
+  const label = key === 'active' ? loc('نشط', 'Active', 'چالاک') : key === 'hidden' ? loc('مخفي', 'Hidden', 'شاراوە') : loc('مسودة', 'Draft', 'ڕەشنووس');
+  return (
+    <span className={`${T.badgeBase} ${T.badge[key]}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+function StatTile({
+  tint, icon, label, value, sub, series,
+}: {
+  tint: 'purple' | 'blue' | 'green' | 'amber' | 'red';
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  series: number[];
+}) {
+  const c = T.statCard.tints[tint];
+  return (
+    <div className={T.statCard.base}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] font-medium text-[var(--ap-text-2)] leading-snug line-clamp-2">{label}</span>
+        <span className={`w-8 h-8 rounded-[9px] flex items-center justify-center shrink-0 ${c.box}`}>{icon}</span>
+      </div>
+      <div className="mt-2.5 text-[24px] font-bold leading-none tracking-tight text-[var(--ap-text-1)]">
+        <span dir="ltr">{value}</span>
+      </div>
+      <div className="mt-1.5 text-[11.5px] text-[var(--ap-text-3)] truncate">{sub}</div>
+      <div className="mt-3 -mb-1 opacity-90">
+        <Spark series={series} className={c.spark} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The top-strip quick-find: a ⌘K palette over the same listing endpoint.
+ * Typing shows the closest matches (name / SKU / slug); ↑↓ + Enter opens the
+ * product in the editor. It never filters the table — that is the filter
+ * card's search — so the two never fight over one piece of state.
+ */
+function QuickFind({
+  inputRef, placeholder, label, onPick, loc, nameOf,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  placeholder: string;
+  label: string;
+  onPick: (p: ListingItem) => void;
+  loc: Loc;
+  nameOf: (p: ListingItem) => string;
+}) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<ListingItem[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const seq = useRef(0);
+
+  useEffect(() => {
+    const term = q.trim();
+    const s = ++seq.current;
+    if (!term) {
+      setRows([]);
+      setBusy(false);
+      return;
+    }
+    setBusy(true);
+    const timer = setTimeout(() => {
+      api.get<ListingResponse>(`/api/admin/products-v2?search=${encodeURIComponent(term)}&limit=8`)
+        .then((d) => {
+          if (s !== seq.current) return;
+          setRows(d.products);
+          setIdx(0);
+        })
+        .catch(() => {
+          if (s === seq.current) setRows([]);
+        })
+        .finally(() => {
+          if (s === seq.current) setBusy(false);
+        });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  const pick = (p: ListingItem | undefined) => {
+    if (!p) return;
+    setOpen(false);
+    setQ('');
+    inputRef.current?.blur();
+    onPick(p);
+  };
+
+  const showList = open && q.trim().length > 0;
+
+  return (
+    <div className="relative flex-1 min-w-[220px] max-w-xl">
+      <Search className="w-4 h-4 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
+      <input
+        ref={inputRef}
+        value={q}
+        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); setIdx((i) => Math.min(rows.length - 1, i + 1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setIdx((i) => Math.max(0, i - 1)); }
+          else if (e.key === 'Enter') { e.preventDefault(); pick(rows[idx]); }
+          else if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur(); }
+        }}
+        placeholder={placeholder}
+        aria-label={label}
+        role="combobox"
+        aria-expanded={showList}
+        aria-controls="ap-quickfind-list"
+        className={`${T.input} !h-9 w-full ps-9 pe-12 text-[13px]`}
+      />
+      <span className="absolute top-1/2 -translate-y-1/2 end-2 hidden sm:inline-flex pointer-events-none">
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--ap-text-3)]" /> : <kbd className={T.kbd} dir="ltr">⌘K</kbd>}
+      </span>
+      {showList && (
+        <div id="ap-quickfind-list" role="listbox" className={`${T.surfaceRaised} absolute top-full mt-1.5 inset-x-0 z-[130] overflow-hidden py-1`}>
+          {rows.length === 0 && !busy ? (
+            <div className="px-3 py-3 text-[12.5px] text-[var(--ap-text-3)]">{loc('لا نتائج', 'No matches', 'هیچ ئەنجامێک')}</div>
+          ) : (
+            rows.map((p, i) => (
+              <button
+                key={p.id}
+                type="button"
+                role="option"
+                aria-selected={i === idx}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setIdx(i)}
+                onClick={() => pick(p)}
+                className={`w-full flex items-center gap-3 px-3 h-11 text-start ${i === idx ? 'bg-[var(--ap-surface-3)]' : ''}`}
+              >
+                <span className={`${T.thumb} w-7 h-7 flex items-center justify-center`}>
+                  {p.image ? <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" /> : <ImageOff className="w-3 h-3 text-[var(--ap-text-3)]" />}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13px] font-medium truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</span>
+                  <span className="block text-[11px] text-[var(--ap-text-3)] truncate" dir="ltr">{p.sku || p.slug} · {formatIqd(p.price_iqd || 0)}</span>
+                </span>
+                <Badge status={p.status} />
+                {i === idx && <CornerDownLeft className="w-3.5 h-3.5 text-[var(--ap-text-3)] shrink-0" />}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MenuItem({
-  icon, label, onClick, disabled,
+  icon, label, onClick, disabled, danger,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  danger?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full text-start px-3 py-2.5 text-[12px] text-zinc-200 active:bg-white/10 flex items-center gap-2 border-b border-white/5 last:border-0 disabled:opacity-40"
-    >
-      <span className="text-zinc-500">{icon}</span>
+    <button onClick={onClick} disabled={disabled} className={danger ? T.menuItemDanger : T.menuItem} role="menuitem">
+      <span className={danger ? 'text-[var(--ap-danger)]' : 'text-[var(--ap-text-3)]'}>{icon}</span>
       {label}
     </button>
   );
@@ -955,13 +1239,7 @@ function PageBtn({
   active?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`min-w-8 h-8 px-2 rounded-lg border text-[12px] font-semibold flex items-center justify-center disabled:opacity-30 ${
-        active ? 'border-[#6B46FF]/60 bg-[#6B46FF]/15 text-[#a78bfa]' : 'border-zinc-700/60 text-zinc-400'
-      }`}
-    >
+    <button onClick={onClick} disabled={disabled} className={active ? T.pageBtn.active : T.pageBtn.base} aria-current={active ? 'page' : undefined}>
       {children}
     </button>
   );
