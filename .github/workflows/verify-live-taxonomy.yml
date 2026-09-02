@@ -123,21 +123,40 @@ jobs:
         id: bundle
         run: |
           set -euo pipefail
-          html=$(curl -s --max-time 25 "$APEX/admin")
+          # --compressed on EVERY fetch: the edge serves these gzipped, and a
+          # grep over compressed bytes finds nothing and calls it a miss.
+          html=$(curl -s --compressed --max-time 25 "$APEX/admin")
           # Vite emits hashed asset names; take every JS module the page loads.
           assets=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
-          if [ -z "$assets" ]; then echo "  FAIL /admin served no JS module"; exit 1; fi
+          if [ -z "$assets" ]; then
+            echo "  FAIL /admin served no JS module. First 400 bytes:"
+            printf '%s' "$html" | head -c 400
+            exit 1
+          fi
+          echo "  modules served by /admin:"
+          printf '    %s\n' $assets
           found=0
           for a in $assets; do
-            if curl -s --max-time 40 "$APEX$a" | grep -q 'data-tax-tab'; then
-              echo "  ok   $a carries the taxonomy screen"
+            body=$(curl -s --compressed --max-time 60 "$APEX$a")
+            bytes=$(printf '%s' "$body" | wc -c)
+            if printf '%s' "$body" | grep -q 'data-tax-tab'; then
+              echo "  ok   $a carries the taxonomy screen ($bytes bytes)"
               found=1
+              # The screen is not enough on its own: the marker below is the
+              # quick-add the product form grew in the same round.
+              if printf '%s' "$body" | grep -q 'data-quick-add-open'; then
+                echo "  ok   $a carries the product form's quick-add too"
+              else
+                echo "  FAIL $a has the screen but not the quick-add"
+                exit 1
+              fi
               break
+            else
+              echo "  --   $a does not carry it ($bytes bytes)"
             fi
           done
           if [ $found -eq 0 ]; then
-            echo "  FAIL none of the served modules carries the taxonomy screen:"
-            printf '%s\n' "$assets"
+            echo "  FAIL none of the served modules carries the taxonomy screen"
             exit 1
           fi
 
