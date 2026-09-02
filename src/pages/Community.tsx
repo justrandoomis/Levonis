@@ -342,11 +342,11 @@ export default function Community() {
                         key={m.id}
                         onClick={() => {
                           // A shop with its own subdomain IS its own site —
-                          // hand the visitor over rather than loading it
-                          // inside the main site (the shared cookie keeps
-                          // their session across the hop).
+                          // it opens in ITS OWN TAB, leaving the directory
+                          // where the visitor left it (the shared cookie
+                          // keeps their session across the hop).
                           const href = storeHref(m.store_url, m.id);
-                          if (href.startsWith('http')) window.location.href = href;
+                          if (href.startsWith('http')) window.open(href, '_blank', 'noopener,noreferrer');
                           else navigate(href);
                         }}
                         className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 flex flex-col gap-4 cursor-pointer hover:border-olive/50 transition-colors"

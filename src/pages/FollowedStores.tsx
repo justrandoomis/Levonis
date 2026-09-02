@@ -97,10 +97,10 @@ export default function FollowedStores() {
             <div
               key={store.id}
               onClick={() => {
-                // The shop's own subdomain when it has one; the in-site page
-                // otherwise. The shared cookie keeps the session either way.
+                // The shop's own subdomain opens in its own tab; the in-site
+                // page otherwise. The shared cookie keeps the session either way.
                 const href = storeHref(store.store_url, store.id);
-                if (href.startsWith('http')) window.location.href = href;
+                if (href.startsWith('http')) window.open(href, '_blank', 'noopener,noreferrer');
                 else navigate(href);
               }}
               className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 transition-colors"

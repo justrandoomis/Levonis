@@ -61,7 +61,8 @@ export default function SavedProducts() {
 
   const openProduct = (p: SavedProduct) => {
     if (p.store_url && /^https?:\/\//.test(p.store_url)) {
-      window.location.href = `${p.store_url.replace(/\/$/, '')}/p/${p.slug}`;
+      // The store's own site opens in its own tab; the saved list stays put.
+      window.open(`${p.store_url.replace(/\/$/, '')}/p/${p.slug}`, '_blank', 'noopener,noreferrer');
     } else {
       navigate(`/community/store/${p.store_slug}/p/${p.slug}`);
     }
