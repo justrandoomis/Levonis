@@ -231,6 +231,24 @@ export const merchantApi = {
     api.get<{ products: MerchantProduct[]; next_cursor: string | null }>(
       `/api/merchant/products${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
     ),
+  /** The manager's filtered mode: server-side search/filters/sort + total. */
+  productsPaged: (params: Record<string, string | number | undefined>) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== '')
+      .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+      .join('&');
+    return api.get<{ products: MerchantProduct[]; total: number; page: number; limit: number }>(
+      `/api/merchant/products?${qs}`
+    );
+  },
+  productsStats: () =>
+    api.get<ProductsStats>('/api/merchant/products/stats'),
+  productInsights: (id: string) =>
+    api.get<{ product: MerchantProduct; insights: ProductInsights }>(
+      `/api/merchant/products/${id}/insights`
+    ),
+  importProducts: (csv: string, confirm: boolean) =>
+    api.post<ProductsImportReport>('/api/merchant/products/import', { csv, confirm }),
   createProduct: (body: Record<string, unknown>) =>
     api.post<{ product: MerchantProduct }>('/api/merchant/products', body),
   updateProduct: (id: string, body: Record<string, unknown>) =>
@@ -338,6 +356,47 @@ export const storefrontApi = {
   services: (slug: string) => api.get<{ services: StoreService[] }>(`/api/storefront/${slug}/services`),
   showcase: (slug: string) => api.get<{ items: ShowcaseItem[] }>(`/api/storefront/${slug}/showcase`),
 };
+
+/** The products manager's stat feed — every number a real aggregate. */
+export interface ProductsStats {
+  totals: {
+    total: number;
+    active: number;
+    draft: number;
+    hidden: number;
+    out_of_stock: number;
+    views: number;
+    sold: number;
+  };
+  weekly: Array<{
+    week: string;
+    added: number;
+    active_added: number;
+    draft_added: number;
+    hidden_added: number;
+    views: number;
+  }>;
+  categories: string[];
+  sales_daily: Array<{ day: string; orders: number; gross: number }>;
+}
+
+export interface ProductInsights {
+  views: number;
+  sold: number;
+  revenue_iqd: number;
+  units_ordered: number;
+  orders: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductsImportReport {
+  confirmed: boolean;
+  created: number;
+  valid: number;
+  invalid: number;
+  report: Array<{ row: number; name: string; ok: boolean; error?: string }>;
+}
 
 /** One saved store product, as the saved-items list renders it. */
 export interface SavedProduct {

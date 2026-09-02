@@ -34,6 +34,7 @@ import {
   type StoreContext,
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
+import { parseCsv, toCsv } from '../lib/importCsv';
 import { merchantBalance } from '../lib/escrowOps';
 
 export const merchantRoutes = new Hono<AppContext>();
@@ -470,19 +471,114 @@ merchantRoutes.post('/store/slug', async (c) => {
 
 // ----------------------------------------------------------------- products
 
+/**
+ * The management list. Two modes on one route so old callers keep working:
+ * the bare call (and ?cursor=) is the original newest-first cursor page,
+ * while ?page= switches to the manager's filtered mode — search, section,
+ * lifecycle, stock, price band, recency window, featured/deal flags, seven
+ * sort orders, and an exact total for «عرض X-Y من Z». Every WHERE clause is
+ * built from a fixed whitelist and bound parameters; nothing a merchant
+ * types reaches the SQL text.
+ */
 merchantRoutes.get('/products', async (c) => {
   const ctx = await requireStoreOwner(c);
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
-  const cursor = c.req.query('cursor') || '';
-  const { results } = await c.env.DB.prepare(
-    `SELECT * FROM community_products
-      WHERE merchant_id = ? AND (? = '' OR created_at < ?)
-      ORDER BY created_at DESC LIMIT ?`
-  ).bind(ctx.merchant.id, cursor, cursor, limit).all();
+
+  if (c.req.query('page') === undefined) {
+    const cursor = c.req.query('cursor') || '';
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM community_products
+        WHERE merchant_id = ? AND (? = '' OR created_at < ?)
+        ORDER BY created_at DESC LIMIT ?`
+    ).bind(ctx.merchant.id, cursor, cursor, limit).all();
+    return c.json({
+      success: true,
+      products: results.map(productShape),
+      next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+    });
+  }
+
+  const page = int(c.req.query('page'), 'page', { min: 1, max: 10_000, def: 1 });
+  const q = str(c.req.query('q') ?? '', 'q', { min: 0, max: 120, required: false });
+  const section = str(c.req.query('section') ?? '', 'section', { min: 0, max: 60, required: false });
+  const lifecycle = c.req.query('lifecycle') ?? '';
+  const stockFilter = c.req.query('stock') ?? '';
+  const category = str(c.req.query('category') ?? '', 'category', { min: 0, max: 60, required: false });
+  const priceMin = c.req.query('price_min') !== undefined ? int(c.req.query('price_min'), 'price_min', { min: 0, max: 1_000_000_000 }) : null;
+  const priceMax = c.req.query('price_max') !== undefined ? int(c.req.query('price_max'), 'price_max', { min: 0, max: 1_000_000_000 }) : null;
+  const days = c.req.query('days') !== undefined ? int(c.req.query('days'), 'days', { min: 1, max: 3650 }) : null;
+  const featuredOnly = c.req.query('featured') === '1';
+  const dealsOnly = c.req.query('deals') === '1';
+  const sort = c.req.query('sort') ?? 'newest';
+
+  const where: string[] = ['merchant_id = ?'];
+  const binds: unknown[] = [ctx.merchant.id];
+  if (q) {
+    // LIKE special characters are literal search text here, not wildcards.
+    const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
+    where.push("(name LIKE ? ESCAPE '\\' OR name_ar LIKE ? ESCAPE '\\' OR sku LIKE ? ESCAPE '\\')");
+    binds.push(like, like, like);
+  }
+  if (section === 'none') where.push('section_id IS NULL');
+  else if (section) {
+    where.push('section_id = ?');
+    binds.push(section);
+  }
+  if (['draft', 'active', 'hidden', 'sold_out', 'archived'].includes(lifecycle)) {
+    where.push('lifecycle = ?');
+    binds.push(lifecycle);
+  }
+  if (stockFilter === 'in') where.push('(track_stock = 0 OR stock > 0)');
+  else if (stockFilter === 'low') where.push('(track_stock = 1 AND stock > 0 AND stock <= 5)');
+  else if (stockFilter === 'out') where.push('(track_stock = 1 AND stock <= 0)');
+  else if (stockFilter === 'untracked') where.push('track_stock = 0');
+  if (category) {
+    where.push('category = ?');
+    binds.push(category);
+  }
+  if (priceMin !== null) {
+    where.push('price_iqd >= ?');
+    binds.push(priceMin);
+  }
+  if (priceMax !== null) {
+    where.push('price_iqd <= ?');
+    binds.push(priceMax);
+  }
+  if (days !== null) {
+    where.push('created_at >= ?');
+    binds.push(new Date(Date.now() - days * 86_400_000).toISOString());
+  }
+  if (featuredOnly) where.push('featured = 1');
+  if (dealsOnly) where.push('(original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd)');
+
+  const ORDERS: Record<string, string> = {
+    newest: 'created_at DESC',
+    oldest: 'created_at ASC',
+    price_asc: 'price_iqd ASC, created_at DESC',
+    price_desc: 'price_iqd DESC, created_at DESC',
+    sales: 'sold_count DESC, created_at DESC',
+    views: 'view_count DESC, created_at DESC',
+    stock: 'stock ASC, created_at DESC',
+    updated: "COALESCE(NULLIF(updated_at, ''), created_at) DESC",
+  };
+  const orderBy = ORDERS[sort] ?? ORDERS.newest;
+
+  const whereSql = where.join(' AND ');
+  const [{ results }, count] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT * FROM community_products WHERE ${whereSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
+    ).bind(...binds, limit, (page - 1) * limit).all(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_products WHERE ${whereSql}`)
+      .bind(...binds)
+      .first<{ n: number }>(),
+  ]);
+
   return c.json({
     success: true,
     products: results.map(productShape),
-    next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+    total: count?.n ?? 0,
+    page,
+    limit,
   });
 });
 
@@ -626,15 +722,274 @@ merchantRoutes.post('/products/:id/duplicate', async (c) => {
     `INSERT INTO community_products
        (id, merchant_id, store_id, slug, name, name_ar, description, description_ar, images,
         price_iqd, original_price_iqd, sku, stock, track_stock, category, condition,
-        options, colors, delivery_methods, prep_days, status, lifecycle, created_at, updated_at)
+        options, colors, delivery_methods, prep_days, status, lifecycle, section_id, featured,
+        created_at, updated_at)
      SELECT ?, merchant_id, store_id, ?, name || ' (copy)', name_ar, description, description_ar, images,
         price_iqd, original_price_iqd, '', stock, track_stock, category, condition,
-        options, colors, delivery_methods, prep_days, 'hidden', 'draft', ?, ?
+        options, colors, delivery_methods, prep_days, 'hidden', 'draft', section_id, featured, ?, ?
        FROM community_products WHERE id = ? AND merchant_id = ?`
   ).bind(id, `${ctx.store.slug}-copy-${id.slice(-6)}`, ts, ts, src.id, ctx.merchant.id).run();
 
   const row = await c.env.DB.prepare('SELECT * FROM community_products WHERE id = ?').bind(id).first();
   return c.json({ success: true, product: productShape(row as Record<string, unknown>) }, 201);
+});
+
+/**
+ * The manager's stat cards, from real rows only. The weekly series buckets
+ * products by CREATION week (the only per-product timestamp history that
+ * exists), so every sparkline is a true statement: how this catalogue — and
+ * each slice of it — grew. No invented month-over-month deltas.
+ */
+merchantRoutes.get('/products/stats', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const db = c.env.DB;
+  const since = new Date(Date.now() - 12 * 7 * 86_400_000).toISOString();
+
+  const [totals, weekly, categories, salesDaily] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active,
+              SUM(CASE WHEN lifecycle = 'draft' THEN 1 ELSE 0 END) AS draft,
+              SUM(CASE WHEN lifecycle IN ('hidden','archived','sold_out') THEN 1 ELSE 0 END) AS hidden,
+              SUM(CASE WHEN track_stock = 1 AND stock <= 0 AND lifecycle = 'active' THEN 1 ELSE 0 END) AS out_of_stock,
+              COALESCE(SUM(view_count), 0) AS views,
+              COALESCE(SUM(sold_count), 0) AS sold
+         FROM community_products WHERE merchant_id = ?`
+    ).bind(ctx.merchant.id).first<Record<string, number>>(),
+    db.prepare(
+      `SELECT substr(created_at, 1, 10) AS day, strftime('%Y-%W', created_at) AS week,
+              COUNT(*) AS added,
+              SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active_added,
+              SUM(CASE WHEN lifecycle = 'draft' THEN 1 ELSE 0 END) AS draft_added,
+              SUM(CASE WHEN lifecycle IN ('hidden','archived','sold_out') THEN 1 ELSE 0 END) AS hidden_added,
+              COALESCE(SUM(view_count), 0) AS views
+         FROM community_products
+        WHERE merchant_id = ? AND created_at >= ?
+        GROUP BY week ORDER BY week`
+    ).bind(ctx.merchant.id, since).all(),
+    db.prepare(
+      `SELECT DISTINCT category FROM community_products
+        WHERE merchant_id = ? AND category != '' ORDER BY category LIMIT 40`
+    ).bind(ctx.merchant.id).all(),
+    db.prepare(
+      `SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS orders, COALESCE(SUM(total_iqd), 0) AS gross
+         FROM orders
+        WHERE merchant_id = ? AND status != 'cancelled' AND created_at >= ?
+        GROUP BY day ORDER BY day`
+    ).bind(ctx.merchant.id, new Date(Date.now() - 14 * 86_400_000).toISOString()).all(),
+  ]);
+
+  return c.json({
+    success: true,
+    totals: {
+      total: totals?.total ?? 0,
+      active: totals?.active ?? 0,
+      draft: totals?.draft ?? 0,
+      hidden: totals?.hidden ?? 0,
+      out_of_stock: totals?.out_of_stock ?? 0,
+      views: totals?.views ?? 0,
+      sold: totals?.sold ?? 0,
+    },
+    weekly: (weekly.results ?? []).map((w) => ({
+      week: w.week,
+      added: Number(w.added ?? 0),
+      active_added: Number(w.active_added ?? 0),
+      draft_added: Number(w.draft_added ?? 0),
+      hidden_added: Number(w.hidden_added ?? 0),
+      views: Number(w.views ?? 0),
+    })),
+    categories: (categories.results ?? []).map((r) => String(r.category)),
+    sales_daily: (salesDaily.results ?? []).map((r) => ({
+      day: r.day,
+      orders: Number(r.orders ?? 0),
+      gross: Number(r.gross ?? 0),
+    })),
+  });
+});
+
+/** One product's real numbers: lifetime views/sales plus settled revenue. */
+merchantRoutes.get('/products/:id/insights', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const id = c.req.param('id');
+  const product = await c.env.DB.prepare(
+    'SELECT * FROM community_products WHERE id = ? AND merchant_id = ?'
+  ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
+  if (!product) throw notFound('Product not found');
+
+  const revenue = await c.env.DB.prepare(
+    `SELECT COALESCE(SUM(i.line_total_iqd), 0) AS revenue, COALESCE(SUM(i.qty), 0) AS units,
+            COUNT(DISTINCT i.order_id) AS orders
+       FROM order_items i JOIN orders o ON o.id = i.order_id
+      WHERE i.community_product_id = ? AND o.merchant_id = ? AND o.status != 'cancelled'`
+  ).bind(id, ctx.merchant.id).first<Record<string, number>>();
+
+  return c.json({
+    success: true,
+    product: productShape(product),
+    insights: {
+      views: Number(product.view_count ?? 0),
+      sold: Number(product.sold_count ?? 0),
+      revenue_iqd: revenue?.revenue ?? 0,
+      units_ordered: revenue?.units ?? 0,
+      orders: revenue?.orders ?? 0,
+      created_at: product.created_at,
+      updated_at: product.updated_at || product.created_at,
+    },
+  });
+});
+
+const PRODUCT_CSV_HEADER = [
+  'name', 'name_ar', 'price_iqd', 'original_price_iqd', 'sku', 'stock', 'track_stock',
+  'category', 'condition', 'prep_days', 'lifecycle', 'featured', 'section', 'description',
+];
+
+/** The whole catalogue as a spreadsheet — BOM for Excel-friendly Arabic. */
+merchantRoutes.get('/products/export.csv', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const { results } = await c.env.DB.prepare(
+    `SELECT p.*, s.name AS section_name FROM community_products p
+       LEFT JOIN merchant_store_sections s ON s.id = p.section_id
+      WHERE p.merchant_id = ? ORDER BY p.created_at DESC LIMIT 2000`
+  ).bind(ctx.merchant.id).all<Record<string, unknown>>();
+
+  const rows: string[][] = [
+    [...PRODUCT_CSV_HEADER, 'sold_count', 'view_count', 'id', 'slug', 'created_at', 'updated_at'],
+    ...(results ?? []).map((p) => [
+      String(p.name ?? ''), String(p.name_ar ?? ''), String(p.price_iqd ?? 0),
+      p.original_price_iqd === null || p.original_price_iqd === undefined ? '' : String(p.original_price_iqd),
+      String(p.sku ?? ''), String(p.stock ?? 0), p.track_stock ? '1' : '0',
+      String(p.category ?? ''), String(p.condition ?? 'new'), String(p.prep_days ?? 0),
+      String(p.lifecycle ?? 'active'), p.featured ? '1' : '0', String(p.section_name ?? ''),
+      String(p.description ?? ''),
+      String(p.sold_count ?? 0), String(p.view_count ?? 0),
+      String(p.id), String(p.slug), String(p.created_at ?? ''), String(p.updated_at ?? ''),
+    ]),
+  ];
+  const csv = '\uFEFF' + toCsv(rows);
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="products.csv"',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+});
+
+/**
+ * Spreadsheet import, previewed before it commits. The caller sends the CSV
+ * text; confirm=false answers with the per-row report and writes NOTHING;
+ * confirm=true creates the valid rows. Imported products always start as
+ * DRAFTS — a spreadsheet must not publish straight to real customers —
+ * and every row passes the same bounds the editor enforces.
+ */
+merchantRoutes.post('/products/import', async (c) => {
+  await rateLimit(c, 'merchant-product-import', 10, 3600);
+  const ctx = await requireSellingPrivileges(c);
+  const body = await c.req.json().catch(() => ({}));
+  const csvText = str(body.csv, 'csv', { min: 1, max: 400_000 });
+  const confirm = body.confirm === true;
+
+  const grid = parseCsv(csvText.replace(/^\uFEFF/, ''));
+  if (grid.length < 2) throw badRequest('The file has no data rows', 'CSV_EMPTY');
+  const header = grid[0].map((h) => h.trim().toLowerCase());
+  const col = (name: string) => header.indexOf(name);
+  if (col('name') === -1 || col('price_iqd') === -1) {
+    throw badRequest('The file must carry name and price_iqd columns', 'CSV_HEADER');
+  }
+  const dataRows = grid.slice(1).filter((r) => r.some((cell) => cell.trim() !== ''));
+  if (dataRows.length > 200) throw badRequest('Up to 200 rows per import', 'CSV_TOO_BIG');
+
+  const sections = await c.env.DB.prepare(
+    'SELECT id, name, name_ar FROM merchant_store_sections WHERE store_id = ?'
+  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  const sectionByName = new Map<string, string>();
+  for (const s of sections.results ?? []) {
+    sectionByName.set(String(s.name).trim().toLowerCase(), String(s.id));
+    if (s.name_ar) sectionByName.set(String(s.name_ar).trim().toLowerCase(), String(s.id));
+  }
+
+  const cell = (r: string[], name: string) => {
+    const i = col(name);
+    return i === -1 ? '' : (r[i] ?? '').trim();
+  };
+  const report: Array<{ row: number; name: string; ok: boolean; error?: string }> = [];
+  const valid: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const name = cell(r, 'name');
+    const rowNo = i + 2;
+    try {
+      if (name.length < 2 || name.length > 120) throw new Error('name must be 2-120 characters');
+      const price = Number(cell(r, 'price_iqd'));
+      if (!Number.isFinite(price) || price < 0 || price > 1_000_000_000) throw new Error('price_iqd is not a valid amount');
+      const origRaw = cell(r, 'original_price_iqd');
+      const orig = origRaw === '' ? null : Number(origRaw);
+      if (orig !== null && (!Number.isFinite(orig) || orig < 0 || orig > 1_000_000_000)) throw new Error('original_price_iqd is not a valid amount');
+      const stockRaw = cell(r, 'stock');
+      const stock = stockRaw === '' ? 0 : Number(stockRaw);
+      if (!Number.isFinite(stock) || stock < 0 || stock > 1_000_000) throw new Error('stock is not a valid count');
+      const prepRaw = cell(r, 'prep_days');
+      const prep = prepRaw === '' ? 0 : Number(prepRaw);
+      if (!Number.isFinite(prep) || prep < 0 || prep > 365) throw new Error('prep_days must be 0-365');
+      const condition = cell(r, 'condition') || 'new';
+      if (!['new', 'used', 'refurbished'].includes(condition)) throw new Error('condition must be new/used/refurbished');
+      const sectionName = cell(r, 'section').toLowerCase();
+      const sectionId = sectionName ? sectionByName.get(sectionName) ?? null : null;
+      if (sectionName && !sectionId) throw new Error(`unknown section «${cell(r, 'section')}»`);
+      valid.push({
+        name,
+        name_ar: cell(r, 'name_ar').slice(0, 120),
+        description: cell(r, 'description').slice(0, 6000),
+        price_iqd: Math.round(price),
+        original_price_iqd: orig === null ? null : Math.round(orig),
+        sku: cell(r, 'sku').slice(0, 64),
+        stock: Math.round(stock),
+        track_stock: cell(r, 'track_stock') === '0' ? 0 : 1,
+        category: cell(r, 'category').slice(0, 60),
+        condition,
+        prep_days: Math.round(prep),
+        featured: cell(r, 'featured') === '1' ? 1 : 0,
+        section_id: sectionId,
+      });
+      report.push({ row: rowNo, name, ok: true });
+    } catch (e) {
+      report.push({ row: rowNo, name: name || '—', ok: false, error: e instanceof Error ? e.message : 'invalid row' });
+    }
+  }
+
+  let created = 0;
+  if (confirm && valid.length) {
+    const ts = nowIso();
+    const stmts = valid.map((v) => {
+      const id = newId('cp');
+      return c.env.DB.prepare(
+        `INSERT INTO community_products
+           (id, merchant_id, store_id, slug, name, name_ar, description, price_iqd, original_price_iqd,
+            sku, stock, track_stock, category, condition, prep_days, featured, section_id,
+            status, lifecycle, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'hidden', 'draft', ?, ?)`
+      ).bind(
+        id, ctx.merchant.id, ctx.store.id,
+        `${ctx.store.slug}-${suggestSlug(String(v.name)) || 'item'}-${id.slice(-6)}`.slice(0, 120),
+        v.name, v.name_ar, v.description, v.price_iqd, v.original_price_iqd,
+        v.sku, v.stock, v.track_stock, v.category, v.condition, v.prep_days,
+        v.featured, v.section_id, ts, ts
+      );
+    });
+    await c.env.DB.batch(stmts);
+    created = valid.length;
+    await audit(c.env.DB, ctx.store.user_id, 'merchant.products_imported', ctx.store.id, { created });
+  }
+
+  return c.json({
+    success: true,
+    confirmed: confirm,
+    created,
+    valid: valid.length,
+    invalid: report.filter((r) => !r.ok).length,
+    report,
+  });
 });
 
 /**
