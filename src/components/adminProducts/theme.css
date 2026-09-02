@@ -60,9 +60,9 @@
 
 /* Native selects share the input chrome; the chevron is drawn once here so
    every select on the screen matches. Direction-aware whether dir sits on
-   the .ap wrapper or on an ancestor. Declared in the components layer so a
-   per-element utility (pe-14 for the period select) still wins. */
-@layer components {
+   the .ap wrapper or on an ancestor. Unlayered rules beat utilities, so the
+   one select that also carries a glyph gets its room from a modifier class
+   here rather than from a padding utility. */
 .ap select.ap-select {
   appearance: none;
   -webkit-appearance: none;
@@ -76,10 +76,12 @@
 .ap:where([dir='rtl'], [dir='rtl'] *) select.ap-select {
   background-position: left 12px center;
 }
+.ap select.ap-select.ap-select--icon {
+  padding-inline-end: 56px;
+}
 .ap select.ap-select option {
   background: #26262c;
   color: #eceef2;
-}
 }
 
 @media (prefers-reduced-motion: reduce) {

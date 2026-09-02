@@ -704,7 +704,7 @@ export default function AdminProducts() {
           </select>
           <div className="relative">
             <CalendarDays className="w-3.5 h-3.5 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 end-8 pointer-events-none" />
-            <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={`${filterSel} pe-14`}>
+            <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={`${filterSel} ap-select--icon`}>
               <option value="">{loc('اختر الفترة', 'Any period', 'هەموو ماوەکان')}</option>
               <option value="7">{loc('آخر 7 أيام', 'Last 7 days', '٧ ڕۆژ')}</option>
               <option value="30">{loc('آخر 30 يومًا', 'Last 30 days', '٣٠ ڕۆژ')}</option>
