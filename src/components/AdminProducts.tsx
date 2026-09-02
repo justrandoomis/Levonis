@@ -185,6 +185,8 @@ export default function AdminProducts() {
   const [priceBand, setPriceBand] = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
+  const [priceMinQ, setPriceMinQ] = useState('');
+  const [priceMaxQ, setPriceMaxQ] = useState('');
   const [days, setDays] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [advanced, setAdvanced] = useState(false);
@@ -246,9 +248,20 @@ export default function AdminProducts() {
     }
   }, [view]);
 
+  // The manual price range commits on the same debounce as the search, so
+  // typing "500000" does not fetch six intermediate result sets.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPriceMinQ(priceMin);
+      setPriceMaxQ(priceMax);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [priceMin, priceMax]);
+
   const band = PRICE_BANDS[priceBand];
-  const pMin = priceMin !== '' ? Number(priceMin) || 0 : band?.min;
-  const pMax = priceMax !== '' ? Number(priceMax) || 0 : band?.max;
+  const pMin = priceMinQ !== '' ? Number(priceMinQ) || 0 : band?.min;
+  const pMax = priceMaxQ !== '' ? Number(priceMaxQ) || 0 : band?.max;
 
   const load = useCallback(async () => {
     const seq = ++seqRef.current;
@@ -344,13 +357,13 @@ export default function AdminProducts() {
     }
   };
 
-  // The pinned legacy upsert accepts {id, status} — the safe quick toggle
-  // (POST /products-v2 would demand the whole document).
+  // A status-only endpoint: the full-document save would demand (and the
+  // legacy upsert would clobber) every other field of the product.
   const quickStatus = async (p: ListingItem, next: 'active' | 'hidden') => {
     setBusyId(p.id);
     setMenuFor('');
     try {
-      await api.post('/api/admin/products', { id: p.id, status: next });
+      await api.patch(`/api/admin/products-v2/${p.id}/status`, { status: next });
       reloadAll();
     } catch (e) {
       setNotice(e instanceof ApiError ? e.message : 'error');
@@ -363,7 +376,7 @@ export default function AdminProducts() {
 
   const resetFilters = () => {
     setSearch(''); setQuery(''); setStatus(''); setBrand(''); setCatalog('');
-    setStockF(''); setPriceBand(''); setPriceMin(''); setPriceMax('');
+    setStockF(''); setPriceBand(''); setPriceMin(''); setPriceMax(''); setPriceMinQ(''); setPriceMaxQ('');
     setDays(''); setFeaturedOnly(false); setPage(1);
   };
 
@@ -425,9 +438,12 @@ export default function AdminProducts() {
               return;
             }
             const r = e.currentTarget.getBoundingClientRect();
+            // Clamped on BOTH sides: in RTL the actions cluster sits at the
+            // far left, and a panel anchored only by its right edge would
+            // hang off-screen.
             setMenuPos({
               top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 220)),
-              right: Math.max(8, window.innerWidth - r.right),
+              right: Math.min(Math.max(8, window.innerWidth - r.right), Math.max(8, window.innerWidth - 216)),
             });
             setMenuFor(p.id);
           }}
@@ -795,7 +811,7 @@ export default function AdminProducts() {
                             {p.name_ar || p.name_en || p.slug}
                           </p>
                           {p.name_en && p.name_ar && (
-                            <p className="text-zinc-500 text-[10.5px] truncate max-w-[190px]" dir="ltr">{p.name_en}</p>
+                            <p className="text-zinc-500 text-[10.5px] truncate max-w-[190px] text-end" dir="ltr">{p.name_en}</p>
                           )}
                           <p className="text-zinc-600 text-[10px]">
                             <span dir="ltr">{p.sku ? p.sku : `#${p.id.slice(-6).toUpperCase()}`}</span>

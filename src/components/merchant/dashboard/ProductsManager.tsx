@@ -701,7 +701,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                               const r = e.currentTarget.getBoundingClientRect();
                               setMenuPos({
                                 top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 240)),
-                                right: Math.max(8, window.innerWidth - r.right),
+                                right: Math.min(Math.max(8, window.innerWidth - r.right), Math.max(8, window.innerWidth - 200)),
                               });
                               setMenuFor(p.id);
                             }}

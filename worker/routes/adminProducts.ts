@@ -568,7 +568,10 @@ adminProductsRoutes.get('/', async (c) => {
     sales: 'sold DESC, updated_at DESC',
     stock: 'stock IS NULL, stock - stock_reserved ASC, updated_at DESC',
   };
-  const orderBy = ORDERS[q.sort ?? 'updated'] ?? ORDERS.updated;
+  // Own-property lookup only: a plain object literal would otherwise answer
+  // ?sort=constructor with a stringified builtin inside the SQL text.
+  const sortKey = q.sort ?? 'updated';
+  const orderBy = Object.prototype.hasOwnProperty.call(ORDERS, sortKey) ? ORDERS[sortKey] : ORDERS.updated;
 
   const [list, count] = await Promise.all([
     c.env.DB.prepare(
@@ -710,6 +713,28 @@ adminProductsRoutes.get('/stats', async (c) => {
     },
     sales_daily: days,
   });
+});
+
+/**
+ * Status-only change for the management screen's quick hide/publish. The
+ * full save demands the whole validated document and the legacy upsert
+ * rewrites every column from whatever body it gets, so neither is safe for a
+ * one-field toggle: this touches status (and updated_at) and nothing else.
+ */
+adminProductsRoutes.patch('/:id/status', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { status?: unknown } | null;
+  const status = body?.status;
+  if (status !== 'draft' && status !== 'active' && status !== 'hidden') {
+    throw badRequest('status must be draft, active or hidden');
+  }
+  const res = await c.env.DB.prepare('UPDATE products SET status = ?, updated_at = ? WHERE id = ?')
+    .bind(status, new Date().toISOString(), id)
+    .run();
+  if (res.meta.changes === 0) throw notFound('Product not found');
+  await audit(c.env.DB, admin.id, 'product_v2.status', id, { status });
+  return c.json({ success: true, id, status });
 });
 
 /** The FULL canonical document + catalog placement — the edit payload. */

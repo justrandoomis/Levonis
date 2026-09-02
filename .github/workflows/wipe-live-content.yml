@@ -1,0 +1,224 @@
+# Wipes the CONTENT of levonis-db-staging — the database behind
+# levonis-iq.com — exactly as the owner ordered on 2026-09-02:
+#
+#   * ALL products (and every relational satellite), ALL community
+#     merchants/stores, ALL orders/invoices/inventory movement, ALL
+#     points/wallet/gift/referral ledgers, ALL chats/support threads,
+#     and ALL user accounts EXCEPT real admin accounts.
+#   * Structure and configuration stay untouched: catalogs, facets, brands,
+#     coupons, membership plans, delivery config, policies, glossary,
+#     admin settings, home banners/sections.
+#
+# SAFETY RAILS, in order:
+#   1. A typed confirmation string gates the run.
+#   2. The exact SQL is rehearsed against a FRESH local database built from
+#      the real migrations, in this job, before the live database is opened.
+#   3. A D1 Time Travel bookmark is recorded first — the full pre-wipe state
+#      stays restorable for 30 days.
+#   4. The keep-list is POSITIVE selection: the run aborts before deleting
+#      anything unless every named email exists on the live database as an
+#      admin account (the owner must never be locked out).
+#
+# What SQL cannot clean, and is NOT touched here: product images already in
+# R2 (orphaned files, harmless), and the separate LEVO Studio database.
+name: 17 - Wipe Live Content (gated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type WIPE-LIVE-CONTENT to confirm the deletion'
+        required: true
+        default: ''
+      keep_admins:
+        description: 'Comma-separated emails of the admin accounts to KEEP (everything else is deleted). Ignored in LIST mode.'
+        required: false
+        default: ''
+      mode:
+        description: 'WIPE to delete, or LIST to only print the live admin accounts (read-only, nothing deleted)'
+        required: true
+        default: 'LIST'
+
+concurrency: staging-deploy
+
+jobs:
+  wipe:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.mode }}" = "LIST" ] && exit 0
+          [ "${{ github.event.inputs.mode }}" = "WIPE" ] \
+            || { echo "::error::mode must be LIST or WIPE"; exit 1; }
+          [ "${{ github.event.inputs.confirm }}" = "WIPE-LIVE-CONTENT" ] \
+            || { echo "::error::type WIPE-LIVE-CONTENT to confirm"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # The keep-list is POSITIVE selection: exactly the emails the owner typed,
+      # SQL-escaped and quoted. Nothing survives by pattern.
+      - name: Build the final SQL from the keep-list
+        if: github.event.inputs.mode == 'WIPE'
+        run: node scripts/build-wipe-sql.mjs /tmp/wipe-final.sql
+        env:
+          KEEP: ${{ github.event.inputs.keep_admins }}
+
+      # The wipe file must run cleanly, in order, against THIS schema —
+      # proven on a throwaway local database before the real one is touched.
+      - name: Rehearse the wipe on a fresh local database
+        if: github.event.inputs.mode == 'WIPE'
+        run: |
+          set -e
+          npx wrangler d1 migrations apply levonis-db --local
+          npx wrangler d1 execute levonis-db --local --file /tmp/wipe-final.sql
+          npx wrangler d1 execute levonis-db --local --json --command "PRAGMA foreign_key_check" \
+            | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); const n=(d[0].results||[]).length; console.log('foreign_key_check rows:', n); process.exit(n===0?0:1)"
+
+      - name: Resolve the staging database id
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); const r=d.find(x=>x.name==='levonis-db-staging'); if(!r)process.exit(1); console.log(r.uuid)")
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found in this account"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      # Read-only mode: name the live admin accounts so the owner can build
+      # the keep-list, then stop. Nothing below this step runs.
+      - name: LIST mode — the live admin accounts (read-only)
+        if: github.event.inputs.mode == 'LIST'
+        run: |
+          set -e
+          npx wrangler d1 execute levonis-db-staging --remote --json --command "SELECT username, email, created_at FROM users WHERE role='admin' ORDER BY created_at" \
+            | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); const rows=d[0].results; console.log('live admin accounts:', rows.length); for (const r of rows) console.log(' -', r.username, '|', r.email, '|', r.created_at)"
+          echo "LIST mode: nothing was changed." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop here in LIST mode
+        if: github.event.inputs.mode == 'LIST'
+        run: echo "done (read-only)" && exit 0
+
+      # The owner must never be locked out: every named email must exist on the
+      # live database AS AN ADMIN, otherwise NOTHING is deleted.
+      - name: Guard — every named admin exists on the live database
+        if: github.event.inputs.mode == 'WIPE'
+        run: |
+          set -e
+          IFS=',' read -ra EMAILS <<< "${{ github.event.inputs.keep_admins }}"
+          FOUND=0
+          for raw in "${EMAILS[@]}"; do
+            e=$(echo "$raw" | xargs)
+            [ -n "$e" ] || continue
+            esc=${e//\'/\'\'}
+            N=$(npx wrangler d1 execute levonis-db-staging --remote --json --command "SELECT COUNT(*) AS n FROM users WHERE email = '$esc' AND role='admin'" \
+              | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d[0].results[0].n)")
+            if [ "$N" = "1" ]; then
+              echo " kept admin verified: ${e:0:3}…"
+              FOUND=$((FOUND+1))
+            else
+              echo "::error::'$e' is not a live admin account (found $N rows) — aborting before touching anything"
+              exit 1
+            fi
+          done
+          [ "$FOUND" -ge 1 ] || { echo "::error::the keep-list verified ZERO admins — aborting"; exit 1; }
+
+      - name: Record a Time Travel bookmark (30-day restore point)
+        if: github.event.inputs.mode == 'WIPE'
+        id: bookmark
+        run: |
+          set -e
+          npx wrangler d1 time-travel info levonis-db-staging 2>&1 | tee /tmp/tt.txt
+          BM=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}' /tmp/tt.txt | head -1 || true)
+          echo "bookmark=${BM:-see-log}" >> "$GITHUB_OUTPUT"
+
+      # A second, independent recovery path next to Time Travel: the whole
+      # pre-wipe database as a SQL dump, kept as a run artifact for 90 days.
+      # Money trails (ledgers, invoices, settlements, audit log) live in it.
+      - name: Export the full database BEFORE the wipe
+        if: github.event.inputs.mode == 'WIPE'
+        run: |
+          set -e
+          npx wrangler d1 export levonis-db-staging --remote --output /tmp/pre-wipe-export.sql
+          ls -la /tmp/pre-wipe-export.sql
+          [ -s /tmp/pre-wipe-export.sql ] || { echo "::error::the pre-wipe export is empty — aborting"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: github.event.inputs.mode == 'WIPE'
+        with:
+          name: pre-wipe-export-${{ github.run_id }}
+          path: /tmp/pre-wipe-export.sql
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Row counts BEFORE
+        if: github.event.inputs.mode == 'WIPE'
+        id: before
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d[0].results[0].n)"; }
+          {
+            for t in users products community_merchants merchant_stores community_products orders order_items invoices points_accruals wallet_transactions reviews sessions; do
+              echo "$t: $(q "SELECT COUNT(*) AS n FROM $t" 2>/dev/null || echo 'n/a')"
+            done
+          } | tee /tmp/before.txt
+
+      - name: Execute the wipe
+        if: github.event.inputs.mode == 'WIPE'
+        run: npx wrangler d1 execute levonis-db-staging --remote --file /tmp/wipe-final.sql
+
+      - name: Row counts AFTER + integrity
+        if: github.event.inputs.mode == 'WIPE'
+        id: after
+        run: |
+          set -e
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d[0].results[0].n)"; }
+          {
+            for t in users products community_merchants merchant_stores community_products orders order_items invoices points_accruals wallet_transactions reviews sessions; do
+              echo "$t: $(q "SELECT COUNT(*) AS n FROM $t" 2>/dev/null || echo 'n/a')"
+            done
+          } | tee /tmp/after.txt
+          echo "── structure kept"
+          for t in catalogs brands membership_plans policy_documents admin_settings facets; do
+            echo "$t: $(q "SELECT COUNT(*) AS n FROM $t" 2>/dev/null || echo 'n/a')"
+          done
+          echo "── integrity"
+          FK=$(npx wrangler d1 execute levonis-db-staging --remote --json --command "PRAGMA foreign_key_check" \
+            | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log((d[0].results||[]).length)")
+          echo "foreign_key_check rows: $FK"
+          [ "$FK" = "0" ] || { echo "::error::foreign key violations after the wipe"; exit 1; }
+          PROD=$(q "SELECT COUNT(*) AS n FROM products")
+          [ "$PROD" = "0" ] || { echo "::error::products not empty"; exit 1; }
+
+      - name: The live site, after
+        if: github.event.inputs.mode == 'WIPE'
+        id: probe
+        run: |
+          set -e
+          for p in /api/health /api/home '/api/products?limit=3' /api/auth/capabilities; do
+            code=$(curl -s -o /tmp/b.txt -w '%{http_code}' --max-time 25 "https://levonis-iq.com$p")
+            echo "$p -> $code"
+            [ "$code" = "200" ] || { echo "::error::$p is not 200 after the wipe"; exit 1; }
+          done
+          n=$(curl -s --max-time 25 "https://levonis-iq.com/api/products?limit=3" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log((d.products||[]).length)")
+          echo "public products now listed: $n"
+          [ "$n" = "0" ] || { echo "::error::the public catalog still lists products"; exit 1; }
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Live content wipe"
+            echo '```'
+            echo "── before"; cat /tmp/before.txt 2>/dev/null || true
+            echo "── after";  cat /tmp/after.txt 2>/dev/null || true
+            echo '```'
+            echo "Restore point (30-day Time Travel):"
+            echo '```'
+            echo "wrangler d1 time-travel restore levonis-db-staging --bookmark ${{ steps.bookmark.outputs.bookmark }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
