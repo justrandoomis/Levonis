@@ -36,6 +36,8 @@ import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
 import { blankDoc, toEditorDoc, type EditorDoc, type ProductResponse, type SaveResponse } from './types';
+import PinnedPriceNotice from './PinnedPriceNotice';
+import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
   Banner,
   CheckCard,
@@ -120,7 +122,7 @@ export default function ProductForm({
   onBack: () => void;
   onListChanged: () => void;
 }) {
-  const { dir } = useLanguage();
+  const { dir, lang } = useLanguage();
   const { user } = useAuth();
   // §11: cost is only rendered for a financial admin. The SERVER refuses to
   // read or write it either way — this only avoids showing an input that
@@ -131,6 +133,11 @@ export default function ProductForm({
   const [rel, setRel] = useState<RelationsState>(() => emptyRelations());
   const [baseline, setBaseline] = useState('');
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState('');
+  // The base price this product had when the editor opened. A pinned-price
+  // warning is only honest against the value the owner started from, not
+  // against every keystroke.
+  const [loadedBasePrice, setLoadedBasePrice] = useState<number | null>(null);
+  const [pinnedDismissed, setPinnedDismissed] = useState(false);
   const [loading, setLoading] = useState(!!productId);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
@@ -240,6 +247,48 @@ export default function ProductForm({
     };
   }, []);
 
+  /**
+   * Move every row that carries its own price, in one pass over the two places
+   * a price can live: the relational option values / colours / variants the
+   * editor manages, and the JSON options and colours the document carries for
+   * products that never grew relational rows. Both are written by the same
+   * save, so the storefront and the cart cannot end up disagreeing.
+   *
+   * This edits the FORM, not the database. Nothing is committed until the
+   * owner saves, so the move is as reviewable and as undoable as any other
+   * edit they make on this screen.
+   */
+  const applyPinnedReprice = useCallback(
+    (mode: RepriceMode, from: number, to: number) => {
+      const move = <X extends { id: string; regular_price_iqd?: number | null; prime_price_iqd?: number | null; pro_price_iqd?: number | null }>(
+        x: X
+      ): X => {
+        const [pinned] = pinnedRows({ options: [x as never] });
+        if (!pinned) return x;
+        const next = repriceRow(pinned, mode, from, to);
+        return {
+          ...x,
+          regular_price_iqd: next.regular_price_iqd,
+          prime_price_iqd: next.prime_price_iqd,
+          pro_price_iqd: next.pro_price_iqd,
+        };
+      };
+      setRel((r) => ({
+        ...r,
+        groups: r.groups.map((g) => ({ ...g, values: g.values.map(move) })),
+        colors: r.colors.map(move),
+        variants: r.variants.map(move),
+      }));
+      setDoc((d) => ({
+        ...d,
+        options: Array.isArray(d.options) ? d.options.map((o) => move(o)) : d.options,
+        colors: Array.isArray(d.colors) ? d.colors.map((col) => move(col)) : d.colors,
+      }));
+      setPinnedDismissed(true);
+    },
+    []
+  );
+
   const loadProduct = useCallback(async (id: string) => {
     setLoading(true);
     setLoadErr(null);
@@ -253,6 +302,8 @@ export default function ProductForm({
       setDoc(d);
       setRel(rs);
       setLoadedUpdatedAt(p.product.updated_at ?? '');
+      setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
+      setPinnedDismissed(false);
       setBaseline(JSON.stringify({ d, rs }));
     } catch (e) {
       setLoadErr(e instanceof ApiError ? e.message : 'تعذّر تحميل المنتج / failed to load');
@@ -785,7 +836,13 @@ export default function ProductForm({
       >
         {showErrors && errors.prices && <Banner kind="error">{errors.prices}</Banner>}
         <Grid cols={3}>
-          <Field ar="السعر الاعتيادي" en="Regular" required error={err('price_iqd')}>
+          <Field
+            ar="السعر الاعتيادي"
+            en="Regular"
+            required
+            error={err('price_iqd')}
+            tip="الخيار أو اللون الذي له سعر خاص يستبدل هذا السعر ولا يُضاف إليه. إن غيّرت هذا الرقم وكانت هناك أسعار خاصة، ستُسأل عمّا تفعل بها."
+          >
             <Money
               required
               value={doc.price_iqd}
@@ -809,6 +866,31 @@ export default function ProductForm({
             </Field>
           )}
         </Grid>
+
+        {/* The answer to "I changed the price and the cart still charges the
+            old one". It appears the moment the base moves away from what this
+            product was opened with, and only while rows exist that would
+            ignore it. */}
+        {!pinnedDismissed && loadedBasePrice !== null && doc.price_iqd !== null && doc.price_iqd !== loadedBasePrice && (
+          <PinnedPriceNotice
+            from={loadedBasePrice}
+            to={doc.price_iqd}
+            lang={lang}
+            source={{
+              options: [
+                ...rel.groups.flatMap((g) => g.values as unknown as Array<Record<string, unknown>>),
+                ...((doc.options ?? []) as unknown as Array<Record<string, unknown>>),
+              ],
+              colors: [
+                ...(rel.colors as unknown as Array<Record<string, unknown>>),
+                ...((doc.colors ?? []) as unknown as Array<Record<string, unknown>>),
+              ],
+              variants: rel.variants as unknown as Array<Record<string, unknown>>,
+            }}
+            onApply={(mode) => applyPinnedReprice(mode, loadedBasePrice, doc.price_iqd as number)}
+            onDismiss={() => setPinnedDismissed(true)}
+          />
+        )}
       </SectionCard>
 
       {/* 4 ─────────────────────────────────────── sale types, availability */}

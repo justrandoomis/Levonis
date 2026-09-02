@@ -31,6 +31,7 @@ import {
 } from '../lib/productModel';
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
+import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '../lib/pinnedPrices';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
 import { transportDefaultsFrom } from './products';
@@ -765,6 +766,54 @@ adminProductsRoutes.get('/:id', async (c) => {
  *    (brand text, categories, shipping_methods, stores, features, ...) are
  *    preserved, never overwritten.
  */
+/**
+ * The variant rows that carry their own price. Variants live only in the
+ * relational table — there is no JSON mirror for them — so they need a read
+ * of their own before the save response can honestly say how many rows will
+ * ignore the new base price.
+ */
+async function relPriceRows(db: D1Database, productId: string, table: string) {
+  const { results } = await db
+    .prepare(
+      `SELECT id, ${table === 'product_variants' ? 'combo_key AS name_en' : 'name_en'},
+              regular_price_iqd, prime_price_iqd, pro_price_iqd, active
+         FROM ${table} WHERE product_id = ?`
+    )
+    .bind(productId)
+    .all<Record<string, unknown>>();
+  return (results ?? []).map((r) => ({
+    id: String(r.id),
+    name_en: String(r.name_en ?? ''),
+    active: Number(r.active) !== 0,
+    regular_price_iqd: r.regular_price_iqd === null ? null : Number(r.regular_price_iqd),
+    prime_price_iqd: r.prime_price_iqd === null ? null : Number(r.prime_price_iqd),
+    pro_price_iqd: r.pro_price_iqd === null ? null : Number(r.pro_price_iqd),
+  }));
+}
+
+/**
+ * The pinned rows a base-price change would leave behind, counted ONCE.
+ *
+ * Options and colours live in two places: the JSON columns on `products` and
+ * the relational tables. They are mirrors of each other, and the cart reads
+ * the relational one when it exists (applyRelations in worker/lib/pricing's
+ * callers). Counting both would tell the owner "4 options" for a product that
+ * has two, so the relational store wins wherever it has rows and the JSON is
+ * used only for products that never grew one.
+ */
+async function pinnedForProduct(db: D1Database, doc: { id: string; options?: unknown; colors?: unknown }) {
+  const [relOptions, relColors, relVariants] = await Promise.all([
+    relPriceRows(db, doc.id, 'product_option_values'),
+    relPriceRows(db, doc.id, 'product_colors'),
+    relPriceRows(db, doc.id, 'product_variants'),
+  ]);
+  return pinnedRows({
+    options: (relOptions.length ? relOptions : (doc.options as never)) ?? null,
+    colors: (relColors.length ? relColors : (doc.colors as never)) ?? null,
+    variants: relVariants,
+  });
+}
+
 adminProductsRoutes.post('/', async (c) => {
   const admin = c.get('user')!;
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -906,6 +955,24 @@ adminProductsRoutes.post('/', async (c) => {
     content_rev: doc.content_rev,
   });
 
+  // THE BASE PRICE MOVED, BUT NOT EVERYTHING MOVED WITH IT.
+  //
+  // An option, colour or variant that carries its own regular price REPLACES
+  // the base (worker/lib/pricing.ts), so a base-price edit leaves those rows
+  // exactly where they were and the cart keeps charging the old number while
+  // the storefront headline shows the new one. That is not a bug in the cart —
+  // it re-prices on every read — and it is not something to fix by rewriting
+  // prices the owner typed on purpose. It is something they have to be TOLD,
+  // with the count and the rows, so they can decide. The form asks; every
+  // other client at least learns that it happened.
+  let pinnedAfterPriceChange: { from: number; to: number; count: number; rows: PinnedPriceRow[] } | null = null;
+  if (prev && typeof prev.price_iqd === 'number' && prev.price_iqd !== doc.price_iqd) {
+    const rows = await pinnedForProduct(c.env.DB, doc);
+    if (rows.length) {
+      pinnedAfterPriceChange = { from: prev.price_iqd, to: doc.price_iqd, count: rows.length, rows };
+    }
+  }
+
   const fresh = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?')
     .bind(doc.id)
     .first<Record<string, unknown>>();
@@ -913,6 +980,7 @@ adminProductsRoutes.post('/', async (c) => {
     success: true,
     created: !prev,
     product: projectForAdmin(c.env, admin, { ...projectAdmin(parseProductRow(fresh!)), catalog_ids: await catalogIdsFor(c.env.DB, doc.id) }),
+    ...(pinnedAfterPriceChange ? { pinned_prices: pinnedAfterPriceChange } : {}),
     // Named honestly rather than hidden behind a green tick: these fields kept
     // their English text because the local engine could not translate them
     // safely (§3). The product is saved and live either way.
@@ -920,6 +988,117 @@ adminProductsRoutes.post('/', async (c) => {
     ...(priceHistoryWarning ? { price_history_warning: priceHistoryWarning } : {}),
     ...(translationWarning ? { translation_warning: translationWarning } : {}),
   });
+});
+
+/**
+ * MOVE THE PINNED PRICES — the deliberate second half of a base-price change.
+ *
+ * Nothing here happens on its own. The save response says how many rows kept
+ * their own price; this is the owner answering "and move them too". It is one
+ * call, it is audited with every before/after pair, and it writes BOTH stores
+ * a price can live in: the JSON columns on `products` and the relational
+ * option/colour/variant tables, because a product may have either or both and
+ * leaving one behind would recreate the very disagreement being fixed.
+ *
+ * `inherit` is the mode worth reaching for: it clears the pinned prices so the
+ * rows follow the base from now on, and the NEXT price change works the way
+ * this one was expected to.
+ */
+adminProductsRoutes.post('/:id/reprice', async (c) => {
+  const admin = c.get('user')!;
+  const productId = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const mode = str(body.mode, 'mode', { min: 4, max: 10 }) as RepriceMode;
+  if (mode !== 'delta' && mode !== 'percent' && mode !== 'inherit') {
+    throw badRequest('mode must be one of: delta, percent, inherit', 'BAD_MODE');
+  }
+  const from = int(body.from_price_iqd, 'from_price_iqd', { min: 0, max: 1_000_000_000 });
+  const to = int(body.to_price_iqd, 'to_price_iqd', { min: 0, max: 1_000_000_000 });
+
+  const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?')
+    .bind(productId)
+    .first<Record<string, unknown>>();
+  if (!row) throw notFound('Product not found');
+
+  // The JSON side. Read the stored arrays rather than the parsed document so
+  // nothing else about the product is rewritten by this call.
+  const readArr = (v: unknown): Array<Record<string, unknown>> => {
+    try {
+      const x = typeof v === 'string' ? JSON.parse(v) : v;
+      return Array.isArray(x) ? (x as Array<Record<string, unknown>>) : [];
+    } catch {
+      return [];
+    }
+  };
+  const jsonOptions = readArr(row.options);
+  const jsonColors = readArr(row.colors);
+
+  const changes: Array<{ kind: string; id: string; label: string; from: number | null; to: number | null }> = [];
+  const moveInPlace = (arr: Array<Record<string, unknown>>, kind: 'option' | 'color') => {
+    for (const item of arr) {
+      const pinned = pinnedRows({ [kind === 'option' ? 'options' : 'colors']: [item] } as never);
+      if (!pinned.length) continue;
+      const next = repriceRow(pinned[0], mode, from, to);
+      changes.push({ kind, id: pinned[0].id, label: pinned[0].label, from: pinned[0].regular_price_iqd, to: next.regular_price_iqd });
+      item.regular_price_iqd = next.regular_price_iqd;
+      item.prime_price_iqd = next.prime_price_iqd;
+      item.pro_price_iqd = next.pro_price_iqd;
+    }
+  };
+  moveInPlace(jsonOptions, 'option');
+  moveInPlace(jsonColors, 'color');
+
+  const stmts = [
+    c.env.DB.prepare(
+      `UPDATE products SET options = ?, colors = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+    ).bind(JSON.stringify(jsonOptions), JSON.stringify(jsonColors), productId),
+  ];
+
+  // The relational side. Each table is updated by row id so an option that
+  // never carried a price is never given one.
+  const relTables: Array<{ table: string; kind: PinnedPriceRow['kind'] }> = [
+    { table: 'product_option_values', kind: 'option' },
+    { table: 'product_colors', kind: 'color' },
+    { table: 'product_variants', kind: 'variant' },
+  ];
+  for (const { table, kind } of relTables) {
+    const { results } = await c.env.DB.prepare(
+      `SELECT id, ${table === 'product_variants' ? 'combo_key AS name_en' : 'name_en'},
+              regular_price_iqd, prime_price_iqd, pro_price_iqd
+         FROM ${table} WHERE product_id = ?`
+    )
+      .bind(productId)
+      .all<Record<string, unknown>>();
+    for (const r of results ?? []) {
+      const asRow = {
+        id: String(r.id),
+        name_en: String(r.name_en ?? ''),
+        regular_price_iqd: r.regular_price_iqd === null ? null : Number(r.regular_price_iqd),
+        prime_price_iqd: r.prime_price_iqd === null ? null : Number(r.prime_price_iqd),
+        pro_price_iqd: r.pro_price_iqd === null ? null : Number(r.pro_price_iqd),
+      };
+      const pinned = pinnedRows({ options: [asRow] });
+      if (!pinned.length) continue;
+      const next = repriceRow({ ...pinned[0], kind }, mode, from, to);
+      changes.push({ kind, id: next.id, label: next.label, from: pinned[0].regular_price_iqd, to: next.regular_price_iqd });
+      stmts.push(
+        c.env.DB.prepare(
+          `UPDATE ${table} SET regular_price_iqd = ?, prime_price_iqd = ?, pro_price_iqd = ? WHERE id = ? AND product_id = ?`
+        ).bind(next.regular_price_iqd, next.prime_price_iqd, next.pro_price_iqd, next.id, productId)
+      );
+    }
+  }
+  if (changes.length) await c.env.DB.batch(stmts);
+
+  await audit(c.env.DB, admin.id, 'product_v2.reprice_pinned', productId, {
+    mode,
+    from_price_iqd: from,
+    to_price_iqd: to,
+    moved: changes.length,
+    changes: changes.slice(0, 60),
+  });
+
+  return c.json({ success: true, mode, moved: changes.length, changes });
 });
 
 /**
