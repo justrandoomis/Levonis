@@ -169,8 +169,16 @@ function longDate(iso: string | null, lang: DocLang): string {
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/**
+ * The amount, with the number isolated instead of the row forced to LTR.
+ * `dir="ltr"` on the whole cell printed the Iraqi dinar abbreviation «د.ع»
+ * reversed as «ع.د» — the bidi algorithm lays a trailing Arabic run out
+ * right-to-left inside a left-to-right line. U+2066/U+2069 pin the digits
+ * left-to-right and leave the unit to the document's own direction, which is
+ * the only arrangement that reads correctly in both languages.
+ */
 const money = (n: number | null, unit: string): string =>
-  n === null || n === undefined ? '—' : `${new Intl.NumberFormat('en-US').format(n)} ${unit}`;
+  n === null || n === undefined ? '—' : `\u2066${new Intl.NumberFormat('en-US').format(n)}\u2069 ${unit}`;
 
 /**
  * The verification address as a QR square, drawn as one SVG path so it
@@ -239,59 +247,65 @@ const CSS = `
   html, body { margin: 0; padding: 0; background: #fff; color: #111; }
   body {
     font-family: 'Cairo', 'Segoe UI', 'Tahoma', 'Arial', system-ui, sans-serif;
-    font-size: 11pt; line-height: 1.5;
+    font-size: 9.5pt; line-height: 1.4;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
+  /* ONE SHEET. 186mm is A4 minus the 12mm margins, and everything below is
+     sized so the whole document lands inside the 273mm of usable height that
+     leaves. A customer's copy that prints its signature box on a second page
+     is not the document the owner asked for, so the type scale, the padding
+     and the column split are all tuned against a measured render rather than
+     left to whatever the content happens to need. */
   .sheet { width: 186mm; margin: 0 auto; }
   /* Header: the one filled block on the page. It keeps its ink in greyscale
      because the text on it is white and the fill is dark enough to stay dark
      when a mono printer converts it. */
-  .head { background: #12233f; color: #fff; text-align: center; padding: 7mm 6mm 6mm; }
-  .head h1 { margin: 0; font-size: 26pt; font-weight: 800; letter-spacing: .5px; }
-  .head .sub { font-size: 12pt; opacity: .92; margin-top: 1mm; }
+  .head { background: #12233f; color: #fff; text-align: center; padding: 4.5mm 6mm 4mm; }
+  .head h1 { margin: 0; font-size: 19pt; font-weight: 800; letter-spacing: .5px; }
+  .head .sub { font-size: 9.5pt; opacity: .92; margin-top: .8mm; }
   .copybar {
     background: #e8eef7; border: 1px solid #12233f; border-top: 0;
-    padding: 2.5mm 5mm; font-weight: 700; font-size: 11.5pt; color: #12233f;
+    padding: 1.6mm 5mm; font-weight: 700; font-size: 9.5pt; color: #12233f;
     display: flex; justify-content: space-between; gap: 6mm;
   }
   .copybar .en { font-weight: 600; opacity: .75; }
-  .body { border: 1px solid #12233f; border-top: 0; padding: 5mm; }
-  .grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 6mm; align-items: start; }
+  .body { border: 1px solid #12233f; border-top: 0; padding: 4mm; }
+  .grid { display: grid; grid-template-columns: 1.12fr 1fr; gap: 5mm; align-items: start; }
   .col { min-width: 0; }
-  .sec { margin-bottom: 4.5mm; break-inside: avoid; }
+  .sec { margin-bottom: 3mm; break-inside: avoid; }
   .sec h2 {
-    margin: 0 0 1.5mm; font-size: 12pt; font-weight: 800; color: #12233f;
-    border-bottom: 1.5px solid #12233f; padding-bottom: 1mm;
+    margin: 0 0 1.2mm; font-size: 10pt; font-weight: 800; color: #12233f;
+    border-bottom: 1.2px solid #12233f; padding-bottom: .8mm;
   }
-  .row { display: flex; gap: 3mm; padding: 1.1mm 0; border-bottom: 1px dotted #b9c2cf; }
+  .row { display: flex; gap: 2.5mm; padding: .7mm 0; border-bottom: 1px dotted #b9c2cf; }
   .row:last-child { border-bottom: 0; }
-  .lbl { flex: 0 0 34%; font-weight: 700; font-size: 10pt; color: #26313f; }
-  .val { flex: 1 1 auto; min-width: 0; font-size: 10.5pt; word-break: break-word; }
+  .lbl { flex: 0 0 36%; font-weight: 700; font-size: 8.5pt; color: #26313f; }
+  .val { flex: 1 1 auto; min-width: 0; font-size: 9pt; word-break: break-word; }
   .val.strong { font-weight: 700; }
   .norow { display: flex; gap: 3mm; align-items: stretch; }
   .no {
-    flex: 1 1 auto; border: 1.5px dashed #12233f; padding: 2.5mm 4mm; text-align: center;
-    font-size: 15pt; font-weight: 800; letter-spacing: 1px; color: #12233f;
+    flex: 1 1 auto; border: 1.5px dashed #12233f; padding: 2mm 3mm; text-align: center;
+    font-size: 12.5pt; font-weight: 800; letter-spacing: 1px; color: #12233f;
     display: flex; flex-direction: column; justify-content: center;
   }
   .qrbox { flex: 0 0 auto; border: 1px solid #12233f; padding: 1mm; display: flex; align-items: center; }
   .qr { display: block; }
-  .no small { display: block; font-size: 8.5pt; letter-spacing: 0; font-weight: 600; color: #26313f; margin-top: 1mm; }
-  .terms { border: 1px solid #12233f; padding: 3mm 4mm; }
-  .terms ul { margin: 0; padding-inline-start: 5mm; }
-  .terms li { font-size: 9.5pt; line-height: 1.55; margin-bottom: 1.6mm; }
-  .coverage { font-size: 10pt; line-height: 1.55; }
-  .sign { margin-top: 5mm; break-inside: avoid; }
+  .no small { display: block; font-size: 7.5pt; letter-spacing: 0; font-weight: 600; color: #26313f; margin-top: .8mm; }
+  .terms { border: 1px solid #12233f; padding: 2.2mm 3mm; }
+  .terms ul { margin: 0; padding-inline-start: 4.5mm; }
+  .terms li { font-size: 8pt; line-height: 1.4; margin-bottom: 1mm; }
+  .coverage { font-size: 8pt; line-height: 1.4; }
+  .sign { margin-top: 3.5mm; break-inside: avoid; }
   .sign-title {
-    margin: 0 0 1.5mm; font-size: 12pt; font-weight: 800; color: #12233f;
-    border-bottom: 1.5px solid #12233f; padding-bottom: 1mm;
+    margin: 0 0 1.2mm; font-size: 10pt; font-weight: 800; color: #12233f;
+    border-bottom: 1.2px solid #12233f; padding-bottom: .8mm;
   }
-  .sign .box { border: 1px solid #12233f; height: 22mm; }
-  .sign .cap { text-align: center; font-size: 9.5pt; color: #26313f; margin-top: 1.5mm; }
-  .foot { margin-top: 4mm; font-size: 9pt; color: #26313f; display: flex; justify-content: space-between; gap: 4mm; }
+  .sign .box { border: 1px solid #12233f; height: 15mm; }
+  .sign .cap { text-align: center; font-size: 8pt; color: #26313f; margin-top: 1.2mm; }
+  .foot { margin-top: 3mm; font-size: 8pt; color: #26313f; display: flex; justify-content: space-between; gap: 4mm; }
   .banner {
-    border: 1.5px solid #111; padding: 2mm 4mm; margin-bottom: 4mm;
-    font-weight: 800; font-size: 11pt; text-align: center;
+    border: 1.5px solid #111; padding: 1.5mm 4mm; margin-bottom: 3mm;
+    font-weight: 800; font-size: 9.5pt; text-align: center;
   }
   .banner.bad { background: #f6e3e1; border-color: #7d2b22; color: #7d2b22; }
   .banner.warn { background: #f7efdc; border-color: #7a5c15; color: #7a5c15; }
@@ -304,6 +318,11 @@ const CSS = `
     border: 1px solid #12233f; background: #12233f; color: #fff; border-radius: 3mm; cursor: pointer;
   }
   .noprint .hint { display: block; margin-top: 2mm; font-size: 9.5pt; color: #444; }
+  .noprint a {
+    display: inline-block; margin-inline-start: 3mm; padding: 2mm 4mm;
+    border: 1px solid #12233f; border-radius: 2mm; color: #12233f;
+    font-weight: 700; text-decoration: none; font-size: 11pt;
+  }
 `;
 
 /**
@@ -334,7 +353,7 @@ export function renderWarrantyDoc(data: WarrantyDocData, lang: DocLang = 'ar', a
     row(t.description, data.product.description, { strong: true }) +
     row(t.model, data.product.model, { ltr: true }) +
     row(t.serial, data.product.serial, { ltr: true, strong: true }) +
-    row(t.price, money(data.product.price_iqd, t.iqd), { ltr: true }) +
+    row(t.price, money(data.product.price_iqd, t.iqd)) +
     row(t.purchaseDate, longDate(data.product.purchase_date, lang)) +
     row(t.orderReceipt, data.product.order_receipt_no, { ltr: true });
 
@@ -362,9 +381,18 @@ export function renderWarrantyDoc(data: WarrantyDocData, lang: DocLang = 'ar', a
     (data.chain.replaces ? `<div class="chain">${escapeHtml(t.replaces)}: <span dir="ltr">${escapeHtml(data.chain.replaces)}</span></div>` : '') +
     (data.chain.replaced_by ? `<div class="chain">${escapeHtml(t.replacedBy)}: <span dir="ltr">${escapeHtml(data.chain.replaced_by)}</span></div>` : '');
 
+  // The other language is one click away from the document itself rather than
+  // from a control on some admin screen, so whichever surface opened this can
+  // switch without going back. Both wordings are stored per receipt, so this
+  // shows the copy it was ISSUED with, not today's configuration.
+  const otherLang = lang === 'ar' ? 'en' : 'ar';
+  const langLink =
+    `<a href="?lang=${otherLang}">${lang === 'ar' ? 'English' : 'العربية'}</a>`;
+
   const printBar =
     `<div class="noprint">` +
     `<button type="button" onclick="window.print()">${lang === 'ar' ? 'طباعة / حفظ PDF' : 'Print / Save as PDF'}</button>` +
+    langLink +
     `<span class="hint">${
       lang === 'ar'
         ? 'اختر «حفظ بصيغة PDF» في نافذة الطباعة للحصول على ملف PDF حقيقي بنص قابل للتحديد.'
@@ -382,15 +410,21 @@ export function renderWarrantyDoc(data: WarrantyDocData, lang: DocLang = 'ar', a
     `<div class="body">` +
     statusBanner(data, t) +
     `<div class="grid">` +
+    // The split is by MEASURED HEIGHT, not by topic: the warranty block
+    // carries the coverage paragraph and the terms carry seven sentences, so
+    // putting both in one column made that column drive the page onto a
+    // second sheet. Identity and provenance on one side, the promise and its
+    // conditions on the other, and the two come out within a few millimetres
+    // of each other.
     `<div class="col">` +
     section(t.receiptNo, receiptNoBlock + row(t.date, longDate(data.issued_date, lang))) +
     section(t.customer, customer) +
     section(t.product, product) +
-    section(t.warranty, warranty) +
+    section(t.retailer, retailer + chain) +
     `</div>` +
     `<div class="col">` +
+    section(t.warranty, warranty) +
     section(t.terms, terms) +
-    section(t.retailer, retailer + chain) +
     `</div>` +
     `</div>` +
     `<div class="sign"><h2 class="sign-title">${escapeHtml(t.signature)}</h2>` +

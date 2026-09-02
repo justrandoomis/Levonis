@@ -126,8 +126,14 @@ export interface WarrantyReceiptRow extends Record<string, unknown> {
   purchase_date: string | null;
   order_receipt_no: string;
   warranty_type: string;
+  /** The same two strings in English. A receipt prints in whichever language
+   *  the reader asked for, and it must print the wording it was ISSUED with —
+   *  never today's configuration, and never the other language because this
+   *  one was not stored. */
+  warranty_type_en: string;
   warranty_months: number;
   coverage_text: string;
+  coverage_text_en: string;
   terms_json: string;
   retailer_json: string;
   warranty_start_at: string | null;
@@ -159,6 +165,7 @@ export interface PublicWarrantyView {
   warranty_end_at: string | null;
   warranty_months: number;
   warranty_type: string;
+  warranty_type_en: string;
   purchase_date: string | null;
   days_remaining: number | null;
   retailer: { name: string; website: string; instagram: string; phone: string };
@@ -180,6 +187,7 @@ export function publicView(row: WarrantyReceiptRow, nowIso: string): PublicWarra
     warranty_end_at: row.warranty_end_at ?? null,
     warranty_months: row.warranty_months,
     warranty_type: row.warranty_type,
+    warranty_type_en: row.warranty_type_en || row.warranty_type,
     purchase_date: row.purchase_date ?? null,
     days_remaining: status === 'active' ? daysRemaining(row.warranty_end_at, nowIso) : null,
     retailer: {

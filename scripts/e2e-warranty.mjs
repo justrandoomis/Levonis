@@ -214,6 +214,18 @@ async function main() {
   await admin.post(`/api/devices/admin/units/${units[0].id}/serial`, { serial: serialA });
   await admin.post(`/api/devices/admin/units/${units[1].id}/serial`, { serial: serialB });
 
+  // The window is printed on paper and compared against the clock on the
+  // public page, so a value that is not a real date has to be refused at the
+  // door rather than stored and rendered later as "Invalid Date".
+  r = await admin.post('/api/admin/warranties', { unit_id: units[0].id, warranty_start_at: 'yesterday-ish' });
+  check('a start date that is not a date is refused by name', r.status === 400 && r.data?.code === 'BAD_DATE', JSON.stringify(r.data).slice(0, 200));
+  r = await admin.post('/api/admin/warranties', {
+    unit_id: units[0].id,
+    warranty_start_at: '2026-09-02T00:00:00.000Z',
+    warranty_end_at: '2020-01-01T00:00:00.000Z',
+  });
+  check('an end before the start is refused', r.status === 400 && r.data?.code === 'BAD_DATE', JSON.stringify(r.data).slice(0, 200));
+
   const genA = await admin.post('/api/admin/warranties', { unit_id: units[0].id });
   const genB = await admin.post('/api/admin/warranties', { unit_id: units[1].id });
   const recA = genA.data?.receipt;
@@ -253,6 +265,15 @@ async function main() {
   check('it carries a vector QR of the verification address', html.includes('<svg class="qr"') && !html.includes('<img'));
   const enDoc = await (await admin.raw('GET', `/api/admin/warranties/${recA.id}/document?lang=en`)).text();
   check('the English copy is the same document in English', enDoc.includes('Warranty Receipt') && enDoc.includes('Authorized Retailer Information'));
+  check(
+    'the English copy prints the ENGLISH coverage the receipt was issued with',
+    enDoc.includes('Covers manufacturing defects') && enDoc.includes('Levonis Warranty'),
+    enDoc.includes('يغطي عيوب التصنيع') ? 'it printed the Arabic coverage' : 'no coverage sentence found'
+  );
+  check('either language is one click from the document', html.includes('?lang=en') && enDoc.includes('?lang=ar'));
+  // The whole point of A4: it has to come out on ONE sheet. 297mm minus the
+  // 12mm margins top and bottom leaves 273mm of usable height.
+  check('the sheet is sized for a single A4 page', html.includes('width: 186mm'), 'sheet width');
 
   // ---------------------------------------------- 10. reprint ≠ new receipt
   console.log('\n8. reprinting');
@@ -280,6 +301,9 @@ async function main() {
   r = await anon.get('/api/admin/warranties');
   check('the admin list refuses a stranger', r.status === 401 || r.status === 403, `status=${r.status}`);
 
+  const missUnknown = (await anon.get('/api/warranty/verify/WR-1999-0101-001')).data;
+  check('an unknown number is a plain miss, not a 404', missUnknown?.found === false, JSON.stringify(missUnknown).slice(0, 140));
+
   // ------------------------------------------------------- 8. replacement
   console.log('\n10. a replaced device keeps its history');
   const newSerial = `SN-R${rnd}0003`;
@@ -289,9 +313,15 @@ async function main() {
   });
   const newUnitId = r.data?.new_unit_id;
   check('the device was replaced and a new unit exists', r.status === 200 && !!newUnitId, JSON.stringify(r.data).slice(0, 200));
-  // The old receipt is superseded by hand (the admin decides), and the new
-  // unit gets its own receipt: both must remain readable afterwards.
-  await admin.post(`/api/admin/warranties/${recB.id}/void`, { reason: `replaced by ${newSerial}` });
+  // Replacing the DEVICE retires its paper in the same breath — nobody has to
+  // remember to. Otherwise the old serial would keep verifying as covered for
+  // a device that no longer exists.
+  const supersededB = (await admin.get(`/api/admin/warranties/${recB.id}`)).data?.receipt;
+  check('replacing the device retires its receipt automatically', supersededB?.status === 'replaced', JSON.stringify(supersededB?.status));
+  check('and records why', String(supersededB?.replacement_reason ?? '').includes('device failed on arrival'), supersededB?.replacement_reason);
+  r = await anon.get(`/api/warranty/verify/${recB.receipt_no}`);
+  check('the replaced serial no longer verifies as covered', r.data?.warranty?.status === 'replaced', JSON.stringify(r.data?.warranty?.status));
+
   const genC = await admin.post('/api/admin/warranties', { unit_id: newUnitId });
   const recC = genC.data?.receipt;
   check('the replacement device gets its own receipt', genC.status === 200 && !!recC?.receipt_no && recC.receipt_no !== recB.receipt_no, JSON.stringify(genC.data).slice(0, 200));
@@ -299,20 +329,30 @@ async function main() {
   check('the replacement keeps the original warranty end', (recC?.warranty_end_at ?? '').startsWith('2027-09-02'), recC?.warranty_end_at);
   const oldStill = (await admin.get(`/api/admin/warranties/${recB.id}`)).data?.receipt;
   check('the OLD receipt is still readable with its old serial', oldStill?.serial_raw === serialB, oldStill?.serial_raw);
+  check('the old receipt names the new one', oldStill?.replaced_by_receipt_id === recC?.id, `${oldStill?.replaced_by_receipt_id} vs ${recC?.id}`);
+  check('and the new one names the old', recC?.replaces_receipt_id === recB.id, `${recC?.replaces_receipt_id} vs ${recB.id}`);
+  const chainHist = (await admin.get(`/api/admin/warranties/${recB.id}`)).data?.history ?? [];
+  check('the replacement is in the audit trail with both serials', chainHist.some((h) => h.action === 'warranty.replaced' && h.detail?.new_serial === newSerial), JSON.stringify(chainHist.map((h) => h.action)));
 
   // --------------------------------------------------- 9. void ≠ verifiable
   console.log('\n11. a void receipt never verifies as covered');
-  r = await anon.get(`/api/warranty/verify/${recB.receipt_no}`);
-  check('a voided receipt verifies as void, not as active', r.data?.warranty?.status === 'void', JSON.stringify(r.data?.warranty?.status));
+  r = await anon.get(`/api/warranty/verify/${recA.receipt_no}`);
+  const beforeVoid = r.data?.warranty?.status;
+  await admin.post(`/api/admin/warranties/${recA.id}/void`, { reason: `cancelled sale ${rnd}` });
+  r = await anon.get(`/api/warranty/verify/${recA.receipt_no}`);
+  check('an active receipt stops being active once voided', beforeVoid === 'active' && r.data?.warranty?.status === 'void', `${beforeVoid} -> ${r.data?.warranty?.status}`);
   check('and it reports no remaining days', r.data?.warranty?.days_remaining === null);
+  r = await admin.post(`/api/admin/warranties/${recA.id}/reissue`, { reason: `undo the void ${rnd}` });
+  check('a voided receipt cannot be reissued back into a live warranty', r.status === 409 && r.data?.code === 'RECEIPT_VOID', JSON.stringify(r.data).slice(0, 200));
+
 
   // ------------------------------------------------------------ reissue
   console.log('\n12. reissue replaces the paper, not the history');
-  r = await admin.post(`/api/admin/warranties/${recA.id}/reissue`, { reason: `address corrected ${rnd}` });
+  r = await admin.post(`/api/admin/warranties/${recC.id}/reissue`, { reason: `address corrected ${rnd}` });
   const reissued = r.data?.receipt;
-  check('a new number is issued', r.status === 200 && !!reissued?.receipt_no && reissued.receipt_no !== recA.receipt_no, JSON.stringify(r.data).slice(0, 200));
-  check('the reissued receipt points back at the one it replaces', reissued?.replaces_receipt_id === recA.id);
-  const oldA = (await admin.get(`/api/admin/warranties/${recA.id}`)).data?.receipt;
+  check('a new number is issued', r.status === 200 && !!reissued?.receipt_no && reissued.receipt_no !== recC.receipt_no, JSON.stringify(r.data).slice(0, 200));
+  check('the reissued receipt points back at the one it replaces', reissued?.replaces_receipt_id === recC.id);
+  const oldA = (await admin.get(`/api/admin/warranties/${recC.id}`)).data?.receipt;
   check('the old number is retired with its reason, not deleted', oldA?.status === 'void' && String(oldA?.void_reason).includes('address corrected'), JSON.stringify(oldA?.void_reason));
   r = await anon.get(`/api/warranty/verify/${reissued.receipt_no}`);
   check('the new number verifies as active', r.data?.warranty?.status === 'active');
@@ -339,6 +379,23 @@ async function main() {
   const laterDoc = await (await admin.raw('GET', `/api/admin/warranties/${reissued.id}/document`)).text();
   check('a receipt issued BEFORE the change keeps its own terms', !laterDoc.includes(`شرط إضافي ${rnd}`));
   await admin.put('/api/admin/warranties/config', cfg);
+
+  // ------------------------------------------------------ a draft is silent
+  console.log('\n15. a prepared draft is invisible to the public, word for word');
+  await admin.post(`/api/admin/warranties/${reissued.id}/void`, { reason: `making room for a draft ${rnd}` });
+  const draft = (await admin.post('/api/admin/warranties', { unit_id: newUnitId, activate: false })).data?.receipt;
+  check('a draft can be prepared without activating it', draft?.status === 'draft', JSON.stringify(draft?.status));
+  const missDraft = (await anon.get(`/api/warranty/verify/${draft.receipt_no}`)).data;
+  check('a draft does not verify', missDraft?.found === false, JSON.stringify(missDraft).slice(0, 140));
+  // Byte for byte the same answer as a number that never existed: a different
+  // wording would tell a stranger that this receipt is real but unissued.
+  check(
+    'and its answer is identical to an unknown number',
+    missDraft?.message === missUnknown?.message,
+    `${String(missDraft?.message).slice(0, 40)} vs ${String(missUnknown?.message).slice(0, 40)}`
+  );
+  r = await admin.post(`/api/admin/warranties/${draft.id}/activate`, {});
+  check('activating the draft makes it a live document', r.status === 200 && (await anon.get(`/api/warranty/verify/${draft.receipt_no}`)).data?.warranty?.status === 'active');
 
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) {

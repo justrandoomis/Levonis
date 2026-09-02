@@ -124,8 +124,13 @@ export default function WarrantyVerify() {
     }
   }, [t.error]);
 
+  // The URL is the source of truth for what is being checked. Keeping the box
+  // in step with it means back and forward show the number that produced the
+  // answer on screen, instead of whatever was last typed.
   useEffect(() => {
-    if (receiptNo) void verify(receiptNo);
+    if (!receiptNo) return;
+    setQuery(decodeURIComponent(receiptNo));
+    void verify(receiptNo);
   }, [receiptNo, verify]);
 
   const tone =
@@ -152,9 +157,11 @@ export default function WarrantyVerify() {
             e.preventDefault();
             const value = query.trim();
             if (!value) return;
-            // The URL is the shareable artefact, so a typed check moves there.
-            navigate(`/warranty/${encodeURIComponent(value)}`);
-            void verify(value);
+            // The URL is the shareable artefact, so a typed check moves there
+            // and the effect above does the lookup. Verifying here as well
+            // sent every check twice, against a 30-per-minute limit.
+            if (decodeURIComponent(receiptNo ?? '') === value) void verify(value);
+            else navigate(`/warranty/${encodeURIComponent(value)}`);
           }}
         >
           <input

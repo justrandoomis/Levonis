@@ -20,6 +20,7 @@ import '../adminProducts/theme.css';
 import { Modal } from '../adminProducts/ui';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
 
 interface ReceiptRow {
   id: string;
@@ -83,6 +84,7 @@ const STR = {
     view: 'عرض',
     print: 'طباعة',
     pdf: 'PDF',
+    pdfHint: 'اختر «حفظ بصيغة PDF» في نافذة الطباعة',
     reissue: 'إعادة إصدار',
     voidIt: 'إلغاء',
     empty: 'لا توجد وصولات ضمان بعد. تُنشأ من صفحة الطلب بعد إدخال الرقم التسلسلي.',
@@ -128,6 +130,7 @@ const STR = {
     view: 'View',
     print: 'Print',
     pdf: 'PDF',
+    pdfHint: 'Choose “Save as PDF” in the print dialog',
     reissue: 'Reissue',
     voidIt: 'Void',
     empty: 'No warranty receipts yet. They are created from an order once a serial is entered.',
@@ -201,8 +204,17 @@ export default function AdminWarranties() {
     setSlot(document.getElementById('dash-topbar-slot'));
   }, []);
 
-  const openDoc = (id: string, print: boolean) =>
-    window.open(`/api/admin/warranties/${id}/document${print ? '?print=1' : ''}`, '_blank', 'noopener');
+  /** Same rules as the order screen: a copy is counted only once it exists,
+   *  and a preview is not a copy. See printDoc.ts. */
+  const openDoc = async (id: string, print: boolean) => {
+    try {
+      const res = await openWarrantyDoc(id, { print, lang });
+      if (res === 'blocked') setErr(popupBlockedMessage(lang));
+      else if (print) await load();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    }
+  };
 
   const openDetail = async (row: ReceiptRow) => {
     try {
@@ -367,10 +379,10 @@ export default function AdminWarranties() {
                       <button type="button" className={T.btnIcon} onClick={() => void openDetail(r)} aria-label={t.view} title={t.view} data-warranty-view>
                         <Eye className="w-4 h-4" aria-hidden />
                       </button>
-                      <button type="button" className={T.btnIcon} onClick={() => openDoc(r.id, true)} aria-label={t.print} title={t.print} data-warranty-print>
+                      <button type="button" className={T.btnIcon} onClick={() => void openDoc(r.id, true)} aria-label={t.print} title={t.print} data-warranty-print>
                         <Printer className="w-4 h-4" aria-hidden />
                       </button>
-                      <button type="button" className={T.btnIcon} onClick={() => openDoc(r.id, false)} aria-label={t.pdf} title={t.pdf} data-warranty-pdf>
+                      <button type="button" className={T.btnIcon} onClick={() => void openDoc(r.id, true)} aria-label={t.pdf} title={t.pdfHint} data-warranty-pdf>
                         <FileText className="w-4 h-4" aria-hidden />
                       </button>
                       <button
@@ -445,7 +457,7 @@ function DetailModal({
   detail: { receipt: ReceiptRow; history: HistoryRow[] };
   t: typeof STR.ar;
   onClose: () => void;
-  onOpenDoc: (id: string, print: boolean) => void;
+  onOpenDoc: (id: string, print: boolean) => void | Promise<void>;
 }) {
   const r = detail.receipt;
   return (
@@ -455,10 +467,10 @@ function DetailModal({
           <span className="font-mono text-[15px] font-bold text-[var(--ap-text-1)]" dir="ltr">
             {r.receipt_no}
           </span>
-          <button type="button" className={T.btnSecondary} onClick={() => onOpenDoc(r.id, false)}>
+          <button type="button" className={T.btnSecondary} onClick={() => void onOpenDoc(r.id, false)}>
             <Eye className="w-4 h-4" aria-hidden /> {t.view}
           </button>
-          <button type="button" className={T.btnSecondary} onClick={() => onOpenDoc(r.id, true)}>
+          <button type="button" className={T.btnSecondary} onClick={() => void onOpenDoc(r.id, true)}>
             <Printer className="w-4 h-4" aria-hidden /> {t.print}
           </button>
           <a
@@ -480,7 +492,9 @@ function DetailModal({
             [t.purchase, shortDate(r.purchase_date)],
             [t.start, shortDate(r.warranty_start_at)],
             [t.end, shortDate(r.warranty_end_at)],
-            [t.status, r.status],
+            // The localized word, not the stored enum: the dialog is what the
+            // owner reads, and "replaced" is not a word on this screen.
+            [t.status, (t as Record<string, string>)[r.status] ?? r.status],
           ] as const).map(([label, value]) => (
             <div key={label} className="flex gap-2 text-[12.5px] border-b border-[var(--ap-hairline)] py-1.5">
               <span className="w-28 shrink-0 font-semibold text-[var(--ap-text-2)]">{label}</span>

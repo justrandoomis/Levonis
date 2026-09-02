@@ -51,9 +51,14 @@ CREATE TABLE IF NOT EXISTS warranty_receipts (
   purchase_price_iqd INTEGER,
   purchase_date TEXT,
   order_receipt_no TEXT NOT NULL DEFAULT '',
+  -- Both languages, because the document prints in either and a receipt
+  -- must never fall back to wording it was not issued with. The terms are
+  -- already bilingual inside terms_json; these two were not.
   warranty_type TEXT NOT NULL DEFAULT '',
+  warranty_type_en TEXT NOT NULL DEFAULT '',
   warranty_months INTEGER NOT NULL DEFAULT 12,
   coverage_text TEXT NOT NULL DEFAULT '',
+  coverage_text_en TEXT NOT NULL DEFAULT '',
   terms_json TEXT NOT NULL DEFAULT '[]',
   retailer_json TEXT NOT NULL DEFAULT '{}',
   warranty_start_at TEXT,

@@ -773,6 +773,18 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
     c.env.DB.prepare(
       `UPDATE device_registrations SET revoked_at = ?2 WHERE unit_id = ?3 AND revoked_at IS NULL AND ${guard}`
     ).bind(newUnitId, nowIso, unitId),
+    // The warranty PAPER for the replaced device stops being the live one in
+    // the same batch that replaces the device. Doing it here rather than when
+    // the next receipt is printed matters: otherwise the old serial keeps
+    // verifying as covered on the public page for a device that is gone, and
+    // it would keep holding the one-live-receipt-per-unit index. The row is
+    // not deleted — 'replaced' is a history state, and the successor receipt
+    // fills in replaced_by_receipt_id when it is issued.
+    c.env.DB.prepare(
+      `UPDATE warranty_receipts
+          SET status = 'replaced', replacement_reason = ?2, replaced_at = ?3, updated_at = ?3
+        WHERE unit_id = ?4 AND status IN ('draft','active') AND ${guard}`
+    ).bind(newUnitId, reason, nowIso, unitId),
   ];
   if (activeReg) {
     // The customer already activated the old device; the replacement stays

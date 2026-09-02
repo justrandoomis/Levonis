@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
 
 export interface WarrantyUnitRow {
   id: string;
@@ -134,7 +135,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
-  const [drafts, setDrafts] = useState<Record<string, { serial: string; months: string; start: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { serial: string; months: string; start: string; start0: string }>>({});
   const [copied, setCopied] = useState('');
 
   const load = useCallback(async () => {
@@ -146,11 +147,12 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
         const next = { ...prev };
         for (const u of res.units) {
           if (!next[u.id]) {
-            next[u.id] = {
-              serial: u.serial ?? '',
-              months: String(u.months ?? res.config.default_months),
-              start: dateInput(u.warranty_start_at ?? u.delivered_at ?? res.order.delivered_at ?? res.order.created_at),
-            };
+            const start = dateInput(u.warranty_start_at ?? u.delivered_at ?? res.order.delivered_at ?? res.order.created_at);
+            // `start0` remembers what was PREFILLED. A date input can only
+            // carry a day, so sending it back unchanged would replace the
+            // device's exact delivery timestamp with midnight UTC and move
+            // the whole window. The value travels only when the admin edits it.
+            next[u.id] = { serial: u.serial ?? '', months: String(u.months ?? res.config.default_months), start, start0: start };
           }
         }
         return next;
@@ -214,7 +216,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
       await api.post('/api/admin/warranties', {
         unit_id: unit.id,
         months: Number(d?.months) || undefined,
-        warranty_start_at: d?.start ? toIso(d.start) : undefined,
+        warranty_start_at: d?.start && d.start !== d.start0 ? toIso(d.start) : undefined,
       });
       await load();
     } catch (e) {
@@ -224,25 +226,22 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
     }
   };
 
-  /** Opening the document is a navigation, so the cookie goes with it. */
-  const openDoc = (receiptId: string, print: boolean) => {
-    window.open(`/api/admin/warranties/${receiptId}/document${print ? '?print=1' : ''}`, '_blank', 'noopener');
-  };
-
-  const reprint = async (receiptId: string) => {
+  /** Opening the document is a navigation, so the cookie goes with it. The
+   *  counting rules live in one place; see printDoc.ts. */
+  const openDoc = async (receiptId: string, print: boolean) => {
     setBusy(`print:${receiptId}`);
     try {
-      // Counted and audited BEFORE the tab opens: a second copy of a warranty
-      // document is exactly the thing that has to leave a trace.
-      await api.post(`/api/admin/warranties/${receiptId}/printed`, {});
-      openDoc(receiptId, true);
-      await load();
+      const res = await openWarrantyDoc(receiptId, { print, lang });
+      if (res === 'blocked') setErr(popupBlockedMessage(lang));
+      else if (print) await load();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
     } finally {
       setBusy('');
     }
   };
+
+  const reprint = (receiptId: string) => openDoc(receiptId, true);
 
   const statusLabel = (s: string) =>
     s === 'active' ? t.stActive : s === 'expired' ? t.stExpired : s === 'void' ? t.stVoid : s === 'replaced' ? t.stReplaced : t.stDraft;
@@ -290,7 +289,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
 
           <div className="space-y-2.5">
             {data.units.map((u) => {
-              const d = drafts[u.id] ?? { serial: '', months: '', start: '' };
+              const d = drafts[u.id] ?? { serial: '', months: '', start: '', start0: '' };
               const serialSaved = !!u.serial && u.serial === d.serial.trim();
               return (
                 <div
@@ -415,7 +414,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                       <div className="ms-auto flex flex-wrap gap-1.5">
                         <button
                           type="button"
-                          onClick={() => openDoc(u.receipt!.id, false)}
+                          onClick={() => void openDoc(u.receipt!.id, false)}
                           data-warranty-preview={u.id}
                           className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800"
                         >
@@ -423,7 +422,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => openDoc(u.receipt!.id, true)}
+                          onClick={() => void openDoc(u.receipt!.id, true)}
                           data-warranty-print={u.id}
                           className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800"
                         >
@@ -431,7 +430,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => openDoc(u.receipt!.id, true)}
+                          onClick={() => void openDoc(u.receipt!.id, true)}
                           data-warranty-pdf={u.id}
                           title={lang === 'en' ? 'Choose “Save as PDF” in the print dialog' : 'اختر «حفظ بصيغة PDF» في نافذة الطباعة'}
                           className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800"

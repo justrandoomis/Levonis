@@ -47,12 +47,29 @@ import { renderWarrantyDoc, type WarrantyDocData } from '../lib/warrantyDoc';
 const RECEIPT_COLS = `id, receipt_no, unit_id, order_id, order_item_id, product_id, user_id,
   serial_norm, serial_raw, status, customer_name, customer_phone, customer_address, customer_email,
   product_description, product_model, purchase_price_iqd, purchase_date, order_receipt_no,
-  warranty_type, warranty_months, coverage_text, terms_json, retailer_json,
+  warranty_type, warranty_type_en, warranty_months, coverage_text, coverage_text_en, terms_json, retailer_json,
   warranty_start_at, warranty_end_at, issued_by, issued_at, print_count, last_printed_at,
   replaces_receipt_id, replaced_by_receipt_id, replacement_reason, replaced_at,
   void_reason, voided_at, voided_by, created_at, updated_at`;
 
 const nowIso = () => new Date().toISOString();
+
+/**
+ * A date an admin typed, or nothing. The window is printed on paper and
+ * compared against the clock on the public page, so a value that is not a
+ * real timestamp has to be refused at the door rather than stored and later
+ * rendered as "Invalid Date".
+ */
+function optionalIso(v: unknown, name: string): string {
+  const raw = str(v, name, { required: false, max: 40 }).trim();
+  if (!raw) return '';
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms)) throw badRequest(`${name} must be an ISO-8601 date or timestamp`, 'BAD_DATE');
+  if (ms < Date.parse('2015-01-01T00:00:00Z') || ms > Date.parse('2100-01-01T00:00:00Z')) {
+    throw badRequest(`${name} is outside the plausible range`, 'BAD_DATE');
+  }
+  return new Date(ms).toISOString();
+}
 
 async function loadConfig(db: D1Database): Promise<WarrantyConfig> {
   return parseWarrantyConfig(await getSetting(db, 'warrantyConfig'));
@@ -67,7 +84,7 @@ function verifyUrl(c: Context<AppContext>, receiptNo: string): string {
   return `${trustedOrigin(c)}/warranty/${receiptNo}`;
 }
 
-function docData(row: WarrantyReceiptRow, c: Context<AppContext>, now: string): WarrantyDocData {
+function docData(row: WarrantyReceiptRow, c: Context<AppContext>, now: string, lang: 'ar' | 'en' = 'ar'): WarrantyDocData {
   const retailer = safeParse<WarrantyConfig['retailer']>(row.retailer_json, DEFAULT_WARRANTY_CONFIG.retailer);
   return {
     receipt_no: row.receipt_no,
@@ -89,8 +106,11 @@ function docData(row: WarrantyReceiptRow, c: Context<AppContext>, now: string): 
     },
     warranty: {
       months: row.warranty_months,
-      type: row.warranty_type,
-      coverage: row.coverage_text,
+      // The wording this receipt was ISSUED with, in the language asked for.
+      // Falls back to the other language only when the receipt predates the
+      // bilingual snapshot, never to today's configuration.
+      type: (lang === 'en' ? row.warranty_type_en : row.warranty_type) || row.warranty_type || row.warranty_type_en,
+      coverage: (lang === 'en' ? row.coverage_text_en : row.coverage_text) || row.coverage_text || row.coverage_text_en,
       start_at: row.warranty_start_at ?? null,
       end_at: row.warranty_end_at ?? null,
     },
@@ -143,8 +163,12 @@ warrantyPublicRoutes.get('/verify/:key', async (c) => {
         .bind(normalizeSerial(key))
         .first<WarrantyReceiptRow>();
 
-  if (!row) {
-    return c.json(
+  // ONE miss answer, byte for byte, for a number that does not exist and for
+  // a draft that has not been handed to anyone. Two different "not found"
+  // messages would let a stranger tell a prepared receipt from a fictional
+  // one, which is exactly the fact a draft is not supposed to publish.
+  const miss = () =>
+    c.json(
       {
         success: true,
         found: false,
@@ -153,12 +177,10 @@ warrantyPublicRoutes.get('/verify/:key', async (c) => {
       },
       200
     );
-  }
+  if (!row) return miss();
   // A draft has not been handed to anyone; it must not verify as a document.
   const view = publicView(row, nowIso());
-  if (view.status === 'draft') {
-    return c.json({ success: true, found: false, message: 'لا يوجد وصل ضمان بهذا الرقم. / No warranty receipt matches this number.' });
-  }
+  if (view.status === 'draft') return miss();
   return c.json({ success: true, found: true, warranty: view });
 });
 
@@ -377,8 +399,13 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
 /** `WR-2026-0902-001`, retried against the unique index rather than locked. */
 async function allocateReceiptNo(db: D1Database, dayIso: string): Promise<{ no: string; seq: number }> {
   const prefix = receiptNoPrefix(dayIso);
+  // LENGTH first, then the string: the sequence is zero-padded to three, so a
+  // plain string sort puts '999' above '1000' and the thousandth receipt of a
+  // day would be handed a number that already exists, for ever.
   const row = await db
-    .prepare('SELECT receipt_no FROM warranty_receipts WHERE receipt_no LIKE ? ORDER BY receipt_no DESC LIMIT 1')
+    .prepare(
+      'SELECT receipt_no FROM warranty_receipts WHERE receipt_no LIKE ? ORDER BY LENGTH(receipt_no) DESC, receipt_no DESC LIMIT 1'
+    )
     .bind(`${prefix}%`)
     .first<{ receipt_no: string }>();
   const next = (row ? receiptNoSequence(row.receipt_no) : 0) + 1;
@@ -439,13 +466,16 @@ warrantyAdminRoutes.post('/', async (c) => {
   // authenticated delivery), and the admin may state a different start when
   // the sale was a counter handover the device record cannot know about.
   const months = int(body.months, 'months', { min: 1, max: 240, def: unitTotalMonths(unitRow) ?? cfg.default_months });
-  const startAt = str(body.warranty_start_at, 'warranty_start_at', { required: false, max: 40 }) ||
+  const startAt =
+    optionalIso(body.warranty_start_at, 'warranty_start_at') ||
     String(unit.warranty_start_at ?? unit.delivered_at ?? unit.order_delivered_at ?? unit.order_created_at ?? nowIso());
   const win = warrantyWindow(startAt, months);
-  const endAt = str(body.warranty_end_at, 'warranty_end_at', { required: false, max: 40 }) || win.end_at;
+  const endAt = optionalIso(body.warranty_end_at, 'warranty_end_at') || win.end_at;
+  if (Date.parse(endAt) <= Date.parse(win.start_at)) {
+    throw badRequest('نهاية الضمان يجب أن تكون بعد بدايته. / The warranty end must come after its start.', 'BAD_DATE');
+  }
   const purchaseDate =
-    str(body.purchase_date, 'purchase_date', { required: false, max: 40 }) ||
-    String(unit.order_delivered_at ?? unit.order_created_at ?? startAt);
+    optionalIso(body.purchase_date, 'purchase_date') || String(unit.order_delivered_at ?? unit.order_created_at ?? startAt);
 
   const doc = {
     customer_name: str(body.customer_name, 'customer_name', { required: false, max: 160 }) || String(address.name ?? unit.user_name ?? ''),
@@ -488,9 +518,10 @@ warrantyAdminRoutes.post('/', async (c) => {
             serial_norm, serial_raw, status,
             customer_name, customer_phone, customer_address, customer_email,
             product_description, product_model, purchase_price_iqd, purchase_date, order_receipt_no,
-            warranty_type, warranty_months, coverage_text, terms_json, retailer_json,
+            warranty_type, warranty_type_en, warranty_months, coverage_text, coverage_text_en,
+            terms_json, retailer_json,
             warranty_start_at, warranty_end_at, issued_by, issued_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           id,
@@ -513,8 +544,10 @@ warrantyAdminRoutes.post('/', async (c) => {
           purchaseDate,
           doc.order_receipt_no,
           cfg.type_ar,
+          cfg.type_en,
           months,
           cfg.coverage_ar,
+          cfg.coverage_en,
           JSON.stringify(cfg.terms),
           JSON.stringify(cfg.retailer),
           win.start_at,
@@ -547,6 +580,43 @@ warrantyAdminRoutes.post('/', async (c) => {
     status: activate ? 'active' : 'draft',
     terms_version: cfg.version,
   });
+
+  // A replacement device's paper names the paper it supersedes, in both
+  // directions. The old receipt already left the live states when the
+  // replacement was recorded (the device route does that in its own batch);
+  // this is what closes the chain so either document leads to the other.
+  const replacedUnitId = unit.replacement_of_unit_id ? String(unit.replacement_of_unit_id) : '';
+  if (replacedUnitId) {
+    const prev = await c.env.DB.prepare(
+      `SELECT id, receipt_no, serial_raw FROM warranty_receipts WHERE unit_id = ? ORDER BY created_at DESC LIMIT 1`
+    )
+      .bind(replacedUnitId)
+      .first<{ id: string; receipt_no: string; serial_raw: string }>();
+    if (prev) {
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `UPDATE warranty_receipts
+              SET replaced_by_receipt_id = ?1, replaced_at = COALESCE(NULLIF(replaced_at, ''), ?2),
+                  status = CASE WHEN status IN ('draft','active') THEN 'replaced' ELSE status END,
+                  updated_at = ?2
+            WHERE id = ?3`
+        ).bind(id, now, prev.id),
+        c.env.DB.prepare('UPDATE warranty_receipts SET replaces_receipt_id = ?1, updated_at = ?2 WHERE id = ?3').bind(
+          prev.id,
+          now,
+          id
+        ),
+      ]);
+      await audit(c.env.DB, admin.id, 'warranty.replaced', prev.id, {
+        replaced_receipt_no: prev.receipt_no,
+        replaced_serial: prev.serial_raw,
+        new_receipt_no: receiptNo,
+        new_serial: serialRaw,
+        new_unit_id: unitId,
+        old_unit_id: replacedUnitId,
+      });
+    }
+  }
 
   const fresh = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE id = ?`)
     .bind(id)
@@ -588,6 +658,17 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
     .first<WarrantyReceiptRow>();
   if (!old) throw notFound('Warranty receipt not found');
   if (old.status === 'replaced') throw conflict('This receipt was superseded by a replacement device; reissue the current one');
+  // Reissuing is for a document that is still the live one and has to be
+  // printed again under a new number. A VOIDED receipt was cancelled on
+  // purpose, and quietly bringing it back as an active warranty is the one
+  // thing void must not do. Issuing a fresh receipt for the device is the
+  // deliberate action, and nothing blocks it — a void row is not live.
+  if (old.status === 'void') {
+    throw conflict(
+      'هذا الوصل ملغى — إعادة إصداره ستُعيده ضمانًا ساريًا. أصدر وصلًا جديدًا للجهاز بدل ذلك. / This receipt was voided; reissuing it would make it a live warranty again. Issue a new receipt for the device instead.',
+      'RECEIPT_VOID'
+    );
+  }
 
   const now = nowIso();
   const newIdValue = newId('wr');
@@ -612,13 +693,14 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
               serial_norm, serial_raw, status,
               customer_name, customer_phone, customer_address, customer_email,
               product_description, product_model, purchase_price_iqd, purchase_date, order_receipt_no,
-              warranty_type, warranty_months, coverage_text, terms_json, retailer_json,
+              warranty_type, warranty_type_en, warranty_months, coverage_text, coverage_text_en,
+              terms_json, retailer_json,
               warranty_start_at, warranty_end_at, issued_by, issued_at, replaces_receipt_id)
            SELECT ?1, ?2, unit_id, order_id, order_item_id, product_id, user_id,
               serial_norm, serial_raw, 'active',
               ?3, ?4, ?5, ?6,
               product_description, product_model, ?7, purchase_date, order_receipt_no,
-              warranty_type, warranty_months, ?8, ?9, ?10,
+              warranty_type, warranty_type_en, warranty_months, ?8, ?14, ?9, ?10,
               warranty_start_at, warranty_end_at, ?11, ?12, id
              FROM warranty_receipts WHERE id = ?13`
         ).bind(
@@ -636,13 +718,25 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
           refreshTerms ? JSON.stringify(cfg.retailer) : old.retailer_json,
           admin.id,
           now,
-          id
+          id,
+          refreshTerms ? cfg.coverage_en : old.coverage_text_en,
         ),
       ]);
       break;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('UNIQUE') && attempt < 5) continue;
+      // Only a receipt-NUMBER collision is worth retrying: another admin took
+      // the same sequence in the same second. A unit or serial collision means
+      // a live receipt appeared underneath us, and retrying it five more times
+      // only turns a clear 409 into an opaque 500.
+      const numberTaken = msg.includes('idx_warranty_receipts_no') || (msg.includes('UNIQUE') && msg.includes('receipt_no'));
+      if (numberTaken && attempt < 5) continue;
+      if (msg.includes('UNIQUE')) {
+        throw conflict(
+          'ظهر وصل ضمان قائم لهذه الوحدة أو لهذا الرقم التسلسلي أثناء إعادة الإصدار — حدّث الصفحة وأعد المحاولة. / A live receipt for this unit or serial appeared while reissuing; reload and try again.',
+          'WARRANTY_EXISTS'
+        );
+      }
       throw e;
     }
   }
@@ -716,7 +810,7 @@ warrantyAdminRoutes.get('/:id/document', async (c) => {
     .first<WarrantyReceiptRow>();
   if (!row) throw notFound('Warranty receipt not found');
   const now = nowIso();
-  const data = docData(row, c, now);
+  const data = docData(row, c, now, lang);
   if (row.replaces_receipt_id) {
     const prev = await c.env.DB.prepare('SELECT receipt_no FROM warranty_receipts WHERE id = ?')
       .bind(row.replaces_receipt_id)

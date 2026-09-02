@@ -155,8 +155,10 @@ const ROW: WarrantyReceiptRow = {
   purchase_date: '2026-09-02T00:00:00.000Z',
   order_receipt_no: 'INV-2026-0902-001',
   warranty_type: 'ضمان ليفونيس',
+  warranty_type_en: 'Levonis Warranty',
   warranty_months: 12,
   coverage_text: 'يغطي عيوب التصنيع',
+  coverage_text_en: 'Covers manufacturing defects.',
   terms_json: JSON.stringify(DEFAULT_WARRANTY_CONFIG.terms),
   retailer_json: JSON.stringify(DEFAULT_WARRANTY_CONFIG.retailer),
   warranty_start_at: '2026-09-02T00:00:00.000Z',
@@ -211,6 +213,21 @@ test('a void or replaced receipt verifies as itself, and never as covered', () =
   const expired = publicView(ROW, '2028-01-01T00:00:00.000Z');
   assert.equal(expired.status, 'expired');
   assert.equal(isCovered(expired.status), false);
+});
+
+test('the amount isolates its digits instead of forcing the row left to right', () => {
+  const html = renderWarrantyDoc(DOC, 'ar');
+  // U+2066 .. U+2069 around the number. Forcing dir="ltr" on the whole cell
+  // laid the Iraqi dinar abbreviation out backwards as «ع.د».
+  assert.match(html, /\u2066[\d,]+\u2069 د\.ع/);
+  const priceCell = /<div class="lbl">[^<]*سعر[^<]*<\/div><div class="val"[^>]*>/.exec(html);
+  assert.ok(priceCell, 'the price row exists');
+  assert.equal(priceCell![0].includes('dir="ltr"'), false, 'and it is not forced to LTR');
+});
+
+test('the other language is reachable from the document itself', () => {
+  assert.match(renderWarrantyDoc(DOC, 'ar'), /href="\?lang=en"/);
+  assert.match(renderWarrantyDoc(DOC, 'en'), /href="\?lang=ar"/);
 });
 
 // ------------------------------------------------------------- the paper
@@ -317,6 +334,14 @@ test('the print dialog opens only when the caller asked for it', () => {
 });
 
 // --------------------------------------------------------- the migration
+
+test('the printed wording is snapshotted in BOTH languages', () => {
+  const sql = readFileSync(new URL('../migrations/0042_warranty_receipts.sql', import.meta.url), 'utf8');
+  // Without these two the English document would print the Arabic type and
+  // coverage, because the row it reads only ever stored one language.
+  assert.match(sql, /warranty_type_en TEXT NOT NULL DEFAULT ''/);
+  assert.match(sql, /coverage_text_en TEXT NOT NULL DEFAULT ''/);
+});
 
 test('migration 0042 is additive and enforces one live receipt per unit and per serial', () => {
   const sql = readFileSync('migrations/0042_warranty_receipts.sql', 'utf8');
