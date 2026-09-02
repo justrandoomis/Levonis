@@ -475,7 +475,7 @@ export default function AdminProducts() {
             });
             setMenuFor(p.id);
           }}
-          className={menuFor === p.id ? T.btnIconActive : T.btnIcon}
+          className={T.btnIcon}
           aria-label={loc('المزيد', 'More', 'زیاتر')}
           aria-expanded={menuFor === p.id}
         >
@@ -565,7 +565,7 @@ export default function AdminProducts() {
       {/* ------------------------------------------------- title + actions */}
       <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
         <div className="min-w-0">
-          <h2 className="text-[22px] font-bold leading-tight tracking-tight text-[var(--ap-text-1)]">{t.title}</h2>
+          <h2 className="text-[21px] font-bold leading-7 tracking-tight text-[var(--ap-text-1)]">{t.title}</h2>
           <p className="text-[12.5px] text-[var(--ap-text-3)] mt-1">{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -578,7 +578,7 @@ export default function AdminProducts() {
           <div className="relative">
             <button
               onClick={() => setHeaderMenu((v) => !v)}
-              className={`${headerMenu ? T.btnIconActive : T.btnIcon} !h-9 !w-9`}
+              className={T.btnIconLg}
               aria-label={loc('إجراءات إضافية', 'More actions', 'زیاتر')}
               aria-expanded={headerMenu}
             >
@@ -704,7 +704,7 @@ export default function AdminProducts() {
           </select>
           <div className="relative">
             <CalendarDays className="w-3.5 h-3.5 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 end-8 pointer-events-none" />
-            <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={`${filterSel} !pe-14`}>
+            <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={`${filterSel} pe-14`}>
               <option value="">{loc('اختر الفترة', 'Any period', 'هەموو ماوەکان')}</option>
               <option value="7">{loc('آخر 7 أيام', 'Last 7 days', '٧ ڕۆژ')}</option>
               <option value="30">{loc('آخر 30 يومًا', 'Last 30 days', '٣٠ ڕۆژ')}</option>
@@ -713,7 +713,7 @@ export default function AdminProducts() {
           </div>
           <button
             onClick={() => setAdvanced((v) => !v)}
-            className={`${advanced ? T.btnSecondary : T.btnGhost} !h-10 ms-auto border ${advanced ? '!border-[var(--ap-accent-border)] !text-[var(--ap-accent-text)] !bg-[var(--ap-accent-soft)]' : 'border-[var(--ap-border)]'}`}
+            className={`${T.btnFilter} ms-auto`}
             aria-pressed={advanced}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -724,7 +724,7 @@ export default function AdminProducts() {
           <div className="flex items-center gap-2 flex-wrap pt-3 mt-3 border-t border-[var(--ap-hairline)]">
             <button
               onClick={() => { setFeaturedOnly((v) => !v); setPage(1); }}
-              className={featuredOnly ? T.chipActive : T.chip}
+              className={T.chip}
               aria-pressed={featuredOnly}
             >
               <Star className={`w-3 h-3 ${featuredOnly ? 'fill-current' : ''}`} />
@@ -754,7 +754,7 @@ export default function AdminProducts() {
               className={`${T.input} w-28`}
               dir="ltr"
             />
-            <button onClick={resetFilters} className={`${T.btnGhost} !h-8 text-[12px]`}>
+            <button onClick={resetFilters} className={`${T.btnGhost.replace('h-9 ', '')} h-8 text-[12px]`}>
               <X className="w-3 h-3" />
               {loc('إعادة التعيين', 'Reset', 'ڕێکخستنەوە')}
             </button>
@@ -771,7 +771,7 @@ export default function AdminProducts() {
           <select
             value={String(limit)}
             onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-            className={`${T.select} !text-[12px]`}
+            className={T.selectSm}
             aria-label={loc('حجم الصفحة', 'Page size', 'قەبارەی پەڕە')}
           >
             {PAGE_SIZES.map((n) => (
@@ -780,7 +780,7 @@ export default function AdminProducts() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={`${T.select} !text-[12px]`} aria-label={loc('الترتيب', 'Sort', 'ڕیزکردن')}>
+          <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={T.selectSm} aria-label={loc('الترتيب', 'Sort', 'ڕیزکردن')}>
             <option value="updated">{loc('آخر تحديث', 'Last updated', 'دوایین نوێکردنەوە')}</option>
             <option value="newest">{loc('الأحدث', 'Newest', 'نوێترین')}</option>
             <option value="oldest">{loc('الأقدم', 'Oldest', 'کۆنترین')}</option>
@@ -800,7 +800,7 @@ export default function AdminProducts() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={view === v ? T.segmented.active : T.segmented.inactive}
+                className={T.segmented.item}
                 aria-label={v}
                 aria-pressed={view === v}
               >
@@ -930,7 +930,7 @@ export default function AdminProducts() {
                           <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5">
                             <span dir="ltr">{p.sku ? p.sku : `#${p.id.slice(-6).toUpperCase()}`}</span>
                             {p.doc_version < 2 && (
-                              <span className={`${T.kbd} ms-1.5 !h-4 !text-[9px]`} title={t.v1Hint}>v1</span>
+                              <span className={`${T.kbdTiny} ms-1.5`} title={t.v1Hint}>v1</span>
                             )}
                           </p>
                         </div>
@@ -1084,7 +1084,7 @@ function StatTile({
         <span className="text-[12px] font-medium text-[var(--ap-text-2)] leading-snug line-clamp-2">{label}</span>
         <span className={`w-8 h-8 rounded-[9px] flex items-center justify-center shrink-0 ${c.box}`}>{icon}</span>
       </div>
-      <div className="mt-2.5 text-[24px] font-bold leading-none tracking-tight text-[var(--ap-text-1)]">
+      <div className="mt-2.5 text-[22px] font-bold leading-7 tracking-tight text-[var(--ap-text-1)]">
         <span dir="ltr">{value}</span>
       </div>
       <div className="mt-1.5 text-[11.5px] text-[var(--ap-text-3)] truncate">{sub}</div>
@@ -1174,7 +1174,7 @@ function QuickFind({
         role="combobox"
         aria-expanded={showList}
         aria-controls="ap-quickfind-list"
-        className={`${T.input} !h-9 w-full ps-9 pe-12 text-[13px]`}
+        className={`${T.input.replace('h-10 ', '')} h-9 w-full ps-9 pe-12`}
       />
       <span className="absolute top-1/2 -translate-y-1/2 end-2 hidden sm:inline-flex pointer-events-none">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--ap-text-3)]" /> : <kbd className={T.kbd} dir="ltr">⌘K</kbd>}
@@ -1239,7 +1239,7 @@ function PageBtn({
   active?: boolean;
 }) {
   return (
-    <button onClick={onClick} disabled={disabled} className={active ? T.pageBtn.active : T.pageBtn.base} aria-current={active ? 'page' : undefined}>
+    <button onClick={onClick} disabled={disabled} className={T.pageBtn} aria-current={active ? 'page' : undefined}>
       {children}
     </button>
   );

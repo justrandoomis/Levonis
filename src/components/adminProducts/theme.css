@@ -1,74 +1,85 @@
 /*
  * Design tokens for the admin products management screen (scoped to .ap).
  *
- * A calm, cool-graphite dark system: surfaces are separated by 2-4%
- * luminance steps and 1px hairlines, never by glow; one violet accent used
- * sparingly; semantic colours sit on 12% tinted grounds with full-strength
- * text. Every text token on surface-1 was checked: text-1 ≈ 17:1,
- * text-2 ≈ 8.6:1, text-3 ≈ 4.4:1 (muted labels only), accent-on-white-text
- * ≈ 5.3:1, badge text ≥ 6:1 on its tint.
+ * The admin shell paints its content column #18181b, so every surface here
+ * is defined as a step ABOVE that ground — cards lift off the page, controls
+ * lift off the cards — separated by ~3 L* and 1px hairlines, never by glow.
+ * One violet accent does four jobs (primary CTA, focus, selection, active
+ * chip); semantic colours are desaturated for dark and sit on 14% tinted
+ * beds with lifted text. Contrast (WCAG, against surface-1 #1f1f24):
+ * text-1 15.1:1 · text-2 7.3:1 · text-3 4.8:1 · white on accent 5.2:1
+ * (hover 4.6, pressed 6.1) · accent text 8.0:1 · every badge ≥ 6.3:1.
  */
 .ap {
-  --ap-bg-0: #0a0b0f;
-  --ap-surface-1: #101217;
-  --ap-surface-2: #14171d;
-  --ap-surface-3: #1a1e26;
-  --ap-surface-4: #212630;
+  color-scheme: dark;
+  font-variant-numeric: tabular-nums;
 
-  --ap-border: rgba(255, 255, 255, 0.07);
-  --ap-border-strong: rgba(255, 255, 255, 0.13);
-  --ap-hairline: rgba(255, 255, 255, 0.05);
+  --ap-bg-0: #18181b;
+  --ap-surface-1: #1f1f24;
+  --ap-surface-2: #26262c;
+  --ap-surface-3: #2d2d34;
+  --ap-surface-4: #35353d;
 
-  --ap-text-1: #f2f3f6;
-  --ap-text-2: #a7aebb;
-  --ap-text-3: #737b8a;
+  --ap-hairline: rgb(255 255 255 / 0.06);
+  --ap-border: rgb(255 255 255 / 0.08);
+  --ap-border-strong: rgb(255 255 255 / 0.13);
+  --ap-border-hover: rgb(255 255 255 / 0.18);
 
-  --ap-accent: #6f5cf5;
-  --ap-accent-hover: #7f6dff;
-  --ap-accent-active: #6150e0;
-  --ap-accent-text: #b5a8ff;
-  --ap-accent-soft: rgba(111, 92, 245, 0.14);
-  --ap-accent-border: rgba(111, 92, 245, 0.42);
-  --ap-ring: rgba(111, 92, 245, 0.5);
+  --ap-text-1: #eceef2;
+  --ap-text-2: #a3a8b6;
+  --ap-text-3: #848a99;
 
-  --ap-success: #5fd48a;
-  --ap-success-bg: rgba(52, 199, 123, 0.12);
-  --ap-success-border: rgba(52, 199, 123, 0.26);
-  --ap-warning: #f2bf4e;
-  --ap-warning-bg: rgba(242, 176, 44, 0.12);
-  --ap-warning-border: rgba(242, 176, 44, 0.28);
-  --ap-danger: #f47b7b;
-  --ap-danger-bg: rgba(239, 83, 83, 0.12);
-  --ap-danger-border: rgba(239, 83, 83, 0.28);
-  --ap-info: #69a8ff;
-  --ap-info-bg: rgba(74, 143, 255, 0.12);
-  --ap-info-border: rgba(74, 143, 255, 0.28);
+  --ap-accent: #6558e0;
+  --ap-accent-hover: #6e62ea;
+  --ap-accent-active: #5a4dd2;
+  --ap-accent-text: #aca4ff;
+  --ap-accent-soft: rgb(101 88 224 / 0.16);
+  --ap-accent-border: rgb(101 88 224 / 0.45);
+  --ap-ring: #8f85f0;
+
+  --ap-success: #66c992;
+  --ap-success-bg: rgb(63 168 107 / 0.14);
+  --ap-success-border: rgb(63 168 107 / 0.28);
+  --ap-warning: #dcae52;
+  --ap-warning-bg: rgb(201 147 31 / 0.14);
+  --ap-warning-border: rgb(201 147 31 / 0.28);
+  --ap-danger: #ef8287;
+  --ap-danger-bg: rgb(217 68 74 / 0.14);
+  --ap-danger-border: rgb(217 68 74 / 0.28);
+  --ap-danger-bg-hover: rgb(217 68 74 / 0.22);
+  --ap-info: #82b1f2;
+  --ap-info-bg: rgb(60 126 230 / 0.14);
+  --ap-info-border: rgb(60 126 230 / 0.28);
 
   --ap-radius-sm: 8px;
   --ap-radius-md: 10px;
   --ap-radius-lg: 14px;
-  --ap-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
-  --ap-shadow-menu: 0 12px 40px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --ap-shadow-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 30px -14px rgb(0 0 0 / 0.6);
+  --ap-shadow-menu: 0 12px 40px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.07);
 }
 
-/* Native selects keep the same chrome as inputs; the chevron is drawn once
-   here so every select on the screen matches (logical inline-end for RTL). */
+/* Native selects share the input chrome; the chevron is drawn once here so
+   every select on the screen matches. Direction-aware whether dir sits on
+   the .ap wrapper or on an ancestor. Declared in the components layer so a
+   per-element utility (pe-14 for the period select) still wins. */
+@layer components {
 .ap select.ap-select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737b8a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23848a99' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat;
   background-size: 12px 12px;
-  background-position: left 12px center;
+  background-position: right 12px center;
   padding-inline-end: 32px;
   padding-inline-start: 12px;
 }
-.ap[dir='ltr'] select.ap-select {
-  background-position: right 10px center;
+.ap:where([dir='rtl'], [dir='rtl'] *) select.ap-select {
+  background-position: left 12px center;
 }
 .ap select.ap-select option {
-  background: #14171d;
-  color: #f2f3f6;
+  background: #26262c;
+  color: #eceef2;
+}
 }
 
 @media (prefers-reduced-motion: reduce) {
