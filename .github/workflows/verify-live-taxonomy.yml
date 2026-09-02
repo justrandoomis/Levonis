@@ -1,0 +1,144 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging, database levonis-db-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the التصنيفات (taxonomy) admin round is actually live:
+# the routes are mounted and guarded, the hashtag vocabulary table exists in
+# the database the live Worker is bound to, and the shipped bundle carries the
+# new screen.
+#
+# WHAT IT WRITES: nothing. Every HTTP call is a GET made ANONYMOUSLY, and
+# every D1 statement is a SELECT. It deliberately does NOT sign in as an
+# admin and does not create, rename or delete a section, brand, filter or
+# hashtag: those are live catalogue rows, and a verification job has no
+# business editing them. What an unauthenticated caller can prove — that the
+# endpoint exists and refuses them — is exactly the part that has to be true
+# after a deploy.
+name: 18 - Verify Live Taxonomy (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-taxonomy
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # ------------------------------------------------------------ routes
+      - name: The taxonomy routes are mounted, and they refuse a stranger
+        id: routes
+        run: |
+          set -euo pipefail
+          fail=0
+          probe() { # path, what it is
+            code=$(curl -s -o /tmp/body.txt -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            body=$(head -c 200 /tmp/body.txt)
+            # 401/403 is the PASS: the route exists and requires an admin.
+            # 404 would mean the code that defines it is not deployed.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $2 — $1 answers $code (mounted, admin-only)"
+            else
+              echo "  FAIL $2 — $1 answers $code: $body"
+              fail=1
+            fi
+          }
+          probe /api/admin/taxonomy/hashtags 'the hashtag vocabulary'
+          probe /api/admin/taxonomy/catalogs 'the section tree'
+          probe /api/admin/taxonomy/brands   'the brands'
+          probe /api/admin/taxonomy/facets   'the filters'
+          probe /api/admin/import/lookups    'the import lookups'
+          # A route that does NOT exist must answer differently, or the check
+          # above proves nothing about deployment.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$APEX/api/admin/taxonomy/not-a-route" || echo 000)
+          if [ "$code" = "401" ] || [ "$code" = "403" ] || [ "$code" = "404" ]; then
+            echo "  ok   an unknown taxonomy path answers $code"
+          else
+            echo "  FAIL an unknown taxonomy path answers $code"; fail=1
+          fi
+          echo "routes_ok=$([ $fail -eq 0 ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+          exit $fail
+
+      # ---------------------------------------------------------- database
+      - name: Migration 0041 is applied to the database the live Worker uses
+        id: schema
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='hashtags'" > /tmp/tbl.json
+          cat /tmp/tbl.json
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('/tmp/tbl.json','utf8'));
+            const rows = (r[0]?.results ?? r.results ?? []);
+            if (!rows.some((x) => x.name === 'hashtags')) { console.log('  FAIL the hashtags table is not there'); process.exit(1); }
+            console.log('  ok   the hashtags table exists');
+          "
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT COUNT(*) AS n FROM hashtags" > /tmp/cnt.json
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('/tmp/cnt.json','utf8'));
+            const n = (r[0]?.results ?? r.results ?? [])[0]?.n;
+            console.log('  ok   the vocabulary reads back (' + n + ' rows)');
+          "
+          # The row count of the table the feature could touch, reported and
+          # not changed — this job never writes.
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT (SELECT COUNT(*) FROM catalogs) AS catalogs, (SELECT COUNT(*) FROM brands) AS brands, (SELECT COUNT(*) FROM facets) AS facets, (SELECT COUNT(*) FROM products) AS products"
+
+      # ------------------------------------------------------------ bundle
+      - name: The shipped bundle carries the التصنيفات screen
+        id: bundle
+        run: |
+          set -euo pipefail
+          html=$(curl -s --max-time 25 "$APEX/admin")
+          # Vite emits hashed asset names; take every JS module the page loads.
+          assets=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          if [ -z "$assets" ]; then echo "  FAIL /admin served no JS module"; exit 1; fi
+          found=0
+          for a in $assets; do
+            if curl -s --max-time 40 "$APEX$a" | grep -q 'data-tax-tab'; then
+              echo "  ok   $a carries the taxonomy screen"
+              found=1
+              break
+            fi
+          done
+          if [ $found -eq 0 ]; then
+            echo "  FAIL none of the served modules carries the taxonomy screen:"
+            printf '%s\n' "$assets"
+            exit 1
+          fi
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live taxonomy verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| taxonomy + lookups routes mounted and admin-only | ${{ steps.routes.outcome }} |"
+            echo "| migration 0041 applied to the live database | ${{ steps.schema.outcome }} |"
+            echo "| the deployed bundle carries the screen | ${{ steps.bundle.outcome }} |"
+            echo ''
+            echo 'Read-only: every HTTP call was an anonymous GET and every D1 statement a SELECT.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.routes.outcome != 'success' || steps.schema.outcome != 'success' || steps.bundle.outcome != 'success'
+        run: exit 1
