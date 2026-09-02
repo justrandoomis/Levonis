@@ -69,8 +69,11 @@ const WARRANTY: WarrantyReceiptData = {
   customer_name: 'أحمد الجبوري',
   phone: '07701234567',
   units: [
-    { product_name: 'Bambu Lab A1', serial: 'SN-9911', unit_index: 0, months: 24, starts_at: '2026-03-05T09:00:00.000Z', ends_at: '2028-03-05T09:00:00.000Z' },
-    { product_name: 'AMS Lite', serial: null, unit_index: 1, months: 12, starts_at: '2026-03-05T09:00:00.000Z', ends_at: '2027-03-05T09:00:00.000Z' },
+    // unit_index is 1-BASED, exactly as deviceOps.createUnitsOnDelivery
+    // writes it (1..qty). The fixture used to start at 0 and hid a slip that
+    // printed every unit one higher than the device record.
+    { product_name: 'Bambu Lab A1', serial: 'SN-9911', unit_index: 1, months: 24, starts_at: '2026-03-05T09:00:00.000Z', ends_at: '2028-03-05T09:00:00.000Z' },
+    { product_name: 'AMS Lite', serial: null, unit_index: 2, months: 12, starts_at: '2026-03-05T09:00:00.000Z', ends_at: '2027-03-05T09:00:00.000Z' },
   ],
   terms: 'الضمان يغطي عيوب التصنيع فقط.',
 };
@@ -161,6 +164,16 @@ test('the warranty slip names every unit, its serial and its window', () => {
   assert.ok(html.includes('SN-9911'));
   assert.ok(html.includes('2028-03-05'));
   assert.ok(html.includes('24'));
+});
+
+test('the unit number on the slip is the unit number in the database', () => {
+  // 1-based on both sides. Printing "2" for the first of two printers sends
+  // a customer to a claim desk holding paper that names the wrong device.
+  const html = renderWarrantyReceipt(WARRANTY);
+  const unitLines = html.split('القطعة').slice(1).map((chunk) => chunk.slice(0, 60));
+  assert.equal(unitLines.length, 2);
+  assert.ok(unitLines[0].includes('>1<'), unitLines[0]);
+  assert.ok(unitLines[1].includes('>2<'), unitLines[1]);
 });
 
 test('a unit with no serial SAYS so rather than leaving a blank box', () => {

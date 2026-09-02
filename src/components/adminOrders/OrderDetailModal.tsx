@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import WarrantySection from '../adminWarranty/WarrantySection';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ShieldCheck, Tag, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
@@ -360,6 +361,12 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 })}
               </ul>
             </section>
+
+            {/* The warranty paper is issued PER DEVICE, so it sits directly
+                under the goods it belongs to rather than in the print bar:
+                each unit needs its serial typed before anything can be
+                generated, and that is data entry, not printing. */}
+            <WarrantySection orderId={orderId} />
 
             {detail.admin_note && (
               <section>

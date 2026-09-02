@@ -1,4 +1,5 @@
 import { safeParse } from './types';
+import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
 
 /** Typed access to the admin_settings key/value store, with safe defaults. */
 
@@ -31,6 +32,12 @@ export interface ManualPaymentMethod {
 }
 
 export const SETTING_DEFAULTS = {
+  /**
+   * The warranty receipt's printed wording and the shop's own details.
+   * Editable from the admin so the terms can change without a deploy; every
+   * issued receipt keeps the copy it was printed with (migration 0042).
+   */
+  warrantyConfig: DEFAULT_WARRANTY_CONFIG as WarrantyConfig,
   exchangeRate: 1400, // IQD per 1 USD
   currency: 'IQD' as 'IQD' | 'USD',
   adVideoUrl: '',

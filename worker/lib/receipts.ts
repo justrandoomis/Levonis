@@ -343,7 +343,9 @@ export function renderWarrantyReceipt(
       (u) =>
         `<div style="border:1px solid #000;border-radius:3px;padding:4px 6px;margin:5px 0">` +
         `<div class="b">${escapeHtml(u.product_name)}</div>` +
-        kv(t.unit, String(u.unit_index + 1)) +
+        // unit_index is 1-BASED in the database (deviceOps.ts creates units
+        // as 1..qty), so the slip used to print unit 1 as "2".
+        kv(t.unit, String(u.unit_index)) +
         `<div class="row"><span>${escapeHtml(t.serial)}</span>` +
         `<span class="b ltr">${escapeHtml(u.serial || t.noSerial)}</span></div>` +
         kv(t.months, String(u.months)) +

@@ -23,6 +23,7 @@ import InvestAdmin from './pages/InvestAdmin';
 import Profile from './pages/Profile';
 import Orders from './pages/Orders';
 import Warranty from './pages/Warranty';
+import WarrantyVerify from './pages/WarrantyVerify';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import StoreCheckout from './pages/StoreCheckout';
@@ -225,6 +226,11 @@ function AppContent() {
           <Route path="/bundles" element={<Bundles />} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
           <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
+          {/* PUBLIC on purpose: whoever holds the printed receipt (or the
+              device) must be able to check its coverage without an account.
+              The response carries the status and the product — never the
+              customer. The customer's own warranty centre stays at /warranty. */}
+          <Route path="/warranty/:receiptNo" element={<WarrantyVerify />} />
           <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/:key" element={<Policies />} />

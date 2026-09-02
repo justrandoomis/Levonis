@@ -22,6 +22,7 @@ import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
 import { adminTaxonomyRoutes } from './routes/adminTaxonomy';
+import { warrantyAdminRoutes, warrantyPublicRoutes } from './routes/warranty';
 import { adminImportRoutes } from './routes/adminImport';
 import { adminProductRelationsRoutes } from './routes/adminProductRelations';
 import { membershipsRoutes } from './routes/memberships';
@@ -123,6 +124,10 @@ app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);
 app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
+// The issued warranty document: public verification by receipt number or by
+// the serial on the device, and the admin side that issues and prints it.
+app.route('/api/warranty', warrantyPublicRoutes);
+app.route('/api/admin/warranties', warrantyAdminRoutes);
 app.route('/api/admin/community', adminCommunityRoutes);
 app.route('/api/admin/import', adminImportRoutes);
 // Mounted on the same prefix as adminProductsRoutes; the paths are distinct

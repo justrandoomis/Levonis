@@ -10,6 +10,7 @@ import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import AdminProducts from '../components/AdminProducts';
 import AdminBundles from '../components/AdminBundles';
 import AdminTaxonomy from '../components/adminTaxonomy/AdminTaxonomy';
+import AdminWarranties from '../components/adminWarranty/AdminWarranties';
 import AdminAds from '../components/AdminAds';
 import AdminHomeSettings from '../components/AdminHomeSettings';
 import AdminOverview from '../components/AdminOverview';
@@ -29,6 +30,7 @@ type AdminTab =
   | 'products'
   | 'bundles'
   | 'taxonomy'
+  | 'warranties'
   | 'home_settings'
   | 'users'
   | 'wallet_requests'
@@ -440,6 +442,7 @@ export default function Admin() {
     { id: 'products', icon: Package, label: t('adminProducts') },
     { id: 'bundles', icon: Boxes, label: dir === 'rtl' ? 'الباقات' : 'Bundles' },
     { id: 'taxonomy', icon: Tag, label: dir === 'rtl' ? 'التصنيفات' : 'Taxonomy' },
+    { id: 'warranties', icon: ShieldCheck, label: dir === 'rtl' ? 'الضمانات' : 'Warranties' },
     { id: 'home_settings', icon: LayoutList, label: dir === 'rtl' ? 'اعدادات الرئيسية' : 'Home Settings' },
     { id: 'users', icon: Users, label: t('adminUsers') },
     { id: 'wallet_settings', icon: Wallet, label: 'Wallet Settings' },
@@ -462,7 +465,7 @@ export default function Admin() {
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'taxonomy' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'taxonomy' || activeTab === 'warranties' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
 
         {activeTab === 'overview' && (
           <AdminOverview onNavigateTab={(tab) => setActiveTab(tab as AdminTab)} />
@@ -478,6 +481,7 @@ export default function Admin() {
 
         {activeTab === 'bundles' && <AdminBundles />}
         {activeTab === 'taxonomy' && <AdminTaxonomy />}
+        {activeTab === 'warranties' && <AdminWarranties />}
         {activeTab === 'ads' && (
           <AdminAds />
         )}
