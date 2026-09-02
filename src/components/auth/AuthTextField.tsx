@@ -45,6 +45,8 @@ export interface AuthTextFieldProps {
   trail?: React.ReactNode;
   /** Whether the value is announced as valid (green hairline). */
   ok?: boolean;
+  /** Something small at the end of the label row (the forgot-password link). */
+  labelEnd?: React.ReactNode;
 }
 
 export default function AuthTextField({
@@ -69,6 +71,7 @@ export default function AuthTextField({
   helpTone = 'neutral',
   trail,
   ok,
+  labelEnd,
 }: AuthTextFieldProps) {
   const [revealed, setRevealed] = useState(false);
   const isPassword = type === 'password';
@@ -82,9 +85,18 @@ export default function AuthTextField({
 
   return (
     <div>
-      <label htmlFor={id} className="lv-field__label">
-        {label}
-      </label>
+      {labelEnd ? (
+        <div className="lv-field__labelrow">
+          <label htmlFor={id} className="lv-field__label">
+            {label}
+          </label>
+          {labelEnd}
+        </div>
+      ) : (
+        <label htmlFor={id} className="lv-field__label">
+          {label}
+        </label>
+      )}
       {/* The wrapper takes the VALUE's direction so the logical start/end
           of the input, the icon and the toggle all resolve to the same side. */}
       <div className="lv-field__frame" dir={dirValue}>

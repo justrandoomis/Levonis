@@ -11,15 +11,23 @@ export interface SocialAuthButtonProps {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  /** Icon-only square for short viewports; the label stays for assistive tech. */
+  compact?: boolean;
 }
 
-export default function SocialAuthButton({ icon, label, onClick, disabled }: SocialAuthButtonProps) {
+export default function SocialAuthButton({ icon, label, onClick, disabled, compact }: SocialAuthButtonProps) {
   return (
-    <button type="button" className="lv-social" onClick={onClick} disabled={disabled}>
+    <button
+      type="button"
+      className={`lv-social${compact ? ' lv-social--compact' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={compact ? label : undefined}
+    >
       <span aria-hidden className="lv-social__icon">
         {icon}
       </span>
-      <span>{label}</span>
+      <span className={compact ? 'lv-social__sr' : undefined}>{label}</span>
     </button>
   );
 }

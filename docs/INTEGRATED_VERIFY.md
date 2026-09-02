@@ -112,7 +112,7 @@ Screenshots → `docs/evidence/integrated/`:
 | File | What it evidences |
 | --- | --- |
 | `auth-methods.png` | 4 method tabs in ONE row, exactly 1 mounted `tabpanel`, 1 visible form — not the long column §2.1 forbids |
-| `auth-fill-partial.png` | sign-up step 1 part-way: the step's own meter grew with the e-mail, then the username, then the password, and the button is still disabled (the blueprint redesign split sign-up into three screens with ONE register call) |
+| `auth-fill-partial.png` | sign-up step 1 part-way: the step's own meter grew as the e-mail, then the password, then a partial confirmation were typed, and the button is still disabled |
 | `auth-fill-ready.png` | every rule of the step satisfied: `--lv-fill-pct: 100%`, `data-ready="true"`, `disabled === false` |
 | `auth-fill-regressed.png` | one character deleted from the confirmation → below 100 %, `data-ready="false"` immediately |
 | `auth-review-step.png` | step 3: the review of the typed e-mail and handle, with zero `POST /register` before it — the steps only validate locally |

@@ -279,9 +279,9 @@ async function main() {
   await page.click('#email');
   await page.keyboard.type('user@example.co', { delay: 10 });
   const pct1 = await readPct();
-  await page.fill('#username', `uifill${rnd}`);
+  await page.fill('#new-password', 'ui-pa');
   const pct2 = await readPct();
-  await page.fill('#new-password', 'ui-pass-12345');
+  await page.keyboard.type('ss-12345', { delay: 10 });
   const pct3 = await readPct();
   const readyBeforeAll = await readReady();
   console.log(`      measured fill: ${pct0}% → ${pct1}% → ${pct2}% → ${pct3}% (ready=${readyBeforeAll})`);
@@ -321,9 +321,12 @@ async function main() {
   await page.waitForSelector('#name', { timeout: 10000 });
   const step2Ready0 = await readReady();
   await page.fill('#name', 'UI Fill Tester');
+  const step2ReadyName = await readReady();
+  await page.fill('#username', `uifill${rnd}`);
   const step2Ready1 = await readReady();
-  check('AUTH-01 step 2 (name + country) carries its own honest meter',
-    step2Ready0 === 'false' && step2Ready1 === 'true', `before=${step2Ready0} after=${step2Ready1}`);
+  check('AUTH-01 step 2 (name + handle + country) carries its own honest meter',
+    step2Ready0 === 'false' && step2ReadyName === 'false' && step2Ready1 === 'true',
+    `ready ${step2Ready0} → ${step2ReadyName} → ${step2Ready1}`);
   await page.click('#signup-next-2');
   await page.waitForSelector('#signup-submit', { timeout: 10000 });
   const reviewText = (await page.textContent('.lv-review')) || '';

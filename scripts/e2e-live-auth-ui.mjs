@@ -27,6 +27,45 @@ const PASSWORD = process.env.TEST_PASSWORD || '';
 const OUT = process.env.OUT_DIR || '/tmp/live-auth-ui';
 mkdirSync(OUT, { recursive: true });
 
+import zlib from 'node:zlib';
+
+/** Minimal PNG decoder (8-bit RGB/RGBA, non-interlaced) for pixel checks. */
+function decodePng(buf) {
+  let pos = 8;
+  let width = 0, height = 0, colorType = 6;
+  const idat = [];
+  while (pos < buf.length) {
+    const len = buf.readUInt32BE(pos);
+    const type = buf.toString('ascii', pos + 4, pos + 8);
+    const data = buf.subarray(pos + 8, pos + 8 + len);
+    if (type === 'IHDR') { width = data.readUInt32BE(0); height = data.readUInt32BE(4); colorType = data[9]; }
+    else if (type === 'IDAT') idat.push(data);
+    else if (type === 'IEND') break;
+    pos += 12 + len;
+  }
+  const bpp = colorType === 6 ? 4 : 3;
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const stride = width * bpp;
+  const out = Buffer.alloc(width * height * 4);
+  let prev = Buffer.alloc(stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    const line = Buffer.from(raw.subarray(y * (stride + 1) + 1, y * (stride + 1) + 1 + stride));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= bpp ? line[i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
+      let v = line[i];
+      if (filter === 1) v += a; else if (filter === 2) v += b; else if (filter === 3) v += (a + b) >> 1;
+      else if (filter === 4) { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
+      line[i] = v & 255;
+    }
+    for (let x = 0; x < width; x++) {
+      out[(y * width + x) * 4] = line[x * bpp]; out[(y * width + x) * 4 + 1] = line[x * bpp + 1]; out[(y * width + x) * 4 + 2] = line[x * bpp + 2]; out[(y * width + x) * 4 + 3] = bpp === 4 ? line[x * bpp + 3] : 255;
+    }
+    prev = line;
+  }
+  return { width, height, rgba: out };
+}
+
 let failures = 0;
 const check = (name, ok, evidence = '') => {
   if (!ok) failures += 1;
@@ -49,8 +88,26 @@ async function main() {
     return { ctx, page, errors };
   };
 
+  // The Google identity iframe must sit transparent on the well: its corner
+  // pixels are sampled from a screenshot and have to be dark, never the
+  // white backdrop a colour-scheme mismatch paints.
+  const wellCorners = async (page) => {
+    const box = await page.$eval('.lv-google', (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    const png = await page.screenshot({ clip: { x: box.x, y: box.y, width: box.w, height: box.h } });
+    const { width, height, rgba } = decodePng(png);
+    const at = (x, y) => { const i = (y * width + x) * 4; return (rgba[i] + rgba[i + 1] + rgba[i + 2]) / 3; };
+    const pts = [[2, 2], [width - 3, 2], [2, height - 3], [width - 3, height - 3], [Math.round(width / 2), 1], [Math.round(width / 2), height - 2]];
+    return { max: Math.max(...pts.map(([x, y]) => at(x, y))), width, height };
+  };
+
   for (const [w, h] of [[390, 844], [1440, 900]]) {
     const { ctx, page, errors } = await open(w, h);
+    if (caps.google && w === 390) {
+      await page.waitForSelector('iframe[src*="accounts.google.com"]', { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      const c = await wellCorners(page);
+      check('the Google button sits on a dark well with no white frame', c.max < 90, `max corner luminance=${Math.round(c.max)} (${c.width}×${c.height})`);
+    }
     const g = await page.evaluate(() => {
       const card = document.querySelector('.lv-card').getBoundingClientRect();
       const fonts = [...document.querySelectorAll('.lv-auth input')].map((i) => parseFloat(getComputedStyle(i).fontSize));
@@ -66,6 +123,24 @@ async function main() {
     check(`${w}px: forgot-password link only when mail is configured`, caps.passwordReset ? forgot === 1 : forgot === 0, `links=${forgot}`);
     await page.screenshot({ path: path.join(OUT, `live-auth-signin-${w}.png`) });
     check(`${w}px: zero page errors`, errors.length === 0, errors.join(' | ').slice(0, 200));
+    await ctx.close();
+  }
+
+  // Short viewports (a phone browser with its bars, an iPad in landscape):
+  // the sign-in must fit without scrolling and the providers become icons.
+  for (const [w, h] of [[390, 600], [1024, 590]]) {
+    const { ctx, page } = await open(w, h);
+    const fit = await page.evaluate(() => { const sc = document.querySelector('.lv-auth > .absolute'); return { sh: sc.scrollHeight, ch: sc.clientHeight }; });
+    check(`${w}×${h}: the live sign-in fits without scrolling`, fit.sh <= fit.ch + 1, JSON.stringify(fit));
+    if (caps.google) {
+      await page.waitForSelector('iframe[src*="accounts.google.com"]', { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(1200);
+      const compact = await page.$eval('.lv-google', (el) => el.classList.contains('lv-google--compact') && el.getBoundingClientRect().width < 60);
+      check(`${w}×${h}: the Google mark is the icon-only official button`, compact);
+      const c = await wellCorners(page);
+      check(`${w}×${h}: no white frame around the Google mark`, c.max < 90, `max=${Math.round(c.max)}`);
+    }
+    await page.screenshot({ path: path.join(OUT, `live-auth-fit-${w}x${h}.png`) });
     await ctx.close();
   }
 
@@ -100,13 +175,11 @@ async function main() {
     const stepper = await page.textContent('.lv-stepper__count').catch(() => '');
     check('sign-up opens on step 1 of 3 with its own meter and the referral bar', /01/.test(stepper || '') && !!(await page.$('#signup-next-1')) && !!(await page.$('.lv-refbar')));
     await page.fill('#email', 'preview@example.com');
-    await page.fill('#username', 'previewhandle');
     await page.fill('#new-password', 'preview-pass-1');
     await page.fill('#confirm-password', 'preview-pass-1');
-    await page.waitForTimeout(600);
     await page.click('#signup-next-1');
     await page.waitForSelector('#name', { timeout: 10000 });
-    check('step 2 (name + country) reached with nothing posted', !!(await page.$('#country')) && posts.length === 0, `posts=${posts.length}`);
+    check('step 2 (name + handle + country) reached with nothing posted', !!(await page.$('#username')) && !!(await page.$('#country')) && posts.length === 0, `posts=${posts.length}`);
     await page.screenshot({ path: path.join(OUT, 'live-auth-signup-2-390.png') });
     await ctx.close();
   }

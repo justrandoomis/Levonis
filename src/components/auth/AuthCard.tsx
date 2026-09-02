@@ -6,5 +6,5 @@ import React from 'react';
  * on opposite corners (auth.css .lv-card).
  */
 export default function AuthCard({ children }: { children: React.ReactNode }) {
-  return <div className="lv-card p-5 min-[360px]:p-6 md:p-7">{children}</div>;
+  return <div className="lv-card">{children}</div>;
 }

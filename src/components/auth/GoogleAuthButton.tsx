@@ -19,9 +19,11 @@ export interface GoogleAuthButtonProps {
   /** 'signup' switches the official label to its create-account variant. */
   view: 'signin' | 'signup';
   busy?: boolean;
+  /** Icon-only (a 40px official Google mark) for short viewports. */
+  compact?: boolean;
 }
 
-export default function GoogleAuthButton({ onCredential, onError, view, busy }: GoogleAuthButtonProps) {
+export default function GoogleAuthButton({ onCredential, onError, view, busy, compact }: GoogleAuthButtonProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(320);
 
@@ -41,15 +43,30 @@ export default function GoogleAuthButton({ onCredential, onError, view, busy }: 
   }, []);
 
   return (
-    <div ref={hostRef} className={`lv-google${busy ? ' is-busy' : ''}`} aria-busy={busy || undefined}>
-      <GoogleLogin
-        onSuccess={(credentialResponse) => onCredential(credentialResponse.credential)}
-        onError={onError}
-        theme="filled_black"
-        shape="rectangular"
-        text={view === 'signup' ? 'signup_with' : 'continue_with'}
-        width={String(width)}
-      />
+    <div
+      ref={hostRef}
+      className={`lv-google${compact ? ' lv-google--compact' : ''}${busy ? ' is-busy' : ''}`}
+      aria-busy={busy || undefined}
+    >
+      {compact ? (
+        <GoogleLogin
+          onSuccess={(credentialResponse) => onCredential(credentialResponse.credential)}
+          onError={onError}
+          theme="filled_black"
+          type="icon"
+          shape="circle"
+          size="large"
+        />
+      ) : (
+        <GoogleLogin
+          onSuccess={(credentialResponse) => onCredential(credentialResponse.credential)}
+          onError={onError}
+          theme="filled_black"
+          shape="rectangular"
+          text={view === 'signup' ? 'signup_with' : 'continue_with'}
+          width={String(width)}
+        />
+      )}
     </div>
   );
 }

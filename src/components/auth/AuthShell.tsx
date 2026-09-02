@@ -52,8 +52,8 @@ export default function AuthShell({ dir, children }: { dir: 'ltr' | 'rtl'; child
     <div ref={rootRef} dir={dir} className="lv-auth relative min-h-0 w-full flex-1 overflow-hidden font-sans">
       <AuthBackground />
       <div className="absolute inset-0 z-10 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto flex min-h-full w-full max-w-[26rem] flex-col px-3 pt-[max(1.125rem,env(safe-area-inset-top))] pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] min-[360px]:px-4">
-          <div className="m-auto w-full py-2">
+        <div className="lv-col">
+          <div className="lv-stack">
             <div className="lv-brand lv-enter">
               <AuthBrand />
               <LanguageSwitch />

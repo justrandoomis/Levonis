@@ -27,6 +27,7 @@ import { useCapabilities } from '../hooks/useCapabilities';
 import { COUNTRIES, COMMON_ISO, countryNames, flagOf, toAsciiDigitsClient } from '../components/auth/PhoneField';
 import ReferralBar from '../components/auth/ReferralBar';
 import { useUsernameAvailability } from '../components/auth/useUsernameAvailability';
+import { useShortViewport } from '../components/auth/useShortViewport';
 import { onboardingStrings, usernameReasonLabel } from '../components/onboarding/strings';
 
 /**
@@ -38,8 +39,8 @@ import { onboardingStrings, usernameReasonLabel } from '../components/onboarding
  * under an "أو" seam; tapping Telegram swaps the panel to the
  * Telegram-verified phone flow (the only route that can prove number
  * ownership), with a way back. Creating an account is a light three-step
- * flow inside the same panel — sign-in details, then name and country,
- * then a review — and ONE request: the steps only validate locally, the
+ * flow inside the same panel — email and password, then name, handle and
+ * country, then a review — and ONE request: the steps only validate locally, the
  * single POST /api/auth/register happens on the last one. Non-sensitive
  * values survive every step/panel switch; passwords never touch
  * localStorage/analytics/logs.
@@ -145,8 +146,8 @@ const STRINGS = {
     step1Name: 'بيانات الدخول',
     step2Name: 'عنك',
     step3Name: 'المراجعة والإنشاء',
-    step1Hint: 'بريدك واسم المستخدم وكلمة المرور.',
-    step2Hint: 'اسمك ودولتك — يظهران في ملفك.',
+    step1Hint: 'بريدك وكلمة المرور.',
+    step2Hint: 'اسمك واسم المستخدم ودولتك.',
     step3Hint: 'راجع بياناتك ثم أنشئ الحساب.',
     next: 'متابعة',
     optional: 'اختياري',
@@ -234,8 +235,8 @@ const STRINGS = {
     step1Name: 'Sign-in details',
     step2Name: 'About you',
     step3Name: 'Review & create',
-    step1Hint: 'Your email, username and password.',
-    step2Hint: 'Your name and country — shown on your profile.',
+    step1Hint: 'Your email and password.',
+    step2Hint: 'Your name, username and country.',
     step3Hint: 'Check your details, then create the account.',
     next: 'Continue',
     optional: 'Optional',
@@ -323,8 +324,8 @@ const STRINGS = {
     step1Name: 'زانیاری چوونەژوورەوە',
     step2Name: 'دەربارەی تۆ',
     step3Name: 'پێداچوونەوە و دروستکردن',
-    step1Hint: 'ئیمەیل، ناوی بەکارهێنەر و وشەی نهێنی.',
-    step2Hint: 'ناو و وڵاتەکەت — لە پرۆفایلەکەت دەردەکەون.',
+    step1Hint: 'ئیمەیل و وشەی نهێنی.',
+    step2Hint: 'ناو، ناوی بەکارهێنەر و وڵاتەکەت.',
     step3Hint: 'زانیارییەکانت بپشکنە، پاشان هەژمارەکە دروست بکە.',
     next: 'بەردەوامبوون',
     optional: 'ئارەزوومەندانە',
@@ -353,19 +354,18 @@ const SHEET = {
   telegram: 'TELEGRAM',
 } as const;
 
-/** Server codes that belong to step 1's fields: the review step hands the person back there. */
-const STEP1_CODES = new Set([
-  'EMAIL_TAKEN',
-  'USERNAME_TAKEN',
-  'USERNAME_RESERVED',
-  'USERNAME_TOO_SHORT',
-  'USERNAME_TOO_LONG',
-  'USERNAME_BAD_CHARACTERS',
-  'USERNAME_BAD_EDGES',
-  'USERNAME_REPEATED_PUNCTUATION',
-  'USERNAME_ALL_DIGITS',
-]);
-
+/** Server codes that belong to an earlier step's field: the review step hands the person back there. */
+const STEP_FOR_CODE: Record<string, SignupStep> = {
+  EMAIL_TAKEN: 1,
+  USERNAME_TAKEN: 2,
+  USERNAME_RESERVED: 2,
+  USERNAME_TOO_SHORT: 2,
+  USERNAME_TOO_LONG: 2,
+  USERNAME_BAD_CHARACTERS: 2,
+  USERNAME_BAD_EDGES: 2,
+  USERNAME_REPEATED_PUNCTUATION: 2,
+  USERNAME_ALL_DIGITS: 2,
+};
 /**
  * Does what somebody typed into the identifier field LOOK like a phone
  * number? Used only to decide whether to offer the Telegram route after a
@@ -389,6 +389,9 @@ export default function Auth() {
   // plain cross-fade with no travel.
   const reduceMotion = useReducedMotion();
   const slide = reduceMotion ? 0 : 4;
+  // Phone browsers with their bars and landscape tablets: the provider
+  // buttons become icon-only so every screen fits without scrolling.
+  const shortViewport = useShortViewport();
 
   const resetToken = searchParams.get('reset') || '';
   // Friend-invite referral code from ?ref=CODE — user-editable in the
@@ -629,8 +632,8 @@ export default function Auth() {
   const emailPart = { progress: emailProgress, valid: emailValid };
 
   // Each step's button answers for ITS fields; the last one for all of them.
-  const step1Fill = combineFillProgress([emailPart, usernamePart, newPwPart, confirmPart]);
-  const step2Fill = combineFillProgress([namePart]);
+  const step1Fill = combineFillProgress([emailPart, newPwPart, confirmPart]);
+  const step2Fill = combineFillProgress([namePart, usernamePart]);
   const signupEmailFill = combineFillProgress([emailPart, usernamePart, namePart, newPwPart, confirmPart]);
 
   const forgotFill = combineFillProgress([emailPart]);
@@ -646,16 +649,18 @@ export default function Auth() {
         : '';
   const step1Hint = !emailValid
     ? s.hintEmail
+    : !newPwValid
+      ? s.hintPassword
+      : !confirmValid
+        ? s.hintConfirm
+        : '';
+  const step2Hint = !trimmedName
+    ? s.hintName
     : !usernameShapeValid
       ? s.hintUsername
       : availability.state === 'unavailable'
         ? s.hintUsernameTaken
-        : !newPwValid
-          ? s.hintPassword
-          : !confirmValid
-            ? s.hintConfirm
-            : '';
-  const step2Hint = !trimmedName ? s.hintName : '';
+        : '';
   const signupEmailHint = step1Hint || step2Hint;
 
   // Inline errors only where they genuinely help while typing.
@@ -745,8 +750,9 @@ export default function Auth() {
     } catch (err) {
       setServerError(errMsg(err));
       // A refusal about the email or the handle is answered on the step
-      // that owns those fields, with the error visible there.
-      if (err instanceof ApiError && err.code && STEP1_CODES.has(err.code)) setStep(1);
+      // that owns that field, with the error visible there.
+      const owner = err instanceof ApiError && err.code ? STEP_FOR_CODE[err.code] : undefined;
+      if (owner) setStep(owner);
     } finally {
       setSubmitting(false);
     }
@@ -913,6 +919,14 @@ export default function Auth() {
           : 'idle';
   const googleBusy = submitting && via === 'google';
 
+  // Only offered when the deployment can actually send the mail; it sits on
+  // the password label's row so it costs no height.
+  const forgotLink = resetConfigured ? (
+    <button type="button" onClick={() => switchView('forgot')} className="lv-link lv-link--inline">
+      {s.forgotLink}
+    </button>
+  ) : undefined;
+
   const passwordField = (autoComplete: 'current-password' | 'new-password', label = s.password) => (
     <AuthTextField
       id={autoComplete}
@@ -924,6 +938,7 @@ export default function Auth() {
       icon={<Lock />}
       revealLabels={{ show: s.showPassword, hide: s.hidePassword }}
       disabled={submitting}
+      labelEnd={autoComplete === 'current-password' ? forgotLink : undefined}
     />
   );
 
@@ -942,15 +957,6 @@ export default function Auth() {
     />
   );
 
-  // Only offered when the deployment can actually send the mail.
-  const forgotRow = resetConfigured ? (
-    <div className="lv-row">
-      <button type="button" onClick={() => switchView('forgot')} className="lv-link lv-link--sm">
-        {s.forgotLink}
-      </button>
-    </div>
-  ) : null;
-
   /**
    * The provider seam. Google is Google's own iframe (the credential flow
    * needs it), Telegram is a quiet outline button; both sit under the
@@ -959,31 +965,35 @@ export default function Auth() {
   const providerBlock =
     googleConfigured || telegramConfigured ? (
       <>
-        <AuthDivider label={s.orLabel} />
-        <div className="lv-providers">
-          {googleConfigured && (
-            <div>
-              <GoogleAuthButton
-                view={view === 'signup' ? 'signup' : 'signin'}
-                busy={googleBusy}
-                onCredential={handleGoogleCredential}
-                onError={() => setServerError(s.googleFailed)}
+        <div className="lv-provider-row">
+          <AuthDivider label={s.orLabel} />
+          <div className="lv-providers">
+            {googleConfigured && (
+              <div>
+                <GoogleAuthButton
+                  view={view === 'signup' ? 'signup' : 'signin'}
+                  busy={googleBusy}
+                  compact={shortViewport}
+                  onCredential={handleGoogleCredential}
+                  onError={() => setServerError(s.googleFailed)}
+                />
+                {googleBusy && (
+                  <span className="sr-only" role="status">
+                    {s.googleWorking}
+                  </span>
+                )}
+              </div>
+            )}
+            {telegramConfigured && (
+              <SocialAuthButton
+                icon={<TelegramIcon />}
+                label={s.continueWithTelegram}
+                onClick={openTelegram}
+                disabled={submitting}
+                compact={shortViewport}
               />
-              {googleBusy && (
-                <span className="sr-only" role="status">
-                  {s.googleWorking}
-                </span>
-              )}
-            </div>
-          )}
-          {telegramConfigured && (
-            <SocialAuthButton
-              icon={<TelegramIcon />}
-              label={s.continueWithTelegram}
-              onClick={openTelegram}
-              disabled={submitting}
-            />
-          )}
+            )}
+          </div>
         </div>
         {googleConfigured && <p className="lv-note-google">{s.googleNote}</p>}
       </>
@@ -1079,7 +1089,7 @@ export default function Auth() {
             {passwordField('new-password', s.newPassword)}
             {confirmField}
           </div>
-          <div style={{ marginTop: 16 }}>
+          <div className="lv-cta">
             <FillButton
               id="reset-submit"
               label={s.setPasswordCta}
@@ -1134,7 +1144,7 @@ export default function Auth() {
             disabled={submitting}
           />
         </div>
-        <div style={{ marginTop: 16 }}>
+        <div className="lv-cta">
           <FillButton
             id="forgot-submit"
             label={s.sendResetCta}
@@ -1188,35 +1198,10 @@ export default function Auth() {
                 spellCheck={false}
                 icon={<Mail />}
               />
-              <AuthTextField
-                id="username"
-                label={s.username}
-                value={username}
-                onChange={onUsernameChange}
-                autoComplete="username"
-                placeholder="username123"
-                valueDir="ltr"
-                autoCapitalize="none"
-                spellCheck={false}
-                maxLength={30}
-                icon={<AtSign />}
-                help={usernameHelp}
-                helpTone={usernameTone}
-                ok={availability.state === 'free'}
-                trail={
-                  availability.state === 'checking' ? (
-                    <span className="lv-dots" />
-                  ) : availability.state === 'free' ? (
-                    <Check />
-                  ) : availability.state === 'unavailable' ? (
-                    <X />
-                  ) : null
-                }
-              />
               {passwordField('new-password')}
               {confirmField}
             </div>
-            <div style={{ marginTop: 16 }}>
+            <div className="lv-cta">
               <FillButton
                 id="signup-next-1"
                 label={s.next}
@@ -1228,7 +1213,7 @@ export default function Auth() {
             </div>
           </form>
           {providerBlock}
-          <p className="lv-foot">
+          <p className="lv-foot lv-foot--optional">
             {s.haveAccount}{' '}
             <button type="button" onClick={() => switchView('signin')} className="lv-link">
               {s.signInAction}
@@ -1254,6 +1239,31 @@ export default function Auth() {
                 valueDir="auto"
                 maxLength={100}
                 icon={<UserRound />}
+              />
+              <AuthTextField
+                id="username"
+                label={s.username}
+                value={username}
+                onChange={onUsernameChange}
+                autoComplete="username"
+                placeholder="username123"
+                valueDir="ltr"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={30}
+                icon={<AtSign />}
+                help={usernameHelp}
+                helpTone={usernameTone}
+                ok={availability.state === 'free'}
+                trail={
+                  availability.state === 'checking' ? (
+                    <span className="lv-dots" />
+                  ) : availability.state === 'free' ? (
+                    <Check />
+                  ) : availability.state === 'unavailable' ? (
+                    <X />
+                  ) : null
+                }
               />
               <div>
                 <label htmlFor="country" className="lv-field__label">
@@ -1281,7 +1291,7 @@ export default function Auth() {
                 </select>
               </div>
             </div>
-            <div style={{ marginTop: 16 }}>
+            <div className="lv-cta">
               <FillButton
                 id="signup-next-2"
                 label={s.next}
@@ -1304,7 +1314,7 @@ export default function Auth() {
           <form onSubmit={handleSignUp} noValidate aria-busy={submitting && via === 'form'}>
             <div className="lv-review">
               {reviewRow(s.email, trimmedEmail, 1, true)}
-              {reviewRow(s.username, trimmedUsername ? `@${trimmedUsername}` : '', 1, true)}
+              {reviewRow(s.username, trimmedUsername ? `@${trimmedUsername}` : '', 2, true)}
               {reviewRow(s.fullName, trimmedName, 2)}
               {reviewRow(ob.country, countryLabel, 2)}
               {referralCode.trim() && reviewRow(s.referralLabel, referralCode.trim(), 1, true)}
@@ -1315,7 +1325,7 @@ export default function Auth() {
                 <p>{s.verifyNote}</p>
               </div>
             )}
-            <div style={{ marginTop: 16 }}>
+            <div className="lv-cta">
               <FillButton
                 id="signup-submit"
                 label={s.signUpCta}
@@ -1369,12 +1379,9 @@ export default function Auth() {
                 icon={<UserRound />}
                 disabled={submitting}
               />
-              <div>
-                {passwordField('current-password')}
-                {forgotRow}
-              </div>
+              {passwordField('current-password')}
             </div>
-            <div style={{ marginTop: forgotRow ? 8 : 16 }}>
+            <div className="lv-cta">
               <FillButton
                 id="signin-submit"
                 label={s.signInCta}
