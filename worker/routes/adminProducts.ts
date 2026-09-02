@@ -504,29 +504,81 @@ adminProductsRoutes.post('/catalogs/:catalogId/reorder', async (c) => {
 
 // ---------------------------------------------------------------- products
 
-/** Bounded listing projection — for tables/search only, NEVER for editing. */
+/**
+ * Bounded listing projection — for tables/search only, NEVER for editing.
+ * The management screen's filters and sorts run here, server-side: every
+ * user value is a bound parameter and the sort key maps through a fixed
+ * whitelist before it can reach the SQL text. The bare call keeps its
+ * original behaviour and shape.
+ */
 adminProductsRoutes.get('/', async (c) => {
   const q = c.req.query();
   const search = str(q.search, 'search', { max: 100, required: false });
   const limit = int(q.limit, 'limit', { min: 1, max: 100, def: 30 });
   const offset = int(q.offset, 'offset', { min: 0, max: 100_000, def: 0 });
 
-  let where = '';
+  const clauses: string[] = [];
   const params: unknown[] = [];
   if (search) {
     // SKU is searchable too: §4 made it a real identifier, and an admin who
     // has a packing slip in hand has the SKU, not the Arabic name.
-    where = ' WHERE (name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR slug LIKE ? OR sku LIKE ?)';
+    clauses.push('(name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR slug LIKE ? OR sku LIKE ?)');
     const like = `%${search}%`;
     params.push(like, like, like, like, like);
   }
+  if (['draft', 'active', 'hidden'].includes(q.status ?? '')) {
+    clauses.push('status = ?');
+    params.push(q.status);
+  }
+  if (q.brand) {
+    clauses.push('brand_id = ?');
+    params.push(str(q.brand, 'brand', { max: 60 }));
+  }
+  if (q.catalog) {
+    clauses.push('EXISTS (SELECT 1 FROM product_catalogs pc WHERE pc.product_id = products.id AND pc.catalog_id = ?)');
+    params.push(str(q.catalog, 'catalog', { max: 60 }));
+  }
+  // BASE-mode honesty: available = stock - stock_reserved; NULL = untracked.
+  if (q.stock === 'untracked') clauses.push('stock IS NULL');
+  else if (q.stock === 'in') clauses.push('(stock IS NULL OR stock - stock_reserved > 0)');
+  else if (q.stock === 'out') clauses.push('(stock IS NOT NULL AND stock - stock_reserved <= 0)');
+  else if (q.stock === 'low')
+    clauses.push('(stock IS NOT NULL AND stock - stock_reserved > 0 AND stock - stock_reserved <= COALESCE(low_stock_threshold, 5))');
+  if (q.price_min !== undefined) {
+    clauses.push('price_iqd >= ?');
+    params.push(int(q.price_min, 'price_min', { min: 0, max: 1_000_000_000 }));
+  }
+  if (q.price_max !== undefined) {
+    clauses.push('price_iqd <= ?');
+    params.push(int(q.price_max, 'price_max', { min: 0, max: 1_000_000_000 }));
+  }
+  if (q.days !== undefined) {
+    clauses.push('created_at >= ?');
+    params.push(new Date(Date.now() - int(q.days, 'days', { min: 1, max: 3650 }) * 86_400_000).toISOString());
+  }
+  if (q.featured === '1') clauses.push('is_featured = 1');
+  const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
+
+  const ORDERS: Record<string, string> = {
+    updated: 'updated_at DESC',
+    newest: 'created_at DESC',
+    oldest: 'created_at ASC',
+    price_asc: 'price_iqd ASC, updated_at DESC',
+    price_desc: 'price_iqd DESC, updated_at DESC',
+    sales: 'sold DESC, updated_at DESC',
+    stock: 'stock IS NULL, stock - stock_reserved ASC, updated_at DESC',
+  };
+  const orderBy = ORDERS[q.sort ?? 'updated'] ?? ORDERS.updated;
 
   const [list, count] = await Promise.all([
     c.env.DB.prepare(
       `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd, stock,
-              is_featured, brand_id, images, updated_at, doc_version
+              stock_reserved, is_featured, brand_id, images, created_at, updated_at, doc_version,
+              COALESCE((SELECT SUM(i.qty) FROM order_items i
+                         JOIN orders o ON o.id = i.order_id
+                        WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold
          FROM products${where}
-        ORDER BY updated_at DESC LIMIT ? OFFSET ?`
+        ORDER BY ${orderBy} LIMIT ? OFFSET ?`
     )
       .bind(...params, limit, offset)
       .all<Record<string, unknown>>(),
@@ -553,13 +605,110 @@ adminProductsRoutes.get('/', async (c) => {
         price_iqd: r.price_iqd,
         pro_price_iqd: (r.pro_price_iqd as number | null) ?? null,
         stock: (r.stock as number | null) ?? null,
+        stock_reserved: Number(r.stock_reserved ?? 0),
+        sold: Number(r.sold ?? 0),
         is_featured: !!r.is_featured,
         brand_id: (r.brand_id as string | null) ?? null,
         image: primary?.url ?? '',
+        created_at: (r.created_at as string | null) ?? null,
         updated_at: r.updated_at,
         doc_version: r.doc_version,
       };
     }),
+  });
+});
+
+/**
+ * The management screen's stat feed — real aggregates only. Weekly buckets
+ * come from created_at (the only per-product history that exists); sales
+ * come from actual order lines for the platform's own goods. Gross revenue
+ * is a financial figure, so scoped admins get the units without it. There
+ * is no view counter on platform products, and none is invented.
+ */
+adminProductsRoutes.get('/stats', async (c) => {
+  const db = c.env.DB;
+  const since12w = new Date(Date.now() - 12 * 7 * 86_400_000).toISOString();
+  const since30d = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const since14d = new Date(Date.now() - 14 * 86_400_000).toISOString();
+
+  const [totals, weekly, sales30, salesDaily] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
+              SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS draft,
+              SUM(CASE WHEN status = 'hidden' THEN 1 ELSE 0 END) AS hidden,
+              SUM(CASE WHEN stock IS NOT NULL AND stock - stock_reserved <= 0 THEN 1 ELSE 0 END) AS out_of_stock,
+              SUM(CASE WHEN is_featured = 1 THEN 1 ELSE 0 END) AS featured
+         FROM products`
+    ).first<Record<string, number>>(),
+    db.prepare(
+      `SELECT substr(created_at, 1, 10) AS day,
+              COUNT(*) AS added,
+              SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_added,
+              SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS draft_added,
+              SUM(CASE WHEN status = 'hidden' THEN 1 ELSE 0 END) AS hidden_added
+         FROM products WHERE created_at >= ?
+        GROUP BY day ORDER BY day`
+    ).bind(since12w).all(),
+    db.prepare(
+      `SELECT COALESCE(SUM(i.qty), 0) AS units, COUNT(DISTINCT o.id) AS orders,
+              COALESCE(SUM(i.line_total_iqd), 0) AS gross
+         FROM order_items i JOIN orders o ON o.id = i.order_id
+        WHERE i.product_id IS NOT NULL AND o.status != 'cancelled' AND o.created_at >= ?`
+    ).bind(since30d).first<Record<string, number>>(),
+    db.prepare(
+      `SELECT substr(o.created_at, 1, 10) AS day, COUNT(DISTINCT o.id) AS orders, COALESCE(SUM(i.qty), 0) AS units
+         FROM order_items i JOIN orders o ON o.id = i.order_id
+        WHERE i.product_id IS NOT NULL AND o.status != 'cancelled' AND o.created_at >= ?
+        GROUP BY day ORDER BY day`
+    ).bind(since14d).all(),
+  ]);
+
+  // Fixed windows, zero-filled: the sparklines describe the WHOLE 12-week /
+  // 14-day span, and an empty bucket is a real zero — never a shrunken series
+  // that makes two lonely data points look like a trend.
+  const now = Date.now();
+  const weeks = Array.from({ length: 12 }, (_, i) => ({
+    week: new Date(now - (12 - i) * 7 * 86_400_000).toISOString().slice(0, 10),
+    added: 0,
+    active_added: 0,
+    draft_added: 0,
+    hidden_added: 0,
+  }));
+  for (const w of weekly.results ?? []) {
+    const age = now - new Date(`${w.day}T00:00:00Z`).getTime();
+    const idx = 11 - Math.floor(age / (7 * 86_400_000));
+    const bucket = weeks[Math.min(11, Math.max(0, idx))];
+    bucket.added += Number(w.added ?? 0);
+    bucket.active_added += Number(w.active_added ?? 0);
+    bucket.draft_added += Number(w.draft_added ?? 0);
+    bucket.hidden_added += Number(w.hidden_added ?? 0);
+  }
+  const dayRows = new Map((salesDaily.results ?? []).map((r) => [String(r.day), r]));
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const day = new Date(now - (13 - i) * 86_400_000).toISOString().slice(0, 10);
+    const r = dayRows.get(day);
+    return { day, orders: Number(r?.orders ?? 0), units: Number(r?.units ?? 0) };
+  });
+
+  const financial = canViewFinancials(c.env, c.get('user'));
+  return c.json({
+    success: true,
+    totals: {
+      total: totals?.total ?? 0,
+      active: totals?.active ?? 0,
+      draft: totals?.draft ?? 0,
+      hidden: totals?.hidden ?? 0,
+      out_of_stock: totals?.out_of_stock ?? 0,
+      featured: totals?.featured ?? 0,
+    },
+    weekly: weeks,
+    sales_30d: {
+      units: sales30?.units ?? 0,
+      orders: sales30?.orders ?? 0,
+      ...(financial ? { gross_iqd: sales30?.gross ?? 0 } : {}),
+    },
+    sales_daily: days,
   });
 });
 

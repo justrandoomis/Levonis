@@ -102,9 +102,14 @@ export interface ListingItem {
   stock: number | null;
   is_featured: boolean;
   brand_id: string | null;
+  sku: string | null;
   image: string;
   updated_at: string;
   doc_version: number;
+  created_at: string | null;
+  /** Units sold across non-cancelled orders (list projection only). */
+  sold: number;
+  stock_reserved?: number;
 }
 
 export interface ListingResponse {

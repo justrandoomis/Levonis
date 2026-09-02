@@ -464,6 +464,11 @@ export function publicWithDisplayPrice(
 ): Record<string, unknown> {
   const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
   const out = publicShape(doc);
+  // §7: the stock a buyer sees is what they can still buy — the base units
+  // minus the holds open checkouts have taken. Raw stock (and the holds
+  // themselves) stay admin-side numbers.
+  const heldBase = Number(row.stock_reserved ?? 0);
+  if (doc.stock !== null && heldBase > 0) out.stock = Math.max(0, doc.stock - heldBase);
   const levels: Array<{ optionId?: string; colorId?: string }> = [{}];
   for (const o of doc.options) if (o.active !== false) levels.push({ optionId: o.id });
   for (const col of doc.colors) if (col.active !== false) levels.push({ colorId: col.id });
@@ -658,6 +663,9 @@ productRoutes.get('/:slug', async (c) => {
       transportDefaults: ctx.transportDefaults,
     });
     const out = publicShape(doc);
+    // Same §7 rule as the list projection: held units are not for sale.
+    const heldBase = Number(row.stock_reserved ?? 0);
+    if (doc.stock !== null && heldBase > 0) out.stock = Math.max(0, doc.stock - heldBase);
     out.display_price_iqd = resolved.applied_iqd;
     out.display_applied_tier = resolved.applied_tier;
     out.display_regular_iqd = resolved.regular_iqd;

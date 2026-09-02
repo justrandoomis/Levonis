@@ -238,19 +238,26 @@ async function main() {
       continue;
     }
 
-    // §1: 44-48px controls. This is the check the form suite could not make,
-    // because with no images there was nothing here to measure.
+    // Control sizes. §1 asked for 44-48px, but the owner's density mandate
+    // later shrank every admin BUTTON to the 36px scale (same reasoning as
+    // e2e-import-ui); inputs and selects keep the 40px floor.
     const touch = await page.evaluate(() => {
-      const labels = ['اجعلها رئيسية', 'للأعلى', 'للأسفل', 'حذف', 'Alt text', 'ربط الصورة'];
-      const out = {};
-      for (const l of labels) {
+      const buttons = ['اجعلها رئيسية', 'للأعلى', 'للأسفل', 'حذف'];
+      const fields = ['Alt text', 'تظهر مع'];
+      const min = (l) => {
         const els = [...document.querySelectorAll(`[aria-label="${l}"]`)];
-        out[l] = els.length ? Math.round(Math.min(...els.map((e) => e.getBoundingClientRect().height))) : 0;
-      }
-      return out;
+        return els.length ? Math.round(Math.min(...els.map((e) => e.getBoundingClientRect().height))) : 0;
+      };
+      return {
+        buttons: Object.fromEntries(buttons.map((l) => [l, min(l)])),
+        fields: Object.fromEntries(fields.map((l) => [l, min(l)])),
+      };
     });
-    for (const [name, h] of Object.entries(touch)) {
-      check(`${width}px — "${name}" is at least 44px tall`, h >= 44, `${h}px`);
+    for (const [name, h] of Object.entries(touch.buttons)) {
+      check(`${width}px — "${name}" is at least 36px tall`, h >= 36, `${h}px`);
+    }
+    for (const [name, h] of Object.entries(touch.fields)) {
+      check(`${width}px — "${name}" is at least 40px tall`, h >= 40, `${h}px`);
     }
 
     // Nothing in the gallery may push the page sideways on a phone.
@@ -261,7 +268,7 @@ async function main() {
 
     const spill = await page.evaluate(() => {
       let worst = 0;
-      for (const el of document.querySelectorAll('[aria-label="ربط الصورة"], [aria-label="اجعلها رئيسية"]')) {
+      for (const el of document.querySelectorAll('[aria-label="تظهر مع"], [aria-label="اجعلها رئيسية"]')) {
         const r = el.getBoundingClientRect();
         worst = Math.max(worst, Math.ceil(r.right) - window.innerWidth, Math.ceil(-r.left));
       }
@@ -294,20 +301,32 @@ async function main() {
     );
     check(`${width}px — exactly one card is badged primary`, primaryCount === 1, `badges=${primaryCount}`);
 
-    // ---- BIND: link the first image to the colour.
-    const select = page.locator('[aria-label="ربط الصورة"]').first();
-    await select.selectOption(`c:${colorId}`);
+    // ---- BIND: link the first image to the colour. The partitioned gallery
+    // (general → option-linked → colour-linked) MOVES a bound card into its
+    // group, so the binding is asserted across all selects, not on .first().
+    await page.locator('[aria-label="تظهر مع"]').first().selectOption(`c:${colorId}`);
     await page.waitForTimeout(300);
+    const bindVals = () =>
+      page.evaluate(() => [...document.querySelectorAll('[aria-label="تظهر مع"]')].map((e) => e.value));
     check(
       `${width}px — an image can be bound to a colour`,
-      (await select.inputValue()) === `c:${colorId}`,
-      await select.inputValue()
+      (await bindVals()).includes(`c:${colorId}`),
+      JSON.stringify(await bindVals())
     );
-    // And to an option value, on the second card.
-    const select2 = page.locator('[aria-label="ربط الصورة"]').nth(1);
-    await select2.selectOption(`o:${valueId}`);
+    // And to an option value, on the first still-general card.
+    await page.locator('[aria-label="تظهر مع"]').first().selectOption(`o:${valueId}`);
     await page.waitForTimeout(300);
-    check(`${width}px — an image can be bound to an option value`, (await select2.inputValue()) === `o:${valueId}`);
+    check(
+      `${width}px — an image can be bound to an option value`,
+      (await bindVals()).includes(`o:${valueId}`),
+      JSON.stringify(await bindVals())
+    );
+
+    // What the gallery shows NOW (post-bind regrouping) is the order the save
+    // must persist — UI↔DB fidelity, not a snapshot from before the binds.
+    const finalUi = await page.evaluate(() =>
+      [...document.querySelectorAll('[aria-label="Alt text"]')].map((e) => e.value)
+    );
 
     // ---- SAVE, then read the DATABASE, not the DOM.
     const saveBtn = page.locator('[data-form="save-bar"] [data-action="save"]').first();
@@ -326,9 +345,9 @@ async function main() {
         JSON.stringify(ordered.map((i) => [i.alt_en, i.is_primary]))
       );
       check(
-        `${width}px — the reorder reached the database`,
-        JSON.stringify(ordered.map((i) => i.alt_en)) === JSON.stringify(after),
-        `db=${JSON.stringify(ordered.map((i) => i.alt_en))} ui=${JSON.stringify(after)}`
+        `${width}px — the saved order matches what the gallery showed`,
+        JSON.stringify(ordered.map((i) => i.alt_en)) === JSON.stringify(finalUi),
+        `db=${JSON.stringify(ordered.map((i) => i.alt_en))} ui=${JSON.stringify(finalUi)}`
       );
       check(
         `${width}px — the colour binding reached the database`,

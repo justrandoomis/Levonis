@@ -27,7 +27,18 @@ import { inflateSync } from 'node:zlib';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { chromium } = require('playwright-core');
+// Same resolution chain as the other browser suites: local playwright first,
+// then playwright-core, then the machine-global install.
+let chromium;
+try {
+  ({ chromium } = require('playwright'));
+} catch {
+  try {
+    ({ chromium } = require('playwright-core'));
+  } catch {
+    ({ chromium } = require('/opt/node22/lib/node_modules/playwright/index.js'));
+  }
+}
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8787';
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
@@ -223,15 +234,22 @@ async function main() {
   // =====================================================================
   console.log('\n— (a) /auth: method organisation, fill progress, OTP boxes');
   await page.goto(`${BASE}/auth`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('[role="tab"]', { timeout: 15000 });
-
-  const tabs = await page.$$eval('[role="tab"]', (els) => els.map((e) => ({
-    label: (e.textContent || '').trim(), selected: e.getAttribute('aria-selected'),
-  })));
-  check('UI-01 the four sign-in methods are ONE tab row, not four stacked forms',
-    tabs.length === 4 && tabs.filter((t) => t.selected === 'true').length === 1, JSON.stringify(tabs).slice(0, 200));
-  const panels = await page.$$eval('[role="tabpanel"]', (els) => els.length);
-  check('UI-01 exactly one method panel is mounted at a time', panels === 1, `panels=${panels}`);
+  // The approved redesign replaced the method tabs: email/password is the
+  // PRIMARY interface, visible immediately, with Google and Telegram as
+  // secondary actions under the «أو» seam.
+  await page.waitForSelector('#identifier', { timeout: 15000 });
+  check('UI-01 the primary email/password form is visible immediately (no tab step)',
+    !!(await page.$('#identifier')) && !!(await page.$('#signin-submit')));
+  // Providers this deployment does not have simply do not appear — the check
+  // matches what capabilities actually offer instead of demanding buttons a
+  // sandbox without Google/Telegram cannot render.
+  const authCaps = await page.evaluate(() =>
+    fetch('/api/auth/capabilities').then((r) => r.json()).catch(() => ({})));
+  const socialCount = await page.$$eval('button.lv-social', (els) =>
+    els.filter((e) => e.offsetParent !== null).length);
+  check('UI-01 secondary methods match capabilities (buttons under the seam, none invented)',
+    authCaps.telegram ? socialCount >= 1 : socialCount === 0,
+    `social buttons=${socialCount} caps.telegram=${!!authCaps.telegram}`);
   const formCount = await page.$$eval('form', (els) => els.filter((f) => f.offsetParent !== null).length);
   check('UI-01 the page shows a single visible form (no long column of every method)',
     formCount === 1, `visible forms=${formCount}`);
@@ -318,7 +336,16 @@ async function main() {
 
   // OTP boxes: the Telegram OTP step is reached with a PLANTED challenge —
   // exactly the row a verified Telegram share would have written. Nothing
-  // about Telegram DELIVERY is claimed here (that stays blocked).
+  // about Telegram DELIVERY is claimed here (that stays blocked). The
+  // redesigned /auth offers the Telegram entry ONLY when capabilities report
+  // a real bot (a live getMe), so without one the step is honestly blocked
+  // rather than driven through markup that no longer exists.
+  const capsTelegram = !!(await page.evaluate(() =>
+    fetch('/api/auth/capabilities').then((r) => r.json()).then((d) => d.telegram).catch(() => false)));
+  if (!capsTelegram) {
+    blocked('§2.4 the six-box OTP step driven through the real /auth UI',
+      'capabilities.telegram is false in this sandbox (no TELEGRAM_BOT_TOKEN / getMe), so the redesigned page never offers the Telegram entry');
+  } else {
   const contToken = randomBytes(24).toString('hex');
   const chId = `lc_ui_${rnd}`;
   const expires = new Date(Date.now() + 15 * 60_000).toISOString();
@@ -335,7 +362,9 @@ async function main() {
   }, [contToken, expires]);
   await page.goto(`${BASE}/auth`, { waitUntil: 'networkidle' });
   await switchToSignup(page);
-  await page.click('[role="tab"]:has-text("تيليغرام")', { timeout: 15000, force: true });
+  // The redesign enters the Telegram flow through the secondary action under
+  // the «أو» seam, not a method tab.
+  await page.click('button.lv-social:has-text("تيليغرام")', { timeout: 15000, force: true });
   let otpVisible = false;
   try {
     await page.waitForSelector('.lv-otp__box', { timeout: 15000 });
@@ -380,6 +409,7 @@ async function main() {
       afterBs.length === 5 && otpReady2 === 'false', `boxes="${afterBs}" ready=${otpReady2}`);
     const pwOnPath = await page.$('#tg-auth-password');
     check('§2.1 the Telegram sign-up step offers the OPTIONAL password (the phone + password account)', !!pwOnPath);
+  }
   }
   blocked('AUTH-06 real Telegram delivery, the contact-ownership share and the resend cooldown',
     'TELEGRAM_BOT_TOKEN and an authorised bot are not configured in this sandbox (docs/DECISIONS.md row 26) — the OTP STEP is driven from a planted verified challenge; delivery is not claimed');
@@ -555,7 +585,10 @@ async function main() {
     await adminPage.waitForSelector('[role="dialog"]', { timeout: 20000 });
     // The dialog body is lazy-loaded; wait for the real import controls so the
     // "the confirm button is visible" claim is about the ACTION, not the ✕.
-    await adminPage.waitForSelector('[role="dialog"] textarea, [role="dialog"] input[type="file"]', { timeout: 30000 });
+    // The CSV/ZIP panel's file input is a hidden label-driven one, so the
+    // visible proof of the loaded body is its section select (or the legacy
+    // tab's textarea).
+    await adminPage.waitForSelector('[role="dialog"] [data-import="section"], [role="dialog"] textarea', { timeout: 30000 });
     await adminPage.waitForTimeout(400);
     importOpened = true;
   } catch (e) {
