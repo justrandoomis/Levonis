@@ -51,6 +51,18 @@ test('parseHashtagsCell reads the stored JSON and never throws on garbage', () =
   assert.deepEqual(parseHashtagsCell('{"a":1}'), []);
 });
 
+test('folding is Unicode-wide, which SQLite NOCASE is not', () => {
+  // The table's NOCASE index folds ASCII and nothing else, so `Çap` and `çap`
+  // do not collide in it. Every count, lookup and rename in the worker keys
+  // on hashtagKey instead — and so does the write path, which is what keeps
+  // one tag from becoming two rows.
+  assert.equal(hashtagKey('Çap'), hashtagKey('çap'));
+  assert.equal(hashtagKey('Über'), hashtagKey('über'));
+  assert.equal(hashtagKey('Édition'), hashtagKey('édition'));
+  assert.notEqual(hashtagKey('Çap'), hashtagKey('Cap'));
+  assert.deepEqual(dedupeHashtags(['Çap', 'çap', 'ÇAP']), ['Çap']);
+});
+
 test('migration 0041 is additive and case-insensitively unique on the tag', () => {
   const sql = readFileSync('migrations/0041_hashtags.sql', 'utf8');
   assert.match(sql, /CREATE TABLE IF NOT EXISTS hashtags/);

@@ -892,6 +892,7 @@ adminImportRoutes.post('/confirm', async (c) => {
   };
   const products = payload.products ?? [];
   const report: ReportRow[] = [];
+  const importedTags: string[] = [];
   let created = 0;
   let updated = 0;
   let failedCount = 0;
@@ -975,8 +976,10 @@ adminImportRoutes.post('/confirm', async (c) => {
         console.error('import translation write failed', productId, e instanceof Error ? e.message : String(e));
       }
       if (localized.review_needed.length) reviewNeeded.push(`${key}: ${localized.review_needed.join(', ')}`);
-      // A tag typed into the sheet becomes an option for the next template.
-      await registerHashtags(c.env.DB, doc.hashtags, newId);
+      // Collected here and registered ONCE after the loop: registration reads
+      // the vocabulary to fold tags itself, and doing that per product would
+      // be one extra read for every row of a 500-row import.
+      importedTags.push(...doc.hashtags);
 
       report.push({
         key,
@@ -994,6 +997,10 @@ adminImportRoutes.post('/confirm', async (c) => {
       failedCount++;
     }
   }
+
+  // Every tag the file carried joins the vocabulary, so the next template
+  // download offers it. One call for the whole import, not one per product.
+  await registerHashtags(c.env.DB, importedTags, newId);
 
   // Rows the preview already rejected are skipped, and say so by name.
   const previewRows = JSON.parse(String(rec.report || '[]')) as PreviewRow[];

@@ -4,7 +4,7 @@ import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http
 import { newId, } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { FAMILIES, fieldsFor, isTemplateFamily } from '../lib/templateFamilies';
-import { hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
+import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
 
 /**
  * Database-managed category tree, facets and brands — mandate §4 and §9:
@@ -602,11 +602,10 @@ adminTaxonomyRoutes.post('/hashtags', async (c) => {
 
   // Another row already spelling this tag: on a create that row is what the
   // admin meant (adopting an unmanaged tag lands here), on a rename it is a
-  // real clash.
-  const clash = await c.env.DB
-    .prepare('SELECT * FROM hashtags WHERE tag = ? COLLATE NOCASE AND id <> ?')
-    .bind(tag, byId?.id ?? '')
-    .first<HashtagRow>();
+  // real clash. Matched with the module's own folding, not with the table's
+  // NOCASE collation — that one only folds ASCII, so `Çap` would not see
+  // `çap` and the rename would strand it.
+  const clash = await findHashtagRow<HashtagRow>(c.env.DB, tag, byId?.id ?? '');
   if (clash && byId) throw badRequest(`"${tag}" is already a hashtag`, 'HASHTAG_TAKEN');
   const existing = byId ?? clash;
   // Adopting or re-adding a tag that exists in another case keeps the stored
@@ -638,10 +637,7 @@ adminTaxonomyRoutes.post('/hashtags', async (c) => {
       .bind(newId('tag'), spelling, nameAr, sort, active)
       .run();
   }
-  const fresh = await c.env.DB
-    .prepare('SELECT * FROM hashtags WHERE tag = ? COLLATE NOCASE')
-    .bind(spelling)
-    .first<HashtagRow>();
+  const fresh = await findHashtagRow<HashtagRow>(c.env.DB, spelling);
   await audit(c.env.DB, admin.id, existing ? 'hashtag.update' : 'hashtag.create', fresh?.id ?? key, {
     tag: spelling,
     previous: existing?.tag ?? null,

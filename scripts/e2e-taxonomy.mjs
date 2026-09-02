@@ -275,12 +275,40 @@ async function main() {
   r = await admin.del(`/api/admin/taxonomy/hashtags/${typedRow?.id}?strip=1`);
   product = (await admin.get(`/api/admin/products-v2/${productId}`)).data?.product;
   check('delete with strip=1 removes the row and the product tag', r.status === 200 && r.data?.products_updated === 1 && !product?.hashtags.includes(`renamed-${rnd}`), JSON.stringify(product?.hashtags));
+  // SQLite's NOCASE folds ASCII only, so a non-ASCII case pair is where a
+  // second vocabulary row for one tag would appear if the write path trusted
+  // the index instead of folding the tags itself.
+  const uniA = `Çap-${rnd}`;
+  const uniB = `çap-${rnd}`;
+  r = await admin.post('/api/admin/products-v2', {
+    name_en: `E2E Unicode A ${rnd}`, name_ar: `يونيكود أ ${rnd}`, price_iqd: 7000, status: 'draft',
+    category_id: rootId, hashtags: [uniA], sale_types: ['direct_sale'], media: [],
+  });
+  const uniProductA = r.data?.product?.id;
+  r = await admin.post('/api/admin/products-v2', {
+    name_en: `E2E Unicode B ${rnd}`, name_ar: `يونيكود ب ${rnd}`, price_iqd: 7000, status: 'draft',
+    category_id: rootId, hashtags: [uniB], sale_types: ['direct_sale'], media: [],
+  });
+  check('two products carry the same tag in two cases', r.status === 200 && !!uniProductA);
+  tags = (await admin.get('/api/admin/taxonomy/hashtags')).data?.hashtags ?? [];
+  const uniRows = tags.filter((t) => t.tag.toLowerCase() === uniA.toLowerCase());
+  check('a non-ASCII case pair is ONE vocabulary row, counted once per product', uniRows.length === 1 && uniRows[0].product_count === 2, JSON.stringify(uniRows));
+  r = await admin.post('/api/admin/taxonomy/hashtags', { id: uniRows[0]?.id, tag: `çapkirin-${rnd}` });
+  check('renaming it moves BOTH products, none stranded', r.status === 200 && r.data?.products_updated === 2, JSON.stringify(r.data).slice(0, 140));
+  tags = (await admin.get('/api/admin/taxonomy/hashtags')).data?.hashtags ?? [];
+  check('and no sibling row is left behind', tags.filter((t) => t.tag.toLowerCase().startsWith(`çap-${rnd}`.toLowerCase())).length === 0);
+
   r = await admin.post('/api/admin/taxonomy/hashtags', { id: tagId, active: false });
   tags = (await admin.get('/api/admin/taxonomy/hashtags')).data?.hashtags ?? [];
   check('a hashtag can be deactivated', tags.find((t) => t.id === tagId)?.active === false);
   r = await admin.post('/api/admin/taxonomy/hashtags', { id: tagId, active: true });
 
   // ----------------------------------------------------------- 5. template
+  r = await admin.post('/api/admin/taxonomy/brands', { id: brandId, active: false });
+  const brandsList = (await admin.get('/api/admin/taxonomy/brands')).data?.brands ?? [];
+  check('a deactivated brand is still LISTED for the admin, flagged inactive', brandsList.find((b) => b.id === brandId)?.active === false);
+  r = await admin.post('/api/admin/taxonomy/brands', { id: brandId, active: true });
+
   console.log('\n5. the template follows the taxonomy');
   r = await admin.get('/api/admin/import/lookups');
   check('lookups endpoint lists the new section, sub-section, brand, filter and hashtag',
@@ -327,7 +355,10 @@ async function main() {
   const expEntries = unzipSync(new Uint8Array(await expRes.arrayBuffer()));
   check('export ZIP carries lookups.csv too', expRes.status === 200 && !!expEntries['lookups.csv']);
   const expRows = parseCsv(strFromU8(expEntries['data.csv'] ?? new Uint8Array()));
-  const expProduct = expRows.find((x) => x[0] === 'product');
+  // The section holds several products by now, so the row is found by NAME,
+  // not by being the first product line in the sheet.
+  const nameCol = expRows[0].indexOf('name');
+  const expProduct = expRows.find((x) => x[0] === 'product' && x[nameCol] === `E2E Taxonomy Product ${rnd}`);
   check('export writes the product hashtags into the hashtags column', expProduct?.[expRows[0].indexOf('hashtags')] === 'PLA', JSON.stringify(expProduct?.[expRows[0].indexOf('hashtags')]));
 
   // ------------------------------------------------------------- 6. import

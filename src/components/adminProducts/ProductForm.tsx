@@ -308,10 +308,17 @@ export default function ProductForm({
     [catalogs, doc.category_id]
   );
   const filteredBrands = useMemo(() => {
+    // Sections and facets were already filtered to the active ones; brands
+    // were not, and deactivating one is a single click in التصنيفات now. An
+    // inactive brand is exactly what the importer refuses, so offering it in
+    // the form would let the two disagree about the same product. The brand
+    // a product ALREADY carries stays in the list, or editing that product
+    // would silently drop its brand.
+    const live = brands.filter((b) => b.active || b.id === doc.brand_id);
     const q = brandSearch.trim().toLowerCase();
-    if (!q) return brands.slice(0, 200);
-    return brands.filter((b) => `${b.name_en} ${b.name_ar} ${b.slug}`.toLowerCase().includes(q)).slice(0, 200);
-  }, [brands, brandSearch]);
+    if (!q) return live.slice(0, 200);
+    return live.filter((b) => `${b.name_en} ${b.name_ar} ${b.slug}`.toLowerCase().includes(q)).slice(0, 200);
+  }, [brands, brandSearch, doc.brand_id]);
 
   const dirty = baseline !== '' && JSON.stringify({ d: doc, rs: rel }) !== baseline;
 

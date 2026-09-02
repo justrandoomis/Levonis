@@ -109,9 +109,18 @@ export async function hashtagUsage(db: D1Database): Promise<Map<string, HashtagU
 }
 
 /**
- * Adds tags to the vocabulary when they are not there yet. Never throws: the
- * product save this runs after must not fail because the vocabulary table is
- * missing on a database that has not run migration 0041 yet.
+ * Adds tags to the vocabulary when they are not there yet.
+ *
+ * THE EXISTING ROWS ARE READ AND FOLDED IN JS, and the unique index is only a
+ * backstop. SQLite's NOCASE collation folds ASCII and nothing else: `Çap` and
+ * `çap` do not collide in the index, so `INSERT OR IGNORE` alone would put
+ * two rows in the table for what `hashtagKey` (and therefore every count,
+ * lookup and rename) treats as one tag — a duplicate in the template, a
+ * doubled product count, and a rename that strands the sibling. Folding here
+ * makes the write path agree with the rest of the module for all of Unicode.
+ *
+ * Never throws: the product save this runs after must not fail because the
+ * vocabulary table is missing on a database that has not run 0041 yet.
  */
 export async function registerHashtags(
   db: D1Database,
@@ -121,12 +130,31 @@ export async function registerHashtags(
   const clean = dedupeHashtags(tags);
   if (clean.length === 0) return;
   try {
+    const { results } = await db.prepare('SELECT tag FROM hashtags').all<{ tag: string }>();
+    const known = new Set(results.map((r) => hashtagKey(r.tag)));
+    const missing = clean.filter((tag) => !known.has(hashtagKey(tag)));
+    if (missing.length === 0) return;
     await db.batch(
-      clean.map((tag) => db.prepare('INSERT OR IGNORE INTO hashtags (id, tag) VALUES (?, ?)').bind(newId('tag'), tag))
+      missing.map((tag) => db.prepare('INSERT OR IGNORE INTO hashtags (id, tag) VALUES (?, ?)').bind(newId('tag'), tag))
     );
   } catch (e) {
     console.error('hashtag registration skipped', e instanceof Error ? e.message : String(e));
   }
+}
+
+/**
+ * The vocabulary row a tag names, matched the way the rest of this module
+ * matches — folded in JS, so a non-ASCII pair is one tag here too.
+ */
+export async function findHashtagRow<T extends { id: string; tag: string }>(
+  db: D1Database,
+  tag: string,
+  exceptId = ''
+): Promise<T | null> {
+  const key = hashtagKey(tag);
+  if (!key) return null;
+  const { results } = await db.prepare('SELECT * FROM hashtags').all<T>();
+  return results.find((r) => r.id !== exceptId && hashtagKey(r.tag) === key) ?? null;
 }
 
 /**

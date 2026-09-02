@@ -137,7 +137,7 @@ regression is covered by `scripts/e2e-taxonomy.mjs`.
 
 | suite | what it covers |
 |---|---|
-| `scripts/e2e-taxonomy.mjs` (64) | the tree and inheritance, loop refusal, delete-vs-deactivate for sections / brands / filters, the whole hashtag lifecycle, every new value appearing in `/lookups`, in the CSV lookup block, in `lookups.csv` and in the README, and an import whose `hashtags` column registers a new tag |
+| `scripts/e2e-taxonomy.mjs` (69) | the tree and inheritance, loop refusal, delete-vs-deactivate for sections / brands / filters, the whole hashtag lifecycle, every new value appearing in `/lookups`, in the CSV lookup block, in `lookups.csv` and in the README, and an import whose `hashtags` column registers a new tag |
 | browser probe (38) | add / edit / toggle / delete from the UI, Arabic and English, 390px with no horizontal scroll, quick-add selecting the new row, arrow keys between tabs, focus returning to the button that opened a dialog, the import panel's accepted-values box |
 | `tests/hashtags.test.ts`, `tests/importCsv.test.ts` | normalization, the lookup block parsing back with zero errors, the round-trip with the new column |
 | `e2e-import`, `e2e-import-ui`, `e2e-product-form`, `api-tests-v2` | the pipeline and the form still pass unchanged |
@@ -167,6 +167,17 @@ skeptics. The ones that survived, and what they cost:
   check. The box renders nothing until it is opened.
 * **A live region that appears with its text is not announced**, so the page's
   result line is now permanently mounted and only its content changes.
+* **`COLLATE NOCASE` folds ASCII and nothing else.** `Çap` and `çap` do not
+  collide in the index, while `hashtagKey` folds all of Unicode — so one tag
+  became two vocabulary rows, each claiming both products, listed twice in the
+  template, and a rename moved both products while stranding the sibling. The
+  write path now reads the rows and folds them itself; the index stays as a
+  cheap backstop, and an import registers its tags once rather than per row.
+* **The product form offered deactivated brands.** Sections and filters were
+  filtered by `active`, brands were not — harmless until this round made
+  deactivating a brand one click, at which point the form would assign a brand
+  the importer refuses. The list is filtered, keeping whatever brand the
+  product already carries.
 * Plus: hints bound to their controls, checkbox hints outside the label, a
   real `tablist` with one tab stop and RTL-aware arrows, Kurdish names read
   rather than only collected, chips keyed by id, and focus parked on the add
