@@ -126,49 +126,46 @@ jobs:
           # --compressed on EVERY fetch: the edge serves these gzipped, and a
           # grep over compressed bytes finds nothing and calls it a miss.
           html=$(curl -s --compressed --max-time 25 "$APEX/admin")
-          # Vite emits hashed asset names; take every JS module the page loads.
-          assets=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
-          if [ -z "$assets" ]; then
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          if [ -z "$entries" ]; then
             echo "  FAIL /admin served no JS module. First 400 bytes:"
             printf '%s' "$html" | head -c 400
             exit 1
           fi
-          echo "  modules served by /admin:"
-          printf '    %s\n' $assets
-          found=0
-          for a in $assets; do
-            # Written to a FILE, never piped into grep: `grep -q` stops at the
-            # first match, the writer takes SIGPIPE, and `pipefail` then reads
-            # a successful match as a failed pipeline. That is what made this
-            # check report a screen that was in fact deployed as missing.
-            curl -s --compressed --max-time 60 -o /tmp/asset.js "$APEX$a"
-            bytes=$(wc -c < /tmp/asset.js)
-            if grep -q 'data-tax-tab' /tmp/asset.js; then
-              echo "  ok   $a carries the taxonomy screen ($bytes bytes)"
-              found=1
-              # The screen alone is not the round: this marker is the
-              # quick-add the product form grew with it.
-              if grep -q 'data-quick-add-open' /tmp/asset.js; then
-                echo "  ok   $a carries the product form's quick-add too"
-              else
-                echo "  FAIL $a has the screen but not the quick-add"
-                exit 1
-              fi
-              if grep -q 'lookups-toggle' /tmp/asset.js; then
-                echo "  ok   $a carries the import panel's accepted-values box"
-              else
-                echo "  FAIL $a has the screen but not the accepted-values box"
-                exit 1
-              fi
-              break
-            else
-              echo "  --   $a does not carry it ($bytes bytes)"
-            fi
+          mkdir -p /tmp/mods
+          # The page names only its ENTRY. The product form and the import
+          # panel are lazy chunks, referenced by name from inside that entry,
+          # so the entry has to be read to find out what else to fetch.
+          all=""
+          for a in $entries; do
+            f=/tmp/mods/$(basename "$a")
+            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
+            all="$all $f"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
+            done
           done
-          if [ $found -eq 0 ]; then
-            echo "  FAIL none of the served modules carries the taxonomy screen"
-            exit 1
-          fi
+          echo "  modules read: $(echo $all | wc -w)"
+          for f in $all; do echo "    $(basename "$f") ($(wc -c < "$f") bytes)"; done
+          fail=0
+          # Written to FILES, never piped into grep: `grep -q` stops at the
+          # first match, the writer takes SIGPIPE, and `pipefail` then reads a
+          # successful match as a failed pipeline.
+          want() { # marker, what it is
+            hit=$(grep -l "$1" $all 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 — no served module contains $1"
+              fail=1
+            fi
+          }
+          want 'data-tax-tab'        'the التصنيفات screen'
+          want 'data-quick-add-open' "the product form's quick-add"
+          want 'lookups-toggle'      "the import panel's accepted-values box"
+          exit $fail
 
       - name: Result
         if: always()
