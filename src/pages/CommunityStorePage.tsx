@@ -8,23 +8,88 @@
  * (slug first, then the id endpoint that accepts either id), and the page
  * renders the same Storefront profile the subdomain serves.
  *
- * THE LEGACY FALLBACK IS DELIBERATE. A merchant from the pre-store era can
- * hold a community profile with no `merchant_stores` row at all — nothing to
- * resolve — and their page must keep working exactly as it always has
- * (including the pinned «مراسلة» behaviour), so they fall through to the old
- * MerchantStore component rather than to a "no store" dead end.
+ * A merchant from the pre-store era can hold a community profile with no
+ * `merchant_stores` row at all — nothing to resolve. They still get the SAME
+ * reference profile: a synthetic store view is assembled from their real
+ * community data (name, avatar, bio, followers, their legacy products,
+ * joined date) and rendered in profile-only mode, where the primary action
+ * is the pinned «مراسلة» conversation. Only a merchant that does not exist
+ * at all falls through to the legacy page's not-found state.
  */
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { storefrontApi, type MerchantStore as StoreShape } from '../lib/merchant';
+import { api } from '../lib/api';
+import { storefrontApi, type MerchantStore as StoreShape, type MerchantProduct } from '../lib/merchant';
 import Storefront from './Storefront';
 import MerchantStore from './MerchantStore';
+
+interface LegacyMerchant {
+  id: string;
+  user_id: string;
+  name: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  verified: boolean;
+  created_at: string;
+}
+
+interface LegacyStorePayload {
+  merchant: LegacyMerchant;
+  products: Array<Record<string, unknown>>;
+  followers: number;
+  following: boolean;
+}
+
+/** The reference profile, fed by the community profile's real data. */
+function syntheticStore(d: LegacyStorePayload): StoreShape {
+  return {
+    id: `profile-${d.merchant.id}`,
+    merchant_id: d.merchant.id,
+    slug: '',
+    url: '',
+    name: d.merchant.name,
+    tagline: '',
+    description: d.merchant.bio ?? '',
+    logoUrl: d.merchant.avatarUrl,
+    bannerUrl: null,
+    accent: 'default',
+    categories: [],
+    governorate: '',
+    service_areas: [],
+    contact_phone: null,
+    business_hours: [],
+    policies: {},
+    social_links: {},
+    accepts_custom_requests: false,
+    sells_direct_products: true,
+    status: 'active',
+    open: true,
+    followers: d.followers,
+    product_count: d.products.length,
+    positive_pct: null,
+    deal_count: 0,
+    profile_links: [],
+    profile_facts: [],
+    profile_facts_configured: false,
+    created_at: d.merchant.created_at,
+    merchant: {
+      id: d.merchant.id,
+      name: d.merchant.name,
+      verified: d.merchant.verified,
+      badge: 'new',
+      rating: null,
+      rating_count: 0,
+      completed_orders: 0,
+    },
+  };
+}
 
 export default function CommunityStorePage() {
   const { id } = useParams<{ id: string }>();
   const [store, setStore] = useState<StoreShape | null>(null);
+  const [profileProducts, setProfileProducts] = useState<MerchantProduct[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +97,7 @@ export default function CommunityStorePage() {
     let alive = true;
     setLoading(true);
     setStore(null);
+    setProfileProducts(null);
     storefrontApi
       .store(id)
       .catch(() => storefrontApi.storeById(id))
@@ -47,7 +113,7 @@ export default function CommunityStorePage() {
           try {
             if (new URL(url).origin !== window.location.origin) {
               // Keep the loader on screen until the browser actually leaves —
-              // dropping it would flash the legacy page mid-handover.
+              // dropping it would flash another page mid-handover.
               window.location.replace(url);
               return;
             }
@@ -58,8 +124,16 @@ export default function CommunityStorePage() {
         setStore(d.store);
         setLoading(false);
       })
-      .catch(() => {
-        /* no store row — the legacy page below owns this case, not-found included */
+      .catch(async () => {
+        // No store row — assemble the profile-only view from community data.
+        try {
+          const d = await api.get<LegacyStorePayload>(`/api/community/store/${encodeURIComponent(id)}`);
+          if (!alive) return;
+          setStore(syntheticStore(d));
+          setProfileProducts((d.products ?? []) as unknown as MerchantProduct[]);
+        } catch {
+          /* merchant truly gone — the legacy page below owns not-found */
+        }
         if (alive) setLoading(false);
       });
     return () => {
@@ -74,5 +148,9 @@ export default function CommunityStorePage() {
       </div>
     );
   }
-  return store ? <Storefront store={store} /> : <MerchantStore />;
+  return store ? (
+    <Storefront store={store} profileProducts={profileProducts ?? undefined} />
+  ) : (
+    <MerchantStore />
+  );
 }

@@ -62,7 +62,10 @@ type Tab = 'products' | 'sections' | 'deals' | 'services' | 'showcase' | 'about'
  *  the visitor signed in across the hop. */
 const MAIN_SITE = 'https://levonis-iq.com';
 
-export default function Storefront({ store: injected }: { store?: MerchantStore | null } = {}) {
+export default function Storefront({
+  store: injected,
+  profileProducts,
+}: { store?: MerchantStore | null; profileProducts?: MerchantProduct[] } = {}) {
   const { slug: routeSlug } = useParams<{ slug: string }>();
   const location = useLocation();
   const { loc, lang } = useLanguage();
@@ -220,6 +223,10 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
 
   const links = (store.profile_links ?? []).filter((w) => w.visible !== false && w.url).slice(0, 3);
   const facts = factsWithFallback(store, loc, lang);
+  // A community merchant with no store row gets the same reference profile,
+  // assembled from their real profile data. The primary action there is the
+  // conversation itself, and product cards walk into the legacy product page.
+  const profileOnly = !store.slug;
 
   const TABS: Array<{ id: Tab; label: string; show: boolean }> = [
     { id: 'products', label: loc('المنتجات', 'Products', 'بەرهەمەکان'), show: true },
@@ -284,7 +291,11 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             </div>
             <div className="min-w-0 flex-1 pt-2.5">
               <h1 className="text-white font-bold text-[17px] leading-tight truncate" dir="auto">{store.name}</h1>
-              <p className="text-zinc-400 text-[12px] truncate">@{store.slug}</p>
+              {profileOnly ? (
+                <p className="text-zinc-400 text-[12px] truncate" dir="auto">{joinedLine(store.created_at, loc, lang)}</p>
+              ) : (
+                <p className="text-zinc-400 text-[12px] truncate">@{store.slug}</p>
+              )}
               {store.merchant.rating !== null ? (
                 <span className="inline-flex items-center gap-1 text-[12.5px] mt-1">
                   <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
@@ -381,7 +392,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
               the right, and the outlined follow pill on the left with the
               share link living inside the pill's far-left end. */}
           <div dir="rtl" className="flex gap-4 mb-4">
-            <ContactButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} accentBtn={accent.btn} />
+            <ContactButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} accentBtn={accent.btn} profileOnly={profileOnly} />
             <div className="relative flex-[1.08] min-w-0">
               <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} />
               <SharePin url={store.url} name={store.name} loc={loc} />
@@ -421,6 +432,7 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
             accentText={accent.text}
             savedIds={savedIds}
             onToggleSave={toggleSave}
+            injected={profileOnly ? (profileProducts ?? []) : undefined}
           />
         )}
         {tab === 'sections' && (
@@ -438,10 +450,14 @@ export default function Storefront({ store: injected }: { store?: MerchantStore 
         {tab === 'about' && (
           <div className="space-y-4">
             <AboutTab store={store} />
-            <div>
-              <h2 className="text-white font-bold text-[15px] mb-3">{loc('التقييمات', 'Reviews', 'هەڵسەنگاندنەکان')}</h2>
-              <ReviewsTab slug={slug} />
-            </div>
+            {/* Store reviews are slug-scoped; a profile-only merchant has no
+                review history to show, and an empty promise helps nobody. */}
+            {!profileOnly && (
+              <div>
+                <h2 className="text-white font-bold text-[15px] mb-3">{loc('التقييمات', 'Reviews', 'هەڵسەنگاندنەکان')}</h2>
+                <ReviewsTab slug={slug} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -456,6 +472,21 @@ function ProfileStat({ value, label }: { value: string; label: string }) {
       <div className="text-zinc-500 text-[11px] truncate">{label}</div>
     </div>
   );
+}
+
+/** «انضم في أغسطس 2026» — the joined line a profile-only merchant shows
+ *  where a store would show its @address. */
+function joinedLine(
+  createdAt: string,
+  loc: (ar: string, en: string, ckb?: string) => string,
+  lang: string
+): string {
+  if (!createdAt) return loc('تاجر مجتمع', 'Community merchant', 'بازرگانی کۆمەڵگا');
+  const when = new Date(createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-IQ', {
+    year: 'numeric',
+    month: 'long',
+  });
+  return `${loc('انضم في', 'Joined', 'بەشداری کرد لە')} ${when}`;
 }
 
 /**
@@ -540,6 +571,7 @@ function ProductsTab({
   accentText,
   savedIds,
   onToggleSave,
+  injected,
 }: {
   slug: string;
   open: boolean;
@@ -549,9 +581,11 @@ function ProductsTab({
   accentText: string;
   savedIds: Set<string>;
   onToggleSave: (id: string) => void;
+  /** Profile-only mode: the merchant's legacy products, already loaded. */
+  injected?: MerchantProduct[];
 }) {
   const { loc, lang } = useLanguage();
-  const [products, setProducts] = useState<MerchantProduct[] | null>(null);
+  const [products, setProducts] = useState<MerchantProduct[] | null>(injected ?? null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -561,6 +595,11 @@ function ProductsTab({
   const sectionParam = sectionFilter ? `?section=${encodeURIComponent(sectionFilter)}` : '';
 
   useEffect(() => {
+    if (injected) {
+      setProducts(injected);
+      setCursor(null);
+      return;
+    }
     let alive = true;
     setProducts(null);
     storefrontApi
@@ -574,7 +613,7 @@ function ProductsTab({
     return () => {
       alive = false;
     };
-  }, [slug, sectionParam]);
+  }, [slug, sectionParam, injected]);
 
   async function loadMore() {
     if (!cursor) return;
@@ -659,7 +698,7 @@ function ProductsTab({
         )}
       </div>
 
-      <ProductGrid slug={slug} products={revealed} storeOpen={open} savedIds={savedIds} onToggleSave={onToggleSave} />
+      <ProductGrid slug={slug} products={revealed} storeOpen={open} savedIds={savedIds} onToggleSave={onToggleSave} legacyLinks={!!injected} />
 
       {cursor && (showAll || sectionFilter) && (
         <button
@@ -680,12 +719,14 @@ function ProductGrid({
   storeOpen,
   savedIds,
   onToggleSave,
+  legacyLinks = false,
 }: {
   slug: string;
   products: MerchantProduct[];
   storeOpen: boolean;
   savedIds: Set<string>;
   onToggleSave: (id: string) => void;
+  legacyLinks?: boolean;
 }) {
   return (
     <div dir="rtl" className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
@@ -697,6 +738,7 @@ function ProductGrid({
           storeOpen={storeOpen}
           saved={savedIds.has(p.id)}
           onToggleSave={onToggleSave}
+          legacyLink={legacyLinks}
         />
       ))}
     </div>
@@ -709,18 +751,25 @@ function ProductCard({
   storeOpen,
   saved,
   onToggleSave,
+  legacyLink = false,
 }: {
   slug: string;
   product: MerchantProduct;
   storeOpen: boolean;
   saved: boolean;
   onToggleSave: (id: string) => void;
+  legacyLink?: boolean;
 }) {
   const { loc } = useLanguage();
   const { store: hostStore } = useStore();
   // On a merchant host the shop IS the site, so the product lives at /p/...
-  // On the main site it needs the store in the path. Same page either way.
-  const href = hostStore ? `/p/${product.slug}` : `/community/store/${slug}/p/${product.slug}`;
+  // On the main site it needs the store in the path. A profile-only
+  // merchant's legacy products keep their historical /product/:slug page.
+  const href = legacyLink
+    ? `/product/${product.slug}`
+    : hostStore
+      ? `/p/${product.slug}`
+      : `/community/store/${slug}/p/${product.slug}`;
   const image = product.images[0];
   const discounted = product.original_price_iqd && product.original_price_iqd > product.price_iqd;
   const sellable = storeOpen && product.in_stock !== false;
@@ -1353,12 +1402,14 @@ function ContactButton({
   onHost,
   loc,
   accentBtn,
+  profileOnly = false,
 }: {
   merchantId: string;
   signedIn: boolean;
   onHost: boolean;
   loc: (ar: string, en: string, ckb?: string) => string;
   accentBtn: string;
+  profileOnly?: boolean;
 }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -1387,7 +1438,11 @@ function ContactButton({
       className={`flex-1 h-[30px] rounded-xl font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 ${accentBtn}`}
     >
       {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircleMore className="w-3.5 h-3.5" strokeWidth={1.75} />}
-      {loc('تواصل مع المتجر', 'Contact the store', 'پەیوەندی بە فرۆشگا')}
+      {/* A profile with no store behind it is a person to talk to, and the
+          «مراسلة» name is a pinned contract for that page. */}
+      {profileOnly
+        ? loc('مراسلة', 'Message', 'نامە')
+        : loc('تواصل مع المتجر', 'Contact the store', 'پەیوەندی بە فرۆشگا')}
     </button>
   );
 }
