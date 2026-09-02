@@ -365,6 +365,21 @@ async function main() {
   r = await anon.get(`/api/warranty/verify/${reissued.receipt_no}`);
   check('the new number verifies as active', r.data?.warranty?.status === 'active');
 
+  // ------------------------------------- 12b. a corrected serial reaches paper
+  console.log('\n12b. correcting a serial does not rewrite paper, it reports and reissues');
+  const fixedSerial = `SN-F${rnd}0004`;
+  r = await admin.post(`/api/devices/admin/units/${newUnitId}/serial`, { serial: fixedSerial, reassign: true, reason: `typo on the sticker ${rnd}` });
+  check('the device serial can be corrected', r.status === 200, JSON.stringify(r.data).slice(0, 160));
+  const withDrift = ((await admin.get(`/api/admin/warranties/orders/${orderId}`)).data?.units ?? []).find((u) => u.id === newUnitId);
+  check('the issued paper is NOT silently rewritten', withDrift?.receipt?.serial !== fixedSerial, `${withDrift?.receipt?.serial}`);
+  check('and the mismatch is reported to the admin', withDrift?.receipt?.drift?.serial === true, JSON.stringify(withDrift?.receipt?.drift));
+  const fixed = (await admin.post(`/api/admin/warranties/${withDrift.receipt.id}/reissue`, { reason: `serial corrected ${rnd}` })).data?.receipt;
+  check('reissuing prints the CORRECTED serial, not the old one', fixed?.serial_raw === fixedSerial, `${fixed?.serial_raw}`);
+  const cleared = ((await admin.get(`/api/admin/warranties/orders/${orderId}`)).data?.units ?? []).find((u) => u.id === newUnitId);
+  check('and the mismatch is gone', cleared?.receipt?.drift?.serial === false, JSON.stringify(cleared?.receipt?.drift));
+  r = await anon.get(`/api/warranty/verify/${encodeURIComponent(fixedSerial)}`);
+  check('the corrected serial verifies as covered', r.data?.warranty?.status === 'active', JSON.stringify(r.data?.warranty?.status));
+
   // ---------------------------------------------------- 11. unique numbers
   console.log('\n13. every number is unique');
   const all = (await admin.get('/api/admin/warranties?limit=100')).data?.receipts ?? [];
@@ -390,7 +405,8 @@ async function main() {
 
   // ------------------------------------------------------ a draft is silent
   console.log('\n15. a prepared draft is invisible to the public, word for word');
-  await admin.post(`/api/admin/warranties/${reissued.id}/void`, { reason: `making room for a draft ${rnd}` });
+  const liveNow = ((await admin.get(`/api/admin/warranties/orders/${orderId}`)).data?.units ?? []).find((u) => u.id === newUnitId)?.receipt;
+  if (liveNow) await admin.post(`/api/admin/warranties/${liveNow.id}/void`, { reason: `making room for a draft ${rnd}` });
   const draft = (await admin.post('/api/admin/warranties', { unit_id: newUnitId, activate: false })).data?.receipt;
   check('a draft can be prepared without activating it', draft?.status === 'draft', JSON.stringify(draft?.status));
   const missDraft = (await anon.get(`/api/warranty/verify/${draft.receipt_no}`)).data;

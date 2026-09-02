@@ -34,7 +34,15 @@ export interface WarrantyUnitRow {
   months: number | null;
   replaced: boolean;
   replacement_of: string | null;
-  receipt: { id: string; receipt_no: string; status: string } | null;
+  receipt: {
+    id: string;
+    receipt_no: string;
+    status: string;
+    serial: string | null;
+    /** The paper no longer matches the device record. It is not rewritten
+     *  behind the owner's back — it is reported, and reissuing fixes it. */
+    drift: { serial: boolean; end: boolean };
+  } | null;
 }
 
 interface OrderWarrantyResponse {
@@ -66,6 +74,8 @@ const STR = {
     generate: 'إنشاء وصل الضمان',
     generating: 'جارٍ الإنشاء…',
     needSerial: 'أدخل الرقم التسلسلي أولًا — لا يُصدر وصل بلا رقم.',
+    driftSerial: 'الوصل المطبوع يحمل الرقم التسلسلي {old} بينما الجهاز صار {new}. أعد إصدار الوصل من شاشة «الضمانات» ليطابق الجهاز.',
+    driftEnd: 'تاريخ نهاية الضمان على الوصل لا يطابق سجل الجهاز بعد تصحيح التسليم. أعد إصدار الوصل ليطابقه.',
     preview: 'معاينة',
     print: 'طباعة',
     pdf: 'حفظ PDF',
@@ -102,6 +112,8 @@ const STR = {
     generate: 'Generate warranty',
     generating: 'Generating…',
     needSerial: 'Enter the serial number first — no receipt is issued without one.',
+    driftSerial: 'The printed receipt carries serial {old} while the device now reads {new}. Reissue it from the Warranties screen so the paper matches the device.',
+    driftEnd: 'The receipt’s end date no longer matches the device record after the delivery correction. Reissue it to match.',
     preview: 'Preview',
     print: 'Print',
     pdf: 'Save PDF',
@@ -405,6 +417,20 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
 
                   {!u.serial && !u.receipt && (
                     <p className="mt-1.5 text-[11px] text-amber-300/90">{t.needSerial}</p>
+                  )}
+
+                  {/* The paper is a snapshot on purpose, so a corrected serial
+                      or delivery date cannot reach back into it. Saying so is
+                      the difference between a snapshot and a stale document. */}
+                  {u.receipt?.drift?.serial && (
+                    <p className="mt-1.5 text-[11px] text-amber-300/90" data-warranty-drift={u.id}>
+                      {t.driftSerial.replace('{old}', u.receipt.serial ?? '—').replace('{new}', u.serial ?? '—')}
+                    </p>
+                  )}
+                  {u.receipt?.drift?.end && !u.receipt.drift.serial && (
+                    <p className="mt-1.5 text-[11px] text-amber-300/90" data-warranty-drift={u.id}>
+                      {t.driftEnd}
+                    </p>
                   )}
 
                   {u.receipt && (

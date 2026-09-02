@@ -312,6 +312,7 @@ interface OrderUnitRow extends UnitRow {
   receipt_no: string | null;
   receipt_status: string | null;
   receipt_end: string | null;
+  receipt_serial: string | null;
 }
 
 /**
@@ -336,7 +337,8 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id,
             s.serial_raw, oi.name_snapshot, oi.unit_price_iqd, oi.option_snapshot,
-            w.id AS receipt_id, w.receipt_no, w.status AS receipt_status, w.warranty_end_at AS receipt_end
+            w.id AS receipt_id, w.receipt_no, w.status AS receipt_status, w.warranty_end_at AS receipt_end,
+            w.serial_raw AS receipt_serial
        FROM order_item_units u
        LEFT JOIN device_serials s ON s.unit_id = u.id
        LEFT JOIN order_items oi ON oi.id = u.order_item_id
@@ -388,6 +390,16 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
             id: u.receipt_id,
             receipt_no: u.receipt_no,
             status: effectiveStatus(String(u.receipt_status), u.receipt_end, now),
+            // A receipt is a snapshot on purpose, so correcting a serial or a
+            // delivery date on the DEVICE cannot reach back into paper already
+            // handed over. What it must not do is drift in silence: the paper
+            // would keep naming a serial the device no longer has. The screen
+            // is told, and reissuing is the deliberate fix.
+            drift: {
+              serial: !!u.serial_raw && !!u.receipt_serial && u.serial_raw !== u.receipt_serial,
+              end: !!u.warranty_end_at && !!u.receipt_end && u.warranty_end_at !== u.receipt_end,
+            },
+            serial: u.receipt_serial ?? null,
           }
         : null,
     })),
@@ -683,6 +695,26 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
   const cfg = await loadConfig(c.env.DB);
   const refreshTerms = body.refresh_terms === true;
 
+  // Reissuing is how a corrected serial or a corrected delivery date reaches
+  // the paper. Copying the old row's serial and window would reprint the very
+  // mistake the admin came here to fix, so the DEVICE record is re-read and
+  // its current values win. The old receipt keeps what it said, as it must.
+  const device = await c.env.DB.prepare(
+    `SELECT u.warranty_start_at, u.warranty_end_at, s.serial_raw, s.serial_norm
+       FROM order_item_units u LEFT JOIN device_serials s ON s.unit_id = u.id
+      WHERE u.id = ?`
+  )
+    .bind(old.unit_id)
+    .first<{ warranty_start_at: string | null; warranty_end_at: string | null; serial_raw: string | null; serial_norm: string | null }>();
+  const serialRaw = device?.serial_raw || old.serial_raw;
+  const serialNorm = device?.serial_norm || old.serial_norm;
+  const startAt = device?.warranty_start_at || old.warranty_start_at;
+  const endAt = device?.warranty_end_at || old.warranty_end_at;
+  const carried = {
+    serial: serialRaw !== old.serial_raw,
+    window: startAt !== old.warranty_start_at || endAt !== old.warranty_end_at,
+  };
+
   let receiptNo = '';
   for (let attempt = 0; attempt < 6; attempt++) {
     const alloc = await allocateReceiptNo(c.env.DB, now);
@@ -705,11 +737,11 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
               terms_json, retailer_json,
               warranty_start_at, warranty_end_at, issued_by, issued_at, replaces_receipt_id)
            SELECT ?1, ?2, unit_id, order_id, order_item_id, product_id, user_id,
-              serial_norm, serial_raw, 'active',
+              ?15, ?16, 'active',
               ?3, ?4, ?5, ?6,
               product_description, product_model, ?7, purchase_date, order_receipt_no,
               warranty_type, warranty_type_en, warranty_months, ?8, ?14, ?9, ?10,
-              warranty_start_at, warranty_end_at, ?11, ?12, id
+              ?17, ?18, ?11, ?12, id
              FROM warranty_receipts WHERE id = ?13`
         ).bind(
           newIdValue,
@@ -728,6 +760,10 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
           now,
           id,
           refreshTerms ? cfg.coverage_en : old.coverage_text_en,
+          serialNorm,
+          serialRaw,
+          startAt,
+          endAt,
         ),
       ]);
       break;
@@ -755,6 +791,8 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
     from_receipt_no: old.receipt_no,
     receipt_no: receiptNo,
     refreshed_terms: refreshTerms,
+    corrected_serial: carried.serial ? { from: old.serial_raw, to: serialRaw } : null,
+    corrected_window: carried.window ? { from: old.warranty_end_at, to: endAt } : null,
   });
   await audit(c.env.DB, admin.id, 'warranty.superseded', id, { reason, to_receipt_no: receiptNo });
   const fresh = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE id = ?`)
