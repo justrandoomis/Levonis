@@ -470,7 +470,15 @@ warrantyAdminRoutes.post('/', async (c) => {
     optionalIso(body.warranty_start_at, 'warranty_start_at') ||
     String(unit.warranty_start_at ?? unit.delivered_at ?? unit.order_delivered_at ?? unit.order_created_at ?? nowIso());
   const win = warrantyWindow(startAt, months);
-  const endAt = optionalIso(body.warranty_end_at, 'warranty_end_at') || win.end_at;
+  // The DEVICE record owns the coverage; the receipt prints it. When the admin
+  // states neither end, the unit's own stored end wins over a recomputed one —
+  // a replacement unit carries the original device's end date on purpose, and
+  // a receipt that recalculated it would print a longer warranty than the
+  // device actually has.
+  const unitEnd = String(unit.warranty_end_at ?? '');
+  const endAt =
+    optionalIso(body.warranty_end_at, 'warranty_end_at') ||
+    (!body.warranty_start_at && !body.months && unitEnd ? unitEnd : win.end_at);
   if (Date.parse(endAt) <= Date.parse(win.start_at)) {
     throw badRequest('نهاية الضمان يجب أن تكون بعد بدايته. / The warranty end must come after its start.', 'BAD_DATE');
   }

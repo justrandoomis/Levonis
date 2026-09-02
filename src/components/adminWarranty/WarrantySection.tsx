@@ -134,7 +134,19 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
   const [data, setData] = useState<OrderWarrantyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState('');
+  // A SET, not one string. Two device rows sit side by side and the owner
+  // does use them in parallel; with a single value the second action cleared
+  // the first one's in-flight flag, re-enabling a button whose request was
+  // still on the wire and inviting a double submit.
+  const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
+  const busy = (key: string) => busyKeys.has(key);
+  const setBusy = (key: string, on: boolean) =>
+    setBusyKeys((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const [drafts, setDrafts] = useState<Record<string, { serial: string; months: string; start: string; start0: string }>>({});
   const [copied, setCopied] = useState('');
 
@@ -179,7 +191,8 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
       setErr(t.needSerial);
       return;
     }
-    setBusy(`serial:${unit.id}`);
+    const key = `serial:${unit.id}`;
+    setBusy(key, true);
     setErr(null);
     try {
       await api.post(`/api/devices/admin/units/${unit.id}/serial`, { serial });
@@ -204,13 +217,14 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
         setErr(e instanceof ApiError ? e.message : String(e));
       }
     } finally {
-      setBusy('');
+      setBusy(key, false);
     }
   };
 
   const generate = async (unit: WarrantyUnitRow) => {
     const d = drafts[unit.id];
-    setBusy(`gen:${unit.id}`);
+    const key = `gen:${unit.id}`;
+    setBusy(key, true);
     setErr(null);
     try {
       await api.post('/api/admin/warranties', {
@@ -222,14 +236,15 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
     } finally {
-      setBusy('');
+      setBusy(key, false);
     }
   };
 
   /** Opening the document is a navigation, so the cookie goes with it. The
    *  counting rules live in one place; see printDoc.ts. */
   const openDoc = async (receiptId: string, print: boolean) => {
-    setBusy(`print:${receiptId}`);
+    const key = `print:${receiptId}`;
+    setBusy(key, true);
     try {
       const res = await openWarrantyDoc(receiptId, { print, lang });
       if (res === 'blocked') setErr(popupBlockedMessage(lang));
@@ -237,7 +252,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
     } finally {
-      setBusy('');
+      setBusy(key, false);
     }
   };
 
@@ -333,7 +348,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         <button
                           type="button"
                           onClick={() => void saveSerial(u)}
-                          disabled={busy === `serial:${u.id}` || serialSaved}
+                          disabled={busy(`serial:${u.id}`) || serialSaved}
                           data-warranty-save-serial={u.id}
                           className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-lg border border-zinc-700 bg-zinc-800 text-[12px] font-bold text-zinc-200 hover:bg-zinc-700 disabled:opacity-40"
                         >
@@ -372,17 +387,17 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         <button
                           type="button"
                           onClick={() => void generate(u)}
-                          disabled={!u.serial || busy === `gen:${u.id}`}
+                          disabled={!u.serial || busy(`gen:${u.id}`)}
                           title={!u.serial ? t.needSerial : undefined}
                           data-warranty-generate={u.id}
                           className="self-end inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          {busy === `gen:${u.id}` ? (
+                          {busy(`gen:${u.id}`) ? (
                             <RefreshCw className="w-4 h-4 animate-spin" aria-hidden />
                           ) : (
                             <ShieldCheck className="w-4 h-4" aria-hidden />
                           )}
-                          {busy === `gen:${u.id}` ? t.generating : t.generate}
+                          {busy(`gen:${u.id}`) ? t.generating : t.generate}
                         </button>
                       </div>
                     )}
@@ -440,11 +455,11 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         <button
                           type="button"
                           onClick={() => void reprint(u.receipt!.id)}
-                          disabled={busy === `print:${u.receipt.id}`}
+                          disabled={busy(`print:${u.receipt.id}`)}
                           data-warranty-reprint={u.id}
                           className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${busy === `print:${u.receipt.id}` ? 'animate-spin' : ''}`} aria-hidden />
+                          <RefreshCw className={`w-3.5 h-3.5 ${busy(`print:${u.receipt.id}`) ? 'animate-spin' : ''}`} aria-hidden />
                           {t.reprint}
                         </button>
                       </div>

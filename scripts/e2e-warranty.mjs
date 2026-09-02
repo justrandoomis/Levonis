@@ -246,6 +246,14 @@ async function main() {
   check('the warranty starts on the delivery date', (recA?.warranty_start_at ?? '').startsWith('2026-09-02'), recA?.warranty_start_at);
   check('one year later, to the day', (recA?.warranty_end_at ?? '').startsWith('2027-09-02'), recA?.warranty_end_at);
   check('the period is recorded in months', recA?.warranty_months === 12, String(recA?.warranty_months));
+  // The device record owns the coverage; the paper prints it rather than
+  // recomputing its own, so the two can never disagree.
+  const unitA = ((await admin.get(`/api/devices/admin/orders/${orderId}/units`)).data?.units ?? []).find((u) => u.unit_id === units[0].id);
+  check(
+    'the receipt prints the DEVICE record’s end date, not its own arithmetic',
+    !!unitA?.warranty?.end_at && recA?.warranty_end_at === unitA.warranty.end_at,
+    `${recA?.warranty_end_at} vs ${unitA?.warranty?.end_at}`
+  );
 
   // --------------------------------------------------- 4. the price snapshot
   console.log('\n6. the price on the paper is a snapshot');
