@@ -1,0 +1,117 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the price-change guard is live: the deliberate reprice
+# route is mounted and refuses a stranger, and the shipped bundle carries the
+# warning panel the owner sees when a base-price edit would leave option
+# prices behind.
+#
+# WHAT IT WRITES: nothing. Every call is an anonymous GET or an anonymous POST
+# that must be REFUSED — no product is repriced, no price is moved, and no D1
+# statement runs at all. Repricing is a deliberate act by a signed-in admin and
+# a verification job has no business performing one.
+name: 20 - Verify Live Price Guard (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-price-guard
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The reprice route is mounted, and it refuses a stranger
+        id: routes
+        run: |
+          set -euo pipefail
+          fail=0
+          # A POST that must NOT succeed. 401/403 proves the route exists and is
+          # admin-only; 404 would mean the code is not deployed. Either way no
+          # price moves, because an unauthenticated caller never reaches the
+          # handler.
+          code=$(curl -s -o /tmp/body.txt -w '%{http_code}' --max-time 25 \
+            -X POST -H 'Content-Type: application/json' \
+            -d '{"mode":"delta","from_price_iqd":1,"to_price_iqd":1}' \
+            "$APEX/api/admin/products-v2/prd_verification_probe/reprice" || echo 000)
+          echo "  body: $(head -c 160 /tmp/body.txt)"
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "  ok   the reprice route is mounted and admin-only ($code)"
+          else
+            echo "  FAIL the reprice route answers $code"
+            fail=1
+          fi
+          # The product save it belongs to, same posture.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 \
+            -X POST -H 'Content-Type: application/json' -d '{}' "$APEX/api/admin/products-v2" || echo 000)
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "  ok   the product save is mounted and admin-only ($code)"
+          else
+            echo "  FAIL the product save answers $code"; fail=1
+          fi
+          exit $fail
+
+      - name: The shipped bundle carries the warning the owner sees
+        id: bundle
+        run: |
+          set -euo pipefail
+          # --compressed on EVERY fetch: the edge serves these gzipped, and a
+          # grep over compressed bytes finds nothing and calls it a miss.
+          html=$(curl -s --compressed --max-time 25 "$APEX/admin")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL /admin served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          all=""
+          for a in $entries; do
+            f=/tmp/mods/$(basename "$a")
+            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
+            all="$all $f"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
+            done
+          done
+          echo "  modules read: $(echo $all | wc -w)"
+          fail=0
+          # Written to FILES, never piped into grep: `grep -q` stops at the
+          # first match, the writer takes SIGPIPE, and `pipefail` then reads a
+          # successful match as a failed pipeline.
+          want() {
+            hit=$(grep -l "$1" $all 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then echo "  ok   $2 — in $(basename "$hit")";
+            else echo "  FAIL $2 — no served module contains $1"; fail=1; fi
+          }
+          want 'data-pinned-notice' 'the warning panel'
+          want 'data-pinned-mode'   'the three answers it offers'
+          want 'data-pinned-apply'  'the control that applies the move'
+          exit $fail
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live price-guard verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| reprice + save routes mounted and admin-only | ${{ steps.routes.outcome }} |"
+            echo "| the deployed bundle carries the warning panel | ${{ steps.bundle.outcome }} |"
+            echo ''
+            echo 'Read-only: the only POSTs made were anonymous ones that had to be refused.'
+            echo 'No product was repriced and no price was moved.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.routes.outcome != 'success' || steps.bundle.outcome != 'success'
+        run: exit 1
