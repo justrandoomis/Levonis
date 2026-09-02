@@ -24,6 +24,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
   AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
@@ -239,6 +240,13 @@ export default function AdminProducts() {
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
   const quickRef = useRef<HTMLInputElement>(null);
+  // The shell's compact topbar offers a slot (#dash-topbar-slot); the
+  // breadcrumb and the ⌘K quick-find live there, so the bar reads
+  // breadcrumb · search · language · notifications, like the reference.
+  const [topbarSlot, setTopbarSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTopbarSlot(document.getElementById('dash-topbar-slot'));
+  }, []);
   const menuTriggerRef = useRef<HTMLElement | null>(null);
   const headerBtnRef = useRef<HTMLButtonElement>(null);
   const seqRef = useRef(0);
@@ -556,22 +564,27 @@ export default function AdminProducts() {
 
   return (
     <div className={T.AP} dir={dir}>
-      {/* ---------------------------------------------------------- top strip */}
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        <nav className="text-[12px] text-[var(--ap-text-3)] flex items-center gap-1.5 shrink-0" aria-label="breadcrumb">
-          <span className="text-[var(--ap-text-1)] font-semibold">{t.breadcrumbA}</span>
-          <span className="text-[var(--ap-text-3)]">/</span>
-          <span>{t.breadcrumbB}</span>
-        </nav>
-        <QuickFind
-          inputRef={quickRef}
-          placeholder={t.quickFind}
-          label={t.quickFindLabel}
-          onPick={(p) => setEditing({ open: true, id: p.id })}
-          loc={loc}
-          nameOf={nameOf}
-        />
-      </div>
+      {/* ------------------------------------------- top strip (topbar slot) */}
+      {(() => {
+        const strip = (
+          <div className={`${T.AP} flex items-center gap-3 sm:gap-5 min-w-0 ${topbarSlot ? 'flex-1' : 'flex-wrap mb-4'}`} dir={dir}>
+            <nav className={`text-[12px] text-[var(--ap-text-3)] items-center gap-1.5 shrink-0 ${topbarSlot ? 'hidden sm:flex' : 'flex'}`} aria-label="breadcrumb">
+              <span className="text-[var(--ap-text-1)] font-semibold">{t.breadcrumbA}</span>
+              <span className="text-[var(--ap-text-3)]">/</span>
+              <span>{t.breadcrumbB}</span>
+            </nav>
+            <QuickFind
+              inputRef={quickRef}
+              placeholder={t.quickFind}
+              label={t.quickFindLabel}
+              onPick={(p) => setEditing({ open: true, id: p.id })}
+              loc={loc}
+              nameOf={nameOf}
+            />
+          </div>
+        );
+        return topbarSlot ? createPortal(strip, topbarSlot) : strip;
+      })()}
 
       {/* ------------------------------------------------- title + actions */}
       <div className="flex items-start justify-between gap-3 flex-wrap mb-5">

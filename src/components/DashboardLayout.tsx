@@ -42,6 +42,13 @@ interface DashboardLayoutProps {
   activeTab: string;
   onTabChange: (id: string) => void;
   children: ReactNode;
+  /**
+   * Compact topbar: no community/dashboard links; instead an empty slot
+   * (#dash-topbar-slot) the active page may fill through a portal — the
+   * admin products page puts its breadcrumb and ⌘K quick-find there, so the
+   * bar reads breadcrumb · search · language · notifications · account.
+   */
+  topbarSlot?: boolean;
 }
 
 const STRINGS = {
@@ -108,7 +115,7 @@ function readCollapsed(): boolean {
   }
 }
 
-export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTab, onTabChange, children }: DashboardLayoutProps) {
+export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTab, onTabChange, children, topbarSlot }: DashboardLayoutProps) {
   const { dir, lang, setLang } = useLanguage();
   const t = STRINGS[lang] ?? STRINGS.ar;
   const navigate = useNavigate();
@@ -339,18 +346,22 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="hidden lg:flex items-center gap-6 text-[13px] font-semibold text-zinc-400 min-w-0">
-            <button
-              onClick={() => navigate('/community')}
-              className="hover:text-white transition-colors flex items-center gap-2 whitespace-nowrap"
-            >
-              {dir === 'rtl' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
-              {t.community}
-            </button>
-            <span className="text-white font-bold border-b-2 border-[#D4AF37] py-1 whitespace-nowrap">
-              {t.dashboard}
-            </span>
-          </div>
+          {topbarSlot ? (
+            <div id="dash-topbar-slot" className="flex-1 min-w-0 flex items-center gap-3 sm:gap-5" />
+          ) : (
+            <div className="hidden lg:flex items-center gap-6 text-[13px] font-semibold text-zinc-400 min-w-0">
+              <button
+                onClick={() => navigate('/community')}
+                className="hover:text-white transition-colors flex items-center gap-2 whitespace-nowrap"
+              >
+                {dir === 'rtl' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+                {t.community}
+              </button>
+              <span className="text-white font-bold border-b-2 border-[#D4AF37] py-1 whitespace-nowrap">
+                {t.dashboard}
+              </span>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 sm:gap-4 ms-auto text-zinc-400 shrink-0">
             {/* Language */}

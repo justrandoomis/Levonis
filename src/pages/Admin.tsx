@@ -454,6 +454,7 @@ export default function Admin() {
   return (
     <DashboardLayout
       title="ADMIN"
+      topbarSlot
       sidebarItems={sidebarItems}
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
