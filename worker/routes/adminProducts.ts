@@ -20,6 +20,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, forbidden } from '../lib/http';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
+import { registerHashtags } from '../lib/hashtags';
 import {
   parseProductRow,
   validateProductDoc,
@@ -867,6 +868,9 @@ adminProductsRoutes.post('/', async (c) => {
       (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
     );
   }
+  // A hashtag typed by hand in the form becomes a selectable option in the
+  // taxonomy admin, the form's suggestions and the import template.
+  await registerHashtags(c.env.DB, doc.hashtags, newId);
 
   // Price history (§6.8): every monetary change on an existing product —
   // base/PRO/compare-at at product, option and color level — is snapshotted

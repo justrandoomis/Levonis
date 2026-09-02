@@ -73,6 +73,7 @@ export function Field({
   error,
   children,
   span,
+  htmlFor,
 }: {
   ar: string;
   en: string;
@@ -83,8 +84,17 @@ export function Field({
   children: ReactNode;
   /** Make the field take the full row in a multi-column grid. */
   span?: boolean;
+  /**
+   * The id of the control this labels, for a field whose child is a WRAPPER
+   * (a select beside a quick-add button, an input above its chips) rather
+   * than the control itself. Without it the clone below would put the id on
+   * the wrapper div and the label would point at nothing — a required select
+   * with no accessible name.
+   */
+  htmlFor?: string;
 }) {
-  const id = useId();
+  const auto = useId();
+  const id = htmlFor ?? auto;
   return (
     <div className={`min-w-0 ${span ? 'md:col-span-2 xl:col-span-3' : ''}`}>
       <div className="flex items-center gap-1.5 mb-1 min-w-0">
@@ -106,7 +116,7 @@ export function Field({
           </span>
         )}
       </div>
-      {React.isValidElement(children)
+      {React.isValidElement(children) && !htmlFor
         ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
         : children}
       {hint && !error && <p className="mt-1 text-[11px] text-zinc-500 truncate">{hint}</p>}

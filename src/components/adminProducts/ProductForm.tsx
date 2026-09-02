@@ -30,7 +30,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
@@ -65,6 +65,7 @@ import { OptionsSection } from './form/OptionsSection';
 import { UsageGuideSection } from './form/UsageGuideSection';
 import PricePreview from './PricePreview';
 import { ImagesSection } from './form/ImagesSection';
+import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 
 interface TemplateField {
   id: string;
@@ -138,14 +139,67 @@ export default function ProductForm({
   const [facets, setFacets] = useState<FacetRow[]>([]);
   const [tplGroups, setTplGroups] = useState<TemplateGroup[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
+  // Quick-add of a section / sub-section / brand from inside the form (the
+  // same rows the التصنيفات page manages), selected on creation.
+  const [quickAdd, setQuickAdd] = useState<QuickAddKind | null>(null);
+  // The managed hashtag vocabulary, offered as suggestions and as a datalist;
+  // typing a new tag still works, and saving registers it in the list.
+  const [hashtagOptions, setHashtagOptions] = useState<string[]>([]);
   // Hashtags always existed on the doc (round-tripped by every save) — this
   // is their first actual INPUT: draft text, committed on Enter/comma/blur.
   const [hashtagDraft, setHashtagDraft] = useState('');
-  const commitHashtag = () => {
-    const tag = hashtagDraft.replace(/^#/, '').trim().replace(/\s+/g, '-').slice(0, 40);
-    setHashtagDraft('');
+  const addHashtag = (raw: string) => {
+    // The same rule worker/lib/hashtags.ts applies on save, so the chip the
+    // admin sees is the tag that gets stored.
+    const tag = raw
+      .replace(/^[#\s]+/, '')
+      .replace(/[|,]+/g, '-')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40)
+      .replace(/-+$/g, '');
     if (!tag) return;
-    setDoc((d) => (d.hashtags.includes(tag) ? d : { ...d, hashtags: [...d.hashtags, tag] }));
+    setDoc((d) => (d.hashtags.some((h) => h.toLowerCase() === tag.toLowerCase()) ? d : { ...d, hashtags: [...d.hashtags, tag] }));
+  };
+  const commitHashtag = () => {
+    const draft = hashtagDraft;
+    setHashtagDraft('');
+    addHashtag(draft);
+  };
+  const hashtagSuggestions = useMemo(
+    () => hashtagOptions.filter((t) => !doc.hashtags.some((h) => h.toLowerCase() === t.toLowerCase())).slice(0, 12),
+    [hashtagOptions, doc.hashtags]
+  );
+
+  const onQuickAdded = (r: QuickAddResult) => {
+    setQuickAdd(null);
+    if (r.kind === 'brand') {
+      const row = r.row as unknown as BrandV2;
+      setBrands((b) => [...b.filter((x) => x.id !== row.id), { ...row, active: true }]);
+      setBrandSearch('');
+      setDoc((d) => ({ ...d, brand_id: row.id }));
+      return;
+    }
+    const raw = r.row;
+    const parent = r.kind === 'sub_category' ? catalogs.find((c) => c.id === doc.category_id) : undefined;
+    const own = raw.template_family === 'devices' || raw.template_family === 'materials' ? raw.template_family : null;
+    const node: CatalogNode = {
+      id: r.id,
+      parent_id: typeof raw.parent_id === 'string' ? raw.parent_id : null,
+      slug: String(raw.slug ?? ''),
+      name_ar: String(raw.name_ar ?? ''),
+      name_en: String(raw.name_en ?? ''),
+      name_ckb: String(raw.name_ckb ?? ''),
+      sort: Number(raw.sort ?? 0),
+      is_printer_catalog: !!raw.is_printer_catalog,
+      active: true,
+      effective_template_family: own ?? parent?.effective_template_family ?? null,
+    };
+    setCatalogs((c) => [...c.filter((x) => x.id !== node.id), node]);
+    if (r.kind === 'category') setDoc((d) => ({ ...d, category_id: node.id, sub_category_id: null }));
+    else setDoc((d) => ({ ...d, sub_category_id: node.id }));
   };
 
   const [open, setOpen] = useState(1);
@@ -162,15 +216,19 @@ export default function ProductForm({
     let alive = true;
     (async () => {
       try {
-        const [b, cat, fc] = await Promise.all([
+        const [b, cat, fc, hs] = await Promise.all([
           api.get<{ brands: BrandV2[] }>('/api/admin/taxonomy/brands'),
           api.get<{ catalogs: CatalogNode[] }>('/api/admin/taxonomy/catalogs'),
           api.get<{ facets: FacetRow[] }>('/api/admin/taxonomy/facets'),
+          api
+            .get<{ hashtags: Array<{ tag: string; active: boolean }> }>('/api/admin/taxonomy/hashtags?counts=0')
+            .catch(() => ({ hashtags: [] as Array<{ tag: string; active: boolean }> })),
         ]);
         if (!alive) return;
         setBrands(b.brands ?? []);
         setCatalogs(cat.catalogs ?? []);
         setFacets((fc.facets ?? []).filter((f) => f.active));
+        setHashtagOptions((hs.hashtags ?? []).filter((h) => h.active).map((h) => h.tag));
       } catch {
         // The taxonomy is not required to edit prices or text; the section
         // says so rather than blocking the whole form.
@@ -429,66 +487,116 @@ export default function ProductForm({
         {...section(1)}
       >
         <Grid cols={2}>
-          <Field ar="١· القسم الرئيسي" en="Main section" required error={err('category_id')}>
-            <Select
-              value={doc.category_id ?? ''}
-              onChange={(e) =>
-                setDoc((d) => ({ ...d, category_id: e.target.value || null, sub_category_id: null }))
-              }
-            >
-              <option value="">— اختر —</option>
-              {roots.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name_ar} · {c.name_en}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field ar="٢· القسم الفرعي" en="Sub-section" hint={doc.category_id ? undefined : 'اختر القسم الرئيسي أولًا'}>
-            <Select
-              value={doc.sub_category_id ?? ''}
-              disabled={!doc.category_id || children.length === 0}
-              onChange={(e) => setDoc((d) => ({ ...d, sub_category_id: e.target.value || null }))}
-            >
-              <option value="">— بدون —</option>
-              {children.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name_ar} · {c.name_en}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field ar="٣· العلامة التجارية" en="Brand">
+          <Field ar="١· القسم الرئيسي" en="Main section" required error={err('category_id')} htmlFor="pf-category">
             <div className="flex gap-1.5 min-w-0">
-              <Select
-                className="flex-1"
-                value={doc.brand_id ?? ''}
-                onChange={(e) => setDoc((d) => ({ ...d, brand_id: e.target.value || null }))}
+              <div className="flex-1 min-w-0">
+                <Select
+                  id="pf-category"
+                  value={doc.category_id ?? ''}
+                  onChange={(e) =>
+                    setDoc((d) => ({ ...d, category_id: e.target.value || null, sub_category_id: null }))
+                  }
+                >
+                  <option value="">— اختر —</option>
+                  {roots.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name_ar} · {c.name_en}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <button
+                type="button"
+                className={`${btnGhost} !px-2.5 shrink-0`}
+                onClick={() => setQuickAdd('category')}
+                aria-label="إضافة قسم رئيسي جديد"
+                title="إضافة قسم رئيسي جديد / New main section"
+                data-quick-add-open="category"
               >
-                <option value="">— بدون —</option>
-                {filteredBrands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name_en || b.name_ar}
-                  </option>
-                ))}
-              </Select>
+                <Plus className="w-4 h-4" aria-hidden />
+              </button>
+            </div>
+          </Field>
+          <Field
+            ar="٢· القسم الفرعي"
+            en="Sub-section"
+            hint={doc.category_id ? undefined : 'اختر القسم الرئيسي أولًا'}
+            htmlFor="pf-sub-category"
+          >
+            <div className="flex gap-1.5 min-w-0">
+              <div className="flex-1 min-w-0">
+                <Select
+                  id="pf-sub-category"
+                  value={doc.sub_category_id ?? ''}
+                  disabled={!doc.category_id || children.length === 0}
+                  onChange={(e) => setDoc((d) => ({ ...d, sub_category_id: e.target.value || null }))}
+                >
+                  <option value="">— بدون —</option>
+                  {children.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name_ar} · {c.name_en}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <button
+                type="button"
+                className={`${btnGhost} !px-2.5 shrink-0`}
+                disabled={!doc.category_id}
+                onClick={() => setQuickAdd('sub_category')}
+                aria-label="إضافة قسم فرعي جديد"
+                title="إضافة قسم فرعي جديد تحت القسم المختار / New sub-section"
+                data-quick-add-open="sub_category"
+              >
+                <Plus className="w-4 h-4" aria-hidden />
+              </button>
+            </div>
+          </Field>
+          <Field ar="٣· العلامة التجارية" en="Brand" htmlFor="pf-brand">
+            <div className="flex gap-1.5 min-w-0">
+              <div className="flex-1 min-w-0">
+                <Select
+                  id="pf-brand"
+                  value={doc.brand_id ?? ''}
+                  onChange={(e) => setDoc((d) => ({ ...d, brand_id: e.target.value || null }))}
+                >
+                  <option value="">— بدون —</option>
+                  {filteredBrands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name_en || b.name_ar}
+                    </option>
+                  ))}
+                </Select>
+              </div>
               <TextInput
-                className="!w-28 shrink-0"
+                className="!w-24 shrink-0"
                 value={brandSearch}
                 onChange={(e) => setBrandSearch(e.target.value)}
                 placeholder="بحث…"
                 aria-label="بحث عن علامة"
               />
+              <button
+                type="button"
+                className={`${btnGhost} !px-2.5 shrink-0`}
+                onClick={() => setQuickAdd('brand')}
+                aria-label="إضافة علامة تجارية جديدة"
+                title="إضافة علامة تجارية جديدة / New brand"
+                data-quick-add-open="brand"
+              >
+                <Plus className="w-4 h-4" aria-hidden />
+              </button>
             </div>
           </Field>
           <Field
             ar="٤· الهاشتاقات"
             en="Hashtags"
-            hint="Enter أو فاصلة لإضافة وسم"
-            tip="وسوم حرّة تُستخدم في البحث والاكتشاف. تُحفظ مع المنتج كما تكتبها."
+            hint="Enter أو فاصلة لإضافة وسم — أو اختر من المقترحات"
+            tip="وسوم تُستخدم في البحث والاكتشاف. المقترحات من قائمة الهاشتاقات في صفحة التصنيفات، ووسم جديد تكتبه هنا يُضاف إلى تلك القائمة عند الحفظ."
+            htmlFor="pf-hashtags"
           >
             <div className="min-w-0">
               <TextInput
+                id="pf-hashtags"
                 value={hashtagDraft}
                 onChange={(e) => setHashtagDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -499,7 +607,31 @@ export default function ProductForm({
                 }}
                 onBlur={commitHashtag}
                 placeholder="#tag"
+                list="hashtag-options"
+                autoComplete="off"
+                data-hashtag-input
               />
+              <datalist id="hashtag-options">
+                {hashtagOptions.map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
+              {hashtagSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5" data-hashtag-suggestions>
+                  {hashtagSuggestions.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => addHashtag(t)}
+                      className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-zinc-600 px-2.5 min-h-8 text-[11px] text-zinc-400 hover:text-white hover:border-zinc-400 transition-colors"
+                      aria-label={`إضافة الوسم ${t}`}
+                    >
+                      <Plus className="w-3 h-3" aria-hidden />
+                      <span dir="ltr">#{t}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               {doc.hashtags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {doc.hashtags.map((h) => (
@@ -556,6 +688,19 @@ export default function ProductForm({
           </div>
         )}
       </SectionCard>
+
+      {quickAdd && (
+        <QuickAddDialog
+          kind={quickAdd}
+          parentId={doc.category_id}
+          parentName={(() => {
+            const p = catalogs.find((c) => c.id === doc.category_id);
+            return p ? p.name_ar || p.name_en : '';
+          })()}
+          onClose={() => setQuickAdd(null)}
+          onCreated={onQuickAdded}
+        />
+      )}
 
       {/* 2 ────────────────────────────────────────────────── basic details */}
       <SectionCard

@@ -24,7 +24,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, Upload, RefreshCw, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
+import { Download, Upload, RefreshCw, CheckCircle2, AlertTriangle, FileText, Copy, Check, ChevronDown } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { btnPrimary, btnSecondary, inputCls, ErrorBanner } from './ui';
@@ -75,6 +75,17 @@ const STRINGS = {
     pickFirst: 'اختر قسمًا وملفًا أولًا.',
     nothingToApply: 'لا يوجد صف صالح للتنفيذ.',
     alreadyApplied: 'هذا الاستيراد نُفّذ من قبل — هذه نتيجته المحفوظة.',
+    lookupsTitle: 'القيم المتاحة لأعمدة التصنيف',
+    lookupsHint:
+      'هذه هي القيم التي يقبلها الملف في أعمدة category و sub_category و brand و facets و hashtags — كما هي الآن في صفحة التصنيفات. اضغط قيمة لنسخها. القالب المنزّل يحملها أيضًا في نهايته وفي lookups.csv.',
+    lkCategory: 'القسم الرئيسي (category)',
+    lkSub: 'القسم الفرعي (sub_category)',
+    lkBrand: 'العلامة التجارية (brand)',
+    lkFacet: 'الفلاتر (facets — بالـ slug)',
+    lkHashtag: 'الهاشتاقات (hashtags)',
+    lkEmpty: 'لا شيء بعد — أضف من صفحة التصنيفات.',
+    lkHashtagFree: 'يمكن كتابة وسم جديد في الملف وسيُضاف إلى القائمة عند التأكيد.',
+    copied: 'نُسخ',
   },
   en: {
     step1: '1. Choose the section',
@@ -118,6 +129,17 @@ const STRINGS = {
     pickFirst: 'Choose a section and a file first.',
     nothingToApply: 'No valid row to apply.',
     alreadyApplied: 'This import was already applied — this is its stored result.',
+    lookupsTitle: 'Accepted values for the classification columns',
+    lookupsHint:
+      'These are the values the file accepts in category, sub_category, brand, facets and hashtags — exactly as they stand in the taxonomy page right now. Click a value to copy it. The downloaded template also carries them at its end and in lookups.csv.',
+    lkCategory: 'Main section (category)',
+    lkSub: 'Sub-section (sub_category)',
+    lkBrand: 'Brand (brand)',
+    lkFacet: 'Filters (facets — by slug)',
+    lkHashtag: 'Hashtags (hashtags)',
+    lkEmpty: 'Nothing yet — add from the taxonomy page.',
+    lkHashtagFree: 'A new tag may be typed into the file; it joins the list on confirm.',
+    copied: 'Copied',
   },
 };
 const pick = (lang: string) => (lang === 'en' ? STRINGS.en : STRINGS.ar);
@@ -137,6 +159,13 @@ interface Catalog {
   active: boolean;
   effective_template_family: 'devices' | 'materials' | null;
   product_count: number;
+}
+
+interface Lookups {
+  sections: Array<{ id: string; slug: string; name_en: string; name_ar: string; parent_id: string | null; parent_name_en: string; family: string | null }>;
+  brands: Array<{ id: string; slug: string; name_en: string; name_ar: string }>;
+  facets: Array<{ id: string; slug: string; name_en: string; name_ar: string; kind: string }>;
+  hashtags: Array<{ tag: string; name_ar: string }>;
 }
 
 interface PreviewRow {
@@ -196,12 +225,19 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
   const [busy, setBusy] = useState<'' | 'preview' | 'confirm' | string>('');
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [lookups, setLookups] = useState<Lookups | null>(null);
 
   useEffect(() => {
     api
       .get<{ catalogs: Catalog[] }>('/api/admin/taxonomy/catalogs')
       .then((r) => setCatalogs(r.catalogs ?? []))
       .catch((e) => setErr(e instanceof ApiError ? e.message : String(e)));
+    // The accepted classification values, read live so a section or brand
+    // added a minute ago is already here.
+    api
+      .get<Lookups>('/api/admin/import/lookups')
+      .then((r) => setLookups(r))
+      .catch(() => setLookups(null));
   }, []);
 
   // Only sections that can actually produce a template are offered; a section
@@ -330,6 +366,7 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
         {catalogs.length > 0 && options.length === 0 && (
           <p className="text-amber-300/90 text-xs mt-2">{t.noFamily}</p>
         )}
+        {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}
       </Section>
 
       {/* 2 ------------------------------------------------------------- */}
@@ -490,6 +527,109 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
 }
 
 // ------------------------------------------------------------------- pieces
+
+/**
+ * The accepted values of the classification columns, as copyable chips. The
+ * sub-sections narrow to the chosen section's branch when one is chosen.
+ */
+function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?: Catalog; lang: string; t: typeof STRINGS.ar }) {
+  // A disclosure that RENDERS nothing while closed, rather than a <details>
+  // that only hides it: the four lists run to a couple of hundred values, and
+  // a closed <details> still lays every one of them out — which is both waste
+  // and a dialog full of controls the admin never asked to see.
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState('');
+  const isEn = lang === 'en';
+  const rootId = section ? (section.parent_id ?? section.id) : null;
+  const roots = lookups.sections.filter((s) => !s.parent_id);
+  const subs = lookups.sections.filter((s) => !!s.parent_id && (!rootId || s.parent_id === rootId));
+  const copy = async (v: string) => {
+    try {
+      await navigator.clipboard.writeText(v);
+      setCopied(v);
+      window.setTimeout(() => setCopied((c) => (c === v ? '' : c)), 1200);
+    } catch {
+      /* clipboard unavailable: the value is still readable on the chip */
+    }
+  };
+  const chips = (items: Array<{ key: string; value: string; label?: string; title?: string }>, group: string) =>
+    items.length === 0 ? (
+      <p className="text-[11px] text-zinc-500">{t.lkEmpty}</p>
+    ) : (
+      <div className="flex flex-wrap gap-1" data-lookup-group={group}>
+        {items.map((it) => (
+          <button
+            key={it.key}
+            type="button"
+            onClick={() => void copy(it.value)}
+            title={it.title ?? it.value}
+            className={`inline-flex items-center gap-1 min-h-9 px-2.5 rounded-full border text-[11px] transition-colors ${
+              copied === it.value ? 'border-emerald-500/50 text-emerald-300 bg-emerald-500/10' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'
+            }`}
+            data-lookup-value={it.value}
+          >
+            {copied === it.value ? <Check className="w-3 h-3" aria-hidden /> : <Copy className="w-3 h-3 opacity-60" aria-hidden />}
+            <span dir="ltr">{it.value}</span>
+            {it.label && <span className="text-zinc-500">· {it.label}</span>}
+            {copied === it.value && <span className="sr-only">{t.copied}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  const facetKinds = [...new Set(lookups.facets.map((f) => f.kind))];
+  return (
+    <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40" data-import="lookups">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        data-import="lookups-toggle"
+        className="w-full flex items-center gap-2 px-3 min-h-10 text-xs font-bold text-white text-start"
+      >
+        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${open ? '' : '-rotate-90 rtl:rotate-90'}`} aria-hidden />
+        <span className="min-w-0 truncate">{t.lookupsTitle}</span>
+      </button>
+      {!open ? null : (
+      <div className="px-3 pb-3 space-y-3 max-h-80 overflow-y-auto">
+        <p className="text-[11px] text-zinc-500">{t.lookupsHint}</p>
+        <div role="status" aria-live="polite" className="sr-only">
+          {copied ? `${t.copied}: ${copied}` : ''}
+        </div>
+        <div>
+          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkCategory}</h5>
+          {chips(roots.map((s) => ({ key: s.id, value: s.slug, label: isEn ? s.name_en : s.name_ar || s.name_en })), 'category')}
+        </div>
+        <div>
+          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkSub}</h5>
+          {chips(subs.map((s) => ({ key: s.id, value: s.slug, label: rootId ? (isEn ? s.name_en : s.name_ar || s.name_en) : s.parent_name_en })), 'sub_category')}
+        </div>
+        <div>
+          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkBrand}</h5>
+          {chips(lookups.brands.map((b) => ({ key: b.id, value: b.slug, label: isEn ? b.name_en : b.name_ar || b.name_en })), 'brand')}
+        </div>
+        <div>
+          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkFacet}</h5>
+          {facetKinds.length === 0
+            ? chips([], 'facets')
+            : facetKinds.map((kind) => (
+                <div key={kind} className="mb-1.5">
+                  <span className="block text-[10px] text-zinc-500 mb-0.5" dir="ltr">
+                    {kind}
+                  </span>
+                  {chips(lookups.facets.filter((f) => f.kind === kind).map((f) => ({ key: f.id, value: f.slug, label: isEn ? f.name_en : f.name_ar || f.name_en })), `facets:${kind}`)}
+                </div>
+              ))}
+        </div>
+        <div>
+          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkHashtag}</h5>
+          {chips(lookups.hashtags.map((h) => ({ key: h.tag, value: h.tag, label: h.name_ar || undefined })), 'hashtags')}
+          <p className="text-[10px] text-zinc-500 mt-1">{t.lkHashtagFree}</p>
+        </div>
+      </div>
+      )}
+    </div>
+  );
+}
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (

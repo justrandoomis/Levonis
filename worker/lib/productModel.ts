@@ -20,6 +20,7 @@ import { safeParse } from './types';
 import { safeLink } from './homeContent';
 import { badRequest } from './http';
 import { newId } from './crypto';
+import { dedupeHashtags, normalizeHashtag } from './hashtags';
 import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields } from './pricing';
 
 export const DOC_VERSION = 2;
@@ -788,7 +789,11 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     is_featured: !!body.is_featured,
     display_order: Number.isInteger(body.display_order) ? (body.display_order as number) : 0,
     payment_options: Array.isArray(body.payment_options) ? (body.payment_options as string[]).slice(0, 20).map((x) => s(x, 60)) : [],
-    hashtags: Array.isArray(body.hashtags) ? (body.hashtags as string[]).slice(0, 30).map((x) => s(x, 60)) : [],
+    // Normalized on the way in, so what a product carries, what the managed
+    // vocabulary lists and what the import sheet round-trips are one spelling.
+    hashtags: Array.isArray(body.hashtags)
+      ? dedupeHashtags((body.hashtags as string[]).slice(0, 30).map((x) => normalizeHashtag(s(x, 60))))
+      : [],
     how_to_use: s(body.how_to_use, 20000),
     usage_guide: upgradeUsageGuide(body.usage_guide),
     legacy: {

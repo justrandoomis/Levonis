@@ -26,6 +26,7 @@
  * column and quietly producing a product nothing can be sold from.
  */
 
+import { normalizeHashtag } from './hashtags';
 import type { ParsedProduct, RowIssue } from './importCsv';
 
 export interface CatalogRef {
@@ -75,7 +76,22 @@ export interface ImportMaps {
   familyOf: Map<string, 'devices' | 'materials' | null>;
   /** image cell (ZIP filename or URL) -> the stored delivery URL */
   images: Map<string, string>;
+  /**
+   * Normalized display names claimed by MORE than one row. Such a name is in
+   * the maps too (pointing at one of them), so a resolver that ignores this
+   * set files the product under an arbitrary row; the importer refuses the
+   * cell instead and names the slug as the unambiguous way to write it.
+   */
+  ambiguous?: {
+    brands: Set<string>;
+    catalogs: Set<string>;
+    facets: Set<string>;
+  };
 }
+
+/** The message an ambiguous cell earns, in the sheet's own language. */
+const ambiguousMessage = (column: string, value: string) =>
+  `${column}: أكثر من صف يحمل الاسم "${value}" — اكتب الـslug بدلًا من الاسم لتحديد المقصود`;
 
 export interface ResolvedProduct {
   key: string;
@@ -131,6 +147,8 @@ export function resolveProduct(
       // spreadsheet cell is how a catalogue ends up with "Bambu", "bambu lab"
       // and "BambuLab" as three separate brands.
       issues.push(err(p.line, `brand: لا توجد علامة تجارية باسم "${p.brand}" — أضفها أولًا من إدارة العلامات`));
+    } else if (maps.ambiguous?.brands.has(normKey(p.brand))) {
+      issues.push(err(p.line, ambiguousMessage('brand', p.brand)));
     } else {
       brandId = found;
     }
@@ -142,12 +160,16 @@ export function resolveProduct(
   if (p.category) {
     const cat = maps.catalogs.get(normKey(p.category));
     if (!cat) issues.push(err(p.line, `category: لا يوجد قسم باسم "${p.category}"`));
-    else categoryId = cat.id;
+    else if (maps.ambiguous?.catalogs.has(normKey(p.category))) {
+      issues.push(err(p.line, ambiguousMessage('category', p.category)));
+    } else categoryId = cat.id;
   }
   if (p.sub_category) {
     const sub = maps.catalogs.get(normKey(p.sub_category));
     if (!sub) {
       issues.push(err(p.line, `sub_category: لا يوجد قسم فرعي باسم "${p.sub_category}"`));
+    } else if (maps.ambiguous?.catalogs.has(normKey(p.sub_category))) {
+      issues.push(err(p.line, ambiguousMessage('sub_category', p.sub_category)));
     } else if (categoryId && sub.parent_id !== categoryId) {
       // §4: the sub-section is limited to the children of the main section.
       issues.push(err(p.line, `sub_category: "${p.sub_category}" ليس قسمًا فرعيًا من "${p.category}"`));
@@ -167,6 +189,7 @@ export function resolveProduct(
   for (const f of p.facets) {
     const id = maps.facets.get(normKey(f));
     if (!id) issues.push(err(p.line, `facets: لا يوجد فلتر باسم "${f}"`));
+    else if (maps.ambiguous?.facets.has(normKey(f))) issues.push(err(p.line, ambiguousMessage('facets', f)));
     else facetIds.push(id);
   }
 
@@ -386,6 +409,13 @@ export function resolveProduct(
     sub_category_id: subCategoryId,
     template_family: family,
     spec_fields: specFields,
+    // Hashtags are free text: a sheet may carry a tag the vocabulary has not
+    // seen, and confirm registers it. A sheet WITHOUT the column keeps the
+    // stored tags, so an older export does not strip them on re-import.
+    hashtags:
+      p.hashtags === null
+        ? ((existing?.doc.hashtags as string[] | undefined) ?? [])
+        : p.hashtags.map(normalizeHashtag).filter(Boolean),
     // The legacy JSON mirrors carry the SAME ids as the relational rows, so a
     // reader that has not moved to the relational tables sees one structure.
     options: groups.flatMap((g) =>

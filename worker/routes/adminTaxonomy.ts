@@ -4,6 +4,7 @@ import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http
 import { newId, } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { FAMILIES, fieldsFor, isTemplateFamily } from '../lib/templateFamilies';
+import { hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
 
 /**
  * Database-managed category tree, facets and brands — mandate §4 and §9:
@@ -53,6 +54,20 @@ export function slugify(input: string, fallback: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
   return s || fallback;
+}
+
+/**
+ * The English name, which every row must carry: absent on an update keeps the
+ * stored one, absent on a create is refused, and an explicit empty string is
+ * refused either way rather than quietly wiping the name a whole admin screen
+ * is sorted by.
+ */
+function requiredName(value: unknown, existing: string | undefined): string {
+  if (value === undefined) {
+    if (existing === undefined) throw badRequest('name_en is required');
+    return existing;
+  }
+  return str(value, 'name_en', { min: 1, max: 120 });
 }
 
 async function uniqueSlug(db: D1Database, table: string, base: string, exceptId: string | null): Promise<string> {
@@ -169,9 +184,22 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
   const id = typeof body.id === 'string' && body.id ? body.id : newId('cat');
   const existing = await c.env.DB.prepare('SELECT * FROM catalogs WHERE id = ?').bind(id).first<CatalogRow>();
 
-  const nameEn = str(body.name_en, 'name_en', { max: 120, required: !existing }) ?? existing?.name_en ?? '';
-  const nameAr = str(body.name_ar, 'name_ar', { max: 120, required: false }) || existing?.name_ar || nameEn;
-  const nameCkb = str(body.name_ckb, 'name_ckb', { max: 120, required: false }) || existing?.name_ckb || '';
+  // `str` returns '' for an absent field, so a partial update (an active
+  // toggle, a re-parent) must fall back with `||`, never `??` — or the name
+  // would be wiped by every edit that does not repeat it.
+  // ABSENT and EMPTY are different: a partial update (an active toggle, a
+  // re-parent) sends neither name and must keep both, while an admin who
+  // clears the Arabic field means to clear it. `str()` cannot tell the two
+  // apart — it answers '' for both — so the check is on `body` itself.
+  const nameEn = requiredName(body.name_en, existing?.name_en);
+  const nameAr =
+    body.name_ar === undefined
+      ? (existing?.name_ar ?? nameEn)
+      : str(body.name_ar, 'name_ar', { max: 120, required: false });
+  const nameCkb =
+    body.name_ckb === undefined
+      ? (existing?.name_ckb ?? '')
+      : str(body.name_ckb, 'name_ckb', { max: 120, required: false });
   const parentId =
     body.parent_id === null || body.parent_id === ''
       ? null
@@ -327,9 +355,18 @@ adminTaxonomyRoutes.post('/facets', async (c) => {
   const id = typeof body.id === 'string' && body.id ? body.id : newId('fct');
   const existing = await c.env.DB.prepare('SELECT * FROM facets WHERE id = ?').bind(id).first<FacetRow>();
 
-  const nameEn = str(body.name_en, 'name_en', { max: 120, required: !existing }) ?? existing?.name_en ?? '';
-  const nameAr = str(body.name_ar, 'name_ar', { max: 120, required: false }) || existing?.name_ar || '';
-  const nameCkb = str(body.name_ckb, 'name_ckb', { max: 120, required: false }) || existing?.name_ckb || '';
+  // `str` returns '' for an absent field, so a partial update (an active
+  // toggle, a re-parent) must fall back with `||`, never `??` — or the name
+  // would be wiped by every edit that does not repeat it.
+  const nameEn = requiredName(body.name_en, existing?.name_en);
+  const nameAr =
+    body.name_ar === undefined
+      ? (existing?.name_ar ?? '')
+      : str(body.name_ar, 'name_ar', { max: 120, required: false });
+  const nameCkb =
+    body.name_ckb === undefined
+      ? (existing?.name_ckb ?? '')
+      : str(body.name_ckb, 'name_ckb', { max: 120, required: false });
   // `kind` is an open grouping axis, not a fixed enum: the seed ships offer /
   // material_type / processing_mode / fdm_material, and an admin may add more.
   const kind = str(body.kind, 'kind', { max: 40, required: false }) || existing?.kind || 'tag';
@@ -428,9 +465,22 @@ adminTaxonomyRoutes.post('/brands', async (c) => {
   const id = typeof body.id === 'string' && body.id ? body.id : newId('brd');
   const existing = await c.env.DB.prepare('SELECT * FROM brands WHERE id = ?').bind(id).first<BrandRow>();
 
-  const nameEn = str(body.name_en, 'name_en', { max: 120, required: !existing }) ?? existing?.name_en ?? '';
-  const nameAr = str(body.name_ar, 'name_ar', { max: 120, required: false }) || existing?.name_ar || nameEn;
-  const nameCkb = str(body.name_ckb, 'name_ckb', { max: 120, required: false }) || existing?.name_ckb || '';
+  // `str` returns '' for an absent field, so a partial update (an active
+  // toggle, a re-parent) must fall back with `||`, never `??` — or the name
+  // would be wiped by every edit that does not repeat it.
+  // ABSENT and EMPTY are different: a partial update (an active toggle, a
+  // re-parent) sends neither name and must keep both, while an admin who
+  // clears the Arabic field means to clear it. `str()` cannot tell the two
+  // apart — it answers '' for both — so the check is on `body` itself.
+  const nameEn = requiredName(body.name_en, existing?.name_en);
+  const nameAr =
+    body.name_ar === undefined
+      ? (existing?.name_ar ?? nameEn)
+      : str(body.name_ar, 'name_ar', { max: 120, required: false });
+  const nameCkb =
+    body.name_ckb === undefined
+      ? (existing?.name_ckb ?? '')
+      : str(body.name_ckb, 'name_ckb', { max: 120, required: false });
   const active = body.active === undefined ? (existing?.active ?? 1) : body.active ? 1 : 0;
   const wantedSlug =
     typeof body.slug === 'string' && body.slug.trim()
@@ -454,4 +504,177 @@ adminTaxonomyRoutes.post('/brands', async (c) => {
   await audit(c.env.DB, admin.id, existing ? 'brand.update' : 'brand.create', id, { slug, name_en: nameEn });
   const fresh = await c.env.DB.prepare('SELECT * FROM brands WHERE id = ?').bind(id).first<BrandRow>();
   return c.json({ success: true, brand: fresh, created: !existing });
+});
+
+/**
+ * Deactivate when in use, delete when not — the same contract as sections
+ * and filters. A brand that products still point at keeps its row so those
+ * products (and their order history) never lose their brand.
+ */
+adminTaxonomyRoutes.delete('/brands/:id', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id');
+  const row = await c.env.DB.prepare('SELECT * FROM brands WHERE id = ?').bind(id).first<BrandRow>();
+  if (!row) throw notFound('Brand not found');
+  const used = await c.env.DB
+    .prepare('SELECT COUNT(*) AS n FROM products WHERE brand_id = ?')
+    .bind(id)
+    .first<{ n: number }>();
+  if ((used?.n ?? 0) > 0) {
+    await c.env.DB.prepare('UPDATE brands SET active = 0 WHERE id = ?').bind(id).run();
+    await audit(c.env.DB, admin.id, 'brand.deactivate', id, { products: used?.n ?? 0 });
+    return c.json({ success: true, deleted: false, deactivated: true, reason: 'IN_USE', products: used?.n ?? 0 });
+  }
+  await c.env.DB.prepare('DELETE FROM brands WHERE id = ?').bind(id).run();
+  await audit(c.env.DB, admin.id, 'brand.delete', id, { slug: row.slug });
+  return c.json({ success: true, deleted: true, deactivated: false });
+});
+
+// ------------------------------------------------------------------ hashtags
+//
+// The managed vocabulary (migration 0041) merged with what products actually
+// carry. A tag that exists on products but not in the table is listed as
+// `managed: false` so the admin can adopt it, rename it or strip it — nothing
+// an admin can see is outside their reach.
+
+interface HashtagRow {
+  id: string;
+  tag: string;
+  name_ar: string;
+  sort: number;
+  active: number;
+}
+
+async function loadHashtagRows(db: D1Database): Promise<HashtagRow[]> {
+  try {
+    const { results } = await db.prepare('SELECT * FROM hashtags ORDER BY sort, tag').all<HashtagRow>();
+    return results;
+  } catch (e) {
+    // Before migration 0041 has run there is no table; the admin still sees
+    // the products' tags rather than an error page.
+    console.error('hashtags table unavailable', e instanceof Error ? e.message : String(e));
+    return [];
+  }
+}
+
+adminTaxonomyRoutes.get('/hashtags', async (c) => {
+  // Both the counts and the unlisted rows come from reading every tagged
+  // product. The product form only needs a list to suggest from, so it asks
+  // with ?counts=0 and that scan never runs for it.
+  const withCounts = c.req.query('counts') !== '0';
+  const [rows, usage] = await Promise.all([
+    loadHashtagRows(c.env.DB),
+    withCounts ? hashtagUsage(c.env.DB) : Promise.resolve(new Map<string, HashtagUsage>()),
+  ]);
+  const seen = new Set<string>();
+  const out = rows.map((r) => {
+    const key = hashtagKey(r.tag);
+    seen.add(key);
+    return {
+      id: r.id,
+      tag: r.tag,
+      name_ar: r.name_ar,
+      sort: r.sort,
+      active: !!r.active,
+      managed: true,
+      product_count: usage.get(key)?.count ?? 0,
+    };
+  });
+  for (const [key, u] of usage) {
+    if (seen.has(key)) continue;
+    out.push({ id: '', tag: u.spelling, name_ar: '', sort: 0, active: true, managed: false, product_count: u.count });
+  }
+  return c.json({ success: true, hashtags: out });
+});
+
+adminTaxonomyRoutes.post('/hashtags', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const byId =
+    typeof body.id === 'string' && body.id
+      ? await c.env.DB.prepare('SELECT * FROM hashtags WHERE id = ?').bind(body.id).first<HashtagRow>()
+      : null;
+  if (typeof body.id === 'string' && body.id && !byId) throw notFound('Hashtag not found');
+
+  const tag = body.tag === undefined && byId ? byId.tag : normalizeHashtag(body.tag);
+  if (!tag) throw badRequest('tag is required');
+  const key = hashtagKey(tag);
+
+  // Another row already spelling this tag: on a create that row is what the
+  // admin meant (adopting an unmanaged tag lands here), on a rename it is a
+  // real clash.
+  const clash = await c.env.DB
+    .prepare('SELECT * FROM hashtags WHERE tag = ? COLLATE NOCASE AND id <> ?')
+    .bind(tag, byId?.id ?? '')
+    .first<HashtagRow>();
+  if (clash && byId) throw badRequest(`"${tag}" is already a hashtag`, 'HASHTAG_TAKEN');
+  const existing = byId ?? clash;
+  // Adopting or re-adding a tag that exists in another case keeps the stored
+  // spelling; only an edit BY ID (a rename) changes how a tag is written.
+  const spelling = byId ? tag : (clash?.tag ?? tag);
+
+  const nameAr = str(body.name_ar, 'name_ar', { max: 120, required: false }) || existing?.name_ar || '';
+  const sort = int(body.sort, 'sort', { min: 0, max: 100000, def: existing?.sort ?? 0 });
+  // Adding or adopting a tag by name means "offer this tag", so it lands
+  // active even when a row for it was deactivated earlier; only an edit BY ID
+  // keeps the stored state when the caller says nothing about it.
+  const active = body.active === undefined ? (byId ? (existing?.active ?? 1) : 1) : body.active ? 1 : 0;
+
+  let productsUpdated = 0;
+  if (existing) {
+    // The PRODUCTS are rewritten first and the vocabulary row after them: a
+    // rename that dies halfway then still has its old spelling in the table,
+    // so the admin can simply run it again. The other order renames the row,
+    // strands the remaining products under a tag no longer in the list, and
+    // leaves nothing to retry with.
+    if (existing.tag !== spelling) productsUpdated = await rewriteHashtag(c.env.DB, existing.tag, spelling);
+    await c.env.DB
+      .prepare('UPDATE hashtags SET tag = ?, name_ar = ?, sort = ?, active = ? WHERE id = ?')
+      .bind(spelling, nameAr, sort, active, existing.id)
+      .run();
+  } else {
+    await c.env.DB
+      .prepare('INSERT INTO hashtags (id, tag, name_ar, sort, active) VALUES (?, ?, ?, ?, ?)')
+      .bind(newId('tag'), spelling, nameAr, sort, active)
+      .run();
+  }
+  const fresh = await c.env.DB
+    .prepare('SELECT * FROM hashtags WHERE tag = ? COLLATE NOCASE')
+    .bind(spelling)
+    .first<HashtagRow>();
+  await audit(c.env.DB, admin.id, existing ? 'hashtag.update' : 'hashtag.create', fresh?.id ?? key, {
+    tag: spelling,
+    previous: existing?.tag ?? null,
+    products_updated: productsUpdated,
+  });
+  return c.json({
+    success: true,
+    hashtag: fresh ? { ...fresh, active: !!fresh.active } : null,
+    created: !existing,
+    products_updated: productsUpdated,
+  });
+});
+
+/** Removes a tag from every product that carries it — managed or not. */
+adminTaxonomyRoutes.post('/hashtags/strip', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const tag = normalizeHashtag(body.tag);
+  if (!tag) throw badRequest('tag is required');
+  const n = await rewriteHashtag(c.env.DB, tag, null);
+  await audit(c.env.DB, admin.id, 'hashtag.strip', hashtagKey(tag), { tag, products_updated: n });
+  return c.json({ success: true, products_updated: n });
+});
+
+/** Deletes the vocabulary row; with ?strip=1 the tag leaves the products too. */
+adminTaxonomyRoutes.delete('/hashtags/:id', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id');
+  const strip = c.req.query('strip') === '1';
+  const row = await c.env.DB.prepare('SELECT * FROM hashtags WHERE id = ?').bind(id).first<HashtagRow>();
+  if (!row) throw notFound('Hashtag not found');
+  await c.env.DB.prepare('DELETE FROM hashtags WHERE id = ?').bind(id).run();
+  const productsUpdated = strip ? await rewriteHashtag(c.env.DB, row.tag, null) : 0;
+  await audit(c.env.DB, admin.id, 'hashtag.delete', id, { tag: row.tag, stripped: strip, products_updated: productsUpdated });
+  return c.json({ success: true, deleted: true, products_updated: productsUpdated });
 });

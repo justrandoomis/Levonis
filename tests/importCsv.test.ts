@@ -12,6 +12,7 @@ import {
   BASE_COLUMNS,
   blankTemplate,
   labelRow,
+  lookupsSheet,
   parseCsv,
   parseImport,
   readmeFor,
@@ -21,7 +22,8 @@ import {
   type ExportProduct,
 } from '../worker/lib/importCsv';
 import { normKey, resolveProduct, splitComboKey } from '../worker/lib/importApply';
-import type { CatalogRef, ImportMaps } from '../worker/lib/importApply';
+import type { CatalogRef, ExistingShape, ImportMaps } from '../worker/lib/importApply';
+import type { Lookups } from '../worker/lib/lookups';
 
 const devices = templateShape('devices', ['fdm-printers', 'printers'], { includeCost: true });
 const materials = templateShape('materials', ['printing-materials'], { includeCost: true });
@@ -107,6 +109,87 @@ test('the README names the section spec columns it ships with', () => {
   for (const f of materials.specFields) assert.ok(readme.includes(f.id), `README omits ${f.id}`);
 });
 
+// ---------------------------------------------------------- the lookups
+
+const lookups: Lookups = {
+  sections: [
+    {
+      id: 'cat_printers',
+      slug: 'printers',
+      name_en: 'Printers',
+      name_ar: 'الطابعات',
+      parent_id: null,
+      parent_name_en: '',
+      parent_slug: null,
+      family: 'devices',
+      is_printer_catalog: true,
+    },
+    {
+      id: 'cat_printers_fdm',
+      slug: 'fdm-printers',
+      name_en: 'FDM Printers',
+      name_ar: 'طابعات FDM',
+      parent_id: 'cat_printers',
+      parent_name_en: 'Printers',
+      parent_slug: 'printers',
+      family: 'devices',
+      is_printer_catalog: false,
+    },
+  ],
+  brands: [{ id: 'brand_bambu', slug: 'bambu-lab', name_en: 'Bambu Lab', name_ar: 'بامبو لاب' }],
+  facets: [{ id: 'fac_new', slug: 'offers-new', name_en: 'New', name_ar: 'جديد', kind: 'offer' }],
+  hashtags: [
+    { tag: 'pla', name_ar: '' },
+    { tag: 'Bambu-Lab', name_ar: 'بامبو' },
+  ],
+};
+
+test('the blank template ends with a lookup block the parser skips by marker', () => {
+  for (const example of [true, false]) {
+    const csv = blankTemplate(devices, example, lookups);
+    const rows = parseCsv(csv);
+    const find = (type: string, key: string) => rows.find((r) => r[0] === type && r[1] === key);
+    // Every value is advertised BY SLUG: display names are not unique, and
+    // the importer refuses an ambiguous one rather than pick a row.
+    assert.ok(find('#lookup:category', 'printers'), 'main section missing');
+    assert.ok(find('#lookup:sub_category', 'fdm-printers'), 'sub-section missing');
+    assert.equal(find('#lookup:sub_category', 'fdm-printers')?.[devices.columns.indexOf('category')], 'printers');
+    assert.ok(find('#lookup:brand', 'bambu-lab'), 'brand missing');
+    assert.ok(find('#lookup:facets', 'offers-new'), 'facet missing');
+    assert.ok(find('#lookup:hashtags', 'pla'), 'hashtag missing');
+    // The marker names the column the value goes in, verbatim.
+    for (const row of rows.filter((r) => r[0].startsWith('#lookup:'))) {
+      const column = row[0].slice('#lookup:'.length);
+      assert.ok(devices.columns.includes(column), `no column named ${column}`);
+    }
+    for (const r of rows) assert.equal(r.length, devices.columns.length, 'a lookup row shifted the columns');
+    const parsed = parseImport(csv, devices);
+    assert.deepEqual(parsed.issues.filter((i) => i.severity === 'error'), []);
+    assert.equal(parsed.products.length, example ? 1 : 0, 'a lookup row was read as a product');
+  }
+});
+
+test('the README and lookups.csv list every accepted classification value', () => {
+  const readme = readmeFor(devices, lookups);
+  for (const v of ['printers', 'fdm-printers', 'bambu-lab', 'Bambu Lab', 'offers-new', 'pla', 'Bambu-Lab', 'lookups.csv']) {
+    assert.ok(readme.includes(v), `README omits ${v}`);
+  }
+  const sheet = parseCsv(lookupsSheet(lookups));
+  assert.deepEqual(sheet[0], ['column', 'value', 'name_en', 'name_ar', 'slug', 'parent', 'extra']);
+  assert.ok(sheet.some((r) => r[0] === 'category' && r[1] === 'printers' && r[6] === 'family=devices'));
+  assert.ok(sheet.some((r) => r[0] === 'sub_category' && r[1] === 'fdm-printers' && r[5] === 'printers'));
+  assert.ok(sheet.some((r) => r[0] === 'brand' && r[1] === 'bambu-lab' && r[2] === 'Bambu Lab'));
+  assert.ok(sheet.some((r) => r[0] === 'facets' && r[1] === 'offers-new' && r[6] === 'kind=offer'));
+  assert.ok(sheet.some((r) => r[0] === 'hashtags' && r[1] === 'Bambu-Lab'));
+});
+
+test('an empty vocabulary still produces a valid template and an honest README', () => {
+  const empty: Lookups = { sections: [], brands: [], facets: [], hashtags: [] };
+  const parsed = parseImport(blankTemplate(devices, true, empty), devices);
+  assert.deepEqual(parsed.issues.filter((i) => i.severity === 'error'), []);
+  assert.ok(readmeFor(devices, empty).includes('لا شيء بعد'));
+});
+
 // ---------------------------------------------------------- the round-trip
 
 const sample: ExportProduct = {
@@ -127,6 +210,7 @@ const sample: ExportProduct = {
   stock: 12,
   low_stock_threshold: 3,
   facets: ['offers-new', 'fdm-pla'],
+  hashtags: ['pla', 'Bambu-Lab'],
   spec_fields: { nozzle: '0.4 mm', build_volume: '256x256x256', technology: 'FDM' },
   options: [
     {
@@ -478,6 +562,37 @@ test('re-importing an existing product REUSES its row ids so stock survives', ()
   assert.ok(!JSON.stringify(second.relations).includes('FRESH'), 'no id was regenerated');
 });
 
+test('hashtags ride in their own column and a sheet without it keeps stored tags', () => {
+  const parsed = parsedSample();
+  assert.deepEqual(parsed.hashtags, ['pla', 'Bambu-Lab']);
+  const fresh = resolveProduct(parsed, null, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(fresh.doc.hashtags, ['pla', 'Bambu-Lab']);
+
+  const stored: ExistingShape = {
+    id: 'prd_live',
+    slug: 'bambu-lab-a1-combo',
+    inventory_mode: 'BASE',
+    doc: { id: 'prd_live', hashtags: ['kept-tag'] },
+    groups: [],
+    values: [],
+    colors: [],
+    images: [],
+    variants: [],
+  };
+  // The column is present and empty: the tags are cleared on purpose.
+  const cleared = resolveProduct({ ...parsed, hashtags: [] }, stored, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(cleared.doc.hashtags, []);
+  // The column is absent (an older export): the stored tags survive.
+  const noColumn = { ...devices, columns: devices.columns.filter((c) => c !== 'hashtags') };
+  const older = parseImport(serializeProducts([sample], noColumn), noColumn).products[0];
+  assert.equal(older.hashtags, null);
+  const kept = resolveProduct(older, stored, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(kept.doc.hashtags, ['kept-tag']);
+  // A tag typed with a hash and spaces is normalized like the form does it.
+  const typed = resolveProduct({ ...parsed, hashtags: ['#My Tag', 'pla'] }, null, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(typed.doc.hashtags, ['My-Tag', 'pla']);
+});
+
 test('spec values the sheet has no column for survive a re-import', () => {
   const existing = {
     id: 'prd_live',
@@ -509,6 +624,39 @@ test('an unknown brand, section or facet blocks the row instead of inventing one
   const r = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
   assert.ok(r.issues.some((i) => i.message.includes('Nonexistent Brand')));
   assert.ok(r.issues.some((i) => i.message.includes('not-a-facet')));
+});
+
+test('a display name two rows share is refused, naming the slug as the way out', () => {
+  const ambiguousMaps: ImportMaps = {
+    ...maps,
+    // Two sections really are called "Printers" (the seed ships several), so
+    // the name is in the map — pointing at ONE of them — and also flagged.
+    ambiguous: { brands: new Set([normKey('Bambu Lab')]), catalogs: new Set([normKey('Printers')]), facets: new Set<string>() },
+  };
+  const p = parsedSample();
+  const r = resolveProduct(p, null, ambiguousMaps, { newId: idFactory(), money: true });
+  const messages = r.issues.map((i) => i.message).join(' | ');
+  assert.match(messages, /category: أكثر من صف/);
+  assert.match(messages, /brand: أكثر من صف/);
+  assert.match(messages, /slug/);
+  // The unambiguous columns still resolve.
+  assert.equal(r.issues.some((i) => i.message.startsWith('facets')), false, messages);
+
+  // And with the slug in the cell instead of the name, the row is clean.
+  const bySlug = { ...p, category: 'printers', sub_category: 'fdm-printers', brand: 'Bambu Lab' };
+  const slugMaps: ImportMaps = {
+    ...maps,
+    brands: new Map([[normKey('Bambu Lab'), 'brand_bambu']]),
+    catalogs: new Map([
+      [normKey('printers'), catalogPrinters],
+      [normKey('fdm-printers'), catalogFdm],
+    ]),
+    ambiguous: { brands: new Set<string>(), catalogs: new Set<string>(), facets: new Set<string>() },
+  };
+  const clean = resolveProduct(bySlug, null, slugMaps, { newId: idFactory(), money: true });
+  assert.deepEqual(clean.issues.filter((i) => i.severity === 'error'), []);
+  assert.equal(clean.doc.category_id, 'cat_printers');
+  assert.equal(clean.doc.sub_category_id, 'cat_printers_fdm');
 });
 
 test('a sub-section that is not a child of the main section is refused', () => {

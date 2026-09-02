@@ -310,7 +310,7 @@ const MODAL_STRINGS = {
   ar: {
     close: 'إغلاق',
     dialog: 'نافذة',
-    unsavedTitle: 'لديك نص قالب غير مطبَّق',
+    unsavedTitle: 'لديك تغييرات غير محفوظة',
     unsavedBody: 'إغلاق النافذة الآن يفقد ما كتبته أو لصقته. هل تريد المتابعة؟',
     discard: 'تجاهل وإغلاق',
     keep: 'متابعة التحرير',
@@ -318,7 +318,7 @@ const MODAL_STRINGS = {
   en: {
     close: 'Close',
     dialog: 'Dialog',
-    unsavedTitle: 'Unapplied template text',
+    unsavedTitle: 'Unsaved changes',
     unsavedBody: 'Closing now discards what you typed or pasted. Continue?',
     discard: 'Discard & close',
     keep: 'Keep editing',
@@ -326,7 +326,7 @@ const MODAL_STRINGS = {
   ckb: {
     close: 'داخستن',
     dialog: 'پەنجەرە',
-    unsavedTitle: 'دەقی قاڵبی جێبەجێنەکراو',
+    unsavedTitle: 'گۆڕانکاری پاشەکەوتنەکراو',
     unsavedBody: 'داخستن ئێستا ئەوەی نووسیوتە دەفەوتێنێت. بەردەوام بم؟',
     discard: 'پشتگوێخستن و داخستن',
     keep: 'بەردەوامبوون لە دەستکاری',

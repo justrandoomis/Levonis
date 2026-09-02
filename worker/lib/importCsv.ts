@@ -32,6 +32,7 @@
  */
 
 import { FAMILIES, fieldsFor, flatFields, type TemplateField } from './templateFamilies';
+import type { Lookups } from './lookups';
 
 export type RowType = 'product' | 'option' | 'color' | 'image';
 
@@ -137,6 +138,7 @@ export const BASE_COLUMNS = [
   'stock',
   'low_stock_threshold',
   'facets',
+  'hashtags',
   // child-row columns
   'group',
   'value',
@@ -196,6 +198,7 @@ export function labelRow(shape: TemplateShape): string[] {
     stock: 'المخزون',
     low_stock_threshold: 'حد التنبيه',
     facets: 'الفلاتر (slug|slug)',
+    hashtags: 'الهاشتاقات (tag|tag)',
     group: 'مجموعة الخيار',
     value: 'قيمة الخيار / اسم اللون',
     hex: 'كود اللون #RRGGBB',
@@ -237,6 +240,9 @@ export interface ParsedProduct {
   stock: number | null;
   low_stock_threshold: number | null;
   facets: string[];
+  /** null when the sheet has no hashtags column at all, so an older file
+   *  leaves a product's stored tags alone instead of clearing them. */
+  hashtags: string[] | null;
   spec_fields: Record<string, string>;
   options: ParsedOption[];
   colors: ParsedColor[];
@@ -390,6 +396,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         stock: intCell(cell(r, 'stock'), line, 'stock', issues),
         low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
         facets: splitList(cell(r, 'facets')),
+        hashtags: index.has('hashtags') ? splitList(cell(r, 'hashtags')) : null,
         spec_fields: spec,
         options: [],
         colors: [],
@@ -592,6 +599,7 @@ export interface ExportProduct {
   stock: number | null;
   low_stock_threshold: number | null;
   facets: string[];
+  hashtags: string[];
   spec_fields: Record<string, string>;
   options: Array<Omit<ParsedOption, 'line'>>;
   colors: Array<Omit<ParsedColor, 'line'>>;
@@ -632,6 +640,7 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       stock: num(p.stock),
       low_stock_threshold: num(p.low_stock_threshold),
       facets: p.facets.join('|'),
+      hashtags: p.hashtags.join('|'),
       ...spec,
     });
     for (const o of p.options) {
@@ -685,13 +694,13 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
 
 /** A blank template: the machine header, a commented label row, and one
  *  worked example so the shape is obvious without reading the README. */
-export function blankTemplate(shape: TemplateShape, example: boolean): string {
+export function blankTemplate(shape: TemplateShape, example: boolean, lookups?: Lookups): string {
   const rows: string[][] = [shape.columns.slice()];
   const labels = labelRow(shape);
   // The label row is marked with '#' in row_type so the parser skips it by
   // marker, not by position — deleting it does not break the file.
   rows.push(shape.columns.map((c, i) => (c === 'row_type' ? '#labels' : labels[i])));
-  if (!example) return toCsv(rows);
+  if (!example) return toCsv(lookups ? [...rows, ...lookupRows(shape, lookups)] : rows);
 
   const specSample: Record<string, string> = {};
   for (const f of shape.specFields.slice(0, 4)) {
@@ -725,11 +734,143 @@ export function blankTemplate(shape: TemplateShape, example: boolean): string {
     links: 'Printer:A1|Plug:EU',
   });
   put({ row_type: 'image', key: 'EXAMPLE-001', image: 'images/example-1.jpg', alt: 'front', primary: 'yes' });
+  if (lookups) rows.push(...lookupRows(shape, lookups));
   return toCsv(rows);
 }
 
+// ------------------------------------------------------------------ lookups
+//
+// "عند إضافة قسم جديد أو براند أو هاشتاق يجعل في قالب الاستيراد خيارات
+// للاختيار": the values the classification columns accept travel WITH the
+// template, read from the database at download time. A CSV cannot carry a
+// dropdown, so the blank template ends with a block of `#lookup:` rows the
+// parser skips by marker — one row per value, with the value to type in the
+// `key` column — and the ZIP adds a proper lookups.csv sheet.
+
+/** One human-readable line per value, for the README. */
+function lookupLine(value: string, ar: string, note: string): string {
+  const tail = [ar, note].filter(Boolean).join(' — ');
+  return `  ${value}${tail ? `   (${tail})` : ''}`;
+}
+
+/** The trailing lookup block of the blank template (rows in the sheet's own columns). */
+export function lookupRows(shape: TemplateShape, lookups: Lookups): string[][] {
+  const put = (v: Record<string, string>) => shape.columns.map((c) => v[c] ?? '');
+  const rows: string[][] = [];
+  rows.push(put({}));
+  rows.push(
+    put({
+      row_type: '#lookups',
+      key: 'القيم المتاحة — انسخ القيمة من عمود key إلى العمود المذكور في row_type. هذه الأسطر تُتجاهل عند الاستيراد.',
+    })
+  );
+  // The SLUG is what every value advertises, for sections and brands too:
+  // two rows may share a display name (the seed ships several sections named
+  // "Printers") and the importer refuses an ambiguous name rather than guess,
+  // while a slug is unique by construction and always resolves.
+  for (const s of lookups.sections.filter((x) => !x.parent_id)) {
+    rows.push(
+      put({
+        row_type: '#lookup:category',
+        key: s.slug,
+        name: s.name_en,
+        description: [s.name_ar, s.family ? `family=${s.family}` : ''].filter(Boolean).join(' · '),
+      })
+    );
+  }
+  for (const s of lookups.sections.filter((x) => !!x.parent_id)) {
+    rows.push(
+      put({
+        row_type: '#lookup:sub_category',
+        key: s.slug,
+        name: s.name_en,
+        description: [s.name_ar, `parent=${s.parent_name_en}`].filter(Boolean).join(' · '),
+        category: s.parent_slug ?? '',
+      })
+    );
+  }
+  for (const b of lookups.brands) {
+    rows.push(put({ row_type: '#lookup:brand', key: b.slug, name: b.name_en, description: b.name_ar }));
+  }
+  for (const f of lookups.facets) {
+    rows.push(
+      put({
+        row_type: '#lookup:facets',
+        key: f.slug,
+        name: f.name_en,
+        description: [f.name_ar, `kind=${f.kind}`].filter(Boolean).join(' · '),
+      })
+    );
+  }
+  for (const h of lookups.hashtags) {
+    rows.push(put({ row_type: '#lookup:hashtags', key: h.tag, name: h.name_ar }));
+  }
+  return rows;
+}
+
+/** lookups.csv — the same values as a plain sheet an admin can filter in Excel. */
+export function lookupsSheet(lookups: Lookups): string {
+  const rows: string[][] = [
+    ['column', 'value', 'name_en', 'name_ar', 'slug', 'parent', 'extra'],
+    [
+      '#العمود',
+      'القيمة التي تُكتب',
+      'الاسم بالإنجليزية',
+      'الاسم بالعربية',
+      'المعرّف',
+      'القسم الأب',
+      'ملاحظات',
+    ],
+  ];
+  for (const s of lookups.sections) {
+    rows.push([
+      s.parent_id ? 'sub_category' : 'category',
+      s.slug,
+      s.name_en,
+      s.name_ar,
+      s.slug,
+      s.parent_slug ?? '',
+      s.family ? `family=${s.family}` : '',
+    ]);
+  }
+  for (const b of lookups.brands) rows.push(['brand', b.slug, b.name_en, b.name_ar, b.slug, '', '']);
+  for (const f of lookups.facets) rows.push(['facets', f.slug, f.name_en, f.name_ar, f.slug, '', `kind=${f.kind}`]);
+  for (const h of lookups.hashtags) rows.push(['hashtags', h.tag, h.tag, h.name_ar, '', '', '']);
+  return toCsv(rows);
+}
+
+/** The README section listing the accepted values. */
+export function lookupsReadme(lookups: Lookups): string {
+  const roots = lookups.sections.filter((s) => !s.parent_id);
+  const subs = lookups.sections.filter((s) => !!s.parent_id);
+  const block = (title: string, lines: string[]) =>
+    `${title}\n${lines.length ? lines.join('\n') : '  (لا شيء بعد — أضف من صفحة التصنيفات في الإدارة)'}`;
+  return [
+    'القيم المتاحة لأعمدة التصنيف',
+    '--------------------------',
+    'الأقسام والعلامات والفلاتر تُقرأ من قاعدة البيانات لحظة تنزيل هذا الملف. أي قسم أو',
+    'علامة أو فلتر أو هاشتاق تضيفه من صفحة «التصنيفات» في الإدارة يظهر هنا في التنزيل التالي.',
+    '',
+    'القيمة المكتوبة أدناه هي الـ slug: يُقبل الاسم الإنجليزي أو العربي أيضًا، لكن أكثر من قسم',
+    'أو علامة قد يحملان الاسم نفسه — وعندها يُرفض السطر ويُطلب منك الـ slug، لذا فهو الأضمن.',
+    'قيمة خارج هذه القوائم تُرفض، باستثناء الهاشتاقات: وسم جديد تكتبه يُضاف إلى القائمة.',
+    '',
+    block('category — القسم الرئيسي', roots.map((s) => lookupLine(s.slug, `${s.name_en}${s.name_ar ? ` / ${s.name_ar}` : ''}`, s.family ? `القالب: ${s.family}` : 'بلا قالب'))),
+    '',
+    block('sub_category — القسم الفرعي (يجب أن يتبع القسم الرئيسي المذكور)', subs.map((s) => lookupLine(s.slug, `${s.name_en}${s.name_ar ? ` / ${s.name_ar}` : ''}`, `تحت: ${s.parent_slug ?? s.parent_name_en}`))),
+    '',
+    block('brand — العلامة التجارية', lookups.brands.map((b) => lookupLine(b.slug, `${b.name_en}${b.name_ar ? ` / ${b.name_ar}` : ''}`, ''))),
+    '',
+    block('facets — الفلاتر (افصل بين أكثر من فلتر بـ |)', lookups.facets.map((f) => lookupLine(f.slug, f.name_ar || f.name_en, `النوع: ${f.kind}`))),
+    '',
+    block('hashtags — الهاشتاقات (افصل بـ | — يمكن كتابة وسم جديد وسيُضاف إلى القائمة)', lookups.hashtags.map((h) => lookupLine(h.tag, h.name_ar, ''))),
+    '',
+    'الملف lookups.csv داخل الـ ZIP يحمل القوائم نفسها كجدول يمكن فرزه في Excel.',
+  ].join('\n');
+}
+
 /** The README that ships inside the ZIP. */
-export function readmeFor(shape: TemplateShape): string {
+export function readmeFor(shape: TemplateShape, lookups?: Lookups): string {
   const specList = shape.specFields
     .map((f) => `  ${SPEC_PREFIX}${f.id}${f.unit ? ` (${f.unit})` : ''} — ${f.label_ar} / ${f.label_en}`)
     .join('\n');
@@ -765,9 +906,10 @@ export function readmeFor(shape: TemplateShape): string {
 -------------------------
 ${specList || '  (لا توجد حقول مواصفات لهذا القسم)'}
 
-الملفات
+${lookups ? `${lookupsReadme(lookups)}\n\n` : ''}الملفات
 -------
   data.csv     البيانات (UTF-8، مفصولة بفواصل)
+  lookups.csv  القيم المتاحة للأقسام والعلامات والفلاتر والهاشتاقات
   images/      ضع هنا الصور المذكورة في أعمدة image
   README.txt   هذا الملف
 `;

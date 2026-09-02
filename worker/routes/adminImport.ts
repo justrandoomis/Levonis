@@ -48,6 +48,7 @@ import { planRelationsWrite } from './adminProductRelations';
 import {
   blankTemplate,
   labelRow,
+  lookupsSheet,
   parseCsv,
   parseImport,
   readmeFor,
@@ -67,6 +68,8 @@ import {
   type ImportMaps,
 } from '../lib/importApply';
 import { isTemplateFamily } from '../lib/templateFamilies';
+import { loadLookups } from '../lib/lookups';
+import { registerHashtags } from '../lib/hashtags';
 import {
   PRODUCT_COLUMNS,
   parseProductRow,
@@ -194,7 +197,11 @@ adminImportRoutes.get('/template', async (c) => {
   const withExample = c.req.query('example') !== '0';
   const { shape, catalog } = await shapeFor(c.env.DB, categoryId, canViewFinancials(c.env, admin));
 
-  const csv = blankTemplate(shape, withExample);
+  // The accepted values of the classification columns ride along with the
+  // template: a section, brand, filter or hashtag added in the taxonomy admin
+  // is offered by the very next download.
+  const lookups = await loadLookups(c.env.DB);
+  const csv = blankTemplate(shape, withExample, lookups);
   const stem = fileStem(catalog, 'template');
 
   if (format === 'csv') return fileResponse(csvBytes(csv), `${stem}.csv`, 'text/csv; charset=utf-8', 'csv');
@@ -202,7 +209,8 @@ adminImportRoutes.get('/template', async (c) => {
   const zip = zipSync(
     {
       'data.csv': strToU8(`\uFEFF${csv}`),
-      'README.txt': strToU8(readmeFor(shape)),
+      'README.txt': strToU8(readmeFor(shape, lookups)),
+      'lookups.csv': strToU8(`\uFEFF${lookupsSheet(lookups)}`),
       // A real, non-empty file: some unzip tools drop empty directories, and an
       // admin who cannot see images/ will not know where to put the pictures.
       'images/PUT-IMAGES-HERE.txt': strToU8(
@@ -212,6 +220,16 @@ adminImportRoutes.get('/template', async (c) => {
     { level: 6 }
   );
   return fileResponse(zip, `${stem}.zip`, 'application/zip', 'zip');
+});
+
+// GET /lookups ------------------------------------------------------------
+//
+// The same values the template ships with, as JSON for the import panel, so
+// an admin sees what the file will accept before typing a single row.
+
+adminImportRoutes.get('/lookups', async (c) => {
+  const lookups = await loadLookups(c.env.DB);
+  return c.json({ success: true, ...lookups });
 });
 
 // ------------------------------------------------------------- export
@@ -312,6 +330,7 @@ async function exportProducts(
       stock: doc.stock,
       low_stock_threshold: doc.low_stock_threshold,
       facets: facets.filter((f) => f.product_id === pid).map((f) => f.slug),
+      hashtags: doc.hashtags,
       spec_fields: doc.spec_fields,
       options: myValues.map((v) => ({
         group: (groupById.get(v.group_id as string)?.name_en ?? ''),
@@ -399,11 +418,13 @@ adminImportRoutes.get('/export', async (c) => {
   const stem = fileStem(catalog, 'export');
 
   if (format === 'csv') return fileResponse(csvBytes(csv), `${stem}.csv`, 'text/csv; charset=utf-8', 'csv');
+  const lookups = await loadLookups(c.env.DB);
   const zip = zipSync(
     {
       'data.csv': strToU8(`\uFEFF${csv}`),
-      'README.txt': strToU8(readmeFor(shape)),
+      'README.txt': strToU8(readmeFor(shape, lookups)),
       'labels.csv': strToU8(`\uFEFF${toCsv([shape.columns, labelRow(shape)])}`),
+      'lookups.csv': strToU8(`\uFEFF${lookupsSheet(lookups)}`),
     },
     { level: 6 }
   );
@@ -524,46 +545,86 @@ async function resolveImages(
   return { map, issues };
 }
 
-async function buildMaps(db: D1Database, images: Map<string, string>): Promise<ImportMaps> {
-  const rows = await loadCatalogs(db);
-  const catalogs = new Map<string, CatalogRef>();
+/**
+ * Registers one table's aliases, in two passes with different rules.
+ *
+ * SLUGS AND IDS FIRST, and they are final: both are unique by construction,
+ * so a slug always resolves to its own row no matter what anything is named.
+ *
+ * DISPLAY NAMES SECOND, and a name claimed by two different rows is recorded
+ * as AMBIGUOUS rather than silently resolved to whichever row was read first.
+ * Two sections called "Printers" are ordinary (the seed ships several), and a
+ * sheet that says `category: Printers` would otherwise file the product under
+ * an arbitrary one of them — a wrong section written silently. The row is
+ * refused instead, naming the slug as the way to say which one is meant.
+ */
+function registerAliases<T>(
+  rows: Array<{ id: string; slug: string; name_en: string; name_ar: string }>,
+  value: (row: { id: string }) => T,
+  into: Map<string, T>,
+  ambiguous: Set<string>
+): void {
+  const authoritative = new Set<string>();
   for (const r of rows) {
-    const ref: CatalogRef = {
-      id: r.id,
-      parent_id: r.parent_id,
-      slug: r.slug,
-      name_en: r.name_en,
-      name_ar: r.name_ar,
-      template_family: r.template_family,
-    };
-    // A section is nameable by its slug, its English name or its Arabic name;
-    // the first definition wins so a duplicate display name cannot shadow a slug.
-    for (const alias of [r.slug, r.name_en, r.name_ar, r.id]) {
-      if (alias && !catalogs.has(normKey(alias))) catalogs.set(normKey(alias), ref);
+    for (const alias of [r.slug, r.id]) {
+      if (!alias) continue;
+      const key = normKey(alias);
+      authoritative.add(key);
+      if (!into.has(key)) into.set(key, value(r));
     }
   }
+  const owner = new Map<string, string>();
+  for (const r of rows) {
+    for (const alias of [r.name_en, r.name_ar]) {
+      if (!alias) continue;
+      const key = normKey(alias);
+      if (authoritative.has(key)) continue; // a slug owns it; names cannot take it
+      const first = owner.get(key);
+      if (first === undefined) {
+        owner.set(key, r.id);
+        into.set(key, value(r));
+      } else if (first !== r.id) {
+        ambiguous.add(key);
+      }
+    }
+  }
+}
+
+async function buildMaps(db: D1Database, images: Map<string, string>): Promise<ImportMaps> {
+  const rows = await loadCatalogs(db);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const catalogs = new Map<string, CatalogRef>();
+  const ambiguous = { brands: new Set<string>(), catalogs: new Set<string>(), facets: new Set<string>() };
+  registerAliases(
+    rows.map((r) => ({ id: r.id, slug: r.slug, name_en: r.name_en, name_ar: r.name_ar })),
+    (r) => {
+      const row = byId.get(r.id)!;
+      return {
+        id: row.id,
+        parent_id: row.parent_id,
+        slug: row.slug,
+        name_en: row.name_en,
+        name_ar: row.name_ar,
+        template_family: row.template_family,
+      } satisfies CatalogRef;
+    },
+    catalogs,
+    ambiguous.catalogs
+  );
 
   const { results: brandRows } = await db
     .prepare('SELECT id, slug, name_en, name_ar FROM brands WHERE active = 1')
     .all<{ id: string; slug: string; name_en: string; name_ar: string }>();
   const brands = new Map<string, string>();
-  for (const b of brandRows) {
-    for (const alias of [b.slug, b.name_en, b.name_ar]) {
-      if (alias && !brands.has(normKey(alias))) brands.set(normKey(alias), b.id);
-    }
-  }
+  registerAliases(brandRows, (b) => b.id, brands, ambiguous.brands);
 
   const { results: facetRows } = await db
     .prepare('SELECT id, slug, name_en, name_ar FROM facets WHERE active = 1')
     .all<{ id: string; slug: string; name_en: string; name_ar: string }>();
   const facets = new Map<string, string>();
-  for (const f of facetRows) {
-    for (const alias of [f.slug, f.name_en, f.name_ar]) {
-      if (alias && !facets.has(normKey(alias))) facets.set(normKey(alias), f.id);
-    }
-  }
+  registerAliases(facetRows, (f) => f.id, facets, ambiguous.facets);
 
-  return { brands, catalogs, facets, familyOf: familyMap(rows), images };
+  return { brands, catalogs, facets, familyOf: familyMap(rows), images, ambiguous };
 }
 
 /** The existing product a `key` refers to: SKU first, then slug. */
@@ -914,6 +975,8 @@ adminImportRoutes.post('/confirm', async (c) => {
         console.error('import translation write failed', productId, e instanceof Error ? e.message : String(e));
       }
       if (localized.review_needed.length) reviewNeeded.push(`${key}: ${localized.review_needed.join(', ')}`);
+      // A tag typed into the sheet becomes an option for the next template.
+      await registerHashtags(c.env.DB, doc.hashtags, newId);
 
       report.push({
         key,
