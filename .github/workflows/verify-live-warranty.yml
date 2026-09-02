@@ -1,0 +1,230 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging, database levonis-db-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the warranty receipt round is actually live: the public
+# verification endpoint answers, the admin routes are mounted and guarded, the
+# receipt table and its live-uniqueness indexes exist in the database the live
+# Worker is bound to, and the shipped bundle carries the three new screens.
+#
+# WHAT IT WRITES: nothing. Every HTTP call is an anonymous GET and every D1
+# statement is a SELECT. It never signs in as an admin and never issues,
+# voids, reissues or reprints a receipt — those are documents customers hold,
+# and a verification job has no business creating one. What an unauthenticated
+# caller can prove — that the endpoint exists, answers honestly about an
+# unknown number, and refuses an admin route — is exactly the part that has to
+# be true after a deploy.
+name: 19 - Verify Live Warranty (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-warranty
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # ------------------------------------------------------- public route
+      - name: A stranger can ask about a receipt number, and is told the truth
+        id: public
+        run: |
+          set -euo pipefail
+          fail=0
+          # A number in the right shape that cannot exist. The endpoint must
+          # answer 200 with found:false — not 404 (which would also be what an
+          # undeployed route returns) and not 500.
+          code=$(curl -s -o /tmp/miss.json -w '%{http_code}' --max-time 25 \
+            "$APEX/api/warranty/verify/WR-1999-0101-001" || echo 000)
+          echo "  body: $(head -c 200 /tmp/miss.json)"
+          if [ "$code" = "200" ] && node -e "process.exit(JSON.parse(require('fs').readFileSync('/tmp/miss.json','utf8')).found === false ? 0 : 1)"; then
+            echo "  ok   an unknown receipt number answers 200 found:false"
+          else
+            echo "  FAIL an unknown receipt number answers $code"
+            fail=1
+          fi
+          # The answer must carry no receipt payload at all.
+          if grep -q '"warranty"' /tmp/miss.json; then
+            echo "  FAIL a miss carried a warranty object"; fail=1
+          else
+            echo "  ok   a miss carries no warranty object"
+          fi
+          # The SPA route exists, so a printed QR resolves to a page and not to
+          # the 404 shell.
+          code=$(curl -s -o /tmp/page.html -w '%{http_code}' --max-time 25 \
+            "$APEX/warranty/WR-1999-0101-001" || echo 000)
+          if [ "$code" = "200" ]; then
+            echo "  ok   /warranty/<no> serves the app shell ($code)"
+          else
+            echo "  FAIL /warranty/<no> answers $code"; fail=1
+          fi
+          exit $fail
+
+      # -------------------------------------------------------- admin routes
+      - name: The admin warranty routes are mounted, and they refuse a stranger
+        id: routes
+        run: |
+          set -euo pipefail
+          fail=0
+          probe() { # path, what it is
+            code=$(curl -s -o /tmp/body.txt -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            body=$(head -c 200 /tmp/body.txt)
+            # 401/403 is the PASS: the route exists and requires an admin.
+            # 404 would mean the code that defines it is not deployed.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $2 — $1 answers $code (mounted, admin-only)"
+            else
+              echo "  FAIL $2 — $1 answers $code: $body"
+              fail=1
+            fi
+          }
+          probe /api/admin/warranties                  'the receipts list'
+          probe /api/admin/warranties/config           'the terms configuration'
+          probe /api/admin/warranties/orders/none      'the per-order units view'
+          probe /api/admin/warranties/none/document    'the printable document'
+          exit $fail
+
+      # ----------------------------------------------------------- database
+      # wrangler.jsonc carries a PLACEHOLDER database id in the repository, so
+      # every job that talks to D1 resolves the real one first — exactly what
+      # the deploy workflow does before it applies a migration.
+      - name: Resolve the staging database id into wrangler.jsonc
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs --env staging
+
+      - name: Migration 0042 is applied to the database the live Worker uses
+        id: schema
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT name, type FROM sqlite_master WHERE name IN ('warranty_receipts','idx_warranty_receipts_no','idx_warranty_receipts_unit_live','idx_warranty_receipts_serial_live','idx_audit_target')" > /tmp/obj.json
+          cat /tmp/obj.json
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('/tmp/obj.json','utf8'));
+            const rows = (r[0]?.results ?? r.results ?? []);
+            const have = new Set(rows.map((x) => x.name));
+            const want = [
+              ['warranty_receipts', 'the receipt table'],
+              ['idx_warranty_receipts_no', 'the unique receipt number'],
+              ['idx_warranty_receipts_unit_live', 'one live receipt per device'],
+              ['idx_warranty_receipts_serial_live', 'one live receipt per serial'],
+              ['idx_audit_target', 'the audit index the history reads'],
+            ];
+            let fail = 0;
+            for (const [name, what] of want) {
+              if (have.has(name)) console.log('  ok   ' + what + ' (' + name + ')');
+              else { console.log('  FAIL ' + what + ' is missing (' + name + ')'); fail = 1; }
+            }
+            process.exit(fail);
+          "
+          # The live-uniqueness indexes have to be PARTIAL, or a voided receipt
+          # would block the device forever instead of being history.
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT sql FROM sqlite_master WHERE name='idx_warranty_receipts_unit_live'" > /tmp/idx.json
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('/tmp/idx.json','utf8'));
+            const sql = String(((r[0]?.results ?? r.results ?? [])[0] || {}).sql || '');
+            if (/WHERE/i.test(sql) && /draft/.test(sql) && /active/.test(sql)) {
+              console.log('  ok   the device index covers only the live states');
+            } else {
+              console.log('  FAIL the device index is not partial: ' + sql); process.exit(1);
+            }
+          "
+          # Reported, never changed — this job writes nothing.
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT (SELECT COUNT(*) FROM warranty_receipts) AS receipts, (SELECT COUNT(*) FROM order_item_units) AS units, (SELECT COUNT(*) FROM device_serials) AS serials"
+
+      # ------------------------------------------------------------- bundle
+      - name: The shipped bundle carries the warranty screens
+        id: bundle
+        run: |
+          set -euo pipefail
+          # --compressed on EVERY fetch: the edge serves these gzipped, and a
+          # grep over compressed bytes finds nothing and calls it a miss.
+          html=$(curl -s --compressed --max-time 25 "$APEX/admin")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          if [ -z "$entries" ]; then
+            echo "  FAIL /admin served no JS module. First 400 bytes:"
+            printf '%s' "$html" | head -c 400
+            exit 1
+          fi
+          mkdir -p /tmp/mods
+          # The page names only its ENTRY; the rest are lazy chunks referenced
+          # by name from inside it, so the entry has to be read to know what
+          # else to fetch.
+          all=""
+          for a in $entries; do
+            f=/tmp/mods/$(basename "$a")
+            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
+            all="$all $f"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
+            done
+          done
+          echo "  modules read: $(echo $all | wc -w)"
+          fail=0
+          # Written to FILES, never piped into grep: `grep -q` stops at the
+          # first match, the writer takes SIGPIPE, and `pipefail` then reads a
+          # successful match as a failed pipeline.
+          want() { # marker, what it is
+            hit=$(grep -l "$1" $all 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 — no served module contains $1"
+              fail=1
+            fi
+          }
+          want 'data-warranty-section' 'the order screen section'
+          want 'data-warranty-filter'  'the warranties dashboard'
+          want 'warranty-verify'       'the public verification page'
+          exit $fail
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live warranty verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| public verification answers honestly | ${{ steps.public.outcome }} |"
+            echo "| admin warranty routes mounted and admin-only | ${{ steps.routes.outcome }} |"
+            echo "| migration 0042 applied to the live database | ${{ steps.schema.outcome }} |"
+            echo "| the deployed bundle carries the screens | ${{ steps.bundle.outcome }} |"
+            echo ''
+            echo 'Read-only: every HTTP call was an anonymous GET and every D1 statement a SELECT.'
+            echo 'No receipt was issued, voided, reissued or reprinted.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.public.outcome != 'success' || steps.routes.outcome != 'success' || steps.schema.outcome != 'success' || steps.bundle.outcome != 'success'
+        run: exit 1
