@@ -34,22 +34,26 @@ import { downloadAdminFile, DownloadError } from './download';
 
 const STRINGS = {
   ar: {
-    step1: '١. اختر القسم',
-    step1Hint: 'الأعمدة تتغير حسب القسم — لا يوجد قالب واحد لكل شيء.',
+    step0: '١. اختر نوع المنتج',
+    step0Hint: 'الأعمدة تتبع النوع — طابعة، ملحقات، فلمنت، اكسسوار. لا يوجد قالب واحد لكل شيء.',
+    step1: '٢. اختر القسم',
+    step1Hint: 'القسم يحدد أين يُحفظ المنتج. اختيار النوع أعلاه يقصر القائمة على أقسامه.',
+    typeColumns: '{n} عمود مواصفات',
+    pickTypeFirst: 'اختر نوع المنتج أولًا.',
     sectionPlaceholder: 'اختر قسمًا…',
     noFamily: 'هذا القسم بلا عائلة قالب. حدّدها (أجهزة أو مواد) من إدارة الأقسام أولًا.',
-    step2: '٢. نزّل القالب',
+    step2: '٣. نزّل القالب',
     csv: 'قالب CSV',
     zip: 'قالب ZIP (مع مجلد الصور)',
     exportCsv: 'تصدير منتجات القسم (CSV)',
     exportZip: 'تصدير منتجات القسم (ZIP)',
-    step2Hint: 'الإدخال بالإنجليزية فقط. الترجمة إلى العربية والكردية تتم محليًا على الخادم بلا ذكاء اصطناعي.',
-    step3: '٣. ارفع الملف وعاين',
+    step2Hint: 'القالب يحمل كل حقول نموذج المنتج: الخيارات والألوان والتوليفات والصور وشحن الطلب المسبق والمواصفات والشارات وخطط الضمان وكتل المحتوى وخطوات الدليل. الإدخال بالإنجليزية فقط، والترجمة تتم محليًا على الخادم بلا ذكاء اصطناعي.',
+    step3: '٤. ارفع الملف وعاين',
     pick: 'اختر ملف CSV أو ZIP',
     preview: 'معاينة',
     previewing: 'جارٍ الفحص…',
     noWrite: 'المعاينة لا تكتب أي شيء في قاعدة البيانات.',
-    step4: '٤. أكّد الاستيراد',
+    step4: '٥. أكّد الاستيراد',
     confirm: 'تأكيد الاستيراد',
     confirming: 'جارٍ التنفيذ…',
     report: 'تنزيل تقرير النتيجة (CSV)',
@@ -77,33 +81,36 @@ const STRINGS = {
     alreadyApplied: 'هذا الاستيراد نُفّذ من قبل — هذه نتيجته المحفوظة.',
     lookupsTitle: 'القيم المتاحة لأعمدة التصنيف',
     lookupsHint:
-      'هذه هي القيم التي يقبلها الملف في أعمدة category و sub_category و brand و facets و hashtags — كما هي الآن في صفحة التصنيفات. اضغط قيمة لنسخها. القالب المنزّل يحملها أيضًا في نهايته وفي lookups.csv.',
+      'هذه هي القيم التي يقبلها الملف في أعمدة category و sub_category و brand و hashtags — كما هي الآن في صفحة التصنيفات. اضغط قيمة لنسخها. القالب المنزّل يحملها أيضًا في نهايته وفي lookups.csv.',
     lkCategory: 'القسم الرئيسي (category)',
     lkSub: 'القسم الفرعي (sub_category)',
     lkBrand: 'العلامة التجارية (brand)',
-    lkFacet: 'الفلاتر (facets — بالـ slug)',
     lkHashtag: 'الهاشتاقات (hashtags)',
     lkEmpty: 'لا شيء بعد — أضف من صفحة التصنيفات.',
     lkHashtagFree: 'يمكن كتابة وسم جديد في الملف وسيُضاف إلى القائمة عند التأكيد.',
     copied: 'نُسخ',
   },
   en: {
-    step1: '1. Choose the section',
-    step1Hint: 'Columns follow the section — there is no one template for everything.',
+    step0: '1. Choose a product type',
+    step0Hint: 'The columns follow the type — printer, parts, filament, accessory. There is no one template for everything.',
+    step1: '2. Choose the section',
+    step1Hint: 'The section decides where the product is filed. Picking a type above narrows this list to its sections.',
+    typeColumns: '{n} spec columns',
+    pickTypeFirst: 'Choose a product type first.',
     sectionPlaceholder: 'Choose a section…',
     noFamily: 'This section has no template family. Set it to Devices or Materials in the sections admin first.',
-    step2: '2. Download the template',
+    step2: '3. Download the template',
     csv: 'CSV template',
     zip: 'ZIP template (with images folder)',
     exportCsv: 'Export this section (CSV)',
     exportZip: 'Export this section (ZIP)',
-    step2Hint: 'English input only. Arabic and Kurdish are generated locally on the server, with no AI.',
-    step3: '3. Upload and preview',
+    step2Hint: 'The template carries every field of the product form: options, colours, stock combinations, images, pre-order transports, specifications, badges, warranty plans, content blocks and guide steps. English input only; Arabic and Kurdish are generated locally on the server, with no AI.',
+    step3: '4. Upload and preview',
     pick: 'Choose a CSV or ZIP file',
     preview: 'Preview',
     previewing: 'Checking…',
     noWrite: 'The preview writes nothing to the database.',
-    step4: '4. Confirm the import',
+    step4: '5. Confirm the import',
     confirm: 'Confirm import',
     confirming: 'Applying…',
     report: 'Download result report (CSV)',
@@ -131,11 +138,10 @@ const STRINGS = {
     alreadyApplied: 'This import was already applied — this is its stored result.',
     lookupsTitle: 'Accepted values for the classification columns',
     lookupsHint:
-      'These are the values the file accepts in category, sub_category, brand, facets and hashtags — exactly as they stand in the taxonomy page right now. Click a value to copy it. The downloaded template also carries them at its end and in lookups.csv.',
+      'These are the values the file accepts in category, sub_category, brand and hashtags — exactly as they stand in the taxonomy page right now. Click a value to copy it. The downloaded template also carries them at its end and in lookups.csv.',
     lkCategory: 'Main section (category)',
     lkSub: 'Sub-section (sub_category)',
     lkBrand: 'Brand (brand)',
-    lkFacet: 'Filters (facets — by slug)',
     lkHashtag: 'Hashtags (hashtags)',
     lkEmpty: 'Nothing yet — add from the taxonomy page.',
     lkHashtagFree: 'A new tag may be typed into the file; it joins the list on confirm.',
@@ -150,6 +156,8 @@ const humanBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n
 
 // -------------------------------------------------------------------- types
 
+type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory';
+
 interface Catalog {
   id: string;
   parent_id: string | null;
@@ -158,13 +166,23 @@ interface Catalog {
   name_en: string;
   active: boolean;
   effective_template_family: 'devices' | 'materials' | null;
+  /** Which of the four types this section's template is built for. */
+  product_type: ProductTypeId | null;
   product_count: number;
+}
+
+interface TypeChoice {
+  id: ProductTypeId;
+  label_ar: string;
+  label_en: string;
+  hint_ar: string;
+  family: 'devices' | 'materials';
+  spec_columns: number;
 }
 
 interface Lookups {
   sections: Array<{ id: string; slug: string; name_en: string; name_ar: string; parent_id: string | null; parent_name_en: string; family: string | null }>;
   brands: Array<{ id: string; slug: string; name_en: string; name_ar: string }>;
-  facets: Array<{ id: string; slug: string; name_en: string; name_ar: string; kind: string }>;
   hashtags: Array<{ tag: string; name_ar: string }>;
 }
 
@@ -218,6 +236,8 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
   const t = pick(lang);
 
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
+  const [types, setTypes] = useState<TypeChoice[]>([]);
+  const [typeId, setTypeId] = useState<ProductTypeId | ''>('');
   const [sectionId, setSectionId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -238,16 +258,29 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
       .get<Lookups>('/api/admin/import/lookups')
       .then((r) => setLookups(r))
       .catch(() => setLookups(null));
+    // The four product types come from the server for the same reason the
+    // spec fields do: one definition, no second copy in the bundle.
+    api
+      .get<{ types: TypeChoice[] }>('/api/admin/import/types')
+      .then((r) => setTypes(r.types ?? []))
+      .catch(() => setTypes([]));
   }, []);
 
   // Only sections that can actually produce a template are offered; a section
   // with no family would download a 400, and offering it is a broken button.
   const options = useMemo(
-    () => catalogs.filter((c) => c.active && c.effective_template_family),
-    [catalogs]
+    () =>
+      catalogs.filter(
+        (c) => c.active && c.effective_template_family && (!typeId || c.product_type === typeId)
+      ),
+    [catalogs, typeId]
   );
   const byId = useMemo(() => new Map(catalogs.map((c) => [c.id, c])), [catalogs]);
   const section = sectionId ? byId.get(sectionId) : undefined;
+
+  // The type a download will actually use: the chosen chip, or the one the
+  // chosen section resolves to. Shown, never guessed at silently.
+  const effectiveType: ProductTypeId | '' = typeId || section?.product_type || '';
 
   const label = (c: Catalog) => {
     const parent = c.parent_id ? byId.get(c.parent_id) : undefined;
@@ -322,11 +355,17 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
     }
   };
 
-  const dlBtn = (key: string, path: string, fallback: string, text: string, zip = false) => (
+  const dlBtn = (
+    key: string,
+    path: string,
+    fallback: string,
+    text: string,
+    { zip = false, needsSection = true }: { zip?: boolean; needsSection?: boolean } = {}
+  ) => (
     <button
       type="button"
       data-import={key}
-      disabled={!sectionId || busy !== ''}
+      disabled={busy !== '' || (needsSection ? !sectionId : !effectiveType)}
       onClick={() => download(key, path, fallback, zip)}
       className={btnSecondary + ' disabled:opacity-40'}
     >
@@ -335,7 +374,11 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
     </button>
   );
 
-  const stem = section ? section.slug : 'section';
+  const stem = section ? section.slug : effectiveType || 'section';
+  // The blank template is addressed by TYPE — a section only narrows where the
+  // product will be filed, and an admin who knows they are adding a filament
+  // should not have to pick a section to get the filament columns.
+  const templateQuery = `type=${encodeURIComponent(effectiveType)}${sectionId ? `&category=${encodeURIComponent(sectionId)}` : ''}`;
 
   return (
     <div className="min-w-0 text-sm" data-panel="import-v2">
@@ -345,6 +388,45 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
       )}
 
       {/* 1 ------------------------------------------------------------- */}
+      <Section title={t.step0} hint={t.step0Hint}>
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]" data-import="types">
+          {types.map((ty) => {
+            const on = typeId === ty.id;
+            return (
+              <button
+                key={ty.id}
+                type="button"
+                data-import-type={ty.id}
+                aria-pressed={on}
+                onClick={() => {
+                  const next = on ? '' : ty.id;
+                  setTypeId(next);
+                  // A section belonging to another type would silently decide
+                  // the columns, so it is cleared rather than left behind.
+                  if (next && section && section.product_type !== next) setSectionId('');
+                  setPreview(null);
+                  setResult(null);
+                }}
+                className={`min-w-0 text-start rounded-xl border px-3 py-2 transition-colors ${
+                  on
+                    ? 'border-violet-500 bg-violet-500/10 text-white'
+                    : 'border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-600'
+                }`}
+              >
+                <span className="block text-[13px] font-bold truncate">
+                  {lang === 'en' ? ty.label_en : ty.label_ar}
+                </span>
+                <span className="block text-[11px] text-zinc-500 truncate">{ty.hint_ar}</span>
+                <span className="block text-[10px] text-zinc-600 mt-0.5">
+                  {fill(t.typeColumns, { n: ty.spec_columns })}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* 2 ------------------------------------------------------------- */}
       <Section title={t.step1} hint={t.step1Hint}>
         <select
           data-import="section"
@@ -369,17 +451,18 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
         {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}
       </Section>
 
-      {/* 2 ------------------------------------------------------------- */}
+      {/* 3 ------------------------------------------------------------- */}
       <Section title={t.step2} hint={t.step2Hint}>
         <div className="flex flex-wrap gap-2">
-          {dlBtn('template-csv', `/api/admin/import/template?category=${encodeURIComponent(sectionId)}&format=csv`, `levonis-template-${stem}.csv`, t.csv)}
-          {dlBtn('template-zip', `/api/admin/import/template?category=${encodeURIComponent(sectionId)}&format=zip`, `levonis-template-${stem}.zip`, t.zip, true)}
+          {dlBtn('template-csv', `/api/admin/import/template?${templateQuery}&format=csv`, `levonis-template-${stem}.csv`, t.csv, { needsSection: false })}
+          {dlBtn('template-zip', `/api/admin/import/template?${templateQuery}&format=zip`, `levonis-template-${stem}.zip`, t.zip, { zip: true, needsSection: false })}
           {dlBtn('export-csv', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=csv`, `levonis-export-${stem}.csv`, t.exportCsv)}
-          {dlBtn('export-zip', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=zip`, `levonis-export-${stem}.zip`, t.exportZip, true)}
+          {dlBtn('export-zip', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=zip`, `levonis-export-${stem}.zip`, t.exportZip, { zip: true })}
         </div>
+        {!effectiveType && <p className="text-amber-300/90 text-xs mt-2">{t.pickTypeFirst}</p>}
       </Section>
 
-      {/* 3 ------------------------------------------------------------- */}
+      {/* 4 ------------------------------------------------------------- */}
       <Section title={t.step3} hint={t.noWrite}>
         <div className="flex flex-wrap items-center gap-2">
           <label className={btnSecondary + ' cursor-pointer'}>
@@ -576,7 +659,6 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
         ))}
       </div>
     );
-  const facetKinds = [...new Set(lookups.facets.map((f) => f.kind))];
   return (
     <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40" data-import="lookups">
       <button
@@ -606,19 +688,6 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
         <div>
           <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkBrand}</h5>
           {chips(lookups.brands.map((b) => ({ key: b.id, value: b.slug, label: isEn ? b.name_en : b.name_ar || b.name_en })), 'brand')}
-        </div>
-        <div>
-          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkFacet}</h5>
-          {facetKinds.length === 0
-            ? chips([], 'facets')
-            : facetKinds.map((kind) => (
-                <div key={kind} className="mb-1.5">
-                  <span className="block text-[10px] text-zinc-500 mb-0.5" dir="ltr">
-                    {kind}
-                  </span>
-                  {chips(lookups.facets.filter((f) => f.kind === kind).map((f) => ({ key: f.id, value: f.slug, label: isEn ? f.name_en : f.name_ar || f.name_en })), `facets:${kind}`)}
-                </div>
-              ))}
         </div>
         <div>
           <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkHashtag}</h5>

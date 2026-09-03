@@ -1,0 +1,159 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the three things the owner asked for are LIVE:
+#
+#   1. the product form no longer carries the «الفلاتر» block,
+#   2. its save bar is the flush-to-the-edge one, not the floating card,
+#   3. the import/export template is offered per product type, and the type
+#      endpoint exists and is admin-gated.
+#
+# WHAT IT WRITES: nothing. Every request is an anonymous GET; the admin
+# endpoints are probed only for their refusal, which is what proves they are
+# both deployed and still closed.
+name: 22 - Verify Live Product Form & Import Template (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-product-template
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The template endpoints are deployed and still admin-only
+        id: api
+        run: |
+          set -euo pipefail
+          fail=0
+          refuse() { # path, what it is
+            code=$(curl -s -o /tmp/body.json -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            # 401/403 proves the route EXISTS and is closed; 404 would mean the
+            # deploy never carried it, which is the failure this step is for.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $2 is deployed and refuses a stranger ($code)"
+            else
+              echo "  FAIL $2 answers $code: $(head -c 140 /tmp/body.json)"
+              fail=1
+            fi
+          }
+          refuse '/api/admin/import/types'                       'the product-type list'
+          refuse '/api/admin/import/template?type=filament'      'the filament template'
+          refuse '/api/admin/import/lookups'                     'the classification lookups'
+          refuse '/api/admin/taxonomy/catalogs'                  'the section tree'
+          exit $fail
+
+      - name: Read every module the deployed app serves
+        id: fetch
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          for a in $entries; do
+            curl -s --compressed --max-time 60 -o "/tmp/mods/$(basename "$a")" "$APEX$a"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "/tmp/mods/$(basename "$a")" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              [ "$code" = "200" ] || rm -f "/tmp/mods/$c"
+            done
+          done
+          echo "  modules read: $(ls /tmp/mods | wc -l)"
+          ls /tmp/mods > /tmp/module-list.txt
+
+      - name: The shipped product form dropped the filters block
+        id: filters
+        run: |
+          set -euo pipefail
+          fail=0
+          # `grep -l` writes to a FILE and is never piped: `grep -q` would stop
+          # at the first match, the writer would take SIGPIPE, and `pipefail`
+          # would then read a successful match as a failed pipeline.
+          hit=$(grep -l 'Filters — separate from sections' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -z "$hit" ]; then
+            echo "  ok   no served module carries the «الفلاتر» block any more"
+          else
+            echo "  FAIL the filters block is still in $(basename "$hit")"; fail=1
+          fi
+          hit=$(grep -l 'Sub-section' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   the sub-section field is still shipped — in $(basename "$hit")"
+          else
+            echo "  FAIL the sub-section field is missing from the bundle"; fail=1
+          fi
+          exit $fail
+
+      - name: The shipped save bar is the flush one
+        id: savebar
+        run: |
+          set -euo pipefail
+          fail=0
+          hit=$(grep -l 'save-bar' /tmp/mods/* 2>/dev/null | head -1 || true)
+          [ -n "$hit" ] || { echo "  FAIL no served module renders the save bar"; exit 1; }
+          echo "  ok   the save bar is shipped — in $(basename "$hit")"
+          # The old bar faded the page through a gradient and sat on rounded
+          # corners; the new one is an opaque band with a hairline on top.
+          bad=$(grep -l 'from-zinc-950 via-zinc-950/95 to-transparent' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -z "$bad" ]; then
+            echo "  ok   the floating gradient bar is gone"
+          else
+            echo "  FAIL the old gradient save bar is still in $(basename "$bad")"; fail=1
+          fi
+          good=$(grep -l 'admin-main-pb' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$good" ]; then
+            echo "  ok   the shell publishes its bottom padding for the bar to cancel — in $(basename "$good")"
+          else
+            echo "  FAIL the bottom-edge mechanism is not in the bundle"; fail=1
+          fi
+          exit $fail
+
+      - name: The shipped import panel offers the four product types
+        id: types
+        run: |
+          set -euo pipefail
+          fail=0
+          hit=$(grep -l 'data-import-type' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   the type picker is shipped — in $(basename "$hit")"
+          else
+            echo "  FAIL no served module renders the product-type picker"; fail=1
+          fi
+          hit=$(grep -l 'import/types' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   the panel asks the server for the types — in $(basename "$hit")"
+          else
+            echo "  FAIL the panel does not read /api/admin/import/types"; fail=1
+          fi
+          exit $fail
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live product form & import template verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| template endpoints deployed and admin-only | ${{ steps.api.outcome }} |"
+            echo "| the filters block is gone from the form | ${{ steps.filters.outcome }} |"
+            echo "| the save bar is the flush-to-the-edge one | ${{ steps.savebar.outcome }} |"
+            echo "| the import panel offers the four product types | ${{ steps.types.outcome }} |"
+            echo ''
+            echo 'Read-only: every request was an anonymous GET; the admin endpoints were probed only for their refusal.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success'
+        run: exit 1

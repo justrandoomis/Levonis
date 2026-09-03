@@ -17,7 +17,7 @@ values.
 |---|---|---|
 | الأقسام / Sections | `catalogs` | the tree: one main section and one sub-section per product, plus the `template_family` (devices / materials) that decides the product form's spec fields and the import file's columns |
 | العلامات التجارية / Brands | `brands` | the product's brand, and the `brand` column of an import |
-| الفلاتر / Filters | `facets` | the filters a product may carry (many per product), grouped by an open `kind` axis; the `facets` column of an import, written by slug |
+| الفلاتر / Filters | `facets` | the filters a product may carry (many per product), grouped by an open `kind` axis. **No longer typed on the product form or in the import sheet** — the owner's «احذف الفلاتر هي تابعه او نفسها القسم الفرعي». The vocabulary is still managed here, and `PUT /api/admin/products/:id/relations` still assigns `facet_ids` explicitly; a payload that omits the key preserves what a product already carries, so nothing was lost when the picker went. |
 | الهاشتاقات / Hashtags | `hashtags` (migration 0041) + `products.hashtags` | the discovery tags, suggested in the form and listed in the template |
 
 Sections and filters are deliberately never merged: a filter is not a place

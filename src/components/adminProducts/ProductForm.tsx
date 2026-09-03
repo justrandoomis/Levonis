@@ -29,7 +29,7 @@
  * exactly that, never as a whole-form failure.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
@@ -90,14 +90,6 @@ interface CatalogNode extends CatalogV2 {
   effective_template_family: 'devices' | 'materials' | null;
 }
 
-interface FacetRow {
-  id: string;
-  name_en: string;
-  name_ar: string;
-  kind: string;
-  active: boolean;
-}
-
 // «باقة» is gone from this list on the owner's order: bundles are now their
 // own admin-composed entity (the الباقات tab), not a per-product checkbox.
 // The backend still accepts the legacy 'bundle' value so old rows load.
@@ -138,12 +130,12 @@ export default function ProductForm({
   // against every keystroke.
   const [loadedBasePrice, setLoadedBasePrice] = useState<number | null>(null);
   const [pinnedDismissed, setPinnedDismissed] = useState(false);
+  const columnRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(!!productId);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [brands, setBrands] = useState<BrandV2[]>([]);
   const [catalogs, setCatalogs] = useState<CatalogNode[]>([]);
-  const [facets, setFacets] = useState<FacetRow[]>([]);
   const [tplGroups, setTplGroups] = useState<TemplateGroup[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
   // Quick-add of a section / sub-section / brand from inside the form (the
@@ -223,10 +215,9 @@ export default function ProductForm({
     let alive = true;
     (async () => {
       try {
-        const [b, cat, fc, hs] = await Promise.all([
+        const [b, cat, hs] = await Promise.all([
           api.get<{ brands: BrandV2[] }>('/api/admin/taxonomy/brands'),
           api.get<{ catalogs: CatalogNode[] }>('/api/admin/taxonomy/catalogs'),
-          api.get<{ facets: FacetRow[] }>('/api/admin/taxonomy/facets'),
           api
             .get<{ hashtags: Array<{ tag: string; active: boolean }> }>('/api/admin/taxonomy/hashtags?counts=0')
             .catch(() => ({ hashtags: [] as Array<{ tag: string; active: boolean }> })),
@@ -234,7 +225,6 @@ export default function ProductForm({
         if (!alive) return;
         setBrands(b.brands ?? []);
         setCatalogs(cat.catalogs ?? []);
-        setFacets((fc.facets ?? []).filter((f) => f.active));
         setHashtagOptions((hs.hashtags ?? []).filter((h) => h.active).map((h) => h.tag));
       } catch {
         // The taxonomy is not required to edit prices or text; the section
@@ -359,7 +349,7 @@ export default function ProductForm({
     [catalogs, doc.category_id]
   );
   const filteredBrands = useMemo(() => {
-    // Sections and facets were already filtered to the active ones; brands
+    // Sections were already filtered to the active ones; brands
     // were not, and deactivating one is a single click in التصنيفات now. An
     // inactive brand is exactly what the importer refuses, so offering it in
     // the form would let the two disagree about the same product. The brand
@@ -467,6 +457,25 @@ export default function ProductForm({
     }
   };
 
+  // THIS SCREEN OWNS ITS BOTTOM EDGE. A `position: sticky` footer can only
+  // travel to the bottom of its containing block, and the admin shell holds
+  // that short of the glass with a bottom padding on its scroll container —
+  // which is exactly the strip of page the owner saw under the save bar
+  // («فهو الان يبدو طائفا»). The form suspends that padding while it is open
+  // and puts it back on the way out, so every other admin screen keeps it and
+  // the safe-area inset is instead applied INSIDE the bar, where it belongs.
+  // The deps are the two states that decide whether the column is mounted at
+  // all: the loading and error screens have no column to reach up from.
+  useEffect(() => {
+    const main = columnRef.current?.closest('main') as HTMLElement | null;
+    if (!main) return;
+    const previous = main.style.paddingBottom;
+    main.style.paddingBottom = '0px';
+    return () => {
+      main.style.paddingBottom = previous;
+    };
+  }, [loading, loadErr]);
+
   // --------------------------------------------------------------- render
 
   if (loading) {
@@ -497,8 +506,9 @@ export default function ProductForm({
 
   return (
     // min-w-0 on the outer column is what keeps a long value from widening the
-    // whole admin page; pb-24 leaves room for the sticky bar below.
-    <div className="min-w-0 w-full max-w-[880px] mx-auto px-3 pb-24">
+    // whole admin page, and there is no bottom padding: this screen owns its
+    // own bottom edge (see the effect above and the save bar below).
+    <div ref={columnRef} className="min-w-0 w-full max-w-[880px] mx-auto px-3">
       <div className="flex items-center gap-2 py-3 min-w-0">
         <button type="button" onClick={onBack} className={`${btnGhost} h-10 px-2.5`} aria-label="رجوع">
           <Back className="w-4 h-4" />
@@ -530,8 +540,16 @@ export default function ProductForm({
       )}
 
       {/* 1 ──────────────── classification: section → sub-section → brand →
-          hashtags, in that exact order (the owner's «اعد ترتيبه»). The
-          derived template and the facet filters follow as secondary rows. */}
+          hashtags, in that exact order (the owner's «اعد ترتيبه»), with the
+          derived template as the closing secondary row.
+
+          THERE IS NO «الفلاتر» PICKER HERE ANY MORE. The owner's ruling:
+          «احذف الفلاتر هي تابعه او نفسها القسم الفرعي» — the filter list was
+          a second vocabulary repeating what the sub-section already says, so
+          a product is classified once, in this section. The facets table and
+          its التصنيفات tab are untouched, and a product that already carries
+          facets keeps them: this form simply stops sending `facet_ids`, and
+          the relations writer preserves what the payload does not mention. */}
       <SectionCard
         n={1}
         ar="التصنيف: القسم والعلامة والهاشتاقات"
@@ -721,30 +739,6 @@ export default function ProductForm({
             <TextInput value={doc.template_family ?? ''} readOnly placeholder="—" />
           </Field>
         </Grid>
-
-        {facets.length > 0 && (
-          <div className="mt-3 min-w-0">
-            <div className="text-[13px] font-bold text-zinc-300 mb-1.5">
-              الفلاتر <span className="text-[11px] font-medium text-zinc-500">Filters — separate from sections</span>
-            </div>
-            <div className="grid gap-1.5 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
-              {facets.map((f) => (
-                <CheckCard
-                  key={f.id}
-                  checked={rel.facet_ids.includes(f.id)}
-                  onChange={(on) =>
-                    setRel((r) => ({
-                      ...r,
-                      facet_ids: on ? [...r.facet_ids, f.id] : r.facet_ids.filter((x) => x !== f.id),
-                    }))
-                  }
-                  title={f.name_en || f.name_ar}
-                  sub={f.kind}
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </SectionCard>
 
       {quickAdd && (
@@ -1200,12 +1194,20 @@ export default function ProductForm({
         )}
       </SectionCard>
 
-      {/* Sticky save bar — inside the content column, never over the nav. */}
+      {/* Sticky save bar — inside the content column, never over the nav.
+          IT SITS ON THE BOTTOM EDGE (the owner's «عدله ليكون مع الحافه
+          السفليه فهو الان يبدو طائفا»): no gap under it, no rounded corners
+          under it and no gradient fade showing the page through — an opaque
+          band whose only border is the hairline along its top, so it reads as
+          the bottom of the screen rather than a card hovering above it. The
+          safe-area inset is added as PADDING INSIDE the band, which is what
+          keeps the buttons clear of the iPad home indicator while the band
+          itself still reaches the glass. */}
       <div
         data-form="save-bar"
-        className="sticky bottom-0 z-10 -mx-3 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent"
+        className="sticky bottom-0 z-10 -mx-3 border-t border-zinc-800 bg-zinc-900 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_24px_-12px_rgba(0,0,0,0.9)]"
       >
-        <div className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/95 backdrop-blur px-2.5 py-2 flex items-center gap-2">
+        <div className="min-w-0 px-3 py-2 flex items-center gap-2">
           <span className="min-w-0 flex-1 text-[11px] truncate">
             {showErrors && errorList.length > 0 ? (
               <span className="text-red-400 inline-flex items-center gap-1">

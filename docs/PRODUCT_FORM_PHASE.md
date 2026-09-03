@@ -285,7 +285,7 @@ by `key` (the product's SKU, or its slug when it has none):
 
 | row_type | what it carries |
 |---|---|
-| `product` | the product, its four prices, stock, sale types, section, facets and the spec columns its section declares |
+| `product` | the product, its four prices, stock, sale types, section and the spec columns its product type declares. Eleven row types now cover the whole form — see docs/IMPORT_TEMPLATE.md. The `facets` column is gone with the form's filters picker. |
 | `option` | one value of one option group, with its own stock and price overrides |
 | `color` | one colour, its HEX, and its links written `Group:Value|Group:Value` |
 | `image` | one image, its order, its primary flag and its `color:Name` / `option:Group:Value` binding |

@@ -148,7 +148,6 @@ const rel = (over: Partial<RelationsState> = {}): RelationsState => ({
   colors: [],
   variants: [],
   images: [],
-  facet_ids: [],
   ...over,
 });
 

@@ -12,3 +12,7 @@ coverage/
 # TypeScript incremental build cache — a local artifact, not source. Now that
 # `npm run check` typechecks studio/ too, every check would otherwise dirty it.
 *.tsbuildinfo
+
+# Probe output. The screenshots worth keeping are copied into docs/evidence/
+# deliberately; the rest is one local run's scratch.
+artifacts/

@@ -3,7 +3,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
 import { newId, } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { FAMILIES, fieldsFor, isTemplateFamily } from '../lib/templateFamilies';
+import { FAMILIES, fieldsFor, isTemplateFamily, productTypeForSection } from '../lib/templateFamilies';
 import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
 
 /**
@@ -150,6 +150,7 @@ adminTaxonomyRoutes.get('/templates', async (c) => {
     success: true,
     category_id: categoryId,
     template_family: family,
+    product_type: family && isTemplateFamily(family) ? productTypeForSection(family, slugs) : null,
     groups: family && isTemplateFamily(family) ? fieldsFor(family, slugs) : [],
     section_slugs: slugs,
   });
@@ -166,15 +167,34 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
     .prepare('SELECT category_id AS id, COUNT(*) AS n FROM products WHERE category_id IS NOT NULL GROUP BY category_id')
     .all<{ id: string; n: number }>();
   const countById = new Map(counts.results.map((r) => [r.id, r.n]));
+
+  // The branch slugs, leaf-first, so a section resolves to the product type
+  // its template is built for — the panel and the form both need to say
+  // «هذا القسم طابعة» without a second round trip.
+  const byId = new Map(results.map((r) => [r.id, r]));
+  const branch = (id: string): string[] => {
+    const out: string[] = [];
+    let node = byId.get(id);
+    for (let hop = 0; node && hop < 12; hop++) {
+      out.push(node.slug);
+      node = node.parent_id ? byId.get(node.parent_id) : undefined;
+    }
+    return out;
+  };
+
   return c.json({
     success: true,
-    catalogs: results.map((r) => ({
-      ...r,
-      is_printer_catalog: !!r.is_printer_catalog,
-      active: !!r.active,
-      effective_template_family: families.get(r.id) ?? null,
-      product_count: countById.get(r.id) ?? 0,
-    })),
+    catalogs: results.map((r) => {
+      const family = families.get(r.id) ?? null;
+      return {
+        ...r,
+        is_printer_catalog: !!r.is_printer_catalog,
+        active: !!r.active,
+        effective_template_family: family,
+        product_type: family ? productTypeForSection(family, branch(r.id)) : null,
+        product_count: countById.get(r.id) ?? 0,
+      };
+    }),
   });
 });
 

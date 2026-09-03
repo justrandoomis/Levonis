@@ -88,7 +88,6 @@ export interface RelationsState {
   colors: FormColor[];
   variants: FormVariant[];
   images: FormImage[];
-  facet_ids: string[];
 }
 
 export const emptyRelations = (): RelationsState => ({
@@ -97,7 +96,6 @@ export const emptyRelations = (): RelationsState => ({
   colors: [],
   variants: [],
   images: [],
-  facet_ids: [],
 });
 
 export const emptyPrices = (): FormPrices => ({
@@ -178,7 +176,6 @@ export interface RelationsResponse {
   links?: WireLink[];
   variants?: WireVariant[];
   images?: WireImage[];
-  facet_ids?: string[];
 }
 
 const prices = (x: FormPrices): FormPrices => ({
@@ -267,7 +264,6 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
         width: i.width,
         height: i.height,
       })),
-    facet_ids: r.facet_ids ?? [],
   };
 }
 
@@ -345,7 +341,6 @@ export function relationsToWire(rel: RelationsState) {
       width: i.width,
       height: i.height,
     })),
-    facet_ids: rel.facet_ids,
   };
 }
 

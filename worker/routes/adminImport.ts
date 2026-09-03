@@ -54,6 +54,7 @@ import {
   readmeFor,
   serializeProducts,
   templateShape,
+  templateTypeChoices,
   toCsv,
   type ExportProduct,
   type ParseResult,
@@ -63,11 +64,17 @@ import {
 import {
   normKey,
   resolveProduct,
+  splitComboKey,
   type CatalogRef,
   type ExistingShape,
   type ImportMaps,
 } from '../lib/importApply';
-import { isTemplateFamily } from '../lib/templateFamilies';
+import {
+  isProductType,
+  isTemplateFamily,
+  productTypeForSection,
+  type ProductTypeId,
+} from '../lib/templateFamilies';
 import { loadLookups } from '../lib/lookups';
 import { registerHashtags } from '../lib/hashtags';
 import {
@@ -166,43 +173,87 @@ function branchSlugs(rows: CatalogRow[], id: string): string[] {
   return out;
 }
 
-/** Resolves ?category= to a shape, or fails with a message naming the reason. */
+/**
+ * Resolves ?category= to a shape, or fails with a message naming the reason.
+ *
+ * THE SHAPE COMES FROM THE PRODUCT TYPE, not from the section directly: the
+ * section picks a family and a branch, the branch picks one of the four types
+ * the owner works in (طابعة / ملحقات / فلمنت / اكسسوار), and the type owns the
+ * columns. A section export and that type's blank template are therefore the
+ * same file shape, which is what makes "download, fill, import" and "export,
+ * edit, import" the same workflow.
+ */
 async function shapeFor(
   db: D1Database,
   categoryId: string,
-  includeCost: boolean
+  includeCost: boolean,
+  typeOverride?: ProductTypeId
 ): Promise<{ shape: TemplateShape; catalog: CatalogRow; rows: CatalogRow[] }> {
   const rows = await loadCatalogs(db);
   const catalog = rows.find((r) => r.id === categoryId);
   if (!catalog) throw notFound(`No section with id "${categoryId}"`);
   const family = familyMap(rows).get(categoryId) ?? null;
-  if (!family) {
+  if (!family && !typeOverride) {
     throw badRequest(
       `Section "${catalog.name_en || catalog.name_ar}" has no template family. Set it to Devices or Materials in the taxonomy admin first.`,
       'NO_FAMILY'
     );
   }
-  return { shape: templateShape(family, branchSlugs(rows, categoryId), { includeCost }), catalog, rows };
+  const slugs = branchSlugs(rows, categoryId);
+  const type = typeOverride ?? productTypeForSection(family!, slugs);
+  return { shape: templateShape(type, slugs, { includeCost }), catalog, rows };
 }
 
 const fileStem = (catalog: CatalogRow, kind: string) =>
   `levonis-${kind}-${catalog.slug}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
 
+const typeStem = (type: ProductTypeId, kind: string) => `levonis-${kind}-${type}`;
+
+/** The `?type=` query parameter, refused by name rather than silently ignored. */
+function typeParam(raw: string | undefined): ProductTypeId | undefined {
+  if (!raw) return undefined;
+  if (!isProductType(raw)) {
+    throw badRequest(
+      `type: "${raw}" is not a product type — use one of printer, parts, filament, accessory`,
+      'BAD_TYPE'
+    );
+  }
+  return raw;
+}
+
 // GET /template ------------------------------------------------------------
 
 adminImportRoutes.get('/template', async (c) => {
   const admin = c.get('user')!;
-  const categoryId = str(c.req.query('category'), 'category', { min: 1, max: 60 });
+  const type = typeParam(c.req.query('type'));
+  const rawCategory = c.req.query('category');
   const format = c.req.query('format') === 'zip' ? 'zip' : 'csv';
   const withExample = c.req.query('example') !== '0';
-  const { shape, catalog } = await shapeFor(c.env.DB, categoryId, canViewFinancials(c.env, admin));
+  const money = canViewFinancials(c.env, admin);
+
+  // TWO WAYS IN, ONE FILE. `?type=` downloads the template for a product type
+  // straight away — the owner's «ويكون حسب نوع المنتج» — and `?category=`
+  // keeps working for an admin who thinks in sections, resolving that section
+  // to its type. Both produce identical columns for the same type.
+  let shape: TemplateShape;
+  let stem: string;
+  if (rawCategory) {
+    const categoryId = str(rawCategory, 'category', { min: 1, max: 60 });
+    const resolved = await shapeFor(c.env.DB, categoryId, money, type);
+    shape = resolved.shape;
+    stem = fileStem(resolved.catalog, 'template');
+  } else if (type) {
+    shape = templateShape(type, [], { includeCost: money });
+    stem = typeStem(type, 'template');
+  } else {
+    throw badRequest('type: pick a product type (printer / parts / filament / accessory) or pass a section id');
+  }
 
   // The accepted values of the classification columns ride along with the
-  // template: a section, brand, filter or hashtag added in the taxonomy admin
-  // is offered by the very next download.
+  // template: a section, brand or hashtag added in the taxonomy admin is
+  // offered by the very next download.
   const lookups = await loadLookups(c.env.DB);
   const csv = blankTemplate(shape, withExample, lookups);
-  const stem = fileStem(catalog, 'template');
 
   if (format === 'csv') return fileResponse(csvBytes(csv), `${stem}.csv`, 'text/csv; charset=utf-8', 'csv');
 
@@ -211,6 +262,7 @@ adminImportRoutes.get('/template', async (c) => {
       'data.csv': strToU8(`\uFEFF${csv}`),
       'README.txt': strToU8(readmeFor(shape, lookups)),
       'lookups.csv': strToU8(`\uFEFF${lookupsSheet(lookups)}`),
+      'labels.csv': strToU8(`\uFEFF${toCsv([shape.columns, labelRow(shape)])}`),
       // A real, non-empty file: some unzip tools drop empty directories, and an
       // admin who cannot see images/ will not know where to put the pictures.
       'images/PUT-IMAGES-HERE.txt': strToU8(
@@ -221,6 +273,13 @@ adminImportRoutes.get('/template', async (c) => {
   );
   return fileResponse(zip, `${stem}.zip`, 'application/zip', 'zip');
 });
+
+// GET /types --------------------------------------------------------------
+//
+// The four product types and what each one costs in columns, so the import
+// panel can offer them without a second copy of the list in `src/`.
+
+adminImportRoutes.get('/types', (c) => c.json({ success: true, types: templateTypeChoices() }));
 
 // GET /lookups ------------------------------------------------------------
 //
@@ -271,13 +330,10 @@ async function exportProducts(
     .prepare(`SELECT * FROM product_images WHERE product_id IN (${ph}) ORDER BY sort_order`)
     .bind(...productIds)
     .all<Record<string, unknown>>();
-  const { results: facets } = await db
-    .prepare(
-      `SELECT pf.product_id, f.slug FROM product_facets pf JOIN facets f ON f.id = pf.facet_id
-        WHERE pf.product_id IN (${ph})`
-    )
+  const { results: variants } = await db
+    .prepare(`SELECT * FROM product_variants WHERE product_id IN (${ph}) ORDER BY rowid`)
     .bind(...productIds)
-    .all<{ product_id: string; slug: string }>();
+    .all<Record<string, unknown>>();
 
   const catalogs = await loadCatalogs(db);
   const catById = new Map(catalogs.map((r) => [r.id, r]));
@@ -309,6 +365,11 @@ async function exportProducts(
     }
     const cat = doc.category_id ? catById.get(doc.category_id) : undefined;
     const sub = doc.sub_category_id ? catById.get(doc.sub_category_id) : undefined;
+    const nameOfValue = (id: string) => {
+      const v = valueById.get(id);
+      const grp = v ? groupById.get(v.group_id as string) : undefined;
+      return v && grp ? { group: grp.name_en as string, value: v.name_en as string } : null;
+    };
 
     return {
       // The key must survive the round-trip and identify the SAME product, so
@@ -317,7 +378,9 @@ async function exportProducts(
       name: doc.name_en,
       description: doc.description_en,
       status: doc.status,
+      sku: doc.sku ?? '',
       display_order: doc.display_order,
+      is_featured: doc.is_featured,
       brand: doc.brand_id ? (brandById.get(doc.brand_id) ?? '') : '',
       category: cat ? cat.name_en || cat.slug : '',
       sub_category: sub ? sub.name_en || sub.slug : '',
@@ -327,11 +390,80 @@ async function exportProducts(
       prime_price_iqd: doc.prime_price_iqd,
       pro_price_iqd: doc.pro_price_iqd,
       cost_iqd: money ? doc.product_cost_iqd : null,
+      direct_surcharge_iqd: doc.direct_surcharge_iqd,
       stock: doc.stock,
       low_stock_threshold: doc.low_stock_threshold,
-      facets: facets.filter((f) => f.product_id === pid).map((f) => f.slug),
+      payment_options: doc.payment_options,
+      how_to_use: doc.how_to_use,
+      usage_url: doc.usage_guide?.official_url ?? '',
       hashtags: doc.hashtags,
       spec_fields: doc.spec_fields,
+      transports: doc.preorder_transports.map((tr) => ({
+        method: tr.method,
+        commission_iqd: tr.commission_iqd,
+        active: tr.active,
+      })),
+      specs: doc.spec_groups.flatMap((grp) =>
+        grp.rows.map((r) => ({
+          group: grp.title_en || grp.title_ar,
+          label: r.label_en || r.label_ar,
+          value: r.value_en || r.value_ar,
+          unit: r.unit,
+        }))
+      ),
+      labels: doc.labels.map((l) => ({
+        key: l.key,
+        text: l.text_en || l.text_ar,
+        icon: l.icon,
+        visible: l.visible,
+      })),
+      warranty_plans: doc.warranty_plans.map((w) => ({
+        title: w.title_en || w.title_ar,
+        terms: w.terms_en || w.terms_ar,
+        duration_months: w.duration_months,
+        duration_kind: w.duration_kind,
+        fee_iqd: w.fee_iqd,
+        active: w.active,
+      })),
+      content_blocks: doc.content_blocks.map((b) => ({
+        kind: b.kind,
+        body: b.body_en || b.body_ar,
+        caption: b.caption_en || b.caption_ar,
+        alt: b.alt_en || b.alt_ar,
+        url: b.url,
+        // The image cell carries the stored URL, which resolveImages maps
+        // straight back to itself, so a round-trip re-uses the same object.
+        image: b.kind === 'image' ? b.url : '',
+      })),
+      guide_steps: doc.usage_guide.steps.map((st) => ({
+        kind: st.kind,
+        title: st.title,
+        body: st.body,
+        images: st.images,
+        video_url: st.video_url,
+        link_url: st.link_url,
+      })),
+      variants: variants
+        .filter((v) => v.product_id === pid)
+        .map((v) => {
+          const sel = splitComboKey(String(v.combo_key));
+          return {
+            selection: sel.option_value_ids
+              .map(nameOfValue)
+              .filter((x): x is { group: string; value: string } => x !== null),
+            color: sel.color_id
+              ? ((colors.find((col) => col.id === sel.color_id)?.name_en as string) ?? '')
+              : '',
+            sku_part: (v.sku as string) ?? '',
+            active: v.active === 1,
+            stock: n(v.stock),
+            low_stock_threshold: n(v.low_stock_threshold),
+            price_iqd: n(v.regular_price_iqd),
+            prime_price_iqd: n(v.prime_price_iqd),
+            pro_price_iqd: n(v.pro_price_iqd),
+            cost_iqd: money0(v.cost_iqd),
+          };
+        }),
       options: myValues.map((v) => ({
         group: (groupById.get(v.group_id as string)?.name_en ?? ''),
         value: v.name_en as string,
@@ -508,10 +640,18 @@ async function resolveImages(
   const map = new Map<string, string>();
   const issues: RowIssue[] = [];
   const wanted = new Map<string, number>(); // cell -> first line that used it
+  const want = (cell: string, line: number) => {
+    if (cell && !wanted.has(cell)) wanted.set(cell, line);
+  };
   for (const p of parsed.products) {
-    for (const im of p.images) if (!wanted.has(im.image)) wanted.set(im.image, im.line);
-    for (const o of p.options) if (o.image && !wanted.has(o.image)) wanted.set(o.image, o.line);
-    for (const col of p.colors) if (col.image && !wanted.has(col.image)) wanted.set(col.image, col.line);
+    for (const im of p.images) want(im.image, im.line);
+    for (const o of p.options) want(o.image, o.line);
+    for (const col of p.colors) want(col.image, col.line);
+    // Content blocks and guide steps carry pictures too. Leaving them out is
+    // what would make an export of a product with a guide fail to re-import:
+    // the cell would resolve to nothing and the row would be refused.
+    for (const b of p.content_blocks ?? []) want(b.image, b.line);
+    for (const g of p.guide_steps ?? []) for (const cell of g.images) want(cell, g.line);
   }
 
   for (const [cell, line] of wanted) {

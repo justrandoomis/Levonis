@@ -75,6 +75,9 @@ class Client {
   post(p, b) {
     return this.json('POST', p, b);
   }
+  put(p, b) {
+    return this.json('PUT', p, b);
+  }
   del(p) {
     return this.json('DELETE', p);
   }
@@ -335,8 +338,11 @@ async function main() {
   check('CSV lookup block names the new main section by slug', !!lk('#lookup:category', rootSlug), rootSlug);
   check('CSV lookup block names the new sub-section under its parent', lk('#lookup:sub_category', subSlug)?.[cols.indexOf('category')] === rootSlug);
   check('CSV lookup block names the new brand by slug', !!lk('#lookup:brand', brandSlug), brandSlug);
-  check('CSV lookup block names the new filter by slug', !!lk('#lookup:facets', facetSlug));
   check('CSV lookup block names the managed hashtag', !!lk('#lookup:hashtags', managedTag));
+  // The product form has no filters picker any more, so the sheet must not
+  // offer a filter column or a filter value nobody could correct afterwards.
+  check('the sheet no longer carries a filters column', !cols.includes('facets'));
+  check('the lookup block no longer offers filters', !lk('#lookup:facets', facetSlug));
   check('every lookup row keeps the column count', tplRows.filter((x) => x[0].startsWith('#lookup')).every((x) => x.length === cols.length));
   check(
     'every lookup marker names a real column of the sheet',
@@ -350,7 +356,9 @@ async function main() {
   const lkRows = parseCsv(strFromU8(entries['lookups.csv'] ?? new Uint8Array()));
   check('lookups.csv lists brand and hashtag rows', lkRows.some((x) => x[0] === 'brand' && x[1] === brandSlug && x[2] === `E2E Brand ${rnd}`) && lkRows.some((x) => x[0] === 'hashtags' && x[1] === managedTag), JSON.stringify(lkRows.filter((x) => x[0] === 'brand').slice(0, 2)));
   const readme = strFromU8(entries['README.txt'] ?? new Uint8Array());
-  check('README lists the accepted values', readme.includes(brandSlug) && readme.includes(`E2E Brand ${rnd}`) && readme.includes(facetSlug) && readme.includes('القيم المتاحة'));
+  check('README lists the accepted values', readme.includes(brandSlug) && readme.includes(`E2E Brand ${rnd}`) && readme.includes('القيم المتاحة'));
+  check('README no longer offers a filters list', !readme.includes('facets — الفلاتر'));
+  check('README names the product type and every row type', ['product', 'option', 'color', 'variant', 'image', 'transport', 'spec', 'label', 'warranty', 'content', 'guide'].every((x) => readme.includes(x)) && readme.includes('النوع:'));
   const expRes = await admin.raw('GET', `/api/admin/import/export?category=${encodeURIComponent(rootId)}&format=zip`);
   const expEntries = unzipSync(new Uint8Array(await expRes.arrayBuffer()));
   check('export ZIP carries lookups.csv too', expRes.status === 200 && !!expEntries['lookups.csv']);
@@ -400,7 +408,6 @@ async function main() {
       inventory_mode: 'BASE',
       price_iqd: '20000',
       stock: '3',
-      facets: facetSlug,
       hashtags: `${managedTag}|from-sheet-${rnd}`,
     }),
   ]);
@@ -427,8 +434,21 @@ async function main() {
   const sepProduct = r.data?.product;
   check('a hashtag with | or , is stored joined, not split', r.status === 200 && sepProduct?.hashtags?.includes(`a-b-${rnd}`) && sepProduct?.hashtags?.includes(`c-d-${rnd}`) && sepProduct?.hashtags?.includes('spaced-tag'), JSON.stringify(sepProduct?.hashtags));
 
+  // FILTERS ARE STILL A MANAGED VOCABULARY, they are just no longer typed on
+  // the product form or in the sheet. The API still assigns them, and a
+  // filter that a product uses is still deactivated rather than deleted.
+  r = await admin.put(`/api/admin/products/${sepProduct.id}/relations`, { facet_ids: [facetId] });
+  check('the relations API still assigns a filter explicitly', r.status === 200, JSON.stringify(r.data).slice(0, 200));
   const facetsAfter = (await admin.get('/api/admin/taxonomy/facets')).data?.facets ?? [];
-  check('the filter now counts the imported product', facetsAfter.find((f) => f.id === facetId)?.product_count === 1);
+  check('the filter counts the product it was assigned to', facetsAfter.find((f) => f.id === facetId)?.product_count === 1);
+
+  // …and a save that says nothing about filters PRESERVES them, which is what
+  // every save from the product form now does.
+  r = await admin.put(`/api/admin/products/${sepProduct.id}/relations`, { inventory_mode: 'BASE' });
+  check('a relations payload without facet_ids preserves the stored filters', r.status === 200, JSON.stringify(r.data).slice(0, 200));
+  const stillThere = (await admin.get('/api/admin/taxonomy/facets')).data?.facets ?? [];
+  check('the filter survived a save that did not mention it', stillThere.find((f) => f.id === facetId)?.product_count === 1);
+
   r = await admin.del(`/api/admin/taxonomy/facets/${facetId}`);
   check('a filter on a product is deactivated, not deleted', r.status === 200 && r.data?.deleted === false && r.data?.products === 1);
 

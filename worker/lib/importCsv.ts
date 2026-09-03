@@ -1,5 +1,5 @@
 /**
- * The import/export format — mandate §10.
+ * The import/export format — mandate §10, extended to the whole product form.
  *
  * ONE PRODUCT SPANS SEVERAL ROWS, distinguished by the first column
  * `row_type`. The alternative — packing options, colours, links and images
@@ -8,33 +8,74 @@
  * types, "row 14: colour hex is not #RRGGBB" points at a real line in the
  * file the admin is looking at.
  *
- *   product   the product itself, plus the spec columns its section declares
- *   option    one value of one option group
- *   color     one colour, with its links to option values
- *   image     one image, with its order, primary flag and binding
+ *   product    the product itself, plus the spec columns its type declares
+ *   option     one value of one option group
+ *   color      one colour, with its links to option values
+ *   variant    one stock combination of option values (and optionally a colour)
+ *   image      one gallery image, with its primary flag and binding
+ *   transport  one pre-order shipping method and its commission
+ *   spec       one specification row, inside a named specification group
+ *   label      one badge shown on the product card
+ *   warranty   one warranty plan, its duration and its fee
+ *   content    one bottom-of-page content block (text / image / video)
+ *   guide      one step of the setup-and-usage guide
+ *
+ * EVERY FIELD OF THE PRODUCT FORM HAS A HOME HERE (the owner's «ويشمل كل شي
+ * كل الحقول في اضافه المنتج»). Sections 1–8 of the form map onto the product
+ * row and the ten child row types above; docs/IMPORT_TEMPLATE.md holds the
+ * table, and tests/importCsv.test.ts asserts that no form field is missing.
  *
  * Rows are attached to their product by `key` — the product's SKU, or its
  * slug when it has no SKU. Every child row repeats the parent key, so the
  * file can be sorted, filtered or split in a spreadsheet without breaking.
  *
- * COLUMNS FOLLOW THE SECTION. The spec columns come from
- * worker/lib/templateFamilies.ts for the chosen section, so a Devices template
- * never shows a filament diameter and a Materials template never shows a
- * nozzle — "ولا تظهر أعمدة لا تخص المنتج".
+ * COLUMNS FOLLOW THE PRODUCT TYPE (طابعة / ملحقات / فلمنت / اكسسوار). The
+ * spec columns come from worker/lib/templateFamilies.ts for the chosen type,
+ * so a printer template never shows a filament diameter and a filament
+ * template never shows a nozzle — «ولا تظهر أعمدة لا تخص المنتج». The same
+ * definition drives the form's specification fields, so a column and a form
+ * field cannot drift apart.
+ *
+ * VALUES ARE CHECKED, NOT ONLY SHAPES. A `select` spec field only accepts one
+ * of its declared options, a `number` field only a number, a `hex` field only
+ * #RRGGBB, and every enum column (status, sale types, transport method,
+ * warranty kind, content kind, guide kind, label key) names its accepted
+ * values back to the admin when it refuses one. That is the precision the
+ * owner asked for: a wrong cell is refused at preview time with the line
+ * number and the list of what it should have said.
  *
  * ROUND-TRIP. `serializeProducts` and `parseImport` are inverses: exporting a
  * product and re-importing it reproduces the same options, colours, links,
- * images, order, stock and prices. tests/importCsv.test.ts holds that line.
+ * variants, images, specs, labels, warranty plans, content blocks, guide
+ * steps, order, stock and prices. tests/importCsv.test.ts holds that line.
  *
  * NO SCRAPING. An image cell is either a file name inside the ZIP or a URL
  * that must point directly at an image file; the server verifies it by magic
  * bytes (worker/routes/media.ts). A product-page URL is rejected, not read.
  */
 
-import { FAMILIES, fieldsFor, flatFields, type TemplateField } from './templateFamilies';
+import {
+  PRODUCT_TYPES,
+  flatFields,
+  groupsForType,
+  productType,
+  type ProductTypeId,
+  type TemplateField,
+} from './templateFamilies';
 import type { Lookups } from './lookups';
 
-export type RowType = 'product' | 'option' | 'color' | 'image';
+export type RowType =
+  | 'product'
+  | 'option'
+  | 'color'
+  | 'variant'
+  | 'image'
+  | 'transport'
+  | 'spec'
+  | 'label'
+  | 'warranty'
+  | 'content'
+  | 'guide';
 
 // ------------------------------------------------------------------- CSV IO
 
@@ -118,60 +159,114 @@ export function toCsv(rows: string[][]): string {
 
 // ------------------------------------------------------------------ columns
 
-/** Columns every template carries, in order. */
+/**
+ * Columns every template carries, in order: the product's own fields first,
+ * then the columns the child rows write into. `facets` is deliberately GONE —
+ * the owner removed the filters picker from the product form («احذف الفلاتر
+ * هي تابعه او نفسها القسم الفرعي»), and a column for a field the form no
+ * longer has would be a way to set something nobody can see or correct.
+ */
 export const BASE_COLUMNS = [
   'row_type',
   'key',
+  // ---- section 1-2 of the form: identity and classification
   'name',
   'description',
   'status',
+  'sku',
   'display_order',
+  'is_featured',
   'brand',
   'category',
   'sub_category',
+  'hashtags',
+  // ---- section 3-4: prices, sale types, stock
   'sale_types',
   'inventory_mode',
   'price_iqd',
   'prime_price_iqd',
   'pro_price_iqd',
   'cost_iqd',
+  'direct_surcharge_iqd',
   'stock',
   'low_stock_threshold',
-  'facets',
-  'hashtags',
-  // child-row columns
+  'payment_options',
+  // ---- section 7: how it is used
+  'how_to_use',
+  'usage_url',
+  // ---- child-row columns
   'group',
   'value',
+  'label',
   'hex',
   'sku_part',
   'links',
   'image',
   'alt',
+  'unit',
+  'kind',
+  'body',
+  'url',
+  'duration_months',
   'primary',
   'active',
 ] as const;
 
 export const SPEC_PREFIX = 'spec.';
 
+/** The four product types the panel offers, with the column count each one
+ *  produces so an admin can see the narrowing before downloading. */
+export function templateTypeChoices(): Array<{
+  id: ProductTypeId;
+  label_ar: string;
+  label_en: string;
+  hint_ar: string;
+  family: 'devices' | 'materials';
+  spec_columns: number;
+}> {
+  return PRODUCT_TYPES.map((t) => ({
+    id: t.id,
+    label_ar: t.label_ar,
+    label_en: t.label_en,
+    hint_ar: t.hint_ar,
+    family: t.family,
+    spec_columns: flatFields(groupsForType(t.id)).length,
+  }));
+}
+
+/** Enumerations the sheet accepts, named back to the admin when refused. */
+export const SALE_TYPES = ['direct_sale', 'pre_order', 'bundle'] as const;
+export const STATUSES = ['draft', 'active', 'hidden'] as const;
+export const INVENTORY_MODES = ['BASE', 'OPTION', 'COLOR', 'VARIANT_COMBINATION'] as const;
+export const TRANSPORT_METHODS = ['air', 'sea', 'land'] as const;
+export const WARRANTY_KINDS = ['total', 'extension'] as const;
+export const CONTENT_KINDS = ['text', 'image', 'video_embed'] as const;
+export const GUIDE_KINDS = ['setup', 'usage'] as const;
+export const LABEL_KEYS = ['featured', 'warranty_included', 'free_returns', 'free_plus'] as const;
+
 export interface TemplateShape {
   columns: string[];
   specFields: TemplateField[];
+  /** The product type the columns were built for. */
+  type: ProductTypeId;
   family: 'devices' | 'materials';
   sectionSlugs: string[];
 }
 
-/** The column list for one section: the base columns then its spec columns. */
+/** The column list for one product type: base columns then its spec columns. */
 export function templateShape(
-  family: 'devices' | 'materials',
-  sectionSlugs: string[],
+  type: ProductTypeId,
+  sectionSlugs: string[] = [],
   { includeCost = true }: { includeCost?: boolean } = {}
 ): TemplateShape {
-  const specFields = flatFields(fieldsFor(family, sectionSlugs));
+  const def = productType(type);
+  const specFields = flatFields(groupsForType(type));
   const base = BASE_COLUMNS.filter((c) => (includeCost ? true : c !== 'cost_iqd'));
   return {
     columns: [...base, ...specFields.map((f) => `${SPEC_PREFIX}${f.id}`)],
     specFields,
-    family,
+    type,
+    family: def.family,
     sectionSlugs,
   };
 }
@@ -180,40 +275,53 @@ export function templateShape(
  *  the Arabic label without the parser ever depending on it. */
 export function labelRow(shape: TemplateShape): string[] {
   const labels: Record<string, string> = {
-    row_type: 'نوع السطر (product/option/color/image)',
-    key: 'مفتاح المنتج (SKU أو slug)',
+    row_type: 'نوع السطر — انظر README',
+    key: 'مفتاح المنتج (SKU أو slug) — يتكرر في كل أسطر المنتج',
     name: 'الاسم بالإنجليزية',
     description: 'الوصف بالإنجليزية',
-    status: 'الحالة (draft/active/hidden)',
-    display_order: 'ترتيب العرض',
+    status: `الحالة (${STATUSES.join('/')})`,
+    sku: 'رمز المنتج SKU (فارغ = يُشتق من key)',
+    display_order: 'ترتيب العرض (رقم)',
+    is_featured: 'منتج مميز (yes/no)',
     brand: 'العلامة التجارية',
     category: 'القسم الرئيسي',
     sub_category: 'القسم الفرعي',
-    sale_types: 'أنواع البيع (direct_sale|pre_order|bundle)',
-    inventory_mode: 'مصدر المخزون (BASE/OPTION/COLOR/VARIANT_COMBINATION)',
+    hashtags: 'الهاشتاقات (tag|tag)',
+    sale_types: `أنواع البيع (${SALE_TYPES.join('|')})`,
+    inventory_mode: `مصدر المخزون (${INVENTORY_MODES.join('/')})`,
     price_iqd: 'السعر الاعتيادي',
     prime_price_iqd: 'سعر PRIME',
     pro_price_iqd: 'سعر PRO',
-    cost_iqd: 'التكلفة (إداري)',
+    cost_iqd: 'التكلفة (إداري — لا تُنشر)',
+    direct_surcharge_iqd: 'زيادة التوفر الفوري (للبيع المباشر)',
     stock: 'المخزون',
     low_stock_threshold: 'حد التنبيه',
-    facets: 'الفلاتر (slug|slug)',
-    hashtags: 'الهاشتاقات (tag|tag)',
-    group: 'مجموعة الخيار',
-    value: 'قيمة الخيار / اسم اللون',
+    payment_options: 'طرق الدفع المسموحة (id|id)',
+    how_to_use: 'طريقة الاستخدام (نص)',
+    usage_url: 'رابط الدليل الرسمي',
+    group: 'مجموعة الخيار / عنوان مجموعة المواصفات',
+    value: 'قيمة الخيار / اسم اللون / العنوان',
+    label: 'اسم المواصفة (سطر spec)',
     hex: 'كود اللون #RRGGBB',
     sku_part: 'جزء SKU',
-    links: 'روابط اللون (Group:Value|Group:Value)',
+    links: 'الروابط (Group:Value|Group:Value)',
     image: 'الصورة (اسم ملف داخل ZIP أو رابط مباشر)',
     alt: 'نص بديل',
+    unit: 'الوحدة (mm، g، W…)',
+    kind: 'النوع — يختلف حسب سطر الصف',
+    body: 'النص الطويل (شروط الضمان / كتلة المحتوى / خطوة الدليل)',
+    url: 'رابط (فيديو أو صورة أو مستند)',
+    duration_months: 'مدة الضمان بالأشهر',
     primary: 'صورة رئيسية (yes/no)',
-    active: 'مفعّل (yes/no)',
+    active: 'مفعّل / ظاهر (yes/no)',
   };
   const byId = new Map(shape.specFields.map((f) => [f.id, f]));
   return shape.columns.map((c) => {
     if (c.startsWith(SPEC_PREFIX)) {
       const f = byId.get(c.slice(SPEC_PREFIX.length));
-      return f ? `${f.label_ar}${f.unit ? ` (${f.unit})` : ''}` : c;
+      if (!f) return c;
+      const suffix = f.unit ? ` (${f.unit})` : f.options ? ` (${f.options.join(' / ')})` : '';
+      return `${f.label_ar}${suffix}`;
     }
     return labels[c] ?? c;
   });
@@ -227,7 +335,9 @@ export interface ParsedProduct {
   name: string;
   description: string;
   status: string;
+  sku: string;
   display_order: number | null;
+  is_featured: boolean | null;
   brand: string;
   category: string;
   sub_category: string;
@@ -237,16 +347,35 @@ export interface ParsedProduct {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  direct_surcharge_iqd: number | null;
   stock: number | null;
   low_stock_threshold: number | null;
-  facets: string[];
+  /** null when the column is absent, so an older sheet keeps stored values. */
+  payment_options: string[] | null;
+  how_to_use: string | null;
+  usage_url: string | null;
   /** null when the sheet has no hashtags column at all, so an older file
    *  leaves a product's stored tags alone instead of clearing them. */
   hashtags: string[] | null;
   spec_fields: Record<string, string>;
   options: ParsedOption[];
   colors: ParsedColor[];
+  variants: ParsedVariant[];
   images: ParsedImage[];
+  /**
+   * The child collections below are null when the file carries NO row of that
+   * type for this product, and an array (possibly empty) when it does. That
+   * distinction is the difference between "this sheet does not talk about
+   * warranty plans" and "this product has no warranty plans": the first
+   * preserves what is stored, the second clears it. A sheet exported from
+   * this product always carries its rows, so the round-trip is exact.
+   */
+  transports: ParsedTransport[] | null;
+  specs: ParsedSpec[] | null;
+  labels: ParsedLabel[] | null;
+  warranty_plans: ParsedWarranty[] | null;
+  content_blocks: ParsedContent[] | null;
+  guide_steps: ParsedGuideStep[] | null;
 }
 
 export interface ParsedOption {
@@ -290,6 +419,77 @@ export interface ParsedImage {
   bind: string;
 }
 
+/** One stock combination, named by the option values (and colour) it selects:
+ *  `Printer:A1|Plug:EU|color:Black`. */
+export interface ParsedVariant {
+  line: number;
+  selection: Array<{ group: string; value: string }>;
+  color: string;
+  sku_part: string;
+  active: boolean;
+  stock: number | null;
+  low_stock_threshold: number | null;
+  price_iqd: number | null;
+  prime_price_iqd: number | null;
+  pro_price_iqd: number | null;
+  cost_iqd: number | null;
+}
+
+export interface ParsedTransport {
+  line: number;
+  method: string;
+  /** null = inherit the admin default commission for this method. */
+  commission_iqd: number | null;
+  active: boolean;
+}
+
+export interface ParsedSpec {
+  line: number;
+  group: string;
+  label: string;
+  value: string;
+  unit: string;
+}
+
+export interface ParsedLabel {
+  line: number;
+  key: string;
+  text: string;
+  icon: string;
+  visible: boolean;
+}
+
+export interface ParsedWarranty {
+  line: number;
+  title: string;
+  terms: string;
+  duration_months: number | null;
+  duration_kind: string;
+  fee_iqd: number | null;
+  active: boolean;
+}
+
+export interface ParsedContent {
+  line: number;
+  kind: string;
+  body: string;
+  caption: string;
+  alt: string;
+  url: string;
+  image: string;
+}
+
+export interface ParsedGuideStep {
+  line: number;
+  kind: string;
+  title: string;
+  body: string;
+  /** Up to six image cells, '|'-separated in the sheet. */
+  images: string[];
+  video_url: string;
+  link_url: string;
+}
+
 export interface RowIssue {
   line: number;
   severity: 'error' | 'warning';
@@ -321,6 +521,72 @@ const splitList = (v: string) =>
     .split('|')
     .map((s) => s.trim())
     .filter(Boolean);
+
+/** A cell that must be one of a fixed list. Empty falls back to `fallback`
+ *  (or is refused when there is none); a wrong value names the whole list,
+ *  because "kind: \"vidoe\" غير معروف" without the options is a dead end. */
+function enumCell<T extends string>(
+  raw: string,
+  allowed: readonly T[],
+  line: number,
+  col: string,
+  issues: RowIssue[],
+  fallback: T | null
+): T | null {
+  const v = raw.trim();
+  if (v === '') return fallback;
+  const hit = allowed.find((a) => a.toLowerCase() === v.toLowerCase());
+  if (hit) return hit;
+  issues.push({
+    line,
+    severity: 'error',
+    message: `${col}: "${v}" غير مقبول — القيم المتاحة: ${allowed.join(' / ')}`,
+  });
+  return fallback;
+}
+
+/** yes / no with a named error instead of a silent `true`. */
+function boolCell(raw: string, line: number, col: string, issues: RowIssue[], fallback: boolean): boolean {
+  const v = raw.trim();
+  if (v === '') return fallback;
+  if (yes(v)) return true;
+  if (no(v)) return false;
+  issues.push({ line, severity: 'error', message: `${col}: "${v}" — اكتب yes أو no` });
+  return fallback;
+}
+
+/**
+ * A spec cell checked against the field that declared it. A `select` field
+ * only accepts one of its options, a `number` field only a number and a `hex`
+ * field only #RRGGBB — so a typo is refused at preview with the line number
+ * and the accepted values, instead of being stored and shown to a customer.
+ */
+function checkSpecCell(f: TemplateField, raw: string, line: number, issues: RowIssue[]): string {
+  const v = raw.trim();
+  if (v === '') return '';
+  const col = `${SPEC_PREFIX}${f.id}`;
+  if (f.options && f.options.length) {
+    const hit = f.options.find((o) => o.toLowerCase() === v.toLowerCase());
+    if (!hit) {
+      issues.push({
+        line,
+        severity: 'error',
+        message: `${col}: "${v}" غير مقبول — القيم المتاحة: ${f.options.join(' / ')}`,
+      });
+      return '';
+    }
+    return hit;
+  }
+  if (f.type === 'number' && !/^-?\d+(\.\d+)?$/.test(v)) {
+    issues.push({ line, severity: 'error', message: `${col}: "${v}" ليس رقمًا` });
+    return '';
+  }
+  if (f.type === 'hex' && !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
+    issues.push({ line, severity: 'error', message: `${col}: "${v}" ليس #RGB أو #RRGGBB` });
+    return '';
+  }
+  return v;
+}
 
 /**
  * Parses a completed template. Pure and side-effect free — this is what the
@@ -374,33 +640,58 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       }
       const spec: Record<string, string> = {};
       for (const f of shape.specFields) {
-        const v = cell(r, `${SPEC_PREFIX}${f.id}`);
+        const v = checkSpecCell(f, cell(r, `${SPEC_PREFIX}${f.id}`), line, issues);
         if (v) spec[f.id] = v;
+      }
+      const saleTypes: string[] = [];
+      for (const st of splitList(cell(r, 'sale_types'))) {
+        const ok = enumCell(st, SALE_TYPES, line, 'sale_types', issues, null);
+        if (ok) saleTypes.push(ok);
       }
       products.set(key, {
         key,
         line,
         name: cell(r, 'name'),
         description: cell(r, 'description'),
-        status: cell(r, 'status') || 'draft',
+        status: enumCell(cell(r, 'status'), STATUSES, line, 'status', issues, 'draft') ?? 'draft',
+        sku: cell(r, 'sku'),
         display_order: intCell(cell(r, 'display_order'), line, 'display_order', issues),
+        is_featured: index.has('is_featured')
+          ? boolCell(cell(r, 'is_featured'), line, 'is_featured', issues, false)
+          : null,
         brand: cell(r, 'brand'),
         category: cell(r, 'category'),
         sub_category: cell(r, 'sub_category'),
-        sale_types: splitList(cell(r, 'sale_types')),
-        inventory_mode: cell(r, 'inventory_mode') || 'BASE',
+        sale_types: saleTypes,
+        inventory_mode:
+          enumCell(cell(r, 'inventory_mode'), INVENTORY_MODES, line, 'inventory_mode', issues, 'BASE') ?? 'BASE',
         price_iqd: intCell(cell(r, 'price_iqd'), line, 'price_iqd', issues),
         prime_price_iqd: intCell(cell(r, 'prime_price_iqd'), line, 'prime_price_iqd', issues),
         pro_price_iqd: intCell(cell(r, 'pro_price_iqd'), line, 'pro_price_iqd', issues),
         cost_iqd: intCell(cell(r, 'cost_iqd'), line, 'cost_iqd', issues),
+        direct_surcharge_iqd: intCell(
+          cell(r, 'direct_surcharge_iqd'),
+          line,
+          'direct_surcharge_iqd',
+          issues
+        ),
         stock: intCell(cell(r, 'stock'), line, 'stock', issues),
         low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
-        facets: splitList(cell(r, 'facets')),
+        payment_options: index.has('payment_options') ? splitList(cell(r, 'payment_options')) : null,
+        how_to_use: index.has('how_to_use') ? cell(r, 'how_to_use') : null,
+        usage_url: index.has('usage_url') ? cell(r, 'usage_url') : null,
         hashtags: index.has('hashtags') ? splitList(cell(r, 'hashtags')) : null,
         spec_fields: spec,
         options: [],
         colors: [],
+        variants: [],
         images: [],
+        transports: null,
+        specs: null,
+        labels: null,
+        warranty_plans: null,
+        content_blocks: null,
+        guide_steps: null,
       });
       continue;
     }
@@ -413,8 +704,34 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       continue;
     }
 
-    const activeCell = cell(r, 'active');
-    const active = activeCell === '' ? true : yes(activeCell) ? true : no(activeCell) ? false : true;
+    const active = boolCell(cell(r, 'active'), line, 'active', issues, true);
+    const money = () => ({
+      price_iqd: intCell(cell(r, 'price_iqd'), line, 'price_iqd', issues),
+      prime_price_iqd: intCell(cell(r, 'prime_price_iqd'), line, 'prime_price_iqd', issues),
+      pro_price_iqd: intCell(cell(r, 'pro_price_iqd'), line, 'pro_price_iqd', issues),
+      cost_iqd: intCell(cell(r, 'cost_iqd'), line, 'cost_iqd', issues),
+    });
+    const counts = () => ({
+      stock: intCell(cell(r, 'stock'), line, 'stock', issues),
+      low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
+    });
+    /** `Group:Value` pairs out of the links column, with the colour split off. */
+    const parseLinks = () => {
+      const pairs: Array<{ group: string; value: string }> = [];
+      let color = '';
+      for (const part of splitList(cell(r, 'links'))) {
+        const idx = part.indexOf(':');
+        if (idx <= 0 || idx === part.length - 1) {
+          issues.push({ line, severity: 'error', message: `links: "${part}" يجب أن تكون Group:Value` });
+          continue;
+        }
+        const head = part.slice(0, idx).trim();
+        const tail = part.slice(idx + 1).trim();
+        if (head.toLowerCase() === 'color') color = tail;
+        else pairs.push({ group: head, value: tail });
+      }
+      return { pairs, color };
+    };
 
     if (type === 'option') {
       const group = cell(r, 'group');
@@ -430,12 +747,8 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         sku_part: cell(r, 'sku_part'),
         image: cell(r, 'image'),
         active,
-        stock: intCell(cell(r, 'stock'), line, 'stock', issues),
-        low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
-        price_iqd: intCell(cell(r, 'price_iqd'), line, 'price_iqd', issues),
-        prime_price_iqd: intCell(cell(r, 'prime_price_iqd'), line, 'prime_price_iqd', issues),
-        pro_price_iqd: intCell(cell(r, 'pro_price_iqd'), line, 'pro_price_iqd', issues),
-        cost_iqd: intCell(cell(r, 'cost_iqd'), line, 'cost_iqd', issues),
+        ...counts(),
+        ...money(),
       });
       continue;
     }
@@ -451,15 +764,6 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         issues.push({ line, severity: 'error', message: `hex: "${hex}" ليس #RGB أو #RRGGBB` });
         continue;
       }
-      const links: Array<{ group: string; value: string }> = [];
-      for (const part of splitList(cell(r, 'links'))) {
-        const idx = part.indexOf(':');
-        if (idx <= 0 || idx === part.length - 1) {
-          issues.push({ line, severity: 'error', message: `links: "${part}" يجب أن تكون Group:Value` });
-          continue;
-        }
-        links.push({ group: part.slice(0, idx).trim(), value: part.slice(idx + 1).trim() });
-      }
       parent.colors.push({
         line,
         name,
@@ -467,13 +771,9 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         sku_part: cell(r, 'sku_part'),
         image: cell(r, 'image'),
         active,
-        stock: intCell(cell(r, 'stock'), line, 'stock', issues),
-        low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
-        price_iqd: intCell(cell(r, 'price_iqd'), line, 'price_iqd', issues),
-        prime_price_iqd: intCell(cell(r, 'prime_price_iqd'), line, 'prime_price_iqd', issues),
-        pro_price_iqd: intCell(cell(r, 'pro_price_iqd'), line, 'pro_price_iqd', issues),
-        cost_iqd: intCell(cell(r, 'cost_iqd'), line, 'cost_iqd', issues),
-        links,
+        ...counts(),
+        ...money(),
+        links: parseLinks().pairs,
       });
       continue;
     }
@@ -494,7 +794,152 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       continue;
     }
 
-    issues.push({ line, severity: 'error', message: `row_type غير معروف: "${type}"` });
+    if (type === 'variant') {
+      const { pairs, color } = parseLinks();
+      if (pairs.length === 0 && !color) {
+        issues.push({
+          line,
+          severity: 'error',
+          message: 'سطر variant يحتاج التوليفة في عمود links — مثال: Printer:A1|Plug:EU|color:Black',
+        });
+        continue;
+      }
+      parent.variants.push({
+        line,
+        selection: pairs,
+        color,
+        sku_part: cell(r, 'sku_part'),
+        active,
+        ...counts(),
+        ...money(),
+      });
+      continue;
+    }
+
+    if (type === 'transport') {
+      const method = enumCell(cell(r, 'value'), TRANSPORT_METHODS, line, 'value', issues, null);
+      if (!method) continue;
+      parent.transports ??= [];
+      parent.transports.push({
+        line,
+        method,
+        commission_iqd: intCell(cell(r, 'price_iqd'), line, 'price_iqd', issues),
+        active,
+      });
+      continue;
+    }
+
+    if (type === 'spec') {
+      const label = cell(r, 'label');
+      if (!label) {
+        issues.push({ line, severity: 'error', message: 'سطر spec يحتاج اسم المواصفة في عمود label' });
+        continue;
+      }
+      parent.specs ??= [];
+      parent.specs.push({
+        line,
+        group: cell(r, 'group'),
+        label,
+        value: cell(r, 'value'),
+        unit: cell(r, 'unit'),
+      });
+      continue;
+    }
+
+    if (type === 'label') {
+      const text = cell(r, 'value');
+      const rawKey = cell(r, 'kind');
+      const key = rawKey === '' ? '' : (enumCell(rawKey, LABEL_KEYS, line, 'kind', issues, null) ?? '');
+      if (!text && !key) {
+        issues.push({ line, severity: 'error', message: 'سطر label يحتاج نصًا في عمود value أو مفتاحًا في عمود kind' });
+        continue;
+      }
+      parent.labels ??= [];
+      parent.labels.push({ line, key, text, icon: cell(r, 'image'), visible: active });
+      continue;
+    }
+
+    if (type === 'warranty') {
+      const title = cell(r, 'value');
+      if (!title) {
+        issues.push({ line, severity: 'error', message: 'سطر warranty يحتاج عنوان الخطة في عمود value' });
+        continue;
+      }
+      const months = intCell(cell(r, 'duration_months'), line, 'duration_months', issues);
+      if (months === null || months < 1 || months > 240) {
+        issues.push({ line, severity: 'error', message: 'duration_months: مدة الضمان بالأشهر مطلوبة بين 1 و240' });
+        continue;
+      }
+      const fee = intCell(cell(r, 'price_iqd'), line, 'price_iqd', issues);
+      parent.warranty_plans ??= [];
+      parent.warranty_plans.push({
+        line,
+        title,
+        terms: cell(r, 'body'),
+        duration_months: months,
+        duration_kind: enumCell(cell(r, 'kind'), WARRANTY_KINDS, line, 'kind', issues, 'total') ?? 'total',
+        // A warranty fee is never inherited: an empty cell means free, and
+        // saying so beats a null that the resolver would have to guess at.
+        fee_iqd: fee ?? 0,
+        active,
+      });
+      continue;
+    }
+
+    if (type === 'content') {
+      const rawKind = cell(r, 'kind');
+      if (rawKind === '') {
+        issues.push({
+          line,
+          severity: 'error',
+          message: `سطر content يحتاج نوعًا في عمود kind — القيم المتاحة: ${CONTENT_KINDS.join(' / ')}`,
+        });
+        continue;
+      }
+      const kind = enumCell(rawKind, CONTENT_KINDS, line, 'kind', issues, null);
+      if (!kind) continue;
+      parent.content_blocks ??= [];
+      parent.content_blocks.push({
+        line,
+        kind,
+        body: cell(r, 'body'),
+        caption: cell(r, 'value'),
+        alt: cell(r, 'alt'),
+        url: cell(r, 'url'),
+        image: cell(r, 'image'),
+      });
+      continue;
+    }
+
+    if (type === 'guide') {
+      const title = cell(r, 'value');
+      if (!title) {
+        issues.push({ line, severity: 'error', message: 'سطر guide يحتاج عنوان الخطوة في عمود value' });
+        continue;
+      }
+      const images = splitList(cell(r, 'image'));
+      if (images.length > 6) {
+        issues.push({ line, severity: 'error', message: 'guide: أقصى ٦ صور للخطوة الواحدة' });
+        continue;
+      }
+      parent.guide_steps ??= [];
+      parent.guide_steps.push({
+        line,
+        kind: enumCell(cell(r, 'kind'), GUIDE_KINDS, line, 'kind', issues, 'usage') ?? 'usage',
+        title,
+        body: cell(r, 'body'),
+        images,
+        video_url: cell(r, 'url'),
+        link_url: cell(r, 'links'),
+      });
+      continue;
+    }
+
+    issues.push({
+      line,
+      severity: 'error',
+      message: `row_type غير معروف: "${type}" — الأنواع المتاحة: product / option / color / variant / image / transport / spec / label / warranty / content / guide`,
+    });
   }
 
   for (const o of orphans) {
@@ -535,11 +980,16 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
     for (const o of p.options) ladder(`الخيار ${o.value}`, o.line, o.price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd);
     for (const c of p.colors) ladder(`اللون ${c.name}`, c.line, c.price_iqd, c.prime_price_iqd, c.pro_price_iqd, c.cost_iqd);
 
+    for (const v of p.variants) {
+      ladder('التوليفة', v.line, v.price_iqd, v.prime_price_iqd, v.pro_price_iqd, v.cost_iqd);
+    }
+
     // A colour link must name an option row that exists in THIS file.
-    const values = new Set(p.options.map((o) => `${o.group} ${o.value}`));
+    const values = new Set(p.options.map((o) => `${o.group}\u0000${o.value}`));
+    const colorNames = new Set(p.colors.map((c) => c.name.trim().toLowerCase()));
     for (const c of p.colors) {
       for (const l of c.links) {
-        if (!values.has(`${l.group} ${l.value}`)) {
+        if (!values.has(`${l.group}\u0000${l.value}`)) {
           issues.push({
             line: c.line,
             severity: 'error',
@@ -547,6 +997,58 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
           });
         }
       }
+    }
+
+    // A combination names option values and a colour, and every one of them
+    // has to exist in this file — a combination pointing at nothing would be
+    // stock nobody can ever buy.
+    const combos = new Set<string>();
+    for (const v of p.variants) {
+      for (const l of v.selection) {
+        if (!values.has(`${l.group}\u0000${l.value}`)) {
+          issues.push({
+            line: v.line,
+            severity: 'error',
+            message: `links: لا يوجد سطر option باسم "${l.group}:${l.value}" لهذا المنتج`,
+          });
+        }
+      }
+      if (v.color && !colorNames.has(v.color.trim().toLowerCase())) {
+        issues.push({
+          line: v.line,
+          severity: 'error',
+          message: `links: لا يوجد سطر color باسم "${v.color}" لهذا المنتج`,
+        });
+      }
+      // Two rows selecting the same values are the same combination; letting
+      // both through would mean two stock numbers for one thing to sell.
+      const sig = [
+        ...v.selection.map((l) => `${l.group.trim().toLowerCase()}:${l.value.trim().toLowerCase()}`).sort(),
+        `color:${v.color.trim().toLowerCase()}`,
+      ].join('|');
+      if (combos.has(sig)) {
+        issues.push({ line: v.line, severity: 'error', message: 'variant: هذه التوليفة مكررة في الملف' });
+      }
+      combos.add(sig);
+    }
+
+    // One warranty plan per title, one spec row per (group, label): a repeat
+    // is a copy-paste slip, and merging it silently would drop one of them.
+    const seenPlans = new Set<string>();
+    for (const w of p.warranty_plans ?? []) {
+      const k = w.title.trim().toLowerCase();
+      if (seenPlans.has(k)) {
+        issues.push({ line: w.line, severity: 'error', message: `warranty: الخطة "${w.title}" مكررة` });
+      }
+      seenPlans.add(k);
+    }
+    const seenSpecs = new Set<string>();
+    for (const sp of p.specs ?? []) {
+      const k = `${sp.group.trim().toLowerCase()}\u0000${sp.label.trim().toLowerCase()}`;
+      if (seenSpecs.has(k)) {
+        issues.push({ line: sp.line, severity: 'error', message: `spec: "${sp.label}" مكررة في نفس المجموعة` });
+      }
+      seenSpecs.add(k);
     }
 
     const primaries = p.images.filter((i) => i.primary);
@@ -567,12 +1069,29 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
     if (p.inventory_mode === 'OPTION' && p.options.length === 0) {
       issues.push({ line: p.line, severity: 'error', message: 'inventory_mode=OPTION بلا خيارات' });
     }
-    if (p.sale_types.length > 0) {
-      for (const t of p.sale_types) {
-        if (!['direct_sale', 'pre_order', 'bundle'].includes(t)) {
-          issues.push({ line: p.line, severity: 'error', message: `sale_types: "${t}" غير معروف` });
-        }
+    if (p.inventory_mode === 'VARIANT_COMBINATION' && p.variants.length === 0) {
+      issues.push({
+        line: p.line,
+        severity: 'error',
+        message: 'inventory_mode=VARIANT_COMBINATION بلا أسطر variant — اكتب توليفة واحدة على الأقل',
+      });
+    }
+    // Pre-order transports only mean something on a product actually sold
+    // that way; accepting them on a direct-only product would store an offer
+    // no checkout can ever reach.
+    if ((p.transports?.length ?? 0) > 0 && p.sale_types.length > 0 && !p.sale_types.includes('pre_order')) {
+      issues.push({
+        line: p.transports![0].line,
+        severity: 'error',
+        message: 'سطر transport لمنتج لا يبيع بالطلب المسبق — أضف pre_order إلى sale_types أو احذف السطر',
+      });
+    }
+    const seenMethods = new Set<string>();
+    for (const tr of p.transports ?? []) {
+      if (seenMethods.has(tr.method)) {
+        issues.push({ line: tr.line, severity: 'error', message: `transport: "${tr.method}" مكرر` });
       }
+      seenMethods.add(tr.method);
     }
   }
 
@@ -586,7 +1105,9 @@ export interface ExportProduct {
   name: string;
   description: string;
   status: string;
+  sku: string;
   display_order: number;
+  is_featured: boolean;
   brand: string;
   category: string;
   sub_category: string;
@@ -596,14 +1117,24 @@ export interface ExportProduct {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  direct_surcharge_iqd: number | null;
   stock: number | null;
   low_stock_threshold: number | null;
-  facets: string[];
+  payment_options: string[];
+  how_to_use: string;
+  usage_url: string;
   hashtags: string[];
   spec_fields: Record<string, string>;
   options: Array<Omit<ParsedOption, 'line'>>;
   colors: Array<Omit<ParsedColor, 'line'>>;
+  variants: Array<Omit<ParsedVariant, 'line'>>;
   images: Array<Omit<ParsedImage, 'line'>>;
+  transports: Array<Omit<ParsedTransport, 'line'>>;
+  specs: Array<Omit<ParsedSpec, 'line'>>;
+  labels: Array<Omit<ParsedLabel, 'line'>>;
+  warranty_plans: Array<Omit<ParsedWarranty, 'line'>>;
+  content_blocks: Array<Omit<ParsedContent, 'line'>>;
+  guide_steps: Array<Omit<ParsedGuideStep, 'line'>>;
 }
 
 const num = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v));
@@ -627,7 +1158,9 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       name: p.name,
       description: p.description,
       status: p.status,
+      sku: p.sku,
       display_order: String(p.display_order ?? 0),
+      is_featured: bool(p.is_featured),
       brand: p.brand,
       category: p.category,
       sub_category: p.sub_category,
@@ -637,9 +1170,12 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       prime_price_iqd: num(p.prime_price_iqd),
       pro_price_iqd: num(p.pro_price_iqd),
       cost_iqd: num(p.cost_iqd),
+      direct_surcharge_iqd: num(p.direct_surcharge_iqd),
       stock: num(p.stock),
       low_stock_threshold: num(p.low_stock_threshold),
-      facets: p.facets.join('|'),
+      payment_options: p.payment_options.join('|'),
+      how_to_use: p.how_to_use,
+      usage_url: p.usage_url,
       hashtags: p.hashtags.join('|'),
       ...spec,
     });
@@ -678,6 +1214,24 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         links: c.links.map((l) => `${l.group}:${l.value}`).join('|'),
       });
     }
+    for (const v of p.variants) {
+      put({
+        row_type: 'variant',
+        key: p.key,
+        links: [
+          ...v.selection.map((l) => `${l.group}:${l.value}`),
+          ...(v.color ? [`color:${v.color}`] : []),
+        ].join('|'),
+        sku_part: v.sku_part,
+        active: bool(v.active),
+        stock: num(v.stock),
+        low_stock_threshold: num(v.low_stock_threshold),
+        price_iqd: num(v.price_iqd),
+        prime_price_iqd: num(v.prime_price_iqd),
+        pro_price_iqd: num(v.pro_price_iqd),
+        cost_iqd: num(v.cost_iqd),
+      });
+    }
     for (const i of p.images) {
       put({
         row_type: 'image',
@@ -686,6 +1240,64 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         alt: i.alt,
         primary: bool(i.primary),
         links: i.bind,
+      });
+    }
+    for (const tr of p.transports) {
+      put({
+        row_type: 'transport',
+        key: p.key,
+        value: tr.method,
+        price_iqd: num(tr.commission_iqd),
+        active: bool(tr.active),
+      });
+    }
+    for (const sp of p.specs) {
+      put({ row_type: 'spec', key: p.key, group: sp.group, label: sp.label, value: sp.value, unit: sp.unit });
+    }
+    for (const l of p.labels) {
+      put({
+        row_type: 'label',
+        key: p.key,
+        kind: l.key,
+        value: l.text,
+        image: l.icon,
+        active: bool(l.visible),
+      });
+    }
+    for (const w of p.warranty_plans) {
+      put({
+        row_type: 'warranty',
+        key: p.key,
+        value: w.title,
+        body: w.terms,
+        duration_months: num(w.duration_months),
+        kind: w.duration_kind,
+        price_iqd: num(w.fee_iqd),
+        active: bool(w.active),
+      });
+    }
+    for (const b of p.content_blocks) {
+      put({
+        row_type: 'content',
+        key: p.key,
+        kind: b.kind,
+        body: b.body,
+        value: b.caption,
+        alt: b.alt,
+        url: b.url,
+        image: b.image,
+      });
+    }
+    for (const g of p.guide_steps) {
+      put({
+        row_type: 'guide',
+        key: p.key,
+        kind: g.kind,
+        value: g.title,
+        body: g.body,
+        image: g.images.join('|'),
+        url: g.video_url,
+        links: g.link_url,
       });
     }
   }
@@ -702,40 +1314,155 @@ export function blankTemplate(shape: TemplateShape, example: boolean, lookups?: 
   rows.push(shape.columns.map((c, i) => (c === 'row_type' ? '#labels' : labels[i])));
   if (!example) return toCsv(lookups ? [...rows, ...lookupRows(shape, lookups)] : rows);
 
-  const specSample: Record<string, string> = {};
-  for (const f of shape.specFields.slice(0, 4)) {
-    specSample[`${SPEC_PREFIX}${f.id}`] = f.options?.[0] ?? (f.type === 'number' ? '10' : 'Example');
-  }
   const put = (v: Record<string, string>) => rows.push(shape.columns.map((c) => v[c] ?? ''));
-  put({
-    row_type: 'product',
-    key: 'EXAMPLE-001',
-    name: 'Example Product',
-    description: 'Nozzle diameter: 0.4 mm',
-    status: 'draft',
-    display_order: '0',
-    sale_types: 'direct_sale|pre_order',
-    inventory_mode: 'COLOR',
-    price_iqd: '250000',
-    prime_price_iqd: '235000',
-    pro_price_iqd: '220000',
-    stock: '10',
-    ...specSample,
-  });
-  put({ row_type: 'option', key: 'EXAMPLE-001', group: 'Printer', value: 'A1', sku_part: 'A1', active: 'yes' });
-  put({ row_type: 'option', key: 'EXAMPLE-001', group: 'Plug', value: 'EU', sku_part: 'EU', active: 'yes' });
-  put({
-    row_type: 'color',
-    key: 'EXAMPLE-001',
-    value: 'Black',
-    hex: '#000000',
-    stock: '3',
-    active: 'yes',
-    links: 'Printer:A1|Plug:EU',
-  });
-  put({ row_type: 'image', key: 'EXAMPLE-001', image: 'images/example-1.jpg', alt: 'front', primary: 'yes' });
+  for (const r of exampleRows(shape)) put(r);
   if (lookups) rows.push(...lookupRows(shape, lookups));
   return toCsv(rows);
+}
+
+/**
+ * A WORKED EXAMPLE IN THE SHAPE OF THE TYPE the admin picked, so the first
+ * thing they see is a product like the one they are about to type — a printer
+ * example never shows a spool weight, and a filament example never shows a
+ * build volume. Every row type the template supports appears at least once,
+ * because a row type nobody demonstrates is a row type nobody uses.
+ *
+ * The rows are ordinary data rows (`row_type=product` and friends), so the
+ * example is DELETED, not commented out, before a real import: leaving it in
+ * would create a product called "Example". The README says so in one line.
+ */
+export function exampleRows(shape: TemplateShape): Array<Record<string, string>> {
+  const key = `EXAMPLE-${shape.type.toUpperCase()}`;
+  const spec: Record<string, string> = {};
+  for (const f of shape.specFields.slice(0, 6)) {
+    spec[`${SPEC_PREFIX}${f.id}`] =
+      f.options?.[0] ?? (f.type === 'number' ? '10' : f.type === 'hex' ? '#1a1a1a' : 'Example');
+  }
+
+  const perType: Record<
+    ProductTypeId,
+    { name: string; description: string; price: string; options: Array<[string, string]>; colors: string[] }
+  > = {
+    printer: {
+      name: 'Example FDM Printer',
+      description: 'A worked example row — delete it before importing.',
+      price: '750000',
+      options: [
+        ['Model', 'Standard'],
+        ['Model', 'Combo'],
+      ],
+      colors: ['Black'],
+    },
+    parts: {
+      name: 'Example Hardened Nozzle',
+      description: 'A worked example row — delete it before importing.',
+      price: '25000',
+      options: [
+        ['Diameter', '0.4'],
+        ['Diameter', '0.6'],
+      ],
+      colors: [],
+    },
+    filament: {
+      name: 'Example PLA Filament',
+      description: 'A worked example row — delete it before importing.',
+      price: '22000',
+      options: [
+        ['Weight', '1 kg'],
+        ['Weight', '250 g'],
+      ],
+      colors: ['Black', 'White'],
+    },
+    accessory: {
+      name: 'Example Filament Dryer',
+      description: 'A worked example row — delete it before importing.',
+      price: '95000',
+      options: [['Plug', 'EU']],
+      colors: [],
+    },
+  };
+  const ex = perType[shape.type];
+  const out: Array<Record<string, string>> = [];
+
+  out.push({
+    row_type: 'product',
+    key,
+    name: ex.name,
+    description: ex.description,
+    status: 'draft',
+    sku: key,
+    display_order: '0',
+    is_featured: 'no',
+    sale_types: 'direct_sale|pre_order',
+    inventory_mode: ex.colors.length ? 'COLOR' : ex.options.length ? 'OPTION' : 'BASE',
+    price_iqd: ex.price,
+    prime_price_iqd: '',
+    pro_price_iqd: '',
+    stock: '10',
+    low_stock_threshold: '2',
+    how_to_use: 'Unbox, plug in, follow the setup guide.',
+    hashtags: 'example',
+    ...spec,
+  });
+  for (const [group, value] of ex.options) {
+    out.push({ row_type: 'option', key, group, value, sku_part: value.replace(/\s+/g, ''), active: 'yes' });
+  }
+  for (const name of ex.colors) {
+    out.push({
+      row_type: 'color',
+      key,
+      value: name,
+      hex: name.toLowerCase() === 'black' ? '#000000' : '#ffffff',
+      stock: '5',
+      active: 'yes',
+      links: ex.options.length ? `${ex.options[0][0]}:${ex.options[0][1]}` : '',
+    });
+  }
+  if (ex.options.length && ex.colors.length) {
+    out.push({
+      row_type: 'variant',
+      key,
+      links: `${ex.options[0][0]}:${ex.options[0][1]}|color:${ex.colors[0]}`,
+      sku_part: 'COMBO',
+      stock: '3',
+      active: 'yes',
+    });
+  }
+  out.push({ row_type: 'image', key, image: 'images/example-1.jpg', alt: 'front', primary: 'yes' });
+  out.push({ row_type: 'transport', key, value: 'air', price_iqd: '', active: 'yes' });
+  out.push({ row_type: 'transport', key, value: 'sea', price_iqd: '15000', active: 'yes' });
+  const firstSpec = shape.specFields[0];
+  out.push({
+    row_type: 'spec',
+    key,
+    group: 'General',
+    label: firstSpec ? firstSpec.label_en : 'Origin',
+    value: firstSpec?.options?.[0] ?? 'Example',
+    unit: firstSpec?.unit ?? '',
+  });
+  out.push({ row_type: 'label', key, kind: 'warranty_included', value: 'Warranty included', active: 'yes' });
+  out.push({
+    row_type: 'warranty',
+    key,
+    value: 'One year',
+    body: 'Manufacturing defects only. Consumables are not covered.',
+    duration_months: '12',
+    kind: 'total',
+    price_iqd: '0',
+    active: 'yes',
+  });
+  out.push({ row_type: 'content', key, kind: 'text', body: 'Anything you want under the product page.' });
+  out.push({
+    row_type: 'guide',
+    key,
+    kind: 'setup',
+    value: 'Unbox and level the bed',
+    body: 'Remove the packing foam, then run the automatic levelling routine.',
+    image: '',
+    url: '',
+    links: '',
+  });
+  return out;
 }
 
 // ------------------------------------------------------------------ lookups
@@ -746,6 +1473,10 @@ export function blankTemplate(shape: TemplateShape, example: boolean, lookups?: 
 // dropdown, so the blank template ends with a block of `#lookup:` rows the
 // parser skips by marker — one row per value, with the value to type in the
 // `key` column — and the ZIP adds a proper lookups.csv sheet.
+//
+// Facets are NOT listed any more: the product form has no filters picker, so
+// a template that offered filter slugs would be offering a value nobody can
+// see or correct in the browser afterwards.
 
 /** One human-readable line per value, for the README. */
 function lookupLine(value: string, ar: string, note: string): string {
@@ -792,16 +1523,6 @@ export function lookupRows(shape: TemplateShape, lookups: Lookups): string[][] {
   for (const b of lookups.brands) {
     rows.push(put({ row_type: '#lookup:brand', key: b.slug, name: b.name_en, description: b.name_ar }));
   }
-  for (const f of lookups.facets) {
-    rows.push(
-      put({
-        row_type: '#lookup:facets',
-        key: f.slug,
-        name: f.name_en,
-        description: [f.name_ar, `kind=${f.kind}`].filter(Boolean).join(' · '),
-      })
-    );
-  }
   for (const h of lookups.hashtags) {
     rows.push(put({ row_type: '#lookup:hashtags', key: h.tag, name: h.name_ar }));
   }
@@ -834,7 +1555,6 @@ export function lookupsSheet(lookups: Lookups): string {
     ]);
   }
   for (const b of lookups.brands) rows.push(['brand', b.slug, b.name_en, b.name_ar, b.slug, '', '']);
-  for (const f of lookups.facets) rows.push(['facets', f.slug, f.name_en, f.name_ar, f.slug, '', `kind=${f.kind}`]);
   for (const h of lookups.hashtags) rows.push(['hashtags', h.tag, h.tag, h.name_ar, '', '', '']);
   return toCsv(rows);
 }
@@ -848,8 +1568,8 @@ export function lookupsReadme(lookups: Lookups): string {
   return [
     'القيم المتاحة لأعمدة التصنيف',
     '--------------------------',
-    'الأقسام والعلامات والفلاتر تُقرأ من قاعدة البيانات لحظة تنزيل هذا الملف. أي قسم أو',
-    'علامة أو فلتر أو هاشتاق تضيفه من صفحة «التصنيفات» في الإدارة يظهر هنا في التنزيل التالي.',
+    'الأقسام والعلامات تُقرأ من قاعدة البيانات لحظة تنزيل هذا الملف. أي قسم أو علامة أو',
+    'هاشتاق تضيفه من صفحة «التصنيفات» في الإدارة يظهر هنا في التنزيل التالي.',
     '',
     'القيمة المكتوبة أدناه هي الـ slug: يُقبل الاسم الإنجليزي أو العربي أيضًا، لكن أكثر من قسم',
     'أو علامة قد يحملان الاسم نفسه — وعندها يُرفض السطر ويُطلب منك الـ slug، لذا فهو الأضمن.',
@@ -861,55 +1581,89 @@ export function lookupsReadme(lookups: Lookups): string {
     '',
     block('brand — العلامة التجارية', lookups.brands.map((b) => lookupLine(b.slug, `${b.name_en}${b.name_ar ? ` / ${b.name_ar}` : ''}`, ''))),
     '',
-    block('facets — الفلاتر (افصل بين أكثر من فلتر بـ |)', lookups.facets.map((f) => lookupLine(f.slug, f.name_ar || f.name_en, `النوع: ${f.kind}`))),
-    '',
     block('hashtags — الهاشتاقات (افصل بـ | — يمكن كتابة وسم جديد وسيُضاف إلى القائمة)', lookups.hashtags.map((h) => lookupLine(h.tag, h.name_ar, ''))),
     '',
     'الملف lookups.csv داخل الـ ZIP يحمل القوائم نفسها كجدول يمكن فرزه في Excel.',
   ].join('\n');
 }
 
-/** The README that ships inside the ZIP. */
+/**
+ * The README that ships inside the ZIP — the only documentation most admins
+ * will ever read, so it names every row type, every column that row type
+ * uses, and the exact values each enum accepts. Nothing here is generic: the
+ * spec list, the example and the title all come from the chosen product type.
+ */
 export function readmeFor(shape: TemplateShape, lookups?: Lookups): string {
+  const def = productType(shape.type);
   const specList = shape.specFields
-    .map((f) => `  ${SPEC_PREFIX}${f.id}${f.unit ? ` (${f.unit})` : ''} — ${f.label_ar} / ${f.label_en}`)
+    .map((f) => {
+      const suffix = f.unit ? ` (${f.unit})` : '';
+      const values = f.options?.length ? `  ← ${f.options.join(' / ')}` : f.type === 'number' ? '  ← رقم' : '';
+      return `  ${SPEC_PREFIX}${f.id}${suffix} — ${f.label_ar} / ${f.label_en}${values}`;
+    })
     .join('\n');
-  return `LEVONIS — قالب استيراد المنتجات (${FAMILIES[shape.family].label_ar} / ${FAMILIES[shape.family].label_en})
+
+  const rowType = (name: string, ar: string, cols: string) => `  ${name.padEnd(10)} ${ar}\n${' '.repeat(13)}الأعمدة: ${cols}`;
+
+  return `LEVONIS — قالب استيراد المنتجات
+النوع: ${def.label_ar} / ${def.label_en}
+${def.hint_ar}
 
 كيف يعمل الملف
 --------------
-كل منتج يمتد على عدة أسطر، والعمود الأول row_type يحدد نوع السطر:
+كل منتج يمتد على عدة أسطر، والعمود الأول row_type يحدد نوع السطر. تُربط الأسطر
+بالمنتج عبر العمود key — وهو SKU المنتج أو الـ slug — وتُكرَّر نفس القيمة في كل
+أسطر المنتج، فيمكن فرز الملف أو تصفيته في Excel بلا أن ينكسر.
 
-  product   المنتج نفسه (سطر واحد لكل منتج)
-  option    قيمة واحدة من مجموعة خيارات
-  color     لون واحد، مع روابطه بالخيارات
-  image     صورة واحدة
-
-تُربط الأسطر بالمنتج عبر العمود key — وهو SKU المنتج أو الـ slug.
-كرّر نفس القيمة في كل أسطر المنتج.
+أنواع الأسطر
+------------
+${[
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, payment_options, how_to_use, usage_url, spec.*'),
+    rowType('option', 'قيمة واحدة من مجموعة خيارات', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
+    rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
+    rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
+    rowType('image', 'صورة واحدة في المعرض', 'image, alt, primary, links (color:Name أو option:Group:Value)'),
+    rowType('transport', 'طريقة شحن للطلب المسبق وعمولتها', `value (${TRANSPORT_METHODS.join(' / ')}), price_iqd (فارغ = العمولة الافتراضية), active`),
+    rowType('spec', 'سطر مواصفة داخل مجموعة مواصفات', 'group (عنوان المجموعة), label (اسم المواصفة), value, unit'),
+    rowType('label', 'شارة تظهر على بطاقة المنتج', `kind (${LABEL_KEYS.join(' / ')} أو فارغ), value (النص), image (اسم الأيقونة), active`),
+    rowType('warranty', 'خطة ضمان', `value (العنوان), body (الشروط), duration_months, kind (${WARRANTY_KINDS.join(' / ')}), price_iqd (الرسم، 0 = مجاني), active`),
+    rowType('content', 'كتلة محتوى أسفل صفحة المنتج', `kind (${CONTENT_KINDS.join(' / ')}), body, value (التعليق), alt, url, image`),
+    rowType('guide', 'خطوة من دليل التركيب والاستخدام', `kind (${GUIDE_KINDS.join(' / ')}), value (العنوان), body, image (حتى ٦ مفصولة بـ |), url (فيديو), links (رابط المستند)`),
+  ].join('\n')}
 
 قواعد مهمة
 ----------
 * الإدخال بالإنجليزية فقط. الترجمة إلى العربية والكردية تتم محليًا على الخادم
   بعد الاستيراد، بلا أي ذكاء اصطناعي وبلا أي اتصال خارجي.
 * الأسعار أرقام صحيحة بالدينار. الترتيب المطلوب: PRO ≤ PRIME ≤ الاعتيادي،
-  ولا يجوز أن يساوي سعر البيع التكلفة.
+  ولا يجوز أن يساوي سعر البيع التكلفة. سعر الخيار أو اللون يستبدل السعر
+  الأساسي ولا يُضاف إليه؛ خلية فارغة تعني «يرث السعر الأساسي».
+* الحالة (status) واحدة من: ${STATUSES.join(' / ')} — و أنواع البيع من:
+  ${SALE_TYPES.join(' / ')} — و مصدر المخزون من: ${INVENTORY_MODES.join(' / ')}.
+  أي قيمة أخرى تُرفض عند المعاينة مع رقم السطر وقائمة القيم المقبولة.
 * روابط اللون تُكتب Group:Value مفصولة بـ | — داخل المجموعة «أو»، وبين
   المجموعات «و». لون بلا روابط يظهر مع كل الخيارات.
+* سطر variant يصف توليفة مخزون واحدة، ويجب أن يذكر خيارات وألوانًا موجودة
+  في نفس الملف. لا تكتب توليفتين بنفس الاختيار.
 * صورة رئيسية واحدة فقط لكل منتج. إن لم تحدد واحدة تُعتمد الأولى.
 * عمود image إمّا اسم ملف داخل مجلد images/ في هذا الـ ZIP، أو رابط مباشر
   إلى ملف صورة. لا يُقرأ من صفحات المنتجات إطلاقًا.
+* نوع السطر الذي لا يظهر في الملف إطلاقًا يُبقي ما هو محفوظ كما هو. مثلًا:
+  ملف بلا أي سطر warranty لا يمس خطط الضمان المخزّنة، بينما ملف صُدِّر من
+  المنتج يحمل أسطره كلها — فحذف سطر منه يعني حذفه فعلًا.
 * المعاينة لا تكتب أي شيء في قاعدة البيانات. الكتابة تحدث فقط بعد التأكيد،
   وإعادة التأكيد بنفس import_id لا تكرر شيئًا.
+* الأسطر التي تبدأ بـ # (مثل #labels و #lookup:) يتجاهلها المستورد.
+* احذف أسطر المثال (المفتاح EXAMPLE-…) قبل الاستيراد، وإلا أُنشئ منتج بهذا الاسم.
 
-الأعمدة الخاصة بهذا القسم
--------------------------
-${specList || '  (لا توجد حقول مواصفات لهذا القسم)'}
+أعمدة المواصفات الخاصة بهذا النوع
+--------------------------------
+${specList || '  (لا توجد حقول مواصفات لهذا النوع)'}
 
 ${lookups ? `${lookupsReadme(lookups)}\n\n` : ''}الملفات
 -------
   data.csv     البيانات (UTF-8، مفصولة بفواصل)
-  lookups.csv  القيم المتاحة للأقسام والعلامات والفلاتر والهاشتاقات
+  lookups.csv  القيم المتاحة للأقسام والعلامات والهاشتاقات
   images/      ضع هنا الصور المذكورة في أعمدة image
   README.txt   هذا الملف
 `;

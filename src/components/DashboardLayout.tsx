@@ -439,10 +439,22 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
         </header>
 
         {/* Scrollable content. min-w-0/min-h-0 stop wide tables and long
-            columns from forcing horizontal page scroll or clipping. */}
+            columns from forcing horizontal page scroll or clipping.
+
+            THE BOTTOM PADDING IS PUBLISHED as --admin-main-pb. A sticky
+            footer inside a screen (the product form's save bar) can only
+            travel to the bottom of ITS OWN box, which this padding holds
+            short of the glass — so a screen that wants a bar on the bottom
+            edge cancels exactly this much, and cannot drift out of sync with
+            it by hard-coding a number. */}
         <main
           className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-3 sm:px-5 xl:px-8 py-4 sm:py-6 custom-scrollbar relative"
-          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          style={
+            {
+              '--admin-main-pb': 'max(1rem, env(safe-area-inset-bottom))',
+              paddingBottom: 'var(--admin-main-pb)',
+            } as React.CSSProperties
+          }
         >
           {children}
         </main>

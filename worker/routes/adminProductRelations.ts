@@ -269,7 +269,7 @@ export async function planRelationsWrite(
         variants: number;
         images: number;
         primary_image: string | null;
-        facets: number;
+        facets: number | 'preserved';
         cost_written: boolean;
       };
     }
@@ -455,9 +455,16 @@ export async function planRelationsWrite(
   }
 
   // ---- facets ------------------------------------------------------------
-  const facetIds = (Array.isArray(body.facet_ids) ? body.facet_ids : []).filter(
-    (x): x is string => typeof x === 'string'
-  );
+  //
+  // ABSENT MEANS PRESERVE, not "clear". The product form no longer carries a
+  // filters picker (the owner's «احذف الفلاتر هي تابعه او نفسها القسم
+  // الفرعي»), so every save from the browser omits `facet_ids` — and a writer
+  // that read an omitted key as an empty list would delete a product's stored
+  // filters the first time anyone edited its price. An explicit array still
+  // replaces the set, which is what the importer and the API contract need.
+  const facetIds = Array.isArray(body.facet_ids)
+    ? body.facet_ids.filter((x): x is string => typeof x === 'string')
+    : null;
 
   // ---- deletions that would strand reserved stock ------------------------
   const keptValues = valueIds;
@@ -653,13 +660,15 @@ export async function planRelationsWrite(
     );
   }
 
-  stmts.push(db.prepare('DELETE FROM product_facets WHERE product_id = ?').bind(productId));
-  for (const f of facetIds) {
-    stmts.push(
-      db
-        .prepare('INSERT OR IGNORE INTO product_facets (product_id, facet_id) VALUES (?, ?)')
-        .bind(productId, f)
-    );
+  if (facetIds !== null) {
+    stmts.push(db.prepare('DELETE FROM product_facets WHERE product_id = ?').bind(productId));
+    for (const f of facetIds) {
+      stmts.push(
+        db
+          .prepare('INSERT OR IGNORE INTO product_facets (product_id, facet_id) VALUES (?, ?)')
+          .bind(productId, f)
+      );
+    }
   }
 
   return {
@@ -675,7 +684,7 @@ export async function planRelationsWrite(
       variants: variantInputs.length,
       images: imageInputs.length,
       primary_image: imageInputs.find((i) => i.is_primary === 1)?.id ?? null,
-      facets: facetIds.length,
+      facets: facetIds === null ? 'preserved' : facetIds.length,
       cost_written: money,
     },
   };

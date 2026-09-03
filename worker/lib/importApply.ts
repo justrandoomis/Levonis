@@ -18,12 +18,21 @@
  * orders. It is also what makes the §10 round-trip hold — export, re-import,
  * same rows.
  *
- * WHAT THE SPREADSHEET DELIBERATELY CANNOT EXPRESS. Variant combinations
- * (`inventory_mode = VARIANT_COMBINATION`) are generated from options x colours
- * in the form, where the admin can see the grid. A CSV row cannot name one
- * unambiguously, so existing combinations are carried through untouched and a
- * NEW product may not claim that mode. Saying so is better than accepting the
- * column and quietly producing a product nothing can be sold from.
+ * VARIANT COMBINATIONS ARE EXPRESSIBLE, and by name. A `variant` row names
+ * its selection the way a human reads it — `Printer:A1|Plug:EU|color:Black` —
+ * and is matched to an existing combination by the ids those names resolve
+ * to, so a re-import updates the combination that already holds the stock
+ * instead of creating a second one beside it. A combination the file does not
+ * mention is dropped only when the file HAS variant rows; a file with none
+ * carries the stored combinations through untouched, which is what keeps an
+ * older export from wiping a grid it never knew about.
+ *
+ * ABSENT MEANS PRESERVE. Every child collection is nullable in the parsed
+ * product: null = "this sheet does not talk about warranty plans", an empty
+ * array = "this product has no warranty plans". Only the second one clears
+ * anything. That is what lets a narrow sheet (prices only) be re-imported
+ * without erasing the labels, specs, guide steps and content blocks somebody
+ * typed in the form.
  */
 
 import { normalizeHashtag } from './hashtags';
@@ -184,15 +193,6 @@ export function resolveProduct(
     (categoryId ? maps.familyOf.get(categoryId) : null) ??
     null;
 
-  // ---- facets ------------------------------------------------------------
-  const facetIds: string[] = [];
-  for (const f of p.facets) {
-    const id = maps.facets.get(normKey(f));
-    if (!id) issues.push(err(p.line, `facets: لا يوجد فلتر باسم "${f}"`));
-    else if (maps.ambiguous?.facets.has(normKey(f))) issues.push(err(p.line, ambiguousMessage('facets', f)));
-    else facetIds.push(id);
-  }
-
   // ---- option groups and values, ids reused where they exist -------------
   const groupIdByName = new Map(existing?.groups.map((g) => [normKey(g.name_en), g.id]) ?? []);
   const valueIdByName = new Map(
@@ -324,42 +324,108 @@ export function resolveProduct(
     issues.push(err(p.line, `inventory_mode: "${p.inventory_mode}" غير معروف`));
     mode = 'BASE';
   }
-  // Combinations are preserved, never invented: a new product asking for the
-  // mode has nothing to preserve, and a silent BASE fallback would sell stock
-  // the admin thinks is tracked per combination.
   const keptValueIds = new Set(groups.flatMap((g) => g.values.map((v) => v.id as string)));
   const keptColorIds = new Set(colors.map((col) => col.id));
-  const variants = (existing?.variants ?? [])
-    .map((v) => {
-      const sel = splitComboKey(v.combo_key);
-      const alive =
-        sel.option_value_ids.every((id) => keptValueIds.has(id)) &&
-        (!sel.color_id || keptColorIds.has(sel.color_id));
-      return alive
-        ? {
-            id: v.id,
-            option_value_ids: sel.option_value_ids,
-            color_id: sel.color_id,
-            sku: v.sku ?? '',
-            active: v.active === 1,
-            stock: v.stock,
-            low_stock_threshold: v.low_stock_threshold,
-            regular_price_iqd: v.regular_price_iqd,
-            prime_price_iqd: v.prime_price_iqd,
-            pro_price_iqd: v.pro_price_iqd,
-            cost_iqd: opts.money ? v.cost_iqd : null,
-          }
-        : null;
-    })
-    .filter((v): v is NonNullable<typeof v> => v !== null);
-  if (variants.length < (existing?.variants.length ?? 0)) {
-    issues.push(warn(p.line, 'حُذفت تركيبات مخزون كانت تشير إلى خيار أو لون لم يعد موجودًا في الملف'));
+
+  // A stored combination, keyed by the ids it selects, so a sheet row that
+  // names the same selection lands on the SAME row — with its stock and its
+  // reserved units — instead of creating a twin beside it.
+  const comboSig = (valueIds: string[], colorId: string | null) =>
+    [...valueIds].sort().join('|') + `#${colorId ?? ''}`;
+  const existingByCombo = new Map<string, ExistingVariant>();
+  for (const v of existing?.variants ?? []) {
+    const sel = splitComboKey(v.combo_key);
+    existingByCombo.set(comboSig(sel.option_value_ids, sel.color_id), v);
+  }
+
+  interface VariantOut {
+    id: string;
+    option_value_ids: string[];
+    color_id: string | null;
+    sku: string;
+    active: boolean;
+    stock: number | null;
+    low_stock_threshold: number | null;
+    regular_price_iqd: number | null;
+    prime_price_iqd: number | null;
+    pro_price_iqd: number | null;
+    cost_iqd: number | null;
+  }
+
+  let variants: VariantOut[];
+  if (p.variants.length > 0) {
+    // The file talks about combinations, so the file decides which exist.
+    variants = [];
+    for (const v of p.variants) {
+      const valueIds: string[] = [];
+      let bad = false;
+      for (const l of v.selection) {
+        const vid = valueIdByPair.get(pairKey(l.group, l.value));
+        if (!vid) {
+          // parseImport already reported the missing option row by name; this
+          // pass only refuses to build a combination out of nothing.
+          bad = true;
+          continue;
+        }
+        valueIds.push(vid);
+      }
+      const colorId = v.color ? (colorIdByCsvName.get(normKey(v.color)) ?? null) : null;
+      if (v.color && !colorId) bad = true;
+      if (bad) continue;
+      const prev = existingByCombo.get(comboSig(valueIds, colorId));
+      variants.push({
+        id: prev?.id ?? opts.newId('pv'),
+        option_value_ids: valueIds,
+        color_id: colorId,
+        sku: v.sku_part,
+        active: v.active,
+        stock: v.stock,
+        low_stock_threshold: v.low_stock_threshold,
+        regular_price_iqd: v.price_iqd,
+        prime_price_iqd: v.prime_price_iqd,
+        pro_price_iqd: v.pro_price_iqd,
+        cost_iqd: opts.money ? v.cost_iqd : (prev?.cost_iqd ?? null),
+      });
+    }
+    const dropped = (existing?.variants.length ?? 0) - variants.filter((v) => existingByCombo.has(comboSig(v.option_value_ids, v.color_id))).length;
+    if (dropped > 0) {
+      issues.push(warn(p.line, `سيُحذف ${dropped} من تركيبات المخزون لأن الملف لم يذكرها`));
+    }
+  } else {
+    // The file says nothing about combinations, so the stored ones are carried
+    // through — minus any that pointed at an option or colour the file removed.
+    variants = (existing?.variants ?? [])
+      .map((v) => {
+        const sel = splitComboKey(v.combo_key);
+        const alive =
+          sel.option_value_ids.every((id) => keptValueIds.has(id)) &&
+          (!sel.color_id || keptColorIds.has(sel.color_id));
+        return alive
+          ? {
+              id: v.id,
+              option_value_ids: sel.option_value_ids,
+              color_id: sel.color_id,
+              sku: v.sku ?? '',
+              active: v.active === 1,
+              stock: v.stock,
+              low_stock_threshold: v.low_stock_threshold,
+              regular_price_iqd: v.regular_price_iqd,
+              prime_price_iqd: v.prime_price_iqd,
+              pro_price_iqd: v.pro_price_iqd,
+              cost_iqd: opts.money ? v.cost_iqd : null,
+            }
+          : null;
+      })
+      .filter((v): v is VariantOut => v !== null);
+    if (variants.length < (existing?.variants.length ?? 0)) {
+      issues.push(warn(p.line, 'حُذفت تركيبات مخزون كانت تشير إلى خيار أو لون لم يعد موجودًا في الملف'));
+    }
   }
   if (mode === 'VARIANT_COMBINATION' && variants.length === 0) {
     issues.push(
       err(
         p.line,
-        'inventory_mode=VARIANT_COMBINATION لا يمكن إنشاؤه من ملف — ركّب التوليفات من نموذج المنتج ثم صدّر'
+        'inventory_mode=VARIANT_COMBINATION بلا توليفات — أضف أسطر variant أو غيّر مصدر المخزون'
       )
     );
   }
@@ -384,10 +450,172 @@ export function resolveProduct(
     if (!declared.has(k)) specFields[k] = v;
   }
   for (const [k, v] of Object.entries(p.spec_fields)) specFields[k] = v;
+  // ---- the collections the child rows own ---------------------------------
+  //
+  // Each one is written ONLY when the file carried rows of that type; null
+  // means "the sheet is silent", and silence preserves. Ids are reused by the
+  // natural key a human would use (a plan's title, a spec's group+label) so a
+  // re-import edits the row that exists instead of replacing it, which is what
+  // keeps translation state and ordering stable.
+  const idFor = (
+    stored: Array<Record<string, unknown>> | undefined,
+    match: (row: Record<string, unknown>) => boolean,
+    prefix: string
+  ): string => {
+    const hit = (stored ?? []).find(match);
+    return typeof hit?.id === 'string' && hit.id ? hit.id : opts.newId(prefix);
+  };
+  const storedGroups = (existing?.doc.spec_groups as Array<Record<string, unknown>> | undefined) ?? [];
+  const storedLabels = (existing?.doc.labels as Array<Record<string, unknown>> | undefined) ?? [];
+  const storedPlans = (existing?.doc.warranty_plans as Array<Record<string, unknown>> | undefined) ?? [];
+  const storedBlocks = (existing?.doc.content_blocks as Array<Record<string, unknown>> | undefined) ?? [];
+  const eq = (a: unknown, b: string) => typeof a === 'string' && normKey(a) === normKey(b);
+
+  let specGroups: unknown = existing?.doc.spec_groups ?? [];
+  if (p.specs !== null) {
+    // Rows are grouped by their `group` cell, in first-appearance order; an
+    // empty group cell collects into one untitled group rather than one group
+    // per row, which is what a spreadsheet user expects.
+    const order: string[] = [];
+    const byGroup = new Map<string, typeof p.specs>();
+    for (const row of p.specs) {
+      const k = normKey(row.group);
+      if (!byGroup.has(k)) {
+        byGroup.set(k, []);
+        order.push(k);
+      }
+      byGroup.get(k)!.push(row);
+    }
+    specGroups = order.map((k, gi) => {
+      const rows = byGroup.get(k)!;
+      const title = rows[0].group;
+      const storedGroup = storedGroups.find((g) => eq(g.title_en, title) || eq(g.title_ar, title));
+      const storedRows = (storedGroup?.rows as Array<Record<string, unknown>> | undefined) ?? [];
+      return {
+        id: typeof storedGroup?.id === 'string' && storedGroup.id ? storedGroup.id : opts.newId('sg'),
+        title_en: title,
+        title_ar: title,
+        title_ckb: title,
+        order: gi,
+        rows: rows.map((row, ri) => ({
+          id: idFor(storedRows, (x) => eq(x.label_en, row.label), 'sr'),
+          label_en: row.label,
+          label_ar: row.label,
+          label_ckb: row.label,
+          value_en: row.value,
+          value_ar: row.value,
+          value_ckb: row.value,
+          unit: row.unit,
+          order: ri,
+        })),
+      };
+    });
+  }
+
+  let labels: unknown = existing?.doc.labels ?? [];
+  if (p.labels !== null) {
+    labels = p.labels.map((l, i) => ({
+      id: idFor(storedLabels, (x) => (l.key ? x.key === l.key : eq(x.text_en, l.text)), 'lbl'),
+      key: l.key,
+      text_en: l.text,
+      text_ar: l.text,
+      text_ckb: l.text,
+      icon: l.icon,
+      order: i,
+      visible: l.visible,
+    }));
+  }
+
+  let warrantyPlans: unknown = existing?.doc.warranty_plans ?? [];
+  if (p.warranty_plans !== null) {
+    warrantyPlans = p.warranty_plans.map((w, i) => ({
+      id: idFor(storedPlans, (x) => eq(x.title_en, w.title), 'wp'),
+      title_en: w.title,
+      title_ar: w.title,
+      title_ckb: w.title,
+      terms_en: w.terms,
+      terms_ar: w.terms,
+      terms_ckb: w.terms,
+      duration_months: w.duration_months,
+      duration_kind: w.duration_kind,
+      fee_iqd: w.fee_iqd ?? 0,
+      order: i,
+      active: w.active,
+    }));
+  }
+
+  let contentBlocks: unknown = existing?.doc.content_blocks ?? [];
+  if (p.content_blocks !== null) {
+    contentBlocks = p.content_blocks.map((b, i) => {
+      const url = b.image ? (maps.images.get(b.image) ?? b.url) : b.url;
+      if (b.image && !maps.images.has(b.image)) {
+        issues.push(err(b.line, `image: تعذّر إيجاد "${b.image}"`));
+      }
+      return {
+        id: idFor(storedBlocks, (x) => x.kind === b.kind && eq(x.body_en, b.body), 'cb'),
+        kind: b.kind,
+        order: i,
+        body_en: b.body,
+        body_ar: b.body,
+        body_ckb: b.body,
+        caption_en: b.caption,
+        caption_ar: b.caption,
+        caption_ckb: b.caption,
+        alt_en: b.alt,
+        alt_ar: b.alt,
+        alt_ckb: b.alt,
+        url,
+        media_key: '',
+      };
+    });
+  }
+
+  let usageGuide: unknown =
+    existing?.doc.usage_guide ?? { official_url: '', steps: [] };
+  if (p.guide_steps !== null || p.usage_url !== null) {
+    const storedGuide = (existing?.doc.usage_guide as { official_url?: string; steps?: unknown[] } | undefined) ?? {};
+    const storedSteps = (storedGuide.steps as Array<Record<string, unknown>> | undefined) ?? [];
+    usageGuide = {
+      official_url: p.usage_url !== null ? p.usage_url : (storedGuide.official_url ?? ''),
+      steps:
+        p.guide_steps === null
+          ? storedSteps
+          : p.guide_steps.map((step, i) => {
+              const urls: string[] = [];
+              for (const cell of step.images) {
+                const resolved = maps.images.get(cell);
+                if (!resolved) issues.push(err(step.line, `image: تعذّر إيجاد "${cell}"`));
+                else urls.push(resolved);
+              }
+              return {
+                id: idFor(storedSteps, (x) => eq(x.title, step.title), 'gs'),
+                kind: step.kind,
+                title: step.title,
+                body: step.body,
+                images: urls,
+                video_url: step.video_url,
+                link_url: step.link_url,
+                order: i,
+              };
+            }),
+    };
+  }
+
+  let transports: unknown = existing?.doc.preorder_transports ?? [];
+  if (p.transports !== null) {
+    transports = p.transports.map((tr) => ({
+      method: tr.method,
+      commission_iqd: tr.commission_iqd,
+      active: tr.active,
+    }));
+  }
+
   const doc: Record<string, unknown> = {
     ...(existing?.doc ?? {}),
     id: productId,
-    sku: p.key,
+    // The SKU column wins when the sheet carries one; otherwise the row key is
+    // the SKU, which is what it was before the column existed.
+    sku: p.sku || p.key,
     name_en: p.name,
     // §3: the NAME is never translated. The Arabic and Kurdish slots carry the
     // English text verbatim so every interface reads the same string.
@@ -402,8 +630,21 @@ export function resolveProduct(
     product_cost_iqd: opts.money ? p.cost_iqd : ((existing?.doc.product_cost_iqd as number | null) ?? null),
     stock: p.stock,
     low_stock_threshold: p.low_stock_threshold,
+    direct_surcharge_iqd: p.direct_surcharge_iqd,
     sale_types: saleTypes,
     selling_type: saleTypes[0],
+    is_featured: p.is_featured === null ? (existing?.doc.is_featured ?? false) : p.is_featured,
+    payment_options:
+      p.payment_options === null
+        ? ((existing?.doc.payment_options as string[] | undefined) ?? [])
+        : p.payment_options,
+    how_to_use: p.how_to_use === null ? ((existing?.doc.how_to_use as string | undefined) ?? '') : p.how_to_use,
+    preorder_transports: transports,
+    spec_groups: specGroups,
+    labels,
+    warranty_plans: warrantyPlans,
+    content_blocks: contentBlocks,
+    usage_guide: usageGuide,
     brand_id: brandId,
     category_id: categoryId,
     sub_category_id: subCategoryId,
@@ -418,13 +659,17 @@ export function resolveProduct(
         : p.hashtags.map(normalizeHashtag).filter(Boolean),
     // The legacy JSON mirrors carry the SAME ids as the relational rows, so a
     // reader that has not moved to the relational tables sees one structure.
+    // The v2 shape names the field `regular_price_iqd` (worker/lib/pricing.ts
+    // PriceFields). Writing `price_iqd` here — as this mirror used to — meant
+    // every mirrored option and colour price read back as null, so any reader
+    // still on the JSON columns showed the base price for every option.
     options: groups.flatMap((g) =>
       g.values.map((v) => ({
         id: v.id,
         name_en: `${g.name_en}: ${v.name_en as string}`,
         name_ar: `${g.name_en}: ${v.name_en as string}`,
         image: v.image,
-        price_iqd: v.regular_price_iqd,
+        regular_price_iqd: v.regular_price_iqd,
         prime_price_iqd: v.prime_price_iqd,
         pro_price_iqd: v.pro_price_iqd,
         cost_iqd: v.cost_iqd,
@@ -438,7 +683,7 @@ export function resolveProduct(
       hex: col.hex,
       image: col.image,
       option_id: col.option_value_ids.length === 1 ? col.option_value_ids[0] : null,
-      price_iqd: col.regular_price_iqd,
+      regular_price_iqd: col.regular_price_iqd,
       prime_price_iqd: col.prime_price_iqd,
       pro_price_iqd: col.pro_price_iqd,
       cost_iqd: col.cost_iqd,
@@ -459,7 +704,9 @@ export function resolveProduct(
     colors,
     variants,
     images,
-    facet_ids: facetIds,
+    // No `facet_ids`: the sheet has no filters column any more, and an absent
+    // key means PRESERVE in planRelationsWrite — a re-import must not clear
+    // filters an admin set before the picker was removed.
   };
 
   return {

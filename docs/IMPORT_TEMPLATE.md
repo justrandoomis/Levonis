@@ -1,0 +1,176 @@
+# قالب الاستيراد / التصدير — Import & export template
+
+> «قم بتطوير وتحديث قالب الاستيراد / التصدير لجعل هناك دقه باضافه المعلومات،
+> ويشمل كل شي كل الحقول في اضافه المنتج، ويكون حسب نوع المنتج اذا طابعه او
+> ملحقات او فلمنت او اكسسوار»
+
+هذه الوثيقة تصف الشكل الذي يخرج من `/api/admin/import/template` ويدخل إلى
+`/api/admin/import/preview` و`/api/admin/import/confirm`.
+
+المصدر: `worker/lib/importCsv.ts` (الشكل والتحقق)، `worker/lib/importApply.ts`
+(التحويل إلى مستند المنتج)، `worker/lib/templateFamilies.ts` (الأنواع والحقول)،
+`worker/routes/adminImport.ts` (النقاط)، `src/components/adminProducts/ImportPanel.tsx`
+(الواجهة). الاختبارات: `tests/importCsv.test.ts`، `scripts/e2e-import.mjs`،
+`scripts/e2e-product-template.mjs`.
+
+---
+
+## ١. أربعة أنواع، أربعة قوالب
+
+| النوع | `type=` | العائلة | ما يدخل فيه |
+|---|---|---|---|
+| طابعة | `printer` | devices | الطابعات ثلاثية الأبعاد بكل أنواعها — FDM و Resin |
+| ملحقات وقطع | `parts` | devices | ما يُركّب على الطابعة أو يُبدَّل فيها: نوزلات، شاشات، ألواح، إلكترونيات، قطع هاردوير |
+| فلمنت ومواد | `filament` | materials | كل ما يُطبع به أو يُستهلك: فلمنت، راتنج، مواد ليزر وقص |
+| اكسسوار | `accessory` | materials | ما يُباع بجانب الطابعة ولا يُركَّب فيها: أدوات، حوامل، أطقم مجسمات، CyberBrick |
+
+النوع يحدد **أعمدة المواصفات** (`spec.*`) وحدها؛ باقي الأعمدة واحدة في كل
+القوالب. النقطة من التقسيم هي ما **يحذفه**: قالب الفلمنت لا يسأل عن حجم
+الطباعة، وقالب القطع لا يسأل عن حرارة النوزل.
+
+**النوع نفسه يقود نموذج المنتج.** `fieldsFor(family, slugs)` — التي يخدمها
+`/api/admin/taxonomy/templates` للنموذج — تمر عبر `groupsForType`، فحقل
+المواصفات موجود في النموذج وفي الملف معًا أو غائب عنهما معًا. يحرس هذا اختبار
+«the form's spec groups and the template's spec columns are the same list».
+
+القسم يُحلّ إلى نوعه بالسير في فرعه من الورقة إلى الجذر
+(`productTypeForSection`)، فملحق تحت «الطابعات» نوعه `parts` لا `printer`.
+قسم لم يُربط بنوع يقع على نوع عائلته الرئيسي — تخمين معلن لا قالب فارغ.
+
+**قيمة مواصفة محفوظة تحت حقل لا يعلنه النوع تبقى كما هي** عند الاستيراد
+(`importApply` يدمج `spec_fields` ولا يستبدلها)، فالتضييق لا يتلف شيئًا.
+
+### كيف يُنزَّل
+
+```
+GET /api/admin/import/template?type=filament&format=csv     ← بالنوع وحده
+GET /api/admin/import/template?category=<section id>        ← بالقسم، يُحلّ إلى نوعه
+GET /api/admin/import/types                                 ← الأنواع الأربعة للواجهة
+GET /api/admin/import/export?category=<section id>          ← تصدير منتجات القسم
+```
+
+`format=zip` يضيف `README.txt` و`lookups.csv` و`labels.csv` ومجلد `images/`.
+نوع غير معروف يُرفض بـ 400 يسمي الأنواع الأربعة، لا يقع على قالب افتراضي.
+
+---
+
+## ٢. أحد عشر نوع سطر — وكل حقل من النموذج له بيت
+
+العمود الأول `row_type` يحدد نوع السطر، والعمود `key` يربطه بمنتجه (SKU أو
+slug، مكرر في كل أسطر المنتج).
+
+| `row_type` | يحمل | الأعمدة |
+|---|---|---|
+| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, payment_options, how_to_use, usage_url, spec.*` |
+| `option` | قيمة خيار | `group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd` |
+| `color` | لون وروابطه | `value, hex, sku_part, image, links, active, stock, …الأسعار` |
+| `variant` | توليفة مخزون | `links (Group:Value\|Group:Value\|color:Name), sku_part, active, stock, …الأسعار` |
+| `image` | صورة معرض | `image, alt, primary, links` |
+| `transport` | شحن الطلب المسبق | `value (air/sea/land), price_iqd (فارغ = العمولة الافتراضية), active` |
+| `spec` | سطر مواصفة | `group (عنوان المجموعة), label, value, unit` |
+| `label` | شارة | `kind (المفتاح المضبوط أو فارغ), value (النص), image (الأيقونة), active` |
+| `warranty` | خطة ضمان | `value (العنوان), body (الشروط), duration_months, kind (total/extension), price_iqd (الرسم), active` |
+| `content` | كتلة محتوى | `kind (text/image/video_embed), body, value (تعليق), alt, url, image` |
+| `guide` | خطوة دليل | `kind (setup/usage), value (العنوان), body, image (حتى ٦ بـ \|), url (فيديو), links (رابط المستند)` |
+
+### الخريطة من أقسام النموذج
+
+| قسم النموذج | يسافر في |
+|---|---|
+| ١ التصنيف | `brand, category, sub_category, hashtags` |
+| ٢ المعلومات الأساسية | `name, description, status, sku, display_order, is_featured` |
+| ٣ الأسعار والعضويات | `price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd` |
+| ٤ البيع والمخزون | `sale_types, inventory_mode, stock, low_stock_threshold, payment_options` + أسطر `transport` |
+| ٥ الخيارات والألوان | أسطر `option` و`color` و`variant` |
+| ٦ الوسائط | أسطر `image` |
+| ٧ المواصفات والاستخدام | أعمدة `spec.*` + أسطر `spec` + `how_to_use` + `usage_url` + أسطر `guide` |
+| ٨ الشارات والضمان والمحتوى | أسطر `label` و`warranty` و`content` |
+
+`id` و`slug` و`doc_version` و`content_rev` و`template_family` و`translation_meta`
+مشتقة ولا تُكتب من الملف. يحرس الخريطةَ اختبارُ «every field of the product
+form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة النموذج نفسها —
+فحقل جديد في النموذج يُسقط الاختبار حتى يجد بيتًا في الملف.
+
+**لا يوجد عمود `facets`.** حُذف مُنتقي الفلاتر من نموذج المنتج، وعمودٌ لحقل لا
+يظهر في المتصفح يعني قيمة لا يستطيع أحد تصحيحها بعد كتابتها. جدول `facets`
+وتبويب «التصنيفات» باقيان، و`PUT /api/admin/products/:id/relations` ما زال
+يقبل `facet_ids` صراحةً.
+
+---
+
+## ٣. الغائب يُحفَظ، والحاضر الفارغ يُطبَّق
+
+كل مجموعة أبناء لها حالتان مختلفتان:
+
+* **الملف لا يحمل أي سطر من هذا النوع** → المحفوظ يبقى كما هو. ملف أسعار فقط
+  لا يمس الشارات ولا خطط الضمان ولا خطوات الدليل.
+* **الملف يحمل أسطرًا (ولو صفرًا بعد حذفها)** → الملف هو المرجع، والمحذوف
+  يُحذف. ملفٌ صُدِّر من المنتج يحمل أسطره كلها، فحذف سطر منه حذفٌ مقصود.
+
+ينطبق الأمر نفسه على أعمدة المنتج القابلة للغياب: `hashtags` و`payment_options`
+و`how_to_use` و`usage_url` و`is_featured`. عمود موجود وخليته فارغة = مسح مقصود.
+
+التوليفات (`variant`) تتبع القاعدة نفسها: ملف بلا أسطر `variant` يمرر المحفوظ
+كما هو (ناقصًا ما صار يشير إلى خيار أو لون حذفه الملف)، وملف يحمل أسطرًا يقرر
+أي التوليفات موجودة. سطر يسمّي اختيارًا مطابقًا لتوليفة محفوظة **يقع عليها
+بمعرّفها**، فلا يُعاد تصفير مخزونها ولا وحداتها المحجوزة.
+
+---
+
+## ٤. الدقة: ما يُرفض ولماذا
+
+المعاينة لا تكتب شيئًا، وترفض بالسطر والقيمة وقائمة المقبول:
+
+* `status` من `draft / active / hidden`، و`sale_types` من
+  `direct_sale / pre_order / bundle`، و`inventory_mode` من
+  `BASE / OPTION / COLOR / VARIANT_COMBINATION`.
+* حقل مواصفة من نوع `select` لا يقبل إلا إحدى قيمه المعلنة — والرسالة تسردها.
+* حقل `number` لا يقبل إلا رقمًا، وحقل `hex` إلا `#RGB` أو `#RRGGBB`.
+* `kind` في `warranty` و`content` و`guide` و`label` كلٌّ من قائمته.
+* `duration_months` مطلوب بين ١ و٢٤٠ لكل خطة ضمان.
+* سطر `transport` على منتج لا يبيع بالطلب المسبق يُرفض.
+* توليفة تسمي خيارًا أو لونًا ليس في الملف تُرفض، وتوليفتان بنفس الاختيار تُرفضان.
+* خطتا ضمان بنفس العنوان، أو مواصفتان بنفس الاسم داخل مجموعة واحدة، تُرفضان.
+* سلّم الأسعار: `PRO ≤ PRIME ≤ الاعتيادي`، ولا يساوي سعر البيع التكلفة.
+* `row_type` غير معروف يُرفض بقائمة الأنواع الأحد عشر.
+* عمود لا يعرفه القالب يُبلَّغ عنه ولا يُخمَّن.
+
+---
+
+## ٥. المثال والقيم المتاحة
+
+كل قالب فارغ يحمل مثالًا عاملًا **بشكل نوعه** ومفتاحه `EXAMPLE-<TYPE>`، ويعرض
+كل نوع سطر مرة على الأقل. المثال أسطر بيانات عادية — يُحذف قبل الاستيراد، وإلا
+أُنشئ منتج بهذا الاسم؛ الـREADME يقول ذلك في سطر.
+
+بعد المثال يأتي بلوك `#lookup:` يحمل القيم المقبولة لأعمدة `category` و
+`sub_category` و`brand` و`hashtags` كما هي في قاعدة البيانات لحظة التنزيل،
+ويتجاهله المستورد بعلامته لا بموقعه. الـZIP يضيف `lookups.csv` كجدول يمكن
+فرزه في Excel.
+
+القيمة المُعلنة هي الـslug: يُقبل الاسم الإنجليزي أو العربي أيضًا، لكن اسمًا
+يحمله صفّان يُرفض ويُطلب الـslug بدله بدل أن يُخمَّن القسم.
+
+---
+
+## ٦. اللغة والصور
+
+الإدخال بالإنجليزية فقط. العربية والكردية تُولَّدان محليًا على الخادم بعد
+الاستيراد، بلا ذكاء اصطناعي وبلا اتصال خارجي، وما تعذّر ترجمته يعود في
+`translation_review_needed` ويُعرض بصدق.
+
+خلية `image` إمّا اسم ملف داخل `images/` في الـZIP، أو `/files/...` يخدمه
+المتجر أصلًا (وهو ما يكتبه التصدير، فتُعاد استخدام نفس النسخة في الدورة
+الكاملة)، أو رابط مباشر إلى ملف صورة يُتحقق منه بالبايتات السحرية. صفحة منتج
+تُرفض ولا تُقرأ.
+
+---
+
+## ٧. الدورة الكاملة
+
+`serializeProducts` و`parseImport` عكس بعضهما: تصدير منتج ثم استيراده يعيد
+الخيارات والألوان والروابط والتوليفات والصور والمواصفات والشارات وخطط الضمان
+وكتل المحتوى وخطوات الدليل والترتيب والمخزون والأسعار كما كانت. المعرّفات
+تُعاد لا تُولَّد: مجموعة بالاسم، قيمة بـ(المجموعة، الاسم)، لون بالاسم، صورة
+بالرابط، توليفة بمعرّفات ما تختاره، خطة ضمان بعنوانها، مواصفة بـ(المجموعة،
+الاسم) — لأن المخزون والوحدات المحجوزة تعيش على تلك الصفوف.

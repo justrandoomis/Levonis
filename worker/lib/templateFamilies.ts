@@ -16,6 +16,12 @@
  * seeded tree; a section an admin invents later simply gets its family's
  * common fields, which is an honest fallback rather than an empty form.
  *
+ * ON TOP OF THE FAMILIES SIT THE FOUR PRODUCT TYPES the owner works in —
+ * طابعة / ملحقات / فلمنت / اكسسوار (see PRODUCT_TYPES at the bottom). A type
+ * COMPOSES its groups from the family definitions, so there is still one
+ * definition of «مواصفات الجهاز»; what a type adds is the decision about
+ * which of those groups a human should be asked to fill in.
+ *
  * Field labels are Arabic-first with an English secondary, matching the rest
  * of the admin panel. VALUES are entered in English only (§3) and translated
  * locally afterwards.
@@ -278,22 +284,179 @@ export function isTemplateFamily(v: unknown): v is 'devices' | 'materials' {
   return v === 'devices' || v === 'materials';
 }
 
+// ------------------------------------------------------------ product types
+//
+// THE OWNER NAMES FOUR KINDS OF THING, and asked for the import/export
+// template to follow them: «ويكون حسب نوع المنتج اذا طابعه او ملحقات او فلمنت
+// او اكسسوار». The two families above are the storage-level split (a section
+// carries `template_family`); a PRODUCT TYPE is the split a human uses when
+// they sit down to type a product in.
+//
+// A type composes its spec groups from the family definitions rather than
+// re-declaring them, so a field added to «مواصفات الجهاز» reaches the printer
+// template with no second edit. Fields are DEDUPED BY ID across the composed
+// groups — the same id twice would mean the same CSV column twice, and the
+// second one would silently win on import.
+//
+// The point of the split is what it LEAVES OUT. A screw is not asked for a
+// nozzle temperature and a filament spool is not asked for a build volume,
+// which is the precision the owner asked for («لجعل هناك دقه باضافه
+// المعلومات»). Nothing is destroyed by the narrowing: a value a product
+// stored under a field its type does not declare is preserved on import
+// (worker/lib/importApply.ts merges spec fields, it never replaces them).
+
+export type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory';
+
+export interface ProductTypeDef {
+  id: ProductTypeId;
+  label_ar: string;
+  label_en: string;
+  /** The family a product of this type is filed under. */
+  family: 'devices' | 'materials';
+  /** One line explaining what belongs here, shown in the import panel. */
+  hint_ar: string;
+  /** Section slugs that mean "this type" when a template is picked by section. */
+  sectionSlugs: string[];
+  groups: TemplateGroup[];
+}
+
+/** What any physical, boxed thing has — the shared core of the two
+ *  non-machine types, so a bracket or a tool is asked ten sensible questions
+ *  instead of the thirty a printer or a filament spool needs. */
+const PHYSICAL_CORE: TemplateGroup = {
+  id: 'physical_core',
+  label_ar: 'بيانات المنتج',
+  label_en: 'Product details',
+  fields: [
+    t('material', 'الخامة', 'Material'),
+    t('color_name', 'اللون', 'Colour'),
+    t('color_hex', 'كود اللون', 'Colour HEX', 'hex'),
+    t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm' }),
+    t('weight', 'الوزن', 'Weight', 'text', { unit: 'kg' }),
+    t('quantity_per_pack', 'الكمية داخل العبوة', 'Quantity per pack', 'number'),
+    t('compatibility', 'التوافق', 'Compatibility'),
+    t('certifications', 'الشهادات', 'Certifications'),
+    t('storage', 'شروط التخزين', 'Storage'),
+    t('warranty', 'الضمان', 'Warranty', 'text', { unit: 'months' }),
+    t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline', {
+      hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
+    }),
+  ],
+};
+
+const g = (family: TemplateFamilyDef, slug: string): TemplateGroup[] => {
+  const found = family.sections[slug];
+  return found ? [found] : [];
+};
+
+export const PRODUCT_TYPES: ProductTypeDef[] = [
+  {
+    id: 'printer',
+    label_ar: 'طابعة',
+    label_en: 'Printer',
+    family: 'devices',
+    hint_ar: 'الطابعات ثلاثية الأبعاد بكل أنواعها — FDM و Resin.',
+    sectionSlugs: ['fdm-printers', 'resin-printers', 'printers'],
+    groups: [DEVICES.common, ...g(DEVICES, 'fdm-printers'), ...g(DEVICES, 'resin-printers')],
+  },
+  {
+    id: 'parts',
+    label_ar: 'ملحقات وقطع',
+    label_en: 'Parts & printer accessories',
+    family: 'devices',
+    hint_ar: 'ما يُركّب على الطابعة أو يُبدَّل فيها: نوزلات، شاشات، ألواح، إلكترونيات، قطع هاردوير.',
+    sectionSlugs: [
+      'printer-accessories',
+      'resin-printer-accessories',
+      'electronics',
+      'hardware-parts',
+      'parts',
+    ],
+    groups: [
+      ...g(DEVICES, 'printer-accessories'),
+      ...g(DEVICES, 'resin-printer-accessories'),
+      ...g(MATERIALS, 'electronics'),
+      ...g(MATERIALS, 'hardware-parts'),
+      PHYSICAL_CORE,
+    ],
+  },
+  {
+    id: 'filament',
+    label_ar: 'فلمنت ومواد',
+    label_en: 'Filament & materials',
+    family: 'materials',
+    hint_ar: 'كل ما يُطبع به أو يُستهلك: فلمنت، راتنج، مواد ليزر وقص.',
+    sectionSlugs: ['fdm-materials', 'resin-materials', 'materials', 'filament'],
+    groups: [MATERIALS.common, ...g(MATERIALS, 'fdm-materials'), ...g(MATERIALS, 'resin-materials')],
+  },
+  {
+    id: 'accessory',
+    label_ar: 'اكسسوار',
+    label_en: 'Accessory',
+    family: 'materials',
+    hint_ar: 'ما يُباع بجانب الطابعة ولا يُركَّب فيها: أدوات، حوامل، أطقم مجسمات، CyberBrick.',
+    sectionSlugs: ['accessories', 'model-kits', 'cyberbrick-rc'],
+    groups: [
+      ...g(MATERIALS, 'accessories'),
+      ...g(MATERIALS, 'model-kits'),
+      ...g(MATERIALS, 'cyberbrick-rc'),
+      PHYSICAL_CORE,
+    ],
+  },
+];
+
+const TYPE_BY_ID = new Map(PRODUCT_TYPES.map((p) => [p.id, p]));
+const TYPE_BY_SLUG = new Map<string, ProductTypeDef>();
+for (const p of PRODUCT_TYPES) for (const slug of p.sectionSlugs) TYPE_BY_SLUG.set(slug, p);
+
+export function isProductType(v: unknown): v is ProductTypeId {
+  return typeof v === 'string' && TYPE_BY_ID.has(v as ProductTypeId);
+}
+
+export const productType = (id: ProductTypeId): ProductTypeDef => TYPE_BY_ID.get(id)!;
+
 /**
- * The groups a product in this family and section should show. An unknown
- * section contributes nothing extra rather than an empty or invented group.
+ * The type a section belongs to. The branch is walked leaf-first — the same
+ * order `branchSlugs` produces — so «ملحقات طابعات Resin» resolves to parts
+ * even though its parent «الطابعات» would say printer. A section nobody
+ * mapped falls back to its family's headline type, which is an honest guess
+ * rather than an empty template.
  */
-export function fieldsFor(family: 'devices' | 'materials', sectionSlugs: string[]): TemplateGroup[] {
-  const def = FAMILIES[family];
-  const out: TemplateGroup[] = [def.common];
-  const seen = new Set<string>();
+export function productTypeForSection(
+  family: 'devices' | 'materials',
+  sectionSlugs: string[]
+): ProductTypeId {
   for (const slug of sectionSlugs) {
-    const g = def.sections[slug];
-    if (g && !seen.has(g.id)) {
-      seen.add(g.id);
-      out.push(g);
-    }
+    const found = TYPE_BY_SLUG.get(slug);
+    if (found) return found.id;
+  }
+  return family === 'devices' ? 'printer' : 'filament';
+}
+
+/** The groups of one product type, deduped by FIELD id (not group id): two
+ *  composed groups may legitimately declare the same field, and a repeated
+ *  field would become a repeated column. The first group to claim a field
+ *  keeps it, so the more specific group (listed first) wins over the core. */
+export function groupsForType(id: ProductTypeId): TemplateGroup[] {
+  const seen = new Set<string>();
+  const out: TemplateGroup[] = [];
+  for (const group of productType(id).groups) {
+    const fields = group.fields.filter((f) => !seen.has(f.id));
+    for (const f of fields) seen.add(f.id);
+    if (fields.length) out.push({ ...group, fields });
   }
   return out;
+}
+
+/**
+ * The groups a product in this family and section should show — the SAME
+ * groups its import template carries, because both go through the product
+ * type. The admin form (worker/routes/adminTaxonomy.ts) and the CSV columns
+ * (worker/lib/importCsv.ts) therefore cannot drift: a field is in both places
+ * or in neither.
+ */
+export function fieldsFor(family: 'devices' | 'materials', sectionSlugs: string[]): TemplateGroup[] {
+  return groupsForType(productTypeForSection(family, sectionSlugs));
 }
 
 /** Flat field list, in render/column order. */
