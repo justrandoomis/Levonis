@@ -121,6 +121,14 @@ export interface OverlayProps {
    * it cannot live on an inner wrapper.
    */
   panelMotion?: Record<string, unknown>;
+  /**
+   * Opt OUT of the glass material, for a surface whose content needs its own
+   * ground: a QR code has to stay dark-on-light to scan at all, and a photo
+   * viewer wants nothing tinted behind it. The window still arrives and leaves
+   * the same way every other window does; it is just not translucent. The
+   * caller supplies the background in `panelClassName`.
+   */
+  solid?: boolean;
 }
 
 const PLACEMENT: Record<NonNullable<OverlayProps['placement']>, string> = {
@@ -155,6 +163,7 @@ export function Overlay({
   z = 200,
   testId,
   panelMotion,
+  solid = false,
 }: OverlayProps) {
   const m = useMotion();
   const { dir } = useLanguage();
@@ -227,7 +236,7 @@ export function Overlay({
             transition={m.spring(placement === 'bottom' ? 'sheet' : 'ui')}
             style={{ transformOrigin: originRef.current, outline: 'none' }}
             {...panelMotion}
-            className={`material material-thick relative min-w-0 border border-white/10 ${
+            className={`relative min-w-0 ${solid ? 'shadow-2xl' : 'material material-thick border border-white/10'} ${
               placement === 'bottom' ? 'rounded-t-3xl sm:rounded-3xl' : 'rounded-3xl'
             } ${panelClassName}`}
           >

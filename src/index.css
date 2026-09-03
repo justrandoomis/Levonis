@@ -119,19 +119,28 @@ html, body, #root {
    background and drop the blur, and it can only do that on surfaces that say
    which colour they should become when they stop being glass.
    --------------------------------------------------------------------------- */
+/* THE FILTER IS ONE VARIABLE, NOT A VARIABLE INSIDE A FILTER FUNCTION, AND THE
+   STANDARD PROPERTY IS DECLARED ALONE. Written the obvious way — the standard
+   and `-webkit-` properties side by side, each `blur(var(--material-blur))` —
+   Lightning CSS (Tailwind v4's minifier) decides it owns prefixing, collapses
+   the pair, and here kept the `-webkit-` alias while DROPPING the standard
+   one. Chromium reads the standard property, so every glass surface in the app
+   shipped completely flat: `.material{-webkit-backdrop-filter:...}` was the
+   whole rule in the built stylesheet. A var() standing as the ENTIRE value is
+   passed through untouched, and declaring only the standard property lets
+   Lightning add whatever prefix the browser targets actually need. */
 .material {
   background-color: color-mix(in oklab, var(--material-tint, #18181b) var(--material-opacity, 72%), transparent);
-  backdrop-filter: blur(var(--material-blur, 20px)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--material-blur, 20px)) saturate(160%);
+  backdrop-filter: var(--material-filter, blur(20px) saturate(160%));
 }
 /* Bigger surfaces read THICKER: more blur, deeper shadow. A sheet is not a chip. */
 .material-thick {
-  --material-blur: 32px;
+  --material-filter: blur(32px) saturate(160%);
   --material-opacity: 82%;
   box-shadow: 0 -18px 48px -16px rgb(0 0 0 / 0.72);
 }
 .material-thin {
-  --material-blur: 12px;
+  --material-filter: blur(12px) saturate(160%);
   --material-opacity: 64%;
 }
 
@@ -193,7 +202,6 @@ html, body, #root {
   .material-thin {
     --material-opacity: 100%;
     backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
   .scroll-edge::after,
   .scroll-edge-up::after {
@@ -207,7 +215,6 @@ html, body, #root {
   .material-thin {
     --material-opacity: 100%;
     backdrop-filter: none;
-    -webkit-backdrop-filter: none;
     border-color: rgb(255 255 255 / 0.55);
   }
 }

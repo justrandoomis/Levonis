@@ -30,6 +30,7 @@ import {
 import { ImageGallery } from '../../media/ImagePicker';
 import { Btn, Chip, Empty, Input, Notice, Spinner, TextArea, Toggle, useMainSiteHref } from './ui';
 import { StatCard } from '../../ui/statCards';
+import { Overlay as SharedOverlay } from '../../ui/Overlay';
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 type View = 'list' | 'grid' | 'compact';
@@ -902,14 +903,30 @@ function StockCell({ p, loc, compact }: { p: MerchantProduct; loc: Loc; compact?
   );
 }
 
+/**
+ * The merchant dashboard's three windows, on the shared primitive.
+ *
+ * This used to be a local shim: a `fixed inset-0` div rendered when a piece of
+ * state became non-null and removed when it became null again — so an editor,
+ * an insights panel and the import tool all appeared instantly and vanished
+ * instantly. Delegating gets them the arrival, the symmetric exit, the
+ * material, the Escape key and the reduced-motion behaviour that every other
+ * window in the app now has, and it keeps the one thing this shim knew that
+ * the primitive does not: these must sit above the floating BottomNav
+ * (z-[120]), because a modal the nav can poke through is not modal.
+ */
 function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  // Above the floating BottomNav (z-[120]) — a modal the nav can poke
-  // through is not modal.
   return (
-    <div className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto p-4 pt-10 pb-16">
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg">{children}</div>
-    </div>
+    <SharedOverlay
+      open
+      onClose={onClose}
+      placement="top"
+      z={130}
+      solid
+      panelClassName="w-full max-w-lg mt-6 mb-16 bg-transparent"
+    >
+      {children}
+    </SharedOverlay>
   );
 }
 

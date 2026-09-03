@@ -278,7 +278,7 @@ export default function Community() {
             between them (TabStrip's shared-layout indicator) instead of three
             conditional divs that blink in and out — so the row reads as one
             row a person moved along, which is the whole job of an indicator. */}
-        <div className="material scroll-edge sticky top-[60px] z-30 [--material-tint:#000] [--material-blur:12px]">
+        <div className="material material-thin scroll-edge sticky top-[60px] z-30 [--material-tint:#000]">
           <TabStrip
             group="community"
             label={dir === 'rtl' ? 'أقسام المجتمع' : 'Community sections'}

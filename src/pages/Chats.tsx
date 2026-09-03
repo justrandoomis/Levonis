@@ -26,6 +26,7 @@ import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { classifyError, ErrorState, EmptyState, UnauthorizedState } from '../components/ui/AsyncStates';
+import { Sheet } from '../components/ui/Overlay';
 import { Search, MessageSquare, X, Bot, LifeBuoy, ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react';
 
 const STRINGS = {
@@ -469,20 +470,20 @@ export default function Chats() {
 
       <div className="flex-1 pt-2">{listBody}</div>
 
-      {/* ---------------------------------------------------- support sheet */}
-      {sheetOpen ? (
-        <div
-          className="fixed inset-0 z-[150] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={s.sheetTitle}
-          onClick={() => setSheetOpen(false)}
-        >
-          <div
-            className="w-full sm:max-w-lg bg-zinc-950 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[88dvh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-            dir={dir}
-          >
+      {/* ---------------------------------------------------- support sheet
+          A SHEET, so it can be thrown away rather than only closed with the X:
+          `Sheet` tracks the finger 1:1, resists upward, and decides on release
+          by projected momentum. It used to be a `fixed inset-0` div that was
+          mounted when a boolean flipped — no arrival, and no exit at all. */}
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        label={s.sheetTitle}
+        z={150}
+        testId="chats-support-sheet"
+        panelClassName="w-full sm:max-w-lg max-h-[88dvh] overflow-y-auto"
+      >
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" dir={dir}>
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2 className="text-white font-bold text-[16px]">{s.sheetTitle}</h2>
               <button
@@ -576,9 +577,8 @@ export default function Chats() {
                 <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.noMoney}</p>
               </>
             )}
-          </div>
         </div>
-      ) : null}
+      </Sheet>
     </div>
   );
 }

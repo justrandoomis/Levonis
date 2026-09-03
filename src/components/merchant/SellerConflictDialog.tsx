@@ -19,7 +19,7 @@
  */
 
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { Overlay } from '../ui/Overlay';
 import { ShoppingBag, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 
@@ -52,23 +52,25 @@ export default function SellerConflictDialog({
       : loc('متجر آخر', 'another store', 'فرۆشگایەکی تر'));
   const incoming = conflict.incoming_seller_name || loc('هذا المتجر', 'this store', 'ئەم فرۆشگایە');
 
+  // THIS ONE MUST BE ANSWERED. It is the only window in the app that refuses
+  // Escape and a scrim tap: both remaining choices change the cart, and
+  // dismissing by accident would leave the customer looking at a store they
+  // cannot buy from with no idea why. Everything else — the arrival, the
+  // symmetric exit, the material, the reduced-motion cross-fade — comes from
+  // the shared primitive, so this file is now only the decision it asks.
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
-        onClick={onCancel}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 24, scale: 0.98 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-sm rounded-[24px] border border-white/10 bg-[#0f0f0f] p-5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)]"
-        >
+    <Overlay
+      open
+      onClose={onCancel}
+      label={loc('سلتك تخص متجرًا آخر', 'Your cart belongs to another store', 'سەبەتەکەت هی فرۆشگایەکی ترە')}
+      placement="bottom"
+      z={100}
+      dismissOnEscape={false}
+      dismissOnScrim={false}
+      testId="seller-conflict"
+      panelClassName="w-full max-w-sm"
+    >
+        <div className="p-5">
           <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4">
             <AlertTriangle className="w-5 h-5 text-amber-400" />
           </div>
@@ -114,8 +116,7 @@ export default function SellerConflictDialog({
               {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
             </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+    </Overlay>
   );
 }
