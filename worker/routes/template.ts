@@ -58,6 +58,13 @@ import {
   projectAdmin,
   type ProductDoc,
 } from '../lib/productModel';
+import {
+  PRODUCT_TYPES,
+  groupsForType,
+  isProductType,
+  productType,
+  type ProductTypeId,
+} from '../lib/templateFamilies';
 
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
@@ -334,6 +341,8 @@ export function buildExampleTemplate(): string {
 export function templateDownloadDiagnostics(): {
   blank: { errors: number; unknown_keys: string[]; disabled: DisabledLine[]; groupsDisabled: string[] };
   example: { errors: number; unknown_keys: string[] };
+  /** Same check, once per product type, for the `?type=` scaffold. */
+  typed: Array<{ type: string; errors: number; unknown_keys: string[] }>;
 } {
   const blank = buildBlankTemplate();
   const blankParsed = parseTemplate(blank.text);
@@ -346,6 +355,10 @@ export function templateDownloadDiagnostics(): {
       groupsDisabled: blank.groupsDisabled,
     },
     example: { errors: exampleParsed.errors.length, unknown_keys: exampleParsed.unknown_keys },
+    typed: PRODUCT_TYPES.map((t) => {
+      const parsed = parseTemplate(`${blank.text}\n${typeSpecScaffold(t.id).join('\n')}`);
+      return { type: t.id, errors: parsed.errors.length, unknown_keys: parsed.unknown_keys };
+    }),
   };
 }
 
@@ -699,8 +712,71 @@ function priceWarnings(doc: ProductDoc): string[] {
 
 // ------------------------------------------------------- GET /blank, /example
 
-templateRoutes.get('/blank', () => {
-  return attachment(buildBlankTemplate().text, 'levonis-product-template.txt');
+/**
+ * THE SPEC SHEET THIS PRODUCT TYPE ACTUALLY HAS, as a commented scaffold.
+ *
+ * The TXT template's `spec_groups` are free-form label/value rows, which is
+ * what makes it able to carry a detail-rich product — and also what makes a
+ * blank one unhelpful: it says "write your specifications" and leaves the
+ * admin to remember what a printer is supposed to list. The CSV template
+ * already knows, because the product form and the CSV columns are both built
+ * from the same per-type registry; this hands the TXT lane the same list.
+ *
+ * EVERY LINE IS A COMMENT. The scaffold names the fields and suggests the
+ * indices; it cannot add a value, cannot introduce a parse error, and cannot
+ * change what /apply writes. The §6.1 round-trip contract (a served template
+ * parses with zero errors) therefore holds by construction, and
+ * tests/templateDownload.test.ts checks it for every type rather than trusting
+ * that.
+ */
+export function typeSpecScaffold(id: ProductTypeId): string[] {
+  const def = productType(id);
+  const groups = groupsForType(id);
+  const out: string[] = [
+    '',
+    '# ============================================================',
+    `# مواصفات «${def.label_ar}» — القائمة نفسها التي يعرضها نموذج المنتج`,
+    `# Specification sheet for "${def.label_en}" — the same list the product form shows`,
+    '# ============================================================',
+    '# كل الأسطر أدناه تعليقات: احذف علامة # من السطر الذي تملؤه فعلاً.',
+    '# Every line below is a comment: uncomment only the rows you actually fill.',
+    '# لا حد ثابت لعدد المجموعات أو الأسطر — كرّر spec_groups.2 / rows.3 وهكذا.',
+    '# No fixed number of groups or rows — keep going with spec_groups.2, rows.3, …',
+  ];
+  let g = 0;
+  for (const group of groups) {
+    g += 1;
+    out.push('', `# --- ${group.label_ar} / ${group.label_en}`);
+    out.push(`# spec_groups.${g}.title_ar=${group.label_ar}`);
+    out.push(`# spec_groups.${g}.title_en=${group.label_en}`);
+    let r = 0;
+    for (const field of group.fields) {
+      r += 1;
+      const unit = field.unit ? ` (${field.unit})` : '';
+      const options = field.options?.length ? ` — ${field.options.join(' / ')}` : '';
+      out.push(`# spec_groups.${g}.rows.${r}.label_ar=${field.label_ar}${unit}${options}`);
+      out.push(`# spec_groups.${g}.rows.${r}.value_ar=`);
+    }
+  }
+  out.push('');
+  return out;
+}
+
+/**
+ * `?type=printer|parts|filament|accessory` appends that type's specification
+ * scaffold. Without it the template is exactly what it has always been, so
+ * every existing caller and saved link keeps its file.
+ */
+templateRoutes.get('/blank', (c) => {
+  const raw = (c.req.query('type') ?? '').trim();
+  if (!raw) return attachment(buildBlankTemplate().text, 'levonis-product-template.txt');
+  if (!isProductType(raw)) {
+    throw badRequest(
+      `type: "${raw}" غير معروف — القيم المتاحة: ${PRODUCT_TYPES.map((t) => t.id).join(' / ')}`
+    );
+  }
+  const text = `${buildBlankTemplate().text}\n${typeSpecScaffold(raw).join('\n')}`;
+  return attachment(text, `levonis-product-template-${raw}.txt`);
 });
 
 /** A filled, valid example. Creating from it yields a DRAFT — never a live

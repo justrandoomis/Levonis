@@ -21,7 +21,7 @@ import { STUDIO_URL } from '../src/translations';
  *
  * Honest deviation from the one-line spec ("no fflate references in src/"):
  * the STORE ITSELF legitimately uses `fflate` for the admin product-template
- * ZIP import (src/components/adminProducts/TemplateImport.tsx,
+ * ZIP import (src/components/adminProducts/ImportPanel.tsx,
  * worker/routes/template.ts) — it predates Studio and is not slicer payload.
  * Banning the name outright would fail on day one for the wrong reason, so
  * instead fflate imports are pinned to that exact allowlist: any NEW fflate
@@ -44,7 +44,7 @@ const FORBIDDEN_MODULES = ['three-slicer', 'occt-import-js', 'three', 'vinext', 
  *  entries below already carry, for the file that replaces them as the
  *  primary flow. */
 const FFLATE_ALLOWLIST = new Set([
-  join('src', 'components', 'adminProducts', 'TemplateImport.tsx'),
+  join('src', 'components', 'adminProducts', 'ImportPanel.tsx'),
   join('worker', 'routes', 'template.ts'),
   join('worker', 'routes', 'adminImport.ts'),
 ]);

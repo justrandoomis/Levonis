@@ -22,6 +22,7 @@ import {
   buildBlankTemplate,
   buildExampleTemplate,
   templateDownloadDiagnostics,
+  typeSpecScaffold,
   contentDisposition,
   applyFingerprint,
   claimApplyFingerprint,
@@ -111,6 +112,32 @@ test('blank template parses with zero errors and zero unknown keys', () => {
   const d = templateDownloadDiagnostics();
   assert.equal(d.blank.errors, 0, 'the downloaded blank must not carry parse errors');
   assert.deepEqual(d.blank.unknown_keys, []);
+});
+
+test('every per-type blank parses clean too — the scaffold is comments only', () => {
+  // `?type=` appends the product type's own specification sheet. It is served
+  // as comments precisely so it cannot break the round-trip contract; this
+  // proves it for all four types rather than assuming it.
+  const d = templateDownloadDiagnostics();
+  assert.equal(d.typed.length, 4);
+  for (const t of d.typed) {
+    assert.equal(t.errors, 0, `the ${t.type} template must not carry parse errors`);
+    assert.deepEqual(t.unknown_keys, [], `the ${t.type} template must not carry unknown keys`);
+  }
+});
+
+test('the per-type scaffold names that type\'s spec fields', () => {
+  // A printer's scaffold must actually list printer specifications, otherwise
+  // the type parameter is decoration.
+  const printer = typeSpecScaffold('printer').join('\n');
+  const filament = typeSpecScaffold('filament').join('\n');
+  assert.notEqual(printer, filament);
+  for (const text of [printer, filament]) {
+    for (const line of text.split('\n')) {
+      assert.ok(line === '' || line.startsWith('#'), `scaffold line is not a comment: ${line}`);
+    }
+  }
+  assert.ok(printer.includes('spec_groups.1.rows.1.label_ar='));
 });
 
 test('blank template auto-disables only the known unparseable required ints', () => {

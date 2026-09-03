@@ -48,7 +48,6 @@ const ProductForm = React.lazy(() => import('./adminProducts/ProductForm'));
 const ImportPanel = React.lazy(() => import('./adminProducts/ImportPanel'));
 // The older TXT pipeline. Kept because it is genuinely used, demoted to a
 // second tab because §10 forbids it being the only option.
-const TemplateTools = React.lazy(() => import('./adminProducts/TemplateImport'));
 
 const PAGE_SIZES = [30, 60, 100];
 const PRICE_BANDS: Record<string, { min?: number; max?: number }> = {
@@ -77,8 +76,6 @@ const STRINGS = {
     unit: 'منتج',
     import: 'استيراد / تصدير',
     importTitle: 'استيراد / تصدير المنتجات',
-    tabNew: 'قوالب الأقسام (CSV / ZIP)',
-    tabLegacy: 'القالب النصي القديم (TXT)',
     newProduct: 'منتج جديد',
     searchPlaceholder: 'بحث في المنتجات...',
     quickFind: 'ابحث عن منتج...',
@@ -106,8 +103,6 @@ const STRINGS = {
     unit: 'products',
     import: 'Import / export',
     importTitle: 'Import / export products',
-    tabNew: 'Section templates (CSV / ZIP)',
-    tabLegacy: 'Legacy TXT template',
     newProduct: 'New product',
     searchPlaceholder: 'Search products…',
     quickFind: 'Find a product…',
@@ -135,8 +130,6 @@ const STRINGS = {
     unit: 'بەرهەم',
     import: 'هاوردە / هەناردە',
     importTitle: 'هاوردە / هەناردەی بەرهەمەکان',
-    tabNew: 'قاڵبی بەشەکان (CSV / ZIP)',
-    tabLegacy: 'قاڵبی کۆنی TXT',
     newProduct: 'بەرهەمی نوێ',
     searchPlaceholder: 'گەڕان لە بەرهەمەکان...',
     quickFind: 'بەرهەمێک بدۆزەرەوە...',
@@ -232,7 +225,6 @@ export default function AdminProducts() {
   const [importOpen, setImportOpen] = useState(false);
   const [importDirty, setImportDirty] = useState(false);
   // The §10 flow is the default tab; the TXT tools are one click away.
-  const [importTab, setImportTab] = useState<'new' | 'legacy'>('new');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -359,7 +351,7 @@ export default function AdminProducts() {
     loadAux();
   }, [load, loadAux]);
 
-  // Stable identity: TemplateTools reports dirtiness from an effect, so a new
+  // Stable identity: the panel reports dirtiness from an effect, so a new
   // function every render would loop.
   const handleImportDirty = useCallback((d: boolean) => setImportDirty(d), []);
   const handleImportApplied = useCallback(() => {
@@ -620,7 +612,7 @@ export default function AdminProducts() {
                   <MenuItem
                     icon={<Download className="w-3.5 h-3.5" />}
                     label={loc('تصدير المنتجات (CSV)', 'Export products (CSV)', 'هەناردە (CSV)')}
-                    onClick={() => { setHeaderMenu(false); setImportTab('new'); setImportOpen(true); }}
+                    onClick={() => { setHeaderMenu(false); setImportOpen(true); }}
                   />
                   <MenuItem
                     icon={<X className="w-3.5 h-3.5" />}
@@ -1031,36 +1023,10 @@ export default function AdminProducts() {
           titleAr={STRINGS.ar.importTitle}
           titleEn={STRINGS.en.importTitle}
           onClose={closeImport}
-          dirty={importTab === 'legacy' && importDirty}
+          dirty={importDirty}
         >
-          <div className="flex gap-2 mb-4 border-b border-zinc-800 pb-2">
-            {(['new', 'legacy'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                data-import-tab={tab}
-                onClick={() => setImportTab(tab)}
-                className={
-                  'px-3 min-h-11 rounded-lg text-xs font-bold transition-colors ' +
-                  (importTab === tab
-                    ? 'bg-zinc-800 text-white border border-zinc-700'
-                    : 'text-zinc-400 hover:text-white border border-transparent')
-                }
-              >
-                {tab === 'new' ? t.tabNew : t.tabLegacy}
-              </button>
-            ))}
-          </div>
           <Suspense fallback={<LazyFallback label={t.loading} />}>
-            {importTab === 'new' ? (
-              <ImportPanel onApplied={handleImportApplied} />
-            ) : (
-              <TemplateTools
-                insideSection={false}
-                onApplied={handleImportApplied}
-                onDirtyChange={handleImportDirty}
-              />
-            )}
+            <ImportPanel onApplied={handleImportApplied} onDirtyChange={handleImportDirty} />
           </Suspense>
         </Modal>
       )}

@@ -137,8 +137,16 @@ spec_groups.1.rows.1.unit=mm
 - [ ] كل اللغات المعروفة معبأة، والباقي فارغ بصدق.
       All known languages filled; the rest honestly left empty.
 
-الملف الكامل بكل الحقول موجود في تنزيل «القالب الفارغ» من لوحة الإدارة
-(`GET /api/admin/template/blank`) مع تعليق يشرح كل حقل. المرجع التقني
-الكامل: `docs/FIELD_MAPPING.md`.
-The full commented field list ships in the blank-template download; the
-technical reference is `docs/FIELD_MAPPING.md`.
+الملف الكامل بكل الحقول موجود في تنزيل «تنزيل قالب TXT» من نافذة الاستيراد
+(`GET /api/admin/template/blank`) مع تعليق يشرح كل حقل. إذا اخترت نوع المنتج
+في النافذة قبل التنزيل (`?type=printer|parts|filament|accessory`) يأتي القالب
+ومعه **ورقة مواصفات ذلك النوع** — نفس القائمة التي يعرضها نموذج المنتج —
+كأسطر تعليق تحذف علامة `#` عمّا تملؤه منها.
+
+المجموعات المتكررة بلا عدد ثابت: `options.1` ثم `options.2` وهكذا (حتى ٥٠٠
+عنصر لكل مجموعة). المرجع التقني الكامل: `docs/FIELD_MAPPING.md`.
+
+The full commented field list ships in the TXT template download. Passing
+`?type=` adds that product type's own specification sheet as commented lines,
+and repeated groups have no fixed count — keep going with `options.2`,
+`options.3`, … The technical reference is `docs/FIELD_MAPPING.md`.

@@ -1,84 +1,144 @@
 /**
- * Devices / Materials import — the primary bulk flow (mandate §10).
+ * ONE IMPORT / EXPORT WINDOW, three formats, and no import before a check.
  *
- * FOUR STEPS, IN THIS ORDER, and none of them lies about the one before:
+ * The window used to be two tabs with different vocabularies: a section
+ * template panel (CSV/ZIP) and, behind a second tab, the older TXT tools. An
+ * admin had to know which tab their file belonged to before the window could
+ * help them, and the TXT half was reachable only by guessing. So the first
+ * thing this asks is the only thing that actually decides everything else:
  *
- *   1. Pick a section. The columns follow it, so this comes first — there is
- *      no "generic" template to download.
- *   2. Download the template (CSV for a plain spreadsheet, ZIP when the file
- *      needs to carry images). Every download is an authenticated fetch that
- *      verifies the response BEFORE saving, so a 403 is never saved as a file.
- *   3. Upload the completed file and read the preview. The preview writes
- *      nothing; the panel says so, and the confirm button is the only thing
- *      that writes.
- *   4. Confirm, then read the report. The report is downloadable as CSV and
- *      names created / updated / skipped / failed with a reason for each.
+ *   1. WHICH FORMAT — CSV, ZIP or TXT, each with one line saying what it is
+ *      for. Everything below reshapes itself around that answer; nothing from
+ *      the other two lanes stays on screen.
+ *   2. WHERE IT GOES — product type and section, as one compact row. The type
+ *      decides the columns, the section decides where the products are filed.
+ *      TXT carries its own classification inside the file, so it only uses the
+ *      type, and only to scaffold the spec sheet in the blank template.
+ *   3. THE TEMPLATE — one clearly named download per lane, plus the export of
+ *      what is already there, which is the intended bulk-EDIT path.
+ *   4. THE FILE, THEN THE CHECK. The check is mandatory: the import button
+ *      does not exist until a check has answered, and it stays disabled while
+ *      anything is blocking. Both checks write nothing — CSV/ZIP through
+ *      /import/preview, TXT through /template/parse (or /parse-zip) — and the
+ *      panel says so where the button is, not in a footnote.
  *
- * The section also carries an EXPORT: the same shape, filled with the
- * products already in that section. Exporting, editing in Excel and importing
- * back is the intended bulk-edit path, and the round-trip is covered by
- * tests/importCsv.test.ts and scripts/e2e-import.mjs.
+ * WHAT THE CHECK REPORTS, because "the file has errors" is not usable: how
+ * many products, how many will be created and updated, then four buckets the
+ * owner asked for by name — errors, missing fields, missing images and
+ * duplicates — with every entry naming its product, its line and its field.
+ * The buckets are a grouping of the same list, never a filter of it: the full
+ * error list is always there underneath, so a mis-grouped complaint is still
+ * read. See ./importIssues.ts for how a complaint is located.
  *
- * The older single TXT template is still reachable from the second tab of the
- * import dialog; it is no longer the default and no longer the only option.
+ * NO IMPORT LOGIC LIVES HERE. Every lane posts to the endpoints that already
+ * existed and shows what they answer. The panel decides nothing about what is
+ * valid, what is a duplicate or what gets written.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Download, Upload, RefreshCw, CheckCircle2, AlertTriangle, FileText, Copy, Check, ChevronDown } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { unzipSync, strFromU8 } from 'fflate';
+import {
+  Download, Upload, RefreshCw, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet,
+  FileArchive, Copy, Check, ChevronDown, ShieldCheck, XCircle, ImageOff, CopyX, ListChecks,
+} from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { btnPrimary, btnSecondary, inputCls, ErrorBanner } from './ui';
 import { downloadAdminFile, DownloadError } from './download';
+import { readIssueText, readIssueEntry, bucketise, issueWhere, type ImportIssue } from './importIssues';
+import type { ParseResponse, ApplyResponse, ZipParseResponse, DuplicateChoice } from './types';
 
 // ------------------------------------------------------------------ strings
 
 const STRINGS = {
   ar: {
-    step0: '١. اختر نوع المنتج',
-    step0Hint: 'الأعمدة تتبع النوع — طابعة، ملحقات، فلمنت، اكسسوار. لا يوجد قالب واحد لكل شيء.',
-    step1: '٢. اختر القسم',
-    step1Hint: 'القسم يحدد أين يُحفظ المنتج. اختيار النوع أعلاه يقصر القائمة على أقسامه.',
-    typeColumns: '{n} عمود مواصفات',
+    step1: '١. اختر صيغة الملف',
+    csvName: 'CSV',
+    csvWhat: 'جدول واحد بكل المنتجات. الأسرع للإضافة والتعديل الجماعي — بلا صور داخل الملف (روابط الصور مقبولة).',
+    zipName: 'ZIP',
+    zipWhat: 'نفس جدول CSV + مجلد images/ بالصور. هذا هو المسار الوحيد لرفع صور من جهازك مع المنتجات.',
+    txtName: 'TXT',
+    txtWhat: 'ملف نصي لكل منتج — للمنتجات التفصيلية ذات الحقول المتكررة (خيارات، ألوان، مواصفات، خطط ضمان) بلا حد ثابت. يقبل ملفاً واحداً أو ZIP يضم عدة ملفات .txt.',
+
+    step2: '٢. النوع والقسم',
+    step2HintTable: 'النوع يحدد أعمدة القالب، والقسم يحدد أين يُحفظ المنتج.',
+    step2HintTxt: 'ملف TXT يحمل تصنيفه بداخله. النوع هنا يُستخدم فقط ليأتي القالب الفارغ بورقة مواصفات هذا النوع.',
+    typeColumns: '{n} حقل مواصفات',
+    anyType: 'كل الأنواع',
     pickTypeFirst: 'اختر نوع المنتج أولًا.',
     sectionPlaceholder: 'اختر قسمًا…',
+    sectionOptional: 'غير مطلوب لصيغة TXT',
     noFamily: 'هذا القسم بلا عائلة قالب. حدّدها (أجهزة أو مواد) من إدارة الأقسام أولًا.',
-    step2: '٣. نزّل القالب',
-    csv: 'قالب CSV',
-    zip: 'قالب ZIP (مع مجلد الصور)',
+
+    step3: '٣. نزّل القالب',
+    tplCsv: 'تنزيل قالب CSV',
+    tplZip: 'تنزيل قالب ZIP',
+    tplTxt: 'تنزيل قالب TXT',
+    tplTxtExample: 'مثال TXT معبّأ',
     exportCsv: 'تصدير منتجات القسم (CSV)',
     exportZip: 'تصدير منتجات القسم (ZIP)',
-    step2Hint: 'القالب يحمل كل حقول نموذج المنتج: الخيارات والألوان والتوليفات والصور وشحن الطلب المسبق والمواصفات والشارات وخطط الضمان وكتل المحتوى وخطوات الدليل. الإدخال بالإنجليزية فقط، والترجمة تتم محليًا على الخادم بلا ذكاء اصطناعي.',
-    step3: '٤. ارفع الملف وعاين',
-    pick: 'اختر ملف CSV أو ZIP',
-    preview: 'معاينة',
-    previewing: 'جارٍ الفحص…',
-    noWrite: 'المعاينة لا تكتب أي شيء في قاعدة البيانات.',
-    step4: '٥. أكّد الاستيراد',
-    confirm: 'تأكيد الاستيراد',
+    tplHintTable: 'القالب يحمل كل حقول نموذج المنتج: الخيارات والألوان والتوليفات والصور وشحن الطلب المسبق والمواصفات والشارات وخطط الضمان وكتل المحتوى وخطوات الدليل. الإدخال بالإنجليزية فقط، والترجمة تتم محليًا على الخادم بلا ذكاء اصطناعي.',
+    tplHintTxt: 'القالب الفارغ يشرح كل حقل، والمجموعات المتكررة معطّلة بعلامة # حتى تحتاجها. كرّر options.1 ثم options.2 وهكذا — لا عدد ثابت للحقول المتكررة (حتى ٥٠٠ عنصر لكل مجموعة). المثال ملف صالح يُنشئ مسودة فقط.',
+
+    step4: '٤. ارفع الملف ثم افحصه',
+    pickCsv: 'اختر ملف CSV',
+    pickZip: 'اختر ملف ZIP',
+    pickTxt: 'اختر ملف TXT أو ZIP يضم ملفات .txt',
+    orPaste: 'أو الصق نص القالب هنا',
+    check: 'افحص الملف',
+    checking: 'جارٍ الفحص…',
+    noWrite: 'الفحص لا يكتب أي شيء في قاعدة البيانات.',
+    mustCheck: 'الاستيراد معطّل حتى ينتهي الفحص ويظهر تقريره.',
+    pickFileFirst: 'اختر ملفًا أولًا.',
+    pickSectionFirst: 'اختر القسم أولًا.',
+
+    checkTitle: 'نتيجة الفحص',
+    statProducts: 'منتجات في الملف',
+    statCreate: 'ستُنشأ',
+    statUpdate: 'ستُحدَّث',
+    statBlocked: 'موقوفة بأخطاء',
+    bErrors: 'أخطاء',
+    bMissing: 'حقول ناقصة',
+    bImages: 'صور مفقودة',
+    bDuplicates: 'تكرارات',
+    bNoImages: 'منتجات بلا صورة',
+    bWarnings: 'تنبيهات',
+    allClear: 'لا أخطاء — الملف جاهز للاستيراد.',
+    blocked: 'كل صف في هذا الملف موقوف بخطأ. عالج الأخطاء أدناه ثم أعد الفحص — الاستيراد معطّل بأمانة.',
+    partial: 'سيُستورد {n} ويُتخطّى {b} موقوفًا بأخطاء. عالج الأخطاء وأعد الفحص لاستيراد الكل.',
+    nothingToApply: 'لا يوجد منتج صالح في هذا الملف.',
+    where: { product: 'المنتج', line: 'سطر', field: 'الحقل' },
+    unknownCols: 'أعمدة غير معروفة في الملف (تُتجاهل): ',
+    unknownKeys: 'مفاتيح غير معروفة (تُتجاهل): ',
+    fileIssues: 'مشاكل عامة في الملف',
+    showAll: 'عرض كل الـ {n}',
+    rowsTitle: 'المنتجات',
+
+    confirm: 'ابدأ الاستيراد',
     confirming: 'جارٍ التنفيذ…',
     report: 'تنزيل تقرير النتيجة (CSV)',
     downloading: 'جارٍ التنزيل…',
     started: 'بدأ تنزيل {name} ({size}).',
     startedNav: 'فُتح {name} في نافذة التنزيل ({size}).',
-    rowsTitle: 'الصفوف',
-    colKey: 'المفتاح',
-    colName: 'الاسم',
-    colAction: 'النتيجة',
-    colDetail: 'التفاصيل',
-    create: 'إنشاء',
-    update: 'تحديث',
-    failed: 'مرفوض',
+    summary: 'أُنشئ {c} — حُدِّث {u} — مُتخطّى {s} — فشل {f}',
     created: 'أُنشئ',
     updated: 'حُدِّث',
     skipped: 'مُتخطّى',
-    unknownCols: 'أعمدة غير معروفة في الملف (تُتجاهل): ',
-    fileIssues: 'مشاكل عامة في الملف',
-    summary: 'أُنشئ {c} — حُدِّث {u} — مُتخطّى {s} — فشل {f}',
-    previewSummary: 'سيُنشأ {c} — سيُحدَّث {u} — مرفوض {f} (من {t})',
-    reviewNeeded: 'حقول بقيت بالإنجليزية وتحتاج مراجعة بشرية:',
-    pickFirst: 'اختر قسمًا وملفًا أولًا.',
-    nothingToApply: 'لا يوجد صف صالح للتنفيذ.',
+    failed: 'فشل',
+    create: 'إنشاء',
+    update: 'تحديث',
+    blockedRow: 'موقوف',
     alreadyApplied: 'هذا الاستيراد نُفّذ من قبل — هذه نتيجته المحفوظة.',
+    reviewNeeded: 'حقول بقيت بالإنجليزية وتحتاج مراجعة بشرية:',
+    needsReview: 'بحاجة مراجعة — يمنع الاستيراد',
+    dupTitle: 'يوجد منتج بنفس الاسم/الرابط — اختر كيف نكمل:',
+    dupUpdate: 'تحديث الموجود',
+    dupNew: 'إنشاء مسودة جديدة',
+    inProgress: 'الدفعة نفسها قيد التنفيذ — انتظر النتيجة قبل إعادة المحاولة.',
+    zipOverLimit: 'ملفات تجاوزت حد الأرشيف ({n}) ولم تُفحص:',
+    zipNotTxt: 'مدخلات ليست ‎.txt وتم تجاهلها:',
+    zipLocalFailed: 'تعذّر فك ضغط الأرشيف محليًا — نتائج الفحص ظاهرة لكن الاستيراد يحتاج رفع كل ملف على حدة.',
+
     lookupsTitle: 'القيم المتاحة لأعمدة التصنيف',
     lookupsHint:
       'هذه هي القيم التي يقبلها الملف في أعمدة category و sub_category و brand و hashtags — كما هي الآن في صفحة التصنيفات. اضغط قيمة لنسخها. القالب المنزّل يحملها أيضًا في نهايته وفي lookups.csv.',
@@ -87,55 +147,97 @@ const STRINGS = {
     lkBrand: 'العلامة التجارية (brand)',
     lkHashtag: 'الهاشتاقات (hashtags)',
     lkEmpty: 'لا شيء بعد — أضف من صفحة التصنيفات.',
-    lkHashtagFree: 'يمكن كتابة وسم جديد في الملف وسيُضاف إلى القائمة عند التأكيد.',
+    lkHashtagFree: 'يمكن كتابة وسم جديد في الملف وسيُضاف إلى القائمة عند التنفيذ.',
     copied: 'نُسخ',
   },
   en: {
-    step0: '1. Choose a product type',
-    step0Hint: 'The columns follow the type — printer, parts, filament, accessory. There is no one template for everything.',
-    step1: '2. Choose the section',
-    step1Hint: 'The section decides where the product is filed. Picking a type above narrows this list to its sections.',
-    typeColumns: '{n} spec columns',
+    step1: '1. Choose the file format',
+    csvName: 'CSV',
+    csvWhat: 'One spreadsheet holding every product. The fastest way to add or bulk-edit — no image files inside (image URLs are accepted).',
+    zipName: 'ZIP',
+    zipWhat: 'The same CSV plus an images/ folder. This is the only way to bring image files from your device with the products.',
+    txtName: 'TXT',
+    txtWhat: 'One text file per product — for detail-rich products with repeated fields (options, colours, specifications, warranty plans) and no fixed count. Takes a single file or a ZIP of .txt files.',
+
+    step2: '2. Type and section',
+    step2HintTable: 'The type decides the template columns; the section decides where the product is filed.',
+    step2HintTxt: 'A TXT file carries its own classification. The type is used here only so the blank template arrives with that type’s specification sheet.',
+    typeColumns: '{n} spec fields',
+    anyType: 'All types',
     pickTypeFirst: 'Choose a product type first.',
     sectionPlaceholder: 'Choose a section…',
+    sectionOptional: 'Not needed for TXT',
     noFamily: 'This section has no template family. Set it to Devices or Materials in the sections admin first.',
-    step2: '3. Download the template',
-    csv: 'CSV template',
-    zip: 'ZIP template (with images folder)',
+
+    step3: '3. Download the template',
+    tplCsv: 'Download CSV Template',
+    tplZip: 'Download ZIP Template',
+    tplTxt: 'Download TXT Template',
+    tplTxtExample: 'Filled TXT example',
     exportCsv: 'Export this section (CSV)',
     exportZip: 'Export this section (ZIP)',
-    step2Hint: 'The template carries every field of the product form: options, colours, stock combinations, images, pre-order transports, specifications, badges, warranty plans, content blocks and guide steps. English input only; Arabic and Kurdish are generated locally on the server, with no AI.',
-    step3: '4. Upload and preview',
-    pick: 'Choose a CSV or ZIP file',
-    preview: 'Preview',
-    previewing: 'Checking…',
-    noWrite: 'The preview writes nothing to the database.',
-    step4: '5. Confirm the import',
-    confirm: 'Confirm import',
+    tplHintTable: 'The template carries every field of the product form: options, colours, stock combinations, images, pre-order transports, specifications, badges, warranty plans, content blocks and guide steps. English input only; Arabic and Kurdish are generated locally on the server, with no AI.',
+    tplHintTxt: 'The blank documents every field, and repeated groups ship commented out until you need them. Keep going with options.1, options.2, … — there is no fixed number of repeated fields (up to 500 items per group). The example is a valid file that only ever creates a draft.',
+
+    step4: '4. Upload the file, then check it',
+    pickCsv: 'Choose a CSV file',
+    pickZip: 'Choose a ZIP file',
+    pickTxt: 'Choose a .txt file, or a ZIP of .txt files',
+    orPaste: 'or paste the template text here',
+    check: 'Check the file',
+    checking: 'Checking…',
+    noWrite: 'The check writes nothing to the database.',
+    mustCheck: 'Import stays disabled until the check has run and reported.',
+    pickFileFirst: 'Choose a file first.',
+    pickSectionFirst: 'Choose the section first.',
+
+    checkTitle: 'Check result',
+    statProducts: 'products in the file',
+    statCreate: 'to create',
+    statUpdate: 'to update',
+    statBlocked: 'blocked by errors',
+    bErrors: 'errors',
+    bMissing: 'missing fields',
+    bImages: 'missing images',
+    bDuplicates: 'duplicates',
+    bNoImages: 'products with no image',
+    bWarnings: 'warnings',
+    allClear: 'No errors — the file is ready to import.',
+    blocked: 'Every row in this file is blocked by an error. Fix them below and check again — import is honestly disabled.',
+    partial: '{n} will be imported and {b} skipped as blocked. Fix the errors and check again to import them all.',
+    nothingToApply: 'No valid product in this file.',
+    where: { product: 'product', line: 'line', field: 'field' },
+    unknownCols: 'Columns the template does not define (ignored): ',
+    unknownKeys: 'Keys the template does not define (ignored): ',
+    fileIssues: 'File-level problems',
+    showAll: 'Show all {n}',
+    rowsTitle: 'Products',
+
+    confirm: 'Start the import',
     confirming: 'Applying…',
     report: 'Download result report (CSV)',
     downloading: 'Downloading…',
     started: '{name} started downloading ({size}).',
     startedNav: '{name} opened in the download window ({size}).',
-    rowsTitle: 'Rows',
-    colKey: 'Key',
-    colName: 'Name',
-    colAction: 'Result',
-    colDetail: 'Details',
-    create: 'create',
-    update: 'update',
-    failed: 'rejected',
+    summary: '{c} created — {u} updated — {s} skipped — {f} failed',
     created: 'created',
     updated: 'updated',
     skipped: 'skipped',
-    unknownCols: 'Columns the template does not define (ignored): ',
-    fileIssues: 'File-level problems',
-    summary: '{c} created — {u} updated — {s} skipped — {f} failed',
-    previewSummary: '{c} to create — {u} to update — {f} rejected (of {t})',
-    reviewNeeded: 'Fields kept in English and needing a human review:',
-    pickFirst: 'Choose a section and a file first.',
-    nothingToApply: 'No valid row to apply.',
+    failed: 'failed',
+    create: 'create',
+    update: 'update',
+    blockedRow: 'blocked',
     alreadyApplied: 'This import was already applied — this is its stored result.',
+    reviewNeeded: 'Fields kept in English and needing a human review:',
+    needsReview: 'Needs review — blocks the import',
+    dupTitle: 'A product with the same name/slug exists — choose how to continue:',
+    dupUpdate: 'Update the existing one',
+    dupNew: 'Create a new draft',
+    inProgress: 'The same batch is being applied — wait for the result before retrying.',
+    zipOverLimit: 'Files past the per-archive limit ({n}) and not checked:',
+    zipNotTxt: 'Non-.txt entries, ignored:',
+    zipLocalFailed: 'Could not unzip locally — the check results are shown, but importing needs each file uploaded on its own.',
+
     lookupsTitle: 'Accepted values for the classification columns',
     lookupsHint:
       'These are the values the file accepts in category, sub_category, brand and hashtags — exactly as they stand in the taxonomy page right now. Click a value to copy it. The downloaded template also carries them at its end and in lookups.csv.',
@@ -144,18 +246,21 @@ const STRINGS = {
     lkBrand: 'Brand (brand)',
     lkHashtag: 'Hashtags (hashtags)',
     lkEmpty: 'Nothing yet — add from the taxonomy page.',
-    lkHashtagFree: 'A new tag may be typed into the file; it joins the list on confirm.',
+    lkHashtagFree: 'A new tag may be typed into the file; it joins the list on import.',
     copied: 'Copied',
   },
 };
-const pick = (lang: string) => (lang === 'en' ? STRINGS.en : STRINGS.ar);
+type Strings = typeof STRINGS.ar;
+const pickStrings = (lang: string): Strings => (lang === 'en' ? (STRINGS.en as Strings) : STRINGS.ar);
 const fill = (tpl: string, vars: Record<string, string | number>) =>
   tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 
-const humanBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const humanBytes = (n: number) =>
+  n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 // -------------------------------------------------------------------- types
 
+type Format = 'csv' | 'zip' | 'txt';
 type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory';
 
 interface Catalog {
@@ -166,7 +271,6 @@ interface Catalog {
   name_en: string;
   active: boolean;
   effective_template_family: 'devices' | 'materials' | null;
-  /** Which of the four types this section's template is built for. */
   product_type: ProductTypeId | null;
   product_count: number;
 }
@@ -229,20 +333,103 @@ interface ConfirmResponse {
   translation_review_needed?: string[];
 }
 
+/** One product the check found, whichever lane found it. */
+interface CheckedItem {
+  id: string;
+  line: number | null;
+  name: string;
+  action: 'create' | 'update' | 'blocked';
+  images: number;
+  issues: ImportIssue[];
+  /** TXT only: the file's own text, so the import can re-post it verbatim. */
+  text?: string;
+}
+
+/** The one shape the report card renders, for all three formats. */
+interface CheckResult {
+  format: Format;
+  items: CheckedItem[];
+  fileIssues: ImportIssue[];
+  unknownColumns: string[];
+  notes: string[];
+  /** CSV / ZIP: the preview id the confirm endpoint takes. */
+  importId?: string;
+  /** TXT: whether this was one file or an archive. */
+  txtMode?: 'single' | 'archive';
+}
+
+/** One row of the final result table, for all three formats. */
+interface ResultRow {
+  key: string;
+  name: string;
+  action: 'created' | 'updated' | 'skipped' | 'failed';
+  detail: string;
+}
+
+/** What an import run answers, whichever lane ran it. */
+interface ImportResult {
+  rows: ResultRow[];
+  summary: ConfirmResponse['summary'];
+  /** TXT only: files the server stopped on to ask the duplicate question. */
+  duplicates?: string[];
+  importId?: string;
+  review?: string[];
+}
+
+// ---------------------------------------------------------------- helpers
+
+/**
+ * How many images a TXT template actually carries. Counted from the text
+ * because neither /parse nor /parse-zip reports a count, and "this product has
+ * no picture" is one of the things the owner asked the check to say. Commented
+ * lines do not count — they are the blank template's disabled scaffold.
+ */
+export function countTxtImages(text: string): number {
+  const seen = new Set<string>();
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^images\.(\d+)\.url\s*=\s*(.*)$/.exec(line);
+    if (m && m[2].trim() && m[2].trim() !== '__NULL__' && m[2].trim() !== '__CLEAR__') seen.add(m[1]);
+  }
+  return seen.size;
+}
+
+/** The product name a TXT file claims, for the report table. */
+function txtName(text: string): string {
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^name_(?:ar|en)\s*=\s*(.+)$/.exec(line);
+    if (m && m[1].trim()) return m[1].trim();
+  }
+  return '';
+}
+
 // --------------------------------------------------------------- component
 
-export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
+export default function ImportPanel({
+  onApplied,
+  onDirtyChange,
+}: {
+  onApplied?: () => void;
+  /** Unapplied pasted text is "dirty" for the host dialog. */
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { lang } = useLanguage();
-  const t = pick(lang);
+  const t = pickStrings(lang);
 
+  const [format, setFormat] = useState<Format>('csv');
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [types, setTypes] = useState<TypeChoice[]>([]);
   const [typeId, setTypeId] = useState<ProductTypeId | ''>('');
   const [sectionId, setSectionId] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
-  const [result, setResult] = useState<ConfirmResponse | null>(null);
-  const [busy, setBusy] = useState<'' | 'preview' | 'confirm' | string>('');
+  const [pasted, setPasted] = useState('');
+  const [check, setCheck] = useState<CheckResult | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [duplicates, setDuplicates] = useState<string[]>([]);
+  const [busy, setBusy] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [lookups, setLookups] = useState<Lookups | null>(null);
@@ -252,104 +439,58 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
       .get<{ catalogs: Catalog[] }>('/api/admin/taxonomy/catalogs')
       .then((r) => setCatalogs(r.catalogs ?? []))
       .catch((e) => setErr(e instanceof ApiError ? e.message : String(e)));
-    // The accepted classification values, read live so a section or brand
-    // added a minute ago is already here.
-    api
-      .get<Lookups>('/api/admin/import/lookups')
-      .then((r) => setLookups(r))
-      .catch(() => setLookups(null));
-    // The four product types come from the server for the same reason the
-    // spec fields do: one definition, no second copy in the bundle.
+    api.get<Lookups>('/api/admin/import/lookups').then(setLookups).catch(() => setLookups(null));
     api
       .get<{ types: TypeChoice[] }>('/api/admin/import/types')
       .then((r) => setTypes(r.types ?? []))
       .catch(() => setTypes([]));
   }, []);
 
-  // Only sections that can actually produce a template are offered; a section
-  // with no family would download a 400, and offering it is a broken button.
+  // Pasted-but-unchecked text is work the host dialog must not discard silently.
+  useEffect(() => {
+    onDirtyChange?.(pasted.trim().length > 0);
+  }, [pasted, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
+  /** Any change to what would be imported invalidates the check that allowed it. */
+  const invalidate = useCallback(() => {
+    setCheck(null);
+    setResult(null);
+    setDuplicates([]);
+  }, []);
+
   const options = useMemo(
-    () =>
-      catalogs.filter(
-        (c) => c.active && c.effective_template_family && (!typeId || c.product_type === typeId)
-      ),
+    () => catalogs.filter((c) => c.active && c.effective_template_family && (!typeId || c.product_type === typeId)),
     [catalogs, typeId]
   );
   const byId = useMemo(() => new Map(catalogs.map((c) => [c.id, c])), [catalogs]);
   const section = sectionId ? byId.get(sectionId) : undefined;
-
-  // The type a download will actually use: the chosen chip, or the one the
-  // chosen section resolves to. Shown, never guessed at silently.
   const effectiveType: ProductTypeId | '' = typeId || section?.product_type || '';
+  const isTable = format !== 'txt';
 
   const label = (c: Catalog) => {
     const parent = c.parent_id ? byId.get(c.parent_id) : undefined;
     const own = lang === 'en' ? c.name_en || c.name_ar : c.name_ar || c.name_en;
     const head = parent ? `${lang === 'en' ? parent.name_en || parent.name_ar : parent.name_ar || parent.name_en} › ` : '';
-    return `${head}${own} (${c.effective_template_family === 'devices' ? 'Devices' : 'Materials'})`;
+    return `${head}${own}`;
   };
 
-  const download = async (key: string, path: string, fallback: string, zip: boolean) => {
+  // ------------------------------------------------------------ downloads
+
+  const download = async (key: string, path: string, fallback: string, kind: 'csv' | 'zip' | 'txt') => {
     setBusy(key);
     setErr(null);
     setNote(null);
     try {
       const out = await downloadAdminFile(path, fallback, {
-        accept: zip ? 'application/zip' : 'text/csv',
-        ext: zip ? 'zip' : 'csv',
-        type: zip ? 'application/zip' : 'text/csv;charset=utf-8',
+        accept: kind === 'zip' ? 'application/zip' : kind === 'csv' ? 'text/csv' : 'text/plain',
+        ext: kind,
+        type:
+          kind === 'zip' ? 'application/zip' : kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
       });
-      setNote(
-        fill(out.method === 'navigation' ? t.startedNav : t.started, {
-          name: out.filename,
-          size: humanBytes(out.bytes),
-        })
-      );
+      setNote(fill(out.method === 'navigation' ? t.startedNav : t.started, { name: out.filename, size: humanBytes(out.bytes) }));
     } catch (e) {
       setErr(e instanceof DownloadError ? e.message : String(e));
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const runPreview = async () => {
-    if (!sectionId || !file) {
-      setErr(t.pickFirst);
-      return;
-    }
-    setBusy('preview');
-    setErr(null);
-    setNote(null);
-    setResult(null);
-    try {
-      const form = new FormData();
-      form.set('file', file);
-      form.set('category', sectionId);
-      const res = await api.post<PreviewResponse>('/api/admin/import/preview', form);
-      setPreview(res);
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : String(e));
-      setPreview(null);
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const runConfirm = async () => {
-    if (!preview) return;
-    if (preview.summary.create + preview.summary.update === 0) {
-      setErr(t.nothingToApply);
-      return;
-    }
-    setBusy('confirm');
-    setErr(null);
-    try {
-      const res = await api.post<ConfirmResponse>('/api/admin/import/confirm', { import_id: preview.import_id });
-      setResult(res);
-      if (res.already_applied) setNote(t.alreadyApplied);
-      onApplied?.();
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : String(e));
     } finally {
       setBusy('');
     }
@@ -360,266 +501,699 @@ export default function ImportPanel({ onApplied }: { onApplied?: () => void }) {
     path: string,
     fallback: string,
     text: string,
-    { zip = false, needsSection = true }: { zip?: boolean; needsSection?: boolean } = {}
+    { kind = 'csv', disabled = false, primary = false }: { kind?: 'csv' | 'zip' | 'txt'; disabled?: boolean; primary?: boolean } = {}
   ) => (
     <button
       type="button"
       data-import={key}
-      disabled={busy !== '' || (needsSection ? !sectionId : !effectiveType)}
-      onClick={() => download(key, path, fallback, zip)}
-      className={btnSecondary + ' disabled:opacity-40'}
+      disabled={busy !== '' || disabled}
+      onClick={() => download(key, path, fallback, kind)}
+      className={(primary ? btnPrimary : btnSecondary) + ' disabled:opacity-40'}
     >
       {busy === key ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-      {busy === key ? t.downloading : text}
+      <span className="truncate">{busy === key ? t.downloading : text}</span>
     </button>
   );
 
+  // ---------------------------------------------------------------- check
+
+  const runCheck = async () => {
+    setErr(null);
+    setNote(null);
+    setResult(null);
+    setDuplicates([]);
+    if (isTable && !sectionId) { setErr(t.pickSectionFirst); return; }
+    if (!file && !pasted.trim()) { setErr(t.pickFileFirst); return; }
+    setBusy('check');
+    try {
+      setCheck(isTable ? await checkTable(file!, sectionId) : await checkTxt(file, pasted, t));
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+      setCheck(null);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  // --------------------------------------------------------------- import
+
+  /**
+   * `dupChoice` means "the admin has answered the duplicate question", and it
+   * re-applies ONLY the files that were waiting on that answer. Re-running the
+   * whole batch would post files that already succeeded a second time — and
+   * with a different duplicate_choice the confirm-once fingerprint no longer
+   * matches, so the guard would not catch it and the catalogue would gain a
+   * second copy of every product in the archive.
+   */
+  const runImport = async (dupChoice?: DuplicateChoice) => {
+    if (!check) return;
+    const ready = check.items.filter(
+      (i) => i.action !== 'blocked' && (!dupChoice || duplicates.includes(i.id))
+    );
+    if (ready.length === 0) { setErr(t.nothingToApply); return; }
+    setBusy('confirm');
+    setErr(null);
+    setDuplicates([]);
+    try {
+      if (check.format === 'txt') {
+        const out = await applyTxt(ready, t, dupChoice);
+        setDuplicates(out.duplicates);
+        setResult((prev) => mergeResults(prev, out));
+      } else {
+        setResult(await applyTable(check.importId!, t, (msg) => setNote(msg)));
+      }
+      onApplied?.();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  // ----------------------------------------------------------------- view
+
   const stem = section ? section.slug : effectiveType || 'section';
-  // The blank template is addressed by TYPE — a section only narrows where the
-  // product will be filed, and an admin who knows they are adding a filament
-  // should not have to pick a section to get the filament columns.
   const templateQuery = `type=${encodeURIComponent(effectiveType)}${sectionId ? `&category=${encodeURIComponent(sectionId)}` : ''}`;
+  const buckets = check ? bucketise(check.items.flatMap((i) => i.issues).concat(check.fileIssues)) : null;
+  const noImages = check ? check.items.filter((i) => i.images === 0).length : 0;
+  const blocked = check ? check.items.filter((i) => i.action === 'blocked').length : 0;
+  const importable = check ? check.items.filter((i) => i.action !== 'blocked').length : 0;
+  // A blocked row is SKIPPED, not a veto over the file: /confirm applies the
+  // rows the check accepted and leaves the rest, and refusing the whole file
+  // would make one bad row hold ninety-nine good ones hostage. What the check
+  // guarantees is that nothing is imported before the admin has seen this.
+  const canImport = importable > 0;
 
   return (
     <div className="min-w-0 text-sm" data-panel="import-v2">
       <ErrorBanner text={err} />
-      {note && (
-        <div className="bg-sky-500/10 border border-sky-500/30 text-sky-200 rounded-xl p-3 mb-3 text-xs">{note}</div>
-      )}
+      {note && <div className="bg-sky-500/10 border border-sky-500/30 text-sky-200 rounded-xl p-2.5 mb-3 text-[11px]">{note}</div>}
 
-      {/* 1 ------------------------------------------------------------- */}
-      <Section title={t.step0} hint={t.step0Hint}>
-        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]" data-import="types">
-          {types.map((ty) => {
-            const on = typeId === ty.id;
+      {/* 1 — the one question that reshapes everything below ------------- */}
+      <Step title={t.step1}>
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]" data-import="formats" role="radiogroup" aria-label={t.step1}>
+          {(
+            [
+              ['csv', t.csvName, t.csvWhat, <FileSpreadsheet key="i" className="w-4 h-4" aria-hidden />],
+              ['zip', t.zipName, t.zipWhat, <FileArchive key="i" className="w-4 h-4" aria-hidden />],
+              ['txt', t.txtName, t.txtWhat, <FileText key="i" className="w-4 h-4" aria-hidden />],
+            ] as Array<[Format, string, string, React.ReactNode]>
+          ).map(([id, name, what, icon]) => {
+            const on = format === id;
             return (
               <button
-                key={ty.id}
+                key={id}
                 type="button"
-                data-import-type={ty.id}
-                aria-pressed={on}
+                role="radio"
+                aria-checked={on}
+                data-import-format={id}
                 onClick={() => {
-                  const next = on ? '' : ty.id;
-                  setTypeId(next);
-                  // A section belonging to another type would silently decide
-                  // the columns, so it is cleared rather than left behind.
-                  if (next && section && section.product_type !== next) setSectionId('');
-                  setPreview(null);
-                  setResult(null);
+                  if (on) return;
+                  setFormat(id);
+                  setFile(null);
+                  setPasted('');
+                  invalidate();
                 }}
-                className={`min-w-0 text-start rounded-xl border px-3 py-2 transition-colors ${
-                  on
-                    ? 'border-violet-500 bg-violet-500/10 text-white'
-                    : 'border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-600'
+                className={`min-w-0 text-start rounded-xl border p-2.5 transition-colors ${
+                  on ? 'border-violet-500 bg-violet-500/10 text-white' : 'border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-600'
                 }`}
               >
-                <span className="block text-[13px] font-bold truncate">
-                  {lang === 'en' ? ty.label_en : ty.label_ar}
+                <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                  {icon}
+                  <span dir="ltr">{name}</span>
+                  {on && <Check className="w-3.5 h-3.5 ms-auto text-violet-300" aria-hidden />}
                 </span>
-                <span className="block text-[11px] text-zinc-500 truncate">{ty.hint_ar}</span>
-                <span className="block text-[10px] text-zinc-600 mt-0.5">
-                  {fill(t.typeColumns, { n: ty.spec_columns })}
-                </span>
+                <span className="block text-[11px] leading-relaxed text-zinc-500 mt-1">{what}</span>
               </button>
             );
           })}
         </div>
-      </Section>
+      </Step>
 
-      {/* 2 ------------------------------------------------------------- */}
-      <Section title={t.step1} hint={t.step1Hint}>
-        <select
-          data-import="section"
-          value={sectionId}
-          onChange={(e) => {
-            setSectionId(e.target.value);
-            setPreview(null);
-            setResult(null);
-          }}
-          className={inputCls + ' w-full max-w-xl h-11'}
-        >
-          <option value="">{t.sectionPlaceholder}</option>
-          {options.map((c) => (
-            <option key={c.id} value={c.id}>
-              {label(c)}
-            </option>
+      {/* 2 — where it goes, on one compact row --------------------------- */}
+      <Step title={t.step2} hint={isTable ? t.step2HintTable : t.step2HintTxt}>
+        <div className="flex flex-wrap gap-1.5" data-import="types">
+          <TypeChip on={typeId === ''} onClick={() => { setTypeId(''); invalidate(); }} label={t.anyType} />
+          {types.map((ty) => (
+            <TypeChip
+              key={ty.id}
+              id={ty.id}
+              on={typeId === ty.id}
+              onClick={() => {
+                const next = typeId === ty.id ? '' : ty.id;
+                setTypeId(next);
+                if (next && section && section.product_type !== next) setSectionId('');
+                invalidate();
+              }}
+              label={lang === 'en' ? ty.label_en : ty.label_ar}
+              sub={fill(t.typeColumns, { n: ty.spec_columns })}
+            />
           ))}
-        </select>
-        {catalogs.length > 0 && options.length === 0 && (
-          <p className="text-amber-300/90 text-xs mt-2">{t.noFamily}</p>
-        )}
-        {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}
-      </Section>
-
-      {/* 3 ------------------------------------------------------------- */}
-      <Section title={t.step2} hint={t.step2Hint}>
-        <div className="flex flex-wrap gap-2">
-          {dlBtn('template-csv', `/api/admin/import/template?${templateQuery}&format=csv`, `levonis-template-${stem}.csv`, t.csv, { needsSection: false })}
-          {dlBtn('template-zip', `/api/admin/import/template?${templateQuery}&format=zip`, `levonis-template-${stem}.zip`, t.zip, { zip: true, needsSection: false })}
-          {dlBtn('export-csv', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=csv`, `levonis-export-${stem}.csv`, t.exportCsv)}
-          {dlBtn('export-zip', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=zip`, `levonis-export-${stem}.zip`, t.exportZip, { zip: true })}
         </div>
-        {!effectiveType && <p className="text-amber-300/90 text-xs mt-2">{t.pickTypeFirst}</p>}
-      </Section>
+        {isTable ? (
+          <div className="mt-2">
+            <select
+              data-import="section"
+              value={sectionId}
+              onChange={(e) => { setSectionId(e.target.value); invalidate(); }}
+              className={inputCls + ' w-full sm:w-auto sm:min-w-[18rem] max-w-full'}
+            >
+              <option value="">{t.sectionPlaceholder}</option>
+              {options.map((c) => (
+                <option key={c.id} value={c.id}>{label(c)}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <p className="text-[11px] text-zinc-500 mt-2">{t.sectionOptional}</p>
+        )}
+        {isTable && catalogs.length > 0 && options.length === 0 && <p className="text-amber-300/90 text-[11px] mt-2">{t.noFamily}</p>}
+        {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}
+      </Step>
 
-      {/* 4 ------------------------------------------------------------- */}
-      <Section title={t.step3} hint={t.noWrite}>
+      {/* 3 — the template, named for what it is -------------------------- */}
+      <Step title={t.step3} hint={isTable ? t.tplHintTable : t.tplHintTxt}>
+        <div className="flex flex-wrap gap-2">
+          {format === 'csv' && (
+            <>
+              {dlBtn('template-csv', `/api/admin/import/template?${templateQuery}&format=csv`, `levonis-template-${stem}.csv`, t.tplCsv, { kind: 'csv', primary: true, disabled: !effectiveType })}
+              {dlBtn('export-csv', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=csv`, `levonis-export-${stem}.csv`, t.exportCsv, { kind: 'csv', disabled: !sectionId })}
+            </>
+          )}
+          {format === 'zip' && (
+            <>
+              {dlBtn('template-zip', `/api/admin/import/template?${templateQuery}&format=zip`, `levonis-template-${stem}.zip`, t.tplZip, { kind: 'zip', primary: true, disabled: !effectiveType })}
+              {dlBtn('export-zip', `/api/admin/import/export?category=${encodeURIComponent(sectionId)}&format=zip`, `levonis-export-${stem}.zip`, t.exportZip, { kind: 'zip', disabled: !sectionId })}
+            </>
+          )}
+          {format === 'txt' && (
+            <>
+              {dlBtn('template-txt', `/api/admin/template/blank${effectiveType ? `?type=${encodeURIComponent(effectiveType)}` : ''}`, `levonis-product-template${effectiveType ? `-${effectiveType}` : ''}.txt`, t.tplTxt, { kind: 'txt', primary: true })}
+              {dlBtn('template-txt-example', '/api/admin/template/example', 'levonis-product-template-example.txt', t.tplTxtExample, { kind: 'txt' })}
+            </>
+          )}
+        </div>
+        {isTable && !effectiveType && <p className="text-amber-300/90 text-[11px] mt-2">{t.pickTypeFirst}</p>}
+      </Step>
+
+      {/* 4 — the file, then the mandatory check -------------------------- */}
+      <Step title={t.step4} hint={t.noWrite}>
         <div className="flex flex-wrap items-center gap-2">
-          <label className={btnSecondary + ' cursor-pointer'}>
-            <FileText className="w-4 h-4" />
-            <span className="truncate max-w-[16rem]">{file ? file.name : t.pick}</span>
+          <label className={btnSecondary + ' cursor-pointer max-w-full'}>
+            <Upload className="w-4 h-4 shrink-0" />
+            <span className="truncate max-w-[15rem]">
+              {file ? file.name : format === 'csv' ? t.pickCsv : format === 'zip' ? t.pickZip : t.pickTxt}
+            </span>
             <input
               type="file"
-              accept=".csv,.zip,text/csv,application/zip"
+              accept={format === 'csv' ? '.csv,text/csv' : format === 'zip' ? '.zip,application/zip' : '.txt,.zip,text/plain,application/zip'}
               data-import="file"
               className="hidden"
               onChange={(e) => {
                 setFile(e.target.files?.[0] ?? null);
-                setPreview(null);
-                setResult(null);
+                if (e.target.files?.[0]) setPasted('');
+                invalidate();
               }}
             />
           </label>
           <button
             type="button"
-            data-import="preview"
-            disabled={!sectionId || !file || busy !== ''}
-            onClick={runPreview}
-            className={btnSecondary + ' disabled:opacity-40'}
+            data-import="check"
+            disabled={busy !== '' || (isTable ? !sectionId || !file : !file && !pasted.trim())}
+            onClick={runCheck}
+            className={btnPrimary + ' disabled:opacity-40'}
           >
-            {busy === 'preview' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {busy === 'preview' ? t.previewing : t.preview}
+            {busy === 'check' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+            {busy === 'check' ? t.checking : t.check}
           </button>
         </div>
-      </Section>
+        {format === 'txt' && (
+          <>
+            {/* The box is forced LTR because template keys are ASCII and a
+                pasted template must not be reordered; so the Arabic label sits
+                ABOVE it and the placeholder inside it is a template line. */}
+            <label className="block text-[11px] text-zinc-500 mt-2 mb-1" htmlFor="import-paste">{t.orPaste}</label>
+            <textarea
+              id="import-paste"
+              data-import="paste"
+              value={pasted}
+              onChange={(e) => { setPasted(e.target.value); if (e.target.value.trim()) setFile(null); invalidate(); }}
+              dir="ltr"
+              placeholder="name_ar=…"
+              className={inputCls + ' h-24 font-mono text-[11px]'}
+            />
+          </>
+        )}
+        {!check && <p className="text-[11px] text-zinc-500 mt-2">{t.mustCheck}</p>}
+      </Step>
 
-      {preview && !result && (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-          <p className="text-xs text-zinc-300 mb-2">
-            {fill(t.previewSummary, {
-              c: preview.summary.create,
-              u: preview.summary.update,
-              f: preview.summary.failed,
-              t: preview.summary.total,
-            })}
-          </p>
-          {preview.unknown_columns.length > 0 && (
-            <p className="text-[11px] text-amber-300/90 mb-2" dir="ltr">
-              {t.unknownCols}
-              {preview.unknown_columns.join(', ')}
+      {/* the check report ------------------------------------------------ */}
+      {check && !result && buckets && (
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3" data-import="check-report">
+          <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+            <ListChecks className="w-4 h-4 text-violet-400" aria-hidden /> {t.checkTitle}
+          </h4>
+
+          <div className="grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(120px,1fr))] mb-2">
+            <Stat label={t.statProducts} value={check.items.length} tone="info" testId="count-products" />
+            <Stat label={t.statCreate} value={check.items.filter((i) => i.action === 'create').length} tone="good" testId="count-create" />
+            <Stat label={t.statUpdate} value={check.items.filter((i) => i.action === 'update').length} tone="info" testId="count-update" />
+            <Stat label={t.statBlocked} value={blocked} tone={blocked ? 'bad' : 'muted'} testId="count-blocked" />
+          </div>
+          <div className="grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(120px,1fr))]">
+            <Stat label={t.bErrors} value={buckets.errors.length} tone={buckets.errors.length ? 'bad' : 'muted'} icon={<XCircle className="w-3 h-3" />} testId="count-errors" />
+            <Stat label={t.bMissing} value={buckets.missing.length} tone={buckets.missing.length ? 'warn' : 'muted'} testId="count-missing" />
+            <Stat label={t.bImages} value={buckets.images.length} tone={buckets.images.length ? 'warn' : 'muted'} icon={<ImageOff className="w-3 h-3" />} testId="count-images" />
+            <Stat label={t.bDuplicates} value={buckets.duplicates.length} tone={buckets.duplicates.length ? 'warn' : 'muted'} icon={<CopyX className="w-3 h-3" />} testId="count-duplicates" />
+            <Stat label={t.bNoImages} value={noImages} tone={noImages ? 'warn' : 'muted'} testId="count-no-images" />
+            <Stat label={t.bWarnings} value={buckets.warnings.length} tone={buckets.warnings.length ? 'warn' : 'muted'} testId="count-warnings" />
+          </div>
+
+          {check.notes.map((n, i) => (
+            <p key={i} className="text-[11px] text-amber-300/90 mt-2 break-words">{n}</p>
+          ))}
+          {check.unknownColumns.length > 0 && (
+            <p className="text-[11px] text-amber-300/90 mt-2" dir="ltr">
+              {check.format === 'txt' ? t.unknownKeys : t.unknownCols}
+              {check.unknownColumns.join(', ')}
             </p>
           )}
-          {preview.file_issues.length > 0 && (
-            <div className="mb-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2">
-              <p className="text-[11px] font-bold text-red-300 mb-1">{t.fileIssues}</p>
-              <ul className="text-[11px] text-red-200 space-y-0.5">
-                {preview.file_issues.slice(0, 20).map((i, n) => (
-                  <li key={n}>
-                    #{i.line} — {i.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <RowTable
-            rows={preview.rows.map((r) => ({
-              key: r.key,
-              name: r.name,
-              tone: r.action === 'failed' ? 'bad' : r.action === 'create' ? 'good' : 'info',
-              action: r.action === 'failed' ? t.failed : r.action === 'create' ? t.create : t.update,
-              detail:
-                r.errors.length > 0
-                  ? r.errors.join(' · ')
-                  : [
-                      `${r.options} opt`,
-                      `${r.colors} col`,
-                      `${r.links} link`,
-                      `${r.images} img`,
-                      ...r.warnings,
-                    ].join(' · '),
-            }))}
-            t={t}
-          />
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+
+          <IssueList title={t.fileIssues} issues={check.fileIssues} t={t} tone="bad" />
+          <IssueList title={t.bErrors} issues={buckets.errors.filter((i) => i.product !== null)} t={t} tone="bad" />
+          <IssueList title={t.bWarnings} issues={buckets.warnings} t={t} tone="warn" />
+
+          <ItemTable items={check.items} t={t} />
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
             <button
               type="button"
               data-import="confirm"
-              disabled={busy !== ''}
-              onClick={runConfirm}
+              disabled={busy !== '' || !canImport}
+              onClick={() => runImport()}
               className={btnPrimary + ' disabled:opacity-40'}
             >
               {busy === 'confirm' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               {busy === 'confirm' ? t.confirming : t.confirm}
             </button>
-            <span className="text-[11px] text-zinc-500">{t.noWrite}</span>
+            <span className={`text-[11px] ${blocked ? 'text-amber-300' : 'text-emerald-300'}`}>
+              {check.items.length === 0
+                ? t.nothingToApply
+                : blocked === 0
+                  ? t.allClear
+                  : importable === 0
+                    ? t.blocked
+                    : fill(t.partial, { n: importable, b: blocked })}
+            </span>
+          </div>
+
+        </div>
+      )}
+
+      {/* the duplicate question — asked, never answered for the admin ----- */}
+      {duplicates.length > 0 && (
+        <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5" data-import="duplicate">
+          <p className="text-[11px] font-bold text-amber-200 mb-1.5">{t.dupTitle}</p>
+          <ul className="text-[11px] text-amber-200/90 mb-2 space-y-0.5" dir="ltr">
+            {duplicates.map((d) => <li key={d}>{d}</li>)}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={busy !== ''} className={btnSecondary} data-import="dup-update" onClick={() => runImport('update_existing')}>
+              {t.dupUpdate}
+            </button>
+            <button type="button" disabled={busy !== ''} className={btnSecondary} data-import="dup-new" onClick={() => runImport('create_hidden_draft_new_identity')}>
+              {t.dupNew}
+            </button>
           </div>
         </div>
       )}
 
+      {/* the result ------------------------------------------------------ */}
       {result && (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3" data-import="result">
           <p className="text-xs text-zinc-200 mb-2 font-bold">
-            {fill(t.summary, {
-              c: result.summary.created,
-              u: result.summary.updated,
-              s: result.summary.skipped,
-              f: result.summary.failed,
-            })}
+            {fill(t.summary, { c: result.summary.created, u: result.summary.updated, s: result.summary.skipped, f: result.summary.failed })}
           </p>
-          <RowTable
-            rows={result.rows.map((r) => ({
-              key: r.key,
-              name: r.name,
-              tone: r.action === 'failed' ? 'bad' : r.action === 'skipped' ? 'warn' : 'good',
-              action:
-                r.action === 'created'
-                  ? t.created
-                  : r.action === 'updated'
-                    ? t.updated
-                    : r.action === 'skipped'
-                      ? t.skipped
-                      : t.failed,
-              detail: r.reason || r.product_id,
-            }))}
-            t={t}
-          />
-          {(result.translation_review_needed?.length ?? 0) > 0 && (
+          <ResultTable rows={result.rows} t={t} />
+          {(result.review?.length ?? 0) > 0 && (
             <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
               <p className="text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> {t.reviewNeeded}
               </p>
               <ul className="text-[11px] text-amber-200 space-y-0.5" dir="ltr">
-                {result.translation_review_needed!.slice(0, 20).map((x, n) => (
-                  <li key={n}>{x}</li>
-                ))}
+                {result.review!.slice(0, 20).map((x, n) => <li key={n}>{x}</li>)}
               </ul>
             </div>
           )}
-          <div className="mt-3">
-            {dlBtn(
-              'report',
-              `/api/admin/import/${encodeURIComponent(result.import_id)}/report?format=csv`,
-              `levonis-import-${result.import_id}.csv`,
-              t.report
-            )}
-          </div>
+          {result.importId && (
+            <div className="mt-3">
+              {dlBtn('report', `/api/admin/import/${encodeURIComponent(result.importId)}/report?format=csv`, `levonis-import-${result.importId}.csv`, t.report)}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ------------------------------------------------------------------- pieces
+// -------------------------------------------------------------- lane: table
+
+/** CSV and ZIP: one POST to the preview endpoint, normalised. */
+async function checkTable(file: File, sectionId: string): Promise<CheckResult> {
+  const form = new FormData();
+  form.set('file', file);
+  form.set('category', sectionId);
+  const res = await api.post<PreviewResponse>('/api/admin/import/preview', form);
+  const columns = res.columns ?? [];
+  return {
+    format: file.name.toLowerCase().endsWith('.zip') ? 'zip' : 'csv',
+    importId: res.import_id,
+    unknownColumns: res.unknown_columns ?? [],
+    notes: [],
+    fileIssues: (res.file_issues ?? []).map((i) =>
+      readIssueText(i.message, { severity: i.severity === 'warning' ? 'warning' : 'error', columns, line: i.line })
+    ),
+    items: (res.rows ?? []).map((r) => ({
+      id: r.key,
+      line: r.line,
+      name: r.name,
+      action: r.action === 'failed' ? 'blocked' : r.action,
+      images: r.images,
+      issues: [
+        ...r.errors.map((m) => readIssueText(m, { product: r.key, severity: 'error', columns })),
+        ...r.warnings.map((m) => readIssueText(m, { product: r.key, severity: 'warning', columns })),
+      ],
+    })),
+  };
+}
+
+async function applyTable(importId: string, t: Strings, note: (m: string) => void) {
+  const res = await api.post<ConfirmResponse>('/api/admin/import/confirm', { import_id: importId });
+  if (res.already_applied) note(t.alreadyApplied);
+  return {
+    importId: res.import_id,
+    summary: res.summary,
+    review: res.translation_review_needed,
+    rows: (res.rows ?? []).map<ResultRow>((r) => ({
+      key: r.key,
+      name: r.name,
+      action: r.action,
+      detail: r.reason || r.product_id,
+    })),
+  };
+}
+
+// ---------------------------------------------------------------- lane: txt
 
 /**
- * The accepted values of the classification columns, as copyable chips. The
- * sub-sections narrow to the chosen section's branch when one is chosen.
+ * TXT: one file through /parse, or an archive through /parse-zip. The archive
+ * is ALSO unzipped locally, because /apply takes the template text and the
+ * server's per-file results do not carry it back.
  */
-function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?: Catalog; lang: string; t: typeof STRINGS.ar }) {
-  // A disclosure that RENDERS nothing while closed, rather than a <details>
-  // that only hides it: the four lists run to a couple of hundred values, and
-  // a closed <details> still lays every one of them out — which is both waste
-  // and a dialog full of controls the admin never asked to see.
+async function checkTxt(file: File | null, pasted: string, t: Strings): Promise<CheckResult> {
+  if (file && file.name.toLowerCase().endsWith('.zip')) return checkTxtArchive(file, t);
+
+  const text = file ? await file.text() : pasted;
+  const res = await api.post<ParseResponse>('/api/admin/template/parse', { text });
+  const issues: ImportIssue[] = [
+    ...res.errors.map((e) => readIssueEntry(e, { product: file?.name ?? 'template', severity: 'error' })),
+    ...(res.validation_error ? [readIssueEntry({ line: 0, key: '', message: res.validation_error.message }, { product: file?.name ?? 'template' })] : []),
+    ...res.needs_review.map((n) =>
+      readIssueEntry({ line: n.line, key: n.key, message: `${t.needsReview}: ${n.message} «${n.value}»` }, { product: file?.name ?? 'template' })
+    ),
+    ...res.warnings.map((w) => readIssueEntry({ key: '', message: w }, { product: file?.name ?? 'template', severity: 'warning' })),
+  ];
+  const blocked = issues.some((i) => i.severity === 'error');
+  return {
+    format: 'txt',
+    txtMode: 'single',
+    unknownColumns: res.unknown_keys ?? [],
+    notes: [],
+    fileIssues: [],
+    items: [
+      {
+        id: file?.name ?? 'template',
+        line: null,
+        name: txtName(text),
+        action: blocked ? 'blocked' : res.is_create ? 'create' : 'update',
+        images: countTxtImages(text),
+        issues,
+        text,
+      },
+    ],
+  };
+}
+
+async function checkTxtArchive(file: File, t: Strings): Promise<CheckResult> {
+  // Local unzip first: without the per-file text there is nothing to apply.
+  const texts = new Map<string, string>();
+  const notes: string[] = [];
+  try {
+    const entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    for (const [name, data] of Object.entries(entries)) {
+      if (name.endsWith('/') || !name.toLowerCase().endsWith('.txt')) continue;
+      texts.set(name, strFromU8(data));
+    }
+  } catch {
+    notes.push(t.zipLocalFailed);
+  }
+
+  const form = new FormData();
+  form.append('file', file);
+  const res = await api.post<ZipParseResponse>('/api/admin/template/parse-zip', form);
+
+  if (res.skipped_entries?.length) notes.push(`${t.zipNotTxt} ${res.skipped_entries.join('، ')}`);
+  if (res.skipped_over_limit?.length) {
+    notes.push(`${fill(t.zipOverLimit, { n: res.counts?.limit ?? '' })} ${res.skipped_over_limit.join('، ')}`);
+  }
+
+  // Two files in one archive naming the same product would import as two
+  // products, or as one silently overwriting the other. Named, not hidden.
+  const seen = new Map<string, string>();
+  const items: CheckedItem[] = res.files.map((f) => {
+    const text = texts.get(f.name) ?? '';
+    const issues: ImportIssue[] = [
+      ...f.errors.map((e) => readIssueEntry(e, { product: f.name, severity: 'error' })),
+      ...(f.validation_error ? [readIssueEntry({ line: 0, key: '', message: f.validation_error.message }, { product: f.name })] : []),
+      ...f.needs_review.map((n) =>
+        readIssueEntry({ line: n.line, key: n.key, message: `${t.needsReview}: ${n.message} «${n.value}»` }, { product: f.name })
+      ),
+      ...f.warnings.map((w) => readIssueEntry({ key: '', message: w }, { product: f.name, severity: 'warning' })),
+    ];
+    const name = f.summary?.name_en || f.summary?.name_ar || txtName(text);
+    if (name) {
+      const first = seen.get(name.toLowerCase());
+      if (first && first !== f.name) {
+        issues.push(
+          readIssueEntry({ key: 'name', message: `مكرر: نفس اسم المنتج في «${first}» / duplicate: the same product name as "${first}"` }, { product: f.name })
+        );
+      } else seen.set(name.toLowerCase(), f.name);
+    }
+    const ok = f.ready_to_apply && !!text && !issues.some((i) => i.severity === 'error');
+    return {
+      id: f.name,
+      line: null,
+      name,
+      action: ok ? (f.is_create === false ? 'update' : 'create') : 'blocked',
+      images: countTxtImages(text),
+      issues,
+      text,
+    };
+  });
+
+  return { format: 'txt', txtMode: 'archive', unknownColumns: [], notes, fileIssues: [], items };
+}
+
+/**
+ * Sequential on purpose: rate-limit friendly, and each file's outcome stays
+ * attributable to its own name in the report. A duplicate stops the run and
+ * asks — the choice is the admin's, never a default.
+ */
+async function applyTxt(ready: CheckedItem[], t: Strings, choice: DuplicateChoice | undefined) {
+  const rows: ResultRow[] = [];
+  const duplicates: string[] = [];
+  const summary = { created: 0, updated: 0, skipped: 0, failed: 0 };
+  for (const item of ready) {
+    if (!item.text) {
+      rows.push({ key: item.id, name: item.name, action: 'failed', detail: t.zipLocalFailed });
+      summary.failed += 1;
+      continue;
+    }
+    try {
+      const out = await api.post<ApplyResponse>('/api/admin/template/apply', {
+        text: item.text,
+        mode: item.action === 'update' ? 'update' : 'draft',
+        confirm: true,
+        duplicate_choice: choice,
+      });
+      const action = out.created ? 'created' : 'updated';
+      rows.push({
+        key: item.id,
+        name: item.name,
+        action,
+        detail: out.already_applied ? t.alreadyApplied : out.product_id,
+      });
+      if (out.already_applied) summary.skipped += 1;
+      else summary[action] += 1;
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : '';
+      const detail =
+        code === 'DUPLICATE' ? t.dupTitle : code === 'APPLY_IN_PROGRESS' ? t.inProgress : e instanceof ApiError ? e.message : String(e);
+      rows.push({ key: item.id, name: item.name, action: 'failed', detail });
+      summary.failed += 1;
+      if (code === 'DUPLICATE') duplicates.push(item.id);
+    }
+  }
+  return { summary, rows, duplicates, review: undefined as string[] | undefined, importId: undefined as string | undefined };
+}
+
+/**
+ * A second pass answers the duplicate question for the files that asked it,
+ * so its rows REPLACE those files' earlier "failed — duplicate" rows rather
+ * than being appended beside them.
+ */
+function mergeResults(prev: ImportResult | null, next: ImportResult): ImportResult {
+  if (!prev) return next;
+  const replaced = new Set(next.rows.map((r) => r.key));
+  const kept = prev.rows.filter((r) => !replaced.has(r.key));
+  const summary = { created: 0, updated: 0, skipped: 0, failed: 0 };
+  for (const r of [...kept, ...next.rows]) summary[r.action] += 1;
+  return { ...next, rows: [...kept, ...next.rows], summary, importId: next.importId ?? prev.importId };
+}
+
+// ------------------------------------------------------------------- pieces
+
+function Step({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-3 first:mt-0">
+      <h4 className="text-[12px] font-bold text-white mb-1">{title}</h4>
+      {hint && <p className="text-[11px] leading-relaxed text-zinc-500 mb-1.5">{hint}</p>}
+      {children}
+    </section>
+  );
+}
+
+function TypeChip({ id, on, onClick, label, sub }: { id?: string; on: boolean; onClick: () => void; label: string; sub?: string }) {
+  return (
+    <button
+      type="button"
+      data-import-type={id}
+      aria-pressed={on}
+      onClick={onClick}
+      title={sub}
+      className={`min-h-9 px-2.5 rounded-lg border text-[12px] font-bold transition-colors ${
+        on ? 'border-violet-500 bg-violet-500/10 text-white' : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-600'
+      }`}
+    >
+      {label}
+      {sub && <span className="text-[10px] font-medium text-zinc-500 ms-1.5">{sub}</span>}
+    </button>
+  );
+}
+
+const TONE = {
+  good: 'text-emerald-300 border-emerald-500/25 bg-emerald-500/5',
+  bad: 'text-red-300 border-red-500/25 bg-red-500/5',
+  warn: 'text-amber-300 border-amber-500/25 bg-amber-500/5',
+  info: 'text-sky-300 border-sky-500/25 bg-sky-500/5',
+  muted: 'text-zinc-500 border-zinc-800 bg-zinc-900/40',
+};
+
+function Stat({ label, value, tone, icon, testId }: { label: string; value: number; tone: keyof typeof TONE; icon?: React.ReactNode; testId: string }) {
+  return (
+    <div className={`min-w-0 rounded-lg border px-2 py-1.5 ${TONE[tone]}`} data-import-stat={testId}>
+      <span className="flex items-center gap-1 text-[15px] font-bold leading-none">
+        {icon}
+        <span dir="ltr">{value}</span>
+      </span>
+      <span className="block text-[10px] leading-tight text-zinc-400 mt-1 truncate" title={label}>{label}</span>
+    </div>
+  );
+}
+
+/**
+ * Every complaint, each naming its product, its line and its field. Long lists
+ * collapse to the first ten with an explicit "show all N" — a truncation the
+ * admin can undo, never one that quietly hides the eleventh error.
+ */
+function IssueList({ title, issues, t, tone }: { title: string; issues: ImportIssue[]; t: Strings; tone: 'bad' | 'warn' }) {
+  const [all, setAll] = useState(false);
+  if (issues.length === 0) return null;
+  const shown = all ? issues : issues.slice(0, 10);
+  const c = tone === 'bad' ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  return (
+    <div className={`mt-2 rounded-lg border p-2 ${c}`} data-import-issues={tone}>
+      <p className="text-[11px] font-bold mb-1">{title} ({issues.length})</p>
+      <ul className="text-[11px] space-y-1">
+        {shown.map((i, n) => (
+          <li key={n} className="break-words">
+            <span className="opacity-70" dir="auto">{issueWhere(i, t.where)}</span>
+            {issueWhere(i, t.where) && ' — '}
+            <span dir="auto">{i.message}</span>
+          </li>
+        ))}
+      </ul>
+      {!all && issues.length > shown.length && (
+        <button type="button" onClick={() => setAll(true)} className="mt-1 min-h-9 text-[11px] font-bold underline">
+          {fill(t.showAll, { n: issues.length })}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ItemTable({ items, t }: { items: CheckedItem[]; t: Strings }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2 overflow-x-auto -mx-1 px-1">
+      <p className="text-[11px] font-bold text-zinc-400 mb-1">{t.rowsTitle}</p>
+      <table className="w-full text-[11px] border-collapse min-w-[24rem]">
+        <tbody>
+          {items.map((i) => (
+            <tr key={i.id} className="border-t border-zinc-800/60 align-top">
+              <td className="py-1 pe-2 font-mono text-zinc-300"><span dir="ltr">{i.id}</span></td>
+              <td className="py-1 pe-2 text-zinc-300"><span dir="ltr">{i.name}</span></td>
+              <td className={`py-1 pe-2 font-bold ${i.action === 'blocked' ? 'text-red-300' : i.action === 'create' ? 'text-emerald-300' : 'text-sky-300'}`}>
+                {i.action === 'blocked' ? t.blockedRow : i.action === 'create' ? t.create : t.update}
+              </td>
+              <td className="py-1 text-zinc-500" dir="ltr">{i.images} img</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ResultTable({ rows, t }: { rows: ResultRow[]; t: Strings }) {
+  if (rows.length === 0) return null;
+  const word = { created: t.created, updated: t.updated, skipped: t.skipped, failed: t.failed };
+  const tone = { created: 'text-emerald-300', updated: 'text-emerald-300', skipped: 'text-amber-300', failed: 'text-red-300' };
+  return (
+    <div className="overflow-x-auto -mx-1 px-1">
+      <table className="w-full text-[11px] border-collapse min-w-[24rem]">
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.key}-${i}`} className="border-t border-zinc-800/60 align-top">
+              <td className="py-1 pe-2 font-mono text-zinc-300"><span dir="ltr">{r.key}</span></td>
+              <td className="py-1 pe-2 text-zinc-300"><span dir="ltr">{r.name}</span></td>
+              <td className={`py-1 pe-2 font-bold ${tone[r.action]}`}>{word[r.action]}</td>
+              <td className="py-1 text-zinc-400 break-words">{r.detail}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The accepted values of the classification columns, as copyable chips. It
+ * RENDERS nothing while closed rather than hiding a laid-out list: the four
+ * lists run to a couple of hundred values, and this window is meant to be the
+ * uncrowded one.
+ */
+function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?: Catalog; lang: string; t: Strings }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const isEn = lang === 'en';
@@ -660,101 +1234,40 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
       </div>
     );
   return (
-    <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40" data-import="lookups">
+    <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/40" data-import="lookups">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         data-import="lookups-toggle"
-        className="w-full flex items-center gap-2 px-3 min-h-10 text-xs font-bold text-white text-start"
+        className="w-full flex items-center gap-2 px-3 min-h-10 text-[11px] font-bold text-white text-start"
       >
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${open ? '' : '-rotate-90 rtl:rotate-90'}`} aria-hidden />
         <span className="min-w-0 truncate">{t.lookupsTitle}</span>
       </button>
       {!open ? null : (
-      <div className="px-3 pb-3 space-y-3 max-h-80 overflow-y-auto">
-        <p className="text-[11px] text-zinc-500">{t.lookupsHint}</p>
-        <div role="status" aria-live="polite" className="sr-only">
-          {copied ? `${t.copied}: ${copied}` : ''}
+        <div className="px-3 pb-3 space-y-3 max-h-72 overflow-y-auto">
+          <p className="text-[11px] text-zinc-500">{t.lookupsHint}</p>
+          <div role="status" aria-live="polite" className="sr-only">{copied ? `${t.copied}: ${copied}` : ''}</div>
+          <div>
+            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkCategory}</h5>
+            {chips(roots.map((s) => ({ key: s.id, value: s.slug, label: isEn ? s.name_en : s.name_ar || s.name_en })), 'category')}
+          </div>
+          <div>
+            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkSub}</h5>
+            {chips(subs.map((s) => ({ key: s.id, value: s.slug, label: rootId ? (isEn ? s.name_en : s.name_ar || s.name_en) : s.parent_name_en })), 'sub_category')}
+          </div>
+          <div>
+            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkBrand}</h5>
+            {chips(lookups.brands.map((b) => ({ key: b.id, value: b.slug, label: isEn ? b.name_en : b.name_ar || b.name_en })), 'brand')}
+          </div>
+          <div>
+            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkHashtag}</h5>
+            {chips(lookups.hashtags.map((h) => ({ key: h.tag, value: h.tag, label: h.name_ar || undefined })), 'hashtags')}
+            <p className="text-[10px] text-zinc-500 mt-1">{t.lkHashtagFree}</p>
+          </div>
         </div>
-        <div>
-          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkCategory}</h5>
-          {chips(roots.map((s) => ({ key: s.id, value: s.slug, label: isEn ? s.name_en : s.name_ar || s.name_en })), 'category')}
-        </div>
-        <div>
-          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkSub}</h5>
-          {chips(subs.map((s) => ({ key: s.id, value: s.slug, label: rootId ? (isEn ? s.name_en : s.name_ar || s.name_en) : s.parent_name_en })), 'sub_category')}
-        </div>
-        <div>
-          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkBrand}</h5>
-          {chips(lookups.brands.map((b) => ({ key: b.id, value: b.slug, label: isEn ? b.name_en : b.name_ar || b.name_en })), 'brand')}
-        </div>
-        <div>
-          <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkHashtag}</h5>
-          {chips(lookups.hashtags.map((h) => ({ key: h.tag, value: h.tag, label: h.name_ar || undefined })), 'hashtags')}
-          <p className="text-[10px] text-zinc-500 mt-1">{t.lkHashtagFree}</p>
-        </div>
-      </div>
       )}
-    </div>
-  );
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-4 first:mt-0">
-      <h4 className="text-xs font-bold text-white mb-1">{title}</h4>
-      {hint && <p className="text-[11px] text-zinc-500 mb-2">{hint}</p>}
-      {children}
-    </section>
-  );
-}
-
-interface DisplayRow {
-  key: string;
-  name: string;
-  action: string;
-  detail: string;
-  tone: 'good' | 'bad' | 'warn' | 'info';
-}
-
-const TONE = {
-  good: 'text-emerald-300',
-  bad: 'text-red-300',
-  warn: 'text-amber-300',
-  info: 'text-sky-300',
-};
-
-function RowTable({ rows, t }: { rows: DisplayRow[]; t: typeof STRINGS.ar }) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="overflow-x-auto -mx-1 px-1">
-      <table className="w-full text-[11px] border-collapse min-w-[32rem]">
-        <thead>
-          <tr className="text-zinc-500 text-start">
-            <th className="text-start font-bold py-1 pe-2">{t.colKey}</th>
-            <th className="text-start font-bold py-1 pe-2">{t.colName}</th>
-            <th className="text-start font-bold py-1 pe-2">{t.colAction}</th>
-            <th className="text-start font-bold py-1">{t.colDetail}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={`${r.key}-${i}`} className="border-t border-zinc-800/60 align-top">
-              {/* The cell keeps the table's direction so the columns stay
-                  aligned; only the Latin text inside it is forced LTR. */}
-              <td className="py-1 pe-2 font-mono text-zinc-300">
-                <span dir="ltr">{r.key}</span>
-              </td>
-              <td className="py-1 pe-2 text-zinc-300">
-                <span dir="ltr">{r.name}</span>
-              </td>
-              <td className={`py-1 pe-2 font-bold ${TONE[r.tone]}`}>{r.action}</td>
-              <td className="py-1 text-zinc-400 break-words">{r.detail}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
