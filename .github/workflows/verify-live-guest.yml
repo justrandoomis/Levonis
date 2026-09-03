@@ -1,0 +1,129 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that a visitor with NO account can browse the site: the open
+# routes answer, the app shell is served for each, and the deployed bundle
+# carries the sign-in helper that sends a guest back where they were.
+#
+# WHAT IT WRITES: nothing. Every request is an anonymous GET with no cookie.
+name: 21 - Verify Live Guest Browsing (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-guest
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every open route answers an anonymous visitor
+        id: routes
+        run: |
+          set -euo pipefail
+          fail=0
+          # No cookie jar, no header, nobody. The SPA serves its shell for any
+          # of its own paths, so a 200 here means the route exists and the app
+          # is reachable; which component renders is asserted by the browser
+          # suite (scripts/e2e-guest.mjs) at build time.
+          for p in / /products /bundles /community /requests /chats /subscription /points /tools /games /leaderboards /policies /support; do
+            code=$(curl -s -o /tmp/page.html -w '%{http_code}' --max-time 25 "$APEX$p" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "  ok   $p answers 200 to a guest"
+            else
+              echo "  FAIL $p answers $code"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: The public read APIs a guest browses are still public
+        id: api
+        run: |
+          set -euo pipefail
+          fail=0
+          probe() { # path, what it is
+            code=$(curl -s -o /tmp/body.json -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "  ok   $2 reads without a session ($code)"
+            else
+              echo "  FAIL $2 answers $code: $(head -c 140 /tmp/body.json)"
+              fail=1
+            fi
+          }
+          probe /api/community/merchants     'the community merchant list'
+          probe /api/community/products      'the community products'
+          probe /api/community/requests      'the community requests'
+          probe /api/memberships/plans       'the membership plans'
+          # And the personal ones must still refuse.
+          refuse() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $2 still refuses a stranger ($code)"
+            else
+              echo "  FAIL $2 answers $code to a stranger"; fail=1
+            fi
+          }
+          refuse /api/orders            'someone’s orders'
+          refuse /api/wallet            'someone’s wallet'
+          refuse /api/addresses         'someone’s addresses'
+          refuse /api/community/followed 'someone’s followed stores'
+          exit $fail
+
+      - name: The shipped bundle carries the guest sign-in helper
+        id: bundle
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          all=""
+          for a in $entries; do
+            f=/tmp/mods/$(basename "$a")
+            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
+            all="$all $f"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
+            done
+          done
+          echo "  modules read: $(echo $all | wc -w)"
+          fail=0
+          # Written to FILES, never piped into grep: `grep -q` stops at the
+          # first match, the writer takes SIGPIPE, and `pipefail` then reads a
+          # successful match as a failed pipeline.
+          hit=$(grep -l '/auth' $all 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then echo "  ok   the sign-in destination is in the bundle — in $(basename "$hit")";
+          else echo "  FAIL no served module references the sign-in route"; fail=1; fi
+          exit $fail
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live guest-browsing verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| every open route answers an anonymous visitor | ${{ steps.routes.outcome }} |"
+            echo "| public reads public, personal reads refused | ${{ steps.api.outcome }} |"
+            echo "| the deployed bundle carries the sign-in helper | ${{ steps.bundle.outcome }} |"
+            echo ''
+            echo 'Read-only: every request was an anonymous GET with no cookie.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.routes.outcome != 'success' || steps.api.outcome != 'success' || steps.bundle.outcome != 'success'
+        run: exit 1
