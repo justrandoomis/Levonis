@@ -5,6 +5,7 @@ import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { TabStrip, TabPanels } from '../components/ui/Tabs';
+import { Sheet } from '../components/ui/Overlay';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import {
@@ -425,10 +426,28 @@ export default function Community() {
 
       </div>
 
-      {/* New Request Modal */}
-      {showNewRequest && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => !reqSubmitting && setShowNewRequest(false)}>
-          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+      {/* NEW REQUEST — the last window on the community screen, and the only one
+          here that was still a `fixed inset-0` div mounted on a boolean: it
+          appeared instantly and vanished instantly, with nothing to say it had
+          come from the button the member pressed.
+
+          A Sheet, because it is a short form a member fills in on a phone with
+          the feed still behind it — arriving from the bottom edge and thrown
+          back down is the gesture that matches. Both dismissals stay held to
+          `!reqSubmitting`, which is what the old backdrop-click test did, and
+          the Escape key it now inherits is held to the same test: a request
+          being submitted must not be dismissed out from under itself. */}
+      <Sheet
+        open={showNewRequest}
+        onClose={() => setShowNewRequest(false)}
+        label={dir === 'rtl' ? 'طلب جديد' : 'New Request'}
+        z={50}
+        testId="community-new-request"
+        dismissOnScrim={!reqSubmitting}
+        dismissOnEscape={!reqSubmitting}
+        panelClassName="w-full max-w-md max-h-[88dvh] overflow-y-auto"
+      >
+          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-bold">{dir === 'rtl' ? 'طلب جديد' : 'New Request'}</h3>
               <button onClick={() => !reqSubmitting && setShowNewRequest(false)} className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
@@ -468,8 +487,7 @@ export default function Community() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+      </Sheet>
     </div>
   );
 }

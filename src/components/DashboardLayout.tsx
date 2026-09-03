@@ -21,11 +21,13 @@
 
 import React, { ReactNode, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   Bell, Menu, User, ArrowLeft, ArrowRight, Globe, LogOut, X,
   Settings as SettingsIcon, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import { useMotion } from '../lib/motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
@@ -316,8 +318,8 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
       </aside>
 
       {/* --------------------------------------------------- mobile drawer */}
-      {showMobileSidebar && (
-        <MobileDrawer
+      <MobileDrawer
+          open={showMobileSidebar}
           title={title}
           items={sidebarItems}
           activeTab={activeTab}
@@ -327,7 +329,6 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           onSelect={(id) => { onTabChange(id); closeDrawer(); }}
           onClose={closeDrawer}
         />
-      )}
 
       {/* ---------------------------------------------------- content column */}
       {/* `relative` with NO z-index: a z-index here would open a stacking
@@ -469,8 +470,13 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
  * context. Escape closes it, focus starts inside and returns to the opener.
  */
 function MobileDrawer({
-  title, items, activeTab, dir, closeLabel, menuLabel, onSelect, onClose,
+  open, title, items, activeTab, dir, closeLabel, menuLabel, onSelect, onClose,
 }: {
+  /** The parent used to mount and unmount this component, which meant the exit
+   *  animation had nothing to run on — a window removed from the tree cannot
+   *  animate its own departure. The drawer is always rendered now and this
+   *  prop decides whether it is on screen. */
+  open: boolean;
   title: string;
   items: SidebarItem[];
   activeTab: string;
@@ -481,8 +487,14 @@ function MobileDrawer({
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const m = useMotion();
 
+  // Everything in here belongs to a drawer that is OPEN: the focus, the Escape
+  // key and the scroll lock. Now that the component stays mounted so it can
+  // animate away, they have to be gated on `open` — a permanently mounted
+  // drawer that permanently locked body scroll would be a bug of its own.
   useEffect(() => {
+    if (!open) return;
     panelRef.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
@@ -494,22 +506,51 @@ function MobileDrawer({
       document.removeEventListener('keydown', onKey, true);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, [open, onClose]);
 
   if (typeof document === 'undefined') return null;
 
+  // THE DRAWER ARRIVES FROM THE EDGE IT LIVES ON, AND LEAVES THROUGH IT.
+  //
+  // It used to be mounted and unmounted outright: the admin's main navigation
+  // on an iPad appeared from nowhere and vanished to nowhere, which is the one
+  // window where "where did that go?" costs the most, because the answer is
+  // "the button you are about to look for". It is a SIDE drawer, which the
+  // shared Overlay does not place, so the motion lives here — but it uses the
+  // house springs, so it feels like every other window rather than like a
+  // second opinion.
+  //
+  // `m.inline(-288)` is the width of the panel along the INLINE axis, sign-
+  // corrected for the writing direction: the drawer sits on `start-0`, so in
+  // Arabic it is the right edge and the slide has to mirror with it. A literal
+  // `x: -288` would have it fly in from off-screen on the wrong side for most
+  // of this app's users.
+  //
+  // The scrim fades and the panel travels, and both reverse along the same
+  // path — AnimatePresence is what makes the exit exist at all, and the spring
+  // is what makes a drawer grabbed mid-slide continue from where it really is.
   return createPortal(
-    <div
+    <AnimatePresence>
+      {open ? (
+    <motion.div
       dir={dir}
       className="fixed inset-0 z-[900] lg:hidden"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={m.spring('quick')}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
-      <div
+      <motion.div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={menuLabel}
+        initial={{ x: m.travel(m.inline(-288)) }}
+        animate={{ x: 0 }}
+        exit={{ x: m.travel(m.inline(-288)) }}
+        transition={m.spring('sheet')}
         className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-[#09090b] text-zinc-300 flex flex-col border-e border-zinc-800 shadow-2xl p-4"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
@@ -547,8 +588,10 @@ function MobileDrawer({
             </button>
           ))}
         </nav>
-      </div>
-    </div>,
+      </motion.div>
+    </motion.div>
+      ) : null}
+    </AnimatePresence>,
     document.body
   );
 }

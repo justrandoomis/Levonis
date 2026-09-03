@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api } from '../lib/api';
+import { Overlay } from './ui/Overlay';
 
 /**
  * Admin — PRO KYC: identity/phone-change review queues and the approved-
@@ -471,10 +472,27 @@ export default function AdminKyc() {
         </div>
       )}
 
-      {/* Case detail modal (audited decrypted view) */}
-      {detail && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-t-[28px] sm:rounded-[28px] p-5 w-full max-w-xl max-h-[88vh] overflow-y-auto">
+      {/* CASE DETAIL — the audited decrypted view.
+
+          It was a `fixed inset-0` div mounted on `detail`, so an identity
+          document appeared instantly and vanished instantly with no Escape
+          key at all: the only way out was the button at the very bottom of a
+          scrolling panel. On a screen whose whole point is that opening it is
+          AUDITED, being able to close it the moment you realise it is the
+          wrong case matters. `solid` keeps its own near-black ground, because
+          a decrypted document read through tinted glass is a document read
+          badly. */}
+      <Overlay
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        label={detail?.user_email ?? t.auditWarn}
+        placement="bottom"
+        z={60}
+        solid
+        testId="kyc-case-detail"
+        panelClassName="w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-[#0a0a0a] border border-zinc-800 !rounded-t-[28px] sm:!rounded-[28px]"
+      >
+          <div className="p-5">
             <div className="flex items-center justify-between mb-1">
               <p className="font-bold">{detail.user_email}</p>
               {stateChip(detail.state)}
@@ -580,8 +598,7 @@ export default function AdminKyc() {
               {t.close}
             </button>
           </div>
-        </div>
-      )}
+      </Overlay>
     </div>
   );
 }
