@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Settings, Trophy, Gamepad2 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
+import { useSignInPrompt } from '../lib/guest';
 
 export default function Leaderboards() {
   const navigate = useNavigate();
   const { dir } = useLanguage();
   const { user } = useAuth();
+  const { signIn } = useSignInPrompt();
 
   const avatarUrl = user?.avatar_key
     ? `/files/${user.avatar_key}`
@@ -25,7 +27,10 @@ export default function Leaderboards() {
           LEADERBOARDS
         </h1>
 
-        <button onClick={() => navigate('/settings')} className="p-2 -mr-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white">
+        {/* Settings is a member page. A guest tapping the gear used to be
+            bounced to sign-in with no way back; now the way back rides along
+            and they return here. */}
+        <button onClick={() => (user ? navigate('/settings') : signIn())} className="p-2 -mr-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white">
           <Settings className="w-6 h-6 fill-current" />
         </button>
       </div>

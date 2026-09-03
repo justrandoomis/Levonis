@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
+import { useSignInPrompt } from '../lib/guest';
 import { api, ApiError } from '../lib/api';
 import {
   ArrowLeft,
@@ -502,8 +503,8 @@ function TicketForm({
 // ------------------------------------------------------------ tickets tab
 
 function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; refreshKey: number }) {
-  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { signIn } = useSignInPrompt();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -573,7 +574,7 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
     return (
       <div className="text-center py-12 text-zinc-400 bg-zinc-900/50 rounded-xl border border-zinc-800/50 space-y-3">
         <p>{s.ticketsSignIn}</p>
-        <button onClick={() => navigate('/auth')} className="px-4 py-2 rounded-xl bg-[#2CE59B] text-black text-sm font-black">
+        <button onClick={() => signIn()} className="px-4 py-2 rounded-xl bg-[#2CE59B] text-black text-sm font-black">
           {s.signIn}
         </button>
       </div>
@@ -699,6 +700,7 @@ export default function Support() {
   const navigate = useNavigate();
   const { lang, dir, loc } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const { signIn } = useSignInPrompt();
   const s: SupportStrings = STRINGS[lang] ?? STRINGS.ar;
 
   const [tab, setTab] = useState<'assistant' | 'tickets'>('assistant');
@@ -865,7 +867,7 @@ export default function Support() {
 
                   {m.reply?.handoff && !showTicketForm && (
                     <button
-                      onClick={() => (isAuthenticated ? setShowTicketForm(true) : navigate('/auth'))}
+                      onClick={() => (isAuthenticated ? setShowTicketForm(true) : signIn())}
                       className="px-3 py-2 rounded-xl bg-[#2CE59B] text-black text-xs font-black flex items-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />

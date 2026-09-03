@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, formatIqd } from '../lib/api';
+import { useAuth } from '../AuthContext';
+import { useSignInPrompt } from '../lib/guest';
 import {
   ArrowLeft, ArrowRight, Star, Store as StoreIcon, BadgeCheck, Box
 } from 'lucide-react';
@@ -30,6 +32,8 @@ interface StoreProduct {
 
 export default function MerchantStore() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { signIn } = useSignInPrompt();
   const { id } = useParams();
   const { dir, lang } = useLanguage();
   const [activeTab, setActiveTab] = useState('products');
@@ -100,6 +104,13 @@ export default function MerchantStore() {
 
   const toggleFollow = async () => {
     if (followBusy || !merchant) return;
+    // Following a shop needs an account. Asking the server first only earns a
+    // 401 and then dumps the visitor on a sign-in page with no way back to the
+    // shop they were looking at.
+    if (!isAuthenticated) {
+      signIn();
+      return;
+    }
     setFollowBusy(true);
     try {
       if (isFollowing) {
@@ -113,7 +124,7 @@ export default function MerchantStore() {
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        navigate('/auth');
+        signIn();
       } else {
         console.error(err);
       }

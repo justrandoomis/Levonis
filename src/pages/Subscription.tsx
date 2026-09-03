@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { api, formatIqd, newIdempotencyKey } from '../lib/api';
+import { useSignInPrompt } from '../lib/guest';
 import StoreCta from '../components/merchant/StoreCta';
 import KycSection from '../components/kyc/KycSection';
 
@@ -112,6 +113,7 @@ export default function Subscription() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const { refreshWallet } = useWallet();
   const { user, refreshUser } = useAuth();
+  const { signIn } = useSignInPrompt();
   const [purchaseMsg, setPurchaseMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [plans, setPlans] = useState<ApiPlan[] | null>(null);
   const [launch, setLaunch] = useState<LaunchInfo | null>(null);
@@ -223,8 +225,11 @@ export default function Subscription() {
 
   const handleSubscribe = async () => {
     if (isSubscribing || !selectedPlan) return;
+    // A guest may read the whole page; subscribing is where an account starts
+    // to matter. Take them to sign in and BRING THEM BACK here, rather than
+    // leaving a red message on a screen they cannot act on.
     if (!user) {
-      showMsg('err', loc('يرجى تسجيل الدخول للاشتراك.', 'Please sign in to subscribe.', 'تکایە بچۆ ژوورەوە بۆ بەشداریکردن.'), 4000);
+      signIn();
       return;
     }
     if (!selectedPlan.purchasable) return; // honest disabled state — never a fake purchase
@@ -379,7 +384,12 @@ export default function Subscription() {
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-olive to-black flex items-center justify-center text-white font-bold text-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)]">
                   {user?.name ? user.name.charAt(0).toUpperCase() : 'L'}
                 </div>
-                <span className="font-bold text-white tracking-wide text-lg drop-shadow-sm">{user?.name || 'Levo User'}</span>
+                {/* A guest reads this page to decide whether to join, so the
+                    card must not wear a name. "Levo User" and an invented
+                    handle look like an account they already have. */}
+                <span className="font-bold text-white tracking-wide text-lg drop-shadow-sm">
+                  {user?.name || loc('بطاقة العضوية', 'Membership card', 'کارتی ئەندامێتی')}
+                </span>
               </div>
               <button
                 onClick={() => setShowCardDetails(!showCardDetails)}
@@ -415,7 +425,9 @@ export default function Subscription() {
 
             <div className="flex justify-between items-end z-10 mt-auto">
               <div>
-                <p className="text-white font-bold text-[15px] tracking-wide mb-1 drop-shadow-sm">@{user?.username || 'username'}</p>
+                <p className="text-white font-bold text-[15px] tracking-wide mb-1 drop-shadow-sm">
+                  {user?.username ? `@${user.username}` : loc('لست مشتركًا بعد', 'Not a member yet', 'هێشتا ئەندام نیت')}
+                </p>
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${
                     currentPlan === 'pro' ? 'bg-[#B03142] text-[#B03142]' :

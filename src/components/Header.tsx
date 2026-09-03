@@ -133,11 +133,11 @@ export default function Header() {
             </AnimatePresence>
           </div>
 
-          {/* Subscription Button — /subscription is a member route; a guest
-              tap goes through /auth with the destination preserved (the
-              ProtectedRoute redirect would otherwise drop it). */}
+          {/* Subscription Button — the plans page is browsable signed out now,
+              so a guest goes straight to it. Sending them through /auth first
+              asked for an account before showing what it costs. */}
           <Link
-            to={isAuthenticated ? '/subscription' : '/auth?next=%2Fsubscription'}
+            to="/subscription"
             className={`relative rounded-full overflow-hidden flex items-center h-11 group ${
               subTier !== 'free' ? 'p-[1.5px]' : 'border border-zinc-800/60'
             }`}

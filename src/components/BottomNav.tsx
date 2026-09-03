@@ -20,12 +20,16 @@ export function isBottomNavHidden(pathname: string): boolean {
 }
 
 /**
- * Destinations wrapped in ProtectedRoute in App.tsx. The route guard
- * redirects a guest to /auth WITHOUT preserving where they were going, so
- * the nav links a signed-out user straight to /auth?next=<dest> instead —
- * after signing in they land on the tab they tapped.
+ * The tabs that still need an account, so the nav can send a guest straight
+ * to /auth?next=<dest> and land them back on the tab they tapped.
+ *
+ * Everything else in the bar is browsable signed out. /community is open, and
+ * /chats has always been (App.tsx routes it without a guard, and the page
+ * renders an honest signed-out state) — it was listed here anyway, which sent
+ * visitors to a sign-in screen for a page they could simply read. The cart is
+ * the one that genuinely cannot exist without an account.
  */
-const PROTECTED_PATHS = new Set(['/cart', '/chats']);
+const PROTECTED_PATHS = new Set(['/cart']);
 
 export default function BottomNav() {
   const { t } = useLanguage();

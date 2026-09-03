@@ -3,6 +3,7 @@ import { ChevronLeft, Bell, PlayCircle, Paperclip, Check, Star, ShoppingBag } fr
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
+import { useSignInPrompt } from '../lib/guest';
 import { api } from '../lib/api';
 
 interface RewardsData {
@@ -22,6 +23,7 @@ export default function Rewards() {
   const navigate = useNavigate();
   const { pointBalance, pointTransactions, refreshWallet } = useWallet();
   const { isAuthenticated, isLoaded: authLoaded } = useAuth();
+  const { signIn } = useSignInPrompt();
 
   const [data, setData] = useState<RewardsData | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -210,7 +212,7 @@ export default function Rewards() {
           <div className="text-center py-20">
             <Star aria-hidden="true" className="w-10 h-10 mx-auto mb-3 text-gold/70" />
             <p className="text-zinc-300 font-medium mb-4">Sign in to earn and track your points</p>
-            <button onClick={() => navigate('/auth')} className="px-6 py-2.5 bg-gold text-black rounded-full font-bold text-sm">
+            <button onClick={signIn} className="px-6 py-2.5 bg-gold text-black rounded-full font-bold text-sm">
               Sign in
             </button>
           </div>

@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
+import { useSignInPrompt } from '../lib/guest';
+import { UnauthorizedState } from '../components/ui/AsyncStates';
 import { api, ApiError } from '../lib/api';
 import { iqd, badgeLabel, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
 import { GOVERNORATE_LABELS, GOVERNORATES } from '../lib/governorates';
@@ -76,6 +78,7 @@ type View = 'board' | 'mine' | 'orders' | 'new';
 export default function Requests() {
   const { loc } = useLanguage();
   const { user } = useAuth();
+  const { signIn } = useSignInPrompt();
   const [view, setView] = useState<View>('board');
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [open, setOpen] = useState<RequestRow | null>(null);
@@ -118,9 +121,9 @@ export default function Requests() {
               {label}
             </button>
           ))}
-          {user && (
+          {(
             <button
-              onClick={() => setView('new')}
+              onClick={() => (user ? setView('new') : signIn())}
               className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-white text-[12.5px] font-semibold flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
@@ -142,16 +145,24 @@ export default function Requests() {
 }
 
 function RequestList({ mine, onOpen }: { mine: boolean; onOpen: (r: RequestRow) => void }) {
+  const { isAuthenticated } = useAuth();
   const { loc, lang } = useLanguage();
   const [rows, setRows] = useState<RequestRow[] | null>(null);
 
   useEffect(() => {
     setRows(null);
+    // "My requests" belongs to somebody. Asking for it with no session earns a
+    // 401 and then an empty list, which reads as "you have not created a
+    // request yet" — said to a visitor who has no account to create one with.
+    if (mine && !isAuthenticated) {
+      setRows([]);
+      return;
+    }
     api
       .get<{ requests: RequestRow[] }>(mine ? '/api/marketplace/my-requests' : '/api/marketplace/requests')
       .then((d) => setRows(d.requests))
       .catch(() => setRows([]));
-  }, [mine]);
+  }, [mine, isAuthenticated]);
 
   if (rows === null) {
     return (
@@ -162,6 +173,7 @@ function RequestList({ mine, onOpen }: { mine: boolean; onOpen: (r: RequestRow) 
   }
 
   if (!rows.length) {
+    if (mine && !isAuthenticated) return <UnauthorizedState next="/requests" />;
     return (
       <div className="py-14 text-center">
         <PackageSearch className="w-9 h-9 text-zinc-600 mx-auto mb-3" />

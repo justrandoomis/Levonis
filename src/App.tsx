@@ -119,7 +119,12 @@ function AppContent() {
     return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
   }
   if (store || unknownStore) return <StorefrontApp />;
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support'].some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
+  // Lower-cased on BOTH sides: react-router matches a path case-insensitively,
+  // so /Points reaches the router while a case-sensitive test here would send
+  // it to the other <Routes> block and render a different tree for the same
+  // page. Comparing the way the router does keeps the two in step.
+  const pathForShell = location.pathname.toLowerCase();
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
     return (
@@ -131,13 +136,22 @@ function AppContent() {
           <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
 
             <Route path="/auth" element={<Auth />} />
-            <Route path="/points" element={<ProtectedRoute><Rewards /></ProtectedRoute>} />
+            {/* OPEN TO GUESTS. The points page is how someone finds out the
+                programme exists; it already skips its own fetch and shows a
+                sign-in panel when there is nobody to fetch for. (The second
+                <Routes> block below also declares /points unguarded, but that
+                line is unreachable — /points is a full-screen route and is
+                always served from here.) */}
+            <Route path="/points" element={<Rewards />} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/addresses" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
             <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
-            <Route path="/games" element={<ProtectedRoute><Games /></ProtectedRoute>} />
-            <Route path="/leaderboards" element={<ProtectedRoute><Leaderboards /></ProtectedRoute>} />
+            {/* OPEN TO GUESTS. Games makes no network call and reads no user
+                at all; Leaderboards already draws a guest avatar and falls
+                back on every name it shows. */}
+            <Route path="/games" element={<Games />} />
+            <Route path="/leaderboards" element={<Leaderboards />} />
             <Route path="/support" element={<Support />} />
           </Routes>
         
@@ -179,7 +193,11 @@ function AppContent() {
 
           <Route path="/profile" element={<Profile />} />
             <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
-          <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+          {/* OPEN TO GUESTS. What a membership costs is the first thing
+              someone weighing one wants to see, and GET /api/memberships/plans
+              is public. The page skips /mine when there is no user, and
+              subscribing itself asks for a sign-in. */}
+          <Route path="/subscription" element={<Subscription />} />
           <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
           <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
@@ -188,16 +206,18 @@ function AppContent() {
               rather than a gate — it redirects home for anyone who has
               already finished or skipped it. */}
           <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
-          <Route path="/points" element={<Rewards />} />
-          {/* Browsing the community needs a SESSION, not a finished profile. It
-              used to sit behind RequireCommunityProfile, which redirected to
-              /edit-profile whenever `username` was unset — and an account
-              created through Google or Telegram has no username, so the tab
-              was simply unreachable for those users. The page itself only
-              reads `username` as an avatar seed with a fallback, and the one
-              write it performs (POST /api/community/requests) is enforced
-              server-side by requireAuth alone. */}
-          <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
+          {/* OPEN TO GUESTS. Browsing the community needs no account at all:
+              worker/routes/community.ts leaves /products, /merchants,
+              /requests and /store/:id public and puts requireAuth only on the
+              writes and on the personal reads. The page reads `username`
+              solely as an avatar seed with a fallback, and its one write
+              (POST /api/community/requests) already invites a signed-out
+              visitor to sign in rather than failing.
+              (It previously sat behind RequireCommunityProfile too, which
+              redirected to /edit-profile whenever `username` was unset — so
+              Google and Telegram accounts, which have none, could not reach
+              it either.) */}
+          <Route path="/community" element={<Community />} />
           {/* Resolves slug / store id / merchant id to the SAME storefront
               profile the subdomain serves; profile-only merchants from the
               pre-store era fall through to the legacy page inside. */}
@@ -231,7 +251,10 @@ function AppContent() {
               The response carries the status and the product — never the
               customer. The customer's own warranty centre stays at /warranty. */}
           <Route path="/warranty/:receiptNo" element={<WarrantyVerify />} />
-          <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
+          {/* OPEN TO GUESTS. A self-contained calculator: it makes no network
+              call and reads no user object, so there was nothing for a
+              sign-in to protect. */}
+          <Route path="/tools" element={<Tools />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/:key" element={<Policies />} />
           {/* §3.1 — referrals live on their own page, reached from the icon

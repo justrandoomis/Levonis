@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
+import { useSignInPrompt } from '../lib/guest';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import {
@@ -50,6 +51,7 @@ export default function Community() {
   const location = useLocation();
   const { lang, dir, t } = useLanguage();
   const { user, isAuthenticated } = useAuth();
+  const { signIn } = useSignInPrompt();
 
   const queryParams = new URLSearchParams(location.search);
   const activeTab = queryParams.get('tab') || 'products';
@@ -105,7 +107,7 @@ export default function Community() {
 
   const openNewRequest = () => {
     if (!isAuthenticated) {
-      navigate('/auth');
+      signIn();
       return;
     }
     setReqError(null);
@@ -134,7 +136,7 @@ export default function Community() {
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        navigate('/auth');
+        signIn();
         return;
       }
       setReqError(

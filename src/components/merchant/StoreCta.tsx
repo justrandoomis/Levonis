@@ -21,27 +21,38 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Store, ArrowRight, ExternalLink, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { useAuth } from '../../AuthContext';
 import { merchantApi, type MerchantMe } from '../../lib/merchant';
 
 export default function StoreCta() {
   const { loc } = useLanguage();
+  const { isAuthenticated, isLoaded: authLoaded } = useAuth();
 
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // Now that this component renders on pages a guest can browse, asking
+    // "which merchant am I?" without a session is a request whose only
+    // possible answer is 401. Don't send it.
+    if (!authLoaded) return;
+    if (!isAuthenticated) {
+      setMe(null);
+      setLoaded(true);
+      return;
+    }
     let alive = true;
     merchantApi
       .me()
       .then((d) => alive && setMe(d))
-      // A signed-out visitor gets a 401 here, which is not an error worth
-      // showing — it just means there is nothing to offer them yet.
+      // A stale session can still answer 401 here, which is not an error
+      // worth showing — it just means there is nothing to offer yet.
       .catch(() => {})
       .finally(() => alive && setLoaded(true));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [authLoaded, isAuthenticated]);
 
   if (!loaded || !me) return null;
   if (!me.eligible && !me.store) return null;
