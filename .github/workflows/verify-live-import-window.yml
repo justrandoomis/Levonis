@@ -123,13 +123,19 @@ jobs:
               echo "  FAIL $2 is not in any served module"; fail=1
             fi
           }
-          present 'data-import="check-report"' 'the check report'
-          present 'data-import-stat'           'the per-bucket counters'
-          present 'count-duplicates'           'the duplicates counter'
-          present 'count-images'               'the missing-images counter'
-          present 'count-missing'              'the missing-fields counter'
-          present 'data-import-issues'         'the located complaint list'
-          present 'data-import="duplicate"'    'the duplicate question'
+          # Attribute VALUES survive minification verbatim, so they are the
+          # markers to grep for. The authored `data-import="check-report"` does
+          # not: JSX props become object keys, so it ships as
+          # `"data-import":"check-report"` and matching the authored form would
+          # fail on a perfectly good bundle.
+          present 'check-report'       'the check report'
+          present 'data-import-stat'   'the per-bucket counters'
+          present 'count-duplicates'   'the duplicates counter'
+          present 'count-images'       'the missing-images counter'
+          present 'count-missing'      'the missing-fields counter'
+          present 'data-import-issues' 'the located complaint list'
+          present 'dup-update'         'the duplicate question offers updating the existing product'
+          present 'dup-new'            'the duplicate question offers a new draft'
           exit $fail
 
       - name: Each lane's clearly named template download is in the bundle
