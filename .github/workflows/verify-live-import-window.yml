@@ -1,0 +1,176 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the rebuilt import/export window is LIVE, not merely
+# merged:
+#
+#   1. the endpoints all three lanes need are deployed and still admin-only —
+#      including the TXT blank's new `?type=` form, which is the one route this
+#      change added;
+#   2. the shipped bundle asks the FORMAT question (csv / zip / txt) and no
+#      longer carries the two-tab strip it replaced;
+#   3. the check report ships with its counters and its located complaints, so
+#      "no import before a check" is in the code the browser downloads;
+#   4. each lane's clearly named template download is in the bundle.
+#
+# WHAT IT WRITES: nothing. Every request is an anonymous GET; the admin
+# endpoints are probed only for their refusal, which is what proves they are
+# both deployed and still closed.
+name: 24 - Verify Live Import Window (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-import-window
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every lane's endpoints are deployed and still admin-only
+        id: api
+        run: |
+          set -euo pipefail
+          fail=0
+          refuse() { # path, what it is
+            code=$(curl -s -o /tmp/body.json -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            # 401/403 proves the route EXISTS and is closed; 404 would mean the
+            # deploy never carried it, which is the failure this step is for.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $2 is deployed and refuses a stranger ($code)"
+            else
+              echo "  FAIL $2 answers $code: $(head -c 140 /tmp/body.json)"
+              fail=1
+            fi
+          }
+          refuse '/api/admin/import/types'                    'the product-type list'
+          refuse '/api/admin/import/template?type=printer&format=csv' 'the CSV template'
+          refuse '/api/admin/import/template?type=printer&format=zip' 'the ZIP template'
+          refuse '/api/admin/template/blank'                  'the TXT template'
+          refuse '/api/admin/template/blank?type=filament'    'the per-type TXT template'
+          refuse '/api/admin/template/example'                'the filled TXT example'
+          refuse '/api/admin/import/lookups'                  'the classification lookups'
+          exit $fail
+
+      - name: Read every module the deployed app serves
+        id: fetch
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          for a in $entries; do
+            curl -s --compressed --max-time 60 -o "/tmp/mods/$(basename "$a")" "$APEX$a"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "/tmp/mods/$(basename "$a")" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              [ "$code" = "200" ] || rm -f "/tmp/mods/$c"
+            done
+          done
+          echo "  modules read: $(ls /tmp/mods | wc -l)"
+
+      # `grep -l` writes to a FILE and is never piped: `grep -q` would stop at
+      # the first match, the writer would take SIGPIPE, and `pipefail` would
+      # then read a successful match as a failed pipeline.
+      - name: The window asks the format question, and the old tabs are gone
+        id: formats
+        run: |
+          set -euo pipefail
+          fail=0
+          present() { # marker, what it is
+            hit=$(grep -l "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 is not in any served module"; fail=1
+            fi
+          }
+          absent() { # marker, what it is
+            hit=$(grep -l "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -z "$hit" ]; then
+              echo "  ok   $2"
+            else
+              echo "  FAIL $2 — still in $(basename "$hit")"; fail=1
+            fi
+          }
+          present 'data-import-format' 'the format choice ships'
+          absent  'data-import-tab'    'the two-tab strip it replaced is gone'
+          present 'template/parse-zip' 'the TXT archive lane is wired to its endpoint'
+          present 'template/apply'     'the TXT import is wired to its endpoint'
+          exit $fail
+
+      - name: The check report ships with its counters and located complaints
+        id: report
+        run: |
+          set -euo pipefail
+          fail=0
+          present() {
+            hit=$(grep -l "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 is not in any served module"; fail=1
+            fi
+          }
+          present 'data-import="check-report"' 'the check report'
+          present 'data-import-stat'           'the per-bucket counters'
+          present 'count-duplicates'           'the duplicates counter'
+          present 'count-images'               'the missing-images counter'
+          present 'count-missing'              'the missing-fields counter'
+          present 'data-import-issues'         'the located complaint list'
+          present 'data-import="duplicate"'    'the duplicate question'
+          exit $fail
+
+      - name: Each lane's clearly named template download is in the bundle
+        id: templates
+        run: |
+          set -euo pipefail
+          fail=0
+          for key in template-csv template-zip template-txt template-txt-example; do
+            hit=$(grep -l "$key" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $key ships — in $(basename "$hit")"
+            else
+              echo "  FAIL $key is missing from the bundle"; fail=1
+            fi
+          done
+          for label in 'Download CSV Template' 'Download ZIP Template' 'Download TXT Template'; do
+            hit=$(grep -l "$label" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   \"$label\" is the name the button carries"
+            else
+              echo "  FAIL \"$label\" is not in the bundle"; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live import-window verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| every lane's endpoints deployed and admin-only | ${{ steps.api.outcome }} |"
+            echo "| the format question ships, the two tabs are gone | ${{ steps.formats.outcome }} |"
+            echo "| the check report and its buckets ship | ${{ steps.report.outcome }} |"
+            echo "| each lane's named template download ships | ${{ steps.templates.outcome }} |"
+            echo ''
+            echo 'Read-only: every request was an anonymous GET; the admin endpoints were probed only for their refusal.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.api.outcome != 'success' || steps.formats.outcome != 'success' || steps.report.outcome != 'success' || steps.templates.outcome != 'success'
+        run: exit 1
