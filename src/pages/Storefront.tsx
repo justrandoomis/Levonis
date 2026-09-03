@@ -29,6 +29,7 @@ import {
   MapPin, X, Heart, MoreHorizontal, Link2,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import {
@@ -45,14 +46,18 @@ import { useStore } from '../StoreContext';
  * supplies a colour, so nothing they type can reach the stylesheet. `btn` is
  * the contact button's fill; the rest tint rings, chips and the active tab.
  */
-const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: string; btn: string; line: string }> = {
-  default: { ring: 'border-gold/30', chip: 'bg-olive/30 text-gold', glow: 'bg-olive/15', text: 'text-gold', btn: 'bg-zinc-100 text-zinc-900', line: 'border-gold' },
-  olive: { ring: 'border-olive-light/40', chip: 'bg-olive/40 text-gold', glow: 'bg-olive/20', text: 'text-gold', btn: 'bg-olive text-white', line: 'border-gold' },
-  gold: { ring: 'border-gold/40', chip: 'bg-gold/15 text-gold', glow: 'bg-gold/10', text: 'text-gold', btn: 'bg-gold text-zinc-900', line: 'border-gold' },
-  slate: { ring: 'border-slate-500/40', chip: 'bg-slate-500/15 text-slate-200', glow: 'bg-slate-500/10', text: 'text-slate-200', btn: 'bg-slate-200 text-slate-900', line: 'border-slate-300' },
-  plum: { ring: 'border-purple-500/40', chip: 'bg-purple-500/15 text-purple-200', glow: 'bg-purple-500/10', text: 'text-purple-200', btn: 'bg-purple-300 text-purple-950', line: 'border-purple-300' },
-  teal: { ring: 'border-teal-500/40', chip: 'bg-teal-500/15 text-teal-200', glow: 'bg-teal-500/10', text: 'text-teal-200', btn: 'bg-teal-300 text-teal-950', line: 'border-teal-300' },
-  blue: { ring: 'border-sky-500/40', chip: 'bg-sky-500/15 text-sky-300', glow: 'bg-sky-500/10', text: 'text-sky-400', btn: 'bg-zinc-100 text-zinc-900', line: 'border-sky-400' },
+/* `line` was a BORDER colour, because the active tab used to be a border on
+   its own button. The travelling indicator is a filled element, so each accent
+   also names the FILL — `indicator` — rather than having the strip guess a
+   background from a border class. `line` stays: other places still use it. */
+const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: string; btn: string; line: string; indicator: string }> = {
+  default: { ring: 'border-gold/30', chip: 'bg-olive/30 text-gold', glow: 'bg-olive/15', text: 'text-gold', btn: 'bg-zinc-100 text-zinc-900', line: 'border-gold', indicator: 'bg-gold' },
+  olive: { ring: 'border-olive-light/40', chip: 'bg-olive/40 text-gold', glow: 'bg-olive/20', text: 'text-gold', btn: 'bg-olive text-white', line: 'border-gold', indicator: 'bg-gold' },
+  gold: { ring: 'border-gold/40', chip: 'bg-gold/15 text-gold', glow: 'bg-gold/10', text: 'text-gold', btn: 'bg-gold text-zinc-900', line: 'border-gold', indicator: 'bg-gold' },
+  slate: { ring: 'border-slate-500/40', chip: 'bg-slate-500/15 text-slate-200', glow: 'bg-slate-500/10', text: 'text-slate-200', btn: 'bg-slate-200 text-slate-900', line: 'border-slate-300', indicator: 'bg-slate-300' },
+  plum: { ring: 'border-purple-500/40', chip: 'bg-purple-500/15 text-purple-200', glow: 'bg-purple-500/10', text: 'text-purple-200', btn: 'bg-purple-300 text-purple-950', line: 'border-purple-300', indicator: 'bg-purple-300' },
+  teal: { ring: 'border-teal-500/40', chip: 'bg-teal-500/15 text-teal-200', glow: 'bg-teal-500/10', text: 'text-teal-200', btn: 'bg-teal-300 text-teal-950', line: 'border-teal-300', indicator: 'bg-teal-300' },
+  blue: { ring: 'border-sky-500/40', chip: 'bg-sky-500/15 text-sky-300', glow: 'bg-sky-500/10', text: 'text-sky-400', btn: 'bg-zinc-100 text-zinc-900', line: 'border-sky-400', indicator: 'bg-sky-400' },
 };
 
 type Tab = 'products' | 'sections' | 'deals' | 'services' | 'showcase' | 'about';
@@ -401,18 +406,23 @@ export default function Storefront({
 
           {/* 8 — Tabs: spread across the width, white when active over an
               accent-colored underline. */}
-          <div dir="rtl" className="flex border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
-            {TABS.filter((t) => t.show).map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex-1 px-2.5 py-2.5 text-[13px] font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                  tab === t.id ? `text-white ${accent.line}` : 'border-transparent text-zinc-500'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* The active tab used to be a `border-b-2` on the button itself, so
+              the underline was destroyed under one tab and built under the
+              next — no movement, nothing saying these are one row. It is now a
+              single element that travels along the strip as a spring, which is
+              also what makes it interruptible: tap three tabs quickly and it
+              chases the finger instead of queueing. */}
+          <div dir="rtl" className="border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
+            <TabStrip
+              group="storefront"
+              label={loc('أقسام المتجر', 'Store sections', 'بەشەکانی فرۆشگا')}
+              value={tab}
+              onChange={(id) => setTab(id as Tab)}
+              items={TABS.map((t) => ({ id: t.id, label: t.label, show: t.show }))}
+              indicatorClassName={accent.indicator}
+              idleClassName="text-zinc-500"
+              className="min-w-full"
+            />
           </div>
         </div>
       </div>
@@ -422,6 +432,11 @@ export default function Storefront({
           a sibling stacking context at the same level would paint this whole
           block over it — taps meant to dismiss the menu would open products. */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 relative z-0">
+        {/* The body arrives from the side the change came from and the old one
+            leaves the other way, so a person can tell which direction they
+            moved along the strip. The order is TABS' own order, and the sign
+            mirrors with the writing direction rather than assuming Latin. */}
+        <TabPanels value={tab} order={TABS.map((t) => t.id)}>
         {tab === 'products' && (
           <ProductsTab
             slug={slug}
@@ -460,6 +475,7 @@ export default function Storefront({
             )}
           </div>
         )}
+        </TabPanels>
       </div>
     </div>
   );

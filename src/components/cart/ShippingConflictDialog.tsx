@@ -13,7 +13,7 @@
  * backdrop-filtered ancestors, under which `position: fixed` stops meaning
  * "the viewport" and the overlay would be clipped into a corner.
  */
-import { createPortal } from 'react-dom';
+import { Overlay } from '../ui/Overlay';
 import { AlertTriangle } from 'lucide-react';
 import { shippingTypeLabel } from '../../lib/shippingType';
 
@@ -69,26 +69,27 @@ export default function ShippingConflictDialog({
   onConfirm,
   onCancel,
 }: ShippingConflictDialogProps) {
-  if (!open) return null;
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
   const currentLabel = shippingTypeLabel(cartType, lang);
   const incomingLabel = shippingTypeLabel(incomingType, lang);
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="shipping-conflict-title"
-      dir={dir}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onCancel();
-      }}
+  // A MODAL, and it says so: this question has to be answered before the cart
+  // can go on, so it dims and takes over rather than sitting beside the page.
+  // `dismissOnScrim` follows `busy` — a tap outside must not cancel a decision
+  // that is already being written.
+  return (
+    <Overlay
+      open={open}
+      onClose={onCancel}
+      labelledBy="shipping-conflict-title"
+      placement="bottom"
+      z={120}
+      dismissOnScrim={!busy}
+      dismissOnEscape={!busy}
+      testId="shipping-conflict"
+      panelClassName="w-full sm:max-w-md"
     >
-      <div
-        data-shipping-conflict
-        className="w-full sm:max-w-md bg-zinc-950 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl"
-      >
+      <div data-shipping-conflict dir={dir} className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <span className="shrink-0 w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
             <AlertTriangle className="w-5 h-5 text-amber-400" aria-hidden />
@@ -142,7 +143,6 @@ export default function ShippingConflictDialog({
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </Overlay>
   );
 }

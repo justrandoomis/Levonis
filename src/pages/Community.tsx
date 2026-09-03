@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
+import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import {
@@ -164,8 +165,17 @@ export default function Community() {
 
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen bg-black">
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
+      {/* The search bar is FLOATING CHROME: content passes under it. It used
+          to end in a 1px border, which is a line the design never asked for —
+          what it was trying to say is "there is more below". A short gradient
+          says that, and only where the overlap is real (`.scroll-edge`). */}
+      <div className="material scroll-edge sticky top-0 z-40 [--material-tint:#000] px-4 py-3 flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
+          onClick={() => navigate(-1)}
+          className="press-scale p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
+        >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
         <div className="flex-1 relative">
@@ -182,32 +192,37 @@ export default function Community() {
 
       <div className="p-4 flex flex-col gap-6">
 
-        {/* Shortcuts */}
+        {/* Shortcuts. THESE ARE BUTTONS. They were `<div onClick>` with a
+            `group-hover:` tint, which means: no keyboard access, no screen-
+            reader role, and — on the iPad this app is actually used on — no
+            feedback at all, because `hover:` does not exist on touch. A tile
+            is small enough that shrinking reads as contact rather than as a
+            wobble, so they take `press-scale` on top of the sitewide dim. */}
         <div className="grid grid-cols-4 gap-2">
-           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/chats')}>
+           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/chats')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
                <MessageSquare className="w-5 h-5 text-zinc-400 group-hover:text-olive transition-colors" />
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الرسائل' : 'Messages'}</span>
-           </div>
-           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/community?tab=requests')}>
+           </button>
+           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/community?tab=requests')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
                <Box className="w-5 h-5 text-zinc-400 group-hover:text-olive transition-colors" />
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الطلبات' : 'Requests'}</span>
-           </div>
-           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={openNewRequest}>
+           </button>
+           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={openNewRequest}>
              <div className="w-12 h-12 rounded-2xl bg-olive/10 border border-olive/30 flex items-center justify-center group-hover:bg-olive/20 transition-colors">
                <Plus className="w-5 h-5 text-olive" />
              </div>
              <span className="text-[10px] font-medium text-olive">{dir === 'rtl' ? 'طلب جديد' : 'New Order'}</span>
-           </div>
-           <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => navigate('/profile')}>
+           </button>
+           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/profile')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
                <img referrerPolicy="no-referrer" src={user?.avatar_key ? `/files/${user.avatar_key}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || "Levonis"}&backgroundColor=fde047`} alt="Avatar" className="w-full h-full object-cover" />
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'ملفي' : 'Profile'}</span>
-           </div>
+           </button>
         </div>
 
         {/* Banners (mandate §9). The «المساعدات والهدايا» / Giveaways card is
@@ -259,31 +274,23 @@ export default function Community() {
            </div>
         </div>
 
-        {/* Explore Tabs */}
-        <div className="border-b border-zinc-800 sticky top-[60px] z-30 bg-black/80 backdrop-blur-md">
-          <div className="flex justify-between">
-            <button
-              onClick={() => navigate('/community?tab=products')}
-              className={`flex-1 py-3 text-sm font-medium text-center relative ${activeTab === 'products' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              {dir === 'rtl' ? 'المنتجات' : 'Products'}
-              {activeTab === 'products' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-olive rounded-t-full"></div>}
-            </button>
-            <button
-              onClick={() => navigate('/community?tab=merchants')}
-              className={`flex-1 py-3 text-sm font-medium text-center relative ${activeTab === 'merchants' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              {dir === 'rtl' ? 'التجار' : 'Merchants'}
-              {activeTab === 'merchants' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-olive rounded-t-full"></div>}
-            </button>
-            <button
-              onClick={() => navigate('/community?tab=requests')}
-              className={`flex-1 py-3 text-sm font-medium text-center relative ${activeTab === 'requests' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              {dir === 'rtl' ? 'الطلبات' : 'Requests'}
-              {activeTab === 'requests' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-olive rounded-t-full"></div>}
-            </button>
-          </div>
+        {/* Explore Tabs. The underline is now ONE element that travels
+            between them (TabStrip's shared-layout indicator) instead of three
+            conditional divs that blink in and out — so the row reads as one
+            row a person moved along, which is the whole job of an indicator. */}
+        <div className="material scroll-edge sticky top-[60px] z-30 [--material-tint:#000] [--material-blur:12px]">
+          <TabStrip
+            group="community"
+            label={dir === 'rtl' ? 'أقسام المجتمع' : 'Community sections'}
+            value={activeTab}
+            onChange={(id) => navigate(`/community?tab=${id}`)}
+            items={[
+              { id: 'products', label: dir === 'rtl' ? 'المنتجات' : 'Products' },
+              { id: 'merchants', label: dir === 'rtl' ? 'التجار' : 'Merchants' },
+              { id: 'requests', label: dir === 'rtl' ? 'الطلبات' : 'Requests' },
+            ]}
+            className="justify-between"
+          />
         </div>
 
         {/* Tab Content */}
@@ -297,7 +304,11 @@ export default function Community() {
               <p className="text-sm">{loadError}</p>
             </div>
           ) : (
-            <>
+            /* The bodies arrive from the side the change came from, and leave
+               to the other — so a person can tell whether they went forward or
+               back along the strip. In Arabic "forward" is leftward, which
+               TabPanels takes from the writing direction rather than assuming. */
+            <TabPanels value={activeTab} order={['products', 'merchants', 'requests']}>
               {activeTab === 'products' && (
                 filteredProducts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
@@ -408,7 +419,7 @@ export default function Community() {
                   </div>
                 )
               )}
-            </>
+            </TabPanels>
           )}
         </div>
 

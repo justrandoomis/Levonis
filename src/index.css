@@ -36,6 +36,182 @@ html, body, #root {
   --default-font-family: var(--font-sans);
 }
 
+/* ---------------------------------------------------------------------------
+   PRESS FEEDBACK — every control answers the finger, on the way DOWN.
+   
+   Apple's first rule of a fluid interface is response: "the moment lag appears,
+   the feeling of directness falls off a cliff." This app had 622 `hover:`
+   states and 129 `active:` ones — so roughly four out of five controls gave no
+   feedback at all when touched, and `hover:` does nothing whatsoever on the
+   iPad the owner actually uses. Waiting for `click` to change anything is worse
+   still: the feedback arrives after the decision.
+   
+   CSS `:active` fires on pointer-DOWN, natively, with no JavaScript and no
+   listener on the input path. So the whole fix is one rule in the BASE layer —
+   base, not a utility, because Tailwind's own `active:*` utilities live in the
+   utilities layer and cascade layers beat specificity: any component that
+   states its own press style still wins, and this is only the floor.
+   
+   WHY DIM AND NOT SCALE. iOS dims a control on touch-down; it does not shrink
+   it. A 3% scale on a full-width button warps its corners against the layout
+   and reads as a wobble. Small, chip-like controls DO scale well, so scale is
+   opt-in through `.press-scale` rather than imposed on everything.
+   
+   `touch-action: manipulation` removes the ~300ms double-tap-to-zoom delay
+   that would otherwise sit in front of every tap, and the transparent tap
+   highlight removes the platform's grey flash so our feedback is the only
+   feedback. Both are latency and noise on the input path — exactly what the
+   response rule says to hunt down.
+   --------------------------------------------------------------------------- */
+@layer base {
+  button,
+  summary,
+  [role="button"],
+  [role="tab"],
+  a[href],
+  label[for],
+  input[type="submit"],
+  input[type="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled):not([aria-disabled="true"]):active,
+  summary:active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  [role="tab"]:not([aria-disabled="true"]):active,
+  a[href]:active,
+  label[for]:active {
+    opacity: 0.72;
+    transition-property: opacity;
+    transition-duration: 100ms;
+    transition-timing-function: ease-out;
+  }
+}
+
+/* Opt in where a control is small enough that shrinking reads as contact
+   rather than as a wobble: chips, icon buttons, cards, tiles. */
+@utility press-scale {
+  &:not(:disabled):not([aria-disabled="true"]):active {
+    transform: scale(0.97);
+    transition-property: transform, opacity;
+    transition-duration: 100ms;
+    transition-timing-function: ease-out;
+  }
+}
+
+/* Opt OUT where a press dim is wrong: a whole sticky bar, a container that is
+   only nominally a button, anything whose children carry their own feedback. */
+@utility no-press {
+  &:active {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   MATERIALS — translucent chrome, and what it becomes when a viewer asks for
+   less of it.
+   
+   `.material` marks a surface that is deliberately glass: a floating bar, a
+   sheet, a menu. Marking them is what makes the two accessibility settings
+   below implementable at all — `prefers-reduced-transparency` has to raise the
+   background and drop the blur, and it can only do that on surfaces that say
+   which colour they should become when they stop being glass.
+   --------------------------------------------------------------------------- */
+.material {
+  background-color: color-mix(in oklab, var(--material-tint, #18181b) var(--material-opacity, 72%), transparent);
+  backdrop-filter: blur(var(--material-blur, 20px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--material-blur, 20px)) saturate(160%);
+}
+/* Bigger surfaces read THICKER: more blur, deeper shadow. A sheet is not a chip. */
+.material-thick {
+  --material-blur: 32px;
+  --material-opacity: 82%;
+  box-shadow: 0 -18px 48px -16px rgb(0 0 0 / 0.72);
+}
+.material-thin {
+  --material-blur: 12px;
+  --material-opacity: 64%;
+}
+
+/* SCROLL EDGE, NOT A DIVIDER. A 1px border under floating chrome is a line the
+   design did not ask for; what it is trying to say is "content passes under
+   here". A short gradient says that instead, and only where the overlap is
+   real. Put this on the floating bar itself. */
+.scroll-edge::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  height: 16px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.28), transparent);
+}
+.scroll-edge-up::after {
+  top: auto;
+  bottom: 100%;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.28), transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   ACCESSIBILITY PREFERENCES — three independent signals, all three answered.
+   
+   Reduced motion does NOT mean no feedback: the press dim, the colour changes
+   and the opacity cross-fades all stay, because they are what tells a person
+   their tap registered. What goes is travel — slides, springs, parallax and
+   anything that oscillates.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  /* Decorative loops and travel: gone. Anything essential is opacity, and
+     opacity survives because it is not vestibular. */
+  .animate-fly-to-cart,
+  .animate-spin-shrink {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  /* Press feedback is the exception that must survive — it is the answer to a
+     touch, not a decoration. */
+  button:active,
+  [role="button"]:active,
+  [role="tab"]:active,
+  a[href]:active {
+    opacity: 0.72 !important;
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material,
+  .material-thick,
+  .material-thin {
+    --material-opacity: 100%;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .scroll-edge::after,
+  .scroll-edge-up::after {
+    display: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .material,
+  .material-thick,
+  .material-thin {
+    --material-opacity: 100%;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: rgb(255 255 255 / 0.55);
+  }
+}
+
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
