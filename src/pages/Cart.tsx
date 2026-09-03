@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Trash2, ChevronRight, Check, Minus, Plus, X, Sho
 import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField from '../components/PromoCodeField';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
@@ -130,6 +131,15 @@ export default function Cart() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
   const knownIdsRef = useRef<Set<string>>(new Set());
+  // Lines whose price moved between one read of the cart and the next. The
+  // new price is what the shop charges and it is applied without asking, but
+  // a total that changes under the customer's eyes is told, not hidden.
+  const [movedPrices, setMovedPrices] = useState<Map<string, { from: number; to: number }>>(new Map());
+  const itemsRef = useRef<CartItem[]>([]);
+  // A quantity tap or a delete is a write followed by a read. A refresh that
+  // lands between the two would paint the pre-write cart back over the
+  // customer's own change, so the wake is held for the length of the action.
+  const actionBusyRef = useRef(false);
 
   // Modals state
   const [variantModalOpen, setVariantModalOpen] = useState(false);
@@ -170,7 +180,29 @@ export default function Cart() {
   });
   const [supportRetry, setSupportRetry] = useState(0);
 
-  const applyItems = useCallback((next: CartItem[]) => {
+  const applyItems = useCallback((next: CartItem[], opts?: { detectPriceChange?: boolean }) => {
+    // ONLY a background revalidation may say "the shop changed this price".
+    // The customer's own edits — a different variant, a new quantity, a
+    // removed line — also change the number on screen, and blaming the shop
+    // for those would be a lie they can see through.
+    if (opts?.detectPriceChange && !firstLoadRef.current) {
+      const moved = changedPrices(itemsRef.current, next);
+      if (moved.size) {
+        setMovedPrices((prev) => {
+          const merged = new Map(prev);
+          for (const [id, m] of moved) {
+            // Keep the price the customer actually SAW as the "from", even if
+            // it has since moved twice.
+            const seen = merged.get(id);
+            merged.set(id, { from: seen ? seen.from : m.from, to: m.to });
+          }
+          // A price that came back to where it started is no longer news.
+          for (const [id, m] of merged) if (m.from === m.to) merged.delete(id);
+          return merged;
+        });
+      }
+    }
+    itemsRef.current = next;
     setItems(next);
     const existing = new Set(next.map((i) => i.id));
     const known = knownIdsRef.current;
@@ -190,13 +222,17 @@ export default function Cart() {
     knownIdsRef.current = existing;
   }, []);
 
-  const loadCart = useCallback(async () => {
+  const loadCart = useCallback(async (opts?: { silent?: boolean }) => {
     try {
       const data = await api.get<{ items: CartItem[] }>('/api/cart');
-      applyItems(data.items || []);
+      applyItems(data.items || [], { detectPriceChange: !!opts?.silent });
       setError('');
       setLoadError(null);
     } catch (err) {
+      // A background refresh that fails must leave the screen alone. Painting
+      // a red banner over a cart that is perfectly readable, because a wake
+      // request timed out, is worse than showing a price a few seconds old.
+      if (opts?.silent) return;
       if (firstLoadRef.current) {
         // Nothing on screen yet: a full error state (401 → sign-in prompt,
         // network/5xx → retry) instead of "your cart is empty" + a banner.
@@ -219,6 +255,24 @@ export default function Cart() {
   useEffect(() => {
     loadCart();
   }, [loadCart]);
+
+  // COMING BACK TO THE CART RE-READS ITS PRICES.
+  //
+  // The server prices every line on every read, so the only way an old number
+  // survives is a page that never asks again: a tab left open, an app switched
+  // away from, or `back` restoring this screen from the bfcache without
+  // remounting it. Asking again on return is what makes "the price changed"
+  // reach the customer instead of stopping at the shelf.
+  //
+  // Held while a dialog is open so a reload never lands under a variant or
+  // shipping choice the customer is in the middle of making.
+  useFreshOnReturn(() => loadCart({ silent: true }), {
+    enabled:
+      !variantModalOpen && !shippingModalOpen && !variantSaving && !shippingSaving && !actionBusyRef.current,
+    minIntervalMs: 8_000,
+    // For the customer who simply leaves the cart in front of them.
+    pollWhileVisibleMs: 60_000,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -298,22 +352,28 @@ export default function Cart() {
     if (newQty === item.qty) return;
     // Optimistic update, reconciled with the server's returned cart.
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, qty: newQty } : i)));
+    actionBusyRef.current = true;
     try {
       const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { qty: newQty });
       applyItems(data.items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update quantity');
       loadCart();
+    } finally {
+      actionBusyRef.current = false;
     }
   };
 
   const deleteItem = async (item: CartItem) => {
+    actionBusyRef.current = true;
     try {
       const data = await api.delete<{ items: CartItem[] }>(`/api/cart/items/${item.id}`);
       applyItems(data.items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove item');
       loadCart();
+    } finally {
+      actionBusyRef.current = false;
     }
   };
 
@@ -627,6 +687,38 @@ export default function Cart() {
                       </>
                     )}
                   </div>
+
+                  {/* The price moved since this cart was opened. The new one is
+                      what the shop charges, so it is already applied — this
+                      only stops the customer wondering whether they misread it
+                      the first time. */}
+                  {movedPrices.has(item.id) && (
+                    <p
+                      className={`mb-2 -mt-1 text-[11.5px] font-semibold ${
+                        movedPrices.get(item.id)!.to > movedPrices.get(item.id)!.from ? 'text-amber-300' : 'text-emerald-300'
+                      }`}
+                      data-price-moved={item.id}
+                    >
+                      {(() => {
+                        const m = movedPrices.get(item.id)!;
+                        const was = formatIqd(m.from);
+                        const up = m.to > m.from;
+                        if (lang === 'en') {
+                          return up
+                            ? `The price went up from ${was} while this was in your cart.`
+                            : `The price dropped from ${was} while this was in your cart.`;
+                        }
+                        if (lang === 'ckb') {
+                          return up
+                            ? `نرخەکە بەرزبووەتەوە لە ${was} کاتێک لە سەبەتەکەت بوو.`
+                            : `نرخەکە داشکاوە لە ${was} کاتێک لە سەبەتەکەت بوو.`;
+                        }
+                        return up
+                          ? `تغيّر السعر وارتفع من ${was} أثناء وجوده في السلة.`
+                          : `تغيّر السعر وانخفض من ${was} أثناء وجوده في السلة.`;
+                      })()}
+                    </p>
+                  )}
 
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-3">

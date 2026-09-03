@@ -21,6 +21,7 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, type ApiAddress } from '../lib/api';
 import { storeCheckoutApi, iqd, type StoreQuote } from '../lib/merchant';
+import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import { GOVERNORATES } from '../lib/governorates';
 import { useStore } from '../StoreContext';
 
@@ -77,6 +78,21 @@ export default function StoreCheckout() {
       })
       .catch(() => setAddresses([]));
   }, [loadQuote]);
+
+  // The merchant order is re-quoted when the customer comes back to this
+  // screen, for the same reason the platform checkout is: the total on the
+  // button is the number they are about to agree to, and a shop that changed
+  // a price while the tab sat open must not be held to the old one. The
+  // coupon in force is carried through, and nothing runs mid-submit.
+  const couponRef = useRef('');
+  couponRef.current = coupon;
+  useFreshOnReturn(async () => {
+    await loadQuote(couponRef.current);
+  }, {
+    enabled: !placing,
+    minIntervalMs: 8_000,
+    pollWhileVisibleMs: 60_000,
+  });
 
   async function place() {
     if (!addressId || !quote) return;

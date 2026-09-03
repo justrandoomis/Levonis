@@ -11,6 +11,7 @@ import { ArrowLeft, Loader2, Minus, Plus, ShoppingCart, Store, Trash2 } from 'lu
 import { useLanguage } from '../../LanguageContext';
 import { ApiError } from '../../lib/api';
 import { storeCheckoutApi, iqd, type MerchantCartData } from '../../lib/merchant';
+import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 
 export default function MerchantCartView() {
   const { loc, dir } = useLanguage();
@@ -26,6 +27,10 @@ export default function MerchantCartView() {
       .catch(() => setCart({ scope: null, store: null, items: [], subtotal_iqd: 0 }));
   }, []);
   useEffect(load, [load]);
+  // Same rule as the platform cart: the merchant's prices are re-read when the
+  // customer comes back to this screen, so a shop that changed a price is not
+  // held to the old one by a tab that was never closed.
+  useFreshOnReturn(load, { enabled: !busy, minIntervalMs: 8_000, pollWhileVisibleMs: 60_000 });
 
   async function setQty(id: string, qty: number) {
     setBusy(id);

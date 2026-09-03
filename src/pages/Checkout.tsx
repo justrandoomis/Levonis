@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import {
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
+import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 
 /**
@@ -147,6 +148,9 @@ export default function Checkout() {
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // True once a line's price moved while this screen was open, so the customer
+  // is told rather than left to spot the total changing on its own.
+  const [pricesMoved, setPricesMoved] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   const [selectedAddressId, setSelectedAddressId] = useState('');
@@ -212,6 +216,32 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * COMING BACK TO CHECKOUT RE-READS THE LINES.
+   *
+   * This screen matters more than the cart: the order is priced on the server
+   * at the moment it is placed, so a stale total here would show one number
+   * and charge another. Only the LINES are re-read — the address, delivery and
+   * payment choices the customer has already made are theirs and are never
+   * touched, and the quote effect below re-runs on its own once a price moves.
+   *
+   * Paused while an order is being placed, so nothing shifts under a customer
+   * who has already pressed the button.
+   */
+  const refreshLines = useCallback(async () => {
+    const data = await api.get<{ items: CartItem[] }>('/api/cart');
+    const all = data.items || [];
+    const filtered =
+      requestedItemIds && requestedItemIds.length > 0 ? all.filter((i) => requestedItemIds.includes(i.id)) : all;
+    setItems((prev) => {
+      const moved = changedPrices(prev, filtered);
+      if (moved.size) setPricesMoved(true);
+      return filtered;
+    });
+  }, [requestedItemIds]);
+
+  useFreshOnReturn(refreshLines, { enabled: !submitting, minIntervalMs: 8_000, pollWhileVisibleMs: 60_000 });
+
   // Default the selectors once settings arrive.
   useEffect(() => {
     if (!deliveryMethod && checkoutDeliveryMethods.length > 0) setDeliveryMethod(checkoutDeliveryMethods[0].id);
@@ -223,7 +253,11 @@ export default function Checkout() {
   // Re-quote on every relevant selection change. The response is the ONLY
   // source of truth for shipping/waivers/policies — local math is a fallback
   // while the request is in flight.
-  const itemIdsKey = items.map((i) => i.id).join(',');
+  // The lines AND their prices. Keying on ids alone meant a price that moved
+  // while this screen was open never re-quoted: the same lines were still the
+  // same lines, so shipping, the coupon and the waiver kept answering for a
+  // total that no longer existed. Quantity belongs here for the same reason.
+  const itemIdsKey = items.map((i) => `${i.id}:${i.qty}:${i.unit_price_iqd}`).join(',');
   useEffect(() => {
     if (!selectedAddressId || !deliveryMethod || items.length === 0) {
       setQuote(null);
@@ -309,8 +343,18 @@ export default function Checkout() {
   const shippingNeedsConfig = !!quote && quote.shipping.needs_config.length > 0;
   const requiredPolicies = quote?.policies ?? [];
   const beforeDiscounts = total + shippingIqd;
-  const pointsDiscount = usePoints ? Math.min(pointBalance, beforeDiscounts) : 0;
-  const orderTotal = beforeDiscounts - pointsDiscount;
+  // THE SERVER'S NUMBER WINS THE MOMENT THERE IS ONE.
+  //
+  // The local arithmetic below is a placeholder for the second before the
+  // first quote lands, and it is not the shop's pricing: it never subtracts
+  // the coupon, so a customer with a valid code was shown the discount as a
+  // line and then a total that ignored it — more than the server would
+  // actually charge. `total_iqd` and `due_on_delivery_iqd` come from the same
+  // function that prices the order at creation, so showing them is the only
+  // way the screen and the charge can agree.
+  const localPoints = usePoints ? Math.min(pointBalance, beforeDiscounts) : 0;
+  const pointsDiscount = quote ? quote.points.applied_iqd : localPoints;
+  const orderTotal = quote ? quote.total_iqd : beforeDiscounts - localPoints;
 
   // Advance payment logic
   let requiredAdvance = 0;
@@ -336,7 +380,7 @@ export default function Checkout() {
     isBalanceSufficient && !submitting && items.length > 0 && !!selectedAddressId && !!deliveryMethod && !!paymentMethod &&
     !quoteLoading && !shippingNeedsConfig && consentSatisfied;
 
-  const amountRemainingOnDelivery = orderTotal - walletDiscount;
+  const amountRemainingOnDelivery = quote ? quote.due_on_delivery_iqd : orderTotal - walletDiscount;
 
   const placeOrder = async () => {
     if (!canCompleteOrder) return;
@@ -670,6 +714,21 @@ export default function Checkout() {
           {/* Mobile CTA */}
           <div className="pt-6 lg:hidden">
             {consentBlock}
+            {/* A price moved while this screen was open. It sits ABOVE the
+                button, because a warning underneath the control it warns about
+                is read after the tap. The order is priced on the server when
+                it is placed, so the total shown is now the real one. */}
+            {pricesMoved && (
+              <p
+                className="text-sm text-amber-300 mb-3 font-medium flex items-center justify-center gap-2 text-center"
+                data-prices-moved
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {dir === 'rtl'
+                  ? 'تغيّر سعر أحد المنتجات وحُدِّث المجموع أعلاه. راجعه قبل التأكيد.'
+                  : 'A price changed and the total above has been updated. Please review it before confirming.'}
+              </p>
+            )}
             <button
               onClick={placeOrder}
               disabled={!canCompleteOrder}
@@ -912,6 +971,21 @@ export default function Checkout() {
 
           <div className="pt-8 hidden lg:block">
             {consentBlock}
+            {/* A price moved while this screen was open. It sits ABOVE the
+                button, because a warning underneath the control it warns about
+                is read after the tap. The order is priced on the server when
+                it is placed, so the total shown is now the real one. */}
+            {pricesMoved && (
+              <p
+                className="text-sm text-amber-300 mb-3 font-medium flex items-center justify-center gap-2 text-center"
+                data-prices-moved
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {dir === 'rtl'
+                  ? 'تغيّر سعر أحد المنتجات وحُدِّث المجموع أعلاه. راجعه قبل التأكيد.'
+                  : 'A price changed and the total above has been updated. Please review it before confirming.'}
+              </p>
+            )}
             <button
               onClick={placeOrder}
               disabled={!canCompleteOrder}
