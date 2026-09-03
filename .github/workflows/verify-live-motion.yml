@@ -149,6 +149,61 @@ jobs:
           done
           exit $fail
 
+      - name: The rail gesture physics ship, attached to something
+        id: rails
+        run: |
+          set -euo pipefail
+          fail=0
+          # Written to FILES, never piped: `grep -q` stops at the first match,
+          # the writer takes SIGPIPE, and pipefail reads a hit as a failure.
+          for marker in 'data-rail-snap' 'data-rail-release' 'data-rail-dragging'; do
+            hit=$(grep -l "$marker" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $marker ships — in $(basename "$hit")"
+            else
+              echo "  FAIL $marker is not in any served module"; fail=1
+            fi
+          done
+          # The gesture primitives were dead code before this. Their call sites
+          # are what proves they are attached, and the minifier keeps the
+          # property names these two write.
+          for marker in 'scrollPaddingInlineStart' 'overscrollBehaviorX'; do
+            hit=$(grep -l "$marker" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   the rail sets $marker — in $(basename "$hit")"
+            else
+              echo "  FAIL the rail does not set $marker"; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Arabic keeps its joins — no tracking on an Arabic document
+        id: arabic
+        run: |
+          set -euo pipefail
+          fail=0
+          # Arabic is a joined script: letter-spacing severs the joins. The rule
+          # is scoped to the DOCUMENT language, so an English session keeps its
+          # Latin tracking. The minifier strips the quotes inside the attribute
+          # selector, so the pattern has to accept both forms.
+          if grep -qE 'lang\(ar\)[^{]*\[class\*=.?tracking-' /tmp/app.css; then
+            echo "  ok   an Arabic document neutralises tracking"
+          else
+            echo "  FAIL no rule stops letter-spacing on Arabic text"; fail=1
+          fi
+          if grep -qE 'lang\(ckb\)' /tmp/app.css; then
+            echo "  ok   Kurdish is covered by the same rule"
+          else
+            echo "  FAIL Kurdish is not covered"; fail=1
+          fi
+          # And an English session must NOT be flattened with it.
+          if grep -qE '(^|\})\.tracking-(tight|wide|widest|wider)\{' /tmp/app.css; then
+            echo "  ok   the Latin tracking utilities still ship for English"
+          else
+            echo "  FAIL the tracking utilities are gone entirely"; fail=1
+          fi
+          exit $fail
+
       - name: Result
         if: always()
         run: |
@@ -161,10 +216,12 @@ jobs:
             echo "| glass blurs — unprefixed backdrop-filter survived | ${{ steps.material.outcome }} |"
             echo "| reduced motion, reduced transparency, more contrast | ${{ steps.a11y.outcome }} |"
             echo "| window primitive and travelling indicator shipped | ${{ steps.bundle.outcome }} |"
+            echo "| rail gesture physics attached and shipping | ${{ steps.rails.outcome }} |"
+            echo "| Arabic keeps its joins, English keeps its tracking | ${{ steps.arabic.outcome }} |"
             echo ''
             echo 'Read-only: every request was an anonymous GET.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail the run if any check failed
-        if: steps.press.outcome != 'success' || steps.material.outcome != 'success' || steps.a11y.outcome != 'success' || steps.bundle.outcome != 'success'
+        if: steps.press.outcome != 'success' || steps.material.outcome != 'success' || steps.a11y.outcome != 'success' || steps.bundle.outcome != 'success' || steps.rails.outcome != 'success' || steps.arabic.outcome != 'success'
         run: exit 1
