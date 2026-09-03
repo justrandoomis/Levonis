@@ -4,6 +4,7 @@ import { ChevronLeft, FileText, ScrollText, ShieldCheck, RefreshCw, Eye, Pencil,
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api } from '../lib/api';
+import { Overlay, Sheet } from '../components/ui/Overlay';
 
 /**
  * Public trilingual reader for PUBLISHED policy documents, with an honest
@@ -464,13 +465,64 @@ export default function Policies() {
         )}
       </div>
 
-      {/* Admin draft preview modal */}
-      {previewDoc && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-t-[28px] sm:rounded-[28px] p-5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+      {/* ------------------------------------------ admin draft preview window
+
+          A SHEET, because this window is a document to be READ and then thrown
+          away. It carries no state of its own: everything in it is a rendering
+          of a draft that already exists on the server, and the only way out was
+          ever a single "cancel" button in the corner. A long scrollable text
+          that an admin skims and dismisses is precisely the case Apple's sheet
+          is for — it arrives from the bottom edge, and it can be flung back to
+          the bottom edge with the same flick that scrolled it. The old window
+          could do neither: it was `fixed inset-0` mounted on `previewDoc`, so
+          it appeared with no arrival and, because `setPreviewDoc(null)`
+          unmounts it, it VANISHED — the reader was left with no sense of where
+          the document went, and nothing to connect it to the row that produced
+          it. Enter and exit now run the same spring in reverse, and the arrival
+          is interruptible: dismiss it halfway up and it continues from where it
+          actually is.
+
+          The old panel already sat at the bottom edge on phones and centred on
+          `sm` (`items-end sm:items-center`); `Sheet` uses the primitive's
+          `bottom` placement, which is that exact geometry, so nothing moves.
+
+          MODAL (the default) rather than `parallel`: the old backdrop dimmed
+          and blurred the page, and this is an admin reading one specific
+          document — the list behind it should hold still. The scrim is a
+          preservation, not an addition.
+
+          `dismissOnScrim={false}` PRESERVES what this window did: the old
+          backdrop was a plain div with no click handler, so tapping outside
+          never closed it, and a migration must not hand a window a dismissal it
+          never had. The cancel button, Escape and the downward drag are the
+          ways out — all of them equivalent, because nothing here is unsaved.
+          There was no Escape listener in this file to delete; the primitive
+          owns that key now and this window simply gains it, which costs the
+          reader nothing on a read-only view.
+
+          `labelledBy` rather than `label`: the document's own title is already
+          on screen, so a screen reader should name the window with the words
+          everyone else reads instead of a second, invented string.
+
+          z={60} preserves the old `z-[60]` exactly. */}
+      <Sheet
+        open={!!previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        labelledBy="policy-preview-title"
+        z={60}
+        dismissOnScrim={false}
+        testId="policy-draft-preview"
+        // Geometry only — the material, the border and the rounding belong to
+        // the primitive now. The old inner `p-5` moves onto a div in the
+        // children, below the grabber, so the grabber is not padded away from
+        // the top edge it belongs to.
+        panelClassName="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+      >
+        {previewDoc && (
+          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="font-bold">{previewDoc.title}</p>
+                <p id="policy-preview-title" className="font-bold">{previewDoc.title}</p>
                 <p className="text-[11px] text-amber-400 font-bold uppercase">
                   {t.draft} — {previewDoc.key} v{previewDoc.version} ({previewDoc.lang})
                 </p>
@@ -481,14 +533,53 @@ export default function Policies() {
             </div>
             <PolicyBody body={previewDoc.body} />
           </div>
-        </div>
-      )}
+        )}
+      </Sheet>
 
-      {/* Admin draft edit modal */}
-      {editDoc && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-t-[28px] sm:rounded-[28px] p-5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <p className="font-bold mb-3">
+      {/* --------------------------------------------- admin draft edit window
+
+          An OVERLAY, NOT a `Sheet`, even though it sits in the same place. The
+          preview above is a document you throw away; this one holds a policy
+          body someone is TYPING, and a draft is only in the database once
+          `saveDraft` returns. Making the panel draggable would mean a downward
+          flick — the same gesture used to scroll a fourteen-row textarea — can
+          silently discard an edit with no undo. The window keeps the bottom
+          placement so it still rises from the bottom edge on phones and centres
+          on `sm` exactly as `items-end sm:items-center` did; what it does not
+          get is a dismissal gesture the content cannot afford.
+
+          For the same reason BOTH `dismissOnEscape` and `dismissOnScrim` are
+          false. This is not the primitive being made stubborn: the old markup
+          had no scrim click handler and no key listener, so neither gesture
+          closed this window before, and the thing at stake is unsaved text.
+          Cancel and Save are the two deliberate answers, and they are both one
+          tap away at the bottom of the form. (There was no Escape listener in
+          this file to delete — the primitive owns that key, and this is the one
+          window that opts out of it.)
+
+          What it DOES gain is the part that was missing: an arrival and a
+          symmetric exit. The editor used to appear from nowhere and vanish the
+          instant `setEditDoc(null)` ran — including on a successful save, so
+          the one moment that deserved a sense of completion had none.
+
+          `labelledBy` points at the heading that already names the document.
+
+          z={60} preserves the old `z-[60]`, so a preview and an edit opened in
+          sequence keep the stacking they had. */}
+      <Overlay
+        open={!!editDoc}
+        onClose={() => setEditDoc(null)}
+        labelledBy="policy-edit-title"
+        placement="bottom"
+        dismissOnEscape={false}
+        dismissOnScrim={false}
+        z={60}
+        testId="policy-draft-editor"
+        panelClassName="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+      >
+        {editDoc && (
+          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <p id="policy-edit-title" className="font-bold mb-3">
               {t.edit}: {editDoc.key} v{editDoc.version} ({editDoc.lang})
             </p>
             <label className="text-[12px] text-zinc-400 block mb-1">{t.docTitle}</label>
@@ -517,8 +608,8 @@ export default function Policies() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Overlay>
     </div>
   );
 }

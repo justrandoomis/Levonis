@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Check, Globe, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { motion, AnimatePresence } from 'motion/react';
+import { Anchored } from './ui/Overlay';
 
 export default function Header() {
   const { lang, setLang, t, dir } = useLanguage();
@@ -27,6 +27,11 @@ export default function Header() {
 
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // The language menu grows out of THIS button, so the primitive needs a handle
+  // on it: it reads the trigger's box once, on open, to point the panel's
+  // transform-origin at the control the person actually pressed.
+  const langButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -100,6 +105,7 @@ export default function Header() {
           {/* Language Toggle */}
           <div className="relative">
             <button
+              ref={langButtonRef}
               type="button"
               onClick={() => setIsLangOpen(!isLangOpen)}
               aria-label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
@@ -109,28 +115,62 @@ export default function Header() {
             >
               <Globe className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
             </button>
-            
-            <AnimatePresence>
-              {isLangOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setIsLangOpen(false)} 
-                  />
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0, y: -5 }}
-                    animate={{ opacity: 1, height: 'auto', y: 0 }}
-                    exit={{ opacity: 0, height: 0, y: -5 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                    className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-32 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl z-50 overflow-hidden`}
-                  >
-                    <button onClick={() => { setLang('en'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'en' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>English</button>
-                    <button onClick={() => { setLang('ar'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ar' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>العربية</button>
-                    <button onClick={() => { setLang('ckb'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ckb' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>کوردی</button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+
+            {/* NOT A WINDOW. This transparent full-screen layer is the pointer
+                click-catcher that makes "tap anywhere else to dismiss" work,
+                and it also swallows the press that would otherwise reach the
+                page behind the open menu. It has no material, no content and
+                nothing to arrive from, so it stays a plain div rather than
+                being forced through the overlay primitive. It sits at z-40,
+                below the menu's z-50, exactly as before. */}
+            {isLangOpen && (
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsLangOpen(false)}
+              />
+            )}
+
+            {/* THE LANGUAGE MENU. It used to be a hand-rolled motion.div that
+                animated its own HEIGHT from 0 with an eased 200ms tween — an
+                unfolding blind, not a window, and a tween cannot be caught: a
+                second tap during the 200ms restarts from the top instead of
+                continuing from where the panel actually is.
+
+                `Anchored` is the right primitive here rather than `Overlay`.
+                This is not a task that takes the page over — it is three
+                radio-ish choices that belong to the globe button, so it must
+                stay welded to that button: no scrim, no page dimming, no
+                portal, and it scales OUT OF the trigger (`anchor`) so the
+                relationship between the control and what it produced is
+                visible. Routing it through `Overlay` would have centred it in
+                the viewport and dimmed the store behind it, which is a much
+                heavier promise than picking a language deserves.
+
+                RTL: the old code branched on `dir` to pick left-0 vs right-0.
+                `align="end"` says the same thing logically — the menu hangs
+                from the trigger's trailing edge — and mirrors itself, so there
+                is no second rule to keep in sync for Arabic and Kurdish.
+
+                The primitive owns Escape and outside-mousedown dismissal, which
+                this menu never had; the geometry it does not own (its 8rem
+                width, and the overflow clip that keeps the first and last rows
+                inside the corner radius) stays here in className. */}
+            <Anchored
+              open={isLangOpen}
+              onClose={() => setIsLangOpen(false)}
+              anchor={langButtonRef}
+              align="end"
+              label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
+              testId="header-language-menu"
+              className="w-32 overflow-hidden"
+            >
+              {/* role=menuitem to match the role=menu the primitive supplies —
+                  the trigger already advertised aria-haspopup="menu", so this
+                  finishes a pairing the old markup only half-declared. */}
+              <button role="menuitem" onClick={() => { setLang('en'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'en' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>English</button>
+              <button role="menuitem" onClick={() => { setLang('ar'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ar' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>العربية</button>
+              <button role="menuitem" onClick={() => { setLang('ckb'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ckb' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>کوردی</button>
+            </Anchored>
           </div>
 
           {/* Subscription Button — the plans page is browsable signed out now,

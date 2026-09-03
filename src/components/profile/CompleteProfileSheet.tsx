@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X, UserRound } from 'lucide-react';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
+import { Sheet } from '../ui/Overlay';
 import { onboardingStrings, missingLabel } from '../onboarding/strings';
 
 /**
@@ -39,10 +39,9 @@ interface CompletionResponse {
 
 export default function CompleteProfileSheet() {
   const { user } = useAuth();
-  const { lang, dir } = useLanguage();
+  const { lang } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
-  const reduceMotion = useReducedMotion();
   const s = onboardingStrings(lang);
 
   const [data, setData] = useState<CompletionResponse | null>(null);
@@ -94,95 +93,124 @@ export default function CompleteProfileSheet() {
   // At most four lines. A list of seven things to do reads as a chore.
   const items = (data?.missing ?? []).slice(0, 4);
 
+  /* ------------------------------------------------------------- the window
+     A SHEET, NOT A DIALOG, and it always was one — by name, by placement
+     (`items-end` on a phone, centred only from `sm:`) and by intent. This is
+     the app asking a favour, not a task the person came here to do, so the
+     right way to answer it is to push it back down off the bottom edge with a
+     thumb. `Sheet` gives it exactly that: the panel tracks the finger 1:1
+     downward, resists progressively upward, and decides on release by
+     PROJECTED momentum rather than by where the finger stopped — a flick
+     throws it away even from near the top, and a slow drag that was
+     decelerating springs back. A drag-away lands on `dismiss`, the same call
+     the X and "later" already made, so throwing it off the screen tells the
+     server "not now" exactly as tapping the words does. That matters for THIS
+     window more than for most: the whole design above is about the prompt not
+     being a nag, and a gesture that closed it without recording the answer
+     would bring it straight back on the next page.
+
+     WHAT IT USED TO BE. Its own `fixed inset-0` with a hand-rolled
+     `AnimatePresence` and two tweens — a 0.15s fade on the backdrop and a
+     0.2s/24px lift on the panel. Tweens run for a duration fixed in advance
+     from a value captured at the start, so this window could not be caught:
+     dismiss it 80ms into its arrival and the exit began from the top of the
+     travel rather than from where the panel actually was. The spring behind
+     the primitive animates from its live presentation value, which is what
+     makes the arrival interruptible, and enter and exit are now literally the
+     same object so they cannot drift apart.
+
+     MODAL (the primitive's default) is right, and it is a preservation: the
+     old backdrop was `bg-black/70 backdrop-blur-[2px]`, so this window already
+     dimmed and pushed the page back. `dismissOnScrim` stays at its default
+     TRUE because that backdrop was a real `<button>` wired to `dismiss` —
+     tapping outside has always closed this, and removing it would be as much
+     of a behaviour change as adding it. Escape is new; there was no key
+     listener here to delete, and the primitive owns that key now.
+
+     BOTH `label` AND `labelledBy` are passed on purpose. `labelledBy` carries
+     across the old `aria-labelledby="complete-profile-title"` verbatim, so the
+     window is still named by the heading a sighted person reads. `label` is
+     not used for the panel when `labelledBy` is set — it names the SCRIM
+     button, which the old markup gave `aria-label={s.close}`; without it the
+     scrim would fall back to the primitive's generic Arabic default and this
+     window would quietly lose a translated string it had. */
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.15 }}
+    <Sheet
+      open={visible}
+      onClose={dismiss}
+      label={s.close}
+      labelledBy="complete-profile-title"
+      z={60}
+      testId="complete-profile-sheet"
+      // Geometry only — the material, the border and the rounding (rounded top
+      // on a phone, all four corners from `sm:`) are the primitive's, and they
+      // are the same shape the hand-rolled panel drew for itself.
+      panelClassName="w-full max-w-sm"
+    >
+      {/* The padding that used to sit on the panel itself lives here now,
+          including the safe-area floor: on a phone this sheet sits against the
+          bottom edge, so the last button has to clear the home indicator. */}
+      <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5">
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label={s.close}
+          className="absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-white"
         >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-gold">
+            {user?.avatar_key ? (
+              <img src={`/files/${user.avatar_key}`} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <UserRound className="h-5 w-5" aria-hidden />
+            )}
+          </span>
+          <div className="min-w-0">
+            <h2 id="complete-profile-title" className="text-[16px] font-bold text-white">
+              {s.completeTitle}
+            </h2>
+            <p className="text-[12px] text-zinc-400">
+              {s.completePercent.replace('{p}', String(data?.percent ?? 0))}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+          <div
+            className="h-full rounded-full bg-gold transition-[width] duration-300"
+            style={{ width: `${data?.percent ?? 0}%` }}
+          />
+        </div>
+
+        <ul className="mt-4 space-y-2">
+          {items.map((field) => (
+            <li key={field} className="flex items-center gap-2 text-[13px] text-zinc-300">
+              <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold/70" />
+              {missingLabel(s, field)}
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
-            aria-label={s.close}
-            onClick={dismiss}
-            className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
-          />
-          <motion.div
-            dir={dir}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="complete-profile-title"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: reduceMotion ? 0 : 24 }}
-            transition={{ duration: reduceMotion ? 0 : 0.2 }}
-            className="relative w-full max-w-sm rounded-t-3xl border border-zinc-800 bg-zinc-900 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:pb-5"
+            onClick={complete}
+            className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90"
           >
-            <button
-              type="button"
-              onClick={dismiss}
-              aria-label={s.close}
-              className="absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-white"
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-
-            <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-gold">
-                {user?.avatar_key ? (
-                  <img src={`/files/${user.avatar_key}`} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <UserRound className="h-5 w-5" aria-hidden />
-                )}
-              </span>
-              <div className="min-w-0">
-                <h2 id="complete-profile-title" className="text-[16px] font-bold text-white">
-                  {s.completeTitle}
-                </h2>
-                <p className="text-[12px] text-zinc-400">
-                  {s.completePercent.replace('{p}', String(data?.percent ?? 0))}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className="h-full rounded-full bg-gold transition-[width] duration-300"
-                style={{ width: `${data?.percent ?? 0}%` }}
-              />
-            </div>
-
-            <ul className="mt-4 space-y-2">
-              {items.map((field) => (
-                <li key={field} className="flex items-center gap-2 text-[13px] text-zinc-300">
-                  <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold/70" />
-                  {missingLabel(s, field)}
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-5 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={complete}
-                className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90"
-              >
-                {s.completeNow}
-              </button>
-              <button
-                type="button"
-                onClick={dismiss}
-                className="min-h-[44px] rounded-xl px-5 text-[13px] font-medium text-zinc-400 transition-colors duration-200 hover:text-white"
-              >
-                {s.later}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            {s.completeNow}
+          </button>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="min-h-[44px] rounded-xl px-5 text-[13px] font-medium text-zinc-400 transition-colors duration-200 hover:text-white"
+          >
+            {s.later}
+          </button>
+        </div>
+      </div>
+    </Sheet>
   );
 }

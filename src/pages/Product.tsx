@@ -47,6 +47,7 @@ import {
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import ReviewSection from '../components/reviews/ReviewSection';
 import SafeImage from '../components/ui/SafeImage';
+import { Overlay } from '../components/ui/Overlay';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { captureSupportRefFromSearch } from './Referrals';
@@ -453,6 +454,13 @@ export default function Product() {
 
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [lightbox, setLightbox] = useState(false);
+  // The zoom control the lightbox came out of. The viewer scales FROM this
+  // button and collapses back INTO it, so the enlarged photo is visibly the
+  // same object as the thumbnail the customer tapped rather than a second,
+  // unrelated window that happened to appear. A plain callback ref (not a
+  // typed useRef on the element) keeps the button conditional — it only
+  // renders when there is a media URL — without fighting ref variance.
+  const zoomBtnRef = useRef<HTMLElement | null>(null);
 
   const [addingToCart, setAddingToCart] = useState(false);
   // Set only from the server's CART_SHIPPING_CONFLICT refusal. null = no dialog.
@@ -715,15 +723,10 @@ export default function Product() {
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
 
-  // Escape closes the lightbox.
-  useEffect(() => {
-    if (!lightbox) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightbox(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox]);
+  // Escape used to be a hand-rolled window listener here. `Overlay` owns
+  // Escape for every window in the app now, so keeping a second listener would
+  // mean two places could disagree about when the viewer closes; it is deleted
+  // rather than duplicated.
 
   // ------------------------------------------------------------ loading/error
   if (loading || !product) {
@@ -1362,6 +1365,9 @@ export default function Product() {
                 {activeMedia?.url ? (
                   <button
                     type="button"
+                    ref={(el) => {
+                      zoomBtnRef.current = el;
+                    }}
                     onClick={() => setLightbox(true)}
                     aria-label={s.zoom}
                     className="absolute bottom-2 end-2 w-11 h-11 rounded-full bg-black/70 border border-zinc-700 flex items-center justify-center text-zinc-200 hover:text-white transition-colors"
@@ -1679,31 +1685,60 @@ export default function Product() {
       </div>
 
       {/* ------------------------------------------------------- image zoom */}
-      {lightbox && activeMedia?.url ? (
-        <div
-          className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={s.gallery}
+      {/*
+        THE PHOTO VIEWER.
+
+        It used to be a bare `fixed inset-0 bg-black/95` that was mounted when
+        `lightbox` flipped true and unmounted when it flipped false: the photo
+        appeared out of nothing and, on close, simply ceased to exist. On a
+        product page that is worse than merely abrupt — the customer loses the
+        thread between the thumbnail they tapped and the enlarged image, so a
+        second tap feels like opening a different thing rather than returning
+        to the same one.
+
+        `Overlay`, not `Sheet`: this is a centred viewing task, not a tray of
+        controls pulled up from the bottom edge, and a drag-down-to-dismiss
+        grabber on top of a photograph would both cover the product and invite
+        a gesture that fights the pinch/pan people expect over an image. It
+        arrives scaled up out of the zoom button (`anchor`) and collapses back
+        into it, which is the spatial link the old markup could not express.
+
+        `solid`: the primitive's default material is tinted, blurred glass.
+        Behind a product photo that is a lie about the colour the customer is
+        about to pay for, so the viewer opts out and supplies its own neutral
+        black ground — matching the old `bg-black/95` — where the only colour
+        on screen is the product's own.
+
+        Dismissal is unchanged in substance: the old container closed on any
+        click that was not the image itself (the <img> stopped propagation), so
+        the scrim closes it here, and the X button stays exactly as it was.
+        `z={200}` preserves the old `z-[200]`.
+      */}
+      <Overlay
+        open={lightbox && !!activeMedia?.url}
+        onClose={() => setLightbox(false)}
+        label={s.gallery}
+        anchor={zoomBtnRef}
+        solid
+        z={200}
+        testId="product-lightbox"
+        panelClassName="bg-black max-w-full max-h-[calc(100dvh-2rem)] overflow-hidden"
+      >
+        <button
+          type="button"
           onClick={() => setLightbox(false)}
+          aria-label={s.close}
+          className="absolute top-4 end-4 z-10 w-11 h-11 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center text-white"
         >
-          <button
-            type="button"
-            onClick={() => setLightbox(false)}
-            aria-label={s.close}
-            className="absolute top-4 end-4 w-11 h-11 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center text-white"
-          >
-            <X aria-hidden="true" className="w-5 h-5" />
-          </button>
-          <img
-            src={activeMedia.url}
-            alt={pick(lang as Lang, activeMedia.alt_ar, activeMedia.alt_en, activeMedia.alt_ckb) || name}
-            referrerPolicy="no-referrer"
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      ) : null}
+          <X aria-hidden="true" className="w-5 h-5" />
+        </button>
+        <img
+          src={activeMedia?.url}
+          alt={pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name}
+          referrerPolicy="no-referrer"
+          className="block max-w-full max-h-[calc(100dvh-2rem)] object-contain"
+        />
+      </Overlay>
 
       <ShippingConflictDialog
         open={shippingConflict !== null}

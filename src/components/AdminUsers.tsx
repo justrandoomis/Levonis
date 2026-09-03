@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import { Search, Edit2, Shield, User, Store, Check, CreditCard, TrendingUp } from 'lucide-react';
+import { Overlay } from './ui/Overlay';
 
 interface AdminUserRow {
   id: string;
@@ -32,6 +33,32 @@ export default function AdminUsers() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The row's own edit button, captured at the moment it is pressed. The editor
+  // is opened from one of many identical buttons in a long table, so without
+  // this the window would grow out of the middle of the screen and the admin
+  // would lose track of WHICH user they just opened. Handing the button to the
+  // overlay makes it scale out of — and collapse back into — the exact row it
+  // belongs to, which is the whole point of the spatial rule.
+  const editAnchorRef = useRef<HTMLElement | null>(null);
+
+  // WHY THE WINDOW DOES NOT READ `editingUser` DIRECTLY. `editingUser` going
+  // null IS the close, but the panel is still on screen for the length of its
+  // exit spring; reading the state would empty the form out from under the
+  // animation and the admin would watch a blank card shrink back into the row.
+  // So the last edited row is held for exactly as long as the window is still
+  // being drawn.
+  const lastEditedRef = useRef<AdminUserRow | null>(null);
+  if (editingUser) lastEditedRef.current = editingUser;
+  const editorUser = editingUser ?? lastEditedRef.current;
+
+  // Closing is the Cancel button's behaviour, and Cancel is disabled while a
+  // save is in flight. Escape and any other route out has to obey the same
+  // rule, or the admin could dismiss the window mid-PATCH and never learn
+  // whether the change landed.
+  const closeEditor = () => {
+    if (saving) return;
+    setEditingUser(null);
+  };
 
   const fetchUsers = async (search: string) => {
     setLoading(true);
@@ -168,7 +195,7 @@ export default function AdminUsers() {
                   </td>
                   <td className="py-4 px-6 text-right">
                     <button
-                      onClick={() => { setSaveError(null); setEditingUser(u); }}
+                      onClick={(e) => { editAnchorRef.current = e.currentTarget; setSaveError(null); setEditingUser(u); }}
                       className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -193,17 +220,65 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {editingUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6">Edit User</h3>
+      {/*
+        THE EDIT-USER WINDOW.
+
+        It used to be a hand-rolled `fixed inset-0 bg-black/60 backdrop-blur-sm`
+        that was mounted the instant a row's pencil was pressed and torn out of
+        the DOM the instant it was dismissed: no arrival, and — the part that
+        actually hurts — no departure. The admin's eye had nothing to follow
+        back to the row they had just been editing, so after every save the
+        long table had to be re-scanned to find their place again.
+
+        `Overlay` AND NOT `Sheet`. This is a centred task dialog: it holds a
+        form with a role choice, a plan select and an investor flag, and it is
+        answered with Cancel or Save. `Sheet` is for a surface you throw away
+        with your thumb, and a half-filled form is not something that should
+        ever leave by accident. So the window stays centred, and the only ways
+        out are the two buttons and Escape.
+
+        NO SCRIM DISMISSAL, deliberately: the old backdrop had no onClick, so
+        clicking outside never closed this form, and gaining that silently
+        would mean a mis-aimed click on a full-screen dim could discard an
+        edit. Escape is new and is the one route the primitive adds — it is
+        the keyboard equivalent of Cancel, and it runs through the same
+        `closeEditor` that refuses to close mid-save.
+
+        `anchor` is the row's own pencil button, so the window grows out of the
+        user it belongs to and collapses back into it. The z-index is still 50,
+        exactly what the old markup used, so this keeps sitting under whatever
+        already sat above it.
+
+        The old markup had no role, no aria-modal and no accessible name at
+        all; the primitive supplies the first two, and the "Edit User" heading
+        that is already on screen now names the window through `labelledBy`.
+      */}
+      {editorUser && (
+        <Overlay
+          open={!!editingUser}
+          onClose={closeEditor}
+          mode="modal"
+          anchor={editAnchorRef}
+          labelledBy="admin-edit-user-title"
+          dismissOnScrim={false}
+          z={50}
+          testId="admin-edit-user"
+          // Geometry only — the material, the border and the rounding belong to
+          // the primitive. `pointer-events-none` on the way out: while the panel
+          // is playing its exit it is a picture of itself, and a click landing on
+          // a role button then would re-open the window the admin just closed.
+          panelClassName={`w-full max-w-md${editingUser ? '' : ' pointer-events-none'}`}
+        >
+          {/* The old inner padding lives on a plain div inside, where it belongs. */}
+          <div className="p-6">
+            <h3 id="admin-edit-user-title" className="text-xl font-bold text-white mb-6">Edit User</h3>
 
             <div className="space-y-4 mb-8">
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Name</label>
                 <input
                   type="text"
-                  value={editingUser.name || editingUser.username || ''}
+                  value={editorUser.name || editorUser.username || ''}
                   disabled
                   className="w-full bg-zinc-800/50 border border-zinc-700 text-zinc-400 px-4 py-3 rounded-xl cursor-not-allowed"
                 />
@@ -213,20 +288,20 @@ export default function AdminUsers() {
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Role</label>
                 <div className="grid grid-cols-3 gap-3">
                   <button
-                    onClick={() => setEditingUser({...editingUser, role: 'customer'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editingUser.role === 'customer' ? 'bg-zinc-800 text-white border-zinc-600' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    onClick={() => setEditingUser({...editorUser, role: 'customer'})}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'customer' ? 'bg-zinc-800 text-white border-zinc-600' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
                   >
                     <User className="w-4 h-4" /> Customer
                   </button>
                   <button
-                    onClick={() => setEditingUser({...editingUser, role: 'merchant'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editingUser.role === 'merchant' ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    onClick={() => setEditingUser({...editorUser, role: 'merchant'})}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'merchant' ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
                   >
                     <Store className="w-4 h-4" /> Merchant
                   </button>
                   <button
-                    onClick={() => setEditingUser({...editingUser, role: 'admin'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editingUser.role === 'admin' ? 'bg-[#6B46FF]/20 text-[#6B46FF] border-[#6B46FF]/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    onClick={() => setEditingUser({...editorUser, role: 'admin'})}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'admin' ? 'bg-[#6B46FF]/20 text-[#6B46FF] border-[#6B46FF]/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
                   >
                     <Shield className="w-4 h-4" /> Admin
                   </button>
@@ -236,8 +311,8 @@ export default function AdminUsers() {
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Subscription Plan</label>
                 <select
-                  value={editingUser.membership_tier || 'free'}
-                  onChange={(e) => setEditingUser({...editingUser, membership_tier: e.target.value as AdminUserRow['membership_tier']})}
+                  value={editorUser.membership_tier || 'free'}
+                  onChange={(e) => setEditingUser({...editorUser, membership_tier: e.target.value as AdminUserRow['membership_tier']})}
                   className="w-full bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50 appearance-none font-medium capitalize"
                 >
                   <option value="free">Free Plan</option>
@@ -250,8 +325,8 @@ export default function AdminUsers() {
               <label className="flex items-center gap-3 cursor-pointer bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3">
                 <input
                   type="checkbox"
-                  checked={!!editingUser.is_investor}
-                  onChange={(e) => setEditingUser({...editingUser, is_investor: e.target.checked ? 1 : 0})}
+                  checked={!!editorUser.is_investor}
+                  onChange={(e) => setEditingUser({...editorUser, is_investor: e.target.checked ? 1 : 0})}
                   className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-[#2CE59B]"
                 />
                 <span className="text-white font-medium flex items-center gap-2">
@@ -268,14 +343,14 @@ export default function AdminUsers() {
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setEditingUser(null)}
+                onClick={closeEditor}
                 disabled={saving}
                 className="px-5 py-2.5 rounded-xl font-bold text-zinc-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleSaveUser(editingUser)}
+                onClick={() => handleSaveUser(editorUser)}
                 disabled={saving}
                 className="px-5 py-2.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
@@ -283,7 +358,7 @@ export default function AdminUsers() {
               </button>
             </div>
           </div>
-        </div>
+        </Overlay>
       )}
     </div>
   );

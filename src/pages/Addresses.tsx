@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, MapPin, Edit2, Trash2, CheckCircle, User } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { api, ApiAddress } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import { GOVERNORATES } from '../lib/governorates';
+import { Overlay } from '../components/ui/Overlay';
 
 export default function Addresses() {
   const navigate = useNavigate();
@@ -20,6 +21,15 @@ export default function Addresses() {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [actionError, setActionError] = useState('');
+
+  // The Delete button of the row being asked about. The confirmation is a
+  // question about ONE address out of a list of otherwise identical cards, and
+  // its copy never names which one — so the only thing on screen that says
+  // "this address" is where the dialog comes from. Holding the element that was
+  // pressed lets the window scale out of that exact button and collapse back
+  // into it. It is a plain ref rather than state on purpose: it must be set
+  // synchronously, before the render that opens the window reads it.
+  const deleteAnchor = useRef<HTMLElement | null>(null);
 
   // Form states
   const [formLabel, setFormLabel] = useState('');
@@ -229,7 +239,7 @@ export default function Addresses() {
                             <Edit2 className="w-3.5 h-3.5" />
                             Edit
                           </button>
-                          <button onClick={() => setDeleteConfirmId(addr.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-zinc-400 text-[11px] font-bold uppercase tracking-wider transition-colors">
+                          <button onClick={(e) => { deleteAnchor.current = e.currentTarget; setDeleteConfirmId(addr.id); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-zinc-400 text-[11px] font-bold uppercase tracking-wider transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />
                             Delete
                           </button>
@@ -250,33 +260,122 @@ export default function Addresses() {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-[28px] p-6 w-full max-w-sm animate-in zoom-in-95 duration-200 shadow-2xl">
-            <h2 className="text-xl font-bold mb-2">Delete Address</h2>
-            <p className="text-zinc-400 mb-6">Are you sure you want to delete this address? This action cannot be undone.</p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="flex-1 py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex-1 py-3.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors shadow-lg shadow-red-500/20"
-              >
-                Delete
-              </button>
-            </div>
+      {/* DELETE CONFIRMATION — a centred question that has to be answered.
+
+          It used to be a `fixed inset-0` div that appeared with Tailwind's
+          `zoom-in-95` keyframe and, when the id was cleared, simply stopped
+          existing: a full arrival and no departure at all. A keyframe is also
+          uninterruptible — someone who taps Delete and immediately reaches for
+          Cancel has to wait out an animation that has stopped meaning anything.
+          The primitive's spring animates from the panel's live value, so the
+          trip back starts from wherever the window actually got to.
+
+          `Overlay`, not `Sheet`. This is a question with exactly two answers,
+          both of them on screen. A sheet's drag-to-dismiss would invent a third
+          answer ("neither") for a gesture that is easy to make by accident,
+          which is the last thing a destructive prompt should offer.
+
+          `anchor` is the row's own Delete button (captured on press), so the
+          question grows out of the control that raised it. With several
+          near-identical address cards stacked up, that origin is the only
+          indication of WHICH address is at stake — the copy says "this
+          address" and never names it.
+
+          dismissOnEscape AND dismissOnScrim are both false. This is not the
+          primitive being made stubborn: the old markup had no scrim handler and
+          no key listener, so neither gesture closed it before, and the thing
+          being confirmed is explicitly irreversible. A destructive question is
+          answered, not dodged — Cancel is the way out, and it is one tap away.
+
+          z={60} preserves the old `z-[60]`, deliberately above the editor's
+          z-50 so a deletion confirmed with the editor open still sits on top. */}
+      <Overlay
+        open={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        labelledBy="delete-address-title"
+        anchor={deleteAnchor}
+        dismissOnEscape={false}
+        dismissOnScrim={false}
+        z={60}
+        testId="address-delete-confirm"
+        panelClassName="w-full max-w-sm"
+      >
+        {/* The old panel's own padding, moved inside: the primitive owns the
+            material, the border and the rounding, the caller owns the inset. */}
+        <div className="p-6">
+          <h2 id="delete-address-title" className="text-xl font-bold mb-2">Delete Address</h2>
+          <p className="text-zinc-400 mb-6">Are you sure you want to delete this address? This action cannot be undone.</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDeleteConfirmId(null)}
+              className="flex-1 py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex-1 py-3.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors shadow-lg shadow-red-500/20"
+            >
+              Delete
+            </button>
           </div>
         </div>
-      )}
+      </Overlay>
 
-      {/* Add/Edit Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col animate-in slide-in-from-bottom-full duration-300">
+      {/* ADD / EDIT ADDRESS — a full-bleed editing task that rises from the
+          bottom edge and goes back down the same way.
+
+          It used to be `fixed inset-0` with `slide-in-from-bottom-full`: it
+          slid up once, and then on close it was unmounted mid-screen and simply
+          ceased to be. So the window had exactly half a life — it came from
+          somewhere and returned to nowhere, which is the spatial contract
+          broken in the one place a person is most likely to reopen it (they
+          save an address, notice a typo, and tap Edit again). `placement="bottom"`
+          keeps the direction the old keyframe established, and now the exit
+          retraces it.
+
+          `Overlay`, not `Sheet`, even though it arrives from the bottom edge.
+          A `Sheet` is draggable, and this window is a long scrolling form: a
+          downward drag started over the fields is the gesture for reading the
+          rest of the form, and handing that same gesture a second meaning
+          ("throw the whole thing away") would put a half-typed address one
+          clumsy swipe from oblivion. The grabber would also land on top of the
+          sticky header and its back button. This window is left the way it was
+          entered: the back chevron, Save, or Escape.
+
+          No `anchor`. A window that covers the entire screen has no visible
+          relationship to the 40px button that opened it — scaling a full-bleed
+          surface out of one corner reads as a glitch, not as provenance. A
+          full-screen task belongs to the edge it comes from, and the two
+          triggers (Add, and every row's Edit) would each claim a different
+          origin for the same window anyway.
+
+          `solid`. The primitive's default material is tinted glass, but every
+          surface in here — the sticky translucent header, the `zinc-800/50`
+          input fields, the map card — is drawn assuming an opaque page ground
+          underneath. Over glass, the address cards of the list behind would
+          show through the very fields being typed into. So the editor supplies
+          the old `bg-[#0a0a0a]` and keeps the arrival, the exit and the
+          reduced-motion cross-fade that the primitive provides regardless.
+
+          dismissOnScrim={false}: there was no backdrop to click before (the old
+          window was opaque and covered everything), and a stray tap beside the
+          panel on a wide screen must not discard a form someone is filling in.
+          Escape now closes it, which the primitive owns — there was no key
+          listener here to remove.
+
+          z={50} is the old `z-50`, unchanged. */}
+      <Overlay
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        labelledBy="address-editor-title"
+        placement="bottom"
+        dismissOnScrim={false}
+        solid
+        z={50}
+        testId="address-editor"
+        panelClassName="w-full sm:max-w-xl h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-[#0a0a0a]"
+      >
           <div className="flex items-center p-4 sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-10 border-b border-zinc-900">
             <button
               onClick={() => setShowAddModal(false)}
@@ -284,10 +383,13 @@ export default function Addresses() {
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
-            <h1 className="text-[19px] font-bold ml-1">Delivery details</h1>
+            <h1 id="address-editor-title" className="text-[19px] font-bold ml-1">Delivery details</h1>
           </div>
 
-          <div className="flex-1 overflow-y-auto pb-24">
+          {/* min-h-0 because this is now a flex child of a panel with a real
+              height rather than of a viewport-sized div: without it the column
+              would refuse to shrink and the scroll would move to the page. */}
+          <div className="flex-1 min-h-0 overflow-y-auto pb-24">
             <div className="p-4">
               {/* Location Card (map image is decorative only) */}
               <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden mb-8">
@@ -451,7 +553,14 @@ export default function Addresses() {
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#0a0a0a]/90 backdrop-blur-md pb-8">
+          {/* `absolute inset-x-0`, not `fixed left-0 right-0`. The panel is an
+              animated (transformed and filtered) element, which makes it the
+              containing block for fixed descendants anyway — so `fixed` here
+              was already lying about what it did. Stating it as absolute ties
+              the bar to the panel it belongs to, which is what keeps it the
+              width of the window rather than the width of the screen once the
+              panel stops being full-bleed on a wide viewport. */}
+          <div className="absolute inset-x-0 bottom-0 p-4 bg-[#0a0a0a]/90 backdrop-blur-md pb-8">
             <button
               onClick={handleSave}
               disabled={isSaving}
@@ -460,8 +569,7 @@ export default function Addresses() {
               {isSaving ? 'Saving…' : 'Save'}
             </button>
           </div>
-        </div>
-      )}
+      </Overlay>
     </div>
   );
 }

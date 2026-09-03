@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import WarrantySection from '../adminWarranty/WarrantySection';
-import { createPortal } from 'react-dom';
 import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ShieldCheck, Tag, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, formatIqd, type AdminOrderDetail } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
+import { useMotion } from '../../lib/motion';
 import Spinner from '../ui/Spinner';
+import { Overlay } from '../ui/Overlay';
 import { ErrorState } from '../ui/AsyncStates';
 import CopyField from './CopyField';
 import OrderChatPanel from './OrderChatPanel';
@@ -26,11 +27,40 @@ import OrderStagePanel from './OrderStagePanel';
  */
 export default function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const { loc, lang, dir } = useLanguage();
+  const m = useMotion();
   const [tab, setTab] = useState<'order' | 'stages' | 'chat'>('order');
   const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // THE WINDOW OWNS ITS OWN CLOSING, so it can be seen leaving.
+  //
+  // The admin page mounts this component when a row is tapped and unmounts it
+  // the instant `onClose` fires. Handing the parent's `onClose` straight to the
+  // close button would therefore rip the window out of the DOM before any exit
+  // could run — which is exactly the disappearing-to-nowhere this migration
+  // exists to end. So the local `open` flag drives the primitive: closing flips
+  // it to false, the panel plays the same path it arrived on in reverse, and
+  // only then does the parent get told (which is also when it reloads the
+  // list, so the refresh lands after the window is gone rather than under it).
+  const [open, setOpen] = useState(true);
+  const closing = useRef<number | null>(null);
+
+  const close = useCallback(() => {
+    if (closing.current != null) return; // a second tap must not queue a second unmount
+    setOpen(false);
+    // Long enough for the `sheet` spring the primitive uses at this placement,
+    // and short enough that a reduced-motion cross-fade is not left waiting.
+    closing.current = window.setTimeout(onClose, m.reduced ? 170 : 340);
+  }, [onClose, m.reduced]);
+
+  useEffect(
+    () => () => {
+      if (closing.current != null) window.clearTimeout(closing.current);
+    },
+    []
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,57 +80,62 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   }, [load]);
 
   // Escape closes — a modal that traps the admin on a busy day is worse than
-  // no modal.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // no modal. The key listener that used to live here is deleted: `Overlay`
+  // owns Escape for every window in the app, and two listeners on the same key
+  // would have closed this one twice over.
 
   const addr = detail?.address ?? {};
   const govId = String(addr.governorate ?? '');
   const govLabel = govId ? GOVERNORATE_LABELS[govId]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? govId : '';
   const fin = detail?.financial;
 
-  // RENDERED INTO document.body, NOT WHERE IT SITS IN THE TREE.
+  // WHY `Overlay` AND NOT `Sheet`, AND WHY IT STILL RISES FROM THE BOTTOM EDGE.
   //
-  // The admin page lives inside a scrolling pane, and `position: fixed` stops
-  // meaning "the viewport" the moment any ancestor establishes a containing
-  // block (a transform, a filter, a backdrop-filter, `contain`). It did: the
-  // modal was laid out relative to that pane instead, so it opened far below
-  // the fold and the owner had to scroll to find it. A portal takes the modal
-  // out of that subtree entirely, which also escapes the pane's
-  // `overflow: hidden`. This is the fix rather than hunting the one offending
-  // ancestor, because the next ancestor to grow a transform would break it
-  // again.
-  const overlay = (
-    <div
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+  // This is the owner's working surface: it is nearly full height, it scrolls
+  // internally, and it holds a tab state that a stray gesture must not throw
+  // away mid-shift. `Sheet` is the right primitive for something you flick
+  // away, but its drag lives on the panel itself, so every downward swipe over
+  // the item list or the chat would be arguing with the scroll underneath it,
+  // and a lost argument would close the window the admin was reading. So:
+  // `Overlay` at `placement="bottom"`, which keeps exactly the geometry this
+  // window already had — full-bleed and rising from the bottom edge on a phone,
+  // a centred card from `sm:` up — while the only way out stays deliberate
+  // (the X, the scrim, Escape). `placement` is also why there is no hardcoded
+  // slide direction here: the travel is along the vertical axis, which does not
+  // mirror, so nothing has to be re-reasoned for Arabic.
+  //
+  // The portal that used to be written out by hand below now belongs to the
+  // primitive, and for the same reason it was added: the admin page lives
+  // inside a scrolling, transformed pane, under which `position: fixed` stops
+  // meaning "the viewport" and this window was laid out far below the fold.
+  //
+  // The old markup carried `role="dialog"` and `aria-modal="true"` with no
+  // accessible name at all — the primitive still supplies both, and the title
+  // that was already on screen now names the window through `labelledBy`.
+  return (
+    <Overlay
+      open={open}
+      onClose={close}
+      mode="modal"
+      placement="bottom"
+      labelledBy="order-detail-title"
+      z={200}
+      testId="order-detail"
+      panelClassName="w-full sm:max-w-3xl h-[92vh] sm:h-[88vh] flex flex-col overflow-hidden"
     >
-      <div
-        data-order-modal
-        dir={dir}
-        className="bg-zinc-950 border border-zinc-800 w-full sm:max-w-3xl h-[92vh] sm:h-[88vh] sm:rounded-3xl rounded-t-3xl flex flex-col overflow-hidden shadow-2xl"
-      >
+      <div data-order-modal className="flex flex-col flex-1 min-h-0">
         {/* ---------------------------------------------------------- header */}
         <div className="shrink-0 border-b border-zinc-800">
           <div className="flex items-center justify-between gap-3 p-4 pb-3">
             <div className="min-w-0">
-              <h2 className="text-white font-black text-lg truncate">
+              <h2 id="order-detail-title" className="text-white font-black text-lg truncate">
                 {loc('تجهيز الطلب', 'Prepare order', 'ئامادەکردنی داواکاری')}
               </h2>
               <p className="text-[12px] font-mono text-zinc-500 truncate">{orderId}</p>
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               aria-label={loc('إغلاق', 'Close', 'داخستن')}
               className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
             >
@@ -423,10 +458,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           </div>
         )}
       </div>
-    </div>
+    </Overlay>
   );
-
-  return createPortal(overlay, document.body);
 }
 
 function Row({

@@ -1603,7 +1603,23 @@ export function readmeFor(shape: TemplateShape, lookups?: Lookups): string {
     })
     .join('\n');
 
-  const rowType = (name: string, ar: string, cols: string) => `  ${name.padEnd(10)} ${ar}\n${' '.repeat(13)}الأعمدة: ${cols}`;
+  // AN ASSISTANT ADMIN'S README MUST NOT NAME A COST COLUMN EITHER. The sheet
+  // already drops `cost_iqd` for them (templateShape's includeCost), and a
+  // README that still lists it as an accepted column both lies about the file
+  // they were handed and tells them a financial field exists. The row-type
+  // table is generated from the SHAPE's own columns for that reason, rather
+  // than from a hand-written string that cannot know who is reading it.
+  const allowed = new Set(shape.columns);
+  const cols = (list: string) =>
+    list
+      .split(', ')
+      .filter((c) => {
+        const bare = c.split(' ')[0];
+        return !bare.endsWith('_iqd') || allowed.has(bare) || bare === 'spec.*';
+      })
+      .join(', ');
+  const rowType = (name: string, ar: string, list: string) =>
+    `  ${name.padEnd(10)} ${ar}\n${' '.repeat(13)}الأعمدة: ${cols(list)}`;
 
   return `LEVONIS — قالب استيراد المنتجات
 النوع: ${def.label_ar} / ${def.label_en}

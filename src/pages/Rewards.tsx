@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, Bell, PlayCircle, Paperclip, Check, Star, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api } from '../lib/api';
+import { Overlay } from '../components/ui/Overlay';
 
 interface RewardsData {
   today: string;
@@ -31,6 +32,13 @@ export default function Rewards() {
   const [loadingMission, setLoadingMission] = useState<string | null>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
+
+  // The window is the "Watch Ad" card's own result, so it should look like it
+  // came out of that card rather than materialising in the middle of nowhere.
+  // The ref is handed to `Overlay` as its `anchor`, which reads the trigger's
+  // position once at open time and scales the panel from there — and back into
+  // it on the way out, which is the half the old markup could not do at all.
+  const videoTriggerRef = useRef<HTMLButtonElement>(null);
 
   const loadRewards = useCallback(async () => {
     try {
@@ -370,6 +378,7 @@ export default function Rewards() {
             {missions && !missions.video.claimed && (
             <button
               type="button"
+              ref={videoTriggerRef}
               onClick={handleVideoMission}
               disabled={!missions.video.available || loadingMission === 'video'}
               className={`w-full text-start bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors ${missions.video.available ? 'hover:bg-[#27272a]' : 'opacity-60 cursor-not-allowed'}`}>
@@ -446,46 +455,107 @@ export default function Rewards() {
       </div>
 
 
-      {/* Video Modal */}
-      {showVideoModal && data?.missions.video.videoUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
-          <div className="bg-[#111113] w-full max-w-md rounded-3xl p-6 border border-[#27272a] shadow-2xl relative flex flex-col items-center">
-            <h3 className="text-white font-bold text-lg mb-2">Watch Video to Earn</h3>
-            <p className="text-zinc-300 text-sm text-center mb-6">Please watch the entire video to receive your points.</p>
+      {/*
+        THE VIDEO MISSION WINDOW.
 
-            <div className="w-full aspect-video bg-black rounded-xl mb-6 relative overflow-hidden flex items-center justify-center border border-white/5">
-              <video
-                src={data.missions.video.videoUrl}
-                autoPlay
-                controls={false}
-                playsInline
-                className="w-full h-full object-contain"
-                onEnded={() => setIsVideoFinished(true)}
-              />
-            </div>
+        WHAT IT USED TO BE. A `fixed inset-0 bg-black/90 backdrop-blur-sm` div
+        that appeared the instant `showVideoModal` flipped and was gone the
+        instant it flipped back — no arrival, and, more to the point, no exit.
+        A window that cuts to black when you press Close breaks the one thing a
+        person can actually reason about spatially: a thing that goes away
+        should go back the way it came. It also lived here in the page's own
+        DOM, under a stack of `relative`/`transform` background layers, which
+        is the arrangement where `position: fixed` quietly stops meaning the
+        viewport at all.
 
-            {isVideoFinished ? (
-              <button
-                className="w-full py-3.5 rounded-xl font-bold bg-gold text-black hover:bg-gold/90 transition-colors"
-                onClick={handleVideoClaim}
-                disabled={loadingMission === 'video_claim'}
-              >
-                {loadingMission === 'video_claim' ? 'Claiming...' : `Claim ${data.missions.video.points} pts`}
-              </button>
-            ) : (
-              <div className="w-full flex items-center justify-between">
-                <span className="text-gold font-bold text-sm">Video is playing...</span>
-                <button
-                  className="px-4 py-2 rounded-lg font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors text-sm"
-                  onClick={() => setShowVideoModal(false)}
-                >
-                  Close
-                </button>
-              </div>
-            )}
+        OVERLAY, NOT SHEET. This is a centred task, not a sheet: the person
+        opened it to do one bounded thing — watch the ad through and claim —
+        and it is the video that has to hold the eye, so the window belongs in
+        the middle of the screen with the page dimmed behind it, not hanging
+        off the bottom edge. `Sheet` would also hand it drag-to-dismiss, and a
+        downward drag on a playing video is exactly the accident that throws
+        away a run the person is halfway through sitting out.
+
+        ANCHORED TO THE CARD THAT OPENED IT. `anchor={videoTriggerRef}` makes
+        the panel grow out of the "Watch Ad" row and shrink back into it, so
+        the window is visibly that card's result.
+
+        THE SCRIM IS INERT ON PURPOSE. The old window had no backdrop handler:
+        the only ways out were the explicit Close button and claiming. Gaining
+        tap-outside-to-close for free would be a real behaviour change and a
+        bad one here, because the whole point of the mission is that the video
+        runs to the end — a stray tap beside a phone-sized panel would abandon
+        it. So `dismissOnScrim={false}`, and the Close button stays the
+        deliberate exit it always was.
+
+        ESCAPE IS ALLOWED, and it is the one thing the window gains. There was
+        no Escape listener here to delete — there was no keyboard way out at
+        all, and once the video ends the Close button is replaced by Claim, so
+        a keyboard user had nothing left to press. Escape is the peer of the
+        Close button that is already on screen, not a new outcome: nothing is
+        posted until the video ends and Claim is pressed, the mission stays
+        unclaimed, and the card reopens it. It is deliberate input, which is
+        what separates it from the stray tap the scrim is protecting against.
+
+        NOT `solid`. The glass is right here: the video already sits in its own
+        black, bordered box, so nothing translucent is behind the picture
+        itself — the material is only the frame around it, and letting the
+        dimmed page show faintly through that frame is what keeps the window
+        reading as sitting *above* the rewards page rather than replacing it.
+
+        `open` carries the same two conditions the old `&&` chain did, so the
+        window still cannot come up without a video URL; the children read the
+        URL optionally because they are evaluated whether or not it is open.
+      */}
+      <Overlay
+        open={showVideoModal && !!data?.missions.video.videoUrl}
+        onClose={() => setShowVideoModal(false)}
+        labelledBy="rewards-video-title"
+        anchor={videoTriggerRef}
+        placement="center"
+        z={50}
+        dismissOnScrim={false}
+        testId="rewards-video"
+        panelClassName="w-full max-w-md"
+      >
+        {/* The material, the border and the rounding are the primitive's now,
+            so the old panel's padding and its centring come inside. */}
+        <div className="p-6 flex flex-col items-center">
+          <h3 id="rewards-video-title" className="text-white font-bold text-lg mb-2">Watch Video to Earn</h3>
+          <p className="text-zinc-300 text-sm text-center mb-6">Please watch the entire video to receive your points.</p>
+
+          <div className="w-full aspect-video bg-black rounded-xl mb-6 relative overflow-hidden flex items-center justify-center border border-white/5">
+            <video
+              src={data?.missions.video.videoUrl ?? undefined}
+              autoPlay
+              controls={false}
+              playsInline
+              className="w-full h-full object-contain"
+              onEnded={() => setIsVideoFinished(true)}
+            />
           </div>
+
+          {isVideoFinished ? (
+            <button
+              className="w-full py-3.5 rounded-xl font-bold bg-gold text-black hover:bg-gold/90 transition-colors"
+              onClick={handleVideoClaim}
+              disabled={loadingMission === 'video_claim'}
+            >
+              {loadingMission === 'video_claim' ? 'Claiming...' : `Claim ${data?.missions.video.points} pts`}
+            </button>
+          ) : (
+            <div className="w-full flex items-center justify-between">
+              <span className="text-gold font-bold text-sm">Video is playing...</span>
+              <button
+                className="px-4 py-2 rounded-lg font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors text-sm"
+                onClick={() => setShowVideoModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </Overlay>
 
     </div>
   );

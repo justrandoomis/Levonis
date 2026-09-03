@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import {
@@ -6,6 +6,7 @@ import {
   Barcode, Paperclip, Send, Wrench, Repeat, AlertTriangle, MessageSquare,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
+import { Overlay } from '../components/ui/Overlay';
 
 /**
  * Warranty center rebuilt around registered PHYSICAL devices (mandate §4):
@@ -256,6 +257,20 @@ export default function Warranty() {
 
   // New device claim modal
   const [claimForDevice, setClaimForDevice] = useState<MyDevice | null>(null);
+  // The control each window grows out of. All three windows in this page are
+  // raised from a LIST of near-identical rows — devices that differ only by a
+  // serial, claims that differ only by a subject — so the origin of the
+  // arrival is doing real work: it is the only thing on screen that says which
+  // row is being acted on while the window is on its way in.
+  const claimAnchor = useRef<HTMLElement | null>(null);
+  const legacyAnchor = useRef<HTMLElement | null>(null);
+  const threadAnchor = useRef<HTMLElement | null>(null);
+  // The claim form must keep its content while it animates OUT. `claimForDevice`
+  // is the open flag AND the data, so the moment it is cleared the panel would
+  // have nothing to render mid-flight (and would throw on the product name).
+  // Holding the last device means the window that leaves is the window that
+  // was there — the exit is the arrival in reverse, including its contents.
+  const lastClaimDevice = useRef<MyDevice | null>(null);
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<Array<{ key: string; url: string; name: string }>>([]);
@@ -277,6 +292,9 @@ export default function Warranty() {
   const [detailError, setDetailError] = useState('');
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
+
+  if (claimForDevice) lastClaimDevice.current = claimForDevice;
+  const claimDevice = claimForDevice ?? lastClaimDevice.current;
 
   const loadDevices = useCallback(async () => {
     try {
@@ -582,7 +600,7 @@ export default function Warranty() {
                   </div>
                   {!d.replaced_by_unit_id && (
                     <button
-                      onClick={() => { setClaimForDevice(d); setSubject(''); setDescription(''); setAttachments([]); setClaimError(''); }}
+                      onClick={(e) => { claimAnchor.current = e.currentTarget; setClaimForDevice(d); setSubject(''); setDescription(''); setAttachments([]); setClaimError(''); }}
                       className="w-full mt-3 bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 py-2 rounded-xl text-[13px] font-bold border border-zinc-700/60 transition-colors inline-flex items-center justify-center gap-1.5"
                     >
                       <Wrench className="w-3.5 h-3.5" />{s.openClaim}
@@ -616,7 +634,7 @@ export default function Warranty() {
                 return (
                   <button
                     key={cl.id}
-                    onClick={() => openThread(cl.id)}
+                    onClick={(e) => { threadAnchor.current = e.currentTarget; openThread(cl.id); }}
                     className="w-full text-start bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 hover:border-zinc-700 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3 mb-1">
@@ -640,7 +658,7 @@ export default function Warranty() {
             </div>
           )}
           <button
-            onClick={() => { setShowLegacyForm(true); setLegacyError(''); }}
+            onClick={(e) => { legacyAnchor.current = e.currentTarget; setShowLegacyForm(true); setLegacyError(''); }}
             className="mt-3 text-[12px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
           >
             {s.legacyClaimLink}
@@ -648,236 +666,364 @@ export default function Warranty() {
         </div>
       </div>
 
-      {/* ------------------------------------------- new device claim modal */}
-      {claimForDevice && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-[24px] p-6 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setClaimForDevice(null)} className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors" aria-label={s.close}>
-              <X className="w-4 h-4" />
-            </button>
-            <h2 className="text-white text-lg font-bold mb-1">{s.newClaimTitle}</h2>
-            <p className="text-zinc-500 text-sm mb-4">
-              {loc(claimForDevice.product.name_ar || claimForDevice.product.name, claimForDevice.product.name, claimForDevice.product.name_ckb)}
-              {claimForDevice.serial ? ` · ${claimForDevice.serial}` : ''}
-            </p>
-            <form onSubmit={submitDeviceClaim} className="space-y-4">
-              {claimError && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{claimError}</div>
-              )}
-              <div>
-                <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.subject}<span className="text-red-500">*</span></label>
-                <input
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  minLength={3}
-                  maxLength={200}
-                  required
-                  placeholder={s.subjectPh}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.description}<span className="text-red-500">*</span></label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  minLength={10}
-                  maxLength={5000}
-                  required
-                  rows={4}
-                  placeholder={s.descriptionPh}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors resize-none"
-                />
-              </div>
-              <div>
-                <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.attachments}</label>
-                <label className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm cursor-pointer hover:border-zinc-700 transition-colors">
-                  <Paperclip className="w-4 h-4" />
-                  {uploadBusy ? s.uploading : s.attach}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
-                    multiple
-                    className="hidden"
-                    disabled={uploadBusy || attachments.length >= 6}
-                    onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
-                  />
-                </label>
-                {attachments.length > 0 && (
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    {attachments.map((a) => (
-                      <div key={a.key} className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
-                        {a.key.endsWith('.mp4') ? (
-                          <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400 px-1 text-center break-all">{a.name}</div>
-                        ) : (
-                          <img src={a.url} alt="" className="w-full h-full object-cover" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setAttachments((arr) => arr.filter((x) => x.key !== a.key))}
-                          className="absolute top-0.5 end-0.5 bg-black/70 rounded-full p-0.5 text-zinc-300 hover:text-white"
-                          aria-label={s.close}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={claimBusy || uploadBusy}
-                className="w-full bg-olive hover:bg-olive-light text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-              >
-                {claimBusy ? s.submitting : s.submit}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* NEW DEVICE CLAIM — a centred form that takes the page over while it
+          is up, and hands it back when it leaves.
 
-      {/* ---------------------------------------------- legacy claim modal */}
-      {showLegacyForm && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-[24px] p-6 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowLegacyForm(false)} className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors" aria-label={s.close}>
-              <X className="w-4 h-4" />
-            </button>
-            <h2 className="text-white text-lg font-bold mb-4">{s.newClaimTitle}</h2>
-            <form onSubmit={submitLegacyClaim} className="space-y-4">
-              {legacyError && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{legacyError}</div>
-              )}
-              <div>
-                <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.productName}<span className="text-red-500">*</span></label>
-                <input
-                  value={legacyName}
-                  onChange={(e) => setLegacyName(e.target.value)}
-                  minLength={2}
-                  maxLength={200}
-                  required
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.description}<span className="text-red-500">*</span></label>
-                <textarea
-                  value={legacyDesc}
-                  onChange={(e) => setLegacyDesc(e.target.value)}
-                  minLength={10}
-                  maxLength={3000}
-                  required
-                  rows={4}
-                  placeholder={s.descriptionPh}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors resize-none"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={legacyBusy}
-                className="w-full bg-olive hover:bg-olive-light text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-              >
-                {legacyBusy ? s.submitting : s.submit}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+          It used to be a `fixed inset-0` div that existed only while
+          `claimForDevice` was set: it appeared fully formed, and on submit or
+          dismiss it stopped existing between one frame and the next. Nothing
+          told the person where the window had gone, which is exactly the
+          spatial contract Apple describes — a thing that leaves should leave
+          the way it came. The primitive gives it a spring arrival and the SAME
+          path back out, and because a spring animates from the panel's live
+          value, someone who opens this and immediately taps the X gets a
+          window that turns around from wherever it actually got to.
 
-      {/* -------------------------------------------------- thread modal */}
-      {openClaimId && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0a0a0a] border border-zinc-800 rounded-[24px] w-full max-w-md shadow-2xl relative max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-zinc-800/70 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-white text-base font-bold truncate">{detail?.claim.subject ?? s.thread}</h2>
-                {detail?.warranty_facts && (
-                  <p className="text-zinc-500 text-[11px] mt-1">
-                    {s.orderRef}: <span className="font-mono">{detail.warranty_facts.order_id}</span>
-                    {' · '}{s.deliveredAt}: {fmtDate(detail.warranty_facts.delivered_at)}
-                    {' · '}{s.warrantyEnd}: {fmtDate(detail.warranty_facts.warranty_end_at)}
-                  </p>
-                )}
-              </div>
-              <button onClick={() => { setOpenClaimId(null); setDetail(null); }} className="p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors shrink-0" aria-label={s.close}>
-                <X className="w-4 h-4" />
-              </button>
+          `Overlay`, not `Sheet`. This is a scrolling form with a required
+          subject, a 5000-character description and a file picker. A downward
+          drag inside it is how a person reads the rest of the form; giving that
+          same gesture a second meaning ("throw the claim away") would put a
+          half-written fault report and freshly uploaded evidence one clumsy
+          swipe from oblivion.
+
+          `anchor` is the device's own "Open claim" button, captured on press.
+          The devices list is a stack of near-identical cards and the dialog
+          names the unit only in small grey type under the title, so growing
+          the window out of the row that raised it is the clearest statement of
+          WHICH device this claim is about.
+
+          dismissOnScrim={false}: the old backdrop had no click handler, so
+          tapping beside the panel never closed it, and that is the right
+          behaviour to keep for a form — a stray tap on a wide screen must not
+          discard typed text and uploaded evidence. Escape now closes it, which
+          the primitive owns; there was no key listener here to delete.
+
+          Glass, not `solid`. Everything this form draws on top of the panel —
+          the zinc-900 fields, the evidence thumbnails, the tinted error bar —
+          is opaque enough to read against the blurred page behind, so the
+          window takes the house material instead of the old flat `#0a0a0a`.
+
+          z={60} is the old `z-[60]`, unchanged. */}
+      <Overlay
+        open={!!claimForDevice}
+        onClose={() => setClaimForDevice(null)}
+        labelledBy="warranty-device-claim-title"
+        anchor={claimAnchor}
+        dismissOnScrim={false}
+        z={60}
+        testId="warranty-device-claim"
+        panelClassName="w-full max-w-md max-h-[90vh] overflow-y-auto"
+      >
+        {/* The old panel's own `p-6`, moved inside: the primitive owns the
+            material, the border and the rounding; the caller owns the inset. */}
+        <div className="p-6">
+          <button onClick={() => setClaimForDevice(null)} className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors" aria-label={s.close}>
+            <X className="w-4 h-4" />
+          </button>
+          <h2 id="warranty-device-claim-title" className="text-white text-lg font-bold mb-1">{s.newClaimTitle}</h2>
+          <p className="text-zinc-500 text-sm mb-4">
+            {claimDevice && loc(claimDevice.product.name_ar || claimDevice.product.name, claimDevice.product.name, claimDevice.product.name_ckb)}
+            {claimDevice?.serial ? ` · ${claimDevice.serial}` : ''}
+          </p>
+          <form onSubmit={submitDeviceClaim} className="space-y-4">
+            {claimError && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{claimError}</div>
+            )}
+            <div>
+              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.subject}<span className="text-red-500">*</span></label>
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                minLength={3}
+                maxLength={200}
+                required
+                placeholder={s.subjectPh}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
+              />
             </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-3 min-h-[160px]">
-              {detailLoading && (
-                <div className="flex justify-center py-8">
-                  <div className="w-7 h-7 border-2 border-olive-light/30 border-t-olive-light rounded-full animate-spin" />
-                </div>
-              )}
-              {detailError && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{detailError}</div>
-              )}
-              {detail && (
-                <>
-                  <div className="bg-zinc-900/70 rounded-xl px-3 py-2 text-sm text-zinc-300 whitespace-pre-wrap">{detail.claim.description}</div>
-                  {detail.claim.evidence.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
-                      {detail.claim.evidence.map((ev) => (
-                        <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
-                          {ev.key.endsWith('.mp4') ? (
-                            <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400">MP4</div>
-                          ) : (
-                            <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                          )}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                  {detail.messages.map((m) => (
-                    <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.mine ? 'bg-olive/25 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'}`}>
-                      {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
-                      {m.file_url && (
-                        <a href={m.file_url} target="_blank" rel="noreferrer" className="block mt-1">
-                          {m.file_url.endsWith('.mp4') ? (
-                            <video src={m.file_url} controls preload="none" className="max-h-40 rounded-lg" />
-                          ) : (
-                            <img src={m.file_url} alt="" className="max-h-40 rounded-lg" loading="lazy" />
-                          )}
-                        </a>
-                      )}
-                      <div className="text-[10px] text-zinc-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
-                    </div>
-                  ))}
-                </>
-              )}
+            <div>
+              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.description}<span className="text-red-500">*</span></label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                minLength={10}
+                maxLength={5000}
+                required
+                rows={4}
+                placeholder={s.descriptionPh}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors resize-none"
+              />
             </div>
-            <div className="p-4 border-t border-zinc-800/70 flex items-center gap-2">
-              <label className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white cursor-pointer transition-colors shrink-0" title={s.attach}>
+            <div>
+              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.attachments}</label>
+              <label className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm cursor-pointer hover:border-zinc-700 transition-colors">
                 <Paperclip className="w-4 h-4" />
+                {uploadBusy ? s.uploading : s.attach}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
+                  multiple
                   className="hidden"
-                  disabled={replyBusy}
-                  onChange={(e) => { attachToThread(e.target.files); e.target.value = ''; }}
+                  disabled={uploadBusy || attachments.length >= 6}
+                  onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
                 />
               </label>
-              <input
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder={s.reply}
-                maxLength={3000}
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
-              />
-              <button
-                onClick={() => sendReply()}
-                disabled={replyBusy || !replyText.trim()}
-                className="p-2.5 bg-olive-light/20 text-olive-light border border-olive-light/30 rounded-xl hover:bg-olive-light/30 disabled:opacity-40 transition-colors shrink-0"
-                aria-label={s.send}
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              {attachments.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {attachments.map((a) => (
+                    <div key={a.key} className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
+                      {a.key.endsWith('.mp4') ? (
+                        <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400 px-1 text-center break-all">{a.name}</div>
+                      ) : (
+                        <img src={a.url} alt="" className="w-full h-full object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setAttachments((arr) => arr.filter((x) => x.key !== a.key))}
+                        className="absolute top-0.5 end-0.5 bg-black/70 rounded-full p-0.5 text-zinc-300 hover:text-white"
+                        aria-label={s.close}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+            <button
+              type="submit"
+              disabled={claimBusy || uploadBusy}
+              className="w-full bg-olive hover:bg-olive-light text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
+            >
+              {claimBusy ? s.submitting : s.submit}
+            </button>
+          </form>
         </div>
-      )}
+      </Overlay>
+
+      {/* GENERAL (LEGACY) CLAIM — the same centred task for a product that was
+          never registered as a device.
+
+          Identical treatment to the device claim above, and deliberately so:
+          these two windows ask for the same thing and a person can arrive at
+          either from the same screen, so they must arrive and leave the same
+          way. The old markup was the third copy of the same `fixed inset-0`
+          div in this file — mounted on a boolean, unmounted on a boolean, with
+          no exit at all.
+
+          `Overlay`, not `Sheet`: a required product name and a 3000-character
+          description are a form, and drag-to-dismiss over a form is a way to
+          lose typing, not a way to close a window.
+
+          `anchor` is the small "not registered as a device?" link at the foot
+          of the claims list. That link is easy to lose track of once a window
+          covers the page, and scaling the dialog out of it is what says the
+          window is the link's own answer rather than something that happened
+          to appear.
+
+          dismissOnScrim={false} preserves the old behaviour exactly — the
+          backdrop was inert — and protects the form. Escape closes, from the
+          primitive.
+
+          z={60} is the old `z-[60]`, unchanged. */}
+      <Overlay
+        open={showLegacyForm}
+        onClose={() => setShowLegacyForm(false)}
+        labelledBy="warranty-legacy-claim-title"
+        anchor={legacyAnchor}
+        dismissOnScrim={false}
+        z={60}
+        testId="warranty-legacy-claim"
+        panelClassName="w-full max-w-md max-h-[90vh] overflow-y-auto"
+      >
+        {/* The old `p-6` inset, moved inside the panel the primitive owns. */}
+        <div className="p-6">
+          <button onClick={() => setShowLegacyForm(false)} className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors" aria-label={s.close}>
+            <X className="w-4 h-4" />
+          </button>
+          <h2 id="warranty-legacy-claim-title" className="text-white text-lg font-bold mb-4">{s.newClaimTitle}</h2>
+          <form onSubmit={submitLegacyClaim} className="space-y-4">
+            {legacyError && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{legacyError}</div>
+            )}
+            <div>
+              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.productName}<span className="text-red-500">*</span></label>
+              <input
+                value={legacyName}
+                onChange={(e) => setLegacyName(e.target.value)}
+                minLength={2}
+                maxLength={200}
+                required
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.description}<span className="text-red-500">*</span></label>
+              <textarea
+                value={legacyDesc}
+                onChange={(e) => setLegacyDesc(e.target.value)}
+                minLength={10}
+                maxLength={3000}
+                required
+                rows={4}
+                placeholder={s.descriptionPh}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors resize-none"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={legacyBusy}
+              className="w-full bg-olive hover:bg-olive-light text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
+            >
+              {legacyBusy ? s.submitting : s.submit}
+            </button>
+          </form>
+        </div>
+      </Overlay>
+
+      {/* CLAIM THREAD — the conversation about one claim, opened from its row
+          in the claims list.
+
+          Like the two forms above it was a `fixed inset-0` div tied to
+          `openClaimId`: it blinked into place and, when the X was tapped, was
+          gone before the finger lifted. This is the window in the page a
+          person opens most often (a claim is checked again and again while it
+          is being diagnosed), so it is the one where the missing return trip
+          costs the most: the window should visibly go back to the claim row it
+          belongs to, and now it does.
+
+          `Overlay`, not `Sheet`. It looks like a chat sheet, but everything a
+          vertical drag could mean here is already taken: the middle section is
+          a scrolling message list, and the bottom is a text field that raises
+          the on-screen keyboard. Drag-to-dismiss would fight the scroll and
+          could throw the window away mid-reply. The X in the header is the
+          way out, and Escape now works too — the primitive owns it, and there
+          was no key listener in this file to remove.
+
+          `anchor` is the claim card that was tapped. Claims differ only by a
+          subject line and a stage chip, so the window growing out of the right
+          card is what makes it obvious the thread belongs to that claim and
+          not the one above it.
+
+          dismissOnScrim={false}: the old backdrop did nothing when tapped, and
+          keeping that matters more here than in the forms — a half-typed reply
+          lives in this window too.
+
+          `onClose` deliberately no longer clears `detail`. `openThread` already
+          resets `detail` and `detailError` on every open, so nothing stale can
+          ever be shown; clearing it on the way OUT only emptied the panel while
+          it was still on screen animating away. Keeping it means the window
+          that leaves is the window that was there.
+
+          The panel keeps its own three-row column geometry (header, scrolling
+          transcript, composer) in `panelClassName`; the material, border and
+          rounding now come from the primitive, and `overflow-hidden` keeps the
+          header and composer edges inside that rounding.
+
+          z={60} is the old `z-[60]`, unchanged. */}
+      <Overlay
+        open={!!openClaimId}
+        onClose={() => setOpenClaimId(null)}
+        labelledBy="warranty-thread-title"
+        anchor={threadAnchor}
+        dismissOnScrim={false}
+        z={60}
+        testId="warranty-claim-thread"
+        panelClassName="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="p-5 border-b border-zinc-800/70 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="warranty-thread-title" className="text-white text-base font-bold truncate">{detail?.claim.subject ?? s.thread}</h2>
+            {detail?.warranty_facts && (
+              <p className="text-zinc-500 text-[11px] mt-1">
+                {s.orderRef}: <span className="font-mono">{detail.warranty_facts.order_id}</span>
+                {' · '}{s.deliveredAt}: {fmtDate(detail.warranty_facts.delivered_at)}
+                {' · '}{s.warrantyEnd}: {fmtDate(detail.warranty_facts.warranty_end_at)}
+              </p>
+            )}
+          </div>
+          {/* The header X closes exactly the way the scrim/Escape do — one
+              close path, so the window can never be dismissed two different
+              ways. `setDetail(null)` moved off it for the reason given
+              above: `openThread` already clears the transcript on every
+              open, and clearing it here only emptied the panel while it was
+              still on screen leaving. */}
+          <button onClick={() => setOpenClaimId(null)} className="p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors shrink-0" aria-label={s.close}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-5 overflow-y-auto flex-1 space-y-3 min-h-[160px]">
+          {detailLoading && (
+            <div className="flex justify-center py-8">
+              <div className="w-7 h-7 border-2 border-olive-light/30 border-t-olive-light rounded-full animate-spin" />
+            </div>
+          )}
+          {detailError && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{detailError}</div>
+          )}
+          {detail && (
+            <>
+              <div className="bg-zinc-900/70 rounded-xl px-3 py-2 text-sm text-zinc-300 whitespace-pre-wrap">{detail.claim.description}</div>
+              {detail.claim.evidence.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {detail.claim.evidence.map((ev) => (
+                    <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
+                      {ev.key.endsWith('.mp4') ? (
+                        <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400">MP4</div>
+                      ) : (
+                        <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+              {detail.messages.map((m) => (
+                <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.mine ? 'bg-olive/25 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'}`}>
+                  {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
+                  {m.file_url && (
+                    <a href={m.file_url} target="_blank" rel="noreferrer" className="block mt-1">
+                      {m.file_url.endsWith('.mp4') ? (
+                        <video src={m.file_url} controls preload="none" className="max-h-40 rounded-lg" />
+                      ) : (
+                        <img src={m.file_url} alt="" className="max-h-40 rounded-lg" loading="lazy" />
+                      )}
+                    </a>
+                  )}
+                  <div className="text-[10px] text-zinc-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+        <div className="p-4 border-t border-zinc-800/70 flex items-center gap-2">
+          <label className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white cursor-pointer transition-colors shrink-0" title={s.attach}>
+            <Paperclip className="w-4 h-4" />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
+              className="hidden"
+              disabled={replyBusy}
+              onChange={(e) => { attachToThread(e.target.files); e.target.value = ''; }}
+            />
+          </label>
+          <input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder={s.reply}
+            maxLength={3000}
+            className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+          />
+          <button
+            onClick={() => sendReply()}
+            disabled={replyBusy || !replyText.trim()}
+            className="p-2.5 bg-olive-light/20 text-olive-light border border-olive-light/30 rounded-xl hover:bg-olive-light/30 disabled:opacity-40 transition-colors shrink-0"
+            aria-label={s.send}
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </Overlay>
     </div>
   );
 }

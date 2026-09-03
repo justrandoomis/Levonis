@@ -11,6 +11,7 @@ import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import { CartSkeleton } from '../components/ui/Skeleton';
 import { ErrorState } from '../components/ui/AsyncStates';
+import { Sheet } from '../components/ui/Overlay';
 import {
   readSupportRefState,
   captureSupportRefFromSearch,
@@ -544,6 +545,26 @@ export default function Cart() {
   const variantItem = items.find((i) => i.id === variantItemId) ?? null;
   const shippingItem = items.find((i) => i.id === shippingItemId) ?? null;
 
+  // THE SHEETS NOW HAVE AN EXIT, SO THEY NEED SOMETHING TO LEAVE WITH.
+  //
+  // While these were `fixed inset-0` divs mounted on a boolean, the line they
+  // described could disappear from `items` in the same tick the boolean went
+  // false and nobody could tell: the whole window was gone that frame. It now
+  // animates out over ~0.3s, and a confirmed variant change is exactly the case
+  // where the row id retires — the server merges the edited line into an
+  // existing one — so a fresh lookup would empty the panel and then slide an
+  // empty box away, which reads as a bug rather than as a dismissal. Holding
+  // the last line each sheet was showing lets the window leave saying what it
+  // said. The live `shippingItem` is still what the write handler uses, so a
+  // tap landing during the exit can never patch a retired id.
+  const lastVariantItem = useRef<CartItem | null>(null);
+  if (variantItem) lastVariantItem.current = variantItem;
+  const variantView = variantItem ?? lastVariantItem.current;
+
+  const lastShippingItem = useRef<CartItem | null>(null);
+  if (shippingItem) lastShippingItem.current = shippingItem;
+  const shippingView = shippingItem ?? lastShippingItem.current;
+
   // §3/§12: the product name is English in every language and is never translated.
   const itemName = (item: CartItem) => item.name;
 
@@ -1047,21 +1068,64 @@ export default function Cart() {
       </div>
       )}
 
-      {/* Variant Modal — the product's real options and colors */}
-      {variantModalOpen && variantItem && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 w-full max-w-md rounded-t-2xl p-5 border-t border-zinc-800 flex flex-col gap-4 animate-in slide-in-from-bottom-full duration-300">
+      {/* ------------------------------------------------------ variant sheet
+          A SHEET, NOT A DIALOG. This is a customer reconsidering the colour
+          and the option of a line that is still on the screen behind it — it
+          belongs to that line, it arrives from the bottom edge the way it
+          always visually did, and the natural way to put it back is to push
+          it back down. `Sheet` gives it that: the panel tracks the finger 1:1
+          downward, resists upward, and decides on release by PROJECTED
+          momentum, so a flick closes it and a slow drag that was decelerating
+          springs back.
+
+          WHAT IT USED TO BE. A `fixed inset-0` div mounted when
+          `variantModalOpen` flipped, with `animate-in slide-in-from-bottom-full`
+          for the arrival and nothing at all for the departure — a keyframe
+          cannot run on an element that is already unmounted, so this window
+          slid in politely and then vanished. The two halves now come from the
+          same spring, which is also why the arrival is interruptible: dismiss
+          it halfway open and it continues from where it actually is.
+
+          MODAL is right here rather than `parallel`: the picker holds a
+          PENDING choice that only `confirmVariant` writes, so the cart behind
+          it must stay put — and the old window dimmed and blurred the page
+          already, so the scrim is a preservation, not an addition.
+
+          `dismissOnScrim={false}` PRESERVES what this window did: the old
+          backdrop was a plain div with no click handler, so tapping outside
+          never closed it, and a migration must not silently hand a window a
+          dismissal it never had — especially one that would silently discard a
+          half-made choice. The X, Escape and the downward drag are the ways
+          out, all of which discard the pending selection exactly as the X
+          always did. There was no Escape listener here to delete; the
+          primitive owns that key now and this window simply gains it. */}
+      <Sheet
+        open={variantModalOpen && !!variantView}
+        onClose={() => setVariantModalOpen(false)}
+        label={dir === 'rtl' ? 'اختر الخيارات' : 'Choose options'}
+        z={60}
+        dismissOnScrim={false}
+        testId="cart-variant-sheet"
+        // Geometry only — the material, the border and the rounding are the
+        // primitive's. The height cap is new and deliberate: a product with
+        // many colours AND many options used to grow past the top of the
+        // viewport with nowhere to scroll, because the panel was pinned to the
+        // bottom edge.
+        panelClassName="w-full sm:max-w-md max-h-[85dvh] overflow-y-auto"
+      >
+        {variantView && (
+          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div className="flex gap-4">
-                {variantItem.image ? (
-                  <img referrerPolicy="no-referrer" src={variantItem.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-white" />
+                {variantView.image ? (
+                  <img referrerPolicy="no-referrer" src={variantView.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-white" />
                 ) : (
                   <div className="w-20 h-20 rounded-lg bg-zinc-800" />
                 )}
                 <div>
-                  <p className="text-[#ef233c] font-bold text-lg">{formatIqd(variantItem.unit_price_iqd)}</p>
-                  {variantItem.stock !== null && (
-                    <p className="text-sm text-zinc-400">{dir === 'rtl' ? 'المخزون' : 'Stock'}: {variantItem.stock}</p>
+                  <p className="text-[#ef233c] font-bold text-lg">{formatIqd(variantView.unit_price_iqd)}</p>
+                  {variantView.stock !== null && (
+                    <p className="text-sm text-zinc-400">{dir === 'rtl' ? 'المخزون' : 'Stock'}: {variantView.stock}</p>
                   )}
                 </div>
               </div>
@@ -1070,11 +1134,11 @@ export default function Cart() {
               </button>
             </div>
 
-            {(variantItem.colors ?? []).length > 0 && (
+            {(variantView.colors ?? []).length > 0 && (
               <div>
                 <p className="text-white font-bold mb-2">{dir === 'rtl' ? 'اللون' : 'Color'}</p>
                 <div className="flex gap-2 flex-wrap">
-                  {(variantItem.colors ?? []).map((c) => {
+                  {(variantView.colors ?? []).map((c) => {
                     // §7: colour and option names are English only.
                     const cName = c.name || c.id;
                     const active = pendingColorId === c.id;
@@ -1096,11 +1160,11 @@ export default function Cart() {
               </div>
             )}
 
-            {(variantItem.options ?? []).length > 0 && (
+            {(variantView.options ?? []).length > 0 && (
               <div>
                 <p className="text-white font-bold mb-2">{dir === 'rtl' ? 'الخيارات' : 'Options'}</p>
                 <div className="flex gap-2 flex-wrap">
-                  {(variantItem.options ?? []).map((o) => {
+                  {(variantView.options ?? []).map((o) => {
                     const oName = o.name || o.id;
                     const active = pendingOptionId === o.id;
                     return (
@@ -1131,16 +1195,43 @@ export default function Cart() {
               {variantSaving ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : (dir === 'rtl' ? 'تأكيد' : 'Confirm')}
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </Sheet>
 
-      {/* Shipping Modal — the item's real shipping methods */}
-      {shippingModalOpen && shippingItem && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 w-full max-w-md rounded-t-2xl p-5 border-t border-zinc-800 flex flex-col gap-4 animate-in slide-in-from-bottom-full duration-300">
+      {/* ----------------------------------------------------- shipping sheet
+          ALSO A GENUINE SHEET, and more obviously one than the variant picker:
+          every row here commits immediately (`chooseShipping` patches the line
+          and closes), so this is a short list of choices for a line the
+          customer is looking at, not a task with its own state. It came from
+          the bottom edge before and it still does — now with an exit down the
+          same path, and with the drag that a bottom-edge window implies.
+
+          MODAL for the same reason as above: the old window dimmed the page,
+          and the write it starts belongs to a specific line that must not
+          scroll away underneath it.
+
+          `dismissOnScrim={false}` again preserves the old backdrop, which had
+          no click handler. Escape and the X close it; neither cancels a patch
+          that is already in flight, exactly as before — `chooseShipping`
+          guards on `shippingSaving` and closes the window itself on success.
+
+          `labelledBy` rather than `label`: the sheet's title is already on
+          screen, so the screen reader should name the window with the same
+          words everyone else reads instead of a second, invented string. */}
+      <Sheet
+        open={shippingModalOpen && !!shippingView}
+        onClose={() => setShippingModalOpen(false)}
+        labelledBy="cart-shipping-sheet-title"
+        z={60}
+        dismissOnScrim={false}
+        testId="cart-shipping-sheet"
+        panelClassName="w-full sm:max-w-md max-h-[85dvh] overflow-y-auto"
+      >
+        {shippingView && (
+          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-white font-bold text-[17px]">{dir === 'rtl' ? 'طريقة الشحن' : 'Shipping Method'}</h3>
+                <h3 id="cart-shipping-sheet-title" className="text-white font-bold text-[17px]">{dir === 'rtl' ? 'طريقة الشحن' : 'Shipping Method'}</h3>
                 <p className="text-zinc-400 text-sm mt-1">{dir === 'rtl' ? 'اختر طريقة الشحن المفضلة لهذا المنتج' : 'Choose your preferred shipping method for this item'}</p>
               </div>
               <button onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
@@ -1153,7 +1244,7 @@ export default function Cart() {
             )}
 
             <div className="flex flex-col gap-3 mt-2">
-              {(shippingItem.shipping_methods ?? []).map((sm) => {
+              {(shippingView.shipping_methods ?? []).map((sm) => {
                 const globalMethod = cartShippingMethods.find((m) => m.id === sm.id);
                 const title = globalMethod
                   ? (dir === 'rtl' ? globalMethod.titleAr : globalMethod.titleEn)
@@ -1161,11 +1252,15 @@ export default function Cart() {
                 const desc = globalMethod
                   ? (dir === 'rtl' ? globalMethod.descAr : globalMethod.descEn)
                   : sm.delivery_time || '';
-                const active = shippingItem.shipping_method_id === sm.id;
+                const active = shippingView.shipping_method_id === sm.id;
                 return (
                   <button
                     key={sm.id}
-                    onClick={() => chooseShipping(shippingItem, sm.id)}
+                    // The LIVE line, not the one being rendered: the panel
+                    // stays on screen for the length of its exit, and a tap
+                    // that lands there must not patch a row the cart has
+                    // already retired.
+                    onClick={() => shippingItem && chooseShipping(shippingItem, sm.id)}
                     disabled={shippingSaving}
                     className={`flex items-start justify-between p-4 rounded-xl border transition-all text-left w-full disabled:opacity-60 ${active ? 'border-[#ef233c] bg-[#ef233c]/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'}`}
                   >
@@ -1190,8 +1285,8 @@ export default function Cart() {
               })}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Sheet>
     </div>
   );
 }

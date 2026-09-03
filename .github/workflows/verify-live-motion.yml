@@ -1,0 +1,170 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the motion system is LIVE, not just merged:
+#
+#   1. every control answers a finger — one press rule for the whole app,
+#      firing on pointer-down, dimming rather than doing nothing;
+#   2. glass actually blurs — the UNPREFIXED backdrop-filter survived the
+#      minifier, which is the bug that shipped every material flat and which a
+#      computed-style check cannot see;
+#   3. the window primitive and the travelling tab indicator are in the bundle;
+#   4. all three accessibility preferences are answered.
+#
+# WHAT IT WRITES: nothing. Every request is an anonymous GET.
+name: 23 - Verify Live Motion System (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-motion
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the served stylesheet
+        id: css
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          href=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.css' | sort -u | head -1)
+          [ -n "$href" ] || { echo "  FAIL / served no stylesheet"; exit 1; }
+          curl -s --compressed --max-time 60 -o /tmp/app.css "$APEX$href"
+          echo "  read $href ($(wc -c < /tmp/app.css) bytes)"
+
+      - name: Every control answers the finger, on the way down
+        id: press
+        run: |
+          set -euo pipefail
+          fail=0
+          # The minifier strips attribute-selector quotes, so the pattern has to
+          # accept `[role=button]` as well as `[role="button"]` — matching only
+          # the authored form would fail on a correct stylesheet.
+          if grep -qE '\[role="?button"?\][^{]*:active' /tmp/app.css; then
+            echo "  ok   a press rule covers role=button, not just literal <button>"
+          else
+            echo "  FAIL no shared :active rule for role=button in the shipped CSS"; fail=1
+          fi
+          if grep -qE 'touch-action: ?manipulation' /tmp/app.css; then
+            echo "  ok   the ~300ms double-tap delay is off the input path"
+          else
+            echo "  FAIL touch-action:manipulation is not in the shipped CSS"; fail=1
+          fi
+          if grep -qE 'press-scale' /tmp/app.css; then
+            echo "  ok   the opt-in scale for small controls shipped"
+          else
+            echo "  FAIL press-scale is missing"; fail=1
+          fi
+          exit $fail
+
+      - name: Glass actually blurs — the standard property survived the minifier
+        id: material
+        run: |
+          set -euo pipefail
+          fail=0
+          # THE BUG THIS EXISTS FOR: given the standard and -webkit- properties
+          # side by side, Lightning CSS collapsed the pair and kept ONLY the
+          # -webkit- alias, so every material shipped flat in Chromium. A
+          # computed-style check cannot catch it because Chromium reports the
+          # alias under backdropFilter too. The stylesheet is the only truth.
+          # `.material` is emitted as SEVERAL rules (a fallback background, the
+          # color-mix background, the filter), so the one that matters has to be
+          # selected by content rather than by position — `head -1` picks the
+          # background rule and would fail on a perfectly good stylesheet.
+          rule=$(grep -oE '\.material\{[^}]*\}' /tmp/app.css | grep 'backdrop-filter' | head -1 || true)
+          if [ -z "$rule" ]; then
+            echo "  FAIL no .material rule carries any backdrop-filter at all"; exit 1
+          fi
+          if printf '%s' "$rule" | grep -qE '(^|;|\{)backdrop-filter:'; then
+            echo "  ok   the UNPREFIXED backdrop-filter is in the .material rule"
+          else
+            echo "  FAIL .material has no unprefixed backdrop-filter — glass is flat: $rule"; fail=1
+          fi
+          for weight in material-thin material-thick; do
+            if grep -qE "\.$weight\{" /tmp/app.css; then
+              echo "  ok   $weight ships, so material weight can encode hierarchy"
+            else
+              echo "  FAIL $weight is missing"; fail=1
+            fi
+          done
+          if grep -qE 'scroll-edge' /tmp/app.css; then
+            echo "  ok   the scroll-edge fade ships instead of a hard divider"
+          else
+            echo "  FAIL scroll-edge is missing"; fail=1
+          fi
+          exit $fail
+
+      - name: All three accessibility preferences are answered
+        id: a11y
+        run: |
+          set -euo pipefail
+          fail=0
+          for q in 'prefers-reduced-motion' 'prefers-reduced-transparency' 'prefers-contrast'; do
+            if grep -q "$q" /tmp/app.css; then
+              echo "  ok   $q is answered in the shipped CSS"
+            else
+              echo "  FAIL $q is not answered anywhere"; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: The window primitive and the travelling indicator are in the bundle
+        id: bundle
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          for a in $entries; do
+            curl -s --compressed --max-time 60 -o "/tmp/mods/$(basename "$a")" "$APEX$a"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "/tmp/mods/$(basename "$a")" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              [ "$code" = "200" ] || rm -f "/tmp/mods/$c"
+            done
+          done
+          echo "  modules read: $(ls /tmp/mods | wc -l)"
+          fail=0
+          # Written to FILES, never piped: `grep -q` stops at the first match,
+          # the writer takes SIGPIPE, and pipefail reads a hit as a failure.
+          for marker in 'data-overlay-panel' 'data-tab-indicator'; do
+            hit=$(grep -l "$marker" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $marker ships — in $(basename "$hit")"
+            else
+              echo "  FAIL $marker is not in any served module"; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live motion-system verification'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| every control answers the finger on pointer-down | ${{ steps.press.outcome }} |"
+            echo "| glass blurs — unprefixed backdrop-filter survived | ${{ steps.material.outcome }} |"
+            echo "| reduced motion, reduced transparency, more contrast | ${{ steps.a11y.outcome }} |"
+            echo "| window primitive and travelling indicator shipped | ${{ steps.bundle.outcome }} |"
+            echo ''
+            echo 'Read-only: every request was an anonymous GET.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run if any check failed
+        if: steps.press.outcome != 'success' || steps.material.outcome != 'success' || steps.a11y.outcome != 'success' || steps.bundle.outcome != 'success'
+        run: exit 1

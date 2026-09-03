@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 import { useLanguage } from '../LanguageContext';
@@ -7,6 +6,7 @@ import { useWallet } from '../WalletContext';
 import { api, uploadFile, usdCentsToIqd, iqdToUsdCents } from '../lib/api';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
+import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
 import {
   ChevronLeft,
@@ -490,9 +490,54 @@ export default function Wallet() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
+  /**
+   * WHY THE WINDOWS ARE NOT MOUNTED BY THEIR OWN STATE ANY MORE.
+   *
+   * Both money dialogs used to be written `{modal && <RequestModal …/>}`, which
+   * meant the component was destroyed the instant the flag went false. A
+   * destroyed component cannot animate: the window appeared from nowhere and
+   * then simply ceased to exist, which is exactly the disappearance Apple's
+   * spatial-consistency rule is about — if it does not leave the way it came,
+   * there is nothing for a person to build a mental model out of.
+   *
+   * So the flag now only drives `open`, and the component stays mounted long
+   * enough to play its exit. Two pieces of bookkeeping fall out of that, and
+   * both matter more here than anywhere else in the app because this page moves
+   * money:
+   *
+   *   `modalKind` remembers WHICH form is on screen, so the panel keeps its
+   *   content and its heading for the length of the exit instead of blanking
+   *   to the other form's copy on the way out.
+   *
+   *   `modalSession` restores what the unmount used to do for free: a fresh
+   *   `key` per opening throws the old instance away, so the step, the typed
+   *   amount, the uploaded receipt and — critically — the per-form idempotency
+   *   key are all regenerated. Without it a second deposit would inherit the
+   *   first one's key and the server would reject or dedupe it. The count also
+   *   gates the first mount, so the form does not exist at all until it has
+   *   been asked for once.
+   */
   const [modal, setModal] = useState<'deposit' | 'withdrawal' | null>(null);
+  const [modalKind, setModalKind] = useState<'deposit' | 'withdrawal'>('deposit');
+  const [modalSession, setModalSession] = useState(0);
   const [reviewFor, setReviewFor] = useState<TxView | null>(null);
+  const [reviewSession, setReviewSession] = useState(0);
+  // The row being reviewed, held past the moment `reviewFor` clears so the
+  // window still has its operation number to show while it leaves.
+  const reviewTxRef = useRef<TxView | null>(null);
   const [cancellingId, setCancellingId] = useState<string>('');
+
+  const openRequest = (which: 'deposit' | 'withdrawal') => {
+    setModalKind(which);
+    setModalSession((n) => n + 1);
+    setModal(which);
+  };
+
+  const openReview = (tx: TxView) => {
+    reviewTxRef.current = tx;
+    setReviewSession((n) => n + 1);
+    setReviewFor(tx);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -686,7 +731,7 @@ export default function Wallet() {
         {/* One primary action, one secondary — the old pair were identical
             olive slabs, so neither read as the thing you came here to do. */}
         <button
-          onClick={() => setModal('withdrawal')}
+          onClick={() => openRequest('withdrawal')}
           disabled={loading || !!loadError}
           className="flex-1 max-w-[240px] bg-zinc-900 border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800 transition-colors text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -694,7 +739,7 @@ export default function Wallet() {
           <ArrowUp className="w-4 h-4" strokeWidth={3} />
         </button>
         <button
-          onClick={() => setModal('deposit')}
+          onClick={() => openRequest('deposit')}
           className="flex-1 max-w-[240px] bg-gold hover:bg-gold-light transition-colors text-black py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-[15px]"
         >
           <ArrowDown className="w-4 h-4" strokeWidth={3} />
@@ -906,7 +951,7 @@ export default function Wallet() {
                               <span className="text-zinc-500 text-[10px] font-bold">{s.reviewRequested}</span>
                             ) : (
                               <button
-                                onClick={() => setReviewFor(tx)}
+                                onClick={() => openReview(tx)}
                                 className="inline-flex items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-bold"
                               >
                                 <HelpCircle className="w-3 h-3" /> {s.requestReview}
@@ -929,12 +974,13 @@ export default function Wallet() {
         </section>
       </div>
 
-      {modal && (
+      {modalSession > 0 && (
         <RequestModal
-          kind={modal}
+          key={modalSession}
+          open={modal !== null}
+          kind={modalKind}
           s={s}
           lang={lang}
-          dir={dir}
           currency={currency}
           exchangeRate={exchangeRate}
           available={balances.usd_cents_available}
@@ -949,10 +995,12 @@ export default function Wallet() {
         />
       )}
 
-      {reviewFor && (
+      {reviewSession > 0 && reviewTxRef.current && (
         <ReviewModal
+          key={reviewSession}
+          open={reviewFor !== null}
           s={s}
-          tx={reviewFor}
+          tx={reviewTxRef.current}
           onClose={() => setReviewFor(null)}
           onDone={async () => {
             setReviewFor(null);
@@ -998,7 +1046,8 @@ const PAYOUT_KIND_LABELS: Record<string, { ar: string; en: string; ckb: string }
  * shortest path to depositing money was buried; and it was rendered inline,
  * where an ancestor's transform makes `position: fixed` stop meaning the
  * viewport — the same bug that put the order modal at the bottom of the page.
- * It is portalled to document.body now.
+ * It is portalled to document.body now — by `Overlay`, which owns the portal
+ * along with the scrim, the material and the motion.
  *
  * The steps are exactly the owner's order:
  *
@@ -1009,10 +1058,10 @@ const PAYOUT_KIND_LABELS: Record<string, { ar: string; en: string; ckb: string }
  * never be about something two screens back.
  */
 function RequestModal({
+  open,
   kind,
   s,
   lang,
-  dir,
   currency,
   exchangeRate,
   available,
@@ -1021,10 +1070,10 @@ function RequestModal({
   onClose,
   onDone,
 }: {
+  open: boolean;
   kind: 'deposit' | 'withdrawal';
   s: Record<string, string>;
   lang: string;
-  dir: 'rtl' | 'ltr';
   currency: 'IQD' | 'USD';
   exchangeRate: number;
   available: number;
@@ -1161,21 +1210,43 @@ function RequestModal({
       ? [s.stepChannel, s.stepAmount, s.stepProof]
       : [s.stepAccount, s.stepAmount, s.stepReview];
 
-  return createPortal(
-    <div
-      dir={dir}
-      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="wallet-request-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting && !uploading) onClose();
-      }}
+  /**
+   * OVERLAY, NOT SHEET, even though it comes up from the bottom edge on a
+   * phone. `Sheet` adds drag-to-dismiss, and this window is the one place in
+   * the app where an accidental dismissal costs the customer real work: three
+   * steps, a typed amount, a destination account, and an uploaded receipt that
+   * would have to be uploaded again. Its panel is also the scroll container
+   * (`max-h-[92vh] overflow-y-auto`), and a vertical drag competing with a
+   * vertical scroll is the classic way a sheet ends up fighting the finger.
+   * So it keeps `placement="bottom"` — the same geometry the hand-rolled
+   * window had, `items-end sm:items-center` — and gains the arrival and the
+   * symmetric exit without gaining a gesture that can throw the form away.
+   *
+   * DISMISSAL IS COPIED ACROSS EXACTLY. The old wrapper closed on a backdrop
+   * click only when nothing was in flight (`!submitting && !uploading`), so
+   * that is what `dismissOnScrim` is given rather than a flat `true` — a tap
+   * outside must not abandon a deposit whose receipt is still uploading or
+   * whose request is already on the wire. Escape is held to the same test: the
+   * primitive owns the key handler now, and there was no Escape listener here
+   * to delete.
+   *
+   * The material, the border and the rounding come from the primitive, so
+   * `panelClassName` carries geometry only and the old inner padding moves to
+   * a div inside.
+   */
+  return (
+    <Overlay
+      open={open}
+      onClose={onClose}
+      labelledBy="wallet-request-title"
+      placement="bottom"
+      z={120}
+      dismissOnScrim={!submitting && !uploading}
+      dismissOnEscape={!submitting && !uploading}
+      testId={`wallet-${kind}`}
+      panelClassName="w-full sm:max-w-[460px] max-h-[92vh] overflow-y-auto"
     >
-      <div
-        data-wallet-modal={kind}
-        className="bg-zinc-950 border border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[460px] p-5 sm:p-6 relative flex flex-col max-h-[92vh] overflow-y-auto"
-      >
+      <div data-wallet-modal={kind} className="relative flex flex-col p-5 sm:p-6">
         <button
           type="button"
           onClick={onClose}
@@ -1446,17 +1517,18 @@ function RequestModal({
           </div>
         </form>
       </div>
-    </div>,
-    document.body
+    </Overlay>
   );
 }
 
 function ReviewModal({
+  open,
   s,
   tx,
   onClose,
   onDone,
 }: {
+  open: boolean;
   s: Record<string, string>;
   tx: TxView;
   onClose: () => void;
@@ -1485,19 +1557,36 @@ function ReviewModal({
     }
   };
 
-  // Portalled for the same reason as the request modal: under a transformed
-  // ancestor `position: fixed` stops meaning the viewport, and the dialog
-  // lands wherever that ancestor happens to be.
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose();
-      }}
+  /**
+   * Portalled for the same reason as the request modal — under a transformed
+   * ancestor `position: fixed` stops meaning the viewport, and the dialog lands
+   * wherever that ancestor happens to be — except the portal, the scrim and the
+   * `role="dialog"`/`aria-modal` pair now come from `Overlay` rather than being
+   * spelled out here.
+   *
+   * `Overlay` and not `Sheet`: this is a short question about one operation,
+   * not a surface you pull around, and dragging away a typed complaint is the
+   * same loss as dragging away the deposit form. It keeps the bottom placement
+   * it already had. The old markup had no accessible name at all — only
+   * `role="dialog"` — so the heading it already shows on screen is given an id
+   * and named through `labelledBy`, which is the label that was missing rather
+   * than a new string. The backdrop closed it only when no request was in
+   * flight, so `dismissOnScrim` and the newly-inherited Escape are both held to
+   * that same `!submitting` test.
+   */
+  return (
+    <Overlay
+      open={open}
+      onClose={onClose}
+      labelledBy="wallet-review-title"
+      placement="bottom"
+      z={120}
+      dismissOnScrim={!submitting}
+      dismissOnEscape={!submitting}
+      testId="wallet-review"
+      panelClassName="w-full sm:max-w-[420px]"
     >
-      <div className="bg-zinc-950 border border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[420px] p-6 relative">
+      <div data-wallet-review className="relative p-6">
         <button
           type="button"
           onClick={onClose}
@@ -1506,7 +1595,9 @@ function ReviewModal({
         >
           <X className="w-5 h-5" />
         </button>
-        <h2 className="text-xl font-black text-white mb-1 text-center pe-10">{s.reviewTitle}</h2>
+        <h2 id="wallet-review-title" className="text-xl font-black text-white mb-1 text-center pe-10">
+          {s.reviewTitle}
+        </h2>
         <p className="text-zinc-400 text-center text-xs mb-4" dir="ltr">
           {tx.number}
         </p>
@@ -1543,7 +1634,6 @@ function ReviewModal({
           </div>
         </form>
       </div>
-    </div>,
-    document.body
+    </Overlay>
   );
 }
