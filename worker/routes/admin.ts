@@ -1026,14 +1026,28 @@ adminRoutes.get('/labels', async (c) => {
   const idsRaw = str(c.req.query('ids'), 'ids', { max: 2000, required: false });
   const ids = idsRaw ? idsRaw.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 100) : [];
   const limit = int(c.req.query('limit') ?? 50, 'limit', { min: 1, max: 100 });
+  // The queue is longer than one sheet on any busy day (177 undispatched
+  // orders against a 50-sticker page, in the database this was found on). It
+  // used to print the oldest fifty and say nothing, which is how a warehouse
+  // ships the wrong set: `offset` makes the rest REACHABLE, and the sheet's
+  // banner makes the truncation VISIBLE. Neither alone is a fix.
+  const offset = int(c.req.query('offset') ?? 0, 'offset', { min: 0, max: 100000 });
 
   const NEW_STAGES = ['received', 'confirmed'];
   const placeholders = NEW_STAGES.map(() => '?').join(',');
   const sql = ids.length
     ? `SELECT * FROM orders WHERE stage IN (${placeholders}) AND id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at`
-    : `SELECT * FROM orders WHERE stage IN (${placeholders}) ORDER BY created_at LIMIT ?`;
-  const binds = ids.length ? [...NEW_STAGES, ...ids] : [...NEW_STAGES, limit];
+    : `SELECT * FROM orders WHERE stage IN (${placeholders}) ORDER BY created_at LIMIT ? OFFSET ?`;
+  const binds = ids.length ? [...NEW_STAGES, ...ids] : [...NEW_STAGES, limit, offset];
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all<Record<string, unknown>>();
+
+  // The whole undispatched queue, counted separately: the page cannot report
+  // what it does not print, and a count derived from the page is always the
+  // page's own length, which is the bug this exists to close.
+  const totalRow = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM orders WHERE stage IN (${placeholders})`
+  ).bind(...NEW_STAGES).first<{ n: number }>();
+  const total = Number(totalRow?.n ?? 0);
 
   const orderIds = (results ?? []).map((o) => String(o.id));
   const counts = new Map<string, number>();
@@ -1064,8 +1078,22 @@ adminRoutes.get('/labels', async (c) => {
     };
   });
 
+  // An explicit selection is its own complete sheet — there is no "rest" to
+  // link to, so it reports only what it holds.
+  const nextOffset = offset + labels.length;
+  const url = new URL(c.req.url);
+  url.searchParams.set('offset', String(nextOffset));
+  url.searchParams.set('limit', String(limit));
+  const batch = ids.length
+    ? { total: labels.length, offset: 0 }
+    : {
+        total,
+        offset,
+        nextUrl: nextOffset < total ? `${url.pathname}${url.search}` : undefined,
+      };
+
   c.header('Cache-Control', 'no-store');
-  return c.html(renderLabelSheet(labels, printLang(c), wantsPrint(c)));
+  return c.html(renderLabelSheet(labels, printLang(c), wantsPrint(c), batch));
 });
 
 // ------------------------------------------------------------ local delivery

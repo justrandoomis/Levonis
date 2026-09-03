@@ -138,6 +138,10 @@ const COPY = {
     prepaid: 'مدفوع مسبقًا',
     pieces: 'عدد القطع',
     tracking: 'رقم التتبع',
+    sheetAll: 'هذه الورقة تحمل كل الطلبات غير المُرسَلة: {n}.',
+    sheetPart: 'هذه الورقة تحمل {from}–{to} من {total} طلبًا غير مُرسَل — الباقي لم يُطبع.',
+    sheetNext: 'اطبع هذه الدفعة ثم افتح التالية',
+    sheetNoPrint: 'هذا السطر يظهر على الشاشة فقط ولا يُطبع على الملصقات.',
   },
   en: {
     receiptTitle: 'Purchase receipt',
@@ -175,6 +179,10 @@ const COPY = {
     prepaid: 'Prepaid',
     pieces: 'Pieces',
     tracking: 'Tracking',
+    sheetAll: 'This sheet carries every undispatched order: {n}.',
+    sheetPart: 'This sheet carries {from}–{to} of {total} undispatched orders — the rest are not printed.',
+    sheetNext: 'Print this batch, then open the next one',
+    sheetNoPrint: 'This line is on screen only; it is not printed on the stickers.',
   },
 } as const;
 
@@ -422,7 +430,13 @@ function labelBody(d: DeliveryLabelData, lang: ReceiptLang): string {
 
 const LABEL_CSS =
   `.label { width: 100mm; height: 70mm; padding: 4mm; overflow: hidden; page-break-after: always; }` +
-  `.label:last-child { page-break-after: auto; }`;
+  `.label:last-child { page-break-after: auto; }` +
+  // The on-screen batch banner. `.noprint` already hides it on paper; it is
+  // sized for reading in a browser tab, not for a 100×70mm sticker.
+  `.sheet-banner { padding: 8px 12px; font-size: 13px; line-height: 1.6; background: #f4f4f5; border-bottom: 1px solid #d4d4d8; }` +
+  `.sheet-banner .warn { font-weight: 700; color: #9a3412; }` +
+  `.sheet-banner .hint { font-size: 11px; color: #71717a; margin-top: 2px; }` +
+  `.sheet-banner a { display: inline-block; margin-top: 4px; font-weight: 700; color: #1d4ed8; }`;
 
 export function renderDeliveryLabel(
   d: DeliveryLabelData,
@@ -439,6 +453,16 @@ export function renderDeliveryLabel(
   });
 }
 
+/** Which slice of the undispatched queue a sheet is showing. */
+export interface LabelBatch {
+  /** Every undispatched order there is, not just the printed ones. */
+  total: number;
+  /** How many were skipped before this page. */
+  offset: number;
+  /** A link to the next page, when there is one. */
+  nextUrl?: string;
+}
+
 /**
  * A batch of stickers, one per page.
  *
@@ -446,20 +470,54 @@ export function renderDeliveryLabel(
  * which is a filter the CALLER applies, not this function. A renderer that
  * decided for itself which orders count as new would quietly disagree with
  * the panel's own list the first time the definition changed.
+ *
+ * THE SHEET SAYS WHAT IT IS NOT SHOWING. The queue is paged — a print sheet
+ * with five hundred stickers is its own accident — and a page that printed
+ * fifty of a hundred and seventy-seven without saying so is how a warehouse
+ * ships the wrong set and never finds out. So the count is always stated, and
+ * when the queue is longer than the page there is a link to the rest.
+ *
+ * The banner is `.noprint`: the paper stays pure stickers (one per 100×70mm
+ * page, and a banner page would waste a label), while the human at the screen
+ * — the one who can act on it — always sees it before pressing print.
  */
 export function renderLabelSheet(
   labels: DeliveryLabelData[],
   lang: ReceiptLang = 'ar',
-  autoPrint = false
+  autoPrint = false,
+  batch?: LabelBatch
 ): string {
   const t = COPY[lang];
-  const body = labels.length
-    ? labels.map((d) => labelBody(d, lang)).join('')
-    : `<div style="padding:12mm;font-size:13px;text-align:center">${escapeHtml(
-        lang === 'ar' ? 'لا توجد طلبات جديدة للطباعة' : 'No new orders to print'
-      )}</div>`;
+  const total = batch ? batch.total : labels.length;
+  const offset = batch ? batch.offset : 0;
+  const complete = total <= offset + labels.length && offset === 0;
+  const fill = (tpl: string, vars: Record<string, number>) =>
+    tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+
+  const banner = labels.length
+    ? `<div class="noprint sheet-banner">` +
+      `<div class="${complete ? '' : 'warn'}">${escapeHtml(
+        complete
+          ? fill(t.sheetAll, { n: total })
+          : fill(t.sheetPart, { from: offset + 1, to: offset + labels.length, total })
+      )}</div>` +
+      (batch?.nextUrl
+        ? `<a href="${escapeHtml(batch.nextUrl)}">${escapeHtml(t.sheetNext)}</a>`
+        : '') +
+      `<div class="hint">${escapeHtml(t.sheetNoPrint)}</div>` +
+      `</div>`
+    : '';
+
+  const body =
+    banner +
+    (labels.length
+      ? labels.map((d) => labelBody(d, lang)).join('')
+      : `<div style="padding:12mm;font-size:13px;text-align:center">${escapeHtml(
+          lang === 'ar' ? 'لا توجد طلبات جديدة للطباعة' : 'No new orders to print'
+        )}</div>`);
+
   return doc({
-    title: `${t.pieces}: ${labels.length}`,
+    title: `${t.pieces}: ${labels.length}${total > labels.length ? ` / ${total}` : ''}`,
     lang,
     size: '100mm 70mm',
     body,

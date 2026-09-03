@@ -8,6 +8,7 @@ import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { Sheet } from '../components/ui/Overlay';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { storeHref } from '../lib/merchant';
+import { useRail } from '../lib/useRail';
 import {
   ArrowLeft, ArrowRight, Search, Box, Calculator,
   MessageSquare, Plus, Store,
@@ -54,6 +55,7 @@ export default function Community() {
   const { lang, dir, t } = useLanguage();
   const { user, isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
+  const featureRail = useRail();
 
   const queryParams = new URLSearchParams(location.search);
   const activeTab = queryParams.get('tab') || 'products';
@@ -238,7 +240,7 @@ export default function Community() {
             claim that the Studio is deployed; publishing the Studio subdomain
             is a separate owner step (docs/DECISIONS.md row 30 covers that domain). The remaining
             cards are features not launched yet, shown honestly as coming soon. */}
-        <div className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
+        <div ref={featureRail.ref} className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
            <a
              href={STUDIO_URL}
              target="_blank"

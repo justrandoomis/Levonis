@@ -217,18 +217,54 @@ async function main() {
   console.log('\n4. the batch sheet is NEW orders only');
   const sheet = await admin.get('/api/admin/labels');
   check('the sheet renders', sheet.status === 200, `${sheet.status}`);
-  check('it contains the undispatched order', sheet.raw.includes(fresh.id), fresh.id);
+
+  // THE SHEET IS PAGED, AND MUST SAY SO. The undispatched queue outgrows one
+  // page on any busy day (177 against a 50-sticker sheet, in the database this
+  // was written on). It used to print the oldest fifty in silence, which is
+  // how a warehouse ships the wrong set — so what is asserted here is that the
+  // page tells the truth about the queue AND that the rest is reachable, not
+  // that the queue happens to fit.
+  const banner = /سطر|noprint|sheet-banner/.test(sheet.raw);
+  check('the sheet carries an on-screen batch banner', banner);
+  const stickers = (sheet.raw.match(/class="label"/g) || []).length;
+  const reported = /(\d+)–(\d+)\s*(?:من|of)\s*(\d+)/.exec(sheet.raw);
+  const wholeQueue = /(?:غير المُرسَلة|undispatched orders?):\s*(\d+)/.exec(sheet.raw);
+  const total = reported ? Number(reported[3]) : wholeQueue ? Number(wholeQueue[1]) : stickers;
+  check(
+    'the banner reports the WHOLE queue, not just the page',
+    total >= stickers,
+    `page=${stickers} queue=${total}`
+  );
+  if (reported) {
+    check(
+      'a truncated sheet names the exact slice it printed',
+      Number(reported[2]) - Number(reported[1]) + 1 === stickers,
+      `${reported[1]}–${reported[2]} vs ${stickers} stickers`
+    );
+    check('and links to the next batch', /offset=/.test(sheet.raw));
+  } else {
+    check('an untruncated sheet says it holds the whole queue', total === stickers, `${total} vs ${stickers}`);
+  }
+
+  /** Every undispatched order is printable — walk the pages to find one. */
+  const onSheet = async (id) => {
+    for (let off = 0; off <= total; off += 100) {
+      const page = await admin.get(`/api/admin/labels?limit=100&offset=${off}`);
+      if (page.raw.includes(id)) return true;
+      if ((page.raw.match(/class="label"/g) || []).length === 0) break;
+    }
+    return false;
+  };
+  check('the undispatched order is on the sheet', await onSheet(fresh.id), fresh.id);
   // The first order was delivered above. Printing a sticker for a parcel
   // that already went out is how the same order goes out twice.
-  check('and NOT the one already delivered', !sheet.raw.includes(order.id), order.id);
+  check('and NOT the one already delivered', !(await onSheet(order.id)), order.id);
 
   // Dispatching an order must remove it from the sheet immediately.
   await admin.patch(`/api/admin/orders/${fresh.id}/stage`, { stage: 'confirmed' });
-  const stillThere = await admin.get('/api/admin/labels');
-  check('a confirmed-but-not-dispatched order is still on the sheet', stillThere.raw.includes(fresh.id));
+  check('a confirmed-but-not-dispatched order is still on the sheet', await onSheet(fresh.id));
   await admin.patch(`/api/admin/orders/${fresh.id}/stage`, { stage: 'out_for_delivery' });
-  const gone = await admin.get('/api/admin/labels');
-  check('once it is out for delivery it LEAVES the sheet', !gone.raw.includes(fresh.id), fresh.id);
+  check('once it is out for delivery it LEAVES the sheet', !(await onSheet(fresh.id)), fresh.id);
 
   const third = await place(`rcp-${rnd}-3`);
   const selected = await admin.get(`/api/admin/labels?ids=${third.id}`);

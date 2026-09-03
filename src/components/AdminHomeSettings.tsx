@@ -311,7 +311,7 @@ export default function AdminHomeSettings() {
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        <div ref={scrollContainerRef} className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-2 px-2 scroll-smooth">
+        <div ref={scrollContainerRef} className="flex-1 overflow-x-auto hide-scrollbar flex items-center gap-2 px-2 scroll-smooth">
           <button
             onClick={() => setActiveTab('layout')}
             className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl font-bold transition-all shrink-0 ${

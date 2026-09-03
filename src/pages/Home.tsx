@@ -1,4 +1,5 @@
 import AnimatedItem from '../components/AnimatedItem';
+import { useRail } from '../lib/useRail';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { PackageSearch } from 'lucide-react';
@@ -15,6 +16,10 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 
 export default function Home() {
   const { t, loc } = useLanguage();
+  // The flagship product rail. Its cards are AnimatedItem wrappers, which is
+  // exactly why useRail measures snap points from offsetWidth: those wrappers
+  // hold a scale transform until they scroll into view.
+  const discountsRail = useRail();
 
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [categories, setCategories] = useState<HomeTaxon[]>([]);
@@ -230,7 +235,10 @@ export default function Home() {
               discountedProducts.length > 0 && sectionVisible('discounts_offers') ? (
                 <section key="discounts_offers" data-home-section="discounts_offers" className="mb-10 sm:mb-12">
                   <SectionHeader title={t('homeDiscounts')} accent="bg-rose-500" to="/products" />
-                  <div className="flex gap-3 sm:gap-4 overflow-x-auto overscroll-x-contain hide-scrollbar pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+                  <div
+                    ref={discountsRail.ref}
+                    className="flex gap-3 sm:gap-4 overflow-x-auto overscroll-x-contain hide-scrollbar pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x"
+                  >
                     {discountedProducts.map((p, index) => (
                       <AnimatedItem key={p.id} index={index} className="snap-start shrink-0">
                         <ProductCard p={p} widthClass="w-[164px] sm:w-[190px]" />

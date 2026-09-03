@@ -4,6 +4,7 @@ import { Layers, ShieldCheck, Wrench, Package, Users, Gift } from 'lucide-react'
 import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
 import SectionHeader from './SectionHeader';
+import { useRail } from '../../lib/useRail';
 
 /**
  * What LEVONIS does besides sell boxes — six compact cards on one
@@ -61,6 +62,8 @@ function CardBody({
 
 export default function ServicesGrid() {
   const { t } = useLanguage();
+  // Six short cards: a snappier decay suits a rail this narrow.
+  const rail = useRail({ decelerationRate: 0.99 });
 
   const inApp: Array<{ id: string; to: string; title: string; icon: React.ElementType }> = [
     { id: 'warranty', to: '/warranty', title: t('svcWarrantyTitle'), icon: ShieldCheck },
@@ -77,7 +80,10 @@ export default function ServicesGrid() {
       {/* One swipe rail at every width; six small cards fit a desktop row
           outright, so the rail only actually scrolls where it should — on a
           phone. min-w-0 so a long Kurdish title wraps inside its card. */}
-      <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 sm:gap-3">
+      <div
+        ref={rail.ref}
+        className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 sm:gap-3"
+      >
         {/* Opens in its OWN tab. The Studio is a separate application on a
             separate subdomain, and replacing the store with it costs the
             customer their cart, their scroll position and their place in

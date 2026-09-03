@@ -219,6 +219,49 @@ html, body, #root {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   ARABIC IS A JOINED SCRIPT, AND LATIN TRACKING RULES DO NOT TRANSFER.
+
+   Tailwind's `tracking-*` utilities encode Latin typography: negative tracking
+   tightens a big display line, positive tracking opens up small caps. Applied
+   to Arabic, positive letter-spacing SEVERS THE JOINS between letters — the
+   word stops being a word and becomes a row of disconnected shapes — and
+   `uppercase`, which almost always travels with it, does nothing at all. The
+   audit found this on the home hero's h1, the subscription card, the whole
+   checkout column, the dashboard sidebar heading and every admin stat label:
+   `tracking-widest uppercase` sitting on «الموافقة على السياسات» and
+   «القائمة الرئيسية».
+
+   Rather than hunt forty call sites and lose the next one to a new component,
+   tracking is neutralised for the document as a whole WHEN THE DOCUMENT IS
+   ARABIC OR KURDISH. LanguageContext writes `lang` onto <html>, so an English
+   session keeps every Latin tracking value exactly as designed, and a run
+   explicitly marked Latin inside an Arabic page keeps its own.
+
+   The attribute selector matches arbitrary values too (`tracking-[0.2em]` is
+   literally that class name), and its specificity beats a single utility class,
+   which is what makes it hold without `!important`.
+
+   NOT DONE HERE, deliberately: the size-specific Arabic type scale (Cairo wants
+   more leading than Tailwind's Latin defaults give at text-4xl and up). That
+   changes density across every page and is the owner's call, not a defect fix.
+   What IS a defect and IS fixed below: a line-height under 1.15 clips Cairo's
+   ascenders and the dots under ب ج ي, so the two tightest steps get a floor.
+   --------------------------------------------------------------------------- */
+html:lang(ar) [class*='tracking-']:not([lang='en']):not([dir='ltr']),
+html:lang(ckb) [class*='tracking-']:not([lang='en']):not([dir='ltr']) {
+  letter-spacing: normal;
+}
+
+html:lang(ar) .leading-none,
+html:lang(ckb) .leading-none {
+  line-height: 1.15;
+}
+html:lang(ar) .leading-tight,
+html:lang(ckb) .leading-tight {
+  line-height: 1.3;
+}
+
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }

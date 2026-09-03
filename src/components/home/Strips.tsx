@@ -5,6 +5,7 @@ import type { HomeSectionItem, HomeTaxon } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
 import Marquee from './Marquee';
+import { useRail } from '../../lib/useRail';
 
 /**
  * The shared shelf scroller: a snap rail on phones that relaxes into a
@@ -15,8 +16,15 @@ import Marquee from './Marquee';
  * a wrapped row is simply three cards.
  */
 function Rail({ children }: { children: React.ReactNode }) {
+  // `useRail` detaches itself above `sm`, where this becomes a wrapped grid —
+  // a drag handler still listening on a layout it does not own would swallow
+  // clicks on the category cards.
+  const rail = useRail();
   return (
-    <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap sm:overflow-visible sm:gap-3">
+    <div
+      ref={rail.ref}
+      className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap sm:overflow-visible sm:gap-3"
+    >
       {children}
     </div>
   );
