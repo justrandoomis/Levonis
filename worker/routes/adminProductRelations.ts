@@ -511,6 +511,30 @@ export async function planRelationsWrite(
     }
   }
 
+  // ---- a variant SKU is unique across the STORE --------------------------
+  //
+  // idx_product_variants_sku is a partial unique index over every non-empty
+  // SKU in the table, not per product — so "L-BLK" on a second product is
+  // refused by SQLite with `UNIQUE constraint failed`, which reaches an admin
+  // as an unreadable D1 error and an importer as a failed row with a database
+  // string for a reason. Two products having a Large-Black combination is
+  // ordinary, so the collision is named here, with the product that holds it.
+  const skus = [...new Set(variantInputs.map((v) => v.sku).filter((x): x is string => !!x))];
+  if (skus.length) {
+    const ph = skus.map(() => '?').join(', ');
+    const { results: taken } = await db
+      .prepare(
+        `SELECT v.sku, COALESCE(NULLIF(p.name_ar,''), p.name, v.product_id) AS owner
+           FROM product_variants v JOIN products p ON p.id = v.product_id
+          WHERE v.sku IN (${ph}) AND v.product_id <> ?`
+      )
+      .bind(...skus, productId)
+      .all<{ sku: string; owner: string }>();
+    for (const row of taken) {
+      errors.push(`Combination SKU "${row.sku}" is already used by "${row.owner}" — a SKU is unique across the store`);
+    }
+  }
+
   if (errors.length) return { errors: [...new Set(errors)] };
 
   // ---- the statements, run as ONE batch by the caller ---------------------

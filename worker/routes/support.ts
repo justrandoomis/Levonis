@@ -32,6 +32,8 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
+import { pricingCtx, publicWithDisplayPrice } from './products';
+import { loadRelationsViews } from '../lib/productOverlay';
 import {
   requireAuth,
   requireAdmin,
@@ -724,10 +726,8 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
   const q = str(params.q, 'q', { max: 100, required: false }) || freeText.trim();
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
   const like = `%${escapeLike(q)}%`;
-  // Public catalog only, allowlisted public fields — NEVER internal costs.
   const { results } = await c.env.DB.prepare(
-    `SELECT slug, name, name_ar, name_ku, price_iqd, original_price_iqd, images, stock
-       FROM products
+    `SELECT * FROM products
       WHERE status = 'active'
         AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\' OR brand LIKE ?1 ESCAPE '\\')
       ORDER BY is_featured DESC, created_at DESC
@@ -736,22 +736,37 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
     .bind(like)
     .all<Record<string, unknown>>();
   if (results.length === 0) return { intent: 'product_search', text: tr(loc, 'search_none') };
-  const cards: AssistantCard[] = results.map((p) => {
-    const images = safeParse<unknown[]>(p.images, []);
+
+  // THE ASSISTANT QUOTES THE PRICE THE STOREFRONT QUOTES. It used to read
+  // `products.price_iqd` — the BASE row — so a product whose cheapest option
+  // costs less was announced at a price its own card contradicted, and a
+  // product repriced only in the relational tables was announced at a stale
+  // one. publicWithDisplayPrice is the same function the cards go through:
+  // the relational overlay, the resolver, the viewer's own tier, and a public
+  // shape that has never carried an internal cost.
+  const ctx = await pricingCtx(c);
+  const views = await loadRelationsViews(
+    c.env.DB,
+    results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
+  );
+  const cards: AssistantCard[] = results.map((row) => {
+    const p = publicWithDisplayPrice(row, ctx, views.get(String(row.id))) as Record<string, unknown>;
+    const images = safeParse<unknown[]>(row.images, []);
     const image = typeof images[0] === 'string' ? (images[0] as string) : undefined;
     const stock = p.stock;
     const badge = typeof stock === 'number' ? (stock > 0 ? tr(loc, 'in_stock') : tr(loc, 'out_of_stock')) : undefined;
+    const shown = Number(p.display_price_iqd ?? p.price_iqd ?? 0) || 0;
     return {
       title: pickName(loc, {
-        p_name: String(p.name ?? ''),
-        p_name_ar: String(p.name_ar ?? ''),
-        p_name_ku: String(p.name_ku ?? ''),
+        p_name: String(row.name ?? ''),
+        p_name_ar: String(row.name_ar ?? ''),
+        p_name_ku: String(row.name_ku ?? ''),
         name_snapshot: null,
       }),
-      subtitle: `${tr(loc, 'f_price')}: ${fmtIqd(loc, Number(p.price_iqd) || 0)}`,
+      subtitle: `${tr(loc, 'f_price')}: ${fmtIqd(loc, shown)}`,
       image,
       badge,
-      link: { label: tr(loc, 'open_product'), to: `/product/${p.slug}` },
+      link: { label: tr(loc, 'open_product'), to: `/product/${row.slug}` },
     };
   });
   return { intent: 'product_search', text: tr(loc, 'search_intro'), cards };

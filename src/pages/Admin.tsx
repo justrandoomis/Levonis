@@ -240,11 +240,20 @@ function AdminOrders() {
         {/* The filter bar scrolls on its own. It used to sit in a flex row
             beside the refresh button with no min-w-0, so on a phone the row
             refused to shrink and the last filters were simply unreachable —
-            the strip could not be scrolled to them. */}
+            the strip could not be scrolled to them.
+
+            THE CHIP IS 36px, THE TARGET IS 44px. The owner asked for the
+            denser admin («اجعل الأزرار أصغر»), and a 36px-tall control is
+            below the 44px a finger needs — the two are only in conflict if
+            the painted pill and the tappable box have to be the same element.
+            They do not: the button is the 44px target and carries no styling,
+            and the span inside it is the 36px pill. The strip's own padding
+            moves into that 4px gap, so the whole bar is exactly as tall as it
+            was before — the density is unchanged, the miss-taps are not. */}
         <div className="-mx-3 px-3 sm:mx-0 sm:px-0 min-w-0">
           <div
             data-order-filters
-            className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl overflow-x-auto hide-scrollbar gap-1"
+            className="flex bg-zinc-900 border border-zinc-800 px-1 rounded-xl overflow-x-auto hide-scrollbar gap-1"
           >
             {(['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const).map((f) => (
               <button
@@ -254,11 +263,15 @@ function AdminOrders() {
                   setStatusFilter(f);
                   setPage(0);
                 }}
-                className={`px-2.5 min-h-9 rounded-lg text-xs font-bold capitalize transition-colors whitespace-nowrap shrink-0 ${
-                  statusFilter === f ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                }`}
+                className="flex items-center min-h-11 shrink-0 rounded-lg"
               >
-                {f === 'all' ? loc('الكل', 'All', 'هەموو') : statusLabel(f)}
+                <span
+                  className={`flex items-center px-2.5 min-h-9 rounded-lg text-xs font-bold capitalize transition-colors whitespace-nowrap ${
+                    statusFilter === f ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {f === 'all' ? loc('الكل', 'All', 'هەموو') : statusLabel(f)}
+                </span>
               </button>
             ))}
           </div>

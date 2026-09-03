@@ -31,6 +31,7 @@ import {
 } from '../lib/productModel';
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
+import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '../lib/pinnedPrices';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
@@ -1034,12 +1035,35 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
   const jsonColors = readArr(row.colors);
 
   const changes: Array<{ kind: string; id: string; label: string; from: number | null; to: number | null }> = [];
+
+  // EVERY MOVE IS RECORDED IN price_history, exactly as a save through the
+  // product form is. Seven-day price protection reads that table and nothing
+  // else (worker/routes/returns.ts), so a reprice that left no row would make
+  // a real price drop invisible to a customer who is entitled to the
+  // difference — the money is decided by this table, not by the audit log.
+  const jsonHistory: PriceDelta[] = [];
+  const relHistory: PriceDelta[] = [];
+  const deltasFor = (
+    into: PriceDelta[],
+    variantKey: string,
+    before: PinnedPriceRow,
+    after: PinnedPriceRow
+  ) => {
+    const push = (field: HistoryField, oldV: number | null, newV: number | null) => {
+      if (oldV !== newV) into.push({ variant_key: variantKey, field, old_iqd: oldV, new_iqd: newV });
+    };
+    push('regular', before.regular_price_iqd, after.regular_price_iqd);
+    push('prime', before.prime_price_iqd, after.prime_price_iqd);
+    push('pro', before.pro_price_iqd, after.pro_price_iqd);
+  };
+
   const moveInPlace = (arr: Array<Record<string, unknown>>, kind: 'option' | 'color') => {
     for (const item of arr) {
       const pinned = pinnedRows({ [kind === 'option' ? 'options' : 'colors']: [item] } as never);
       if (!pinned.length) continue;
       const next = repriceRow(pinned[0], mode, from, to);
       changes.push({ kind, id: pinned[0].id, label: pinned[0].label, from: pinned[0].regular_price_iqd, to: next.regular_price_iqd });
+      deltasFor(jsonHistory, `${kind}:${pinned[0].id}`, pinned[0], next);
       item.regular_price_iqd = next.regular_price_iqd;
       item.prime_price_iqd = next.prime_price_iqd;
       item.pro_price_iqd = next.pro_price_iqd;
@@ -1081,6 +1105,7 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
       if (!pinned.length) continue;
       const next = repriceRow({ ...pinned[0], kind }, mode, from, to);
       changes.push({ kind, id: next.id, label: next.label, from: pinned[0].regular_price_iqd, to: next.regular_price_iqd });
+      deltasFor(relHistory, `${kind}:${next.id}`, pinned[0], next);
       stmts.push(
         c.env.DB.prepare(
           `UPDATE ${table} SET regular_price_iqd = ?, prime_price_iqd = ?, pro_price_iqd = ? WHERE id = ? AND product_id = ?`
@@ -1090,15 +1115,37 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
   }
   if (changes.length) await c.env.DB.batch(stmts);
 
+  // The relational row is the one the cart prices from, so where both stores
+  // hold the same option it is the relational move that is recorded; the JSON
+  // pass only fills in products that never grew a relational row.
+  const seen = new Set(relHistory.map((d) => `${d.variant_key}\u0000${d.field}`));
+  const history = [...relHistory, ...jsonHistory.filter((d) => !seen.has(`${d.variant_key}\u0000${d.field}`))];
+  // Never let a history failure lose the reprice the owner just confirmed:
+  // the prices are already written, and the warning is reported honestly.
+  let historyWarning: string | null = null;
+  try {
+    await recordPriceHistory(c.env.DB, productId, admin.id, history);
+  } catch (e) {
+    historyWarning = `price history not recorded: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
   await audit(c.env.DB, admin.id, 'product_v2.reprice_pinned', productId, {
     mode,
     from_price_iqd: from,
     to_price_iqd: to,
     moved: changes.length,
     changes: changes.slice(0, 60),
+    price_history_rows: history.length,
   });
 
-  return c.json({ success: true, mode, moved: changes.length, changes });
+  return c.json({
+    success: true,
+    mode,
+    moved: changes.length,
+    changes,
+    price_history_rows: history.length,
+    ...(historyWarning ? { price_history_warning: historyWarning } : {}),
+  });
 });
 
 /**
@@ -1170,7 +1217,14 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
   if (!row) throw notFound('Product not found');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
-  const doc = parseProductRow(row);
+  // THE PREVIEW PRICES WHAT THE CUSTOMER WOULD PAY, which means reading the
+  // product the way the cart reads it: the relational option/colour/variant
+  // rows win over the JSON mirrors on `products` wherever they exist. Without
+  // this, the one screen the owner uses to check a price was the one screen
+  // reading the other store — so a mirror that had drifted showed the owner a
+  // number no customer would ever be charged.
+  const relations = await loadRelationsView(c.env.DB, String(row.id), row.inventory_mode);
+  const doc = relations ? applyRelations(parseProductRow(row), relations) : parseProductRow(row);
   const tier: Tier =
     body.tier === 'plus' || body.tier === 'pro' || body.tier === 'prime' ? body.tier : 'free';
 

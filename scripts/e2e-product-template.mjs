@@ -210,7 +210,7 @@ async function main() {
     }),
     line({ row_type: 'option', key: importKey, group: 'Size', value: 'Large', sku_part: 'L', active: 'yes' }),
     line({ row_type: 'color', key: importKey, value: 'Black', hex: '#000000', active: 'yes', links: 'Size:Large' }),
-    line({ row_type: 'variant', key: importKey, links: 'Size:Large|color:Black', sku_part: 'L-BLK', stock: '3', active: 'yes' }),
+    line({ row_type: 'variant', key: importKey, links: 'Size:Large|color:Black', sku_part: `L-BLK-${rnd}`, stock: '3', active: 'yes' }),
     line({ row_type: 'transport', key: importKey, value: 'air', active: 'yes' }),
     line({ row_type: 'transport', key: importKey, value: 'sea', price_iqd: '12000', active: 'no' }),
     line({ row_type: 'spec', key: importKey, group: 'Motion', label: 'System', value: 'CoreXY' }),
@@ -258,6 +258,25 @@ async function main() {
   check('the sheet built the stock combination', rel?.variants?.length === 1 && rel.variants[0].stock === 3, JSON.stringify(rel?.variants));
   check('the arabic copy was produced locally for a translated field',
     typeof doc?.description_ar === 'string' && doc.description_ar.length > 0);
+
+  // A COMBINATION SKU IS UNIQUE ACROSS THE STORE (idx_product_variants_sku is a
+  // partial unique index over the whole table). Two products both having a
+  // Large-Black combination is ordinary, so the collision has to come back as a
+  // sentence naming the product that holds it — not as a raw D1 error.
+  const clashKey = `${importKey}-CLASH`;
+  const clashSheet = sheet
+    .split('\r\n')
+    .map((ln, i) => (i === 0 ? ln : ln.replace(new RegExp(importKey, 'g'), clashKey)))
+    .join('\r\n');
+  const clashForm = new FormData();
+  clashForm.set('file', new File([new TextEncoder().encode(clashSheet)], 'clash.csv'));
+  clashForm.set('category', sectionForImport.id);
+  const clashPrev = await (await fetch(`${BASE}/api/admin/import/preview`, { method: 'POST', headers: { Cookie: cookie }, body: clashForm })).json();
+  const clashRes = await api('POST', '/api/admin/import/confirm', { import_id: clashPrev?.import_id });
+  const clashRow = clashRes.data?.rows?.[0];
+  check('a combination SKU another product holds is refused by name, not by a database error',
+    clashRow?.action === 'failed' && /SKU/i.test(String(clashRow?.reason)) && !/D1_ERROR|SQLITE/i.test(String(clashRow?.reason)),
+    JSON.stringify(clashRow?.reason));
 
   // …and the export writes them all back out.
   const backRes = await raw(`/api/admin/import/export?ids=${importedId}&format=csv`);

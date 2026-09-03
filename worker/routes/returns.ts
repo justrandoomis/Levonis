@@ -40,6 +40,7 @@ import { notifyAdmins } from '../lib/telegram';
 import { getSettings } from '../lib/settings';
 import { parseProductRow } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
+import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { reversePointsForOrder, unitMerchandiseIqd } from '../lib/pointsOps';
 
 const WINDOW_MS = 7 * 86_400_000;
@@ -536,7 +537,13 @@ priceProtectionRoutes.post('/claims', async (c) => {
   if (!productRow) throw badRequest('The product is no longer available for comparison', 'PRODUCT_MISSING');
 
   const settings = await getSettings(c.env.DB, ['proPricingPolicy']);
-  const doc = parseProductRow(productRow);
+  // THE COMPARISON PRICE IS THE ONE A BUYER WOULD PAY TODAY, so the product is
+  // read the way the cart reads it: the relational option/colour rows win over
+  // the JSON mirrors on `products`. This claim decides a real credit — reading
+  // the other store would compare the customer's paid price against a number
+  // nobody is charged, and refuse or grant money on it.
+  const relations = await loadRelationsView(c.env.DB, String(productRow.id), productRow.inventory_mode);
+  const doc = relations ? applyRelations(parseProductRow(productRow), relations) : parseProductRow(productRow);
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: optionId || null,

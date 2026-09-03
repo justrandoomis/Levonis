@@ -662,13 +662,15 @@ productRoutes.get('/:slug', async (c) => {
       proPolicy: ctx.proPolicy,
       transportDefaults: ctx.transportDefaults,
     });
-    const out = publicShape(doc);
-    // Same §7 rule as the list projection: held units are not for sale.
-    const heldBase = Number(row.stock_reserved ?? 0);
-    if (doc.stock !== null && heldBase > 0) out.stock = Math.max(0, doc.stock - heldBase);
-    out.display_price_iqd = resolved.applied_iqd;
-    out.display_applied_tier = resolved.applied_tier;
-    out.display_regular_iqd = resolved.regular_iqd;
+    // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
+    // cheapest way to buy the product — everywhere else it appears, and this
+    // endpoint used to set it to the base selection instead. A customer who
+    // tapped a card reading 250,000 got a page whose own card field said
+    // 400,000, and any surface reading the detail response (a share preview,
+    // a saved-products row) repeated the higher number. The base-selection
+    // quote is still returned, unchanged, as `pricing` — that is what the
+    // page prices with until the customer picks an option.
+    const out = publicWithDisplayPrice(row, ctx, relations);
 
     return c.json({
       success: true,
@@ -875,11 +877,25 @@ homeRoutes.get('/', async (c) => {
     homeSectionItems: normalizeSectionItems(raw.homeSectionItems),
   };
 
+  // THE HOME CARDS PRICE FROM THE SAME PLACE THE CART DOES. Without the
+  // relational overlay a card falls back to the `products.options` /
+  // `products.colors` JSON mirrors, and an owner who repriced an option in the
+  // form would see the home page keep the old number while the product page
+  // and the cart showed the new one — the very split the price-change round
+  // was about. One batched read for both strips, not N+1 per card.
+  // A product can be in BOTH strips, and the same id twice would bind a
+  // duplicate placeholder for nothing.
+  const homeRows = new Map<string, { id: string; inventory_mode: unknown }>();
+  for (const r of [...discounted.results, ...latest.results]) {
+    homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
+  }
+  const homeViews = await loadRelationsViews(c.env.DB, [...homeRows.values()]);
+
   return c.json({
     success: true,
     settings: safeSettings,
-    discounted: discounted.results.map((p) => publicWithDisplayPrice(p, ctx)),
-    latest: latest.results.map((p) => publicWithDisplayPrice(p, ctx)),
+    discounted: discounted.results.map((p) => publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)))),
+    latest: latest.results.map((p) => publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)))),
     categories: categories.results.filter((r) => Number(r.product_count) > 0),
     brands: brands.results.filter((r) => Number(r.product_count) > 0),
   });

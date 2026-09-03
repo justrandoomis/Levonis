@@ -14,6 +14,14 @@
  *   4. clearing them to follow the base makes every FUTURE change reach the
  *      cart with no dialog at all
  *   5. none of it touches an order already placed
+ *   6. the refusals
+ *   7. EVERY SURFACE QUOTES ONE PRICE. Options and colours live in two
+ *      stores — the JSON columns on `products` and the relational tables —
+ *      and the cart reads the relational one. A screen that read the other
+ *      showed a number nobody would be charged, so the home strip, the list,
+ *      the product page, the ADMIN'S OWN price preview, the support
+ *      assistant and the price-protection claim are all pinned to the same
+ *      answer here, with the two stores deliberately made to disagree.
  */
 import { execSync } from 'node:child_process';
 
@@ -21,6 +29,15 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8787';
 const ROOT = '/home/user/Levonis';
 const rnd = Math.random().toString(36).slice(2, 8);
 const sql = (s) => execSync(`npx wrangler d1 execute levonis-db --local --command ${JSON.stringify(s)}`, { cwd: ROOT, stdio: 'pipe' });
+/** Rows of a SELECT. Wrangler prints a banner before the JSON, so the parse
+ *  starts at the first `[` rather than at the start of the output. */
+const query = (statement) => {
+  const out = execSync(
+    `npx wrangler d1 execute levonis-db --local --json --command ${JSON.stringify(statement)}`,
+    { cwd: ROOT, stdio: 'pipe' }
+  ).toString();
+  return JSON.parse(out.slice(out.indexOf('[')))[0].results;
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let passed = 0, failed = 0;
@@ -158,6 +175,83 @@ async function main() {
   const anon = new C();
   r = await anon.post(`/api/admin/products-v2/${opt.id}/reprice`, { mode: 'delta', from_price_iqd: 1, to_price_iqd: 2 });
   check('a stranger cannot move anyone’s prices', r.status === 401 || r.status === 403, `status=${r.status}`);
+
+  // ------------------------------------ 7. one price, on every surface
+  console.log('\n7. every surface quotes the price the cart would charge');
+
+  // A product whose relational option is CHEAPER than the base, written
+  // through the relations endpoint only. The JSON mirror on `products` keeps
+  // the base price, so the two stores disagree on purpose — which is exactly
+  // the state a screen reading the wrong one gets caught by.
+  const split = (await admin.post('/api/admin/products-v2', {
+    name_en: `Split ${rnd}`, price_iqd: 400000, status: 'active', sale_types: ['direct_sale'], stock: 20,
+  })).data?.product;
+  const gid = `og_split_${rnd}`, vid = `ov_split_${rnd}`;
+  r = await admin.put(`/api/admin/products/${split.id}/relations`, {
+    inventory_mode: 'BASE',
+    groups: [{
+      id: gid, name_en: 'Size', sort: 0, active: true,
+      values: [
+        { id: vid, name_en: 'Small', sort: 0, active: true, regular_price_iqd: 250000 },
+        { id: `${vid}_b`, name_en: 'Large', sort: 1, active: true, regular_price_iqd: null },
+      ],
+    }],
+    colors: [], variants: [], images: [],
+  });
+  check('the relational option is written', r.status === 200, JSON.stringify(r.data).slice(0, 200));
+
+  // The JSON mirror was never told, so it still says 400,000 — proving the
+  // checks below are reading the relational store and not the mirror.
+  const stored = (await admin.get(`/api/admin/products-v2/${split.id}`)).data?.product;
+  check('the JSON mirror still disagrees, so the test means something',
+    (stored?.options ?? []).length === 0, JSON.stringify(stored?.options ?? []).slice(0, 160));
+
+  const cheapest = 250000;
+  const pub = (await buyer.get(`/api/products/${split.slug}`)).data?.product;
+  // `display_price_iqd` is the CARD price wherever it appears; the detail
+  // endpoint used to set it to the base selection, so the page contradicted
+  // the card the customer had just tapped. The base-selection quote is still
+  // returned separately as `pricing`, which is what the page prices with.
+  check('the product detail card price agrees with the list', pub?.display_price_iqd === cheapest, String(pub?.display_price_iqd));
+  const detail = (await buyer.get(`/api/products/${split.slug}`)).data;
+  check('and the base-selection quote is still reported on its own',
+    detail?.pricing?.applied_iqd === 400000, String(detail?.pricing?.applied_iqd));
+
+  const listed = ((await buyer.get('/api/products?limit=50')).data?.products ?? []).find((x) => x.id === split.id);
+  check('the products list card quotes it too', listed?.display_price_iqd === cheapest, String(listed?.display_price_iqd));
+
+  const home = (await buyer.get('/api/home')).data ?? {};
+  const homeCard = [...(home.latest ?? []), ...(home.discounted ?? [])].find((x) => x.id === split.id);
+  check('the HOME card quotes it, instead of the base row it used to read',
+    homeCard?.display_price_iqd === cheapest, JSON.stringify({ found: !!homeCard, price: homeCard?.display_price_iqd }));
+
+  r = await admin.post(`/api/admin/products-v2/${split.id}/quote`, { optionId: vid, tier: 'free' });
+  check("the ADMIN's own price preview quotes what the customer would pay",
+    r.data?.quote?.applied_iqd === cheapest, String(r.data?.quote?.applied_iqd));
+
+  r = await buyer.post('/api/support/assistant', { intent: 'product_search', params: { q: `Split ${rnd}` }, locale: 'en' });
+  const card = (r.data?.reply?.cards ?? [])[0];
+  check('the support assistant quotes the same number, not the base row',
+    !!card && /250,?000/.test(String(card.subtitle)), JSON.stringify(card?.subtitle));
+
+  // The cart is the arbiter: whatever it charges is what the screens above
+  // had to agree with.
+  await buyer.post('/api/cart/items', { productId: split.id, qty: 1, optionId: vid });
+  check('and the cart charges exactly that', (await cartPrice(buyer, split.id)) === cheapest, String(await cartPrice(buyer, split.id)));
+
+  // ---- a reprice must leave a price-history trail, or seven-day price
+  //      protection cannot see the drop it is supposed to refund.
+  const historyBefore = Number(query(`SELECT COUNT(*) AS n FROM price_history WHERE product_id = '${split.id}'`)[0].n);
+  check('no price history for the product yet', historyBefore === 0, String(historyBefore));
+  r = await admin.post(`/api/admin/products-v2/${split.id}/reprice`, { mode: 'delta', from_price_iqd: 400000, to_price_iqd: 300000 });
+  check('the reprice moves the pinned row', r.status === 200 && r.data?.moved >= 1, JSON.stringify(r.data).slice(0, 200));
+  check('and it RECORDS the move in price_history', (r.data?.price_history_rows ?? 0) >= 1, JSON.stringify(r.data?.price_history_rows));
+  const rows = query(
+    `SELECT variant_key, field, old_iqd, new_iqd FROM price_history WHERE product_id = '${split.id}' ORDER BY id`
+  );
+  check('the row names the option it moved and both prices',
+    rows.some((x) => x.variant_key === `option:${vid}` && x.field === 'regular' && x.old_iqd === 250000 && x.new_iqd === 150000),
+    JSON.stringify(rows).slice(0, 240));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) { console.log('\nFailures:'); for (const f of failures) console.log(`  - ${f}`); process.exit(1); }
