@@ -1,6 +1,6 @@
 {
-  "target": "http://127.0.0.1:8799/",
-  "passed": 13,
+  "target": "http://127.0.0.1:8801/",
+  "passed": 22,
   "failed": 0,
   "failures": [],
   "before": [
@@ -36,5 +36,19 @@
     }
   ],
   "heightBefore": 90,
-  "height": 8.000000000000005
+  "height": 8.000000000000005,
+  "cutResult": [
+    {
+      "id": 2,
+      "name": "tower-8x8x90.stl (A)",
+      "volume": 2880,
+      "open": 0
+    },
+    {
+      "id": 3,
+      "name": "tower-8x8x90.stl (B)",
+      "volume": 2880,
+      "open": 0
+    }
+  ]
 }

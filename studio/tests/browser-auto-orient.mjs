@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Auto-orient, pressed in a real browser against a real build.
+ * Auto-orient and Cut, pressed in a real browser against a real build.
  *
  * tests/auto-orient.test.mjs proves the MATHS in Node. What it cannot prove is
  * the wiring: that the button exists, that the engine accepts the rotation the
@@ -22,6 +22,10 @@
  *   npm run build
  *   npx wrangler dev --local --port 8799 --ip 127.0.0.1   # in another shell
  *   node tests/browser-auto-orient.mjs                     # defaults to :8799
+ *
+ * The cut is checked the way the unit tests check it — closed solids and
+ * conserved volume, measured from the ENGINE's own geometry afterwards, not
+ * from the code that produced it.
  *
  * Report written to tests/browser-auto-orient.latest.json.
  */
@@ -208,7 +212,85 @@ if (await undo.count()) {
   check("back on the bed too", Math.abs(restored[0]?.lowestY ?? 9) < 0.5, `lowestY ${restored[0]?.lowestY}`);
 }
 
-writeFileSync(REPORT_PATH, `${JSON.stringify({ target, passed, failed, failures, before, after, heightBefore, height }, null, 2)}\n`);
+// ---------------------------------------------------------------- the cut
+//
+// Same page, same tower, straight after the undo: it is back to 90mm standing
+// up, which is the shape whose halves are easiest to check.
+console.log("\n--- cut");
+const cutButton = page.locator('[data-levo-action="cut"]');
+check("the Cut control is in the editor", (await cutButton.count()) > 0, `${await cutButton.count()} found`);
+let cutResult = null;
+if (await cutButton.count()) {
+  await cutButton.first().click({ timeout: 20_000 });
+  await page.waitForSelector('[data-levo-sheet="cut"]', { timeout: 20_000 });
+  check("it opens a sheet with a height bounded by the model",
+    (await page.locator('[data-levo-cut="slider"]').count()) === 1);
+  const slider = page.locator('[data-levo-cut="slider"]');
+  const min = Number(await slider.getAttribute("min"));
+  const max = Number(await slider.getAttribute("max"));
+  check("and the bounds are the tower's own 90mm", Math.abs(max - min - 90) < 0.5, `${min} – ${max}`);
+
+  await page.locator('[data-levo-cut="height"]').fill(String((min + max) / 2));
+  await page.locator('[data-levo-cut="apply"]').click({ timeout: 20_000 });
+  await page.waitForFunction(() => (window.__vpApi?.()?.sceneSnapshot?.() ?? []).length === 2, null,
+    { timeout: 60_000 }).catch(() => {});
+  await page.waitForTimeout(1_000);
+
+  cutResult = await page.evaluate(() => {
+    const list = window.__vpApi().sceneSnapshot();
+    // Volume from the engine's own geometry, so the check does not trust the
+    // same code that produced the cut.
+    const volume = (p) => {
+      let sum = 0;
+      for (let i = 0; i + 8 < p.length; i += 9) {
+        sum += (p[i] * (p[i + 4] * p[i + 8] - p[i + 5] * p[i + 7])
+          - p[i + 1] * (p[i + 3] * p[i + 8] - p[i + 5] * p[i + 6])
+          + p[i + 2] * (p[i + 3] * p[i + 7] - p[i + 4] * p[i + 6])) / 6;
+      }
+      return sum;
+    };
+    // Every edge must still be shared by exactly two facets, or the piece is
+    // not a solid and will slice into nonsense.
+    const openEdgeCount = (p) => {
+      const key = (x, y, z) => `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
+      const seen = new Map();
+      for (let i = 0; i + 8 < p.length; i += 9) {
+        const v = [key(p[i], p[i + 1], p[i + 2]), key(p[i + 3], p[i + 4], p[i + 5]), key(p[i + 6], p[i + 7], p[i + 8])];
+        for (let e = 0; e < 3; e++) {
+          const a = v[e], b = v[(e + 1) % 3];
+          if (a === b) continue;
+          const back = `${b}|${a}`;
+          if (seen.get(back)) seen.set(back, seen.get(back) - 1);
+          else seen.set(`${a}|${b}`, (seen.get(`${a}|${b}`) ?? 0) + 1);
+        }
+      }
+      let open = 0;
+      for (const c of seen.values()) open += Math.abs(c);
+      return open;
+    };
+    return list.map((s) => ({ id: s.id, name: s.name, volume: volume(s.localPos), open: openEdgeCount(s.localPos) }));
+  });
+
+  check("the cut produced two objects", cutResult.length === 2, JSON.stringify(cutResult.map((c) => c.name)));
+  check("both pieces are closed solids", cutResult.every((c) => c.open === 0), JSON.stringify(cutResult));
+  const total = cutResult.reduce((sum, c) => sum + c.volume, 0);
+  // 8 x 8 x 90 = 5760.
+  check("and together they still weigh the original", Math.abs(total - 5760) < 1,
+    `${total.toFixed(1)} vs 5760`);
+  check("cut in half, each piece is half", cutResult.every((c) => Math.abs(c.volume - 2880) < 5),
+    JSON.stringify(cutResult.map((c) => Math.round(c.volume))));
+
+  const undoCut = page.locator('button:has-text("Undo the cut"), button:has-text("تراجع عن القص"), button:has-text("گەڕاندنەوەی بڕین")');
+  check("an undo is offered for the cut", (await undoCut.count()) > 0);
+  if (await undoCut.count()) {
+    await undoCut.first().click({ timeout: 20_000 });
+    await page.waitForTimeout(1_200);
+    const back = await page.evaluate(() => window.__vpApi().sceneSnapshot().length);
+    check("and it puts the single object back", back === 1, `${back} objects`);
+  }
+}
+
+writeFileSync(REPORT_PATH, `${JSON.stringify({ target, passed, failed, failures, before, after, heightBefore, height, cutResult }, null, 2)}\n`);
 await context.close();
 await browser.close();
 

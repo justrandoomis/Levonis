@@ -31,6 +31,7 @@ import {
 } from "./plate-packing";
 import { planSeats, type SeatedFootprint, type SeatRequest } from "./spawn-seating";
 import { autoOrient, lowestPoint } from "./auto-orient";
+import { cutByPlane, extentAlong, type CutPlane } from "./plane-cut";
 
 // ---------------------------------------------------------------------------
 // Engine contract (verified by tests/editor-capabilities.test.mjs)
@@ -1004,6 +1005,170 @@ export function autoOrientObjects(
     approximated,
     undo: captured && orientedCount ? () => adapter.restoreSceneState(captured) : null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Plane cut
+// ---------------------------------------------------------------------------
+
+export type CutKeep = "both" | "upper" | "lower";
+
+export interface CutSceneOptions {
+  /** Object to cut. Defaults to the engine's current selection. */
+  id?: number;
+  /** Height along `normal`, in the object's LOCAL millimetres. */
+  offset: number;
+  /** Defaults to the bed normal — the "cut it so it fits" case. */
+  normal?: { x: number; y: number; z: number };
+  keep?: CutKeep;
+  cap?: boolean;
+  selectedPlate?: number;
+}
+
+export interface CutSceneResult {
+  ok: boolean;
+  reason?: "engine-unavailable" | "no-object" | "not-cuttable" | "plane-missed";
+  upperTriangles: number;
+  lowerTriangles: number;
+  cappedLoops: number;
+  /** Cross-sections that could not be closed — the mesh had holes there. */
+  openChains: number;
+  skippedLoops: number;
+  /** Ids the cut produced (one or two). */
+  pieceIds: number[];
+  undo: (() => boolean) | null;
+}
+
+const EMPTY_CUT: Omit<CutSceneResult, "ok" | "reason"> = {
+  upperTriangles: 0,
+  lowerTriangles: 0,
+  cappedLoops: 0,
+  openChains: 0,
+  skippedLoops: 0,
+  pieceIds: [],
+  undo: null,
+};
+
+/** The bed normal in the engine's frame. */
+const BED_UP = { x: 0, y: 1, z: 0 };
+
+/**
+ * Cuts one object into two and puts both back on the bed.
+ *
+ * SAME MECHANISM AS AUTO-ORIENT, ONE STEP FURTHER. `restoreScene` does not only
+ * re-apply transforms: it DELETES entries missing from the list and CREATES
+ * entries whose id it has never seen, building them from `localPos`. So a cut
+ * is expressible as a single restore — drop the original, add two objects with
+ * new geometry — with no engine change and no new global.
+ *
+ * THE HEIGHT IS LOCAL. `offset` is measured in the object's own space along
+ * `normal`, because that is the space `localPos` is in and the space the
+ * cut-height control shows. Rotation and scale are carried to both pieces
+ * unchanged, so a cut object stays where it was.
+ */
+export function cutObject(adapter: EngineAdapter, options: CutSceneOptions): CutSceneResult {
+  const api = adapter.api();
+  if (!api) return { ok: false, reason: "engine-unavailable", ...EMPTY_CUT };
+  const snapshots = api.sceneSnapshot();
+  if (!snapshots.length) return { ok: false, reason: "no-object", ...EMPTY_CUT };
+
+  const wantedId = options.id ?? api.selectedObjectId() ?? snapshots[0].id;
+  const target = snapshots.find((s) => s.id === wantedId);
+  if (!target) return { ok: false, reason: "no-object", ...EMPTY_CUT };
+  const positions = target.localPos;
+  if (!(positions instanceof Float32Array) || positions.length < 36) {
+    return { ok: false, reason: "not-cuttable", ...EMPTY_CUT };
+  }
+
+  const normal = options.normal ?? BED_UP;
+  const plane: CutPlane = { normal, offset: options.offset };
+  const result = cutByPlane(positions, plane, { cap: options.cap !== false });
+  if (!result) return { ok: false, reason: "not-cuttable", ...EMPTY_CUT };
+  if (!result.upperTriangles || !result.lowerTriangles) {
+    // The plane missed the model. Saying so beats silently doing nothing, and
+    // beats "cutting" it into one piece and an empty one.
+    return { ok: false, reason: "plane-missed", ...EMPTY_CUT, ...{
+      upperTriangles: result.upperTriangles,
+      lowerTriangles: result.lowerTriangles,
+    } };
+  }
+
+  const captured = adapter.captureSceneState(options.selectedPlate ?? 0);
+  const keep = options.keep ?? "both";
+
+  // Ids the engine has never issued, so `restoreScene` creates rather than
+  // re-applies. Derived from the highest live id, not from a clock, so the
+  // result is deterministic and a test can predict it.
+  const highest = snapshots.reduce((max, s) => Math.max(max, s.id), 0);
+  const pieces: Array<{ id: number; name: string; localPos: Float32Array }> = [];
+  if (keep !== "upper") {
+    pieces.push({ id: highest + 1, name: `${target.name} (A)`, localPos: result.lower });
+  }
+  if (keep !== "lower") {
+    pieces.push({ id: highest + 2, name: `${target.name} (B)`, localPos: result.upper });
+  }
+
+  const scale = { x: target.scale.x, y: target.scale.y, z: target.scale.z };
+  const baseLowest = lowestPoint(positions, { x: target.rot.x, y: target.rot.y, z: target.rot.z }, scale);
+
+  const entries = snapshots.filter((s) => s.id !== target.id) as LevoSceneSnapshot[];
+  for (const piece of pieces) {
+    const pieceLowest = lowestPoint(piece.localPos, { x: target.rot.x, y: target.rot.y, z: target.rot.z }, scale);
+    entries.push({
+      ...target,
+      id: piece.id,
+      name: piece.name,
+      localPos: piece.localPos,
+      /*
+       * Each piece keeps the original's placement, dropped by however much its
+       * own lowest point differs — the same difference rule auto-orient uses,
+       * so neither half sinks into the bed or floats above it.
+       *
+       * A PLAIN OBJECT IS CORRECT HERE, unlike `rot`. The engine does
+       * `position.copy(pos)`, and Vector3.copy reads `.x/.y/.z`; Euler.copy
+       * reads `_x/_y/_z`, which is why the rotation is shared from the
+       * original rather than rebuilt. Both pieces need their OWN position, so
+       * this cannot be shared.
+       *
+       * The two pieces start on top of each other. That is deliberate: the
+       * shell's own `seatNewObjects` sees two ids it has not placed before and
+       * seats them on the next scene event, which is the one code path that
+       * knows the bed and the other objects on it.
+       */
+      pos: { x: target.pos.x, y: target.pos.y + (baseLowest - pieceLowest), z: target.pos.z },
+    } as LevoSceneSnapshot);
+  }
+
+  api.restoreScene(entries);
+  api.frame();
+  adapter.notifySceneEdited();
+
+  return {
+    ok: true,
+    upperTriangles: result.upperTriangles,
+    lowerTriangles: result.lowerTriangles,
+    cappedLoops: result.cappedLoops,
+    openChains: result.openChains,
+    skippedLoops: result.skippedLoops,
+    pieceIds: pieces.map((p) => p.id),
+    undo: captured ? () => adapter.restoreSceneState(captured) : null,
+  };
+}
+
+/** Where a cut may sit: the object's own extent along `normal`, in local mm. */
+export function cutRange(
+  adapter: EngineAdapter,
+  id?: number,
+  normal: { x: number; y: number; z: number } = BED_UP,
+): { min: number; max: number; id: number } | null {
+  const api = adapter.api();
+  if (!api) return null;
+  const snapshots = api.sceneSnapshot();
+  if (!snapshots.length) return null;
+  const wantedId = id ?? api.selectedObjectId() ?? snapshots[0].id;
+  const target = snapshots.find((s) => s.id === wantedId);
+  if (!target || !(target.localPos instanceof Float32Array)) return null;
+  return { ...extentAlong(target.localPos, normal), id: target.id };
 }
 
 // ---------------------------------------------------------------------------

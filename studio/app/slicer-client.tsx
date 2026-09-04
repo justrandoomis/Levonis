@@ -34,7 +34,10 @@ import type { SettingsPanelProps } from "three-slicer/components";
 import { uiTree } from "three-slicer/data";
 import type { ViewportEvent, ViewportProps } from "three-slicer/viewer";
 import { registerExtendedModelLoaders } from "./model-loaders";
-import { arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, seatNewObjects, type EngineTestId } from "./engine-adapter";
+import {
+  arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, cutObject, cutRange, seatNewObjects,
+  type CutKeep, type EngineTestId,
+} from "./engine-adapter";
 import { currentDeviceProfile } from "./device-profile";
 import { createImportOrchestrator, ImportError, type ImportNotice, type ImportProgressUpdate } from "./import-orchestrator";
 import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from "./hooks/use-slicing-state";
@@ -91,8 +94,9 @@ import SetupSheet from "./components/sheets/setup";
 import PrintSheet from "./components/sheets/print";
 import ConnectSheet, { type LanAction } from "./components/sheets/connect";
 import AboutSheet from "./components/sheets/about";
+import CutSheet from "./components/sheets/cut";
 
-type Sheet = "setup" | "projects" | "print" | "connect" | "about" | null;
+type Sheet = "setup" | "projects" | "print" | "connect" | "about" | "cut" | null;
 type EditorStatus = "loading" | "editing" | "slicing" | "ready" | "error";
 type CanvasMode = "prepare" | "preview";
 
@@ -242,6 +246,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [arrangeUndoAvailable, setArrangeUndoAvailable] = useState(false);
   const [orientUndoAvailable, setOrientUndoAvailable] = useState(false);
   const [orienting, setOrienting] = useState(false);
+  const [cutUndoAvailable, setCutUndoAvailable] = useState(false);
+  const [cutting, setCutting] = useState(false);
+  const [cutOffset, setCutOffset] = useState(0);
+  const [cutBounds, setCutBounds] = useState({ min: 0, max: 0 });
+  const [cutKeep, setCutKeep] = useState<CutKeep>("both");
+  const [cutCap, setCutCap] = useState(true);
   const [nativeEnvironment, setNativeEnvironment] = useState<LevoNativeEnvironment>({
     native: false,
     platform: "web",
@@ -284,6 +294,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const projectFilesRef = useRef<File[]>([]);
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
   const orientUndoRef = useRef<(() => boolean) | null>(null);
+  const cutUndoRef = useRef<(() => boolean) | null>(null);
   const plateCountRef = useRef(1);
   const selectedPlateRef = useRef(0);
   /** Object ids currently in the scene, so the shell can tell a spawn from a split. */
@@ -806,16 +817,75 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setOrientUndoAvailable(false);
     arrangeUndoRef.current = null;
     setArrangeUndoAvailable(false);
+    cutUndoRef.current = null;
+    setCutUndoAvailable(false);
     suppressSeating();
     if (undo?.()) setNotice(t.orientUndone);
     else setNotice(t.actionUnavailable);
   }, [suppressSeating, t.actionUnavailable, t.orientUndone]);
+
+  // -- plane cut (one object into two, undoable) -----------------------------
+  /**
+   * Opens the cut sheet, seeded with the SELECTED object's own extent. Reading
+   * the range first is what makes the slider mean something: a control bounded
+   * by the model rather than by a guess cannot ask for a cut that misses.
+   */
+  const openCut = useCallback(() => {
+    setToolTrayOpen(false);
+    const range = cutRange(adapter);
+    if (!range || range.max - range.min <= 0.001) { setNotice(t.cutUnavailable); return; }
+    setCutBounds({ min: range.min, max: range.max });
+    setCutOffset((range.min + range.max) / 2);
+    setSheet("cut");
+  }, [adapter, t.cutUnavailable]);
+
+  const applyCut = useCallback(() => {
+    setCutting(true);
+    const api = adapter.api();
+    api?.suspendRendering(true);
+    let result;
+    try {
+      result = cutObject(adapter, { offset: cutOffset, keep: cutKeep, cap: cutCap, selectedPlate });
+    } finally {
+      api?.suspendRendering(false);
+      setCutting(false);
+    }
+    if (!result.ok) {
+      setNotice(result.reason === "plane-missed" ? t.cutMissed : t.cutUnavailable);
+      return;
+    }
+    setSheet(null);
+    cutUndoRef.current = result.undo;
+    setCutUndoAvailable(Boolean(result.undo));
+    const messages = [templateText(t.cutDone, { pieces: result.pieceIds.length })];
+    // A cut face that could not be closed leaves a hole in a piece that will
+    // then slice badly. Saying so is the difference between a tool and a toy.
+    if (result.openChains) messages.push(templateText(t.cutOpen, { open: result.openChains }));
+    if (result.skippedLoops) messages.push(templateText(t.cutSkipped, { skipped: result.skippedLoops }));
+    setNotice(messages.join(" "));
+  }, [adapter, cutCap, cutKeep, cutOffset, selectedPlate, t.cutDone, t.cutMissed, t.cutOpen,
+      t.cutSkipped, t.cutUnavailable]);
+
+  const undoCut = useCallback(() => {
+    const undo = cutUndoRef.current;
+    cutUndoRef.current = null;
+    setCutUndoAvailable(false);
+    arrangeUndoRef.current = null;
+    setArrangeUndoAvailable(false);
+    orientUndoRef.current = null;
+    setOrientUndoAvailable(false);
+    suppressSeating();
+    if (undo?.()) setNotice(t.cutUndone);
+    else setNotice(t.actionUnavailable);
+  }, [suppressSeating, t.actionUnavailable, t.cutUndone]);
 
   const undoArrange = useCallback(() => {
     const undo = arrangeUndoRef.current;
     arrangeUndoRef.current = null;
     orientUndoRef.current = null;
     setOrientUndoAvailable(false);
+    cutUndoRef.current = null;
+    setCutUndoAvailable(false);
     setArrangeUndoAvailable(false);
     // A restore re-creates objects at their captured positions; seating them
     // again would undo the undo.
@@ -1322,6 +1392,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     arrangeUndoRef.current = null;
     orientUndoRef.current = null;
     setOrientUndoAvailable(false);
+    cutUndoRef.current = null;
+    setCutUndoAvailable(false);
     setArrangeUndoAvailable(false);
     setObjects([]);
     projectFilesRef.current = [];
@@ -1401,7 +1473,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     : sheet === "projects" ? t.projects
       : sheet === "print" ? t.printExport
         : sheet === "connect" ? t.connectTitle
-          : t.settings;
+          : sheet === "cut" ? t.cutTitle
+            : t.settings;
 
   const savedStateLabel = displaySavedKind === "full"
     ? t.savedLocalFull
@@ -1486,6 +1559,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           <span>{error || notice}</span>
           {!error && arrangeUndoAvailable && <button className="message-action" onClick={undoArrange}>{t.arrangeUndo}</button>}
           {!error && orientUndoAvailable && <button className="message-action" onClick={undoOrient}>{t.orientUndo}</button>}
+          {!error && cutUndoAvailable && <button className="message-action" onClick={undoCut}>{t.cutUndo}</button>}
           <button onClick={() => { setError(""); setNotice(""); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
         </div>}
 
@@ -1503,6 +1577,9 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           <button data-levo-action="auto-orient" disabled={!objects.length || orienting} onClick={() => void orientAll()}>
             <Icon name="orient" /><span>{t.orient}</span>
           </button>
+          <button data-levo-action="cut" disabled={!objects.length} onClick={openCut}>
+            <Icon name="cut" /><span>{t.cut}</span>
+          </button>
         </div>
 
         {toolTrayOpen && <section className="mobile-tooltray" aria-label={t.editTools}>
@@ -1519,6 +1596,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             <button onClick={() => runTool("gizmo-paint")}><Icon name="paint" /><span>{t.paint}</span></button>
             <button onClick={() => void arrangeAll()}><Icon name="arrange" /><span>{t.arrange}</span></button>
             <button data-levo-action="auto-orient-tray" disabled={orienting} onClick={() => void orientAll()}><Icon name="orient" /><span>{t.orient}</span></button>
+            <button data-levo-action="cut-tray" onClick={openCut}><Icon name="cut" /><span>{t.cut}</span></button>
             <button onClick={() => { shortcut("z"); setToolTrayOpen(false); }}><Icon name="fit" /><span>{t.fit}</span></button>
             <button onClick={() => { shortcut("b"); setToolTrayOpen(false); }}><Icon name="bed" /><span>{t.bed}</span></button>
             <button onClick={() => { clickControl("undo"); setToolTrayOpen(false); }}><Icon name="undo" /><span>{t.undo}</span></button>
@@ -1549,7 +1627,21 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             <button onClick={() => setSheet(null)} aria-label={t.close}><Icon name="close" /></button>
           </header>
 
-          {sheet === "setup" ? (
+          {sheet === "cut" ? (
+            <CutSheet
+              t={t}
+              min={cutBounds.min}
+              max={cutBounds.max}
+              offset={cutOffset}
+              onOffset={setCutOffset}
+              keep={cutKeep}
+              onKeep={setCutKeep}
+              cap={cutCap}
+              onCap={setCutCap}
+              busy={cutting}
+              onCut={applyCut}
+            />
+          ) : sheet === "setup" ? (
             <SetupSheet
               t={t}
               profileId={profileId}

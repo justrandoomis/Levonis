@@ -24,7 +24,7 @@ export type IconName =
   | "plus" | "file" | "move" | "rotate" | "scale" | "copy" | "trash" | "fit"
   | "bed" | "layers" | "slice" | "print" | "save" | "share" | "undo" | "redo"
   | "split" | "paint" | "info" | "settings" | "close" | "check" | "external"
-  | "arrange" | "orient" | "warning";
+  | "arrange" | "orient" | "cut" | "warning";
 
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -54,6 +54,8 @@ export function Icon({ name }: { name: IconName }) {
     arrange: <><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><path d="M17 13v8M13 17h8"/></>,
     // A part being tipped down onto the bed line — the thing the action does.
     orient: <><path d="M3 21h18"/><path d="m7 17 5-11 5 11z"/><path d="M9.5 12h5"/></>,
+    // A dashed line through a body: where the cut goes.
+    cut: <><path d="M6 4h12v16H6z"/><path d="M3 12h3M9 12h2M14 12h2M19 12h2" strokeDasharray="0"/></>,
     warning: <><path d="m12 3 10 18H2z"/><path d="M12 10v5M12 18h.01"/></>,
   };
   return (

@@ -28,11 +28,18 @@ This project does not copy code from the surveyed Bambu MCP repositories. They w
   terms (overhang, bottom, bottom-hull, contour, low-angle faces) and the
   `OrientParamsArea` constants. LEVO Web Slicer is AGPL-3.0-or-later, so the
   port is a derivative work under the same licence.
+- `app/plane-cut.ts` follows the SHAPE of upstream's `cut_mesh`
+  (`src/libslic3r/TriangleMeshSlicer.cpp`) — split every facet against the
+  plane, chain the intersection segments into loops, triangulate, and give each
+  half the cap wound to face out of it — but is NOT a port of it: upstream's is
+  fused to libslic3r's scaled-integer slicer, ExPolygons and 2D triangulation
+  library. The geometry there is written for this codebase and stated as such
+  in its own header.
 - What was NOT taken: no C++ was vendored, no build artefact, no profile data,
-  and no printer-integration code. The port is a re-implementation of the
-  documented algorithm in this repository's own language and coordinate frame
-  (three.js is Y-up; BambuStudio is Z-up), with the differences stated in the
-  file's own header.
+  and no printer-integration code. The auto-orient port is a re-implementation
+  of the documented algorithm in this repository's own language and coordinate
+  frame (three.js is Y-up; BambuStudio is Z-up), with the differences stated in
+  the file's own header.
 
 ### occt-import-js 0.0.23
 

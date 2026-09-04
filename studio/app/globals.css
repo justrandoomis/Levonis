@@ -283,6 +283,23 @@ button:disabled { cursor: not-allowed; }
 .editor-message button.message-action { width: auto; min-height: 34px; padding: 0 12px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 800; }
 .editor-message svg { width: 17px; height: 17px; }
 
+/* The cut sheet: a height, what to keep, and whether to close the face. */
+.cut-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px 16px; }
+.cut-help { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.cut-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.cut-row > span:first-child { flex: 0 0 auto; font-weight: 700; color: #D3DED5; }
+.cut-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.cut-number { width: 84px; min-height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: #D3DED5; font-size: 12px; direction: ltr; }
+.cut-extent { margin: -6px 0 0; font-size: 11px; color: var(--muted); }
+.cut-keep button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: #D3DED5; font-size: 12px; font-weight: 700; cursor: pointer; }
+.cut-keep button.active { border-color: var(--accent-strong); background: var(--accent); color: var(--accent-ink); }
+.cut-cap { align-items: flex-start; gap: 8px; }
+.cut-cap input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
+.cut-cap span { display: flex; flex-direction: column; gap: 3px; }
+.cut-cap small { font-size: 11px; line-height: 1.45; color: var(--muted); }
+.cut-apply { min-height: 46px; border: 1px solid var(--accent-strong); border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 850; cursor: pointer; }
+.cut-apply:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /**
  * SHELL ACTIONS ON DESKTOP.
  *
