@@ -1,9 +1,24 @@
 # Field Mapping — Product Template v2 ↔ API ↔ Database ↔ Storefront
 
-This table is generated from `FIELD_REGISTRY` in `worker/lib/template.ts`,
-the single source of truth for what the TXT template can read and write.
-The template pipeline is fully deterministic — **no AI is involved at any
-step** (parsing, merging, validation, export, or translation bookkeeping).
+> **Correction, 2026-09-04.** This file said it "is generated from
+> `FIELD_REGISTRY`". It is not, and never was — there is no generator
+> anywhere in the repository, and the table had drifted from the registry it
+> claimed to mirror. A reader trusting that sentence would take the omissions
+> below for the format's real limits.
+>
+> The registry in `worker/lib/template.ts` is the source of truth. This page
+> is a HAND-WRITTEN companion to it, and the round of 2026-09-04 added keys it
+> does not yet list: `category`, `sub_category`, `template_family`, `sku`,
+> `low_stock_threshold`, `direct_surcharge_iqd`, the `spec.<field_id>` family,
+> `options.N.group` / `sku_part` / `low_stock_threshold`, `colors.N.option_ids`
+> / `sku_part` / `stock` / `low_stock_threshold`, and
+> `images.N.option_value_id` / `color_id` / `variant_id` / `width` / `height`.
+> Read the registry, or an actual export, for the complete list.
+
+`FIELD_REGISTRY` in `worker/lib/template.ts` is the single source of truth for
+what the TXT template can read and write. The template pipeline is fully
+deterministic — **no AI is involved at any step** (parsing, merging,
+validation, export, or translation bookkeeping).
 
 Conventions used everywhere below:
 
