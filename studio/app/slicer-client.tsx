@@ -1126,9 +1126,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * is downloaded instead: the user came here for a file, and a broken
    * envelope is not a reason to send them away with nothing.
    */
-  const finishBambuProject = useCallback(async (file: File | Blob) => {
+  const finishBambuProject = useCallback(async (
+    file: File | Blob,
+    overrideFilename?: string,
+    onDone?: () => void
+  ) => {
     const safeName = (projectName.trim() || "LEVO Project").replace(/[^\p{L}\p{N}._-]+/gu, "-");
-    const filename = `${safeName}.3mf`;
+    const filename = overrideFilename ?? `${safeName}.3mf`;
     try {
       const [{ toBambuProject }, big, small] = await Promise.all([
         import("./bambu-project-3mf"),
@@ -1147,11 +1151,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         nozzleDiameters: profile.nozzle ? String(profile.nozzle) : undefined,
       });
       downloadBlob(new Blob([result.bytes as BlobPart], { type: "model/3mf" }), filename);
+      if (onDone) onDone();
       // Honest notice: name the one thing that could not be included.
-      setNotice(result.warnings.length > 0 ? `${t.projectFileReady} — ${result.warnings[0]}` : t.projectFileReady);
+      else setNotice(result.warnings.length > 0 ? `${t.projectFileReady} — ${result.warnings[0]}` : t.projectFileReady);
     } catch {
       downloadBlob(file, filename);
-      setNotice(t.projectFileReady);
+      if (onDone) onDone();
+      else setNotice(t.projectFileReady);
     }
   }, [adapter, profile.nozzle, profile.shortName, projectName, t.projectFileReady]);
 
@@ -1180,13 +1186,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       suppressNextExportNoticeRef.current = true;
       snapshotResolverRef.current?.(snapshot);
     } else {
-      const phoneFilename = `LEVO-${profile.shortName}-Bambu-Handy.3mf`;
-      downloadBlob(file, phoneFilename);
-      setHandyProjectReady(true);
-      setNotice(t.handyFileReady);
+      // The MakerWorld/Handy file is the SAME file as the project save — one
+      // converter, one shape. Before this it was the engine's raw output, so
+      // two buttons a few pixels apart produced two different 3MFs and only
+      // one of them carried the user's settings in a form Bambu Studio reads.
+      // Only the filename differs, because this one names the printer it was
+      // prepared for.
+      void finishBambuProject(file, `LEVO-${profile.shortName}-Bambu-Handy.3mf`, () => {
+        setHandyProjectReady(true);
+        setNotice(t.handyFileReady);
+      });
     }
     return true;
-  }, [profile.shortName, projectName, t.handyFileReady]);
+  }, [finishBambuProject, profile.shortName, projectName, t.handyFileReady]);
 
   /** Save the open project as a Bambu-shaped .3mf — never gated on a slice. */
   const saveBambuProject = useCallback(() => {
