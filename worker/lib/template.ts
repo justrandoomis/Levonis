@@ -17,6 +17,7 @@
 
 import { newId } from './crypto';
 import { isMixed } from './availability';
+import { buildGrid, COLUMN_OF, FIELDS, type Field } from './priceGrid';
 import type {
   ProductDoc,
   TranslationMeta,
@@ -125,12 +126,27 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // classification
   f('brand', 'ref', 'classification', 'العلامة التجارية — brand slug or id, resolved against the brands table; unknown values need review; __NULL__ = no brand', { nullable: true }),
   f('catalogs', 'csv', 'classification', 'الكتالوجات — comma-separated catalog slugs or ids; unknown values need review; empty = in no catalog', { nullable: true }),
+  // ---- EIGHT FIELDS THE FILE COULD NOT SAY --------------------------------
+  // Every one of these is edited in the admin form and stored on `products`,
+  // and none had a template key: worker/lib/template.ts carried them across an
+  // update untouched and defaulted them to null on a create. So a product made
+  // from a .txt had no section — and the owner asking the file to «يملأ جميع
+  // الحقول» was asking for something structurally impossible.
+  f('category', 'ref', 'classification', 'القسم الرئيسي — main section slug or id from the sections tree; __NULL__ = بلا قسم. مطلوب للنشر.', { nullable: true }),
+  f('sub_category', 'ref', 'classification', 'القسم الفرعي — sub-section slug or id; __NULL__ = بلا قسم فرعي', { nullable: true }),
+  f('template_family', 'enum', 'classification', 'عائلة قالب المواصفات: devices | materials | فارغ — تحدد أي حقول spec.* تخصّ هذا المنتج', { enumValues: ['', 'devices', 'materials'] as const }),
+  f('sku', 'string', 'classification', 'رمز المنتج — SKU; فارغ = بلا رمز'),
   f('hashtags', 'csv', 'classification', 'وسوم — comma-separated hashtags'),
   f('is_featured', 'bool', 'classification', 'منتج مميز — featured flag (true/false)'),
   f('display_order', 'int', 'classification', 'ترتيب العرض — display order (integer, lower = earlier)', { min: -100_000, max: 100_000 }),
   // selling
   f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. والأدق أن تترك الخيارات تقرر: أنواع البيع تُشتق من availability_type لكل خيار.', { enumValues: ['direct_sale', 'pre_order', 'bundle', 'mixed'] as const }),
   f('stock', 'int', 'selling', 'المخزون — stock count; __NULL__ = not tracked', { nullable: true, min: 0, max: 1_000_000 }),
+  f('low_stock_threshold', 'int', 'selling', 'حد التنبيه لمخزون المنتج — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
+  // Real money on a direct line, added on top of the price. Exporting a file
+  // that showed a price the customer never pays was the quiet half of the
+  // owner's complaint about the numbers in the export.
+  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف على السعر عند الشراء الفوري من المخزون؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
 ];
 
@@ -356,6 +372,8 @@ export interface ParsedTemplate {
   fields: Record<string, ParsedField>;
   /** group name → clear marker (e.g. `options=__CLEAR__`) */
   groupClears: Record<string, ParsedField>;
+  /** §10 spec sheet values, keyed by field id (`spec.build_volume=…`). */
+  specFields: Record<string, ParsedField>;
   groups: Record<string, ParsedGroupItem[]>;
   unknown_keys: string[];
   errors: TemplateError[];
@@ -442,6 +460,7 @@ export function parseTemplate(text: string): ParsedTemplate {
     header: { template_version: null, product_id: null, expected_updated_at: null, allow_slug_change: false },
     fields: {},
     groupClears: {},
+    specFields: {},
     groups: {},
     unknown_keys: [],
     errors: [],
@@ -547,6 +566,32 @@ export function parseTemplate(text: string): ParsedTemplate {
       continue;
     }
 
+    /**
+     * ---- the §10 spec sheet: `spec.<field_id>=value` ---------------------
+     *
+     * The printer and filament sheet — build volume, nozzle, weight, warranty
+     * months, «ما في الصندوق» — is a flat {field_id: value} map on
+     * `products.spec_fields`, filled from the per-family templates in
+     * templateFamilies.ts. It is the biggest block of the admin form (the
+     * «٤٤ حقل» badge in section 7) and the TXT registry had no key for any of
+     * it, so an export could neither show nor set a single spec.
+     *
+     * A PREFIX family rather than a registry entry, because the field list
+     * depends on the product's template_family and its section — a fixed
+     * registry would either be wrong for half the catalogue or 200 keys long.
+     * Values are free text, which is what the column stores.
+     */
+    const sm = /^spec\.([a-z0-9_]{1,80})$/.exec(key);
+    if (sm) {
+      if (out.specFields[sm[1]]) { err(lineNo, key, 'duplicate key'); continue; }
+      out.specFields[sm[1]] = {
+        value: value === NULL_TOKEN ? null : value,
+        clear: value === CLEAR_TOKEN,
+        line: lineNo,
+      };
+      continue;
+    }
+
     // ---- whole-group clear: options=__CLEAR__
     if (GROUP_BY_NAME.has(key)) {
       if (value !== CLEAR_TOKEN) {
@@ -617,6 +662,17 @@ export function parseTemplate(text: string): ParsedTemplate {
 export interface ExportOpts {
   /** brand slug for readability (falls back to doc.brand_id / __NULL__) */
   brand?: string | null;
+  /**
+   * The §10 spec field ids this product's family declares, in form order.
+   * Supplied by the route from `fieldsFor(template_family, sections)`; the
+   * exporter writes every one of them, empty or not, so the file lists the
+   * whole sheet rather than only the specs that happen to be filled.
+   */
+  specFieldIds?: string[];
+  /** main-section slug for readability (falls back to doc.category_id) */
+  category?: string | null;
+  /** sub-section slug for readability (falls back to doc.sub_category_id) */
+  subCategory?: string | null;
   /** catalog slugs; when undefined the catalogs key is omitted (unknown) */
   catalogs?: string[];
   /** include field-annotation comments (blank template style) */
@@ -633,6 +689,24 @@ export interface ExportOpts {
    * the FORMAT rather than any product's data, is unchanged.
    */
   includeCost?: boolean;
+  /**
+   * THE NUMBER THE CUSTOMER ACTUALLY PAYS, written beside every inheriting
+   * field as a comment.
+   *
+   * The owner's words: «ويضع السعر في الخيارات المفتوحه مثل خيارات الشحن».
+   * A row that inherits exports as `__NULL__`, which is the truth about what
+   * is STORED and useless as an answer to "what does this option cost?".
+   * Comments are ignored by the parser, so the file stays byte-for-byte
+   * re-importable while finally saying what it means. Off for the blank
+   * template, which describes the format rather than a product.
+   */
+  showEffective?: boolean;
+  /**
+   * The admin's per-method pre-order commissions, from the
+   * `preorderTransportDefaults` setting. `transports.N.commission_iqd=__NULL__`
+   * means "inherit this", and without it the export cannot say what.
+   */
+  transportDefaults?: Array<{ method: string; commission_iqd: number | null }>;
 }
 
 interface Entry { key: string; value: string | null }
@@ -666,6 +740,31 @@ const numStr = (n: number | null) => (n === null || n === undefined ? null : Str
  * group items ordered by their `order` then id). Reused by exportProduct and
  * by the route-level diff (before/after keyed by template key).
  */
+/**
+ * Options in the order the file lists them: GROUP BY GROUP, not by a global
+ * sort number.
+ *
+ * `order` is the position WITHIN a group, so sorting the flat list by it
+ * interleaves the groups — "Model / A1", "Nozzle / 0.6", "Model / A1 Combo".
+ * The file is read and edited by a person and rows that belong together must
+ * sit together; the importer rebuilds the groups from the `group` column
+ * either way, so this is presentation, not semantics. Exported because the
+ * effective-price annotations must number the rows exactly as the file does.
+ */
+export function orderedOptions(doc: ProductDoc): ProductDoc['options'] {
+  const groupOrder = new Map<string, number>();
+  for (const o of doc.options) {
+    const g = o.group_en ?? '';
+    if (!groupOrder.has(g)) groupOrder.set(g, groupOrder.size);
+  }
+  return [...doc.options].sort(
+    (a, b) =>
+      (groupOrder.get(a.group_en ?? '') ?? 0) - (groupOrder.get(b.group_en ?? '') ?? 0) ||
+      (a.order ?? 0) - (b.order ?? 0) ||
+      String(a.id).localeCompare(String(b.id))
+  );
+}
+
 export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   const e: Entry[] = [];
   const push = (key: string, value: string | null) => e.push({ key, value });
@@ -697,6 +796,15 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   if (opts.brand !== undefined) push('brand', opts.brand);
   else push('brand', doc.brand_id ?? null);
   if (opts.catalogs !== undefined) push('catalogs', opts.catalogs.join(','));
+  // The section pair is written as SLUGS when the caller resolved them, so the
+  // file is readable and re-importable on another environment; ids are the
+  // fallback rather than the norm.
+  if (opts.category !== undefined) push('category', opts.category);
+  else push('category', doc.category_id ?? null);
+  if (opts.subCategory !== undefined) push('sub_category', opts.subCategory);
+  else push('sub_category', doc.sub_category_id ?? null);
+  push('template_family', doc.template_family ?? '');
+  push('sku', doc.sku ?? '');
   push('hashtags', doc.hashtags.join(','));
   push('is_featured', boolStr(doc.is_featured));
   push('display_order', String(doc.display_order));
@@ -707,12 +815,34 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   // own availability types are the authority either way.
   push('selling_type', isMixed(doc.sale_types) ? 'mixed' : doc.selling_type);
   push('stock', numStr(doc.stock));
+  push('low_stock_threshold', numStr(doc.low_stock_threshold));
+  push('direct_surcharge_iqd', numStr(doc.direct_surcharge_iqd));
   push('payment_options', doc.payment_options.join(','));
 
   const sorted = <T extends { order?: number; id?: string }>(items: T[]): T[] =>
     [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)));
 
-  doc.preorder_transports.forEach((t, i) => {
+  /**
+   * ALL THREE ROUTES, ALWAYS.
+   *
+   * A product that has never been given a transport row exported nothing at
+   * all here — no keys, no section, no hint — so «خيارات الشحن» could not be
+   * turned on by editing the file, which is half of what the owner asked for.
+   * A method the product does not carry is written with an empty commission
+   * and `active=false`: importing it back changes nothing, and switching the
+   * flag is now a one-word edit.
+   */
+  const METHOD_ORDER: Array<'air' | 'sea' | 'land'> = ['air', 'sea', 'land'];
+  const declared = new Map(doc.preorder_transports.map((t) => [t.method, t]));
+  const transportRows = [
+    ...doc.preorder_transports,
+    ...METHOD_ORDER.filter((m) => !declared.has(m)).map((method) => ({
+      method,
+      commission_iqd: null,
+      active: false,
+    })),
+  ];
+  transportRows.forEach((t, i) => {
     const p = `transports.${i + 1}`;
     push(`${p}.method`, t.method);
     push(`${p}.commission_iqd`, numStr(t.commission_iqd));
@@ -736,27 +866,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.height`, numStr(mItem.height));
   });
 
-  /**
-   * Options are listed GROUP BY GROUP, not by a global sort number.
-   *
-   * `order` is the position WITHIN a group, so sorting the flat list by it
-   * interleaves the groups — "Model / A1", "Nozzle / 0.6", "Model / A1 Combo".
-   * The file is meant to be read and edited by a person, and rows that belong
-   * together must sit together; the importer rebuilds the groups from the
-   * `group` column either way, so this is presentation, not semantics.
-   */
-  const groupOrder = new Map<string, number>();
-  for (const o of doc.options) {
-    const g = o.group_en ?? '';
-    if (!groupOrder.has(g)) groupOrder.set(g, groupOrder.size);
-  }
-  const optionsInOrder = [...doc.options].sort(
-    (a, b) =>
-      (groupOrder.get(a.group_en ?? '') ?? 0) - (groupOrder.get(b.group_en ?? '') ?? 0) ||
-      (a.order ?? 0) - (b.order ?? 0) ||
-      String(a.id).localeCompare(String(b.id))
-  );
-  optionsInOrder.forEach((o, i) => {
+  orderedOptions(doc).forEach((o, i) => {
     const p = `options.${i + 1}`;
     push(`${p}.id`, o.id);
     push(`${p}.group`, o.group_en ?? '');
@@ -810,6 +920,26 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.pro_adjust_iqd`, numStr(cItem.pro_adjust_iqd ?? null));
     if (money) push(`${p}.cost_adjust_iqd`, numStr(cItem.cost_adjust_iqd ?? null));
   });
+
+  /**
+   * The §10 sheet, one `spec.<id>` line per field.
+   *
+   * Every field the product's family declares is written even when it is
+   * empty — that is what «يملأ جميع الحقول» asks for here: the owner opens the
+   * file and sees the build volume, the nozzle, the weight and «ما في الصندوق»
+   * waiting to be typed, instead of having to know the field ids. Values the
+   * product carries that the family no longer declares are written after them
+   * rather than silently dropped.
+   */
+  const specWritten = new Set<string>();
+  for (const id of opts.specFieldIds ?? []) {
+    specWritten.add(id);
+    push(`spec.${id}`, doc.spec_fields[id] ?? '');
+  }
+  for (const [id, value] of Object.entries(doc.spec_fields)) {
+    if (specWritten.has(id)) continue;
+    push(`spec.${id}`, value);
+  }
 
   sorted(doc.spec_groups).forEach((g, gi) => {
     const p = `spec_groups.${gi + 1}`;
@@ -886,6 +1016,88 @@ function sectionHeader(groupId: string): string[] {
   return ['', `# ------------------------------ ${t.ar} / ${t.en}`];
 }
 
+const iqd = (n: number): string => n.toLocaleString('en-US');
+
+/**
+ * WHAT EACH INHERITING FIELD ACTUALLY CHARGES, as a comment map keyed by
+ * template key.
+ *
+ * Every number here comes from `buildGrid`, which computes the ladder with the
+ * SAME rules `pricing.ts` resolves at checkout — so the file and the cart
+ * cannot disagree. Nothing is written to a value: these are comment lines the
+ * parser skips, so annotating can never change what a re-import means.
+ */
+function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> {
+  const out = new Map<string, string>();
+  const money = opts.includeCost !== false;
+  const options = orderedOptions(doc);
+  const rows = buildGrid({
+    price_iqd: doc.price_iqd,
+    prime_price_iqd: doc.prime_price_iqd,
+    pro_price_iqd: doc.pro_price_iqd,
+    product_cost_iqd: doc.product_cost_iqd,
+    selling_type: doc.selling_type,
+    sale_types: doc.sale_types,
+    options,
+    colors: doc.colors,
+  });
+  const rowById = new Map(rows.map((r) => [`${r.level}:${r.id}`, r]));
+
+  // Whole phrases, not a noun plus a shared adjective: «الكلفة الفعلي» is
+  // wrong in Arabic, and a bare «الاعتيادي» does not say what it measures.
+  const label: Record<Field, string> = {
+    regular: 'السعر الاعتيادي الفعلي',
+    prime: 'سعر PRIME الفعلي',
+    pro: 'سعر PRO الفعلي',
+    cost: 'الكلفة الفعلية',
+  };
+  const note = (prefix: string, level: 'option' | 'color', id: string) => {
+    const row = rowById.get(`${level}:${id}`);
+    if (!row) return;
+    for (const f of FIELDS) {
+      if (f === 'cost' && !money) continue;
+      const cell = row.cells[f];
+      // Only a row that does NOT state its own number needs telling. A fixed
+      // price is already written in the file above the comment.
+      if (cell.mode === 'fixed') continue;
+      if (cell.effective === null) continue;
+      const source =
+        cell.mode === 'adjust'
+          ? `فرق ${cell.adjust !== null && cell.adjust >= 0 ? '+' : ''}${iqd(cell.adjust ?? 0)} عن ${iqd(cell.inherited ?? 0)}`
+          : 'موروث';
+      out.set(`${prefix}.${COLUMN_OF[f]}`, `${label[f]}: ${iqd(cell.effective)} د.ع — ${source}`);
+    }
+  };
+
+  options.forEach((o, i) => note(`options.${i + 1}`, 'option', o.id));
+  const colorsInOrder = [...doc.colors].sort(
+    (a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id))
+  );
+  colorsInOrder.forEach((c, i) => note(`colors.${i + 1}`, 'color', c.id));
+
+  // Pre-order transports. `__NULL__` here means "use the admin default for
+  // this method", and the export could never say what that default is.
+  const defaults = new Map((opts.transportDefaults ?? []).map((d) => [d.method, d.commission_iqd]));
+  const declaredMethods = new Set(doc.preorder_transports.map((t) => t.method));
+  const transportRows = [
+    ...doc.preorder_transports,
+    ...(['air', 'sea', 'land'] as const)
+      .filter((m) => !declaredMethods.has(m))
+      .map((method) => ({ method, commission_iqd: null as number | null })),
+  ];
+  transportRows.forEach((t, i) => {
+    if (t.commission_iqd !== null) return;
+    const def = defaults.get(t.method);
+    out.set(
+      `transports.${i + 1}.commission_iqd`,
+      def === null || def === undefined
+        ? 'الافتراضي الإداري لهذه الطريقة غير مضبوط — لا تُضاف عمولة نقل'
+        : `العمولة الفعلية ${iqd(def)} د.ع — الافتراضي الإداري لهذه الطريقة`
+    );
+  });
+  return out;
+}
+
 /** Deterministic full export of a product document (all languages). */
 export function exportProduct(doc: ProductDoc, opts: ExportOpts = {}): string {
   const lines: string[] = [
@@ -901,8 +1113,12 @@ export function exportProduct(doc: ProductDoc, opts: ExportOpts = {}): string {
   lines.push(`slug=${doc.slug}`);
 
   const entries = docToEntries(doc, opts);
+  const notes = opts.showEffective === false ? new Map<string, string>() : effectiveNotes(doc, opts);
   let currentSection = '';
   const sectionOf = (key: string): string => {
+    // `spec.<id>` is a prefix family, not an indexed group, so it needs its
+    // own branch or the whole §10 sheet lands under the identity header.
+    if (key.startsWith('spec.')) return 'specs';
     const gm = /^([a-z_]+)\.\d+\./.exec(key);
     if (gm) return GROUP_BY_NAME.get(gm[1])?.group ?? gm[1];
     return SCALAR_BY_KEY.get(key)?.group ?? 'identity';
@@ -914,6 +1130,10 @@ export function exportProduct(doc: ProductDoc, opts: ExportOpts = {}): string {
       lines.push(...sectionHeader(sec));
     }
     lines.push(...fmtLines(entry.key, entry.value));
+    const note = notes.get(entry.key);
+    // Only annotate a field that is actually inheriting; a row that states its
+    // own price does not need to be told what its own price is.
+    if (note && entry.value === null) lines.push(`#   ↳ ${note}`);
   }
   lines.push('');
   return lines.join('\n');
@@ -941,6 +1161,8 @@ function blankValue(spec: FieldSpec): string {
 
 /** Blank template with every key, commented with type/required/notes. */
 export function generateBlankTemplate(): string {
+  // No product, so nothing to resolve: `showEffective` never applies here.
+
   const lines: string[] = [
     '# ============================================================',
     '# قالب منتج ليفونيس (فارغ) — الإصدار 2',
@@ -1003,11 +1225,18 @@ export function generateBlankTemplate(): string {
 
 export interface NeedsReviewEntry { key: string; line: number; value: string; message: string }
 
+/** Scalar keys the ROUTE resolves against a table before the body is built. */
+const REF_KEYS = new Set(['brand', 'catalogs', 'category', 'sub_category']);
+
 export interface ResolvedRefs {
   /** resolved brand id; null = clear brand; undefined = omitted/unresolved (preserve) */
   brand_id?: string | null;
   /** resolved catalog ids; undefined = omitted/unresolved (preserve associations) */
   catalog_ids?: string[];
+  /** resolved main-section id; null = clear; undefined = omitted/unresolved */
+  category_id?: string | null;
+  /** resolved sub-section id; null = clear; undefined = omitted/unresolved */
+  sub_category_id?: string | null;
   needs_review?: NeedsReviewEntry[];
 }
 
@@ -1217,6 +1446,11 @@ export function toDocBody(
         // placement vanished, and the newer direct premium / usage guide
         // would have been erased the day they were written).
         sale_types: existing.sale_types,
+        // The eight below are the STARTING values. Six of them now have
+        // template keys (category, sub_category, template_family, sku,
+        // low_stock_threshold, direct_surcharge_iqd) and the scalar loop
+        // overwrites those the file actually carries — carrying them here is
+        // what makes an omitted key mean "preserve" rather than "erase".
         direct_surcharge_iqd: existing.direct_surcharge_iqd,
         stock: existing.stock,
         low_stock_threshold: existing.low_stock_threshold,
@@ -1263,10 +1497,10 @@ export function toDocBody(
   for (const spec of SCALAR_FIELDS) {
     const pf = parsed.fields[spec.key];
     if (!pf) {
-      if (existing && spec.key !== 'brand' && spec.key !== 'catalogs') result.preserved_fields.push(spec.key);
+      if (existing && !REF_KEYS.has(spec.key)) result.preserved_fields.push(spec.key);
       continue;
     }
-    if (spec.key === 'brand' || spec.key === 'catalogs') continue; // handled below via resolved refs
+    if (REF_KEYS.has(spec.key)) continue; // handled below via resolved refs
     if (pf.clear) {
       result.cleared_fields.push(spec.key);
     } else {
@@ -1277,9 +1511,33 @@ export function toDocBody(
       case 'hashtags':
         body[spec.key] = pf.value ?? [];
         break;
+      case 'template_family':
+        // The enum allows '' for "no family"; the column holds NULL for that.
+        body.template_family = pf.value ? pf.value : null;
+        break;
       default:
         body[spec.key] = pf.value;
     }
+  }
+
+  // ---- §10 spec sheet -----------------------------------------------------
+  // Merged onto what the product already has, so a file that carries three
+  // specs edits three and leaves the other forty alone — the same "an omitted
+  // key preserves" rule every other field follows. __CLEAR__ removes one.
+  const specKeys = Object.keys(parsed.specFields);
+  if (specKeys.length > 0) {
+    const merged: Record<string, string> = { ...(existing?.spec_fields ?? {}) };
+    for (const id of specKeys) {
+      const pf = parsed.specFields[id];
+      if (pf.clear || pf.value === null || pf.value === '') {
+        delete merged[id];
+        result.cleared_fields.push(`spec.${id}`);
+      } else {
+        merged[id] = String(pf.value);
+        result.applied_fields.push(`spec.${id}`);
+      }
+    }
+    body.spec_fields = merged;
   }
 
   // ---- brand / catalogs via resolved refs
@@ -1296,6 +1554,35 @@ export function toDocBody(
     }
   } else if (existing) {
     result.preserved_fields.push('brand');
+  }
+  for (const [key, target] of [
+    ['category', 'category_id'],
+    ['sub_category', 'sub_category_id'],
+  ] as const) {
+    const field = parsed.fields[key];
+    if (!field) {
+      if (existing) result.preserved_fields.push(key);
+      continue;
+    }
+    // Clearing a reference needs no table lookup: `__NULL__` means "no
+    // section" whatever the sections tree contains, so an offline caller
+    // (and the blank template, which ships every ref as __NULL__) must not be
+    // sent to review for it.
+    if (field.clear || field.value === null || String(field.value).trim() === '') {
+      body[target] = null;
+      result.cleared_fields.push(key);
+      continue;
+    }
+    const resolvedId = resolved ? resolved[target] : undefined;
+    if (resolvedId !== undefined) {
+      body[target] = resolvedId;
+      result.applied_fields.push(key);
+    } else if (!result.needs_review.some((n) => n.key === key)) {
+      result.needs_review.push({
+        key, line: field.line, value: String(field.value ?? NULL_TOKEN),
+        message: `${key} reference was not resolved against the sections tree`,
+      });
+    }
   }
   const catalogsField = parsed.fields.catalogs;
   if (catalogsField) {

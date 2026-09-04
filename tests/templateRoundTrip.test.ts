@@ -274,3 +274,184 @@ test('clearing the options group drops the combination that depended on it', () 
     'a combination naming an option that no longer exists would be refused by the writer'
   );
 });
+
+// ------------------------------------------- what the file could not say
+
+test('the section pair, SKU, template family, low-stock and direct premium round-trip', () => {
+  const doc = applyRelations(
+    parseProductRow({
+      ...baseRow(),
+      sku: 'BL-A1-001',
+      template_family: 'devices',
+      low_stock_threshold: 3,
+      direct_surcharge_iqd: 50_000,
+      category_id: 'cat_printers',
+      sub_category_id: 'cat_fdm',
+    }),
+    view(),
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, {
+    includeCost: true,
+    brand: 'bambu-lab',
+    catalogs: ['printers'],
+    category: 'printers',
+    subCategory: 'fdm',
+  });
+  for (const line of [
+    'category=printers',
+    'sub_category=fdm',
+    'template_family=devices',
+    'sku=BL-A1-001',
+    'low_stock_threshold=3',
+    'direct_surcharge_iqd=50000',
+  ]) {
+    assert.ok(text.includes(`${line}\n`), `the export must carry ${line}`);
+  }
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  const built = validateProductDoc(
+    toDocBody(parsed, doc, {
+      needs_review: [],
+      category_id: 'cat_printers',
+      sub_category_id: 'cat_fdm',
+    }).body
+  );
+  assert.equal(built.sku, 'BL-A1-001');
+  assert.equal(built.template_family, 'devices');
+  assert.equal(built.low_stock_threshold, 3);
+  assert.equal(built.direct_surcharge_iqd, 50_000);
+  assert.equal(built.category_id, 'cat_printers');
+  assert.equal(built.sub_category_id, 'cat_fdm');
+});
+
+test('an unknown section is sent to review, never silently created or dropped', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  // Replace, not append: a second `category=` line would be a duplicate key.
+  const text = exportProduct(doc, { includeCost: true }).replace(
+    /^category=.*$/m,
+    'category=no-such-section'
+  );
+  const parsed = parseTemplate(text);
+  // The route resolves refs; with nothing resolved the merge must ASK rather
+  // than guess — the same rule brands have always followed.
+  const merged = toDocBody(parsed, doc, { needs_review: [] });
+  assert.ok(merged.needs_review.some((n) => n.key === 'category'));
+});
+
+test('the §10 spec sheet is written field by field and read back', () => {
+  const doc = applyRelations(
+    parseProductRow({ ...baseRow(), template_family: 'devices', spec_fields: JSON.stringify({ weight: '8.5', nozzle: '0.4' }) }),
+    view(),
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, {
+    includeCost: true,
+    // What the route passes: every field this family declares, in form order.
+    specFieldIds: ['technology', 'build_volume', 'nozzle', 'weight', 'in_the_box'],
+  });
+  assert.ok(text.includes('spec.weight=8.5\n'), 'a filled spec is written with its value');
+  assert.ok(text.includes('spec.nozzle=0.4\n'));
+  assert.ok(text.includes('spec.build_volume=\n'), 'an EMPTY declared spec is still listed, waiting to be typed');
+  assert.ok(text.includes('spec.in_the_box=\n'));
+
+  const edited = text.replace('spec.build_volume=\n', 'spec.build_volume=256 x 256 x 256\n');
+  const parsed = parseTemplate(edited);
+  assert.deepEqual(parsed.errors, []);
+  const built = validateProductDoc(toDocBody(parsed, doc, { needs_review: [] }).body);
+  assert.equal(built.spec_fields.build_volume, '256 x 256 x 256');
+  assert.equal(built.spec_fields.weight, '8.5', 'the specs already set are not lost');
+});
+
+test('a spec the file leaves out is preserved; __CLEAR__ removes it', () => {
+  const doc = applyRelations(
+    parseProductRow({ ...baseRow(), spec_fields: JSON.stringify({ weight: '8.5', nozzle: '0.4' }) }),
+    view(),
+    { includeInactive: true }
+  );
+  const only = `template_version=2\nproduct_id=prd_x\nname_ar=منتج\nprice_iqd=500000\nspec.nozzle=__CLEAR__\n`;
+  const built = validateProductDoc(toDocBody(parseTemplate(only), doc, { needs_review: [] }).body);
+  assert.equal(built.spec_fields.weight, '8.5');
+  assert.equal(built.spec_fields.nozzle, undefined);
+});
+
+// ------------------------------------------ the number actually charged
+
+test('an inheriting price is annotated with what the customer really pays', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true });
+  // options.2 inherits its regular price and carries a +300,000 adjustment,
+  // so the file must say 500,000 + 300,000 rather than only "__NULL__".
+  assert.match(text, /options\.2\.regular_price_iqd=__NULL__\n#\s+↳ السعر الاعتيادي الفعلي: 800,000 د\.ع — فرق \+300,000 عن 500,000/);
+});
+
+test('the annotation is a COMMENT — re-parsing the annotated file is identical', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const withNotes = exportProduct(doc, { includeCost: true });
+  const withoutNotes = exportProduct(doc, { includeCost: true, showEffective: false });
+  assert.notEqual(withNotes, withoutNotes, 'the annotations must actually be there');
+  const a = validateProductDoc(toDocBody(parseTemplate(withNotes), doc, { needs_review: [] }).body);
+  const b = validateProductDoc(toDocBody(parseTemplate(withoutNotes), doc, { needs_review: [] }).body);
+  assert.deepEqual(a, b, 'a comment can never change what a file means');
+});
+
+test('a row that states its own price is not told what its own price is', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true });
+  const lines = text.split('\n');
+  const i = lines.findIndex((l) => l === 'options.1.regular_price_iqd=899000');
+  assert.ok(i > 0, 'options.1 states its own regular price');
+  assert.ok(!lines[i + 1].startsWith('#   ↳'), 'a fixed price needs no annotation');
+});
+
+test('an assistant admin sees no cost, and no cost annotation either', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: false });
+  assert.ok(!text.includes('cost_iqd='), 'no cost key');
+  assert.ok(!text.includes('الكلفة الفعلية'), 'and no cost smuggled into a comment');
+});
+
+// --------------------------------------------------- shipping / transports
+
+test('all three pre-order routes are listed even when the product declares none', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  assert.equal(doc.preorder_transports.length, 0, 'this product has no transport rows');
+  const text = exportProduct(doc, { includeCost: true });
+  for (const m of ['air', 'sea', 'land']) {
+    assert.ok(text.includes(`.method=${m}\n`), `${m} must be listed so it can be switched on`);
+  }
+  assert.match(text, /transports\.1\.active=false/);
+});
+
+test('an inheriting transport commission names the admin default', () => {
+  const doc = applyRelations(
+    parseProductRow({
+      ...baseRow(),
+      preorder_transports: JSON.stringify([{ method: 'air', commission_iqd: null, active: true }]),
+    }),
+    view(),
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, {
+    includeCost: true,
+    transportDefaults: [{ method: 'air', commission_iqd: 250_000 }],
+  });
+  assert.match(text, /transports\.1\.commission_iqd=__NULL__\n#\s+↳ العمولة الفعلية 250,000 د\.ع/);
+});
+
+test('an unconfigured transport default says so rather than inventing a number', () => {
+  const doc = applyRelations(
+    parseProductRow({
+      ...baseRow(),
+      preorder_transports: JSON.stringify([{ method: 'land', commission_iqd: null, active: true }]),
+    }),
+    view(),
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, {
+    includeCost: true,
+    transportDefaults: [{ method: 'land', commission_iqd: null }],
+  });
+  assert.match(text, /غير مضبوط/);
+  assert.ok(!/العمولة الفعلية \d/.test(text), 'no fabricated commission');
+});

@@ -38,6 +38,7 @@ import { applyRelations, loadRelationsView, type ProductRelationsView } from '..
 import { relationsBodyFromDoc } from '../lib/templateRelations';
 import { planRelationsWrite } from './adminProductRelations';
 import { canViewFinancials } from '../lib/adminScope';
+import { getSetting } from '../lib/settings';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { newId, sha256Hex } from '../lib/crypto';
@@ -65,6 +66,8 @@ import {
 import {
   PRODUCT_TYPES,
   groupsForType,
+  fieldsFor,
+  flatFields,
   isProductType,
   productType,
   type ProductTypeId,
@@ -472,6 +475,31 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
     }
   }
 
+  // The main section and the sub-section are single references into the SAME
+  // catalogs tree the `catalogs` list draws from — resolved by slug or id, and
+  // never silently created, exactly like the brand above.
+  for (const [key, target] of [
+    ['category', 'category_id'],
+    ['sub_category', 'sub_category_id'],
+  ] as const) {
+    const field = parsed.fields[key];
+    if (!field) continue;
+    const v = field.clear || field.value === null ? '' : String(field.value).trim();
+    if (!v) {
+      refs[target] = null;
+      continue;
+    }
+    const row = await db.prepare('SELECT id FROM catalogs WHERE slug = ? OR id = ?').bind(v, v).first<{ id: string }>();
+    if (row) refs[target] = row.id;
+    else
+      refs.needs_review!.push({
+        key,
+        line: field.line,
+        value: v,
+        message: `unknown section "${v}" — create it in التصنيفات first, or fix the slug/id (sections are never silently created)`,
+      });
+  }
+
   const catField = parsed.fields.catalogs;
   if (catField) {
     const wanted = catField.clear || catField.value === null ? [] : (catField.value as string[]);
@@ -603,7 +631,17 @@ function computeDiff(
   return diff;
 }
 
-async function exportOptsFor(db: D1Database, doc: ProductDoc): Promise<{ brand: string | null; catalogs: string[] }> {
+async function exportOptsFor(
+  db: D1Database,
+  doc: ProductDoc
+): Promise<{
+  brand: string | null;
+  catalogs: string[];
+  transportDefaults: Array<{ method: string; commission_iqd: number | null }>;
+  category: string | null;
+  subCategory: string | null;
+  specFieldIds: string[];
+}> {
   let brand: string | null = null;
   if (doc.brand_id) {
     const row = await db.prepare('SELECT slug FROM brands WHERE id = ?').bind(doc.brand_id).first<{ slug: string }>();
@@ -616,7 +654,42 @@ async function exportOptsFor(db: D1Database, doc: ProductDoc): Promise<{ brand: 
     )
     .bind(doc.id)
     .all<{ slug: string }>();
-  return { brand, catalogs: results.map((r) => r.slug) };
+  // `transports.N.commission_iqd=__NULL__` means "inherit the admin default
+  // for this method". Without reading that setting the export can name the
+  // inheritance but not the number, which is precisely the complaint.
+  const transportDefaults = await getSetting(db, 'preorderTransportDefaults');
+
+  /**
+   * The §10 field ids this product's family declares, so the export can list
+   * the whole sheet rather than only the specs that happen to be filled. The
+   * field set depends on the family AND on the product's sections — the same
+   * resolution the admin form and the CSV columns go through, so a spec is in
+   * all three places or in none.
+   */
+  let specFieldIds: string[] = [];
+  if (doc.template_family === 'devices' || doc.template_family === 'materials') {
+    const sectionIds = [doc.category_id, doc.sub_category_id].filter((x): x is string => !!x);
+    const slugs: string[] = [];
+    for (const id of sectionIds) {
+      const row = await db.prepare('SELECT slug FROM catalogs WHERE id = ?').bind(id).first<{ slug: string }>();
+      if (row) slugs.push(row.slug);
+    }
+    specFieldIds = flatFields(fieldsFor(doc.template_family, slugs)).map((f) => f.id);
+  }
+  // Slugs, not ids: a file that says `category=printers` is readable, and it
+  // re-imports on any environment where that section exists.
+  const slugOf = async (id: string | null) =>
+    id
+      ? ((await db.prepare('SELECT slug FROM catalogs WHERE id = ?').bind(id).first<{ slug: string }>())?.slug ?? id)
+      : null;
+  return {
+    brand,
+    catalogs: results.map((r) => r.slug),
+    transportDefaults,
+    category: await slugOf(doc.category_id),
+    subCategory: await slugOf(doc.sub_category_id),
+    specFieldIds,
+  };
 }
 
 async function findDuplicate(
