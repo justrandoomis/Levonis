@@ -194,13 +194,14 @@ async function main() {
   // ------------------------------------------------- 1. the request is created
   console.log('\n1. one request, created through the marketplace that already exists');
   const before = Number(query('SELECT COUNT(*) AS n FROM community_requests')[0].n);
+  // EXACTLY WHAT THE WIZARD SENDS AT THE END OF STEP 1 — a title, a
+  // description, nothing from step 2. The material, the colour, the size and
+  // the governorate are not known yet, and the row must survive not knowing
+  // them; `publish` is what fills them in.
   const created = await customer.post('/api/marketplace/requests', {
     title: `Bracket ${rnd}`,
     description: 'A functional bracket for a shelf, printed in PETG.',
     quantity: 1,
-    governorate: 'baghdad',
-    material: 'PETG',
-    color: 'black',
   });
   check('the request is created', created.status === 201, `${created.status} ${JSON.stringify(created.data).slice(0, 200)}`);
   const requestId = created.data?.request?.id;
@@ -299,9 +300,30 @@ async function main() {
   // ------------------------------------------------ 6. publish and match
   console.log('\n6. publishing notifies the right merchants and creates NOTHING else');
   const requestsBefore = Number(query('SELECT COUNT(*) AS n FROM community_requests')[0].n);
-  r = await customer.post(`/api/marketplace/print/requests/${requestId}/publish`, { ...spec, primary_file_id: fileId });
+  const rowBefore = query(`SELECT governorate, material, dimensions FROM community_requests WHERE id='${requestId}'`)[0];
+  check('before publishing the row knows no governorate', (rowBefore?.governorate ?? '') === '',
+    JSON.stringify(rowBefore));
+  r = await customer.post(`/api/marketplace/print/requests/${requestId}/publish`,
+    { ...spec, primary_file_id: fileId, governorate: 'baghdad', delivery_pref: 'delivery', budget_iqd: 40000 });
   check('the publish succeeds', r.status === 200, `${r.status} ${JSON.stringify(r.data).slice(0, 250)}`);
   const requestsAfter = Number(query('SELECT COUNT(*) AS n FROM community_requests')[0].n);
+
+  // The step-2 answers land on THE REQUEST, not only on the print row — the
+  // matcher reads the governorate from there, and so does the public board.
+  const rowAfter = query(
+    `SELECT governorate, delivery_pref, budget_iqd, material, color, dimensions FROM community_requests WHERE id='${requestId}'`
+  )[0];
+  check('publishing writes the governorate onto the request', rowAfter?.governorate === 'baghdad', JSON.stringify(rowAfter));
+  check('and the delivery preference', rowAfter?.delivery_pref === 'delivery', String(rowAfter?.delivery_pref));
+  check('and the budget', Number(rowAfter?.budget_iqd) === 40000, String(rowAfter?.budget_iqd));
+  check('and the material, so the board card says what it is made of',
+    String(rowAfter?.material).toUpperCase().includes('PETG'), String(rowAfter?.material));
+  check('and the MEASURED size, which nobody typed',
+    String(rowAfter?.dimensions).startsWith('220×180×140'), String(rowAfter?.dimensions));
+  const board = await customer.get('/api/marketplace/requests');
+  const onBoard = (board.data?.requests ?? []).find((x) => x.id === requestId);
+  check('and the public board shows them', onBoard?.governorate === 'baghdad' && onBoard?.budget_iqd === 40000,
+    JSON.stringify(onBoard ?? null).slice(0, 160));
 
   check('EXACTLY ONE request exists — publishing created no copies',
     requestsAfter === requestsBefore, `${requestsBefore} -> ${requestsAfter}`);
@@ -341,7 +363,8 @@ async function main() {
   }
 
   console.log('\n6c. republishing does not buzz the same merchant twice');
-  await customer.post(`/api/marketplace/print/requests/${requestId}/publish`, { ...spec, primary_file_id: fileId });
+  await customer.post(`/api/marketplace/print/requests/${requestId}/publish`,
+    { ...spec, primary_file_id: fileId, governorate: 'baghdad', delivery_pref: 'delivery', budget_iqd: 40000 });
   const again = await Cm.client.get('/api/notifications');
   check('C still has exactly one notification', again.data?.notifications?.length === 1,
     String(again.data?.notifications?.length));
@@ -443,6 +466,28 @@ async function main() {
   const mineList = await customer.get('/api/marketplace/my-requests');
   check('the request appears in my requests',
     (mineList.data?.requests ?? []).some((x) => x.id === requestId), String((mineList.data?.requests ?? []).length));
+
+  // The owner's OWN list is a separate, richer route — it carries the estimate,
+  // the material and the chosen merchant, none of which the public board's
+  // privacy whitelist may ever expose.
+  const richMine = await customer.get('/api/marketplace/print/my-requests');
+  const richRow = (richMine.data?.requests ?? []).find((x) => x.id === requestId);
+  check('the owner-scoped list returns the request', !!richRow, `${richMine.status}`);
+  check('and it carries the print side', !!richRow?.print, JSON.stringify(richRow?.print ?? null).slice(0, 80));
+  check('with the estimate the publish snapshotted',
+    typeof richRow?.print?.estimate_low_iqd === 'number' && richRow.print.estimate_low_iqd > 0,
+    String(richRow?.print?.estimate_low_iqd));
+  check('and the material, so the card can say what it is made of',
+    richRow?.print?.material_id === 'petg', String(richRow?.print?.material_id));
+  check('no merchant is named before one is chosen', richRow?.accepted === null, JSON.stringify(richRow?.accepted));
+  // Owner-scoped means owner-scoped: the SQL, not a filter afterwards.
+  const strangerMine = new C('mine-stranger');
+  const smEmail = `pm-${rnd}@test.local`;
+  await strangerMine.post('/api/auth/register', { email: smEmail, username: `pm${rnd}`, name: 'Nosy', password: 'print-e2e-12345' });
+  await strangerMine.post('/api/auth/login', { email: smEmail, password: 'print-e2e-12345' });
+  const nosy = await strangerMine.get('/api/marketplace/print/my-requests');
+  check('somebody else\'s list does not contain it',
+    !(nosy.data?.requests ?? []).some((x) => x.id === requestId), String((nosy.data?.requests ?? []).length));
 
   const beforeRepeat = Number(query('SELECT COUNT(*) AS n FROM community_requests')[0].n);
   const repeat = await customer.post(`/api/marketplace/print/requests/${requestId}/repeat`);

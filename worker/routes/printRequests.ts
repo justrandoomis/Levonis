@@ -372,6 +372,65 @@ printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
 
   const completeness = completenessOf(spec, analysis, sourceKind, sourceUrl, quote.priced);
 
+  /**
+   * THE REQUEST ROW CATCHES UP WITH THE WIZARD.
+   *
+   * The row is created at the end of step 1, before the customer has chosen a
+   * material or a governorate — and `POST /api/marketplace/requests` is the
+   * only route that writes those fields. So without this, everything picked in
+   * step 2 would exist on the print side only, and two things that matter would
+   * silently be empty: the public board card (`publicRequest()` reads
+   * `material`, `color`, `dimensions`, `budget_iqd`, `governorate` from HERE),
+   * and — worse — the matcher's `governorate` and `delivery_pref`, which decide
+   * which merchants are eligible at all. A customer who picked Baghdad would
+   * have been matched as though they had picked nowhere.
+   *
+   * This is not a second create. It is the same row, the same owner, the same
+   * open state, written at the last moment before any merchant can see it.
+   * Only fields the caller actually supplied are touched; a republish that
+   * sends nothing leaves the row exactly as it is.
+   */
+  const governorate = str(body.governorate, 'governorate', { max: 60, required: false });
+  const deliveryPref = str(body.delivery_pref, 'delivery_pref', { max: 40, required: false });
+  const deadline = str(body.deadline, 'deadline', { max: 40, required: false });
+  const budget =
+    body.budget_iqd === undefined || body.budget_iqd === null || body.budget_iqd === ''
+      ? undefined
+      : int(body.budget_iqd, 'budget_iqd', { min: 0, max: 1_000_000_000 });
+
+  // What the board shows about the job, written from what was actually chosen
+  // and measured rather than asked for a second time in prose.
+  const materialLabel = mats.find((m) => m.id === spec.material_id)?.name_en ?? spec.material_id;
+  const colorLabel = spec.color_name || spec.color_hex;
+  const dimsLabel = analysis?.measured
+    ? `${Math.round(analysis.dimensions_mm.x)}×${Math.round(analysis.dimensions_mm.y)}×${Math.round(analysis.dimensions_mm.z)} mm`
+    : '';
+
+  const sets: string[] = [
+    'material = ?', 'color = ?', 'quantity = ?', "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+  ];
+  const vals: Array<string | number | null> = [materialLabel, colorLabel, spec.quantity];
+  if (dimsLabel) { sets.splice(2, 0, 'dimensions = ?'); vals.splice(2, 0, dimsLabel); }
+  if (governorate !== undefined) { sets.push('governorate = ?'); vals.push(governorate); }
+  if (deliveryPref !== undefined) { sets.push('delivery_pref = ?'); vals.push(deliveryPref); }
+  if (deadline !== undefined) { sets.push('deadline = ?'); vals.push(deadline || null); }
+  if (budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(budget); }
+
+  await c.env.DB.prepare(
+    `UPDATE community_requests SET ${sets.join(', ')}
+      WHERE id = ? AND customer_id = ? AND state IN ('open','receiving_offers','draft')`
+  )
+    .bind(...vals, requestId, user.id)
+    .run();
+
+  // Re-read, so the matcher sees what was just written rather than what
+  // `ownedRequest` loaded a few statements ago.
+  const forMatching = await c.env.DB.prepare(
+    'SELECT governorate, delivery_pref FROM community_requests WHERE id = ?'
+  )
+    .bind(requestId)
+    .first<{ governorate: string; delivery_pref: string }>();
+
   await c.env.DB.prepare(
     `INSERT INTO community_print_requests
        (request_id, process, material_id, color_hex, color_name, quality, infill_percent,
@@ -415,8 +474,8 @@ printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
     quality: spec.quality,
     colors_count: spec.colors_count,
     dimensions_mm: analysis?.measured ? analysis.dimensions_mm : { x: 0, y: 0, z: 0 },
-    governorate: String(request.governorate ?? ''),
-    delivery_pref: String(request.delivery_pref ?? ''),
+    governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
+    delivery_pref: String(forMatching?.delivery_pref ?? request.delivery_pref ?? ''),
     estimate_iqd: quote.priced ? quote.price_iqd : null,
     quantity: spec.quantity,
   };
@@ -951,4 +1010,102 @@ printRequestRoutes.post('/requests/:id/repeat', requireAuth, async (c) => {
 
   await audit(c.env.DB, user.id, 'print.request_repeated', newRequestId, { from: sourceId });
   return c.json({ success: true, request_id: newRequestId, files: fileIdMap.size }, 201);
+});
+
+// ------------------------------------------------------------ 9. my requests
+
+/**
+ * THE CUSTOMER'S OWN LIST — richer than the public board, and only ever theirs.
+ *
+ * `publicRequest()` in worker/routes/marketplace.ts is a privacy WHITELIST: it
+ * decides what a stranger may see about somebody's request. The owner's "My
+ * requests" screen needs more than that — the estimate, the material, the
+ * merchant they chose, the promised ETA — and the wrong way to get it would be
+ * to widen the whitelist, because a whitelist that keeps growing stops being
+ * one. So this is a separate, owner-scoped route: `WHERE r.customer_id = ?` is
+ * in the SQL, not in a filter afterwards, and it joins the print side that the
+ * public board does not know about at all.
+ *
+ * The thumbnail is the preview KEY, not a URL. Turning it into something
+ * fetchable goes through the marketplace's existing file route, which checks
+ * who is asking; emitting a public URL here would quietly make every uploaded
+ * model world-readable.
+ */
+printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.id, r.title, r.state, r.status, r.quantity, r.material, r.color,
+            r.budget_iqd, r.deadline, r.governorate, r.offer_count, r.created_at,
+            r.accepted_offer_id, r.community_order_id,
+            p.material_id, p.color_hex, p.color_name, p.process, p.quality,
+            p.estimate_low_iqd, p.estimate_high_iqd, p.estimate_confidence,
+            p.completeness, p.primary_file_id, p.source_kind, p.source_provider,
+            f.preview_key AS preview_key, f.file_name AS primary_file_name,
+            f.model_format AS primary_format,
+            o.price_iqd AS accepted_price_iqd, o.completion_days AS accepted_days,
+            m.name AS accepted_merchant_name,
+            (SELECT COUNT(*) FROM community_request_files cf WHERE cf.request_id = r.id) AS file_count
+       FROM community_requests r
+       LEFT JOIN community_print_requests p ON p.request_id = r.id
+       LEFT JOIN community_request_files f ON f.id = p.primary_file_id
+       LEFT JOIN community_offers o ON o.id = r.accepted_offer_id
+       LEFT JOIN community_merchants m ON m.id = o.merchant_id
+      WHERE r.customer_id = ?
+      ORDER BY r.created_at DESC
+      LIMIT 50`
+  )
+    .bind(user.id)
+    .all<Record<string, unknown>>();
+
+  return c.json({
+    success: true,
+    requests: (results ?? []).map((r) => ({
+      id: String(r.id),
+      title: String(r.title ?? ''),
+      state: String(r.state ?? ''),
+      quantity: Number(r.quantity ?? 1),
+      material: String(r.material ?? ''),
+      color: String(r.color ?? ''),
+      budget_iqd: r.budget_iqd === null ? null : Number(r.budget_iqd),
+      deadline: r.deadline === null ? null : String(r.deadline),
+      governorate: String(r.governorate ?? ''),
+      offer_count: Number(r.offer_count ?? 0),
+      file_count: Number(r.file_count ?? 0),
+      created_at: String(r.created_at ?? ''),
+      // The print side is null for a request made before this system, or one
+      // that was never published through the wizard. The UI renders the plain
+      // card for those rather than pretending there is a measurement.
+      print: r.material_id === null && r.estimate_low_iqd === null && r.primary_file_id === null
+        ? null
+        : {
+            process: String(r.process ?? 'fdm'),
+            material_id: String(r.material_id ?? ''),
+            color_hex: String(r.color_hex ?? ''),
+            color_name: String(r.color_name ?? ''),
+            quality: String(r.quality ?? 'standard'),
+            estimate_low_iqd: r.estimate_low_iqd === null ? null : Number(r.estimate_low_iqd),
+            estimate_high_iqd: r.estimate_high_iqd === null ? null : Number(r.estimate_high_iqd),
+            estimate_confidence: String(r.estimate_confidence ?? '') || null,
+            completeness: Number(r.completeness ?? 0),
+            primary_file_id: r.primary_file_id === null ? null : String(r.primary_file_id),
+            primary_file_name: String(r.primary_file_name ?? ''),
+            primary_format: String(r.primary_format ?? ''),
+            // A key, never a URL — see the note above.
+            has_preview: !!String(r.preview_key ?? ''),
+            source_kind: String(r.source_kind ?? 'upload'),
+            source_provider: String(r.source_provider ?? ''),
+          },
+      // Present only once the customer has chosen. Before that the merchant is
+      // nobody's business, including the customer's own list.
+      accepted: r.accepted_offer_id
+        ? {
+            offer_id: String(r.accepted_offer_id),
+            order_id: r.community_order_id === null ? null : String(r.community_order_id),
+            merchant_name: String(r.accepted_merchant_name ?? ''),
+            price_iqd: r.accepted_price_iqd === null ? null : Number(r.accepted_price_iqd),
+            completion_days: r.accepted_days === null ? null : Number(r.accepted_days),
+          }
+        : null,
+    })),
+  });
 });

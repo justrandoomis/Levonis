@@ -25,9 +25,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Loader2, Search, BadgeCheck, Ban, ShieldCheck, Store, AlertTriangle, Wallet,
-  Scale, Settings2, TrendingUp, ChevronLeft, Check, ClipboardList, Star,
+  Scale, Settings2, TrendingUp, ChevronLeft, Check, ClipboardList, Star, Printer,
 } from 'lucide-react';
 import { ApiError } from '../../lib/api';
+import PrintPricingAdmin from './PrintPricingAdmin';
 import { newIdempotencyKey } from '../../lib/api';
 import {
   adminCommunityApi, iqd, badgeLabel,
@@ -35,7 +36,8 @@ import {
   type AdminRequestRow, type AdminReviewRow, type AdminReputation,
 } from '../../lib/merchant';
 
-type Section = 'overview' | 'merchants' | 'board' | 'disputes' | 'finance' | 'reputation' | 'settings';
+type Section =
+  | 'overview' | 'merchants' | 'board' | 'disputes' | 'finance' | 'reputation' | 'settings' | 'print';
 
 export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
   const rtl = dir === 'rtl';
@@ -50,6 +52,10 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
     { id: 'finance', label: t('الأموال', 'Money'), icon: Wallet },
     { id: 'reputation', label: t('التقييمات والسمعة', 'Reviews & reputation'), icon: Star },
     { id: 'settings', label: t('الإعدادات', 'Settings'), icon: Settings2 },
+    /* The numbers behind every print estimate. They live here rather than in
+       the code because the price of a kilo of PETG in Baghdad is not a
+       constant — the owner changes it, and the next quote follows. */
+    { id: 'print', label: t('تسعير الطباعة', 'Print pricing'), icon: Printer },
   ];
 
   return (
@@ -78,6 +84,7 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
       {section === 'finance' && <Finance t={t} />}
       {section === 'reputation' && <Reputation t={t} />}
       {section === 'settings' && <SettingsSection t={t} />}
+      {section === 'print' && <PrintPricingAdmin dir={dir} />}
     </div>
   );
 }

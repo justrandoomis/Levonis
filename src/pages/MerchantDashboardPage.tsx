@@ -20,12 +20,12 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   Store, Package, ShoppingBag, Star, Users, BarChart3, Settings as SettingsIcon,
   Bell, Wallet, Loader2, Plus, ExternalLink,
-  ArrowRight, LayoutGrid, Hammer, Images, Tag, ClipboardList, MessageCircle,
+  ArrowRight, LayoutGrid, Hammer, Images, Tag, ClipboardList, MessageCircle, Printer,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
@@ -37,17 +37,30 @@ import { SectionsTab, ServicesTab, ShowcaseTab } from '../components/merchant/da
 import { ProductsManager } from '../components/merchant/dashboard/ProductsManager';
 import { OrdersTab, CustomOrdersTab, CouponsTab } from '../components/merchant/dashboard/SalesTabs';
 import { StoreSettingsTab } from '../components/merchant/dashboard/StoreSettingsTab';
+import { PrintersTab } from '../components/merchant/dashboard/PrintersTab';
 
 type Tab =
   | 'overview' | 'products' | 'sections' | 'services' | 'showcase'
   | 'orders' | 'custom' | 'coupons'
-  | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications';
+  | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications' | 'printers';
 
 export default function MerchantDashboardPage() {
   const { loc } = useLanguage();
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('overview');
+  /**
+   * A BRAND-NEW STORE LANDS ON ITS PRINTERS, NOT ON AN EMPTY OVERVIEW.
+   *
+   * Onboarding is deliberately one short step and says so, so the printer and
+   * notification preferences do not belong inside it. But they are what decides
+   * whether Levonis can ever match a print request to this shop — a merchant
+   * with no printer here is invisible to the matcher forever. Handing them
+   * straight to that screen is the honest continuation of the sign-up, and
+   * `MerchantStart` already sends the `created` flag that says this is the
+   * first time anyone has seen this dashboard.
+   */
+  const created = !!(useLocation().state as { created?: string } | null)?.created;
+  const [tab, setTab] = useState<Tab>(created ? 'printers' : 'overview');
 
   const reload = useCallback(() => {
     merchantApi
@@ -107,6 +120,10 @@ export default function MerchantDashboardPage() {
     { id: 'customers', label: loc('العملاء', 'Customers', 'کڕیاران'), icon: <Users className="w-3.5 h-3.5" /> },
     { id: 'money', label: loc('الأرباح', 'Earnings', 'قازانج'), icon: <Wallet className="w-3.5 h-3.5" /> },
     { id: 'settings', label: loc('إعداد المتجر', 'Store setup', 'ڕێکخستنی فرۆشگا'), icon: <SettingsIcon className="w-3.5 h-3.5" />, group: true },
+    /* The printers are what Levonis matches a print request against, so they
+       belong beside the store setup rather than in the catalogue: a shop with
+       no printer here is a shop the matcher can never notify. */
+    { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەرەکان'), icon: <Printer className="w-3.5 h-3.5" /> },
     { id: 'notifications', label: loc('الإشعارات', 'Notifications', 'ئاگادارکردنەوە'), icon: <Bell className="w-3.5 h-3.5" /> },
   ];
 
@@ -204,6 +221,7 @@ export default function MerchantDashboardPage() {
           {tab === 'money' && <MoneyTab />}
           {tab === 'settings' && <StoreSettingsTab me={me} onSaved={reload} />}
           {tab === 'notifications' && <NotificationsTab />}
+          {tab === 'printers' && <PrintersTab canSell={canSell} />}
         </motion.div>
       </div>
     </div>

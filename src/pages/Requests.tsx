@@ -18,8 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Plus, Loader2, PackageSearch, Clock, MapPin, Star, BadgeCheck, ShieldCheck,
   ChevronLeft, Send, X,
@@ -27,13 +26,13 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { UnauthorizedState } from '../components/ui/AsyncStates';
 import { api, ApiError } from '../lib/api';
 import { iqd, badgeLabel, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
-import { GOVERNORATE_LABELS, GOVERNORATES } from '../lib/governorates';
-import {
-  AttachmentDraft, AttachmentList, uploadRequestFiles, type RequestFile,
-} from '../components/media/RequestAttachments';
+import { GOVERNORATE_LABELS } from '../lib/governorates';
+import { AttachmentList, type RequestFile } from '../components/media/RequestAttachments';
+import PrintRequestWizard from '../components/print/PrintRequestWizard';
+import PrintSummary from '../components/print/PrintSummary';
+import MyRequestsList from '../components/print/MyRequestsList';
 
 interface RequestRow {
   id: string;
@@ -82,13 +81,79 @@ export default function Requests() {
   const [view, setView] = useState<View>('board');
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [open, setOpen] = useState<RequestRow | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [deepLinkError, setDeepLinkError] = useState('');
 
   useEffect(() => {
     if (!user) return;
     merchantApi.me().then(setMe).catch(() => {});
   }, [user]);
 
-  if (open) return <RequestDetail request={open} me={me} onBack={() => setOpen(null)} />;
+  /**
+   * ONE REQUEST HAS ONE ADDRESS.
+   *
+   * A merchant told about a matching job arrives at `/requests?request=<id>`,
+   * and that link has to land on THAT request — the notification's entire
+   * purpose is to open the one the matcher pointed at, and a page that dropped
+   * them on a generic board would make the match pointless. The detail view
+   * used to be local state with no URL, so this reads the id back out and
+   * fetches it, which also makes any request shareable and reloadable.
+   */
+  const deepLinked = params.get('request') ?? '';
+  useEffect(() => {
+    if (!deepLinked || open?.id === deepLinked) return;
+    let alive = true;
+    setDeepLinkError('');
+    api
+      .get<{ request: RequestRow }>(`/api/marketplace/requests/${deepLinked}`)
+      .then((d) => {
+        if (alive) setOpen(d.request);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        // A closed or private request 404s by design. Say so plainly rather
+        // than leaving a merchant staring at a board wondering what happened.
+        setDeepLinkError(
+          e instanceof ApiError && e.status === 404
+            ? loc(
+                'هذا الطلب لم يعد متاحًا — ربما أُغلق أو اختار صاحبه عرضًا.',
+                'That request is no longer available — it may have closed or an offer was accepted.',
+                'ئەم داواکاریە بەردەست نییە — لەوانەیە داخرابێت.'
+              )
+            : loc('تعذّر فتح الطلب', 'Could not open the request', 'نەتوانرا داواکاری بکرێتەوە')
+        );
+        setParams({}, { replace: true });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [deepLinked, open?.id, loc, setParams]);
+
+  /** Opening and closing move the URL with them, so Back works. */
+  const openRequest = useCallback(
+    (r: RequestRow) => {
+      setOpen(r);
+      setParams({ request: r.id });
+    },
+    [setParams]
+  );
+  /**
+   * The wizard and the repeat button know an id and nothing else. Rather than
+   * make them fetch the row just to hand it back, they move the URL and let the
+   * deep-link effect above do the one fetch it already knows how to do.
+   */
+  const openRequestId = useCallback(
+    (id: string) => {
+      setParams({ request: id });
+    },
+    [setParams]
+  );
+  const closeRequest = useCallback(() => {
+    setOpen(null);
+    setParams({}, { replace: true });
+  }, [setParams]);
+
+  if (open) return <RequestDetail request={open} me={me} onBack={closeRequest} />;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
@@ -105,6 +170,16 @@ export default function Requests() {
             'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
           )}
         </p>
+
+        {deepLinkError && (
+          <p
+            className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-200"
+            data-requests="deep-link-error"
+            role="status"
+          >
+            {deepLinkError}
+          </p>
+        )}
 
         <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
           {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
@@ -133,36 +208,49 @@ export default function Requests() {
         </div>
 
         {view === 'new' ? (
-          <NewRequest onDone={() => setView('mine')} onCancel={() => setView('board')} />
+          /* THE WIZARD REPLACED THE FORM. `NewRequest` asked for eighteen
+             fields before it would create anything; the wizard asks for a file
+             and a sentence, measures the model itself, prices it, and only
+             then offers the rest behind "خيارات متقدمة". It still creates the
+             SAME `community_requests` row through the same endpoint — the
+             print side hangs off it, and publishing is what notifies the
+             merchants who can make it. */
+          <PrintRequestWizard
+            onCreated={(id) => {
+              setView('mine');
+              openRequestId(id);
+            }}
+            onCancel={() => setView('board')}
+          />
         ) : view === 'orders' ? (
           <MyCommunityOrders />
+        ) : view === 'mine' ? (
+          <MyRequestsList onOpen={openRequestId} />
         ) : (
-          <RequestList mine={view === 'mine'} onOpen={setOpen} />
+          <RequestList onOpen={openRequest} />
         )}
       </div>
     </div>
   );
 }
 
-function RequestList({ mine, onOpen }: { mine: boolean; onOpen: (r: RequestRow) => void }) {
-  const { isAuthenticated } = useAuth();
+/**
+ * THE PUBLIC BOARD. It renders `publicRequest()`'s whitelist and nothing more.
+ * The customer's own list is `MyRequestsList`, which reads an owner-scoped
+ * route carrying the estimate and the chosen merchant — data this component
+ * deliberately never receives.
+ */
+function RequestList({ onOpen }: { onOpen: (r: RequestRow) => void }) {
   const { loc, lang } = useLanguage();
   const [rows, setRows] = useState<RequestRow[] | null>(null);
 
   useEffect(() => {
     setRows(null);
-    // "My requests" belongs to somebody. Asking for it with no session earns a
-    // 401 and then an empty list, which reads as "you have not created a
-    // request yet" — said to a visitor who has no account to create one with.
-    if (mine && !isAuthenticated) {
-      setRows([]);
-      return;
-    }
     api
-      .get<{ requests: RequestRow[] }>(mine ? '/api/marketplace/my-requests' : '/api/marketplace/requests')
+      .get<{ requests: RequestRow[] }>('/api/marketplace/requests')
       .then((d) => setRows(d.requests))
       .catch(() => setRows([]));
-  }, [mine, isAuthenticated]);
+  }, []);
 
   if (rows === null) {
     return (
@@ -173,14 +261,11 @@ function RequestList({ mine, onOpen }: { mine: boolean; onOpen: (r: RequestRow) 
   }
 
   if (!rows.length) {
-    if (mine && !isAuthenticated) return <UnauthorizedState next="/requests" />;
     return (
       <div className="py-14 text-center">
         <PackageSearch className="w-9 h-9 text-zinc-600 mx-auto mb-3" />
         <p className="text-zinc-400 text-[13px]">
-          {mine
-            ? loc('لم تنشئ أي طلب بعد', 'You have not created a request yet', 'هێشتا داواکاریت دروست نەکردووە')
-            : loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')}
+          {loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')}
         </p>
       </div>
     );
@@ -331,6 +416,11 @@ function RequestDetail({
             )}
           </div>
         </div>
+
+        {/* What Levonis measured and estimated. Renders nothing at all for a
+            request that carries no print row — an older one, or one whose link
+            could not be measured. */}
+        <PrintSummary requestId={request.id} />
 
         {(files.length > 0 || isOwner) && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4">
@@ -490,153 +580,6 @@ function OfferCard({
         )}
       </div>
     </div>
-  );
-}
-
-// ------------------------------------------------------------- creation
-
-function NewRequest({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const { loc, lang } = useLanguage();
-  const [f, setF] = useState({
-    title: '',
-    description: '',
-    category: '',
-    quantity: 1,
-    material: '',
-    color: '',
-    dimensions: '',
-    budget_iqd: '' as string,
-    governorate: '',
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
-
-  async function submit() {
-    setSaving(true);
-    setError('');
-    try {
-      // A file belongs to a request, so the request has to exist first. Two
-      // steps, and the second one is reported honestly: a posted request with
-      // a failed attachment is still a posted request, and telling the
-      // customer their model uploaded when it did not is how a merchant ends
-      // up quoting on nothing.
-      const created = await api.post<{ request: { id: string } }>('/api/marketplace/requests', {
-        ...f,
-        budget_iqd: f.budget_iqd === '' ? null : Number(f.budget_iqd),
-      });
-      if (attachments.length) {
-        const failed = await uploadRequestFiles(created.request.id, attachments);
-        if (failed) {
-          alert(loc(
-            `نُشر طلبك، لكن تعذّر رفع ${failed} من الملفات. يمكنك إضافتها من صفحة الطلب.`,
-            `Your request was posted, but ${failed} file(s) did not upload. You can add them from the request page.`,
-            `داواکارییەکەت بڵاوکرایەوە، بەڵام ${failed} فایل بار نەکرا.`
-          ));
-        }
-      }
-      onDone();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر الإرسال', 'Could not submit', 'نەتوانرا بنێردرێت'));
-      setSaving(false);
-    }
-  }
-
-  const valid = f.title.trim().length >= 4 && f.description.trim().length >= 10;
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-gold font-bold text-[14px]">{loc('طلب جديد', 'New request', 'داواکاری نوێ')}</h2>
-        <button onClick={onCancel} className="text-zinc-500">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      <F label={loc('ماذا تريد؟', 'What do you need?', 'چی دەتەوێت؟')} required>
-        <input
-          value={f.title}
-          onChange={(e) => setF({ ...f, title: e.target.value })}
-          maxLength={140}
-          placeholder={loc('مثال: قطعة غيار لمكنسة', 'e.g. A replacement bracket', 'نموونە: پارچەیەکی جێگرەوە')}
-          className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-        />
-      </F>
-
-      <F label={loc('التفاصيل', 'Details', 'وردەکاری')} required>
-        <textarea
-          value={f.description}
-          onChange={(e) => setF({ ...f, description: e.target.value })}
-          rows={4}
-          maxLength={6000}
-          className="w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 text-white text-[14px] outline-none focus:border-gold/40 resize-none"
-        />
-      </F>
-
-      <div className="grid grid-cols-2 gap-3">
-        <F label={loc('الكمية', 'Quantity', 'بڕ')}>
-          <input
-            type="number"
-            min={1}
-            value={f.quantity}
-            onChange={(e) => setF({ ...f, quantity: Number(e.target.value) || 1 })}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-          />
-        </F>
-        <F label={loc('الميزانية (اختياري)', 'Budget (optional)', 'بودجە')}>
-          <input
-            type="number"
-            value={f.budget_iqd}
-            onChange={(e) => setF({ ...f, budget_iqd: e.target.value })}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-          />
-        </F>
-        <F label={loc('المادة', 'Material', 'ماددە')}>
-          <input
-            value={f.material}
-            onChange={(e) => setF({ ...f, material: e.target.value })}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-          />
-        </F>
-        <F label={loc('اللون', 'Colour', 'ڕەنگ')}>
-          <input
-            value={f.color}
-            onChange={(e) => setF({ ...f, color: e.target.value })}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-          />
-        </F>
-      </div>
-
-      <F label={loc('المحافظة', 'Governorate', 'پارێزگا')}>
-        <select
-          value={f.governorate}
-          onChange={(e) => setF({ ...f, governorate: e.target.value })}
-          className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-        >
-          <option value="">{loc('اختر', 'Select', 'هەڵبژێرە')}</option>
-          {GOVERNORATES.map((g) => (
-            <option key={g.id} value={g.id} className="bg-[#0a0a0a]">
-              {lang === 'ar' ? g.ar : lang === 'ckb' ? g.ckb : g.en}
-            </option>
-          ))}
-        </select>
-      </F>
-
-      <F label={loc('المرفقات', 'Attachments', 'هاوپێچەکان')}>
-        <AttachmentDraft files={attachments} onChange={setAttachments} />
-      </F>
-
-      {error && <p className="text-red-400 text-[12.5px]">{error}</p>}
-
-      <button
-        onClick={submit}
-        disabled={!valid || saving}
-        className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40"
-      >
-        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        {loc('انشر الطلب', 'Post request', 'داواکاری بڵاو بکەرەوە')}
-      </button>
-    </motion.div>
   );
 }
 

@@ -1,0 +1,462 @@
+#!/usr/bin/env node
+/**
+ * THE PRINT-REQUEST JOURNEY IN A REAL BROWSER.
+ *
+ * scripts/e2e-print-request.mjs already proves the API: the measurement, the
+ * price, the single request, the matching and the notification. What it cannot
+ * prove is the sentence the owner actually wrote the specification around —
+ * "Complex underneath. Extremely simple above." So this drives the screens:
+ *
+ *   - three steps, not a wall of fields; the advanced options START CLOSED;
+ *   - a real STL goes in and the WIZARD shows back the size it measured,
+ *     without ever asking the customer for it;
+ *   - the estimate appears as a RANGE with a confidence, before publishing;
+ *   - publishing shows the owner's exact sentence and lands on the request;
+ *   - the request page shows the measurement and offers the 3D view;
+ *   - /model-viewer/<token> renders the model from a token — no session;
+ *   - "طلباتي" shows the estimate and offers "إعادة الطلب";
+ *   - the merchant's Printers tab exists and their preferences save;
+ *   - the bell shows the unread count and its item opens THAT request;
+ *   - and all of it at 390px with no sideways scroll.
+ *
+ *   node scripts/e2e-print-request-ui.mjs      (expects wrangler dev on :8787)
+ */
+import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const BASE = process.env.BASE_URL || 'http://127.0.0.1:8787';
+const OUT = path.join(ROOT, 'docs', 'evidence', 'print-request');
+
+let chromium;
+try {
+  ({ chromium } = require('playwright'));
+} catch {
+  try {
+    ({ chromium } = require('playwright-core'));
+  } catch {
+    ({ chromium } = require('/opt/node22/lib/node_modules/playwright/index.js'));
+  }
+}
+
+let passed = 0;
+let failed = 0;
+const failures = [];
+function check(label, ok, detail = '') {
+  if (ok) {
+    passed++;
+    console.log(`  ok   ${label}`);
+  } else {
+    failed++;
+    failures.push(`${label}${detail ? ` — ${detail}` : ''}`);
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
+  }
+}
+function report() {
+  console.log('\n================================================================');
+  console.log(`${passed} passed, ${failed} failed`);
+  if (failures.length) {
+    console.log('\nfailures:');
+    for (const f of failures) console.log(`  - ${f}`);
+  }
+  process.exit(failed ? 1 : 0);
+}
+
+const sql = (statement) =>
+  execSync(`npx wrangler d1 execute levonis-db --local --command ${JSON.stringify(statement)}`, {
+    cwd: ROOT,
+    stdio: 'pipe',
+  });
+
+const rnd = Math.random().toString(36).slice(2, 8);
+
+// ------------------------------------------------------------ an STL fixture
+
+/** A closed 220x180x140 box: twelve triangles, a known volume, one shell. */
+function boxTriangles(sx, sy, sz) {
+  const v = (i, j, k) => [i * sx, j * sy, k * sz];
+  const p000 = v(0, 0, 0), p100 = v(1, 0, 0), p110 = v(1, 1, 0), p010 = v(0, 1, 0);
+  const p001 = v(0, 0, 1), p101 = v(1, 0, 1), p111 = v(1, 1, 1), p011 = v(0, 1, 1);
+  return [
+    [p000, p110, p100].flat(), [p000, p010, p110].flat(),
+    [p001, p101, p111].flat(), [p001, p111, p011].flat(),
+    [p000, p100, p101].flat(), [p000, p101, p001].flat(),
+    [p010, p011, p111].flat(), [p010, p111, p110].flat(),
+    [p000, p001, p011].flat(), [p000, p011, p010].flat(),
+    [p100, p110, p111].flat(), [p100, p111, p101].flat(),
+  ];
+}
+
+function binaryStl(triangles) {
+  const out = new Uint8Array(84 + triangles.length * 50);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(80, triangles.length, true);
+  let at = 84;
+  for (const t of triangles) {
+    at += 12;
+    for (let i = 0; i < 9; i++) { dv.setFloat32(at, t[i], true); at += 4; }
+    at += 2;
+  }
+  return out;
+}
+
+const STL_PATH = path.join(OUT, `bracket-${rnd}.stl`);
+
+// ------------------------------------------------------------------ the run
+
+async function main() {
+  mkdirSync(OUT, { recursive: true });
+  writeFileSync(STL_PATH, Buffer.from(binaryStl(boxTriangles(220, 180, 140))));
+  console.log(`\nPRINT REQUEST journey — ${BASE}\n`);
+
+  // Rate limits are per-identifier and this script signs several people in.
+  try { sql('DELETE FROM rate_limits'); } catch { /* fresh database */ }
+
+  // ------------------------------------------------- accounts, over the API
+  const mk = () => {
+    let cookie = '';
+    return {
+      get cookie() { return cookie; },
+      async post(p, body) {
+        const res = await fetch(BASE + p, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+          body: JSON.stringify(body ?? {}),
+        });
+        const sc = res.headers.get('set-cookie');
+        if (sc) cookie = sc.split(';')[0];
+        let data = null;
+        try { data = await res.json(); } catch { /* not JSON */ }
+        return { status: res.status, data };
+      },
+      async get(p) {
+        const res = await fetch(BASE + p, { headers: cookie ? { Cookie: cookie } : {} });
+        let data = null;
+        try { data = await res.json(); } catch { /* not JSON */ }
+        return { status: res.status, data };
+      },
+    };
+  };
+
+  const customer = mk();
+  const cEmail = `pui-c-${rnd}@test.local`;
+  const pw = 'print-ui-12345';
+  await customer.post('/api/auth/register', { email: cEmail, username: `puc${rnd}`, name: 'Customer UI', password: pw });
+  const cLogin = await customer.post('/api/auth/login', { email: cEmail, password: pw });
+  check('the customer is signed in', cLogin.status === 200, `${cLogin.status}`);
+
+  const merchant = mk();
+  const mEmail = `pui-m-${rnd}@test.local`;
+  await merchant.post('/api/auth/register', { email: mEmail, username: `pum${rnd}`, name: 'Print Shop UI', password: pw });
+  await merchant.post('/api/auth/login', { email: mEmail, password: pw });
+  // Opening a store needs an active LEVO PLUS. The subscription flow is not
+  // what this probe is about, so the row goes in directly — the same shortcut
+  // scripts/e2e-coupons.mjs and scripts/e2e-tools.mjs take.
+  sql(
+    `INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, source, starts_at, expires_at) ` +
+      `SELECT 'mem_ui_${rnd}', id, 'plus_12mo', 'plus', 'active', 12, 0, 'admin', '2026-01-01T00:00:00Z', '2030-01-01T00:00:00Z' ` +
+      `FROM users WHERE email='${mEmail}'`
+  );
+  const onboard = await merchant.post('/api/merchant/onboard', {
+    name: `Print Shop ${rnd}`, slug: `print-shop-${rnd}`, tagline: 'UI probe', description: 'UI probe', governorate: 'baghdad',
+  });
+  check('the merchant has a store', onboard.status === 200 || onboard.status === 201, `${onboard.status}`);
+  // A printer that CAN do the job, so publishing produces a real notification.
+  const printer = await merchant.post('/api/merchant/printers', {
+    name: 'X1C', technology: 'fdm', build_x_mm: 256, build_y_mm: 256, build_z_mm: 256,
+    nozzle_mm: 0.4, materials: ['pla', 'petg'], colors: ['#000000'], multicolor: true,
+    enclosed: true, hardened_nozzle: true, quality_max: 'fine', machine_hour_iqd: 2000,
+    availability: 'available', active: true,
+  });
+  check('and a printer that fits the job', printer.status === 201 || printer.status === 200, `${printer.status}`);
+
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
+    args: ['--no-sandbox'],
+  });
+
+  let requestId = '';
+  let viewerUrl = '';
+
+  // ============================================== the customer, on a phone
+  for (const width of [390, 1280]) {
+    const label = `${width}px`;
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ar' });
+    await ctx.addCookies([cookieFor(customer.cookie)]);
+    const page = await ctx.newPage();
+
+    console.log(`\n--- the wizard at ${label}`);
+    await page.goto(`${BASE}/requests`, { waitUntil: 'networkidle' });
+    await page.locator('text=طلب جديد').first().click();
+    await page.waitForSelector('[data-wizard="stepper"]', { timeout: 15000 });
+    check(`[${label}] the wizard opens on step 1`,
+      (await page.locator('[data-wizard="stepper"]').getAttribute('data-wizard-active')) === '1');
+    check(`[${label}] it is three steps, not a form`,
+      (await page.locator('[data-wizard-step]').count()) === 3,
+      String(await page.locator('[data-wizard-step]').count()));
+
+    // step 1 — the file and the words
+    await page.locator('[data-wizard="file-input"]').setInputFiles(STL_PATH);
+    await page.waitForSelector('[data-wizard="file"]', { timeout: 10000 });
+    check(`[${label}] the STL is attached`, (await page.locator('[data-wizard="file"]').count()) === 1);
+    await page.locator('[data-wizard="title"]').fill(`قاعدة تثبيت ${rnd}`);
+    await page.locator('[data-wizard="description"]').fill('قطعة تثبيت لرف معدني، تحتاج متانة جيدة وتحمل حرارة معتدلة.');
+    await page.locator('[data-wizard="next"]').click();
+
+    // step 2 — what the customer chooses, and what they never had to type
+    await page.waitForSelector('[data-wizard="material"]', { timeout: 40000 });
+    check(`[${label}] step 2 is reached`,
+      (await page.locator('[data-wizard="stepper"]').getAttribute('data-wizard-active')) === '2');
+    check(`[${label}] the advanced options start CLOSED`,
+      (await page.locator('[data-wizard="advanced"]').getAttribute('data-open')) === 'false');
+    check(`[${label}] the encouraging line is there, verbatim`,
+      (await page.locator('text=كلما زادت المعلومات التي تضيفها').count()) > 0);
+    check(`[${label}] a completeness meter is shown`,
+      (await page.locator('[data-wizard="completeness"]').count()) === 1);
+    check(`[${label}] step 2 never asks for the size`,
+      (await page.locator('[data-wizard="dimensions-input"]').count()) === 0);
+
+    await page.locator('[data-wizard="material"][data-material-id="petg"]').click();
+    await page.locator('[data-wizard="advanced-toggle"]').click();
+    check(`[${label}] the advanced options open when asked for`,
+      (await page.locator('[data-wizard="advanced"]').getAttribute('data-open')) === 'true');
+    await page.locator('[data-wizard="governorate"]').selectOption('baghdad');
+    await page.locator('[data-wizard="next"]').click();
+
+    // step 3 — the estimate
+    await page.waitForSelector('[data-wizard="estimate"]', { timeout: 40000 });
+    await page.waitForFunction(
+      () => document.querySelector('[data-wizard="estimate"]')?.getAttribute('data-estimate-confidence') !== 'none',
+      null,
+      { timeout: 40000 }
+    );
+    // The wizard NEVER asked for the size — it says it back, beside the price
+    // it produced from it.
+    const measured = await page.locator('[data-wizard="analysis"]').getAttribute('data-measured');
+    check(`[${label}] the model was measured, not asked about`, measured === 'true', String(measured));
+    const analysisText = (await page.locator('[data-wizard="analysis"]').innerText()).replace(/\s/g, '');
+    check(`[${label}] and the real 220 x 180 x 140 is shown back`,
+      analysisText.includes('220.0×180.0×140.0'),
+      analysisText.slice(0, 120));
+
+    const conf = await page.locator('[data-wizard="estimate"]').getAttribute('data-estimate-confidence');
+    check(`[${label}] the estimate carries a confidence`, ['high', 'medium', 'low'].includes(conf), String(conf));
+    const estText = await page.locator('[data-wizard="estimate"]').innerText();
+    check(`[${label}] and it is a RANGE, not one number`, /–|-/.test(estText.replace(/\n/g, ' ')), estText.slice(0, 100).replace(/\n/g, ' '));
+    check(`[${label}] it never leaks the shop's cost`, !/تكلفة التشغيل|cost_lines|هامش/.test(estText), estText.slice(0, 120));
+
+    await shot(page, `${width}-estimate`);
+
+    if (width === 390) {
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      check('[390px] the wizard does not scroll sideways', overflow <= 1, `${overflow}px`);
+    }
+
+    // publish — but only once, from the phone pass, so the counts stay honest
+    if (width === 390) {
+      await page.locator('[data-wizard="publish"]').click();
+      await page.waitForSelector('[data-wizard="published"]', { timeout: 60000 });
+      const done = await page.locator('[data-wizard="published"]').innerText();
+      check('[390px] the owner\'s exact sentence is shown',
+        done.includes('تم نشر طلبك. سيقوم Levonis بإشعار التجار الذين تتوافق إمكانياتهم مع طلبك، وستظهر عروضهم هنا.'),
+        done.slice(0, 140).replace(/\n/g, ' '));
+      await shot(page, '390-published');
+
+      await page.locator('[data-wizard="open-request"]').click();
+      await page.waitForURL(/\?request=/, { timeout: 20000 });
+      requestId = new URL(page.url()).searchParams.get('request') ?? '';
+      check('[390px] publishing lands on THAT request', /^req_/.test(requestId), requestId);
+
+      // the request page carries the measurement and the 3D door
+      await page.waitForSelector(`[data-print-summary="${requestId}"]`, { timeout: 20000 });
+      const summary = await page.locator(`[data-print-summary="${requestId}"]`).innerText();
+      check('[390px] the request shows the measured size',
+        summary.replace(/\s/g, '').includes('220×180×140'), summary.slice(0, 160).replace(/\n/g, ' '));
+      check('[390px] and its estimate', (await page.locator('[data-print-summary-estimate]').count()) === 1);
+      check('[390px] and offers the 3D view', (await page.locator('[data-print-summary="viewer"]').count()) === 1);
+      await shot(page, '390-request');
+
+      // "my requests"
+      await page.goto(`${BASE}/requests`, { waitUntil: 'networkidle' });
+      await page.locator('text=طلباتي').first().click();
+      await page.waitForSelector(`[data-my-request="${requestId}"]`, { timeout: 20000 });
+      check('[390px] the request is in "طلباتي"', true);
+      check('[390px] with its estimate on the card',
+        (await page.locator(`[data-my-request="${requestId}"] [data-my-request-estimate]`).count()) === 1);
+      check('[390px] and an "إعادة الطلب" button',
+        (await page.locator(`[data-my-request-repeat="${requestId}"]`).count()) === 1);
+      const mineOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      check('[390px] "طلباتي" does not scroll sideways', mineOverflow <= 1, `${mineOverflow}px`);
+      await shot(page, '390-my-requests');
+    }
+
+    await ctx.close();
+  }
+
+  if (!requestId) {
+    console.log('\n(no request was published — the rest cannot run)');
+    await browser.close();
+    return report();
+  }
+
+  // =============================================== the viewer, with no session
+  console.log('\n--- the 3D viewer');
+  const files = await customer.get(`/api/marketplace/requests/${requestId}`);
+  const fileId = (files.data?.files ?? []).find((f) => f.kind === 'model')?.id;
+  check('the request has a model file', !!fileId, JSON.stringify(files.data?.files ?? []).slice(0, 120));
+  if (fileId) {
+    const tok = await customer.post(`/api/marketplace/print/requests/${requestId}/files/${fileId}/viewer-token`);
+    viewerUrl = tok.data?.url ?? '';
+    check('a viewer token is minted', !!viewerUrl, `${tok.status}`);
+  }
+  if (viewerUrl) {
+    // NO COOKIES AT ALL: the token is the whole credential, which is the point.
+    const anon = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: 'ar' });
+    const vp = await anon.newPage();
+    const target = viewerUrl.startsWith('http') ? viewerUrl : BASE + viewerUrl;
+    await vp.goto(target, { waitUntil: 'networkidle' });
+    await vp.waitForSelector('[data-viewer="canvas"]', { timeout: 30000 }).catch(() => {});
+    check('the viewer renders without a session', (await vp.locator('[data-viewer="canvas"]').count()) === 1);
+    const info = await vp.locator('[data-viewer="info"]').innerText().catch(() => '');
+    check('and states the dimensions it was given',
+      info.replace(/\s/g, '').includes('220.0×180.0×140.0'), info.slice(0, 160).replace(/\n/g, ' '));
+    await shot(vp, '390-viewer');
+
+    const dead = await anon.newPage();
+    await dead.goto(`${BASE}/model-viewer/not-a-real-token-000000`, { waitUntil: 'networkidle' });
+    await dead.waitForTimeout(1500);
+    check('a bad token says the link is dead, and nothing else',
+      (await dead.locator('text=لم يعد صالح').count()) > 0 || (await dead.locator('text=no longer valid').count()) > 0,
+      (await dead.locator('body').innerText()).slice(0, 120).replace(/\n/g, ' '));
+    await anon.close();
+  }
+
+  // ============================================ the merchant: bell + printers
+  console.log('\n--- the merchant');
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: 'ar' });
+  await mctx.addCookies([cookieFor(merchant.cookie)]);
+  const mp = await mctx.newPage();
+
+  await mp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await mp.waitForSelector('[data-notif="bell"]', { timeout: 20000 });
+  check('the merchant has a notification bell', true);
+  // The count lives on the button as data, so the assertion reads the number
+  // rather than the rendered "99+" cap.
+  await mp.waitForFunction(
+    () => Number(document.querySelector('[data-notif="bell"]')?.getAttribute('data-notif-unread') || 0) > 0,
+    null,
+    { timeout: 25000 }
+  ).catch(() => {});
+  const badge = await mp.locator('[data-notif="bell"]').getAttribute('data-notif-unread');
+  check('and it is showing an unread notification', Number(badge) >= 1, String(badge));
+  check('the badge is actually painted', (await mp.locator('[data-notif="badge"]').count()) === 1);
+
+  await mp.locator('[data-notif="bell"]').click();
+  await mp.waitForSelector('[data-notif-item]', { timeout: 20000 });
+  check('the panel lists it', (await mp.locator('[data-notif-item]').count()) >= 1);
+  await shot(mp, '390-bell');
+  await mp.locator('[data-notif-item]').first().click();
+  await mp.waitForURL(/\/requests\?request=/, { timeout: 20000 });
+  check('and tapping it opens THE SAME request, not a copy',
+    new URL(mp.url()).searchParams.get('request') === requestId,
+    `${new URL(mp.url()).searchParams.get('request')} vs ${requestId}`);
+
+  await mp.goto(`${BASE}/merchant`, { waitUntil: 'networkidle' });
+  await mp.locator('text=الطابعات').first().click();
+  await mp.waitForSelector('[data-printers]', { timeout: 20000 });
+  check('the merchant dashboard has a Printers tab', true);
+  check('and the printer they registered is listed',
+    (await mp.locator('[data-printer]').count()) >= 1, String(await mp.locator('[data-printer]').count()));
+  check('with the request preferences beside them',
+    (await mp.locator('[data-prefs]').count()) >= 1);
+  const mOverflow = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  check('[390px] the printers screen does not scroll sideways', mOverflow <= 1, `${mOverflow}px`);
+  await shot(mp, '390-printers');
+  await mctx.close();
+
+  // ============================================ the admin: the price is a knob
+  console.log('\n--- the admin');
+  const admin = mk();
+  const aEmail = `pui-a-${rnd}@test.local`;
+  await admin.post('/api/auth/register', { email: aEmail, username: `pua${rnd}`, name: 'Admin UI', password: pw });
+  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'`);
+  await admin.post('/api/auth/login', { email: aEmail, password: pw });
+
+  // The same job, priced before and after the owner moves the price of PETG.
+  const quoteSpec = {
+    process: 'fdm', material_id: 'petg', quality: 'standard', infill_percent: 20,
+    supports: true, colors_count: 1, quantity: 1, color_hex: '#000000',
+    volume_cm3: 500,
+  };
+  const before = await admin.post('/api/marketplace/print/quote', quoteSpec);
+  const beforePrice = before.data?.quote?.price_iqd ?? 0;
+  check('the estimate can be priced before the change', beforePrice > 0, String(beforePrice));
+
+  const actx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ar' });
+  await actx.addCookies([cookieFor(admin.cookie)]);
+  const ap = await actx.newPage();
+  await ap.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+  if ((await ap.locator('[data-tab="community"]:visible').count()) === 0) {
+    await ap.locator('[data-action="open-sidebar"]').first().click().catch(() => {});
+    await ap.waitForTimeout(400);
+  }
+  await ap.locator('[data-tab="community"]:visible').first().click({ timeout: 20000 });
+  await ap.locator('text=تسعير الطباعة').first().click({ timeout: 20000 });
+  await ap.waitForSelector('[data-print-admin="pricing"]', { timeout: 25000 });
+  check('the admin has a print-pricing screen', true);
+  check('and it is not one page — pricing, materials, weights, model sites',
+    (await ap.locator('[data-print-admin-tab]').count()) === 4,
+    String(await ap.locator('[data-print-admin-tab]').count()));
+
+  await ap.locator('[data-print-admin-tab="materials"]').click();
+  await ap.waitForSelector('[data-material-row="petg"]', { timeout: 20000 });
+  check('every filament and resin is editable, PETG included', true);
+  const kg = ap.locator('[data-material-row="petg"] [data-print-field="price_iqd_per_kg"]');
+  const wasKg = Number(await kg.inputValue());
+  check('PETG has a reference price per kilo', wasKg > 0, String(wasKg));
+  await kg.fill(String(wasKg * 3));
+  await ap.locator('[data-print-admin-save="materials"]').click();
+  await ap.waitForTimeout(2500);
+  await shot(ap, '1280-admin-materials');
+
+  const after = await admin.post('/api/marketplace/print/quote', quoteSpec);
+  const afterPrice = after.data?.quote?.price_iqd ?? 0;
+  check('tripling the filament price moves the estimate UP',
+    afterPrice > beforePrice, `${beforePrice} -> ${afterPrice}`);
+  check('and it is not hardcoded anywhere — the change came from the admin screen',
+    afterPrice !== beforePrice);
+
+  // Put it back, so a second run of this probe starts from the same place.
+  await kg.fill(String(wasKg));
+  await ap.locator('[data-print-admin-save="materials"]').click();
+  await ap.waitForTimeout(2500);
+  const restored = await admin.post('/api/marketplace/print/quote', quoteSpec);
+  check('and putting the price back restores the estimate',
+    (restored.data?.quote?.price_iqd ?? 0) === beforePrice,
+    `${restored.data?.quote?.price_iqd} vs ${beforePrice}`);
+  await actx.close();
+
+  await browser.close();
+  report();
+}
+
+// -------------------------------------------------------------- small helpers
+
+function cookieFor(raw) {
+  const [name, ...rest] = raw.split('=');
+  return { name, value: rest.join('='), domain: '127.0.0.1', path: '/' };
+}
+
+async function shot(page, name) {
+  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: false }).catch(() => {});
+}
+
+main().catch((e) => {
+  console.error(e);
+  report();
+});

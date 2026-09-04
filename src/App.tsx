@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { StoreProvider, useStore } from './StoreContext';
 import Storefront from './pages/Storefront';
@@ -6,6 +6,14 @@ import MerchantStart from './pages/MerchantStart';
 import MerchantDashboardPage from './pages/MerchantDashboardPage';
 import StorefrontProduct from './pages/StorefrontProduct';
 import Requests from './pages/Requests';
+/**
+ * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
+ * pulls in `ogl`, a WebGL renderer and a mesh parser, and it is reached from a
+ * token link rather than from navigation — nobody browsing the store passes
+ * through it. Loading it eagerly would put a renderer nobody asked for into the
+ * first byte of every page, so it arrives when the route does.
+ */
+const ModelViewer = React.lazy(() => import('./pages/ModelViewer'));
 import { LanguageProvider } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -124,7 +132,7 @@ function AppContent() {
   // it to the other <Routes> block and render a different tree for the same
   // page. Comparing the way the router does keeps the two in step.
   const pathForShell = location.pathname.toLowerCase();
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/model-viewer'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
     return (
@@ -153,6 +161,29 @@ function AppContent() {
             <Route path="/games" element={<Games />} />
             <Route path="/leaderboards" element={<Leaderboards />} />
             <Route path="/support" element={<Support />} />
+            {/* PUBLIC BY DESIGN, AND THAT IS THE WHOLE POINT OF THE TOKEN.
+                A print model belongs to the customer, so the preview is not
+                gated on being signed in — it is gated on holding a token that
+                was minted for one file, expires, is stored hashed, and
+                resolves to a DERIVED mesh rather than to the uploaded file
+                (worker/routes/printRequests.ts §7). Putting a session check
+                here instead would break the one case the viewer exists for:
+                a merchant weighing a job, or a customer showing somebody the
+                part on another device. */}
+            <Route
+              path="/model-viewer/:token"
+              element={
+                <Suspense
+                  fallback={
+                    <div className="min-h-screen w-full bg-black flex items-center justify-center text-zinc-400 text-sm">
+                      …
+                    </div>
+                  }
+                >
+                  <ModelViewer />
+                </Suspense>
+              }
+            />
           </Routes>
         
         </main>

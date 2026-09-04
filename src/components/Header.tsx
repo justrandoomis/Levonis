@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { Anchored } from './ui/Overlay';
+import NotificationBell from './notifications/NotificationBell';
 
 export default function Header() {
   const { lang, setLang, t, dir } = useLanguage();
@@ -102,6 +103,12 @@ export default function Header() {
         
         {/* Right: Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* The inbox. It renders nothing at all for a signed-out visitor —
+              there is no such thing as a guest's notifications, and a bell that
+              always says zero is furniture. Placed before the language toggle
+              so it sits closest to the content it refers to. */}
+          <NotificationBell />
+
           {/* Language Toggle */}
           <div className="relative">
             <button
