@@ -353,8 +353,15 @@ button:disabled { cursor: not-allowed; }
    * The bottom-left corner is free: the left rail runs down x 5..42, which is
    * what the inline-start inset clears, and the engine's viewport hint line
    * sits under the bottom inset.
+   *
+   * Raised clear of the engine's plate bar too. At 34px the strip's own
+   * bottom edge (y 1298..1332 at 1024x1366) crossed the plate tabs at
+   * 1305..1331 — a second collision, found by tests/browser-shell-layout.mjs
+   * the moment the Save button widened the strip, which is the whole reason
+   * that probe measures every LEVO control against every engine control
+   * rather than the one pair that was wrong last time.
    */
-  bottom: 34px;
+  bottom: 76px;
   inset-inline-start: 52px;
   display: flex;
   gap: 6px;

@@ -25,7 +25,7 @@ The quick setup sheet uses the Orca profile and process presets shipped by the e
 
 ## Print and export workflow
 
-The primary output path is **«تجهيز لـ MakerWorld» (Prepare for MakerWorld)** — four honest steps: preflight the project, prepare a real editable 3MF through the engine's save path, summarize what transfers and what may not be supported, then open the official MakerWorld upload page for the user to upload with their own account. Opening that page uploads nothing; the flow says "file ready" and "open MakerWorld", never "uploaded" — no sanctioned third-party upload API exists.
+The output path that ships is **«حفظ ملف المشروع (3MF)»** — `saveBambuProject` in `app/slicer-client.tsx`, which runs the engine's save path and converts the result through `app/bambu-project-3mf.ts` into a Bambu-shaped project package. Reachable from the canvas strip, the mobile tool tray and the print sheet, and never gated on a completed slice. A separate DESIGNED flow, **«تجهيز لـ MakerWorld» (Prepare for MakerWorld)**, is written but **not mounted on any screen** (see BAMBU_PRINT_PIPELINE.md) — four honest steps: preflight the project, prepare a real editable 3MF through the engine's save path, summarize what transfers and what may not be supported, then open the official MakerWorld upload page for the user to upload with their own account. Opening that page uploads nothing; the flow says "file ready" and "open MakerWorld", never "uploaded" — no sanctioned third-party upload API exists.
 
 Three output kinds stay strictly distinguished:
 

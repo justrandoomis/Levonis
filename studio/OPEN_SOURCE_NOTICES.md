@@ -35,6 +35,16 @@ This project does not copy code from the surveyed Bambu MCP repositories. They w
   fused to libslic3r's scaled-integer slicer, ExPolygons and 2D triangulation
   library. The geometry there is written for this codebase and stated as such
   in its own header.
+- `app/bambu-project-3mf.ts` derives from `src/libslic3r/Format/bbs_3mf.cpp`
+  (`_BBS_3MF_Exporter`): the archive layout, the exact `[Content_Types].xml`
+  and `_rels/.rels` documents, the `BambuStudio` namespace and
+  `BambuStudio:3mfVersion` marker, the `project_settings.config` header keys
+  (`name` / `from` / `version`) that upstream's `Config::save_to_json` writes
+  and `ConfigBase::is_project_settings` reads back, and the `slice_info.config`
+  header grammar. It is a converter, not a writer: the mesh serialization stays
+  the engine's, and the module documents in its own header both what it takes
+  and the one thing it deliberately does not — the `Application` value that
+  would claim Bambu Studio produced the file.
 - What was NOT taken: no C++ was vendored, no build artefact, no profile data,
   and no printer-integration code. The auto-orient port is a re-implementation
   of the documented algorithm in this repository's own language and coordinate
