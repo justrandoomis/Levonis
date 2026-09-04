@@ -395,7 +395,11 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
       // way to the writer — and the group in particular could not survive a
       // round trip at all. `group` is the template's spelling, `group_en` the
       // model's; both are read so either shape parses.
-      group_en: s(o.group_en ?? o.group, 80),
+      // The FILE's `group` wins over the value merged in from the existing
+      // row. `o.group_en ?? o.group` never fell through — the base object
+      // always carries a group_en string, even an empty one — so editing
+      // options.N.group in an exported file did nothing at all.
+      group_en: s(o.group !== undefined ? o.group : o.group_en, 80),
       sku_part: s(o.sku_part, 40),
       low_stock_threshold: num(o.low_stock_threshold),
     };

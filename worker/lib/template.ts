@@ -23,6 +23,16 @@ import type {
   TranslationMeta,
 } from './productModel';
 
+/**
+ * The parser demands an EXACT match, so bumping this rejects every file
+ * already in the owner's hands. Version 2 has therefore grown keys rather than
+ * becoming version 3 — and because an unrecognised key is a warning, not an
+ * error, an older parser accepts a newer file and drops the new content
+ * quietly. That trade is deliberate: a file the owner downloaded last week
+ * must keep working, and the alternative is a hard failure on every one of
+ * them. Any future change that cannot be ignored safely by an old parser is
+ * the one that has to bump this and accept the break.
+ */
 export const TEMPLATE_VERSION = 2;
 export const NULL_TOKEN = '__NULL__';
 export const CLEAR_TOKEN = '__CLEAR__';
@@ -1021,8 +1031,13 @@ function sectionHeader(groupId: string): string[] {
 const iqd = (n: number): string => n.toLocaleString('en-US');
 
 /**
- * WHAT EACH INHERITING FIELD ACTUALLY CHARGES, as a comment map keyed by
- * template key.
+ * WHAT EACH INHERITING FIELD RESOLVES TO, as a comment map keyed by template
+ * key.
+ *
+ * These are ITEM prices — what the ladder resolves for that row. What the
+ * customer pays on a LINE is this plus the direct premium (a direct sale) or
+ * the transport commission (a pre-order), and the file annotates those
+ * separately where they live.
  *
  * Every number here comes from `buildGrid`, which computes the ladder with the
  * SAME rules `pricing.ts` resolves at checkout — so the file and the cart
@@ -1044,18 +1059,51 @@ function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> 
     colors: doc.colors,
   });
   const rowById = new Map(rows.map((r) => [`${r.level}:${r.id}`, r]));
+  // Do the options actually price differently from one another? If they all
+  // resolve to the same regular price, a colour's inherited number is the same
+  // whichever option is picked, and naming it is safe.
+  const optionRegulars = new Set(
+    rows.filter((r) => r.level === 'option').map((r) => r.cells.regular.effective)
+  );
+  const optionsPriceDiffer = optionRegulars.size > 1;
 
   // Whole phrases, not a noun plus a shared adjective: «الكلفة الفعلي» is
   // wrong in Arabic, and a bare «الاعتيادي» does not say what it measures.
+  // «للصنف» is load-bearing: these are the ITEM prices the ladder resolves.
+  // A direct line also pays direct_surcharge_iqd and a pre-order line pays its
+  // transport commission, neither of which is part of this number — calling it
+  // "what the customer pays" would be wrong on most lines.
   const label: Record<Field, string> = {
-    regular: 'السعر الاعتيادي الفعلي',
-    prime: 'سعر PRIME الفعلي',
-    pro: 'سعر PRO الفعلي',
-    cost: 'الكلفة الفعلية',
+    regular: 'السعر الاعتيادي الفعلي للصنف',
+    prime: 'سعر PRIME الفعلي للصنف',
+    pro: 'سعر PRO الفعلي للصنف',
+    cost: 'الكلفة الفعلية للصنف',
   };
   const note = (prefix: string, level: 'option' | 'color', id: string) => {
     const row = rowById.get(`${level}:${id}`);
     if (!row) return;
+
+    /**
+     * THE MEMBER LADDER IS CLAMPED AT CHECKOUT, AND buildGrid DOES NOT CLAMP.
+     *
+     * pricing.ts caps PRO and PRIME at the regular price resolved for the SAME
+     * row, and floors PRIME at PRO. buildGrid reports the raw inherited number
+     * instead, so a row whose regular price is adjusted DOWN was annotated with
+     * a member price higher than the one the customer is charged. Annotating a
+     * number the cart will not honour is worse than annotating nothing.
+     */
+    const regular = row.cells.regular.effective;
+    const clamp = (f: Field, v: number | null): number | null => {
+      if (v === null || regular === null) return v;
+      if (f === 'pro') return Math.min(v, regular);
+      if (f === 'prime') {
+        const pro = row.cells.pro.effective === null ? null : Math.min(row.cells.pro.effective, regular);
+        const capped = Math.min(v, regular);
+        return pro === null ? capped : Math.max(capped, pro);
+      }
+      return v;
+    };
+
     for (const f of FIELDS) {
       if (f === 'cost' && !money) continue;
       const cell = row.cells[f];
@@ -1063,11 +1111,29 @@ function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> 
       // price is already written in the file above the comment.
       if (cell.mode === 'fixed') continue;
       if (cell.effective === null) continue;
+
+      /**
+       * A COLOUR THAT INHERITS HAS NO SINGLE ANSWER.
+       *
+       * buildGrid resolves an unlinked colour from the BASE price; the resolver
+       * walks base → the option the customer picked → the colour. So for a
+       * product with options, an inheriting colour costs whatever the chosen
+       * option costs, and printing one number would name a price the cart
+       * charges only when that option happens to be the base-priced one. The
+       * file says what is true instead of a number that is sometimes right.
+       */
+      if (level === 'color' && cell.mode !== 'adjust' && optionsPriceDiffer) {
+        out.set(`${prefix}.${COLUMN_OF[f]}`, `${label[f]}: يتبع الخيار الذي يختاره الزبون`);
+        continue;
+      }
+
+      const value = clamp(f, cell.effective);
+      if (value === null) continue;
       const source =
         cell.mode === 'adjust'
           ? `فرق ${cell.adjust !== null && cell.adjust >= 0 ? '+' : ''}${iqd(cell.adjust ?? 0)} عن ${iqd(cell.inherited ?? 0)}`
           : 'موروث';
-      out.set(`${prefix}.${COLUMN_OF[f]}`, `${label[f]}: ${iqd(cell.effective)} د.ع — ${source}`);
+      out.set(`${prefix}.${COLUMN_OF[f]}`, `${label[f]}: ${iqd(value)} د.ع — ${source}`);
     }
   };
 

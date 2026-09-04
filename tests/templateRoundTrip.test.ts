@@ -134,9 +134,11 @@ function roundTrip() {
 test('the export parses back with no errors and no unknown keys', () => {
   const { parsed } = roundTrip();
   assert.deepEqual(parsed.errors, []);
-  // An unrecognised key is reported as an ERROR by parseTemplate, so an empty
-  // error list already proves the exporter writes nothing the parser rejects.
-  assert.equal(parsed.errors.length, 0);
+  // An unrecognised key is a WARNING, not an error — parseTemplate collects it
+  // in unknown_keys and carries on. So asserting on errors alone would let the
+  // exporter start writing keys the parser silently ignores; this is the
+  // assertion that actually catches that.
+  assert.deepEqual(parsed.unknown_keys, []);
 });
 
 test('the option GROUPS survive — «1 مجموعة · 4 قيمة» is not flattened', () => {
@@ -377,12 +379,48 @@ test('a spec the file leaves out is preserved; __CLEAR__ removes it', () => {
 
 // ------------------------------------------ the number actually charged
 
-test('an inheriting price is annotated with what the customer really pays', () => {
+test('an inheriting price is annotated with the number the ladder resolves', () => {
   const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
   const text = exportProduct(doc, { includeCost: true });
   // options.2 inherits its regular price and carries a +300,000 adjustment,
   // so the file must say 500,000 + 300,000 rather than only "__NULL__".
-  assert.match(text, /options\.2\.regular_price_iqd=__NULL__\n#\s+↳ السعر الاعتيادي الفعلي: 800,000 د\.ع — فرق \+300,000 عن 500,000/);
+  assert.match(
+    text,
+    /options\.2\.regular_price_iqd=__NULL__\n#\s+↳ السعر الاعتيادي الفعلي للصنف: 800,000 د\.ع — فرق \+300,000 عن 500,000/
+  );
+});
+
+test('a member price is never annotated above the regular price of its own row', () => {
+  // pricing.ts caps PRO and PRIME at the regular price resolved AT THAT ROW;
+  // buildGrid does not. A clearance option — regular adjusted down below the
+  // inherited PRO price — was annotated with a PRO price the cart refuses.
+  const v = view();
+  const vals = v.values as unknown as Array<Record<string, unknown>>;
+  vals[1].regular_adjust_iqd = -450_000; // 500,000 - 450,000 = 50,000
+  const doc = applyRelations(
+    parseProductRow({ ...baseRow(), pro_price_iqd: 400_000, prime_price_iqd: 450_000 }),
+    v,
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, { includeCost: true });
+  const line = text.split('\n').find((l) => l.includes('سعر PRO الفعلي للصنف') && l.includes('50,000'));
+  assert.ok(line, `PRO must be clamped to 50,000; got:\n${text.split('\n').filter((l) => l.includes('PRO')).join('\n')}`);
+});
+
+test('an inheriting colour on a product whose options differ says so instead of naming a price', () => {
+  // buildGrid resolves an unlinked colour from the BASE price; the resolver
+  // walks base → the option the customer picked → the colour. One number
+  // would be right only when the base-priced option is chosen.
+  const doc = applyRelations(
+    parseProductRow({ ...baseRow(), pro_price_iqd: 450_000, prime_price_iqd: 480_000 }),
+    view(),
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, { includeCost: true });
+  const lines = text.split('\n');
+  const idx = lines.findIndex((l) => l.startsWith('colors.1.pro_price_iqd='));
+  assert.ok(idx > 0, 'the colour inherits its PRO price');
+  assert.match(lines[idx + 1], /يتبع الخيار الذي يختاره الزبون/);
 });
 
 test('the annotation is a COMMENT — re-parsing the annotated file is identical', () => {

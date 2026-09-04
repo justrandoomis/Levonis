@@ -212,8 +212,18 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
       id: m.id,
       url: m.url,
       alt_en: m.alt_en,
-      alt_ar: m.alt_ar,
-      alt_ckb: m.alt_ckb,
+      /**
+       * A .txt exported before 0048 carries the ENGLISH alt in alt_ar and
+       * alt_ckb, because the overlay faked both from alt_en — product_images
+       * had no column for either. Applying such a file would write English
+       * into the Arabic column and call it Arabic. A value byte-identical to
+       * the English one is therefore treated as the fake it is and dropped;
+       * the writer keeps whatever is stored when a field arrives empty, so
+       * nothing real is lost. A genuinely identical Arabic alt is possible in
+       * principle (a model number) and costs nothing when it is skipped.
+       */
+      alt_ar: m.alt_ar && m.alt_ar !== m.alt_en ? m.alt_ar : '',
+      alt_ckb: m.alt_ckb && m.alt_ckb !== m.alt_en ? m.alt_ckb : '',
       r2_key: m.key,
       source_url: m.source_url,
       sort_order: typeof m.order === 'number' ? m.order : i,

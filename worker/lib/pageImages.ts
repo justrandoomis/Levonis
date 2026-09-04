@@ -475,9 +475,13 @@ export function extractPageImages(html: string, pageUrl: string, limit = 24): Pa
     const set = at.get('srcset') ?? at.get('data-srcset');
     if (set) {
       const best = widestFromSrcset(set);
+      // The page said its WIDEST candidate is below the floor. Falling through
+      // to `src` — which declares no width at all — smuggled the same
+      // thumbnail back in as "size unknown".
+      if (best && best.width !== null && best.width < MIN_DECLARED_WIDTH) continue;
       if (best) {
         const abs = absolute(best.url, pageUrl);
-        if (abs && !seen.has(abs) && isPlausibleImage(abs) && !(best.width !== null && best.width < MIN_DECLARED_WIDTH)) {
+        if (abs && !seen.has(abs) && isPlausibleImage(abs)) {
           seen.add(abs);
           fromImgs.push({ url: abs, source: 'srcset', width: best.width, alt });
           continue;
