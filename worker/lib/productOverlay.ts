@@ -22,7 +22,7 @@
  * neither options nor colours nor images.
  */
 
-import type { ProductDoc } from './productModel';
+import type { MediaV2, ProductDoc } from './productModel';
 import type { ColorV2, OptionV2 } from './pricing';
 import {
   loadProductRelations,
@@ -334,22 +334,42 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
       };
     });
 
-  const media =
+  /**
+   * A COMPLETE MediaV2, not a near-miss.
+   *
+   * This used to build an object with `kind` and `media_key` — neither of
+   * which MediaV2 has — while missing `key`, `role`, `width`, `height` and
+   * `source_url`, and an `as ProductDoc['media']` cast at the return hid the
+   * mismatch from the compiler. Every consumer that read one of the absent
+   * fields got `undefined`, and the TXT exporter's formatter takes a
+   * `string | null`: exporting a product with a relational image crashed the
+   * whole export with "Cannot read properties of undefined (reading
+   * 'includes')". The cast is gone so the next missing field is a build error
+   * rather than a 500.
+   *
+   * `width`/`height` come from the row; the rest are '' because the relational
+   * image table genuinely does not carry them, and an empty string is the
+   * honest answer for "no alt text was written", not a guess at one.
+   */
+  const media: MediaV2[] =
     view.images.length > 0
       ? view.images.map((i) => ({
           id: i.id,
           url: i.url,
-          kind: 'image' as const,
+          key: '',
+          role: 'gallery' as const,
           alt_ar: i.alt_en,
           alt_en: i.alt_en,
           alt_ckb: i.alt_en,
           order: i.sort_order,
           primary: i.is_primary === 1,
-          media_key: '',
+          width: i.width,
+          height: i.height,
+          source_url: '',
         }))
       : doc.media;
 
-  return { ...doc, options, colors, media: media as ProductDoc['media'] };
+  return { ...doc, options, colors, media };
 }
 
 /** The snapshot the inventory engine needs, from an already-loaded view. */

@@ -596,6 +596,18 @@ export interface ExportOpts {
   catalogs?: string[];
   /** include field-annotation comments (blank template style) */
   comments?: boolean;
+  /**
+   * Whether the caller may see cost.
+   *
+   * §11 says cost appears in NO API, HTML or export an assistant admin can
+   * reach, and the CSV path has always honoured it (adminImport.ts passes
+   * `canViewFinancials`). This flag did not exist, so the TXT export wrote
+   * `product_cost_iqd`, `options.N.cost_iqd` and the colour equivalents
+   * unconditionally — an assistant could download the whole cost sheet as a
+   * .txt. Defaults to true, so the blank-template generator, which describes
+   * the FORMAT rather than any product's data, is unchanged.
+   */
+  includeCost?: boolean;
 }
 
 interface Entry { key: string; value: string | null }
@@ -632,6 +644,10 @@ const numStr = (n: number | null) => (n === null || n === undefined ? null : Str
 export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   const e: Entry[] = [];
   const push = (key: string, value: string | null) => e.push({ key, value });
+  // §11: cost reaches no export an assistant admin can open. Absent means
+  // "may see it" so the blank template — which describes the FORMAT, not any
+  // product's data — is unchanged.
+  const money = opts.includeCost !== false;
 
   // identity
   push('name_ar', doc.name_ar);
@@ -647,7 +663,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   push('price_iqd', String(doc.price_iqd));
   push('pro_price_iqd', numStr(doc.pro_price_iqd));
   push('prime_price_iqd', numStr(doc.prime_price_iqd));
-  push('product_cost_iqd', numStr(doc.product_cost_iqd));
+  if (money) push('product_cost_iqd', numStr(doc.product_cost_iqd));
   // classification
   if (opts.brand !== undefined) push('brand', opts.brand);
   else push('brand', doc.brand_id ?? null);
@@ -697,11 +713,11 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.regular_price_iqd`, numStr(o.regular_price_iqd));
     push(`${p}.pro_price_iqd`, numStr(o.pro_price_iqd));
     push(`${p}.prime_price_iqd`, numStr(o.prime_price_iqd));
-    push(`${p}.cost_iqd`, numStr(o.cost_iqd));
+    if (money) push(`${p}.cost_iqd`, numStr(o.cost_iqd));
     push(`${p}.regular_adjust_iqd`, numStr(o.regular_adjust_iqd ?? null));
     push(`${p}.prime_adjust_iqd`, numStr(o.prime_adjust_iqd ?? null));
     push(`${p}.pro_adjust_iqd`, numStr(o.pro_adjust_iqd ?? null));
-    push(`${p}.cost_adjust_iqd`, numStr(o.cost_adjust_iqd ?? null));
+    if (money) push(`${p}.cost_adjust_iqd`, numStr(o.cost_adjust_iqd ?? null));
     // 0043. Exported unconditionally, including as empty strings, because an
     // export is the bulk-EDIT path: a field the file omits is one the importer
     // PRESERVES, so a silently-absent availability could never be cleared by
@@ -728,11 +744,11 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.regular_price_iqd`, numStr(cItem.regular_price_iqd));
     push(`${p}.pro_price_iqd`, numStr(cItem.pro_price_iqd));
     push(`${p}.prime_price_iqd`, numStr(cItem.prime_price_iqd));
-    push(`${p}.cost_iqd`, numStr(cItem.cost_iqd));
+    if (money) push(`${p}.cost_iqd`, numStr(cItem.cost_iqd));
     push(`${p}.regular_adjust_iqd`, numStr(cItem.regular_adjust_iqd ?? null));
     push(`${p}.prime_adjust_iqd`, numStr(cItem.prime_adjust_iqd ?? null));
     push(`${p}.pro_adjust_iqd`, numStr(cItem.pro_adjust_iqd ?? null));
-    push(`${p}.cost_adjust_iqd`, numStr(cItem.cost_adjust_iqd ?? null));
+    if (money) push(`${p}.cost_adjust_iqd`, numStr(cItem.cost_adjust_iqd ?? null));
   });
 
   sorted(doc.spec_groups).forEach((g, gi) => {

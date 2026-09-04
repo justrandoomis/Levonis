@@ -34,6 +34,8 @@ import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, oneOf, str, HttpError } from '../lib/http';
+import { applyRelations, loadRelationsView } from '../lib/productOverlay';
+import { canViewFinancials } from '../lib/adminScope';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { newId, sha256Hex } from '../lib/crypto';
@@ -364,9 +366,33 @@ export function templateDownloadDiagnostics(): {
 
 // ---------------------------------------------------------------- helpers
 
+/**
+ * THE PRODUCT AS IT ACTUALLY IS, NOT AS ITS JSON COLUMNS REMEMBER IT.
+ *
+ * This read `products` alone. Every product built in the current admin form
+ * keeps its options, colours and images in the relational tables instead — the
+ * relations PUT writes them there and never mirrors them back into
+ * `products.options` — so exporting one produced a file with the base fields
+ * and NOTHING else.
+ *
+ * Measured on a product with two priced options (each with its own cost), a
+ * colour and an image: the exported .txt carried 24 keys, of which
+ * `options.*` = 0, `colors.*` = 0, `images.*` = 0 and option costs = 0. That is
+ * the owner's report — «حقول فارغة أو قليلة»، «الخيارات غير متضمنة»،
+ * «صور لا توجد»، «التكلفة» — as one defect, not four.
+ *
+ * `applyRelations` is the same overlay the storefront, the cart, the quote and
+ * the price grid already read through, so the export now shows what the
+ * customer is actually sold rather than a stale JSON mirror. It is a no-op for
+ * a product that has no relational rows, which is why the old products still
+ * export exactly as before.
+ */
 async function loadProductDoc(db: D1Database, id: string): Promise<ProductDoc | null> {
   const row = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  return row ? parseProductRow(row) : null;
+  if (!row) return null;
+  const doc = parseProductRow(row);
+  const view = await loadRelationsView(db, id, row.inventory_mode);
+  return applyRelations(doc, view);
 }
 
 /**
@@ -825,7 +851,12 @@ templateRoutes.get('/export/:productId', async (c) => {
   const doc = await loadProductDoc(c.env.DB, id);
   if (!doc) throw notFound('Product not found');
   const opts = await exportOptsFor(c.env.DB, doc);
-  return attachment(exportProduct(doc, opts), `levonis-product-${doc.id}.txt`);
+  // §11, the same gate the CSV export has always applied: an assistant admin
+  // downloads the product without its cost, not the whole cost sheet.
+  return attachment(
+    exportProduct(doc, { ...opts, includeCost: canViewFinancials(c.env, c.get('user')!) }),
+    `levonis-product-${doc.id}.txt`
+  );
 });
 
 // ---------------------------------------------------------------- POST /parse
