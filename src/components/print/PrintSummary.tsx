@@ -16,6 +16,8 @@ import {
   Box, Ruler, Scale, Clock, Layers, TriangleAlert, Sparkles, Loader2, Rotate3d,
 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { useAuth } from '../../AuthContext';
+import { useSignInPrompt } from '../../lib/guest';
 import { formatIqd } from '../../lib/api';
 import {
   printApi, priceRange, mmSize, cm3, duration,
@@ -64,6 +66,8 @@ export default function PrintSummary({
   onLoaded?: (facts: PrintFacts | null) => void;
 }) {
   const { loc, lang } = useLanguage();
+  const { isAuthenticated } = useAuth();
+  const { signIn } = useSignInPrompt();
   const ar = lang === 'ar' || lang === 'ckb';
   const [facts, setFacts] = useState<PrintFacts | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'none'>('loading');
@@ -100,6 +104,14 @@ export default function PrintSummary({
    */
   const openViewer = useCallback(async () => {
     if (!facts?.primary_file_id) return;
+    // MINTING NEEDS A SESSION — `POST .../viewer-token` is behind requireAuth,
+    // so for a signed-out visitor this button could only ever fail. The board
+    // itself is browsable signed out, so the honest move is to ask for the
+    // sign-in the token needs rather than to show a dead control or a shrug.
+    if (!isAuthenticated) {
+      signIn();
+      return;
+    }
     setViewer('loading');
     try {
       const d = await printApi.viewerToken(requestId, facts.primary_file_id);
@@ -108,7 +120,7 @@ export default function PrintSummary({
     } catch {
       setViewer('error');
     }
-  }, [facts?.primary_file_id, requestId]);
+  }, [facts?.primary_file_id, requestId, isAuthenticated, signIn]);
 
   if (state === 'loading') {
     return (
