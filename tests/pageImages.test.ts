@@ -30,13 +30,16 @@ test('the vendor gate matches a host and its subdomains, not a lookalike', () =>
   assert.equal(isVendorHost('example.com'), false);
 });
 
-test('every vendor the owner named is on the list', () => {
+test('every vendor the owner named is on the list, and the gate agrees', () => {
+  // Checking the array alone would pass while isVendorHost was broken, so
+  // each entry is also put through the gate that actually decides.
   for (const needle of ['bambulab', 'qidi', 'biqu', 'esun', 'creality']) {
-    assert.ok(
-      VENDOR_HOSTS.some((h) => h.includes(needle)),
-      `${needle} is missing from VENDOR_HOSTS`
-    );
+    const host = VENDOR_HOSTS.find((h) => h.includes(needle));
+    assert.ok(host, `${needle} is missing from VENDOR_HOSTS`);
+    assert.equal(isVendorHost(host!), true, `${host} is listed but the gate refuses it`);
+    assert.equal(isVendorHost(`shop.${host}`), true, `a storefront subdomain of ${host} must pass`);
   }
+  assert.equal(isVendorHost('example.com'), false, 'and the gate is not simply true for everything');
 });
 
 // ------------------------------------------------------------- open graph
@@ -101,11 +104,18 @@ test('one malformed JSON-LD block does not lose the page', () => {
 });
 
 test('a NON-product JSON-LD image is not mistaken for the product', () => {
+  // The Product block is in the SAME fixture on purpose. Asserting only that
+  // the organization image is absent would pass against an extractor that
+  // returns nothing at all — a test that cannot fail is not a test.
   const html = `
     <script type="application/ld+json">
     {"@type":"Organization","logo":"https://cdn.example.com/logo.png","image":"https://cdn.example.com/org.png"}
+    </script>
+    <script type="application/ld+json">
+    {"@type":"Product","image":"https://cdn.example.com/the-real-product.jpg"}
     </script>`;
-  assert.deepEqual(extractPageImages(html, 'https://creality.com/p'), []);
+  const urls = extractPageImages(html, 'https://creality.com/p').map((i) => i.url);
+  assert.deepEqual(urls, ['https://cdn.example.com/the-real-product.jpg']);
 });
 
 // ----------------------------------------------------------------- srcset
