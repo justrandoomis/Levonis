@@ -147,10 +147,40 @@ export const cell = 'px-3 py-2.5 text-[13px] align-middle';
 export const cellHead = `${cell} text-start font-semibold text-[11.5px] whitespace-nowrap`;
 export const mono = 'font-mono text-[12px] text-[var(--ap-text-3)]';
 
+/**
+ * THE ACTIONS COLUMN IS PINNED, BECAUSE OFF-SCREEN IS UNCLICKABLE.
+ *
+ * Every one of these tables puts edit / activate / delete in its LAST column
+ * and sets a `minWidth` wider than a tablet held upright. The wrapper then
+ * scrolls horizontally — and because the admin is RTL, the last column is on
+ * the LEFT, so it is the actions that get pushed out of the viewport rather
+ * than the slug.
+ *
+ * Measured on the built app at 1024x1366 with the taxonomy tab open: the
+ * scroller is 766px wide over 869px of table, the edit button lands at x=2
+ * and the DELETE BUTTON AT x=-70 — entirely outside the screen. That is
+ * exactly the owner's report that they could not edit or delete a section, a
+ * sub-section or a brand: the API accepts all three (verified end to end), the
+ * buttons exist, and on an iPad in portrait they were unreachable.
+ *
+ * `position: sticky` on the last cell of every row keeps them against the
+ * inline-end edge whatever the scroll offset, in both writing directions, and
+ * costs no information — nothing is hidden, the other columns simply scroll
+ * underneath. The opaque background is what makes "underneath" true; without
+ * it the scrolled text shows through the buttons.
+ */
+const STICKY_ACTIONS = [
+  '[&_tr>*:last-child]:sticky',
+  '[&_tr>*:last-child]:end-0',
+  '[&_tr>*:last-child]:z-[1]',
+  '[&_tbody_tr>*:last-child]:bg-[var(--ap-surface-1)]',
+  '[&_thead_tr>*:last-child]:bg-[var(--ap-surface-2)]',
+].join(' ');
+
 export function Table({ head, children, minWidth = 640 }: { head: ReactNode[]; children: ReactNode; minWidth?: number }) {
   return (
     <div className={`${T.surface} overflow-x-auto`}>
-      <table className="w-full border-collapse" style={{ minWidth }}>
+      <table className={`w-full border-collapse ${STICKY_ACTIONS}`} style={{ minWidth }}>
         <thead className={T.tableHead}>
           <tr>
             {head.map((h, i) => (

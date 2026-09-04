@@ -106,6 +106,35 @@ export const tableHead =
   'text-[11.5px] font-semibold text-[var(--ap-text-3)] border-b border-[var(--ap-border)] bg-[rgb(255_255_255_/_0.02)]';
 export const tableRow = 'transition-colors duration-150 hover:bg-[rgb(255_255_255_/_0.025)]';
 
+/**
+ * PIN THE LAST COLUMN OF A WIDE TABLE.
+ *
+ * Every admin list sets a min-width wider than a tablet held upright, so its
+ * wrapper scrolls sideways — and because the admin is RTL, the LAST column is
+ * on the LEFT. It is therefore the row actions that leave the screen, not the
+ * slug or the SKU.
+ *
+ * Measured on the built app at 1024x1366: on the products tab the scroller is
+ * 766px over 938px and «تعديل» sat at x=-97, «حذف / أرشفة» at x=-59, «المزيد»
+ * at x=-135 — 90 controls entirely outside the viewport. On the users tab, 100.
+ * The owner reported this as not being able to edit or delete; the buttons were
+ * there and simply could not be reached.
+ *
+ * Sticky keeps them against the inline-end edge at any scroll offset, in both
+ * writing directions, and hides nothing — the other columns scroll underneath.
+ * The opaque background is what makes "underneath" true.
+ *
+ * Apply to the <table>, not the wrapper: sticky positions against the nearest
+ * scrolling ancestor, and the cells must be the sticky elements.
+ */
+export const stickyActionsColumn = [
+  '[&_tr>*:last-child]:sticky',
+  '[&_tr>*:last-child]:end-0',
+  '[&_tr>*:last-child]:z-[1]',
+  '[&_tbody_tr>*:last-child]:bg-[var(--ap-surface-1)]',
+  '[&_thead_tr>*:last-child]:bg-[var(--ap-surface-2)]',
+].join(' ');
+
 export const menuBox =
   'w-56 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-3)] shadow-[var(--ap-shadow-menu)] overflow-hidden py-1';
 export const menu = `fixed z-[140] ${menuBox}`;

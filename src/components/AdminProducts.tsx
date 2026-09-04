@@ -944,7 +944,7 @@ export default function AdminProducts() {
         </div>
       ) : (
         <div className={`${T.surface} overflow-x-auto`}>
-          <table className="w-full min-w-[760px] border-collapse">
+          <table className={`w-full min-w-[760px] border-collapse ${T.stickyActionsColumn}`}>
             <thead>
               <tr className={T.tableHead}>
                 <th className="text-start font-semibold px-4 py-2.5">{loc('المنتج', 'Product', 'بەرهەم')}</th>

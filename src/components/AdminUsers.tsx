@@ -145,7 +145,13 @@ export default function AdminUsers() {
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[900px]">
+          {/* The actions column is pinned: this table is 900px wide inside a
+              766px viewport on a tablet held upright, and its own row controls
+              measured at x=-79 — off the screen entirely. The backgrounds are
+              this table's own zinc palette rather than the shared admin tokens,
+              and they are opaque on purpose: a translucent cell lets the
+              scrolled columns show through the buttons. */}
+          <table className="w-full text-left border-collapse min-w-[900px] [&_tr>*:last-child]:sticky [&_tr>*:last-child]:end-0 [&_tr>*:last-child]:z-[1] [&_tbody_tr>*:last-child]:bg-zinc-900 [&_thead_tr>*:last-child]:bg-zinc-800">
             <thead>
               <tr className="bg-zinc-800/50 border-b border-zinc-700">
                 <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider">User Info</th>
