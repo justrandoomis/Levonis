@@ -34,7 +34,7 @@ import type { SettingsPanelProps } from "three-slicer/components";
 import { uiTree } from "three-slicer/data";
 import type { ViewportEvent, ViewportProps } from "three-slicer/viewer";
 import { registerExtendedModelLoaders } from "./model-loaders";
-import { arrangeCurrentObjects, createEngineAdapter, seatNewObjects, type EngineTestId } from "./engine-adapter";
+import { arrangeCurrentObjects, autoOrientObjects, createEngineAdapter, seatNewObjects, type EngineTestId } from "./engine-adapter";
 import { currentDeviceProfile } from "./device-profile";
 import { createImportOrchestrator, ImportError, type ImportNotice, type ImportProgressUpdate } from "./import-orchestrator";
 import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from "./hooks/use-slicing-state";
@@ -240,6 +240,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [toolTrayOpen, setToolTrayOpen] = useState(false);
   const [handyProjectReady, setHandyProjectReady] = useState(false);
   const [arrangeUndoAvailable, setArrangeUndoAvailable] = useState(false);
+  const [orientUndoAvailable, setOrientUndoAvailable] = useState(false);
+  const [orienting, setOrienting] = useState(false);
   const [nativeEnvironment, setNativeEnvironment] = useState<LevoNativeEnvironment>({
     native: false,
     platform: "web",
@@ -281,6 +283,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const machineKeysRef = useRef<string[]>([]);
   const projectFilesRef = useRef<File[]>([]);
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
+  const orientUndoRef = useRef<(() => boolean) | null>(null);
   const plateCountRef = useRef(1);
   const selectedPlateRef = useRef(0);
   /** Object ids currently in the scene, so the shell can tell a spawn from a split. */
@@ -752,9 +755,67 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setNotice(messages.join(" "));
   }, [adapter, objects.length, profile.bedDepth, profile.bedWidth, selectedPlate, t.arrangeDone, t.arrangeUnavailable, t.zipOverflow, t.zipOversized]);
 
+  // -- auto-orient (BambuStudio's scoring, undoable) -------------------------
+  /**
+   * Orients every object for printing. The search is a synchronous pass over
+   * the raw triangles, so rendering is suspended around it: on a dense mesh the
+   * engine's own render loop would otherwise fight the main thread for the very
+   * milliseconds the measurement needs.
+   *
+   * The busy flag is set BEFORE the yield, so the button reports itself as
+   * working rather than looking dead on a big part.
+   */
+  const orientAll = useCallback(async () => {
+    setToolTrayOpen(false);
+    if (!objects.length) { setNotice(t.orientUnavailable); return; }
+    setOrienting(true);
+    setNotice(t.orientBusy);
+    const api = adapter.api();
+    api?.suspendRendering(true);
+    // One frame, so the busy notice actually paints before the blocking pass.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    let result;
+    try {
+      result = autoOrientObjects(adapter, { selectedPlate });
+    } finally {
+      api?.suspendRendering(false);
+      setOrienting(false);
+    }
+    if (!result.ok) { setNotice(t.orientUnavailable); return; }
+    orientUndoRef.current = result.undo;
+    setOrientUndoAvailable(Boolean(result.undo));
+    const total = result.orientedCount + result.alreadyBestCount + result.skippedCount;
+    const messages = result.orientedCount
+      ? [templateText(t.orientDone, { oriented: result.orientedCount, total })]
+      : [t.orientNoChange];
+    if (result.skippedCount) messages.push(templateText(t.orientSkipped, { skipped: result.skippedCount }));
+    if (result.lockedCount) messages.push(templateText(t.orientLocked, { locked: result.lockedCount }));
+    setNotice(messages.join(" "));
+  }, [adapter, objects.length, selectedPlate, t.orientBusy, t.orientDone, t.orientLocked,
+      t.orientNoChange, t.orientSkipped, t.orientUnavailable]);
+
+  /**
+   * BOTH UNDOS ARE WHOLE-SCENE RESTORES, so using either makes the other stale:
+   * restoring the pre-orient scene also throws away an arrangement made after
+   * it, and vice versa. Offering the second button afterwards would promise an
+   * undo of something that is already gone — so each one clears the other.
+   */
+  const undoOrient = useCallback(() => {
+    const undo = orientUndoRef.current;
+    orientUndoRef.current = null;
+    setOrientUndoAvailable(false);
+    arrangeUndoRef.current = null;
+    setArrangeUndoAvailable(false);
+    suppressSeating();
+    if (undo?.()) setNotice(t.orientUndone);
+    else setNotice(t.actionUnavailable);
+  }, [suppressSeating, t.actionUnavailable, t.orientUndone]);
+
   const undoArrange = useCallback(() => {
     const undo = arrangeUndoRef.current;
     arrangeUndoRef.current = null;
+    orientUndoRef.current = null;
+    setOrientUndoAvailable(false);
     setArrangeUndoAvailable(false);
     // A restore re-creates objects at their captured positions; seating them
     // again would undo the undo.
@@ -1259,6 +1320,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     everSeenObjectIdsRef.current = new Set();
     restoreInFlightRef.current = false;
     arrangeUndoRef.current = null;
+    orientUndoRef.current = null;
+    setOrientUndoAvailable(false);
     setArrangeUndoAvailable(false);
     setObjects([]);
     projectFilesRef.current = [];
@@ -1422,6 +1485,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         {(error || notice) && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
           <span>{error || notice}</span>
           {!error && arrangeUndoAvailable && <button className="message-action" onClick={undoArrange}>{t.arrangeUndo}</button>}
+          {!error && orientUndoAvailable && <button className="message-action" onClick={undoOrient}>{t.orientUndo}</button>}
           <button onClick={() => { setError(""); setNotice(""); if (status === "error") setStatus("editing"); }} aria-label={t.close}><Icon name="close" /></button>
         </div>}
 
@@ -1429,6 +1493,17 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           <Icon name="warning" /><span>{t.staleHelp}</span>
           <button onClick={() => triggerSlice(false)}>{t.slice}</button>
         </div>}
+
+        {/* Desktop home for the shell's own actions — see .shell-actions in
+            globals.css for why they need one at all. */}
+        <div className="shell-actions" role="group" aria-label={t.editTools}>
+          <button data-levo-action="auto-arrange-desktop" disabled={!objects.length} onClick={() => void arrangeAll()}>
+            <Icon name="arrange" /><span>{t.arrange}</span>
+          </button>
+          <button data-levo-action="auto-orient" disabled={!objects.length || orienting} onClick={() => void orientAll()}>
+            <Icon name="orient" /><span>{t.orient}</span>
+          </button>
+        </div>
 
         {toolTrayOpen && <section className="mobile-tooltray" aria-label={t.editTools}>
           <header><span><strong>{t.editTools}</strong><small>{t.editToolsHelp}</small></span><button onClick={() => setToolTrayOpen(false)} aria-label={t.close}><Icon name="close" /></button></header>
@@ -1443,6 +1518,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             <button onClick={() => runTool("tool-onbed")}><Icon name="bed" /><span>{t.onBed}</span></button>
             <button onClick={() => runTool("gizmo-paint")}><Icon name="paint" /><span>{t.paint}</span></button>
             <button onClick={() => void arrangeAll()}><Icon name="arrange" /><span>{t.arrange}</span></button>
+            <button data-levo-action="auto-orient-tray" disabled={orienting} onClick={() => void orientAll()}><Icon name="orient" /><span>{t.orient}</span></button>
             <button onClick={() => { shortcut("z"); setToolTrayOpen(false); }}><Icon name="fit" /><span>{t.fit}</span></button>
             <button onClick={() => { shortcut("b"); setToolTrayOpen(false); }}><Icon name="bed" /><span>{t.bed}</span></button>
             <button onClick={() => { clickControl("undo"); setToolTrayOpen(false); }}><Icon name="undo" /><span>{t.undo}</span></button>

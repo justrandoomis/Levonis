@@ -283,6 +283,46 @@ button:disabled { cursor: not-allowed; }
 .editor-message button.message-action { width: auto; min-height: 34px; padding: 0 12px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 800; }
 .editor-message svg { width: 17px; height: 17px; }
 
+/**
+ * SHELL ACTIONS ON DESKTOP.
+ *
+ * Auto-arrange and auto-orient are the shell's own actions, not the engine's,
+ * so they have no home in the engine's native toolbar inside the shadow root.
+ * Below 900px they live in the mobile tool tray; above it that tray is
+ * `display: none`, which left both actions unreachable on a desktop entirely.
+ * This strip is their desktop home — deliberately small, top-left, out of the
+ * way of the engine's own controls, and hidden again on the widths where the
+ * tray takes over.
+ */
+.shell-actions {
+  position: absolute;
+  z-index: 42;
+  top: 12px;
+  inset-inline-start: 12px;
+  display: flex;
+  gap: 6px;
+  direction: ltr;
+}
+.shell-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  /* Solid, never translucent-and-blurred: the studio's visual system is flat
+     surfaces, and tests/editor-capabilities.test.mjs enforces it. */
+  background: var(--panel);
+  color: #D3DED5;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.shell-actions button:hover:not(:disabled) { border-color: var(--accent-strong); color: #fff; }
+.shell-actions button:disabled { opacity: 0.55; cursor: progress; }
+.shell-actions svg { width: 15px; height: 15px; flex: 0 0 auto; }
+
 .stale-banner {
   position: absolute;
   z-index: 44;
@@ -563,6 +603,8 @@ button:disabled { cursor: not-allowed; }
 }
 
 @media (max-width: 899px) {
+  /* The tool tray owns these two below this width; one home each. */
+  .shell-actions { display: none; }
   :root { --header-height: 54px; --mobile-bar-height: 68px; }
   .studio-header { grid-template-columns: 39px minmax(0, 1fr) auto; gap: 8px; padding: calc(7px + env(safe-area-inset-top)) 8px 7px; }
   .studio-brand { width: 38px; height: 38px; font-size: 13px; }

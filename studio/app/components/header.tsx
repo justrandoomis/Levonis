@@ -24,7 +24,7 @@ export type IconName =
   | "plus" | "file" | "move" | "rotate" | "scale" | "copy" | "trash" | "fit"
   | "bed" | "layers" | "slice" | "print" | "save" | "share" | "undo" | "redo"
   | "split" | "paint" | "info" | "settings" | "close" | "check" | "external"
-  | "arrange" | "warning";
+  | "arrange" | "orient" | "warning";
 
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -52,6 +52,8 @@ export function Icon({ name }: { name: IconName }) {
     check: <><path d="m5 12 4 4L19 6"/></>,
     external: <><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v7H4V6h7"/></>,
     arrange: <><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><path d="M17 13v8M13 17h8"/></>,
+    // A part being tipped down onto the bed line — the thing the action does.
+    orient: <><path d="M3 21h18"/><path d="m7 17 5-11 5 11z"/><path d="M9.5 12h5"/></>,
     warning: <><path d="m12 3 10 18H2z"/><path d="M12 10v5M12 18h.01"/></>,
   };
   return (

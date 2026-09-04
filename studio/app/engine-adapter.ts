@@ -30,6 +30,7 @@ import {
   type ArrangePlan,
 } from "./plate-packing";
 import { planSeats, type SeatedFootprint, type SeatRequest } from "./spawn-seating";
+import { autoOrient, lowestPoint } from "./auto-orient";
 
 // ---------------------------------------------------------------------------
 // Engine contract (verified by tests/editor-capabilities.test.mjs)
@@ -870,6 +871,139 @@ export async function arrangeCurrentObjects(
     undo: captured ? () => adapter.restoreSceneState(captured) : null,
   };
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-orient (BambuStudio's scoring, applied through the engine's own scene API)
+// ---------------------------------------------------------------------------
+
+export interface AutoOrientSceneOptions {
+  /** Restrict to these ids; empty/omitted means every object. */
+  ids?: ReadonlySet<number>;
+  /** Objects that must not be touched. */
+  lockedIds?: ReadonlySet<number>;
+  /** The process preset's support threshold, in degrees. */
+  overhangAngleDeg?: number;
+  selectedPlate?: number;
+}
+
+export interface AutoOrientSceneResult {
+  ok: boolean;
+  reason?: "engine-unavailable" | "no-objects";
+  /** Objects whose orientation actually changed. */
+  orientedCount: number;
+  /** Objects already in their best orientation — counted, never "fixed". */
+  alreadyBestCount: number;
+  /** Objects too small or too degenerate to measure. Left untouched. */
+  skippedCount: number;
+  lockedCount: number;
+  /** True when a hull had to be approximated; the UI says so rather than not. */
+  approximated: boolean;
+  undo: (() => boolean) | null;
+}
+
+const EMPTY_ORIENT: Omit<AutoOrientSceneResult, "ok" | "reason"> = {
+  orientedCount: 0,
+  alreadyBestCount: 0,
+  skippedCount: 0,
+  lockedCount: 0,
+  approximated: false,
+  undo: null,
+};
+
+/**
+ * Orients objects the way BambuStudio would, without asking the engine for a
+ * capability it does not have.
+ *
+ * HOW IT REACHES THE SCENE. `sceneSnapshot()` hands back each object's raw
+ * local triangles (`localPos`) plus live `THREE.Euler`/`Vector3` clones, and
+ * `restoreScene()` copies those straight back onto the meshes. So the whole
+ * feature is: measure the local geometry, write a new rotation, restore. No
+ * engine patch, no new global.
+ *
+ * WHY THE ROTATION IS REPLACED, NOT COMPOSED. The score is computed from the
+ * LOCAL mesh, so the answer is a property of the shape itself. Composing it
+ * with whatever the user had already rotated to would make "auto-orient" mean
+ * something different depending on history — press it twice and get two
+ * different results. Replacing is what makes it idempotent.
+ *
+ * WHY THE OBJECT DOES NOT SINK. Re-seating is done by DIFFERENCE: the object
+ * moves by (old lowest point − new lowest point), so whatever rule the engine
+ * used to sit it on the bed still holds afterwards, without this code having to
+ * know what that rule is.
+ */
+export function autoOrientObjects(
+  adapter: EngineAdapter,
+  options: AutoOrientSceneOptions = {},
+): AutoOrientSceneResult {
+  const api = adapter.api();
+  if (!api) return { ok: false, reason: "engine-unavailable", ...EMPTY_ORIENT };
+  const snapshots = api.sceneSnapshot();
+  if (!snapshots.length) return { ok: false, reason: "no-objects", ...EMPTY_ORIENT };
+
+  const captured = adapter.captureSceneState(options.selectedPlate ?? 0);
+  const locked = options.lockedIds ?? new Set<number>();
+  const wanted = options.ids;
+
+  let orientedCount = 0;
+  let alreadyBestCount = 0;
+  let skippedCount = 0;
+  let lockedCount = 0;
+  let approximated = false;
+
+  for (const snapshot of snapshots) {
+    if (wanted && !wanted.has(snapshot.id)) continue;
+    if (locked.has(snapshot.id)) {
+      lockedCount++;
+      continue;
+    }
+    const positions = snapshot.localPos;
+    if (!(positions instanceof Float32Array) || positions.length < 36) {
+      skippedCount++;
+      continue;
+    }
+    const result = autoOrient(positions, { overhangAngleDeg: options.overhangAngleDeg });
+    if (!result) {
+      skippedCount++;
+      continue;
+    }
+    if (result.hullFaces === 0) approximated = true;
+    if (!result.improved) {
+      alreadyBestCount++;
+      continue;
+    }
+
+    const scale = { x: snapshot.scale.x, y: snapshot.scale.y, z: snapshot.scale.z };
+    const before = lowestPoint(positions, { x: snapshot.rot.x, y: snapshot.rot.y, z: snapshot.rot.z }, scale);
+    const after = lowestPoint(positions, result.euler, scale);
+    // Plain assignment, not `.set(...)`: the DECLARED type is the minimal
+    // LevoVector3, while the runtime object is a real THREE.Euler whose x/y/z
+    // are accessors writing `_x`/`_y`/`_z`. Assignment satisfies both, and the
+    // engine's `restoreScene` does `rotation.copy(rot)` — which reads `_x`, so
+    // handing it a hand-rolled plain object would silently produce NaN.
+    // tests/auto-orient.test.mjs pins that the engine really clones an Euler.
+    snapshot.rot.x = result.euler.x;
+    snapshot.rot.y = result.euler.y;
+    snapshot.rot.z = result.euler.z;
+    snapshot.pos.y += before - after;
+    orientedCount++;
+  }
+
+  if (orientedCount) {
+    api.restoreScene(snapshots);
+    api.frame();
+    adapter.notifySceneEdited();
+  }
+
+  return {
+    ok: true,
+    orientedCount,
+    alreadyBestCount,
+    skippedCount,
+    lockedCount,
+    approximated,
+    undo: captured && orientedCount ? () => adapter.restoreSceneState(captured) : null,
+  };
 }
 
 // ---------------------------------------------------------------------------

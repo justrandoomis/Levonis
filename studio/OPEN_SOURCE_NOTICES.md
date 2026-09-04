@@ -19,6 +19,21 @@ LEVO Web Slicer is distributed under the GNU Affero General Public License v3.0 
 
 This project does not copy code from the surveyed Bambu MCP repositories. They were used only to understand the integration boundary around `.gcode.3mf`, FTPS/MQTT transport, AMS mapping, and printer-state validation.
 
+### BambuStudio
+
+- Source: https://github.com/bambulab/BambuStudio
+- License: GNU AGPL-3.0
+- Role: `app/auto-orient.ts` is a TypeScript port of `src/libslic3r/Orient.cpp`
+  and `src/libslic3r/Orient.hpp` — the candidate-direction search, the cost
+  terms (overhang, bottom, bottom-hull, contour, low-angle faces) and the
+  `OrientParamsArea` constants. LEVO Web Slicer is AGPL-3.0-or-later, so the
+  port is a derivative work under the same licence.
+- What was NOT taken: no C++ was vendored, no build artefact, no profile data,
+  and no printer-integration code. The port is a re-implementation of the
+  documented algorithm in this repository's own language and coordinate frame
+  (three.js is Y-up; BambuStudio is Z-up), with the differences stated in the
+  file's own header.
+
 ### occt-import-js 0.0.23
 
 - Source: https://github.com/kovacsv/occt-import-js
