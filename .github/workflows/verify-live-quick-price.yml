@@ -75,6 +75,11 @@ jobs:
           write POST  '/api/admin/products/does-not-exist/price-grid/copy'     'the price copy'
           write POST  '/api/admin/products/does-not-exist/price-grid/undo'     'the undo'
           write POST  '/api/admin/products/does-not-exist/price-grid/cost-change' 'the cost-change preview'
+          # The traits write — an option's fulfilment route, stock and active
+          # flag from the same drawer as its prices. It re-derives the
+          # product's sale types, so a stranger reaching it would be able to
+          # turn a pre-order product into a direct sale.
+          write PATCH '/api/admin/products/does-not-exist/price-grid/traits'  'the traits save'
           exit $fail
 
       - name: Read every module the deployed app serves
@@ -120,6 +125,17 @@ jobs:
           want 'copy-preview'    'the copy tab previews'
           want 'price-history'   'the history tab is shipped'
           want 'PROFIT_GUARD'    'the drawer knows the guard refusal by code'
+          # The traits controls, live in the same drawer as the prices.
+          want 'price-grid/traits'  'the drawer writes availability, stock and active'
+          want 'qp-availability'    'an option offers its fulfilment route'
+          want 'qp-stock'           'stock is typed where the row is read'
+          want 'qp-active'          'and an option can be switched off from here'
+          want 'qp-traits'          'the traits row is rendered'
+          # The global rules the owner asked to keep OUT of the product form.
+          want 'shipping-policy'    'the admin can edit the global shipping rules'
+          want 'preorder-gift'      'and the PRO pre-order gift rule'
+          want 'protected-delivery' 'checkout offers protected shipping'
+          want 'protectedDelivery'  'and sends the choice with the quote'
           exit $fail
 
       - name: The deployed template declares the adjustment fields
