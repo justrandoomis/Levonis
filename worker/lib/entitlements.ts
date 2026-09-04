@@ -209,3 +209,67 @@ export const benefits = {
   primeDeliveryEligible: (t: TierStatus) =>
     t.active && t.tier === 'prime' && notGated(t, 'primeDeliveryEligible'),
 };
+
+/**
+ * «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية» — the whole rule, in one
+ * testable place.
+ *
+ * It lives here rather than inline in the checkout because it is a membership
+ * rule, and every other one is here; the checkout supplies the facts and takes
+ * the answer. The gift is worth 0 IQD on every total — the customer pays the
+ * same price and a spool ships in the box — so nothing about it belongs in the
+ * price resolver, the shipping quote or the wallet ledger.
+ *
+ * All four conditions are necessary:
+ *   proContext        active PRO at the single approved default address, the
+ *                     same gate every other PRO purchase benefit passes. An
+ *                     order priced as ordinary does not earn a PRO gift.
+ *   isPreorder        the order is on a pre-order journey; a direct sale earns
+ *                     nothing, because the promise is about waiting.
+ *   dueOnDeliveryIqd  exactly 0 — «مدفوع مقدمًا» means nothing is left to
+ *                     collect at the door.
+ *   a configured gift the owner has both enabled AND named a product for.
+ *     An enabled switch with no product grants nothing; the admin endpoint
+ *     refuses to store that combination, and this refuses to honour it if it
+ *     somehow exists.
+ */
+export interface PreorderGiftConfig {
+  enabled?: boolean;
+  product_id?: string;
+  label_ar?: string;
+  qty?: number;
+}
+
+export interface PreorderGiftSnapshot {
+  kind: 'preorder_filament';
+  reason: 'pro_prepaid_preorder';
+  product_id: string;
+  label_ar: string;
+  qty: number;
+  /** Always 0: it is stock the store gives, not a discount on the total. */
+  value_iqd: 0;
+  granted_at: string;
+}
+
+export function preorderGiftFor(input: {
+  config: PreorderGiftConfig | null | undefined;
+  proContext: boolean;
+  isPreorder: boolean;
+  dueOnDeliveryIqd: number;
+  now: string;
+}): PreorderGiftSnapshot | null {
+  const cfg = input.config;
+  if (!cfg?.enabled || !cfg.product_id) return null;
+  if (!input.proContext || !input.isPreorder) return null;
+  if (input.dueOnDeliveryIqd !== 0) return null;
+  const qty = Number.isInteger(cfg.qty) && (cfg.qty as number) > 0 ? (cfg.qty as number) : 1;
+  return {
+    kind: 'preorder_filament',
+    reason: 'pro_prepaid_preorder',
+    product_id: cfg.product_id,
+    label_ar: cfg.label_ar ?? '',
+    qty,
+    value_iqd: 0,
+    granted_at: input.now,
+  };
+}

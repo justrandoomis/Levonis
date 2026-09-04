@@ -11,8 +11,8 @@ import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/produc
 import { planInventory, resolveStock } from '../lib/inventory';
 import { returnOrderStock } from '../lib/orderInventory';
 import type { StockMove, StockTarget } from '../lib/inventory';
-import { getTierStatus } from '../lib/entitlements';
-import type { TierStatus } from '../lib/entitlements';
+import { getTierStatus, preorderGiftFor } from '../lib/entitlements';
+import type { PreorderGiftConfig, TierStatus } from '../lib/entitlements';
 import {
   referralFreeDeliveryApplies,
   validateCoupon,
@@ -180,6 +180,14 @@ export function orderPublic(
     next_stage: o.next_stage || null,
     next_stage_at: o.next_stage_at ?? null,
     tracking_no: o.delivery_tracking_no || null,
+    /**
+     * A membership gift that ships WITH this order — today only «PRO + طلب
+     * مسبق مدفوع مقدمًا = فلمنت هدية». It is worth 0 IQD on every total: the
+     * customer paid the same price and a spool comes in the box, so it appears
+     * beside the order rather than inside its arithmetic. Frozen at purchase,
+     * so a membership that lapses later cannot take it back.
+     */
+    membership_gift: safeParse<Record<string, unknown> | null>(o.membership_gift, null),
     address: safeParse(o.address_snapshot, {}),
     delivery_method: safeParse(o.delivery_method_snapshot, {}),
     payment_method_id: o.payment_method_id,
@@ -395,6 +403,7 @@ interface CheckoutComputation {
   dueOnDelivery: number;
   policies: PolicyRef[];
   printerGiftConfig: unknown;
+  preorderGiftConfig: unknown;
 }
 
 async function computeCheckout(
@@ -414,6 +423,7 @@ async function computeCheckout(
     'proPricingPolicy',
     'preorderTransportDefaults',
     'printerGiftConfig',
+    'preorderGiftConfig',
     'shippingPolicy',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
@@ -735,6 +745,7 @@ async function computeCheckout(
     dueOnDelivery,
     policies,
     printerGiftConfig: settings.printerGiftConfig,
+    preorderGiftConfig: settings.preorderGiftConfig,
   };
 }
 
@@ -957,14 +968,30 @@ orderRoutes.post('/', async (c) => {
   // compatible) and gains the authoritative shipping quote for transparency.
   const deliverySnapshot = JSON.stringify({ ...comp.delivery, quote: comp.shipping });
 
+  /**
+   * «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». The rule itself is in
+   * worker/lib/entitlements.ts beside every other membership benefit; the
+   * checkout only supplies the facts and FREEZES the answer onto the order, so
+   * a membership that lapses next month cannot retract a spool already earned
+   * — the same reason membership_tier_snapshot is written two lines above.
+   */
+  const gift = preorderGiftFor({
+    config: comp.preorderGiftConfig as PreorderGiftConfig | null,
+    proContext: comp.proContext,
+    isPreorder: orderShippingType.startsWith('preorder_'),
+    dueOnDeliveryIqd: comp.dueOnDelivery,
+    now,
+  });
+  const membershipGift = gift ? JSON.stringify(gift) : '';
+
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
          payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
-         support_snapshot, shipping_type, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         support_snapshot, shipping_type, membership_gift, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.pointsDiscount, comp.walletApplied,
@@ -979,7 +1006,7 @@ orderRoutes.post('/', async (c) => {
       // state machine must not have to re-derive the path from lines that can
       // change afterwards. The cart guarantees one type, so the first line
       // speaks for all of them.
-      orderShippingType, now, now
+      orderShippingType, membershipGift, now, now
     ),
   ];
 

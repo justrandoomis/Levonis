@@ -110,6 +110,20 @@ export const SETTING_DEFAULTS = {
   printerGiftConfig: { enabled: false, plan_id: 'plus_1mo', milestone: 'delivered' } as {
     enabled: boolean; plan_id: string; milestone: 'paid' | 'delivered';
   },
+  /**
+   * «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية» — a spool ships with a
+   * pre-order that an active PRO paid in full at checkout.
+   *
+   * DISABLED WITH NOTHING CHOSEN, deliberately. The rule names a benefit but
+   * not which filament it means, and a default here would be the store giving
+   * away stock nobody approved. While `enabled` is false or `product_id` is
+   * empty, no order records a gift and nothing is promised to a customer.
+   * `label_ar` is what the customer is told when the product itself is not
+   * the whole answer ("بكرة PLA بلون من اختيارك").
+   */
+  preorderGiftConfig: { enabled: false, product_id: '', label_ar: '', qty: 1 } as {
+    enabled: boolean; product_id: string; label_ar: string; qty: number;
+  },
   // Last-mile shipping policy (final-phase brief §6.3). Confirmed values are
   // filled; unresolved parts stay null and produce honest needs_config
   // states instead of invented fees.

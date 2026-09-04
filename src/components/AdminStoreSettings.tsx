@@ -16,6 +16,21 @@ import { Plus, Trash2, Check, AlertTriangle, Lock } from 'lucide-react';
  * charging an invented number — which is why every money field here can be
  * left empty on purpose.
  */
+/**
+ * «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية» — the one membership rule that is
+ * a fulfilment fact rather than a price. It ships disabled with no product
+ * chosen, and the server refuses to enable it until one is named: a switch
+ * that promises a gift and grants nothing is worse than a switch that is off.
+ */
+interface PreorderGift {
+  enabled: boolean;
+  product_id: string;
+  label_ar: string;
+  qty: number;
+}
+
+const GIFT_DEFAULTS: PreorderGift = { enabled: false, product_id: '', label_ar: '', qty: 1 };
+
 interface ShippingPolicy {
   ordinary_iqd: number;
   protected_iqd: number | null;
@@ -108,6 +123,10 @@ export default function AdminStoreSettings() {
   const [policyState, setPolicyState] = useState<SaveState>('idle');
   const [policyError, setPolicyError] = useState<string | null>(null);
 
+  const [gift, setGift] = useState<PreorderGift | null>(null);
+  const [giftState, setGiftState] = useState<SaveState>('idle');
+  const [giftError, setGiftError] = useState<string | null>(null);
+
   // The policy is admin-only, so it is not in the wallet context with the
   // public checkout methods — it is read straight from the admin settings.
   useEffect(() => {
@@ -118,8 +137,13 @@ export default function AdminStoreSettings() {
         if (!alive) return;
         const raw = (res.settings?.shippingPolicy ?? {}) as Partial<ShippingPolicy>;
         setPolicy({ ...SHIPPING_DEFAULTS, ...raw });
+        const rawGift = (res.settings?.preorderGiftConfig ?? {}) as Partial<PreorderGift>;
+        setGift({ ...GIFT_DEFAULTS, ...rawGift });
       } catch {
-        if (alive) setPolicy({ ...SHIPPING_DEFAULTS });
+        if (alive) {
+          setPolicy({ ...SHIPPING_DEFAULTS });
+          setGift({ ...GIFT_DEFAULTS });
+        }
       }
     })();
     return () => {
@@ -139,6 +163,19 @@ export default function AdminStoreSettings() {
       setPolicyError(e instanceof ApiError ? e.message : 'Save failed');
     }
   }, [policy]);
+
+  const saveGift = useCallback(async () => {
+    if (!gift) return;
+    setGiftState('saving');
+    setGiftError(null);
+    try {
+      await api.put('/api/admin/settings/preorderGiftConfig', { value: gift });
+      setGiftState('saved');
+    } catch (e) {
+      setGiftState('error');
+      setGiftError(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }, [gift]);
 
   // Seed local state from the context only after settings have loaded — the
   // context starts empty, so a plain useState initializer would race it.
@@ -532,6 +569,56 @@ export default function AdminStoreSettings() {
           </div>
           <div className="mt-5">
             <SaveButton state={policyState} onClick={() => void savePolicy()} error={policyError} />
+          </div>
+        </div>
+      )}
+
+      {/* Global membership rules that are not prices. */}
+      {gift && (
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="preorder-gift">
+          <h2 className="text-xl font-bold mb-1">هدية الطلب المسبق لمشتركي PRO</h2>
+          <p className="text-sm text-zinc-400 mb-4">
+            عندما يدفع مشترك PRO طلبًا مسبقًا بالكامل عند الشراء، تُسجَّل بكرة فلمنت هدية على الطلب.
+            لا يتغيّر أي مبلغ — الهدية تُرفَق بالشحنة. لا تُمنح أي هدية قبل اختيار المنتج.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="block text-sm text-zinc-400 mb-1">معرّف منتج الفلمنت</span>
+              <input
+                type="text"
+                value={gift.product_id}
+                placeholder="prd_..."
+                onChange={(e) => { setGift((g) => (g ? { ...g, product_id: e.target.value.trim() } : g)); setGiftState('idle'); }}
+                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 font-mono text-sm"
+              />
+              <span className="block text-xs text-zinc-500 mt-1">يُتحقَّق من وجوده عند الحفظ</span>
+            </label>
+            <label className="block">
+              <span className="block text-sm text-zinc-400 mb-1">وصف الهدية للزبون (اختياري)</span>
+              <input
+                type="text"
+                value={gift.label_ar}
+                placeholder="بكرة PLA بلون من اختيارك"
+                onChange={(e) => { setGift((g) => (g ? { ...g, label_ar: e.target.value } : g)); setGiftState('idle'); }}
+                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
+              />
+            </label>
+            <MoneyField
+              label="عدد البكرات"
+              value={gift.qty}
+              onChange={(v) => { setGift((g) => (g ? { ...g, qty: v && v > 0 ? v : 1 } : g)); setGiftState('idle'); }}
+            />
+            <label className="flex items-center gap-2 self-end py-2">
+              <input
+                type="checkbox"
+                checked={gift.enabled}
+                onChange={(e) => { setGift((g) => (g ? { ...g, enabled: e.target.checked } : g)); setGiftState('idle'); }}
+              />
+              <span className="text-sm">تفعيل الهدية</span>
+            </label>
+          </div>
+          <div className="mt-5">
+            <SaveButton state={giftState} onClick={() => void saveGift()} error={giftError} />
           </div>
         </div>
       )}

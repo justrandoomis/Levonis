@@ -352,6 +352,23 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
                 {loc('المنتجات', 'Items', 'بەرهەمەکان')}
               </h3>
+              {/* A membership gift is not a line: it costs the customer 0 IQD
+                  and is a PACKING instruction, so it sits above the items
+                  where whoever fills the box will read it. */}
+              {detail.membership_gift && (
+                <div
+                  className="mb-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-emerald-300"
+                  data-admin="order-gift"
+                >
+                  <p className="text-[12.5px] font-semibold">
+                    {loc('يُرفَق مع الشحنة — هدية عضوية', 'Ships with the parcel — membership gift', 'لەگەڵ پاکەتەکە — دیاری ئەندامێتی')}
+                  </p>
+                  <p className="text-[12px] text-emerald-200/85 mt-0.5">
+                    {detail.membership_gift.label_ar || detail.membership_gift.product_id}
+                    {detail.membership_gift.qty > 1 && ` × ${detail.membership_gift.qty}`}
+                  </p>
+                </div>
+              )}
               <ul className="space-y-2">
                 {detail.items.map((it) => {
                   const units = detail.units.filter((u) => u.order_item_id === it.id);

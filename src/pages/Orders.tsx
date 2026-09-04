@@ -399,6 +399,22 @@ export default function Orders() {
                     </span>
                   </div>
                 </div>
+                {/* A membership gift earned on this order. It is worth 0 IQD
+                    on every total — the customer paid the same price and a
+                    spool comes in the box — so it is announced beside the
+                    order rather than folded into its arithmetic. */}
+                {order.membership_gift && (
+                  <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
+                    <p className="text-[12.5px] font-bold text-emerald-300">
+                      {lang === 'en' ? 'A gift ships with this order' : 'هدية مرفقة مع هذا الطلب'}
+                    </p>
+                    <p className="text-[12px] text-emerald-200/85 mt-0.5">
+                      {order.membership_gift.label_ar ||
+                        (lang === 'en' ? 'Filament spool' : 'بكرة فلمنت')}
+                      {order.membership_gift.qty > 1 && ` × ${order.membership_gift.qty}`}
+                    </p>
+                  </div>
+                )}
                 {/* Where the parcel actually is, on the path this order
                     walks — five stages direct, fourteen for a pre-order.
                     Opened on demand: the list is already the slowest query on

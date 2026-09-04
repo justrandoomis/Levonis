@@ -1664,6 +1664,31 @@ adminRoutes.put('/settings/:key', async (c) => {
     // admits endpoint paths and field-name maps, and secrets belong in Worker
     // secrets where no admin screen can read them back.
     value = resolveWire(value);
+  } else if (key === 'preorderGiftConfig') {
+    // «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». Enabling it without naming
+    // the filament is refused rather than stored: a switch that promises a
+    // gift and grants nothing is worse than a switch that is off, and the
+    // checkout would silently skip every order.
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw badRequest('preorderGiftConfig must be an object');
+    }
+    const g = value as Record<string, unknown>;
+    const enabled = g.enabled === true;
+    const productId = str(g.product_id, 'product_id', { max: 60, required: false });
+    if (enabled && !productId) {
+      throw badRequest('اختر منتج الفلمنت قبل تفعيل الهدية', 'GIFT_PRODUCT_REQUIRED');
+    }
+    if (productId) {
+      const exists = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(productId).first();
+      if (!exists) throw badRequest('منتج الفلمنت غير موجود', 'GIFT_PRODUCT_NOT_FOUND');
+    }
+    const qty = g.qty === undefined || g.qty === null ? 1 : int(g.qty, 'qty', { min: 1, max: 10 });
+    value = {
+      enabled,
+      product_id: productId,
+      label_ar: str(g.label_ar, 'label_ar', { max: 200, required: false }),
+      qty,
+    };
   } else if (key === 'shippingPolicy') {
     // THE GLOBAL SHIPPING RULES, normalized by the SAME function the checkout
     // reads them with. Anything the engine cannot use is dropped here rather

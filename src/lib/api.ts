@@ -232,6 +232,17 @@ export interface ApiOrder {
   email?: string;
   username?: string;
   user_id?: string;
+  /** A membership gift that ships WITH the order and is worth 0 IQD on every
+   *  total — today only «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». */
+  membership_gift?: {
+    kind: string;
+    reason: string;
+    product_id: string;
+    label_ar: string;
+    qty: number;
+    value_iqd: number;
+    granted_at: string;
+  } | null;
 }
 
 /** One order item unit — a physical device with its own serial and cover. */
