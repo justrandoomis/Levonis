@@ -150,6 +150,8 @@ export const ckb: StudioDictionary = {
   primaryPathHelp: "ڕێڕەوی سەرەکیی هەناردەکردن: پڕۆژەیەکی ڕاستەقینەی 3MF پاشەکەوت بکە، خۆت بە شێوەی تایبەت (Private) بە هەژماری خۆت باری بکە بۆ MakerWorld، پاشان لە Bambu Handyەوە دەستی پێ بکە. LEVO هیچ شتێک لە جیاتی تۆ بار ناکات.",
   prepareForHandy: "ئامادەکردنی فایلی MakerWorld 3MF",
   prepareForHandyHelp: "پڕۆژەیەکی 3MF لەگەڵ چاپکەر و ڕێکخستنەکانی ئێستا لەسەر ئامێرەکەت پاشەکەوت دەکات.",
+  projectFileReady: "فایلی پڕۆژەی 3MF لە داگرتنەکاندا پاشەکەوت کرا — لە Bambu Studio و OrcaSlicer بە ڕێکخستنەکانتەوە دەکرێتەوە، و دەکرێت بۆ MakerWorld بار بکرێت.",
+  saveProjectFile: "پاشەکەوتی فایلی پڕۆژە (3MF)",
   handyFileReady: "فایلی 3MF لە داگرتنەکاندا پاشەکەوت کرا. خۆت باری بکە بۆ MakerWorld و بە Private بیهێڵەوە — کردنەوەی پەڕەکە هیچ شتێک بار ناکات.",
   openMakerWorld: "کردنەوەی پەڕەی بارکردنی MakerWorld",
   phoneStepOne: "فایلی 3MFی ئامادەکراو لەسەر ئامێرەکەت پاشەکەوت بکە.",

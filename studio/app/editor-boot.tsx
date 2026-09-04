@@ -42,6 +42,46 @@ export default function EditorBoot({ user = null }: { user?: EditorUser }) {
     };
   }, []);
 
+  /**
+   * PUT A STRAY ROOT SCROLL BACK.
+   *
+   * `.studio-app` is `position: fixed` (globals.css) so a scrolled root can no
+   * longer carry the header off-screen — but the document would still be
+   * sitting at a non-zero offset, which moves the engine's own shadow-root
+   * chrome and leaves the page in a state `body { overflow: hidden }` forbids
+   * the user from correcting. WebKit can apply such an offset on its own:
+   * revealing a focused control, settling a collapsing URL bar, or restoring a
+   * remembered position after a reload.
+   *
+   * So this listens rather than polls, and only acts when the offset is real.
+   * `scrollRestoration = "manual"` stops the reload case at the source.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+
+    let frame = 0;
+    const settle = () => {
+      frame = 0;
+      if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+    const onMove = () => {
+      // Coalesce: WebKit fires these in bursts while a keyboard animates.
+      if (frame === 0) frame = window.requestAnimationFrame(settle);
+    };
+
+    onMove();
+    window.addEventListener("scroll", onMove, { passive: true });
+    window.visualViewport?.addEventListener("resize", onMove);
+    window.visualViewport?.addEventListener("scroll", onMove);
+    return () => {
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onMove);
+      window.visualViewport?.removeEventListener("resize", onMove);
+      window.visualViewport?.removeEventListener("scroll", onMove);
+    };
+  }, []);
+
   if (failed) {
     // Honest failure — no fake progress. Reload is the real recovery action.
     return (

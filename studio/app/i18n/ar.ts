@@ -148,6 +148,8 @@ export const ar: StudioDictionary = {
   primaryPathHelp: "مسار الإخراج الأساسي: احفظ مشروع 3MF حقيقيًا، ارفعه بنفسك بشكل خاص إلى MakerWorld بحسابك، ثم ابدأ الطباعة من Bambu Handy. لا يرفع LEVO أي شيء نيابة عنك.",
   prepareForHandy: "تجهيز ملف MakerWorld 3MF",
   prepareForHandyHelp: "يحفظ مشروع 3MF مع الطابعة والإعدادات الحالية على جهازك.",
+  projectFileReady: "تم حفظ ملف المشروع 3MF في التنزيلات — يفتح في Bambu Studio و OrcaSlicer بإعداداتك، ويصلح للرفع إلى MakerWorld.",
+  saveProjectFile: "حفظ ملف المشروع (3MF)",
   handyFileReady: "تم حفظ ملف 3MF في التنزيلات. ارفعه بنفسك إلى MakerWorld واجعله Private — فتح الصفحة لا يرفع شيئًا.",
   openMakerWorld: "فتح صفحة الرفع في MakerWorld",
   phoneStepOne: "احفظ ملف 3MF الجاهز على جهازك.",

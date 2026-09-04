@@ -79,7 +79,31 @@ button:disabled { cursor: not-allowed; }
 .native-file-input { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .native-file-input:disabled { cursor: not-allowed; }
 
+/*
+ * PINNED TO THE VIEWPORT, SO THE HEADER CANNOT BE LOST.
+ *
+ * The owner reported the top bar simply gone on an iPad, with the engine's own
+ * toolbar clipped in half at the top edge — a picture that only a shell
+ * displaced upward produces. `body { overflow: hidden }` forbids the USER from
+ * scrolling but not the user agent: WebKit scrolls the root to reveal a focused
+ * control, to settle a collapsing URL bar, or to restore a remembered position
+ * after a reload. With the shell in normal flow, any such offset carries the
+ * header above y=0 and `overflow: hidden` then makes it unreachable — the user
+ * cannot scroll back.
+ *
+ * `position: fixed` takes the shell out of that flow entirely: it is laid out
+ * against the viewport, so a root scroll offset cannot move it. This is
+ * deliberately a fix for the CLASS of causes rather than for one of them — I
+ * could not reproduce iPadOS Safari here, and every plain iPad viewport
+ * measured in Chromium renders the header correctly at top 0, so the trigger
+ * is not established. What is established is that the shell had no defence if
+ * anything ever scrolled the root, and now it does. app/editor-boot.tsx adds
+ * the matching belt: it puts any stray scroll back to zero.
+ */
 .studio-app {
+  position: fixed;
+  top: 0;
+  inset-inline: 0;
   width: 100%;
   height: 100dvh;
   min-height: 0;
@@ -314,8 +338,24 @@ button:disabled { cursor: not-allowed; }
 .shell-actions {
   position: absolute;
   z-index: 42;
-  top: 12px;
-  inset-inline-start: 12px;
+  /*
+   * BOTTOM-LEFT, AND THE REASON IS A BUG THIS STRIP CAUSED.
+   *
+   * It shipped at `top: 12px; inset-inline-start: 12px`, which puts it at
+   * page-y 75..109 — directly on top of the engine's own top bar at 72..97.
+   * Measured at 1366x1024: «توجيه تلقائي» occupies x 137..255 and covers the
+   * right half of the engine's [Save as 3mf] (x 91..200) and the whole of
+   * [STL] (x 208..252). The owner could not save their project as a file
+   * because this strip was sitting on the button that does it.
+   *
+   * The engine owns the top band — its `.topbar` at 72..97 and its
+   * `.vp-top-toolbar` at 124..156 — so the shell must not put anything there.
+   * The bottom-left corner is free: the left rail runs down x 5..42, which is
+   * what the inline-start inset clears, and the engine's viewport hint line
+   * sits under the bottom inset.
+   */
+  bottom: 34px;
+  inset-inline-start: 52px;
   display: flex;
   gap: 6px;
   direction: ltr;

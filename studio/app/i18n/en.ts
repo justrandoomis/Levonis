@@ -148,6 +148,8 @@ export const en = {
   primaryPathHelp: "The main output path: save a real 3MF project, upload it privately to MakerWorld with your own account, then start it from Bambu Handy. LEVO never uploads anything for you.",
   prepareForHandy: "Prepare MakerWorld 3MF",
   prepareForHandyHelp: "Saves a 3MF project with the current printer and settings to your device.",
+  projectFileReady: "The project 3MF was saved to Downloads — it opens in Bambu Studio and OrcaSlicer with your settings, and can be uploaded to MakerWorld.",
+  saveProjectFile: "Save project file (3MF)",
   handyFileReady: "The 3MF was saved to Downloads. Upload it to MakerWorld yourself and keep it Private — opening the page does not upload anything.",
   openMakerWorld: "Open MakerWorld upload page",
   phoneStepOne: "Save the prepared 3MF to your device.",

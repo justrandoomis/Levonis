@@ -73,6 +73,18 @@ import {
 import { useProjectPersistence } from "./hooks/use-project-persistence";
 import ProjectsPanel from "./components/projects-panel";
 import { captureEngineThumbnail } from "./thumbnail";
+
+/**
+ * How the exported project names its producer.
+ *
+ * Honest by construction: LEVO Studio wrote the file, so LEVO Studio is what
+ * the file says. BambuStudio decides a 3MF is its own from an `Application`
+ * value starting with "BambuStudio-" (bbs_3mf.cpp:4234) — claiming that here
+ * would be a false statement of origin made to pass someone else's check, so
+ * it is not done, and tests/bambu-project-3mf.test.mjs fails if it ever is.
+ */
+const LEVO_VERSION = "1.0.0";
+const LEVO_APPLICATION = `LEVO Studio-${LEVO_VERSION}`;
 import type {
   OpenedRemoteProject,
   ProjectManifest,
@@ -284,7 +296,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   const viewportMountRef = useRef<HTMLDivElement>(null);
   const profileRequestRef = useRef(0);
-  const exportIntentRef = useRef<"bambu-handy" | "persist" | null>(null);
+  const exportIntentRef = useRef<"bambu-handy" | "bambu-project" | "persist" | null>(null);
   const snapshotResolverRef = useRef<((file: File | null) => void) | null>(null);
   const exportIntentTimerRef = useRef<number | null>(null);
   const suppressNextExportNoticeRef = useRef(false);
@@ -1104,6 +1116,45 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [nativeEnvironment.capabilities, printerStatus, profile, selectedPlate, slicing.freshGcodeFile, slicing.resultState, t.actionUnavailable, t.confirmLanPrint, t.lanBridgeIncomplete, t.lanPrintQueued, t.printNotReady, t.printStale]);
 
   // -- 3MF export intents (engine save-project via adapter) ------------------
+  /**
+   * Completes a Bambu-project export once the engine has produced its 3MF.
+   *
+   * Async because the preview is a real canvas read-back, and
+   * `handleViewportExport` must answer the engine synchronously — it returns
+   * `true` to say "I have taken this file, do not download it yourself" and
+   * this finishes afterwards. If the conversion throws, the ENGINE'S OWN file
+   * is downloaded instead: the user came here for a file, and a broken
+   * envelope is not a reason to send them away with nothing.
+   */
+  const finishBambuProject = useCallback(async (file: File | Blob) => {
+    const safeName = (projectName.trim() || "LEVO Project").replace(/[^\p{L}\p{N}._-]+/gu, "-");
+    const filename = `${safeName}.3mf`;
+    try {
+      const [{ toBambuProject }, big, small] = await Promise.all([
+        import("./bambu-project-3mf"),
+        captureEngineThumbnail(adapter, { width: 512, height: 512 }),
+        captureEngineThumbnail(adapter, { width: 128, height: 128 }),
+      ]);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const result = toBambuProject(bytes, {
+        projectName: projectName.trim() || "LEVO Project",
+        application: LEVO_APPLICATION,
+        version: LEVO_VERSION,
+        createdAt: new Date().toISOString().slice(0, 10),
+        thumbnailPng: big ? new Uint8Array(await big.arrayBuffer()) : null,
+        thumbnailSmallPng: small ? new Uint8Array(await small.arrayBuffer()) : null,
+        printerModelId: profile.shortName,
+        nozzleDiameters: profile.nozzle ? String(profile.nozzle) : undefined,
+      });
+      downloadBlob(new Blob([result.bytes as BlobPart], { type: "model/3mf" }), filename);
+      // Honest notice: name the one thing that could not be included.
+      setNotice(result.warnings.length > 0 ? `${t.projectFileReady} — ${result.warnings[0]}` : t.projectFileReady);
+    } catch {
+      downloadBlob(file, filename);
+      setNotice(t.projectFileReady);
+    }
+  }, [adapter, profile.nozzle, profile.shortName, projectName, t.projectFileReady]);
+
   const handleViewportExport = useCallback<NonNullable<ViewportProps["onExport"]>>((file, filename) => {
     const intent = exportIntentRef.current;
     if (!intent || !filename.toLowerCase().endsWith(".3mf")) return;
@@ -1111,6 +1162,15 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     if (exportIntentTimerRef.current !== null) {
       window.clearTimeout(exportIntentTimerRef.current);
       exportIntentTimerRef.current = null;
+    }
+    if (intent === "bambu-project") {
+      // The engine hands back a real 3MF; this adds the Bambu project envelope
+      // (schema markers, the project_settings header BambuStudio identifies the
+      // settings by, a preview and the package relationships) and downloads it
+      // under the PROJECT's name rather than the first object's. See
+      // app/bambu-project-3mf.ts for what is and is not written.
+      void finishBambuProject(file);
+      return true;
     }
     if (intent === "persist") {
       // Engine snapshot capture for the S5 sync layer (captureEngineSnapshot).
@@ -1127,6 +1187,23 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
     return true;
   }, [profile.shortName, projectName, t.handyFileReady]);
+
+  /** Save the open project as a Bambu-shaped .3mf — never gated on a slice. */
+  const saveBambuProject = useCallback(() => {
+    exportIntentRef.current = "bambu-project";
+    if (!adapter.clickControl("save-project")) {
+      exportIntentRef.current = null;
+      setNotice(t.actionUnavailable);
+      return;
+    }
+    if (exportIntentTimerRef.current !== null) window.clearTimeout(exportIntentTimerRef.current);
+    exportIntentTimerRef.current = window.setTimeout(() => {
+      if (exportIntentRef.current !== "bambu-project") return;
+      exportIntentRef.current = null;
+      exportIntentTimerRef.current = null;
+      setNotice(t.actionUnavailable);
+    }, 30_000);
+  }, [adapter, t.actionUnavailable]);
 
   const prepareForBambuHandy = useCallback(() => {
     setHandyProjectReady(false);
@@ -1580,6 +1657,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           <button data-levo-action="cut" disabled={!objects.length} onClick={openCut}>
             <Icon name="cut" /><span>{t.cut}</span>
           </button>
+          {/* Saving the project belongs on the canvas, not only in the header
+              and not behind a slice. The header can be lost — that is exactly
+              what the owner hit — and a project is worth saving long before
+              anything has been sliced. */}
+          <button data-levo-action="save-project" disabled={!objects.length} onClick={saveBambuProject}>
+            <Icon name="save" /><span>{t.saveProjectFile}</span>
+          </button>
         </div>
 
         {toolTrayOpen && <section className="mobile-tooltray" aria-label={t.editTools}>
@@ -1602,7 +1686,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             <button onClick={() => { clickControl("undo"); setToolTrayOpen(false); }}><Icon name="undo" /><span>{t.undo}</span></button>
             <button onClick={() => { clickControl("redo"); setToolTrayOpen(false); }}><Icon name="redo" /><span>{t.redo}</span></button>
             <button onClick={() => { clickControl("plate-add"); setToolTrayOpen(false); }}><Icon name="layers" /><span>{t.addPlate}</span></button>
-            <button onClick={() => { clickControl("save-project"); setToolTrayOpen(false); }}><Icon name="save" /><span>{t.save}</span></button>
+            <button onClick={() => { saveBambuProject(); setToolTrayOpen(false); }}><Icon name="save" /><span>{t.save}</span></button>
             {plateCount > 1 && <button onClick={() => { triggerSlice(true); setToolTrayOpen(false); }}><Icon name="slice" /><span>{t.sliceAll}</span></button>}
             <button className="danger" onClick={deleteAll}><Icon name="trash" /><span>{t.deleteAll}</span></button>
           </div>
@@ -1691,7 +1775,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
               onPrepareForHandy={prepareForBambuHandy}
               onDownloadGcode={() => { downloadCurrentGcode(); }}
               onShareGcode={() => void shareCurrentGcode()}
-              onSaveProject={() => clickControl("save-project")}
+              onSaveProject={saveBambuProject}
               onExportAll={() => clickControl("export-all")}
               onOpenConnect={() => setSheet("connect")}
             />
