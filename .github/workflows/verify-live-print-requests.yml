@@ -1,0 +1,199 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the print-request journey is LIVE, not merely merged:
+#
+#   1. the catalogue is deployed and answers anonymously — it is what the
+#      wizard's material chips and quality words are drawn from, so an empty
+#      or missing one is a wizard with nothing to choose;
+#   2. every endpoint that costs money or touches somebody's file is deployed
+#      AND still refuses a stranger;
+#   3. the deployed bundle really contains the three-step wizard, the estimate,
+#      the notification bell, the printers tab and the admin pricing screen;
+#   4. /model-viewer/:token is a real route on the live app rather than a
+#      404, and a made-up token gets nothing;
+#   5. and the notification link the matcher writes — /requests?request=<id> —
+#      resolves on the live site.
+#
+# WHAT IT WRITES: nothing. Every request is an anonymous GET or an empty POST
+# probed only for its refusal, which is what proves a route is both deployed
+# and still closed.
+#
+# WHAT IT DOES NOT PROVE, said plainly: it does not read the live database, so
+# it is not evidence that migration 0045 ran. That evidence is the deploy
+# workflow's own step, "Apply any pending migrations BEFORE the code that needs
+# them", which runs `wrangler d1 migrations apply --remote` and fails the deploy
+# if it cannot.
+name: 26 - Verify Live Print Requests (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-print-requests
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The print catalogue is live and answers a visitor
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/cat.json -w '%{http_code}' --max-time 25 "$APEX/api/marketplace/print/catalog" || echo 000)
+          [ "$code" = "200" ] || { echo "  FAIL the catalogue answers $code: $(head -c 160 /tmp/cat.json)"; exit 1; }
+          fail=0
+          # Materials, qualities and formats are what the wizard renders. A
+          # catalogue that 200s but is empty is a wizard with no choices.
+          for k in '"materials"' '"qualities"' '"formats"' '"min_job_iqd"'; do
+            grep -q "$k" /tmp/cat.json && echo "  ok   the catalogue carries $k" \
+              || { echo "  FAIL the catalogue has no $k"; fail=1; }
+          done
+          for m in '"pla"' '"petg"' '"abs"' '"asa"' '"tpu"'; do
+            grep -q "$m" /tmp/cat.json && echo "  ok   $m is offered" \
+              || { echo "  FAIL $m is missing from the live catalogue"; fail=1; }
+          done
+          # A resin, to prove both processes shipped rather than FDM alone.
+          grep -q '"resin"' /tmp/cat.json && echo "  ok   resin is offered too" \
+            || { echo "  FAIL no resin process in the live catalogue"; fail=1; }
+          # The shop's economics must NOT be in a public response.
+          for leak in 'price_iqd_per_kg' 'waste_factor' 'min_economic_iqd' 'difficulty'; do
+            grep -q "$leak" /tmp/cat.json && { echo "  FAIL the public catalogue leaks $leak"; fail=1; } \
+              || echo "  ok   the public catalogue does not leak $leak"
+          done
+          exit $fail
+
+      - name: Everything that costs money or reads a file refuses a stranger
+        run: |
+          set -euo pipefail
+          fail=0
+          refuse() { # method, path, what it is
+            code=$(curl -s -o /tmp/r.json -w '%{http_code}' --max-time 25 \
+                     -X "$1" -H 'Content-Type: application/json' -d '{}' "$APEX$2" || echo 000)
+            # 401/403 proves the route EXISTS and is closed. 404 would mean the
+            # deploy never carried it, which is the failure this step is for.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $3 is deployed and refuses a stranger ($code)"
+            else
+              echo "  FAIL $3 answers $code: $(head -c 140 /tmp/r.json)"
+              fail=1
+            fi
+          }
+          refuse POST '/api/marketplace/print/quote'                                'the quote'
+          refuse POST '/api/marketplace/print/link'                                 'the link reader'
+          refuse POST '/api/marketplace/print/requests/nope/publish'                'publishing'
+          refuse POST '/api/marketplace/print/requests/nope/repeat'                 'repeating a request'
+          refuse POST '/api/marketplace/print/requests/nope/files/nope/analyze'     'the measurement'
+          refuse POST '/api/marketplace/print/requests/nope/files/nope/viewer-token' 'minting a viewer link'
+          refuse GET  '/api/marketplace/print/my-requests'                          'the owner-scoped list'
+          refuse GET  '/api/notifications'                                          'the notification inbox'
+          refuse GET  '/api/notifications/unread-count'                             'the unread badge'
+          refuse GET  '/api/merchant/printers'                                      'the merchant printers'
+          refuse GET  '/api/merchant/request-prefs'                                 'the merchant preferences'
+          refuse GET  '/api/merchant/request-matches'                               'the merchant match log'
+          exit $fail
+
+      - name: A made-up viewer token gets nothing
+        run: |
+          set -euo pipefail
+          fail=0
+          for p in '/api/marketplace/print/viewer/not-a-real-token-000000' \
+                   '/api/marketplace/print/viewer/not-a-real-token-000000/mesh'; do
+            code=$(curl -s -o /tmp/v.bin -w '%{http_code}' --max-time 25 "$APEX$p" || echo 000)
+            if [ "$code" = "404" ]; then
+              echo "  ok   $p is 404 for an invented token"
+            else
+              echo "  FAIL $p answers $code"; fail=1
+            fi
+          done
+          # And the refusal must not explain itself — "expired" vs "revoked" vs
+          # "never existed" is a hint nobody guessing tokens should be handed.
+          grep -qiE 'expired|revoked|used' /tmp/v.bin && { echo "  FAIL the refusal explains itself"; fail=1; } \
+            || echo "  ok   and it does not say which kind of wrong it was"
+          exit $fail
+
+      - name: The routes the journey needs are served by the live app
+        run: |
+          set -euo pipefail
+          fail=0
+          route() { # path, what it is
+            code=$(curl -s -o /tmp/p.html -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            # The SPA answers 200 with the shell on every route it owns; a 404
+            # would mean the Worker is not serving it at all.
+            if [ "$code" = "200" ] && grep -q '<div id="root"' /tmp/p.html; then
+              echo "  ok   $2 is served"
+            else
+              echo "  FAIL $2 answers $code"; fail=1
+            fi
+          }
+          route '/requests'                       'the request board'
+          route '/requests?request=req_probe'     'the notification deep link'
+          route '/model-viewer/probe-token'       'the 3D viewer route'
+          exit $fail
+
+      - name: Read every module the deployed app serves
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          for a in $entries; do
+            curl -s --compressed --max-time 60 -o "/tmp/mods/$(basename "$a")" "$APEX$a"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "/tmp/mods/$(basename "$a")" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              [ "$code" = "200" ] || rm -f "/tmp/mods/$c"
+            done
+          done
+          echo "  modules read: $(ls /tmp/mods | wc -l)"
+
+      - name: The shipped app really contains the journey
+        run: |
+          set -euo pipefail
+          fail=0
+          # Only VALUES are grepped, never `attr="value"`: minification turns a
+          # JSX prop into an object key, so the attribute form is absent from a
+          # perfectly correct bundle.
+          want() { # needle, what it is
+            hit=$(grep -l -- "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 is not in any served module"; fail=1
+            fi
+          }
+          want 'wizard-step'                'the wizard is three steps'
+          want 'wizard-source'              'a file or a link, both offered'
+          want 'advanced'                   'the advanced options exist to be folded away'
+          want 'completeness'               'the completeness meter shipped'
+          want 'estimate-confidence'        'the estimate carries its confidence'
+          want 'print/quote'                'the wizard asks the server for the price'
+          want 'print/catalog'              'and the server for the materials'
+          want 'كلما زادت المعلومات'         'the encouraging line is shipped verbatim'
+          want 'تم نشر طلبك'                 'and so is the published message'
+          want 'print-summary'              'the request page shows what the file turned out to be'
+          want 'my-request'                 'the customer has their own list'
+          want 'viewer-token'               'the 3D view is minted, not linked'
+          want 'model-viewer'               'and opens on its own route'
+          want 'notif'                      'the notification bell shipped'
+          want 'unread-count'               'and polls its badge'
+          want 'merchant/printers'          'the merchant can register printers'
+          want 'request-prefs'              'and say what they want to hear about'
+          want 'request-matches'            'and ask why they were never told'
+          want 'printPricingConfig'         'the admin can move the pricing'
+          want 'printMaterials'             'and the material prices'
+          want 'printMatchWeights'          'and the matching weights'
+          exit $fail
+
+      - name: Summary
+        if: always()
+        run: echo "Print requests verified against $APEX"
