@@ -455,3 +455,89 @@ test('an unconfigured transport default says so rather than inventing a number',
   assert.match(text, /غير مضبوط/);
   assert.ok(!/العمولة الفعلية \d/.test(text), 'no fabricated commission');
 });
+
+// ============================================================ review round 2
+// Each test below is a defect an adversarial review found in the first cut and
+// that would have destroyed real data on an ordinary edit.
+
+test('a file that omits the compare-at price PRESERVES it, as the header promises', () => {
+  const doc = applyRelations(
+    parseProductRow({ ...baseRow(), original_price_iqd: 650_000 }),
+    view(),
+    { includeInactive: true }
+  );
+  // The partial file an owner writes by hand, or last week's export from a
+  // build that never wrote the key.
+  const partial = `template_version=2\nproduct_id=prd_x\nname_ar=منتج\nprice_iqd=500000\n`;
+  const built = validateProductDoc(toDocBody(parseTemplate(partial), doc, { needs_review: [] }).body);
+  assert.equal(built.original_price_iqd, 650_000, 'the struck-through price must survive an omitted key');
+});
+
+test('a file with no group column leaves every group exactly where it was', () => {
+  // The export before the `group` key existed. All rows arrive nameless; they
+  // used to collapse into the first group, which deleted every other group.
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const stripped = { ...doc, options: doc.options.map((o) => ({ ...o, group_en: '' })) };
+  const body = relationsBodyFromDoc(stripped, view());
+  const groups = body.groups as Array<{ id: string; name_en: string; values: Array<{ id: string }> }>;
+  assert.equal(groups.length, 2, 'both groups must survive a file that never mentions them');
+  assert.deepEqual(
+    groups.map((g) => g.values.map((v) => v.id)).flat().sort(),
+    ['ov1', 'ov2', 'ov3'],
+    'and every option must still be in one'
+  );
+  const nozzle = groups.find((g) => g.id === 'og2')!;
+  assert.deepEqual(nozzle.values.map((v) => v.id), ['ov3'], 'ov3 stays in the group it is in');
+});
+
+test('renaming a group keeps its id, so its values are not cascade-deleted', () => {
+  // product_option_values.group_id is ON DELETE CASCADE. Matching a group by
+  // NAME alone gave a renamed group a fresh id, the old row was deleted, its
+  // values went with it, and they came back with reserved units zeroed.
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const renamed = {
+    ...doc,
+    options: doc.options.map((o) => (o.group_en === 'Nozzle' ? { ...o, group_en: 'Nozzle size' } : o)),
+  };
+  const groups = relationsBodyFromDoc(renamed, view()).groups as Array<{ id: string; name_en: string }>;
+  const nozzle = groups.find((g) => g.name_en === 'Nozzle size')!;
+  assert.equal(nozzle.id, 'og2', 'a rename must reuse the group id, not mint a new one');
+});
+
+test('a NEW group named in the file gets a new id and does not steal an existing one', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const extra = {
+    ...doc,
+    options: [...doc.options, { ...doc.options[0], id: 'ov9', group_en: 'Plate', name_ar: 'PEI', name_en: 'PEI' }],
+  };
+  const groups = relationsBodyFromDoc(extra, view()).groups as Array<{ id: string; name_en: string }>;
+  const plate = groups.find((g) => g.name_en === 'Plate')!;
+  assert.ok(!['og1', 'og2'].includes(plate.id), 'a genuinely new group must not reuse an existing id');
+  assert.equal(groups.length, 3);
+});
+
+test("a colour's SKU fragment survives an ordinary edit", () => {
+  const v = view();
+  (v.colors as unknown as Array<Record<string, unknown>>)[0].sku_part = 'BLK';
+  const doc = applyRelations(parseProductRow(baseRow()), v, { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true });
+  assert.ok(text.includes('colors.1.sku_part=BLK\n'), 'the file must SHOW it, or it cannot be restored');
+  const built = validateProductDoc(toDocBody(parseTemplate(text), doc, { needs_review: [] }).body);
+  const colors = relationsBodyFromDoc(built, v).colors as Array<Record<string, unknown>>;
+  assert.equal(colors[0].sku_part, 'BLK', 'the writer overwrites this column unconditionally');
+});
+
+test("an image's recorded type and size are carried, not cleared", () => {
+  const v = view();
+  const first = (v.images as unknown as Array<Record<string, unknown>>)[0];
+  first.content_type = 'image/jpeg';
+  first.bytes = 204_800;
+  const doc = applyRelations(parseProductRow(baseRow()), v, { includeInactive: true });
+  const built = validateProductDoc(
+    toDocBody(parseTemplate(exportProduct(doc, { includeCost: true })), doc, { needs_review: [] }).body
+  );
+  const images = relationsBodyFromDoc(built, v).images as Array<Record<string, unknown>>;
+  const im1 = images.find((i) => i.id === 'im1')!;
+  assert.equal(im1.content_type, 'image/jpeg');
+  assert.equal(im1.bytes, 204_800);
+});

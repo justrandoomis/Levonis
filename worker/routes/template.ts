@@ -1135,10 +1135,11 @@ templateRoutes.post('/apply', async (c) => {
     if (relational && (structureTouched.length > 0 || mediaTouched)) {
       const current = await loadProductDocWithView(c.env.DB, existing.id);
       if (!current) throw notFound('Product not found');
+      const relationBody = relationsBodyFromDoc(doc, current.view);
       const plan = await planRelationsWrite(
         c.env.DB,
         existing.id,
-        relationsBodyFromDoc(doc, current.view),
+        relationBody,
         // §11: an assistant admin who cannot see cost must not be able to
         // OVERWRITE it either — the writer keeps the stored cost when money
         // is false, exactly as it does for the form and the CSV importer.
@@ -1152,9 +1153,17 @@ templateRoutes.post('/apply', async (c) => {
       }
       relationStmts = plan.stmts;
       if (current.view.variants.length > 0) {
+        // relationsBodyFromDoc drops a combination whose option or colour the
+        // file no longer contains — the writer would refuse the whole save for
+        // it. Saying "carried unchanged" at the moment some are deleted is the
+        // one thing the message must not do.
+        const kept = (relationBody.variants as unknown[] | undefined)?.length ?? 0;
+        const dropped = current.view.variants.length - kept;
         warnings.push(
-          `التركيبات المسعّرة (${current.view.variants.length}) لا يعبّر عنها قالب TXT، ` +
-            'فقد نُقلت كما هي دون تغيير.'
+          dropped > 0
+            ? `${dropped} من التركيبات المسعّرة حُذفت لأن خيارها أو لونها لم يعد موجودًا في الملف` +
+                (kept > 0 ? `، و${kept} نُقلت كما هي.` : '.')
+            : `التركيبات المسعّرة (${kept}) لا يعبّر عنها قالب TXT، فقد نُقلت كما هي دون تغيير.`
         );
       }
     } else if (relational) {
@@ -1169,6 +1178,26 @@ templateRoutes.post('/apply', async (c) => {
 
     doc.id = existing.id;
     if (!doc.slug) doc.slug = existing.slug; // slug stability (toDocBody enforces allow_slug_change)
+
+    /**
+     * §11 — AN ADMIN WHO CANNOT SEE COST CANNOT OVERWRITE IT EITHER.
+     *
+     * The relational writer was gated the moment it was wired up. The products
+     * UPDATE in the same request was not: it is built from every key of
+     * serializeDoc, product_cost_iqd included, and the scalar loop applies
+     * whatever the file says. So an assistant admin could download a template
+     * with the cost correctly stripped, type `product_cost_iqd=0` into the gap
+     * and destroy the margin — and never see it, because the response is
+     * stripped on the way back.
+     */
+    if (!canViewFinancials(c.env, adminUser)) {
+      if (doc.product_cost_iqd !== existing.product_cost_iqd) {
+        warnings.push(
+          'الكلفة لا تُعدَّل من هذا الحساب — أُبقيت كما هي / cost is not editable by this account; the stored value was kept'
+        );
+      }
+      doc.product_cost_iqd = existing.product_cost_iqd;
+    }
 
     const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
     if (!claimed) return repeatSubmission(c, adminUser.id, fingerprint);

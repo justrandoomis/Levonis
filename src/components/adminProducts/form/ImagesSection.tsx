@@ -50,7 +50,7 @@ export function ImagesSection({
   const dragFrom = useRef<number | null>(null);
 
   const addImage = useCallback(
-    (url: string, width?: number | null, height?: number | null) =>
+    (url: string, extra?: { alt?: string; source_url?: string; width?: number | null; height?: number | null }) =>
       setRel((r) => ({
         ...r,
         images: [
@@ -58,7 +58,11 @@ export function ImagesSection({
           {
             id: localId('pi'),
             url,
-            alt_en: '',
+            // Alt text the vendor page carried, and the address it came from.
+            // Dropping the source meant the column 0048 added for exactly this
+            // was never filled by the flow that motivated it.
+            alt_en: extra?.alt ?? '',
+            source_url: extra?.source_url ?? '',
             sort_order: r.images.length,
             // The first image ever added becomes primary; the storefront needs
             // one, and silently having none is worse than choosing.
@@ -66,8 +70,8 @@ export function ImagesSection({
             option_value_id: null,
             color_id: null,
             variant_id: null,
-            width: width ?? null,
-            height: height ?? null,
+            width: extra?.width ?? null,
+            height: extra?.height ?? null,
           },
         ],
       })),
@@ -144,7 +148,7 @@ export function ImagesSection({
       const failed: string[] = [];
       for (const r of res.results) {
         if (r.status === 'stored' && r.url) {
-          addImage(r.url);
+          addImage(r.url, { alt: r.alt, source_url: r.from_page ? r.source_url : undefined });
           ok += 1;
           if (r.from_page) fromPages += 1;
         } else {

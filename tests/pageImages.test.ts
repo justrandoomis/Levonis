@@ -236,3 +236,105 @@ test('a resize strip that changes nothing does not duplicate the address', () =>
 test('an unparseable address is passed through rather than throwing', () => {
   assert.deepEqual(imageCandidates('not a url'), ['not a url']);
 });
+
+// ============================================================ review round 2
+// Each test below is a defect an adversarial review found in the first cut of
+// this file, reproduced before it was fixed.
+
+test('an attribute is never read out of another attribute VALUE', () => {
+  // Shopify writes `?width=` into essentially every src. Matching the tag's
+  // raw text made attr(tag,'width') return 1946 for a 64px thumbnail, which
+  // then sorted to the FRONT of the gallery ahead of the real shots.
+  const html = `<img src="https://cdn.example.com/p.jpg?v=1&amp;width=1946" width="64" height="64">`;
+  assert.deepEqual(extractPageImages(html, 'https://us.store.bambulab.com/p'), []);
+});
+
+test('srcset does not match data-srcset by accident', () => {
+  // `\\bsrcset` also matches after a hyphen, which made the data-srcset
+  // fallback unreachable and read the lazy attribute as the eager one.
+  const html = `<img data-srcset="https://cdn.example.com/lazy-1600.jpg 1600w">`;
+  const out = extractPageImages(html, 'https://qidi3d.com/p');
+  assert.equal(out[0].url, 'https://cdn.example.com/lazy-1600.jpg');
+  assert.equal(out[0].width, 1600);
+});
+
+test('alt text is not read out of a URL query parameter', () => {
+  const html = `<img src="https://cdn.example.com/p.jpg?alt=media&amp;token=x" alt="Bambu Lab A1 rear view">`;
+  assert.equal(extractPageImages(html, 'https://us.store.bambulab.com/p')[0].alt, 'Bambu Lab A1 rear view');
+});
+
+test('og:image:width belongs to the og:image above it, not to the whole page', () => {
+  const html = `
+    <meta property="og:image" content="https://cdn.example.com/hero-2000.jpg">
+    <meta property="og:image:width" content="2000">
+    <meta property="og:image" content="https://cdn.example.com/swatch.jpg">
+    <meta property="og:image:width" content="200">
+    <meta name="twitter:image" content="https://cdn.example.com/card-1200.jpg">`;
+  const urls = extractPageImages(html, 'https://www.creality.com/p').map((i) => i.url);
+  assert.ok(urls.includes('https://cdn.example.com/hero-2000.jpg'), 'the 2000px hero must survive');
+  assert.ok(!urls.includes('https://cdn.example.com/swatch.jpg'), 'the 200px swatch is a thumbnail');
+  assert.ok(urls.includes('https://cdn.example.com/card-1200.jpg'), 'twitter:image declared no width');
+});
+
+test('a real product photo is not mistaken for page furniture', () => {
+  // Every one of these was dropped by the first, unanchored filter: `close`
+  // inside closeup, `arrow` inside narrow, `icon-` inside silicon-,
+  // `profile-` in a part BIQU actually sells.
+  const names = [
+    'k1-max-closeup.jpg',
+    'close-up-nozzle.jpg',
+    'narrow-nozzle-0.2.jpg',
+    'silicon-carbide-nozzle.jpg',
+    'aluminium-profile-2020.jpg',
+    'fidget-spinner-blue.jpg',
+    'skeleton-hand-model.png',
+  ];
+  const html = names.map((n) => `<img src="https://cdn.example.com/products/${n}">`).join('');
+  const out = extractPageImages(html, 'https://biqu.equipment/p');
+  assert.equal(out.length, names.length, `dropped: ${names.filter((n) => !out.some((i) => i.url.endsWith(n)))}`);
+});
+
+test('real page furniture is still dropped', () => {
+  const html = [
+    'assets/logo.png',
+    'icons/cart.png',
+    'ui/spinner.gif',
+    'chrome/close.png',
+    'pay/visa.png',
+    'ui/menu-arrow.png',
+  ]
+    .map((n) => `<img src="https://cdn.example.com/${n}">`)
+    .join('');
+  assert.deepEqual(extractPageImages(html, 'https://biqu.equipment/p'), []);
+});
+
+test('AVIF is accepted — the sniffer stores it', () => {
+  const html = `<img src="https://cdn.example.com/files/a1-hero.avif">`;
+  assert.equal(extractPageImages(html, 'https://us.store.bambulab.com/p').length, 1);
+});
+
+test('a huge descriptorless srcset is parsed in linear time, not quadratic', () => {
+  // The regex version took 19.5 s on 84 KB of this shape. A linear scan is
+  // milliseconds; the assertion is a wall-clock ceiling, generous enough not
+  // to flake on a loaded runner and far under the old cost.
+  const one = 'https://res.example.com/w_400,h_400,c_fit/product-photo.jpg';
+  const srcset = Array.from({ length: 1500 }, () => one).join(',');
+  const html = `<img srcset="${srcset}">`;
+  const started = process.hrtime.bigint();
+  extractPageImages(html, 'https://www.creality.com/p');
+  const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  assert.ok(ms < 1000, `took ${Math.round(ms)}ms — the parser is backtracking again`);
+});
+
+test('a trailing comma in srcset does not stick to the URL', () => {
+  const html = `<img srcset="https://cdn.example.com/a-1600.jpg 1600w,">`;
+  const out = extractPageImages(html, 'https://esun3d.com/p');
+  assert.equal(out[0].url, 'https://cdn.example.com/a-1600.jpg');
+});
+
+test('a tag declaring a thumbnail width is refused even through the src fallback', () => {
+  // The width check used to run only on the src path, so a small tag whose
+  // srcset was rejected fell through to src and was kept with width unknown.
+  const html = `<img width="48" srcset="https://cdn.example.com/tiny.svg 48w" src="https://cdn.example.com/tiny.jpg">`;
+  assert.deepEqual(extractPageImages(html, 'https://qidi3d.com/p'), []);
+});

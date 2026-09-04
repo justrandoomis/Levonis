@@ -151,6 +151,8 @@ export interface ColorV2 extends PriceFields {
   stock?: number | null;
   /** Warn level for this colour's own stock; null = none configured. */
   low_stock_threshold?: number | null;
+  /** The fragment this colour contributes to a built SKU. */
+  sku_part?: string;
 }
 
 export interface TransportOffer {

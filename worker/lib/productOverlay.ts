@@ -69,11 +69,20 @@ export interface ImageRow {
   // ---- 0048 ------------------------------------------------------------
   // Optional in the TYPE because a Worker deployed before the migration ran
   // reads rows that have no such column; `?? ''` at every use site keeps that
-  // deploy serving instead of crashing on undefined.
+  // deploy READING instead of crashing on undefined. The WRITE side is not
+  // survivable — the upsert in adminProductRelations.ts names these columns
+  // unconditionally and would fail with "no such column" — which is why the
+  // deploy workflow applies migrations BEFORE it publishes the code
+  // (.github/workflows/deploy-staging-code.yml, "Apply any pending migrations
+  // BEFORE the code that needs them"). A rollback to an older Worker is safe;
+  // a deploy that skips its migration is not, and never has been.
   alt_ar?: string | null;
   alt_ckb?: string | null;
   r2_key?: string | null;
   source_url?: string | null;
+  /** Recorded by the uploader; carried so a text edit does not erase it. */
+  content_type?: string | null;
+  bytes?: number | null;
 }
 
 export interface ProductRelationsView {
@@ -360,6 +369,7 @@ export function applyRelations(
         active: showAll ? truthy(x.active) : true,
         stock: x.stock ?? null,
         low_stock_threshold: x.low_stock_threshold ?? null,
+        sku_part: x.sku_part ?? '',
         regular_price_iqd: x.regular_price_iqd,
         prime_price_iqd: x.prime_price_iqd,
         pro_price_iqd: x.pro_price_iqd,

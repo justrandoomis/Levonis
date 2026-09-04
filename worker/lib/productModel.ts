@@ -435,6 +435,7 @@ export function upgradeColors(raw: unknown): ColorV2[] {
             : [],
       stock: num(c.stock),
       low_stock_threshold: num(c.low_stock_threshold),
+      sku_part: s(c.sku_part, 40),
     };
   }).sort((a, b) => a.order - b.order);
 }

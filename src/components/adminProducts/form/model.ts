@@ -100,6 +100,13 @@ export interface FormImage {
   variant_id: string | null;
   width: number | null;
   height: number | null;
+  /**
+   * Where this picture came from, when it was fetched from a vendor page.
+   * Carried so the record reaches the database — the server preserves a
+   * stored value when this is empty, so an image the form did not fetch keeps
+   * whatever provenance it already had.
+   */
+  source_url?: string;
 }
 
 export interface RelationsState {
@@ -395,6 +402,7 @@ export function relationsToWire(rel: RelationsState) {
       variant_id: i.variant_id,
       width: i.width,
       height: i.height,
+      source_url: i.source_url ?? '',
     })),
   };
 }

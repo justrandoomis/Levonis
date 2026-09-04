@@ -14,6 +14,13 @@ import { badRequest } from './http';
 
 const BLOCKED_HOST_RE = /^(localhost|.*\.local|.*\.internal|.*\.localhost)$/i;
 
+/**
+ * `http://localhost./x` has hostname `localhost.` — the fully-qualified form,
+ * which resolves to exactly the same place and matched none of the four
+ * alternatives above. Every host is normalized before it is judged.
+ */
+const normalizeHost = (h: string): string => h.toLowerCase().replace(/\.$/, '');
+
 function ipIsPrivate(host: string): boolean {
   // IPv4 literal check.
   const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
@@ -27,7 +34,7 @@ function ipIsPrivate(host: string): boolean {
     return false;
   }
   // IPv6 literal (bracketed or not).
-  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  const h = normalizeHost(host.replace(/^\[|\]$/g, ''));
   if (h.includes(':')) {
     // An IPv4-MAPPED address wraps a v4 address inside a v6 literal, in either
     // spelling: `::ffff:127.0.0.1` or `::ffff:7f00:1`. Neither starts with fc,
@@ -47,6 +54,18 @@ function ipIsPrivate(host: string): boolean {
       }
       return true; // an ::ffff: form we cannot read is refused, not trusted
     }
+    // The deprecated IPv4-COMPATIBLE form has no ffff marker at all:
+    // `::127.0.0.1` and `::7f00:1` are still loopback, and neither starts with
+    // fc, fd or fe80 nor equals ::1.
+    const compat = /^::((?:\d{1,3}\.){3}\d{1,3}|[0-9a-f]{1,4}:[0-9a-f]{1,4})$/.exec(h);
+    if (compat) {
+      const inner = compat[1];
+      if (inner.includes('.')) return ipIsPrivate(inner);
+      const [hiRaw, loRaw] = inner.split(':');
+      const hi = parseInt(hiRaw, 16);
+      const lo = parseInt(loRaw, 16);
+      return ipIsPrivate(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
+    }
     return h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80') || h === '::';
   }
   return false;
@@ -64,7 +83,8 @@ export function validateOutboundUrl(raw: string): URL {
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw badRequest('Only http(s) URLs are allowed');
   if (url.username || url.password) throw badRequest('URLs with credentials are not allowed');
-  if (BLOCKED_HOST_RE.test(url.hostname) || ipIsPrivate(url.hostname)) {
+  const host = normalizeHost(url.hostname);
+  if (BLOCKED_HOST_RE.test(host) || ipIsPrivate(host)) {
     throw badRequest('This address is not allowed');
   }
   return url;

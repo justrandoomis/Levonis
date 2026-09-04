@@ -93,33 +93,66 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
   // A row that names none joins the first group, so a file written before this
   // key existed still produces exactly one group, as it always did.
   const groups: GroupOut[] = [];
-  const byName = new Map<string, GroupOut>();
+  const byKey = new Map<string, GroupOut>();
   const existingGroupIdByName = new Map(view.groups.map((g) => [g.name_en.trim().toLowerCase(), g.id]));
-  const groupFor = (rawName: string): GroupOut => {
-    const name = rawName.trim();
-    const key = name.toLowerCase();
-    const found = byName.get(key);
+  const existingGroupById = new Map(view.groups.map((g) => [g.id, g]));
+  // Where each option value sits TODAY. This is what lets a file that never
+  // heard of the `group` key leave the groups exactly as they were.
+  const groupIdOfValue = new Map(view.values.map((v) => [v.id, v.group_id]));
+
+  const groupOut = (id: string, name: string): GroupOut => {
+    const key = `id:${id}`;
+    const found = byKey.get(key);
     if (found) return found;
-    if (!name && groups.length > 0) return groups[0];
-    const label = name || view.groups[0]?.name_en || 'Options';
-    const reuse = existingGroupIdByName.get(label.trim().toLowerCase());
-    const made: GroupOut = {
-      // Keeping the EXISTING group's id when the name matches means editing a
-      // value does not orphan every image and variant bound through it.
-      id: reuse ?? newId('og'),
-      name_en: label,
-      sort: groups.length,
-      active: true,
-      values: [],
-    };
+    const made: GroupOut = { id, name_en: name, sort: groups.length, active: true, values: [] };
     groups.push(made);
-    byName.set(key, made);
-    if (!name) byName.set(label.trim().toLowerCase(), made);
+    byKey.set(key, made);
+    byKey.set(`name:${name.trim().toLowerCase()}`, made);
     return made;
   };
 
+  /**
+   * Which group an option row belongs to.
+   *
+   * Three cases, in order, and the order is what keeps old files safe:
+   *
+   *  1. The row NAMES a group. A name that matches an existing group reuses
+   *     that group's id — a rename would otherwise delete the group row, and
+   *     `ON DELETE CASCADE` on product_option_values would take its values
+   *     with it and re-insert them with their reserved units zeroed. So a
+   *     renamed group is matched by the id its values still carry.
+   *  2. The row names nothing but ALREADY EXISTS. It stays in the group it is
+   *     in. This is every row of a file exported before the `group` key
+   *     existed: without it they all collapsed into the first group, deleting
+   *     every other group in the product.
+   *  3. The row names nothing and is new. It joins the first group — the only
+   *     defensible guess, and correct for the single-group products that are
+   *     the common case.
+   */
+  const groupFor = (o: { id: string; group_en?: string }): GroupOut => {
+    const name = (o.group_en ?? '').trim();
+    if (name) {
+      const byName = byKey.get(`name:${name.toLowerCase()}`);
+      if (byName) return byName;
+      const existingId = existingGroupIdByName.get(name.toLowerCase());
+      if (existingId) return groupOut(existingId, name);
+      // A rename: this row's own group still exists under its old name, and
+      // reusing its id renames it in place instead of deleting it.
+      const currentId = groupIdOfValue.get(o.id);
+      const current = currentId ? existingGroupById.get(currentId) : undefined;
+      if (current && !byKey.has(`id:${current.id}`)) return groupOut(current.id, name);
+      return groupOut(newId('og'), name);
+    }
+    const currentId = groupIdOfValue.get(o.id);
+    const current = currentId ? existingGroupById.get(currentId) : undefined;
+    if (current) return groupOut(current.id, current.name_en);
+    if (groups.length > 0) return groups[0];
+    const first = view.groups[0];
+    return first ? groupOut(first.id, first.name_en) : groupOut(newId('og'), 'Options');
+  };
+
   doc.options.forEach((o, i) => {
-    groupFor(o.group_en ?? '').values.push({
+    groupFor(o).values.push({
       id: o.id,
       name_en: o.name_en || o.name_ar,
       sku_part: o.sku_part ?? '',
@@ -156,6 +189,10 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
       active: c.active !== false,
       stock: c.stock ?? null,
       low_stock_threshold: c.low_stock_threshold ?? null,
+      // The writer's ON CONFLICT sets sku_part from what it is given, so an
+      // absent one is an ERASURE: every SKU built from this colour would
+      // silently lose its fragment on an ordinary text edit.
+      sku_part: c.sku_part ?? '',
       option_value_ids: declared,
       ...priceBag(c),
     };
@@ -163,6 +200,7 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
 
   // ---- images ------------------------------------------------------------
   const colorIds = new Set(doc.colors.map((c) => c.id));
+  const existingImageById = new Map(view.images.map((i) => [i.id, i]));
   const images = doc.media.map((m, i) => {
     // A binding to a row this file does not contain would be refused by the
     // writer; dropping it turns the picture back into a gallery image, which
@@ -185,6 +223,11 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
       variant_id: va,
       width: m.width,
       height: m.height,
+      // Carried for the same reason as sku_part above: the upsert writes both
+      // columns unconditionally, so omitting them clears what the uploader
+      // recorded about the file.
+      content_type: existingImageById.get(m.id)?.content_type ?? '',
+      bytes: existingImageById.get(m.id)?.bytes ?? null,
     };
   });
 

@@ -78,11 +78,63 @@ export function isVendorHost(hostname: string, allow: readonly string[] = VENDOR
  * page carries dozens of them and each one costs a fetch, so they are dropped
  * before the network is touched — not after.
  */
-const CHROME_RE =
-  /(sprite|logo|favicon|icon[-_.]|placeholder|loading|spinner|skeleton|avatar|profile[-_]|payment|visa|mastercard|paypal|amex|klarna|apple[-_]?pay|google[-_]?pay|flag[-_]|badge[-_]|arrow|chevron|close|search|cart[-_]|menu[-_])/i;
+/**
+ * Directories a store keeps its furniture in. A file under one of these is
+ * chrome whatever it is called.
+ */
+const CHROME_DIRS = new Set([
+  'icon', 'icons', 'sprite', 'sprites', 'assets', 'asset', 'ui', 'chrome', 'theme',
+  'payment', 'payments', 'pay', 'flags', 'badges', 'avatars', 'logos', 'static',
+]);
 
-/** Extensions the ingest sniffer cannot store — fetching them is wasted work. */
-const UNSUPPORTED_EXT_RE = /\.(svg|ico|avif|bmp|tiff?|heic|heif|mp4|webm|mov|pdf)(\?|#|$)/i;
+/** Words that are never part of a product's name. */
+const HARD_WORDS = new Set([
+  'sprite', 'favicon', 'placeholder', 'visa', 'mastercard', 'paypal', 'amex', 'klarna',
+  'applepay', 'googlepay', 'apay', 'gpay',
+]);
+
+/**
+ * Words that MEAN furniture on their own and mean nothing on their own inside
+ * a product name.
+ *
+ * The first version tested these as substrings of the whole path, and it ate
+ * real photography: `close` matched `k1-max-closeup.jpg`, `arrow` matched
+ * `narrow-nozzle-0.2.jpg`, `icon-` matched `silicon-carbide-nozzle.jpg`, and
+ * `profile-` matched `aluminium-profile-2020.jpg` — a part BIQU sells.
+ * Matching whole TOKENS instead was better and still wrong: `close-up-nozzle`,
+ * `fidget-spinner-blue`, `skeleton-hand-model` and `aluminium-profile-2020`
+ * all contain one of these as a real word.
+ *
+ * The rule that works: a file is furniture only when EVERY word of its name is
+ * one of these (or a bare number). `cart-icon.png` and `menu-arrow.png` are;
+ * `close-up-nozzle.jpg` is not, because `nozzle` is a real word about a real
+ * thing.
+ */
+const SOFT_WORDS = new Set([
+  'logo', 'icon', 'cart', 'menu', 'arrow', 'chevron', 'close', 'search', 'profile',
+  'spinner', 'skeleton', 'avatar', 'badge', 'flag', 'loading', 'load', 'nav', 'header',
+  'footer', 'bg', 'background', 'btn', 'button', 'thumb', 'thumbnail', 'blank', 'empty',
+  'up', 'down', 'left', 'right', 'small', 'mini', 'x', 'default',
+]);
+
+function isChrome(pathname: string): boolean {
+  const parts = pathname.toLowerCase().split('/').filter(Boolean);
+  const file = parts.pop() ?? '';
+  if (parts.some((d) => CHROME_DIRS.has(d))) return true;
+  const stem = file.replace(/\.[a-z0-9]+$/i, '');
+  const tokens = stem.split(/[-_.\s]+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+  if (tokens.some((t) => HARD_WORDS.has(t))) return true;
+  return tokens.every((t) => SOFT_WORDS.has(t) || /^\d+$/.test(t) || /^\d+x\d+$/.test(t));
+}
+
+/**
+ * Extensions the ingest sniffer cannot store — fetching them is wasted work.
+ * AVIF is NOT here: the sniffer learned it in the same change that added this
+ * file, and Shopify serves AVIF by default, so refusing it here would drop a
+ * whole vendor's gallery for a format the pipeline can store.
+ */
+const UNSUPPORTED_EXT_RE = /\.(svg|ico|bmp|tiff?|heic|heif|mp4|webm|mov|pdf)(\?|#|$)/i;
 
 /** The smallest declared width we accept when a width IS declared. Thumbnails
  *  below this are navigation chrome, not the product shot. An UNKNOWN width is
@@ -110,7 +162,7 @@ function isPlausibleImage(url: string): boolean {
   } catch {
     return false;
   }
-  return !CHROME_RE.test(path);
+  return !isChrome(path);
 }
 
 /** Decode the handful of entities that actually appear inside HTML attributes. */
@@ -124,51 +176,130 @@ function unescapeAttr(s: string): string {
     .replace(/&gt;/g, '>');
 }
 
-/** Read one attribute off a tag's raw text. */
-function attr(tag: string, name: string): string | null {
-  const re = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
-  const m = re.exec(tag);
-  if (!m) return null;
-  return unescapeAttr(m[2] ?? m[3] ?? m[4] ?? '');
+/**
+ * Every attribute of a tag, read once, in order.
+ *
+ * The first version matched `\bname\s*=` anywhere in the tag's raw text, which
+ * is wrong twice over: `\b` also matches after a hyphen, so `srcset` matched
+ * `data-srcset`; and the search ran over the whole tag INCLUDING attribute
+ * values, so a Shopify `src="…?v=1&width=1946"` made `attr(tag,'width')`
+ * return 1946 instead of the real `width="64"`. A 64px thumbnail then sailed
+ * past the minimum-width check and sorted to the FRONT of the gallery.
+ *
+ * A tokenizer instead: walk the tag, take name=value pairs, and never look
+ * inside a value.
+ */
+function parseAttrs(tag: string): Map<string, string> {
+  const out = new Map<string, string>();
+  // Skip "<img" / "<meta" and stop before the closing ">".
+  let i = tag.indexOf('<') + 1;
+  while (i < tag.length && !/[\s/>]/.test(tag[i])) i += 1;
+  while (i < tag.length) {
+    while (i < tag.length && /[\s/]/.test(tag[i])) i += 1;
+    if (i >= tag.length || tag[i] === '>') break;
+    const nameStart = i;
+    while (i < tag.length && !/[\s=/>]/.test(tag[i])) i += 1;
+    const name = tag.slice(nameStart, i).toLowerCase();
+    while (i < tag.length && /\s/.test(tag[i])) i += 1;
+    let value = '';
+    if (tag[i] === '=') {
+      i += 1;
+      while (i < tag.length && /\s/.test(tag[i])) i += 1;
+      const quote = tag[i];
+      if (quote === '"' || quote === "'") {
+        i += 1;
+        const end = tag.indexOf(quote, i);
+        // An unterminated quote is a malformed tag; take the rest and stop.
+        value = end === -1 ? tag.slice(i) : tag.slice(i, end);
+        i = end === -1 ? tag.length : end + 1;
+      } else {
+        const start = i;
+        while (i < tag.length && !/[\s>]/.test(tag[i])) i += 1;
+        value = tag.slice(start, i);
+      }
+    }
+    if (name && !out.has(name)) out.set(name, unescapeAttr(value));
+  }
+  return out;
 }
 
 /**
- * The widest entry of a srcset. `srcset` is the page telling us, in its own
- * words, which file is the big one — far more reliable than guessing from a
- * filename.
+ * The widest entry of a srcset.
  *
- * Entries are found by anchoring on the DESCRIPTOR rather than by splitting on
- * commas, because a comma is legal inside a URL (Cloudinary writes transforms
- * as `/w_800,h_800/`) and a naive split cuts those addresses in half. A srcset
- * with no descriptor at all is one URL, which is the fallback.
+ * `srcset` is the page telling us, in its own words, which file is the big
+ * one — far more reliable than guessing from a filename.
+ *
+ * Parsed by a LINEAR scan rather than a regex. The regex version anchored on
+ * the descriptor to survive commas inside URLs (Cloudinary writes transforms
+ * as `/w_800,h_800/`), and its lazy `(?:,[^\s,]+)*?` group re-expanded at
+ * every start position: measured on comma-joined URL lists with no
+ * descriptors, 5 KB cost 81 ms and 84 KB cost 19.5 seconds — clean quadratic,
+ * on an attribute read straight out of a third-party page capped at 4 MB. CPU
+ * is not bounded by the fetch timeout, so that was a hang waiting to be
+ * pasted. This walks the string once.
+ *
+ * The rule the scan implements is the HTML one: an entry ends at a comma that
+ * FOLLOWS whitespace or a descriptor, so a comma inside a URL — which never
+ * has whitespace before it — does not split.
  */
 function widestFromSrcset(srcset: string): { url: string; width: number | null } | null {
-  const entry = /([^\s,]+(?:,[^\s,]+)*?)\s+(\d+)(w)(?=\s*(?:,|$))|([^\s,]+(?:,[^\s,]+)*?)\s+([\d.]+)(x)(?=\s*(?:,|$))/g;
+  if (srcset.length > 64_000) return null; // far past any real gallery
   let best: { url: string; width: number | null } | null = null;
   let bestRank = -1;
   let hasWidthDescriptor = false;
-  let m: RegExpExecArray | null;
-  while ((m = entry.exec(srcset)) !== null) {
-    const isW = m[3] === 'w';
-    const url = (isW ? m[1] : m[4]).trim();
-    const num = Number(isW ? m[2] : m[5]);
-    if (!url || !Number.isFinite(num)) continue;
-    // A width descriptor is real information; a density descriptor is not a
-    // width and is never reported as one. When both appear (invalid HTML, but
-    // it happens) the widths win outright.
+
+  let i = 0;
+  const n = srcset.length;
+  while (i < n) {
+    while (i < n && (srcset[i] === ',' || /\s/.test(srcset[i]))) i += 1;
+    if (i >= n) break;
+    // The URL runs to the next whitespace or to the end.
+    const urlStart = i;
+    while (i < n && !/\s/.test(srcset[i])) i += 1;
+    let url = srcset.slice(urlStart, i);
+    // A URL may legally end with the comma that separates it from the next
+    // entry when no descriptor was written.
+    let sawTrailingComma = false;
+    while (url.endsWith(',')) {
+      url = url.slice(0, -1);
+      sawTrailingComma = true;
+    }
+    if (!url) continue;
+
+    // A descriptor, if this entry has one, is the next token before the comma.
+    let width: number | null = null;
+    let rank = 0;
+    let isW = false;
+    if (!sawTrailingComma) {
+      while (i < n && /\s/.test(srcset[i])) i += 1;
+      const descStart = i;
+      while (i < n && srcset[i] !== ',') i += 1;
+      const desc = srcset.slice(descStart, i).trim();
+      const w = /^(\d+)w$/.exec(desc);
+      const x = /^([\d.]+)x$/.exec(desc);
+      if (w) {
+        isW = true;
+        width = Number(w[1]);
+        rank = width;
+      } else if (x) {
+        rank = Number(x[1]);
+      }
+    }
+
+    // A width descriptor is real information; a density is not a width and is
+    // never reported as one. When both appear (invalid HTML, but it happens)
+    // the widths win outright.
     if (isW && !hasWidthDescriptor) {
       hasWidthDescriptor = true;
       bestRank = -1;
     }
     if (!isW && hasWidthDescriptor) continue;
-    if (num > bestRank) {
-      bestRank = num;
-      best = { url, width: isW ? num : null };
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = { url, width };
     }
   }
-  if (best) return best;
-  const only = srcset.trim();
-  return only && !/\s/.test(only) ? { url: only, width: null } : null;
+  return best;
 }
 
 /**
@@ -277,23 +408,37 @@ export function extractPageImages(html: string, pageUrl: string, limit = 24): Pa
 
   // 1. Open Graph / Twitter card — the store's own answer to "which picture is
   //    this product?".
+  //
+  //    `og:image:width` belongs to the og:image it FOLLOWS, per the Open Graph
+  //    spec's structured properties. One page-wide variable applied to every
+  //    tag meant a small second og:image (a swatch, a Yoast-generated
+  //    thumbnail) set the width for the 2000px hero above it and dropped it —
+  //    and gave twitter:image a width it never declared.
   const metaRe = /<meta\b[^>]*>/gi;
   let m: RegExpExecArray | null;
-  let ogWidth: number | null = null;
-  const ogTags: string[] = [];
+  const ogTags: Array<{ url: string; width: number | null }> = [];
   while ((m = metaRe.exec(html)) !== null) {
-    const tag = m[0];
-    const prop = (attr(tag, 'property') ?? attr(tag, 'name') ?? '').toLowerCase();
+    const at = parseAttrs(m[0]);
+    const prop = (at.get('property') ?? at.get('name') ?? '').toLowerCase();
+    const content = at.get('content') ?? '';
     if (prop === 'og:image:width') {
-      const w = Number(attr(tag, 'content'));
-      if (Number.isFinite(w) && w > 0) ogWidth = w;
+      const w = Number(content);
+      // Attach it to the most recent og:image that has none yet.
+      const last = ogTags[ogTags.length - 1];
+      if (last && last.width === null && Number.isFinite(w) && w > 0) last.width = w;
+      continue;
     }
-    if (prop === 'og:image' || prop === 'og:image:secure_url' || prop === 'og:image:url' || prop === 'twitter:image' || prop === 'twitter:image:src') {
-      const content = attr(tag, 'content');
-      if (content) ogTags.push(content);
+    if (
+      prop === 'og:image' ||
+      prop === 'og:image:secure_url' ||
+      prop === 'og:image:url' ||
+      prop === 'twitter:image' ||
+      prop === 'twitter:image:src'
+    ) {
+      if (content) ogTags.push({ url: content, width: null });
     }
   }
-  for (const t of ogTags) add(t, 'og', ogWidth, '');
+  for (const t of ogTags) add(t.url, 'og', t.width, '');
 
   // 2. JSON-LD Product.image — usually the whole gallery, in order.
   const ld: string[] = [];
@@ -303,14 +448,15 @@ export function extractPageImages(html: string, pageUrl: string, limit = 24): Pa
   // 3. <link rel="preload" as="image"> — what the page itself rushes to load.
   const linkRe = /<link\b[^>]*>/gi;
   while ((m = linkRe.exec(html)) !== null) {
-    const tag = m[0];
-    if (!/\brel\s*=\s*["']?preload/i.test(tag) || !/\bas\s*=\s*["']?image/i.test(tag)) continue;
-    const set = attr(tag, 'imagesrcset');
+    const at = parseAttrs(m[0]);
+    if (!(at.get('rel') ?? '').toLowerCase().includes('preload')) continue;
+    if ((at.get('as') ?? '').toLowerCase() !== 'image') continue;
+    const set = at.get('imagesrcset');
     if (set) {
       const best = widestFromSrcset(set);
       if (best) add(best.url, 'preload', best.width, '');
     }
-    add(attr(tag, 'href'), 'preload', null, '');
+    add(at.get('href') ?? null, 'preload', null, '');
   }
 
   // 4. <img> — srcset first (the page names the widest file itself), then the
@@ -318,11 +464,15 @@ export function extractPageImages(html: string, pageUrl: string, limit = 24): Pa
   const imgRe = /<img\b[^>]*>/gi;
   const fromImgs: PageImage[] = [];
   while ((m = imgRe.exec(html)) !== null) {
-    const tag = m[0];
-    const alt = attr(tag, 'alt') ?? '';
-    const declared = Number(attr(tag, 'width'));
+    const at = parseAttrs(m[0]);
+    const alt = at.get('alt') ?? '';
+    const declared = Number(at.get('width'));
     const declaredWidth = Number.isFinite(declared) && declared > 0 ? declared : null;
-    const set = attr(tag, 'srcset') ?? attr(tag, 'data-srcset');
+    // A tag that declares itself a thumbnail is a thumbnail whichever
+    // attribute its address is in — the src fallback below must not smuggle it
+    // back in with an unknown width.
+    if (declaredWidth !== null && declaredWidth < MIN_DECLARED_WIDTH) continue;
+    const set = at.get('srcset') ?? at.get('data-srcset');
     if (set) {
       const best = widestFromSrcset(set);
       if (best) {
@@ -334,10 +484,10 @@ export function extractPageImages(html: string, pageUrl: string, limit = 24): Pa
         }
       }
     }
-    const src = attr(tag, 'src') ?? attr(tag, 'data-src') ?? attr(tag, 'data-original') ?? attr(tag, 'data-lazy-src');
-    const abs = absolute(src ?? '', pageUrl);
+    const src =
+      at.get('src') ?? at.get('data-src') ?? at.get('data-original') ?? at.get('data-lazy-src') ?? '';
+    const abs = absolute(src, pageUrl);
     if (!abs || seen.has(abs) || !isPlausibleImage(abs)) continue;
-    if (declaredWidth !== null && declaredWidth < MIN_DECLARED_WIDTH) continue;
     seen.add(abs);
     fromImgs.push({ url: abs, source: 'img', width: declaredWidth, alt });
   }

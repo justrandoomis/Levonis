@@ -105,15 +105,29 @@ async function readCapped(res: Response, cap: number): Promise<Uint8Array> {
 export async function ingestImageUrl(
   env: Env,
   rawUrl: string,
-  opts: { allowPage?: boolean } = {}
+  opts: { allowPage?: boolean; budget?: IngestBudget } = {}
 ): Promise<IngestResult> {
   let sourceUrl = rawUrl;
+  const budget = opts.budget;
+  if (budget && (budget.fetches <= 0 || budget.bytes <= 0)) {
+    return {
+      source_url: rawUrl,
+      status: 'failed',
+      reason: 'تجاوز هذا الطلب حدّ التنزيل — أعد المحاولة بعدد أقل من الروابط',
+    };
+  }
   try {
     let target = validateOutboundUrl(rawUrl);
     sourceUrl = target.toString();
 
     let res: Response | null = null;
     for (let hop = 0; hop < 4; hop++) {
+      if (budget) {
+        if (budget.fetches <= 0) {
+          return { source_url: sourceUrl, status: 'failed', reason: 'تجاوز هذا الطلب حدّ التنزيل' };
+        }
+        budget.fetches -= 1;
+      }
       res = await fetch(target.toString(), {
         redirect: 'manual',
         signal: AbortSignal.timeout(10_000),
@@ -131,7 +145,8 @@ export async function ingestImageUrl(
       return { source_url: sourceUrl, status: 'failed', reason: `HTTP ${res ? res.status : 'error'}` };
     }
 
-    const buf = await readCapped(res, IMAGE_CAP + 1);
+    const buf = await readCapped(res, Math.min(IMAGE_CAP + 1, budget ? budget.bytes : IMAGE_CAP + 1));
+    if (budget) budget.bytes -= buf.length;
     if (buf.length > IMAGE_CAP) {
       return { source_url: sourceUrl, status: 'failed', reason: 'Image exceeds the 4 MB limit' };
     }
@@ -194,8 +209,33 @@ export async function ingestImageUrl(
  * which went through the same fetch, the same SSRF check and the same
  * magic-byte test, because extraction only decides which addresses to TRY.
  */
-export async function ingestUrlOrPage(env: Env, rawUrl: string): Promise<IngestResult[]> {
-  const first = await ingestImageUrl(env, rawUrl, { allowPage: true });
+export interface IngestBudget {
+  /** Outbound fetches left for this request, across every URL in it. */
+  fetches: number;
+  /** Bytes left to download for this request. */
+  bytes: number;
+}
+
+/**
+ * ONE REQUEST, ONE BUDGET.
+ *
+ * MAX_PER_CALL bounds the URLs, PAGE_IMAGE_LIMIT bounds the images per page and
+ * imageCandidates adds up to two tries each — which multiplied out to 12 × (1
+ * page + 10 × 2) ≈ 250 fetches and, at the 4 MB cap apiece, most of a gigabyte
+ * for a single POST. Neither the per-fetch timeout nor the per-fetch cap sees
+ * the total. This does: the budget is created per request and every fetch
+ * decrements it, so the worst case is bounded no matter what a page names.
+ */
+export function newIngestBudget(): IngestBudget {
+  return { fetches: 40, bytes: 64 * 1024 * 1024 };
+}
+
+export async function ingestUrlOrPage(
+  env: Env,
+  rawUrl: string,
+  budget: IngestBudget = newIngestBudget()
+): Promise<IngestResult[]> {
+  const first = await ingestImageUrl(env, rawUrl, { allowPage: true, budget });
   if (first.reason !== PAGE_MARKER) return [first];
 
   const pageUrl = first.source_url;
@@ -220,7 +260,11 @@ export async function ingestUrlOrPage(env: Env, rawUrl: string): Promise<IngestR
     let stored: IngestResult | null = null;
     let lastReason = '';
     for (const candidate of imageCandidates(image.url)) {
-      const r = await ingestImageUrl(env, candidate);
+      if (budget.fetches <= 0 || budget.bytes <= 0) {
+        lastReason = 'تجاوز هذا الطلب حدّ التنزيل — أعد المحاولة بعدد أقل من الروابط';
+        break;
+      }
+      const r = await ingestImageUrl(env, candidate, { budget });
       if (r.status === 'stored') {
         stored = r;
         break;
@@ -250,7 +294,8 @@ mediaRoutes.post('/ingest', requireAdmin, async (c) => {
 
   const urls = raw.map((u, i) => str(u, `urls[${i}]`, { min: 8, max: 2000 }));
   const results: IngestResult[] = [];
-  for (const u of urls) results.push(...(await ingestUrlOrPage(c.env, u)));
+  const budget = newIngestBudget();
+  for (const u of urls) results.push(...(await ingestUrlOrPage(c.env, u, budget)));
   // The decoded page never leaves this module — it is working state, not a
   // payload, and returning someone else's markup to the browser is not this
   // endpoint's job.

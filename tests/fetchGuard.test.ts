@@ -68,3 +68,22 @@ test('non-http schemes and embedded credentials are refused', () => {
   refuses('https://user:pass@example.com/a.jpg', 'credentials');
   refuses('not a url', 'unparseable');
 });
+
+// ============================================================ review round 2
+
+test('a fully-qualified trailing dot does not slip past the name blocklist', () => {
+  // `new URL('http://localhost./x').hostname` is `localhost.`, which matched
+  // none of the four alternatives and reached loopback.
+  refuses('http://localhost./probe', 'localhost with a root dot');
+  refuses('http://db.internal./x', 'an internal name with a root dot');
+  refuses('http://printer.local./x', 'mDNS with a root dot');
+  refuses('http://LOCALHOST./x', 'and it is case-insensitive');
+});
+
+test('the deprecated IPv4-compatible IPv6 form is unwrapped too', () => {
+  refuses('http://[::127.0.0.1]/', 'dotted v4-compatible loopback');
+  refuses('http://[::7f00:1]/', 'hex v4-compatible loopback');
+  refuses('http://[::169.254.169.254]/', 'v4-compatible metadata address');
+  // A v4-compatible PUBLIC address is still allowed: unwrap and judge.
+  assert.equal(validateOutboundUrl('http://[::8.8.8.8]/').protocol, 'http:');
+});

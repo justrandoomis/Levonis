@@ -241,6 +241,7 @@ const GROUP_SPECS: GroupSpec[] = [
       // carries every link, comma separated; it wins over option_id when both
       // are present.
       f('option_ids', 'csv', 'colors', 'كل الخيارات التي يتوفر لها هذا اللون، مفصولة بفواصل — the FULL link set; يتقدّم على option_id. فارغ = متاح لكل الخيارات.'),
+      f('sku_part', 'string', 'colors', 'الجزء الذي يضيفه هذا اللون إلى رمز المنتج — SKU fragment'),
       f('stock', 'int', 'colors', 'مخزون هذا اللون — __NULL__ = لا يُتتبع على مستوى اللون', { nullable: true, min: 0, max: 1_000_000 }),
       f('low_stock_threshold', 'int', 'colors', 'حد التنبيه لمخزون هذا اللون — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
       f('active', 'bool', 'colors', 'فعال — active'),
@@ -908,6 +909,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.image`, cItem.image);
     push(`${p}.option_id`, cItem.option_id ?? null);
     push(`${p}.option_ids`, (cItem.option_ids ?? []).join(','));
+    push(`${p}.sku_part`, cItem.sku_part ?? '');
     push(`${p}.stock`, numStr(cItem.stock ?? null));
     push(`${p}.low_stock_threshold`, numStr(cItem.low_stock_threshold ?? null));
     push(`${p}.active`, boolStr(cItem.active));
@@ -1451,6 +1453,10 @@ export function toDocBody(
         // low_stock_threshold, direct_surcharge_iqd) and the scalar loop
         // overwrites those the file actually carries — carrying them here is
         // what makes an omitted key mean "preserve" rather than "erase".
+        // Wiring original_price_iqd end to end made it a column the apply
+        // WRITES on every request; without carrying it, a file that omits the
+        // key set the compare-at price to null while reporting it preserved.
+        original_price_iqd: existing.original_price_iqd,
         direct_surcharge_iqd: existing.direct_surcharge_iqd,
         stock: existing.stock,
         low_stock_threshold: existing.low_stock_threshold,

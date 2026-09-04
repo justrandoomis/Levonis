@@ -806,8 +806,22 @@ export async function planRelationsWrite(
              is_primary = excluded.is_primary, option_value_id = excluded.option_value_id,
              color_id = excluded.color_id, variant_id = excluded.variant_id,
              width = excluded.width, height = excluded.height, bytes = excluded.bytes,
-             content_type = excluded.content_type, alt_ar = excluded.alt_ar,
-             alt_ckb = excluded.alt_ckb, r2_key = excluded.r2_key, source_url = excluded.source_url`
+             content_type = excluded.content_type,
+             -- ---- 0048, PRESERVED WHEN NOT SENT ----------------------------
+             -- Every existing client omits these four: the admin form's
+             -- relations PUT and the CSV importer both map images without
+             -- them, so writing "excluded" unconditionally meant the next
+             -- ordinary price edit wiped the Arabic alt text and, worse, the
+             -- record of which vendor page a photo came from — the column the
+             -- whole ingest feature exists to fill. An empty incoming value
+             -- therefore keeps what is stored. The cost of that is that these
+             -- four cannot be cleared by blanking them; the template's
+             -- __CLEAR__ is not wired to them either, so nothing silently
+             -- promises otherwise.
+             alt_ar = CASE WHEN excluded.alt_ar <> '' THEN excluded.alt_ar ELSE product_images.alt_ar END,
+             alt_ckb = CASE WHEN excluded.alt_ckb <> '' THEN excluded.alt_ckb ELSE product_images.alt_ckb END,
+             r2_key = CASE WHEN excluded.r2_key <> '' THEN excluded.r2_key ELSE product_images.r2_key END,
+             source_url = CASE WHEN excluded.source_url <> '' THEN excluded.source_url ELSE product_images.source_url END`
         )
         .bind(
           img.id, productId, img.url, img.alt_en, img.sort_order, img.is_primary,
