@@ -173,6 +173,13 @@ const GROUP_SPECS: GroupSpec[] = [
       f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للخيار — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
       f('compare_at_iqd', 'iqd', 'options', 'سعر المقارنة للخيار — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'options', 'كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
+      // ---- 0044: an ADJUSTMENT instead of a pin. A row that says "+60,000
+      // above the base" keeps following the base; a row that pins a number
+      // does not, which is the whole reason pinnedPrices.ts exists.
+      f('regular_adjust_iqd', 'int', 'options', 'فرق السعر عن المستوى الأعلى بالدينار (موجب أو سالب) — يُستخدم فقط عندما يكون regular_price_iqd فارغًا؛ عندها يتبع هذا الصف السعر الأساسي ويبقى الفرق ثابتًا. __NULL__ = بدون فرق.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('prime_adjust_iqd', 'int', 'options', 'فرق سعر PRIME عن المستوى الأعلى — يُستخدم فقط عندما يكون prime_price_iqd فارغًا. بدون سعر PRIME موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('pro_adjust_iqd', 'int', 'options', 'فرق سعر PRO عن المستوى الأعلى — يُستخدم فقط عندما يكون pro_price_iqd فارغًا. بدون سعر PRO موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('cost_adjust_iqd', 'int', 'options', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       // ---- 0043: this option's own availability, stock and lead time ------
       f('availability_type', 'enum', 'options', 'نوع التوفر لهذا الخيار — direct_sale | pre_order. اتركه فارغًا ليرث نوع بيع المنتج (وهو ما تفعله كل الخيارات القديمة).', { enumValues: ['', 'direct_sale', 'pre_order'] as const }),
       f('stock', 'int', 'options', 'مخزون هذا الخيار — __NULL__ = لا يُتتبع (الطلب المسبق عادةً). البيع المباشر يضع رقمًا.', { nullable: true, min: 0, max: 1_000_000 }),
@@ -201,6 +208,11 @@ const GROUP_SPECS: GroupSpec[] = [
       f('prime_price_iqd', 'iqd', 'colors', 'سعر PRIME للون — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
       f('compare_at_iqd', 'iqd', 'colors', 'سعر المقارنة للون — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'colors', 'كلفة اللون (داخلي) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
+      // ---- 0044: see the options group above.
+      f('regular_adjust_iqd', 'int', 'colors', 'فرق السعر عن المستوى الأعلى بالدينار (موجب أو سالب) — يُستخدم فقط عندما يكون regular_price_iqd فارغًا؛ عندها يتبع هذا الصف السعر الأساسي ويبقى الفرق ثابتًا. __NULL__ = بدون فرق.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('prime_adjust_iqd', 'int', 'colors', 'فرق سعر PRIME عن المستوى الأعلى — يُستخدم فقط عندما يكون prime_price_iqd فارغًا. بدون سعر PRIME موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('pro_adjust_iqd', 'int', 'colors', 'فرق سعر PRO عن المستوى الأعلى — يُستخدم فقط عندما يكون pro_price_iqd فارغًا. بدون سعر PRO موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('cost_adjust_iqd', 'int', 'colors', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
     ],
   },
   {
@@ -686,6 +698,10 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.pro_price_iqd`, numStr(o.pro_price_iqd));
     push(`${p}.prime_price_iqd`, numStr(o.prime_price_iqd));
     push(`${p}.cost_iqd`, numStr(o.cost_iqd));
+    push(`${p}.regular_adjust_iqd`, numStr(o.regular_adjust_iqd ?? null));
+    push(`${p}.prime_adjust_iqd`, numStr(o.prime_adjust_iqd ?? null));
+    push(`${p}.pro_adjust_iqd`, numStr(o.pro_adjust_iqd ?? null));
+    push(`${p}.cost_adjust_iqd`, numStr(o.cost_adjust_iqd ?? null));
     // 0043. Exported unconditionally, including as empty strings, because an
     // export is the bulk-EDIT path: a field the file omits is one the importer
     // PRESERVES, so a silently-absent availability could never be cleared by
@@ -713,6 +729,10 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.pro_price_iqd`, numStr(cItem.pro_price_iqd));
     push(`${p}.prime_price_iqd`, numStr(cItem.prime_price_iqd));
     push(`${p}.cost_iqd`, numStr(cItem.cost_iqd));
+    push(`${p}.regular_adjust_iqd`, numStr(cItem.regular_adjust_iqd ?? null));
+    push(`${p}.prime_adjust_iqd`, numStr(cItem.prime_adjust_iqd ?? null));
+    push(`${p}.pro_adjust_iqd`, numStr(cItem.pro_adjust_iqd ?? null));
+    push(`${p}.cost_adjust_iqd`, numStr(cItem.cost_adjust_iqd ?? null));
   });
 
   sorted(doc.spec_groups).forEach((g, gi) => {

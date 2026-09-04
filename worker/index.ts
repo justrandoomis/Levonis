@@ -25,6 +25,7 @@ import { adminTaxonomyRoutes } from './routes/adminTaxonomy';
 import { warrantyAdminRoutes, warrantyPublicRoutes } from './routes/warranty';
 import { adminImportRoutes } from './routes/adminImport';
 import { adminProductRelationsRoutes } from './routes/adminProductRelations';
+import { adminPriceGridRoutes } from './routes/adminPriceGrid';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
@@ -133,6 +134,10 @@ app.route('/api/admin/import', adminImportRoutes);
 // Mounted on the same prefix as adminProductsRoutes; the paths are distinct
 // (/:id/relations, /:id/stock) so neither router shadows the other.
 app.route('/api/admin/products', adminProductRelationsRoutes);
+// Quick Edit pricing shares that prefix too; its paths (/:id/price-grid,
+// /:id/price-history) are distinct from both routers above, so none shadows
+// another.
+app.route('/api/admin/products', adminPriceGridRoutes);
 app.route('/api/memberships', membershipsRoutes);
 app.route('/api/telegram', telegramRoutes);
 app.route('/api/invoices', invoiceRoutes);

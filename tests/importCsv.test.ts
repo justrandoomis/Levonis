@@ -236,6 +236,10 @@ const sample: ExportProduct = {
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
       // 0043: this fixture predates per-option availability; blank means
       // 'inherit the product', which is what every old option does.
       availability_type: '',
@@ -257,6 +261,10 @@ const sample: ExportProduct = {
       prime_price_iqd: 700000,
       pro_price_iqd: 690000,
       cost_iqd: 500000,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
       // 0043: this fixture predates per-option availability; blank means
       // 'inherit the product', which is what every old option does.
       availability_type: '',
@@ -278,6 +286,10 @@ const sample: ExportProduct = {
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
       // 0043: this fixture predates per-option availability; blank means
       // 'inherit the product', which is what every old option does.
       availability_type: '',
@@ -301,6 +313,10 @@ const sample: ExportProduct = {
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
       links: [
         { group: 'Printer', value: 'A1' },
         { group: 'Plug', value: 'EU' },
@@ -318,6 +334,10 @@ const sample: ExportProduct = {
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
       links: [],
     },
   ],
@@ -711,6 +731,10 @@ test('re-importing an existing product REUSES its row ids so stock survives', ()
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
     })),
   };
 
@@ -898,6 +922,10 @@ const existingLike = (first: ReturnType<typeof resolveProduct>, comboStock: numb
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      regular_adjust_iqd: null,
+      prime_adjust_iqd: null,
+      pro_adjust_iqd: null,
+      cost_adjust_iqd: null,
     })),
   };
 };

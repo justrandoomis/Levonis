@@ -29,7 +29,7 @@ import {
   Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
   AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
   Copy, ChevronRight, ChevronLeft, Package, PackageX, ShoppingBag, Check, Pencil,
-  CalendarDays, Loader2, CornerDownLeft, ImageOff,
+  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag,
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
@@ -46,6 +46,9 @@ const ProductForm = React.lazy(() => import('./adminProducts/ProductForm'));
 // The §10 replacement for the single giant template: per-section Devices /
 // Materials sheets with preview, idempotent confirm and a round-trip export.
 const ImportPanel = React.lazy(() => import('./adminProducts/ImportPanel'));
+// The daily price change should never require opening the full product form,
+// so Quick Edit is one click from the row and loads only when it is asked for.
+const QuickPricePanel = React.lazy(() => import('./adminProducts/QuickPricePanel'));
 // The older TXT pipeline. Kept because it is genuinely used, demoted to a
 // second tab because §10 forbids it being the only option.
 
@@ -90,6 +93,8 @@ const STRINGS = {
     updated: 'آخر تحديث',
     edit: 'تعديل',
     del: 'حذف / أرشفة',
+    quickPrice: 'تعديل سريع للسعر',
+    quickPriceTitle: 'تعديل سريع للأسعار',
     featured: 'مميز',
     loadFailed: 'تعذّر تحميل المنتجات',
     deleteFailed: 'فشل الحذف: ',
@@ -117,6 +122,8 @@ const STRINGS = {
     updated: 'Updated',
     edit: 'Edit',
     del: 'Delete / archive',
+    quickPrice: 'Quick price edit',
+    quickPriceTitle: 'Quick price edit',
     featured: 'Featured',
     loadFailed: 'Failed to load products',
     deleteFailed: 'Delete failed: ',
@@ -144,6 +151,8 @@ const STRINGS = {
     updated: 'دوا نوێکردنەوە',
     edit: 'دەستکاری',
     del: 'سڕینەوە / ئەرشیف',
+    quickPrice: 'دەستکاری خێرای نرخ',
+    quickPriceTitle: 'دەستکاری خێرای نرخەکان',
     featured: 'تایبەت',
     loadFailed: 'نەتوانرا بەرهەمەکان باربکرێن',
     deleteFailed: 'سڕینەوە شکستی هێنا: ',
@@ -224,6 +233,13 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [importOpen, setImportOpen] = useState(false);
   const [importDirty, setImportDirty] = useState(false);
+  // Quick Edit: which product's price grid is open, and whether it holds cells
+  // the admin has typed but not saved (the modal asks before discarding them).
+  const [pricing, setPricing] = useState<{ id: string; name: string } | null>(null);
+  const [pricingDirty, setPricingDirty] = useState(false);
+  // Escape inside the drawer cancels the typed cells before it closes the
+  // window; the panel decides which, and answers through this handle.
+  const pricingEscape = useRef<(() => boolean) | null>(null);
   // The §10 flow is the default tab; the TXT tools are one click away.
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -446,6 +462,16 @@ export default function AdminProducts() {
 
   const rowActions = (p: ListingItem, compact = false) => (
     <div className="flex items-center gap-1.5">
+      <button
+        data-action="quick-price"
+        data-quick-price={p.id}
+        onClick={() => setPricing({ id: p.id, name: nameOf(p) })}
+        className={T.btnIcon}
+        title={t.quickPrice}
+        aria-label={t.quickPrice}
+      >
+        <Tag className="w-3.5 h-3.5" />
+      </button>
       {!compact && (
         <button
           onClick={() => handleDelete(p)}
@@ -957,7 +983,15 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <p className="text-[13.5px] font-bold whitespace-nowrap text-[var(--ap-text-1)]"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></p>
+                      <InlinePrice
+                        product={p}
+                        loc={loc}
+                        onSaved={(price) => {
+                          setItems((list) => list.map((x) => (x.id === p.id ? { ...x, price_iqd: price } : x)));
+                          setNotice(loc('تم تحديث السعر', 'Price updated', 'نرخ نوێکرایەوە'));
+                        }}
+                        onFailed={(msg) => setNotice(msg)}
+                      />
                       {p.pro_price_iqd !== null && (
                         <p className="text-[11px] text-[var(--ap-text-3)] whitespace-nowrap mt-0.5">
                           PRO <span dir="ltr">{formatIqd(p.pro_price_iqd)}</span>
@@ -1017,6 +1051,31 @@ export default function AdminProducts() {
         </div>
       )}
 
+      {pricing && (
+        <Modal
+          wide
+          titleAr={`${STRINGS.ar.quickPriceTitle} — ${pricing.name}`}
+          titleEn={`${STRINGS.en.quickPriceTitle} — ${pricing.name}`}
+          onClose={() => {
+            setPricing(null);
+            setPricingDirty(false);
+          }}
+          dirty={pricingDirty}
+          onEscape={() => pricingEscape.current?.() ?? false}
+        >
+          <Suspense fallback={<LazyFallback label={t.loading} />}>
+            <QuickPricePanel
+              productId={pricing.id}
+              onChanged={() => reloadAll()}
+              onDirtyChange={setPricingDirty}
+              registerEscape={(fn) => {
+                pricingEscape.current = fn;
+              }}
+            />
+          </Suspense>
+        </Modal>
+      )}
+
       {importOpen && (
         <Modal
           wide
@@ -1036,6 +1095,121 @@ export default function AdminProducts() {
 
 
 // ----------------------------------------------------------------- pieces
+
+/**
+ * THE BASE PRICE, EDITABLE WHERE IT IS READ.
+ *
+ * Most days the change an admin wants is one number on one product, and making
+ * them open a drawer for it is the difference between prices that are kept up
+ * to date and prices that are not. Clicking the price turns it into a field;
+ * Enter saves, Escape puts it back, and the row updates from the response with
+ * no reload.
+ *
+ * It writes through the SAME dirty-cell endpoint Quick Edit uses, so a price
+ * changed here lands in price_history and is undoable exactly like one changed
+ * there. It only ever touches the product's own regular price — an option or
+ * colour needs the grid, because it needs to be seen next to its siblings.
+ */
+function InlinePrice({
+  product,
+  loc,
+  onSaved,
+  onFailed,
+}: {
+  product: ListingItem;
+  loc: Loc;
+  onSaved: (price: number) => void;
+  onFailed: (message: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  const start = () => {
+    setText(String(product.price_iqd ?? 0));
+    setEditing(true);
+  };
+
+  const commit = async () => {
+    if (busy) return;
+    const typed = text.trim();
+    if (typed === '' || typed === String(product.price_iqd ?? 0)) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      // `confirm` is deliberately NOT sent: a base price under the cost has to
+      // be seen against the whole product, which is what the drawer is for.
+      const res = await api.patch<{ rows: Array<{ level: string; cells: { regular: { effective: number | null } } }> }>(
+        `/api/admin/products/${product.id}/price-grid`,
+        { cells: [{ level: 'product', id: '', field: 'regular', mode: 'fixed', value: typed }] }
+      );
+      const base = (res.rows ?? []).find((x) => x.level === 'product');
+      onSaved(base?.cells.regular.effective ?? Number(typed));
+      setEditing(false);
+    } catch (e) {
+      onFailed(
+        e instanceof ApiError && e.code === 'PROFIT_GUARD'
+          ? loc(
+              'السعر أقل من التكلفة — افتح التعديل السريع للتأكيد',
+              'The price is below the cost — open Quick Edit to confirm',
+              'نرخ لە تێچووەکە کەمترە — دەستکاری خێرا بکەرەوە'
+            )
+          : e instanceof ApiError
+            ? e.message
+            : 'error'
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={start}
+        data-inline-price={product.id}
+        title={loc('اضغط لتعديل السعر', 'Click to edit the price', 'کلیک بکە بۆ گۆڕینی نرخ')}
+        className="text-[13.5px] font-bold whitespace-nowrap text-[var(--ap-text-1)] rounded-[6px] px-1 -mx-1 hover:bg-[var(--ap-surface-3)] transition-colors duration-150"
+      >
+        <span dir="ltr">{formatIqd(product.price_iqd || 0)}</span>
+      </button>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      inputMode="numeric"
+      dir="ltr"
+      disabled={busy}
+      value={text}
+      data-inline-price-input={product.id}
+      aria-label={loc('السعر الأساسي', 'Base price', 'نرخی بنەڕەتی')}
+      className={`${T.input} h-8 w-28 text-[12.5px]`}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => void commit()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          void commit();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          setEditing(false);
+        }
+      }}
+    />
+  );
+}
 
 function Thumb({ p, size }: { p: ListingItem; size: string }) {
   return (

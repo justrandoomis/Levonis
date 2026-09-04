@@ -36,6 +36,88 @@ used). At product level the four map to columns `price_iqd` (required),
 Option/color prices **replace** the applicable base price; they are never
 surcharges.
 
+## Inherit, adjust, fixed — the three modes (0044)
+
+Each of the four fields on an option or a colour row is in exactly one of three
+modes, and **the mode is read from the row, never stored beside it**:
+
+| `<field>_price_iqd` | `<field>_adjust_iqd` | mode | what the row does |
+| --- | --- | --- | --- |
+| `NULL` | `NULL` | **inherit** | takes whatever the level below resolved to |
+| `NULL` | set | **adjust** | that value **plus a signed number of dinars** |
+| set | (ignored) | **fixed** | its own number, whatever the base does |
+
+A fixed price wins over an adjustment on the same row: a number the owner typed
+is an answer, and an adjustment beside it is at most a leftover.
+`worker/lib/pricing.ts` exports `priceMode(row, field)` so nothing has to
+re-derive the rule, and every row written before 0044 has `NULL` in all four
+adjustment columns — so a catalogue that has never used one resolves exactly as
+it did before.
+
+**Why adjust exists.** A fixed price is a *pin*: raise the product's base price
+and the pinned option stays where it was, so the headline changes while a
+customer who picks that option is charged the old number. That failure is the
+whole subject of `worker/lib/pinnedPrices.ts`. An adjustment says "this option
+is 60,000 above the base" once, and keeps saying it after every future base
+change.
+
+**Anchoring.** An adjustment applies to the value the row would otherwise have
+inherited *for the same field*. When a member field (PRIME/PRO) has nothing to
+inherit — no member price is set anywhere below it — the adjustment anchors on
+the **regular price resolved at that same rung**, because "PRO pays 15,000 less"
+can only mean less than what everyone else pays. **Cost has no such fallback**: a
+cost adjustment with no cost beneath it stays `inherit`, because inventing a cost
+from a selling price would make the profit figures confidently wrong. The result
+is clamped at zero and rounded to whole dinars.
+
+`product_variants` deliberately has **no** adjustment columns: `resolveUnitPrice`
+takes an option and a colour and never reads a variant price, so a variant
+adjustment would be a field an admin could set that no customer could be charged
+from.
+
+## Quick Edit — the whole price table of one product
+
+`worker/lib/priceGrid.ts` projects a product into one flat grid (the base row,
+then one row per option, then one per colour) with a cell per field carrying its
+mode, its stored value, its **effective** price and the price it would fall back
+to on `inherit`. `effective` is computed by the same ladder `resolveUnitPrice`
+walks, so the admin preview and the customer's cart cannot disagree — that
+agreement is asserted row by row in `scripts/e2e-quick-price.mjs`.
+
+The endpoints live in `worker/routes/adminPriceGrid.ts`, all under
+`/api/admin/products/:id`:
+
+| Route | What it does |
+| --- | --- |
+| `GET /price-grid` | the grid, the scope vocabulary, the margin floor |
+| `PATCH /price-grid` | writes **only** the cells in the body |
+| `POST /price-grid/bulk` | preview by default; `apply: true` writes what the preview returned |
+| `POST /price-grid/copy` | pre-order↔direct, or model↔model, same two-step |
+| `POST /price-grid/undo` | reverses one `batch_id`, out of `price_history` |
+| `GET /price-history` | the timeline (financial admins only) |
+| `POST /price-grid/cost-change` | the supplier-cost difference and a suggestion; **writes nothing** |
+
+Every write appends to `price_history` (the table the seven-day price protection
+already reads) stamped with a `batch_id`, which is what makes undo possible
+without a snapshot table.
+
+**Profit and the guard.** `profitOf(price, cost)` reports margin as profit over
+the **selling price** — the retail convention — so a floor set at 20% is not
+quietly satisfied at 16%. A missing cost yields `null`, never `0`. The guard
+warns when a price is under its cost, or under the `minMarginPercent` admin
+setting when one is configured, and it **warns rather than vetoes**: the write is
+refused with `409 PROFIT_GUARD` until the caller sends `confirm: true`, because a
+launch sold at cost and a clearance sold below it are both real decisions. A
+guard only ever speaks about the fields the request changed — except a cost
+change, which re-checks all three selling prices because it can put any of them
+under water at once (`guardedFields`).
+
+**Amounts.** `parseAmount` accepts `950K`, `1.25M`, `950,000`, Arabic-Indic
+digits and `مليون`, and **refuses rather than guesses** on anything ambiguous —
+a bare fraction of a dinar, two suffixes, a suffix that lands between dinars.
+The admin drawer runs the same rule locally so a typo turns red as it is typed,
+but the server is what parses the value that is written.
+
 ## PRO resolution
 
 1. Resolved explicit PRO price (color→option→base) when present.

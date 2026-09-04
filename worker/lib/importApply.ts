@@ -247,6 +247,12 @@ export function resolveProduct(
       prime_price_iqd: o.prime_price_iqd,
       pro_price_iqd: o.pro_price_iqd,
       cost_iqd: opts.money ? o.cost_iqd : null,
+      // 0044 — carried through so a CSV round trip does not silently convert
+      // an adjustment back into nothing.
+      regular_adjust_iqd: o.regular_adjust_iqd,
+      prime_adjust_iqd: o.prime_adjust_iqd,
+      pro_adjust_iqd: o.pro_adjust_iqd,
+      cost_adjust_iqd: opts.money ? o.cost_adjust_iqd : null,
     });
   }
 
@@ -279,6 +285,10 @@ export function resolveProduct(
       prime_price_iqd: col.prime_price_iqd,
       pro_price_iqd: col.pro_price_iqd,
       cost_iqd: opts.money ? col.cost_iqd : null,
+      regular_adjust_iqd: col.regular_adjust_iqd,
+      prime_adjust_iqd: col.prime_adjust_iqd,
+      pro_adjust_iqd: col.pro_adjust_iqd,
+      cost_adjust_iqd: opts.money ? col.cost_adjust_iqd : null,
       option_value_ids: linked,
     };
   });
@@ -673,6 +683,10 @@ export function resolveProduct(
         prime_price_iqd: v.prime_price_iqd,
         pro_price_iqd: v.pro_price_iqd,
         cost_iqd: v.cost_iqd,
+        regular_adjust_iqd: v.regular_adjust_iqd,
+        prime_adjust_iqd: v.prime_adjust_iqd,
+        pro_adjust_iqd: v.pro_adjust_iqd,
+        cost_adjust_iqd: v.cost_adjust_iqd,
         active: v.active,
       }))
     ),
@@ -687,6 +701,10 @@ export function resolveProduct(
       prime_price_iqd: col.prime_price_iqd,
       pro_price_iqd: col.pro_price_iqd,
       cost_iqd: col.cost_iqd,
+      regular_adjust_iqd: col.regular_adjust_iqd,
+      prime_adjust_iqd: col.prime_adjust_iqd,
+      pro_adjust_iqd: col.pro_adjust_iqd,
+      cost_adjust_iqd: col.cost_adjust_iqd,
       active: col.active,
     })),
     media: images.map((im) => ({

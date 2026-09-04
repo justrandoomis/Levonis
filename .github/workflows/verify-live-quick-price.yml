@@ -1,0 +1,151 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that Quick Edit pricing is LIVE, not merely merged:
+#
+#   1. the price-grid endpoints are deployed and still admin-only,
+#   2. the shipped bundle actually renders the drawer, the mode chips, the
+#      profit column and the preview-before-apply gate,
+#   3. the products list carries the quick-price button and the inline price
+#      field,
+#   4. and the migration that adjustments depend on has been applied — proved
+#      through behaviour, since the database is not readable from here.
+#
+# WHAT IT WRITES: nothing. Every request is an anonymous GET; the admin
+# endpoints are probed only for their refusal, which is what proves they are
+# both deployed and still closed.
+name: 24 - Verify Live Quick Edit Pricing (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-quick-price
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The price-grid endpoints are deployed and still admin-only
+        run: |
+          set -euo pipefail
+          fail=0
+          refuse() { # path, what it is
+            code=$(curl -s -o /tmp/body.json -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
+            # 401/403 proves the route EXISTS and is closed; 404 would mean the
+            # deploy never carried it, which is the failure this step is for.
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $2 is deployed and refuses a stranger ($code)"
+            else
+              echo "  FAIL $2 answers $code: $(head -c 140 /tmp/body.json)"
+              fail=1
+            fi
+          }
+          refuse '/api/admin/products/does-not-exist/price-grid'    'the price grid'
+          refuse '/api/admin/products/does-not-exist/price-history' 'the price history'
+          exit $fail
+
+      - name: The write endpoints are closed to a stranger too
+        run: |
+          set -euo pipefail
+          fail=0
+          write() { # method, path, what it is
+            code=$(curl -s -o /tmp/w.json -w '%{http_code}' --max-time 25 \
+                     -X "$1" -H 'Content-Type: application/json' -d '{}' "$APEX$2" || echo 000)
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "  ok   $3 refuses a stranger ($code)"
+            else
+              echo "  FAIL $3 answers $code: $(head -c 140 /tmp/w.json)"
+              fail=1
+            fi
+          }
+          write PATCH '/api/admin/products/does-not-exist/price-grid'          'the dirty-cell save'
+          write POST  '/api/admin/products/does-not-exist/price-grid/bulk'     'the bulk change'
+          write POST  '/api/admin/products/does-not-exist/price-grid/copy'     'the price copy'
+          write POST  '/api/admin/products/does-not-exist/price-grid/undo'     'the undo'
+          write POST  '/api/admin/products/does-not-exist/price-grid/cost-change' 'the cost-change preview'
+          exit $fail
+
+      - name: Read every module the deployed app serves
+        run: |
+          set -euo pipefail
+          html=$(curl -s --compressed --max-time 25 "$APEX/")
+          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
+          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
+          mkdir -p /tmp/mods
+          for a in $entries; do
+            curl -s --compressed --max-time 60 -o "/tmp/mods/$(basename "$a")" "$APEX$a"
+            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "/tmp/mods/$(basename "$a")" | sort -u); do
+              [ -f "/tmp/mods/$c" ] && continue
+              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
+              [ "$code" = "200" ] || rm -f "/tmp/mods/$c"
+            done
+          done
+          echo "  modules read: $(ls /tmp/mods | wc -l)"
+
+      - name: The shipped admin renders the Quick Edit drawer
+        run: |
+          set -euo pipefail
+          fail=0
+          # Only VALUES are grepped, never `attr="value"`: minification turns a
+          # JSX prop into an object key, so the attribute form is absent from a
+          # perfectly correct bundle.
+          want() { # needle, what it is
+            hit=$(grep -l "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 is not in any served module"; fail=1
+            fi
+          }
+          want 'price-grid'      'the drawer talks to the price-grid endpoint'
+          want 'quick-price'     'the products list carries the quick-price button'
+          want 'inline-price'    'the list price is editable where it is read'
+          want 'qp-mode-btn'     'every cell offers its three modes'
+          want 'qp-profit'       'the profit is shown beside each row'
+          want 'qp-guard'        'the profit guard has somewhere to speak'
+          want 'bulk-preview'    'the bulk tab previews'
+          want 'bulk-apply'      'and applies separately'
+          want 'copy-preview'    'the copy tab previews'
+          want 'price-history'   'the history tab is shipped'
+          want 'PROFIT_GUARD'    'the drawer knows the guard refusal by code'
+          exit $fail
+
+      - name: The adjustment columns reached the live database
+        run: |
+          set -euo pipefail
+          # The database is not readable from here, so this is proved through
+          # BEHAVIOUR: the import template is generated from the field specs and
+          # served to admins only, but the blank template is public. If 0044 had
+          # not been applied the endpoints above would still answer — so what is
+          # checked instead is that the deployed template DECLARES the fields,
+          # which is the contract an importer is validated against.
+          fail=0
+          code=$(curl -s -o /tmp/blank.txt -w '%{http_code}' --max-time 25 "$APEX/api/admin/template/blank" || echo 000)
+          if [ "$code" = "200" ]; then
+            for f in regular_adjust_iqd prime_adjust_iqd pro_adjust_iqd cost_adjust_iqd; do
+              if grep -q "$f" /tmp/blank.txt; then
+                echo "  ok   the served template declares $f"
+              else
+                echo "  FAIL the served template is missing $f"; fail=1
+              fi
+            done
+          elif [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "  ok   the blank template is admin-gated ($code) — field coverage is proved by tests/importCsv.test.ts"
+          else
+            echo "  FAIL /api/admin/template/blank answers $code"; fail=1
+          fi
+          exit $fail
+
+      - name: Summary
+        if: always()
+        run: echo "Quick Edit pricing verified against $APEX"

@@ -191,6 +191,12 @@ export const BASE_COLUMNS = [
   'direct_surcharge_iqd',
   'stock',
   'low_stock_threshold',
+  // ---- 0044: an ADJUSTMENT instead of a pin — "+60,000 above the base",
+  // which keeps following the base instead of freezing away from it.
+  'regular_adjust_iqd',
+  'prime_adjust_iqd',
+  'pro_adjust_iqd',
+  'cost_adjust_iqd',
   // ---- 0043: an option answers for itself (blank = inherit the product's)
   'availability_type',
   'lead_time_text',
@@ -399,6 +405,11 @@ export interface ParsedOption {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0044 adjustments — signed; null = this row has no adjustment. */
+  regular_adjust_iqd: number | null;
+  prime_adjust_iqd: number | null;
+  pro_adjust_iqd: number | null;
+  cost_adjust_iqd: number | null;
   /** 0043: how THIS option is fulfilled. '' = inherit the product's. */
   availability_type: string;
   lead_time_text: string;
@@ -421,6 +432,11 @@ export interface ParsedColor {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0044 adjustments — signed; null = this row has no adjustment. */
+  regular_adjust_iqd: number | null;
+  prime_adjust_iqd: number | null;
+  pro_adjust_iqd: number | null;
+  cost_adjust_iqd: number | null;
   /** [{group, value}] — resolved to ids at apply time. */
   links: Array<{ group: string; value: string }>;
 }
@@ -520,6 +536,18 @@ export interface ParseResult {
 
 const yes = (v: string) => /^(1|y|yes|true|نعم)$/i.test(v.trim());
 const no = (v: string) => /^(0|n|no|false|لا)$/i.test(v.trim());
+
+/** A 0044 adjustment is SIGNED: "-15000" means fifteen thousand cheaper than
+ *  the level above, which is the ordinary case for a member price. */
+function signedCell(v: string, line: number, col: string, issues: RowIssue[]): number | null {
+  const s = v.trim();
+  if (s === '') return null;
+  if (!/^[+-]?\d+$/.test(s)) {
+    issues.push({ line, severity: 'error', message: `${col}: "${s}" ليس رقمًا صحيحًا` });
+    return null;
+  }
+  return Number(s);
+}
 
 function intCell(v: string, line: number, col: string, issues: RowIssue[]): number | null {
   const s = v.trim();
@@ -725,6 +753,10 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       prime_price_iqd: intCell(cell(r, 'prime_price_iqd'), line, 'prime_price_iqd', issues),
       pro_price_iqd: intCell(cell(r, 'pro_price_iqd'), line, 'pro_price_iqd', issues),
       cost_iqd: intCell(cell(r, 'cost_iqd'), line, 'cost_iqd', issues),
+      regular_adjust_iqd: signedCell(cell(r, 'regular_adjust_iqd'), line, 'regular_adjust_iqd', issues),
+      prime_adjust_iqd: signedCell(cell(r, 'prime_adjust_iqd'), line, 'prime_adjust_iqd', issues),
+      pro_adjust_iqd: signedCell(cell(r, 'pro_adjust_iqd'), line, 'pro_adjust_iqd', issues),
+      cost_adjust_iqd: signedCell(cell(r, 'cost_adjust_iqd'), line, 'cost_adjust_iqd', issues),
     });
     const counts = () => ({
       stock: intCell(cell(r, 'stock'), line, 'stock', issues),
@@ -1238,6 +1270,10 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         prime_price_iqd: num(o.prime_price_iqd),
         pro_price_iqd: num(o.pro_price_iqd),
         cost_iqd: num(o.cost_iqd),
+        regular_adjust_iqd: num(o.regular_adjust_iqd),
+        prime_adjust_iqd: num(o.prime_adjust_iqd),
+        pro_adjust_iqd: num(o.pro_adjust_iqd),
+        cost_adjust_iqd: num(o.cost_adjust_iqd),
         // 0043 — written even when blank, so the exported sheet is editable
         // in both directions: an omitted cell is one the importer preserves.
         //
@@ -1269,6 +1305,10 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         prime_price_iqd: num(c.prime_price_iqd),
         pro_price_iqd: num(c.pro_price_iqd),
         cost_iqd: num(c.cost_iqd),
+        regular_adjust_iqd: num(c.regular_adjust_iqd),
+        prime_adjust_iqd: num(c.prime_adjust_iqd),
+        pro_adjust_iqd: num(c.pro_adjust_iqd),
+        cost_adjust_iqd: num(c.cost_adjust_iqd),
         links: c.links.map((l) => `${l.group}:${l.value}`).join('|'),
       });
     }

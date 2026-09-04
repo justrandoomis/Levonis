@@ -24,6 +24,17 @@ export interface FormPrices {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /**
+   * 0044 adjustments. THE FORM DOES NOT EDIT THESE — Quick Edit does — but it
+   * must carry them, because the relations save replaces the whole row set and
+   * a field the form drops is a field the save clears. An adjustment set in
+   * Quick Edit and silently erased by the next rename in the product form is
+   * exactly the kind of invisible price change this round exists to end.
+   */
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
 }
 
 export interface FormValue extends FormPrices {
@@ -112,6 +123,10 @@ export const emptyPrices = (): FormPrices => ({
   prime_price_iqd: null,
   pro_price_iqd: null,
   cost_iqd: null,
+  regular_adjust_iqd: null,
+  prime_adjust_iqd: null,
+  pro_adjust_iqd: null,
+  cost_adjust_iqd: null,
 });
 
 let seq = 0;
@@ -204,6 +219,10 @@ const prices = (x: FormPrices): FormPrices => ({
   prime_price_iqd: x.prime_price_iqd ?? null,
   pro_price_iqd: x.pro_price_iqd ?? null,
   cost_iqd: x.cost_iqd ?? null,
+  regular_adjust_iqd: x.regular_adjust_iqd ?? null,
+  prime_adjust_iqd: x.prime_adjust_iqd ?? null,
+  pro_adjust_iqd: x.pro_adjust_iqd ?? null,
+  cost_adjust_iqd: x.cost_adjust_iqd ?? null,
 });
 
 /** Decodes the server's canonical `o:<id>|c:<id>` combination key. */

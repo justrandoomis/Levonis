@@ -66,6 +66,17 @@ export const SETTING_DEFAULTS = {
   // PRO pricing fallback when no explicit PRO price exists on a product/option/color.
   // 'explicit_only' = no fabricated discount (default until the owner approves a rule).
   proPricingPolicy: { mode: 'explicit_only', percent: null } as { mode: 'explicit_only' | 'global_percent'; percent: number | null },
+  /**
+   * §13 profit guard. The smallest gross margin (percent of the SELLING price)
+   * the admin wants to be warned below. null = no floor configured, so only
+   * "price below cost" warns — a number invented here would fire on healthy
+   * products and train the owner to click through the warning.
+   *
+   * It WARNS, it does not veto: the quick-edit and bulk endpoints refuse the
+   * write only until an explicit confirm flag arrives, so a deliberate
+   * clearance price is still one confirmation away.
+   */
+  minMarginPercent: null as number | null,
   // Admin defaults for preorder transport commissions (IQD), inherited by
   // products whose offer has commission_iqd = null. Unset (null) = unconfigured.
   preorderTransportDefaults: [

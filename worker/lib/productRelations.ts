@@ -47,6 +47,13 @@ export interface OptionValueRow {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0044. Signed dinar move applied to the inherited value for the same
+   *  field; NULL on every row that has never used an adjustment. Optional on
+   *  the type for the same reason as the 0043 columns above. */
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
   /** 0043. Optional on the type because a row read from a database that has
    *  not run 0043 yet simply will not have them, and the overlay must not
    *  crash a storefront over a column that is only ever an enrichment. */
@@ -74,6 +81,13 @@ export interface ColorRow {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0044. Signed dinar move applied to the inherited value for the same
+   *  field; NULL on every row that has never used an adjustment. Optional on
+   *  the type for the same reason as the 0043 columns above. */
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
 }
 
 export interface ColorLinkRow {

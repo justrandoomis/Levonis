@@ -42,6 +42,48 @@ export interface PriceFields {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /**
+   * ADJUSTMENTS (migration 0044). A signed number of dinars applied to the
+   * value this row would otherwise have inherited for the SAME field. Optional
+   * everywhere, and null on every row written before 0044, so a catalogue that
+   * has never used them resolves byte-for-byte as it always did.
+   *
+   * The MODE IS DERIVED, never stored (see `priceMode` below):
+   *   price null, adjust null  -> INHERIT
+   *   price null, adjust set   -> ADJUSTMENT
+   *   price set                -> FIXED  (a typed number is an answer; an
+   *                                       adjustment beside it is a leftover)
+   */
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
+}
+
+/** The four fields a price ladder is made of, and their adjustment twins. */
+export type PriceKey = 'regular_price_iqd' | 'prime_price_iqd' | 'pro_price_iqd' | 'cost_iqd';
+export type AdjustKey = 'regular_adjust_iqd' | 'prime_adjust_iqd' | 'pro_adjust_iqd' | 'cost_adjust_iqd';
+export const ADJUST_OF: Record<PriceKey, AdjustKey> = {
+  regular_price_iqd: 'regular_adjust_iqd',
+  prime_price_iqd: 'prime_adjust_iqd',
+  pro_price_iqd: 'pro_adjust_iqd',
+  cost_iqd: 'cost_adjust_iqd',
+};
+
+export type PriceMode = 'inherit' | 'adjust' | 'fixed';
+
+/**
+ * Which of the owner's three modes (§5) one row is in for one field. Read from
+ * the row, never stored beside it — two columns already say it unambiguously,
+ * and a third that repeats them is a value that can go stale.
+ */
+export function priceMode(row: Partial<PriceFields> | null | undefined, field: PriceKey): PriceMode {
+  if (!row) return 'inherit';
+  const fixed = row[field];
+  if (fixed !== null && fixed !== undefined) return 'fixed';
+  const adj = row[ADJUST_OF[field]];
+  if (adj !== null && adj !== undefined && Number.isFinite(adj)) return 'adjust';
+  return 'inherit';
 }
 
 export interface OptionV2 extends PriceFields {
@@ -148,10 +190,66 @@ export interface ResolvedPrice {
   errors: string[]; // non-empty = selection invalid, reject server-side
 }
 
-function pick(field: keyof PriceFields, color: ColorV2 | null, option: OptionV2 | null, base: number | null): { value: number | null; source: 'color' | 'option' | 'base' } {
-  if (color && color[field] !== null && color[field] !== undefined) return { value: color[field], source: 'color' };
-  if (option && option[field] !== null && option[field] !== undefined) return { value: option[field], source: 'option' };
-  return { value: base, source: 'base' };
+type PriceSource = 'color' | 'option' | 'base';
+
+/** The value of one field after each rung of the ladder — needed so a member
+ *  adjustment with nothing of its own to inherit can anchor on the regular
+ *  price AT THE SAME RUNG rather than on the product's. */
+interface LadderTrace {
+  value: number | null;
+  source: PriceSource;
+  at: Record<PriceSource, number | null>;
+}
+
+/**
+ * Walks base -> option -> colour for ONE field.
+ *
+ * A rung with a fixed price REPLACES what came below it (unchanged behaviour,
+ * and the reason worker/lib/pinnedPrices.ts exists). A rung with an adjustment
+ * MOVES what came below it by that many dinars, clamped at zero.
+ *
+ * `regularAt` is passed only for PRIME and PRO. When one of them has nothing to
+ * inherit — no member price is set anywhere below — an adjustment on it anchors
+ * on the regular price resolved at that same rung, because "PRO pays 15,000
+ * less" can only mean less than what everyone else pays. COST gets no such
+ * fallback: a cost adjustment with no cost beneath it stays inherit, because
+ * inventing a cost from a selling price would make the profit figures of §12
+ * confidently wrong.
+ */
+function pick(
+  field: PriceKey,
+  color: ColorV2 | null,
+  option: OptionV2 | null,
+  base: number | null,
+  regularAt?: Record<PriceSource, number | null>
+): LadderTrace {
+  let value = base;
+  let source: PriceSource = 'base';
+  const at: Record<PriceSource, number | null> = { base, option: base, color: base };
+  const rungs: Array<[Exclude<PriceSource, 'base'>, PriceFields | null]> = [
+    ['option', option],
+    ['color', color],
+  ];
+  for (const [rung, row] of rungs) {
+    if (row) {
+      const fixed = row[field];
+      if (fixed !== null && fixed !== undefined) {
+        value = fixed;
+        source = rung;
+      } else {
+        const adj = row[ADJUST_OF[field]];
+        if (adj !== null && adj !== undefined && Number.isFinite(adj)) {
+          const anchor = value !== null && value !== undefined ? value : regularAt?.[rung] ?? null;
+          if (anchor !== null) {
+            value = Math.max(0, Math.round(anchor + adj));
+            source = rung;
+          }
+        }
+      }
+    }
+    at[rung] = value;
+  }
+  return { value: value ?? null, source, at };
 }
 
 export function resolveUnitPrice(input: {
@@ -185,10 +283,11 @@ export function resolveUnitPrice(input: {
     errors.push('COLOR_OPTION_MISMATCH');
   }
 
-  // Per-field independent inheritance.
+  // Per-field independent inheritance. Regular is resolved first because the
+  // member fields may need to anchor an adjustment on it.
   const regular = pick('regular_price_iqd', color, option, product.price_iqd);
-  const proExplicit = pick('pro_price_iqd', color, option, product.pro_price_iqd);
-  const primeExplicit = pick('prime_price_iqd', color, option, product.prime_price_iqd);
+  const proExplicit = pick('pro_price_iqd', color, option, product.pro_price_iqd, regular.at);
+  const primeExplicit = pick('prime_price_iqd', color, option, product.prime_price_iqd, regular.at);
   const cost = pick('cost_iqd', color, option, product.product_cost_iqd);
 
   const regularIqd = regular.value ?? product.price_iqd;

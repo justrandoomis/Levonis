@@ -352,7 +352,7 @@ const MODAL_STRINGS = {
  * silently throwing template text away.
  */
 export function Modal({
-  titleAr, titleEn, onClose, children, wide, footer, dirty = false,
+  titleAr, titleEn, onClose, children, wide, footer, dirty = false, onEscape,
 }: {
   titleAr: string;
   titleEn: string;
@@ -363,6 +363,19 @@ export function Modal({
   footer?: ReactNode;
   /** Unsaved work — dismissing asks before discarding. */
   dirty?: boolean;
+  /**
+   * FIRST REFUSAL ON ESCAPE, for content that has its own meaning for the key.
+   *
+   * The dialog listens in the CAPTURE phase on `document` and stops the event
+   * there, so nothing inside can hear Escape on its own — that is deliberate,
+   * because it is what stops a nested dialog from closing two at once. But an
+   * editor inside a dialog can have a smaller thing to cancel than the dialog
+   * itself: Quick Edit throws away the cells the admin typed and stays open.
+   *
+   * Return true to say "I handled it"; the dialog then leaves itself open.
+   * Return false (or omit the prop) and Escape closes as it always has.
+   */
+  onEscape?: () => boolean;
 }) {
   const { lang, dir } = useLanguage();
   const t = MODAL_STRINGS[lang] ?? MODAL_STRINGS.ar;
@@ -414,6 +427,7 @@ export function Modal({
       if (!isTop()) return; // a dialog opened on top of this one owns the key
       if (e.key === 'Escape') {
         e.stopPropagation();
+        if (onEscape?.()) return;
         requestClose();
         return;
       }
@@ -437,7 +451,7 @@ export function Modal({
     };
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [requestClose, isTop]);
+  }, [requestClose, isTop, onEscape]);
 
   const body = (
     <div

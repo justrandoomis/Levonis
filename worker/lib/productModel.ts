@@ -220,6 +220,11 @@ export interface ProductDoc {
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : null;
 
+/** A 0044 adjustment is SIGNED — a discount below the inherited value is the
+ *  ordinary case — so it cannot go through `num`, which floors at zero. */
+const signed = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isInteger(v) && Math.abs(v) <= 2_000_000_000 ? v : null;
+
 /** Legacy semantics ignored non-positive overrides → upgrade 0/absent to null. */
 const legacyPrice = (v: unknown): number | null =>
   typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null;
@@ -276,6 +281,13 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
 // compare_at_iqd from before 0018 — it is simply not read, and prime_price_iqd
 // takes its place in the four-price ladder.
 function upgradePriceFields(o: Record<string, unknown>): PriceFields {
+  // 0044 adjustments ride along on both branches: a v1 row simply has none.
+  const adjust = {
+    regular_adjust_iqd: signed(o.regular_adjust_iqd),
+    prime_adjust_iqd: signed(o.prime_adjust_iqd),
+    pro_adjust_iqd: signed(o.pro_adjust_iqd),
+    cost_adjust_iqd: signed(o.cost_adjust_iqd),
+  };
   const isV2 = 'regular_price_iqd' in o || 'compare_at_iqd' in o || 'prime_price_iqd' in o;
   if (isV2) {
     return {
@@ -283,6 +295,7 @@ function upgradePriceFields(o: Record<string, unknown>): PriceFields {
       prime_price_iqd: num(o.prime_price_iqd),
       pro_price_iqd: num(o.pro_price_iqd),
       cost_iqd: num(o.cost_iqd),
+      ...adjust,
     };
   }
   return {
@@ -290,6 +303,7 @@ function upgradePriceFields(o: Record<string, unknown>): PriceFields {
     prime_price_iqd: legacyPrice(o.prime_price_iqd),
     pro_price_iqd: legacyPrice(o.pro_price_iqd),
     cost_iqd: legacyPrice(o.cost_iqd),
+    ...adjust,
   };
 }
 

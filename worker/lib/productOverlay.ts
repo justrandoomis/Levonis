@@ -281,6 +281,12 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
       prime_price_iqd: v.prime_price_iqd,
       pro_price_iqd: v.pro_price_iqd,
       cost_iqd: v.cost_iqd,
+      // 0044. Adjustments travel with the row so the central resolver applies
+      // them; an old row has NULL in all four and resolves exactly as before.
+      regular_adjust_iqd: v.regular_adjust_iqd ?? null,
+      prime_adjust_iqd: v.prime_adjust_iqd ?? null,
+      pro_adjust_iqd: v.pro_adjust_iqd ?? null,
+      cost_adjust_iqd: v.cost_adjust_iqd ?? null,
       // 0043. The label falls back to the option's own name so a row written
       // before variant_key existed still names its model; the KEY falls back
       // to that label's slug rather than to name parsing, so grouping is
@@ -321,6 +327,10 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
         prime_price_iqd: x.prime_price_iqd,
         pro_price_iqd: x.pro_price_iqd,
         cost_iqd: x.cost_iqd,
+        regular_adjust_iqd: x.regular_adjust_iqd ?? null,
+        prime_adjust_iqd: x.prime_adjust_iqd ?? null,
+        pro_adjust_iqd: x.pro_adjust_iqd ?? null,
+        cost_adjust_iqd: x.cost_adjust_iqd ?? null,
       };
     });
 

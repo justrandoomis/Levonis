@@ -52,6 +52,11 @@ interface PriceInput {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0044 adjustments — signed, and null on every row that has never used one. */
+  regular_adjust_iqd: number | null;
+  prime_adjust_iqd: number | null;
+  pro_adjust_iqd: number | null;
+  cost_adjust_iqd: number | null;
 }
 
 const nullableInt = (v: unknown, field: string, max = 1_000_000_000): number | null => {
@@ -62,12 +67,26 @@ const nullableInt = (v: unknown, field: string, max = 1_000_000_000): number | n
   return v;
 };
 
+/** A 0044 adjustment may be negative — a discount below the inherited value is
+ *  the ordinary case — so it cannot share `nullableInt`, which floors at zero. */
+const nullableSigned = (v: unknown, field: string, max = 1_000_000_000): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v !== 'number' || !Number.isInteger(v) || Math.abs(v) > max) {
+    throw badRequest(`${field}: must be a whole number between -${max} and ${max}, or empty`);
+  }
+  return v;
+};
+
 function readPrices(o: Record<string, unknown>, where: string): PriceInput {
   return {
     regular_price_iqd: nullableInt(o.regular_price_iqd, `${where}.regular_price_iqd`),
     prime_price_iqd: nullableInt(o.prime_price_iqd, `${where}.prime_price_iqd`),
     pro_price_iqd: nullableInt(o.pro_price_iqd, `${where}.pro_price_iqd`),
     cost_iqd: nullableInt(o.cost_iqd, `${where}.cost_iqd`),
+    regular_adjust_iqd: nullableSigned(o.regular_adjust_iqd, `${where}.regular_adjust_iqd`),
+    prime_adjust_iqd: nullableSigned(o.prime_adjust_iqd, `${where}.prime_adjust_iqd`),
+    pro_adjust_iqd: nullableSigned(o.pro_adjust_iqd, `${where}.pro_adjust_iqd`),
+    cost_adjust_iqd: nullableSigned(o.cost_adjust_iqd, `${where}.cost_adjust_iqd`),
   };
 }
 
@@ -664,27 +683,33 @@ export async function planRelationsWrite(
           `INSERT INTO product_option_values
              (id, product_id, group_id, name_en, sku_part, image, sort, active, stock, low_stock_threshold,
               regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
+              regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
               availability_type, lead_time_text, lead_time_min_days, lead_time_max_days,
               variant_key, variant_label)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
              group_id = excluded.group_id, name_en = excluded.name_en, sku_part = excluded.sku_part,
              image = excluded.image, sort = excluded.sort, active = excluded.active,
              stock = excluded.stock, low_stock_threshold = excluded.low_stock_threshold,
              regular_price_iqd = excluded.regular_price_iqd, prime_price_iqd = excluded.prime_price_iqd,
              pro_price_iqd = excluded.pro_price_iqd,
+             regular_adjust_iqd = excluded.regular_adjust_iqd,
+             prime_adjust_iqd = excluded.prime_adjust_iqd,
+             pro_adjust_iqd = excluded.pro_adjust_iqd,
              availability_type = excluded.availability_type,
              lead_time_text = excluded.lead_time_text,
              lead_time_min_days = excluded.lead_time_min_days,
              lead_time_max_days = excluded.lead_time_max_days,
              variant_key = excluded.variant_key,
-             variant_label = excluded.variant_label${money ? ', cost_iqd = excluded.cost_iqd' : ''}`
+             variant_label = excluded.variant_label${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
         )
         .bind(
           v.id, productId, v.group_id, v.name_en, v.sku_part, v.image, v.sort, v.active,
           v.stock, v.low_stock_threshold,
           v.prices.regular_price_iqd, v.prices.prime_price_iqd, v.prices.pro_price_iqd,
           money ? v.prices.cost_iqd : null,
+          v.prices.regular_adjust_iqd, v.prices.prime_adjust_iqd, v.prices.pro_adjust_iqd,
+          money ? v.prices.cost_adjust_iqd : null,
           v.availability_type, v.lead_time_text, v.lead_time_min_days, v.lead_time_max_days,
           v.variant_key, v.variant_label
         )
@@ -697,20 +722,26 @@ export async function planRelationsWrite(
         .prepare(
           `INSERT INTO product_colors
              (id, product_id, name_en, hex, image, sku_part, sort, active, stock, low_stock_threshold,
-              regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
+              regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
              name_en = excluded.name_en, hex = excluded.hex, image = excluded.image,
              sku_part = excluded.sku_part, sort = excluded.sort, active = excluded.active,
              stock = excluded.stock, low_stock_threshold = excluded.low_stock_threshold,
              regular_price_iqd = excluded.regular_price_iqd, prime_price_iqd = excluded.prime_price_iqd,
-             pro_price_iqd = excluded.pro_price_iqd${money ? ', cost_iqd = excluded.cost_iqd' : ''}`
+             pro_price_iqd = excluded.pro_price_iqd,
+             regular_adjust_iqd = excluded.regular_adjust_iqd,
+             prime_adjust_iqd = excluded.prime_adjust_iqd,
+             pro_adjust_iqd = excluded.pro_adjust_iqd${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
         )
         .bind(
           col.id, productId, col.name_en, col.hex, col.image, col.sku_part, col.sort, col.active,
           col.stock, col.low_stock_threshold,
           col.prices.regular_price_iqd, col.prices.prime_price_iqd, col.prices.pro_price_iqd,
-          money ? col.prices.cost_iqd : null
+          money ? col.prices.cost_iqd : null,
+          col.prices.regular_adjust_iqd, col.prices.prime_adjust_iqd, col.prices.pro_adjust_iqd,
+          money ? col.prices.cost_adjust_iqd : null
         )
     );
     for (const valueId of col.linked) {

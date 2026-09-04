@@ -51,6 +51,10 @@ export const FINANCIAL_FIELDS = [
   'margin_iqd',
   'margin_percent',
   'supplier_price_iqd',
+  // 0044/§12: a cost adjustment is a cost, and a profit figure IS the margin
+  // detail §11 restricts — leaking either would defeat stripping the cost.
+  'cost_adjust_iqd',
+  'profit_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

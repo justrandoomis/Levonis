@@ -476,6 +476,11 @@ async function exportProducts(
         prime_price_iqd: n(v.prime_price_iqd),
         pro_price_iqd: n(v.pro_price_iqd),
         cost_iqd: money0(v.cost_iqd),
+        // 0044. The adjustments ship for the same reason the 0043 fields do.
+        regular_adjust_iqd: n(v.regular_adjust_iqd),
+        prime_adjust_iqd: n(v.prime_adjust_iqd),
+        pro_adjust_iqd: n(v.pro_adjust_iqd),
+        cost_adjust_iqd: money0(v.cost_adjust_iqd),
         // 0043. An export is the bulk-EDIT path, so every one of these ships
         // even when empty: an omitted column is one the importer PRESERVES,
         // and a silently absent availability could never be cleared by editing
@@ -501,6 +506,10 @@ async function exportProducts(
           prime_price_iqd: n(col.prime_price_iqd),
           pro_price_iqd: n(col.pro_price_iqd),
           cost_iqd: money0(col.cost_iqd),
+          regular_adjust_iqd: n(col.regular_adjust_iqd),
+          prime_adjust_iqd: n(col.prime_adjust_iqd),
+          pro_adjust_iqd: n(col.pro_adjust_iqd),
+          cost_adjust_iqd: money0(col.cost_adjust_iqd),
           links: linkNames.get(col.id as string) ?? [],
         })),
       images: images

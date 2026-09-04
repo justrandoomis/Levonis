@@ -1664,6 +1664,16 @@ adminRoutes.put('/settings/:key', async (c) => {
     // admits endpoint paths and field-name maps, and secrets belong in Worker
     // secrets where no admin screen can read them back.
     value = resolveWire(value);
+  } else if (key === 'minMarginPercent') {
+    // The profit guard's floor. null clears it, which is not the same as zero:
+    // "no floor configured" leaves only the below-cost warning, while a floor
+    // of 0 would warn on any product sold at exactly cost.
+    if (value === null || value === '' || value === undefined) {
+      value = null;
+    } else {
+      const n = int(value, 'minMarginPercent', { min: 0, max: 99 });
+      value = n;
+    }
   } else if (key === 'orderStageDurations') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       throw badRequest('orderStageDurations must be an object of minute values');
