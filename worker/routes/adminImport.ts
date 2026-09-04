@@ -648,8 +648,14 @@ async function storeAsset(env: Env, bytes: Uint8Array): Promise<string | null> {
  *
  * Three legal forms, and nothing else (§2 and §10): a path inside the ZIP, a
  * `/files/...` URL this store already serves (which is what an export writes,
- * so a round-trip re-uses the same object), and a direct image URL, which is
- * verified by magic bytes and rejected if it turns out to be a product page.
+ * so a round-trip re-uses the same object), and a direct image URL, verified
+ * by magic bytes.
+ *
+ * A spreadsheet cell is ONE image, so this path calls `ingestImageUrl` and not
+ * the page reader: pasting a product page into a cell that means "this row's
+ * picture" would turn one cell into ten images with no way to say which. Page
+ * reading is offered where an admin can see the result — the product form's
+ * image box (worker/routes/media.ts).
  */
 async function resolveImages(
   env: Env,

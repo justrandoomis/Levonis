@@ -37,7 +37,7 @@ import { requireAdmin, badRequest, notFound, oneOf, str, HttpError } from '../li
 import { applyRelations, loadRelationsView, type ProductRelationsView } from '../lib/productOverlay';
 import { relationsBodyFromDoc } from '../lib/templateRelations';
 import { planRelationsWrite } from './adminProductRelations';
-import { canViewFinancials } from '../lib/adminScope';
+import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -602,19 +602,23 @@ async function analyzeTemplate(
 
 function computeDiff(
   before: ProductDoc | null,
-  after: ProductDoc
+  after: ProductDoc,
+  opts: { includeCost?: boolean } = {}
 ): Array<{ field: string; before: string | null; after: string | null }> {
   const repr = (v: string | null): string => (v === null ? NULL_TOKEN : v);
+  // §11: the diff is built from the SAME entry writer as the export, so it
+  // inherits the export's cost gate rather than needing its own list of keys.
+  const entryOpts = { includeCost: opts.includeCost !== false };
   const beforeMap = new Map<string, string | null>();
   if (before) {
     beforeMap.set('slug', before.slug);
-    for (const e of docToEntries(before)) beforeMap.set(e.key, e.value);
+    for (const e of docToEntries(before, entryOpts)) beforeMap.set(e.key, e.value);
   }
   const diff: Array<{ field: string; before: string | null; after: string | null }> = [];
   const seen = new Set<string>();
   const afterEntries: Array<{ key: string; value: string | null }> = [
     { key: 'slug', value: after.slug },
-    ...docToEntries(after),
+    ...docToEntries(after, entryOpts),
   ];
   for (const e of afterEntries) {
     seen.add(e.key);
@@ -821,7 +825,8 @@ async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fin
     );
   }
   const fresh = await loadProductDoc(c.env.DB, prior.product_id);
-  return c.json({
+  // §11: a resubmitted batch answers with the product; gate it like the rest.
+  return c.json(projectForAdmin(c.env, c.get('user'), {
     success: true,
     already_applied: true,
     created: prior.created,
@@ -834,7 +839,7 @@ async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fin
     warnings: [
       'هذه الدفعة طُبِّقت مسبقاً بالمحتوى نفسه — لم يُنشأ منتج ثانٍ / this exact batch was already applied; no second product was created',
     ],
-  });
+  }));
 }
 
 /** Honest money warnings — §6.1 forbids a dropped zero/empty field silently
@@ -967,7 +972,17 @@ templateRoutes.post('/parse', async (c) => {
   // Every error / warning / needs-review entry is returned in full — the UI
   // must be able to show ALL rejected rows with their reason (§6.1), never a
   // truncated "first five".
-  return c.json({
+  /**
+   * §11 — the cost gate belongs on EVERY response, not only on the download.
+   *
+   * `includeCost` was added to the .txt export, and this route kept returning
+   * the whole merged document plus a key-by-key diff. An assistant admin who
+   * could not open the export could paste the same text here and read every
+   * cost out of `preview` and `diff` instead. `projectForAdmin` is the same
+   * stripper the relations endpoint uses, and it removes every field naming a
+   * cost at any depth rather than a list someone has to remember to extend.
+   */
+  return c.json(projectForAdmin(c.env, c.get('user'), {
     success: true,
     product_id: a.parsed.header.product_id,
     is_create: !a.parsed.header.product_id,
@@ -981,8 +996,8 @@ templateRoutes.post('/parse', async (c) => {
     preserved_fields: a.merge?.preserved_fields ?? [],
     // Merged-vs-existing preview (admin view; parse never writes anything).
     preview: a.doc ? projectAdmin(a.doc) : null,
-    diff: a.doc ? computeDiff(a.existing, a.doc) : [],
-  });
+    diff: a.doc ? computeDiff(a.existing, a.doc, { includeCost: canViewFinancials(c.env, c.get('user')) }) : [],
+  }));
 });
 
 // ---------------------------------------------------------------- POST /apply
@@ -1255,7 +1270,9 @@ templateRoutes.post('/apply', async (c) => {
   });
 
   const fresh = await loadProductDoc(c.env.DB, doc.id);
-  return c.json({
+  // §11: the same gate as the export and /parse — the applied product is the
+  // whole document, cost included, and an assistant admin must not read it.
+  return c.json(projectForAdmin(c.env, adminUser, {
     success: true,
     created: !isUpdate,
     already_applied: false,
@@ -1266,7 +1283,7 @@ templateRoutes.post('/apply', async (c) => {
     cleared_fields: a.merge?.cleared_fields ?? [],
     preserved_fields: a.merge?.preserved_fields ?? [],
     warnings,
-  });
+  }));
 });
 
 // ------------------------------------------------------------ POST /parse-zip

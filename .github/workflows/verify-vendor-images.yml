@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+#   Runs the REAL image extractor over REAL vendor product pages.
+# ---------------------------------------------------------------------------
+# The owner asked for image ingestion «خاصه من مواقع مثل bambulab + qidi + biqu
+# + esun + creality». The unit tests use hand-written fixtures shaped like what
+# Shopify, WordPress and Magento emit — they prove the parser handles those
+# shapes, and they cannot prove the shapes are right, because the build
+# environment cannot reach any of those five (the egress proxy answers 403).
+#
+# This job is where that claim is allowed to come from. It fetches the pages
+# for real and runs the same `extractPageImages` the Worker runs.
+#
+# WHAT IT WRITES: nothing. GETs on public product pages, HEADs on the image
+# addresses they name. No credentials, no database, no R2, no upload.
+#
+# A page that refuses a bot (403/429) is REPORTED, not failed — that is the
+# vendor's policy, not a defect here. The run fails when a page we could
+# actually read named no usable product image.
+name: 27 - Verify vendor image extraction (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: 'Space-separated product page URLs (blank = the defaults below)'
+        required: false
+        default: ''
+
+concurrency: verify-vendor-images
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Read the pages and extract what they advertise
+        id: extract
+        run: |
+          set -euo pipefail
+          PAGES="${{ github.event.inputs.pages }}"
+          if [ -z "$PAGES" ]; then
+            # One product page per vendor the owner named. Kept as defaults
+            # rather than hard-coded so a moved URL is a workflow input, not a
+            # code change.
+            PAGES="https://us.store.bambulab.com/products/a1
+                   https://qidi3d.com/products/qidi-plus4
+                   https://biqu.equipment/products/bigtreetech-manta-m8p
+                   https://us.esun3d.com/products/pla-plus-filament
+                   https://www.creality.com/products/creality-k1-3d-printer"
+          fi
+          npx tsx scripts/extract-vendor-images.mjs $PAGES
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Vendor image extraction'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| the extractor finds product images on real vendor pages | ${{ steps.extract.outcome }} |"
+            echo ''
+            echo 'Read-only: GET on public product pages, HEAD on the images they name. Nothing was stored.'
+            echo 'A page that answered 403/429 is reported as refused, not counted as a failure.'
+          } >> "$GITHUB_STEP_SUMMARY"

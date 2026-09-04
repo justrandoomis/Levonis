@@ -113,8 +113,12 @@ export function ImagesSection({
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  /** §2/§10: a DIRECT image-file URL only. The server verifies magic bytes, so
-   *  a product page pasted here is rejected rather than scraped. */
+  /**
+   * A direct image-file URL, or — for the vendor hosts the owner named — the
+   * product PAGE. The server reads only image ADDRESSES out of a page, never
+   * text, and every address it finds is downloaded and verified by magic bytes
+   * exactly like one typed here by hand. Anything else is still refused.
+   */
   const ingestUrls = async () => {
     const urls = urlText
       .split(/[\s,]+/)
@@ -126,23 +130,35 @@ export function ImagesSection({
     try {
       const res = await api.post<{
         success: boolean;
-        results: Array<{ source_url: string; status: string; url?: string; reason?: string }>;
+        results: Array<{
+          source_url: string;
+          status: string;
+          url?: string;
+          reason?: string;
+          from_page?: string;
+          alt?: string;
+        }>;
       }>('/api/admin/media/ingest', { urls });
       let ok = 0;
+      let fromPages = 0;
       const failed: string[] = [];
       for (const r of res.results) {
         if (r.status === 'stored' && r.url) {
           addImage(r.url);
           ok += 1;
+          if (r.from_page) fromPages += 1;
         } else {
           failed.push(`${r.source_url}: ${r.reason ?? 'failed'}`);
         }
       }
       setUrlText('');
+      // Saying how many came from a page matters: pasting one link and getting
+      // eight pictures is surprising unless the screen says why.
+      const pageNote = fromPages > 0 ? ` (${fromPages} من صفحة المنتج)` : '';
       setUrlNote(
         failed.length === 0
-          ? `تمت إضافة ${ok} صورة`
-          : `أضيفت ${ok}، وفشلت ${failed.length}: ${failed.slice(0, 2).join(' | ')}`
+          ? `تمت إضافة ${ok} صورة${pageNote}`
+          : `أضيفت ${ok}${pageNote}، وفشلت ${failed.length}: ${failed.slice(0, 2).join(' | ')}`
       );
     } catch (e) {
       setUrlNote(e instanceof ApiError ? e.message : 'تعذّر جلب الصور');
@@ -226,21 +242,21 @@ export function ImagesSection({
           className="hidden"
           onChange={(e) => pick(e.target.files)}
         />
-        <span className="text-[11px] text-zinc-500">JPEG / PNG / WebP / GIF · حتى 8MB للصورة</span>
+        <span className="text-[11px] text-zinc-500">JPEG / PNG / WebP / GIF / AVIF · حتى 8MB للصورة</span>
       </div>
 
       <div className="flex flex-wrap items-end gap-2 mb-3 min-w-0">
         <div className="flex-1 min-w-[200px]">
           <Field
-            ar="روابط صور مباشرة"
-            en="Direct image URLs"
-            hint="رابط ملف صورة فقط — لا يُقرأ من صفحات المنتجات"
-            tip="الخادم يتحقق من الملف ببصمة البايتات، فصفحة HTML تُرفض. لا يوجد استخراج من صفحات المنتجات."
+            ar="روابط الصور أو صفحة المنتج"
+            en="Image URLs, or a vendor product page"
+            hint="رابط صورة مباشر — أو رابط صفحة منتج من bambulab / qidi / biqu / esun / creality"
+            tip="من صفحة المنتج تُقرأ عناوين الصور فقط (og:image و JSON-LD والمعرض)، ولا يُؤخذ منها أي نص أو سعر. كل صورة تُنزَّل وتُفحص ببصمة البايتات قبل حفظها، تمامًا كالرابط المباشر. المواقع الأخرى تحتاج رابط ملف الصورة نفسه."
           >
             <TextInput
               value={urlText}
               onChange={(e) => setUrlText(e.target.value)}
-              placeholder="https://…/photo.jpg"
+              placeholder="https://…/photo.jpg  ·  https://us.store.bambulab.com/products/…"
             />
           </Field>
         </div>

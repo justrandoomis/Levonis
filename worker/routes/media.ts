@@ -5,28 +5,50 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { validateOutboundUrl } from '../lib/fetchGuard';
 import { sniff } from './uploads';
+import { extractPageImages, imageCandidates, isVendorHost } from '../lib/pageImages';
 
 /**
- * Direct image-file ingestion — POST /api/admin/media/ingest.
+ * Image ingestion — POST /api/admin/media/ingest.
  *
- * This is the ONLY outbound fetch the admin product surface performs, and it
- * is deliberately narrow (product-form mandate §2): the URL must resolve to a
- * real image file, verified by MAGIC BYTES, not by its extension or by the
- * server's Content-Type header. An HTML page is rejected outright — nothing
- * here parses markup, reads metadata or extracts text, so a product page URL
- * cannot be scraped through it.
+ * A URL is fetched and stored only if the BYTES are an image: magic bytes
+ * decide, never the extension and never the remote Content-Type. Discipline
+ * on every fetch: SSRF check on each redirect hop, 10s timeout, 4MB cap,
+ * content-addressed at products/import/<sha256>.<ext> with a HEAD probe first
+ * so re-importing the same bytes is a no-op, and writes only under the public
+ * products/import/ prefix.
  *
- * Discipline: SSRF check on every redirect hop, 10s timeout, 4MB cap, images
- * only, content-addressed at products/import/<sha256>.<ext> with a HEAD probe
- * first so re-importing the same bytes is a no-op. Writes only under the
- * public products/import/ prefix — never a private one.
+ * ---------------------------------------------------------------------------
+ * WHAT CHANGED ON 2026-09-04, AND WHY
+ * ---------------------------------------------------------------------------
+ * Product-form mandate §2 said this endpoint must never read a product page,
+ * and the refusal was total: an HTML body matches no magic signature, so a
+ * vendor URL came back "The URL must point directly at an image file".
+ *
+ * The owner then asked for exactly that, in these words:
+ *
+ *   «دعم الصور بشكل احترافي خاصه من مواقع مثل bambulab + qidi + biqu + esun + creality»
+ *
+ * It is their store, so page reading is now supported — as a NARROW, NAMED
+ * capability rather than by loosening the old rule:
+ *
+ *   - only hosts on `VENDOR_HOSTS` may be parsed as HTML. Every other URL
+ *     still has to be a real image file, exactly as before;
+ *   - only image ADDRESSES are read. Nothing extracts prices, titles,
+ *     descriptions or any other text, so no product copy is ever lifted;
+ *   - every address found goes back through this same pipeline, so extraction
+ *     decides WHICH urls to try and never what is safe to store;
+ *   - the page fetch is capped, timed out and SSRF-checked like any other, and
+ *     one page can queue at most PAGE_IMAGE_LIMIT images.
  */
 
 export const mediaRoutes = new Hono<AppContext>();
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; LevonisBot/1.0)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; LevonisBot/1.0; +https://levonis-iq.com)';
 const IMAGE_CAP = 4 * 1024 * 1024;
 const MAX_PER_CALL = 12;
+/** The most pictures one vendor page may queue. A gallery is a dozen shots;
+ *  a page that offers fifty is offering cross-sells, not this product. */
+const PAGE_IMAGE_LIMIT = 10;
 
 export interface IngestResult {
   source_url: string;
@@ -34,7 +56,21 @@ export interface IngestResult {
   key?: string;
   url?: string;
   reason?: string;
+  /** Set when this image was found ON a page rather than requested directly. */
+  from_page?: string;
+  /** Alt text the page carried for it. Never invented. */
+  alt?: string;
+  /** Internal: the decoded page, when this URL turned out to be a vendor page.
+   *  Stripped before the result ever reaches a response. */
+  page_body?: string;
 }
+
+/**
+ * The internal marker `ingestImageUrl` returns when the address turned out to
+ * be a readable vendor PAGE rather than an image. It never leaves this module:
+ * `ingestUrlOrPage` swaps it for the images the page named.
+ */
+const PAGE_MARKER = '__LEVONIS_VENDOR_PAGE__';
 
 /** Read a response body up to `cap` bytes, then stop. */
 async function readCapped(res: Response, cap: number): Promise<Uint8Array> {
@@ -58,7 +94,19 @@ async function readCapped(res: Response, cap: number): Promise<Uint8Array> {
   return out;
 }
 
-export async function ingestImageUrl(env: Env, rawUrl: string): Promise<IngestResult> {
+/**
+ * Fetch one address and store it if the bytes are an image.
+ *
+ * `allowPage` is what separates the two callers: the public endpoint lets a
+ * vendor page through to the extractor, while the recursive call the extractor
+ * makes for each found image does NOT — so a page can never lead to another
+ * page, and there is no crawl.
+ */
+export async function ingestImageUrl(
+  env: Env,
+  rawUrl: string,
+  opts: { allowPage?: boolean } = {}
+): Promise<IngestResult> {
   let sourceUrl = rawUrl;
   try {
     let target = validateOutboundUrl(rawUrl);
@@ -88,13 +136,31 @@ export async function ingestImageUrl(env: Env, rawUrl: string): Promise<IngestRe
       return { source_url: sourceUrl, status: 'failed', reason: 'Image exceeds the 4 MB limit' };
     }
     // Magic bytes decide, not the extension and not the remote Content-Type.
-    // An HTML product page fails here, which is what keeps §2 enforced.
     const kind = sniff(buf);
     if (!kind || !kind.mime.startsWith('image/')) {
+      /**
+       * Not an image. On a vendor host it may be the product PAGE, which the
+       * owner asked to be able to paste. Anywhere else the answer is the same
+       * refusal it has always been.
+       */
+      if (opts.allowPage && isVendorHost(target.hostname)) {
+        // Signals the caller to run the extractor; the page bytes are already
+        // in hand, so it is handed back rather than fetched a second time.
+        return {
+          source_url: target.toString(),
+          status: 'failed',
+          reason: PAGE_MARKER,
+          page_body: new TextDecoder().decode(buf),
+        };
+      }
       return {
         source_url: sourceUrl,
         status: 'failed',
-        reason: 'The URL must point directly at an image file (JPEG/PNG/WebP/GIF)',
+        reason: isVendorHost(target.hostname)
+          ? 'The URL must point directly at an image file (JPEG/PNG/WebP/GIF/AVIF)'
+          : 'The URL must point directly at an image file (JPEG/PNG/WebP/GIF/AVIF). ' +
+            'Product PAGES can be read only for the supported vendors — ' +
+            'paste the image address itself, or the page URL of a supported vendor.',
       };
     }
 
@@ -120,6 +186,61 @@ export async function ingestImageUrl(env: Env, rawUrl: string): Promise<IngestRe
   }
 }
 
+/**
+ * One address in, every picture it leads to out.
+ *
+ * A direct image URL yields one result, exactly as before. A product page on
+ * a supported vendor yields one result per picture the page names — each of
+ * which went through the same fetch, the same SSRF check and the same
+ * magic-byte test, because extraction only decides which addresses to TRY.
+ */
+export async function ingestUrlOrPage(env: Env, rawUrl: string): Promise<IngestResult[]> {
+  const first = await ingestImageUrl(env, rawUrl, { allowPage: true });
+  if (first.reason !== PAGE_MARKER) return [first];
+
+  const pageUrl = first.source_url;
+  const found = extractPageImages(first.page_body ?? '', pageUrl, PAGE_IMAGE_LIMIT);
+  if (found.length === 0) {
+    return [
+      {
+        source_url: pageUrl,
+        status: 'failed',
+        reason:
+          'قرأنا الصفحة ولم نجد فيها صور منتج — انسخ رابط الصورة نفسها / ' +
+          'the page was read but named no product image; paste the image address itself',
+      },
+    ];
+  }
+
+  const out: IngestResult[] = [];
+  const storedKeys = new Set<string>();
+  for (const image of found) {
+    // A known CDN is asked for the ORIGINAL file first and the rendered size
+    // second, so a wrong guess costs one failed fetch and never the picture.
+    let stored: IngestResult | null = null;
+    let lastReason = '';
+    for (const candidate of imageCandidates(image.url)) {
+      const r = await ingestImageUrl(env, candidate);
+      if (r.status === 'stored') {
+        stored = r;
+        break;
+      }
+      lastReason = r.reason ?? 'failed';
+    }
+    if (stored) {
+      // The same photo offered twice at two addresses is one photo: the key is
+      // the SHA-256 of the bytes, so this catches it after the download that
+      // proved it, which is the only point at which it can be known.
+      if (stored.key && storedKeys.has(stored.key)) continue;
+      if (stored.key) storedKeys.add(stored.key);
+      out.push({ ...stored, from_page: pageUrl, alt: image.alt || undefined });
+    } else {
+      out.push({ source_url: image.url, status: 'failed', reason: lastReason, from_page: pageUrl });
+    }
+  }
+  return out;
+}
+
 mediaRoutes.post('/ingest', requireAdmin, async (c) => {
   await rateLimit(c, 'media_ingest', 60, 3600);
   const body = (await c.req.json().catch(() => ({}))) as { urls?: unknown; url?: unknown };
@@ -129,12 +250,19 @@ mediaRoutes.post('/ingest', requireAdmin, async (c) => {
 
   const urls = raw.map((u, i) => str(u, `urls[${i}]`, { min: 8, max: 2000 }));
   const results: IngestResult[] = [];
-  for (const u of urls) results.push(await ingestImageUrl(c.env, u));
+  for (const u of urls) results.push(...(await ingestUrlOrPage(c.env, u)));
+  // The decoded page never leaves this module — it is working state, not a
+  // payload, and returning someone else's markup to the browser is not this
+  // endpoint's job.
+  for (const r of results) delete r.page_body;
 
   const user = c.get('user');
   await audit(c.env.DB, user?.id ?? null, 'media.ingest', 'products/import', {
     requested: urls.length,
     stored: results.filter((r) => r.status === 'stored').length,
+    // Which vendor pages were read, so the audit trail says where the store's
+    // photography came from.
+    pages: [...new Set(results.map((r) => r.from_page).filter(Boolean))],
   });
 
   return c.json({ success: true, results });

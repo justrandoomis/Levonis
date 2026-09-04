@@ -1,12 +1,13 @@
 /**
- * SSRF guard for the only two outbound fetches the admin surface still makes:
- * ingesting a DIRECT image file URL for a product or an import (mandate §2 —
- * "رابط الصورة يجب أن يشير مباشرة إلى ملف وسائط صالح، ولا يجوز استعماله لكشط
- * صفحة منتج أو استخراج نصوص منها").
+ * SSRF guard for every outbound fetch the admin surface makes: ingesting an
+ * image file, and — since 2026-09-04, at the owner's request — reading a
+ * product page on one of the named vendor hosts for the image ADDRESSES it
+ * advertises.
  *
- * Product-page extraction was REMOVED in the product-form mandate (§2). This
- * module deliberately contains no HTML parsing, no metadata reading and no
- * page fetch — only the address validation those image fetches need.
+ * This module still contains no HTML parsing and no page fetch of its own: it
+ * validates addresses and nothing else, and it must be re-run on EVERY
+ * redirect hop. Which hosts may be read as pages, and what is read out of
+ * them, live in worker/lib/pageImages.ts.
  */
 
 import { badRequest } from './http';
@@ -28,6 +29,24 @@ function ipIsPrivate(host: string): boolean {
   // IPv6 literal (bracketed or not).
   const h = host.replace(/^\[|\]$/g, '').toLowerCase();
   if (h.includes(':')) {
+    // An IPv4-MAPPED address wraps a v4 address inside a v6 literal, in either
+    // spelling: `::ffff:127.0.0.1` or `::ffff:7f00:1`. Neither starts with fc,
+    // fd or fe80 and neither equals ::1, so both walked straight past the
+    // checks below and reached 127.0.0.1. The embedded address is unwrapped
+    // and re-tested as what it is.
+    const mapped = /^::ffff:(.+)$/.exec(h);
+    if (mapped) {
+      const inner = mapped[1];
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(inner)) return ipIsPrivate(inner);
+      // Hex form: two groups of 16 bits are the four v4 octets.
+      const hex = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(inner);
+      if (hex) {
+        const hi = parseInt(hex[1], 16);
+        const lo = parseInt(hex[2], 16);
+        return ipIsPrivate(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
+      }
+      return true; // an ::ffff: form we cannot read is refused, not trusted
+    }
     return h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80') || h === '::';
   }
   return false;

@@ -27,6 +27,19 @@ const MAGIC: Array<{ ext: string; mime: string; match: (b: Uint8Array) => boolea
     ext: 'webp', mime: 'image/webp',
     match: (b) => b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50,
   },
+  /**
+   * AVIF, before mp4 — both are ISO-BMFF and both carry `ftyp` at offset 4, so
+   * the BRAND at 8..11 is what separates them. Modern vendor CDNs (Shopify and
+   * Cloudflare Images among them) serve AVIF by default, so leaving it out
+   * meant a perfectly good direct image URL from bambulab or creality was
+   * refused as "not an image file".
+   */
+  {
+    ext: 'avif', mime: 'image/avif',
+    match: (b) =>
+      b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70 &&
+      b[8] === 0x61 && b[9] === 0x76 && b[10] === 0x69 && (b[11] === 0x66 || b[11] === 0x73),
+  },
   {
     ext: 'mp4', mime: 'video/mp4',
     match: (b) => b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70,
