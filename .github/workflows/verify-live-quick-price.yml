@@ -14,7 +14,7 @@
 # WHAT IT WRITES: nothing. Every request is an anonymous GET; the admin
 # endpoints are probed only for their refusal, which is what proves they are
 # both deployed and still closed.
-name: 24 - Verify Live Quick Edit Pricing (read-only)
+name: 25 - Verify Live Quick Edit Pricing (read-only)
 
 on:
   workflow_dispatch:
