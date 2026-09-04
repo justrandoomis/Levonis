@@ -12,10 +12,14 @@
  * check that a wrong file would fail:
  *
  *   images, PDF, 3MF   magic bytes
+ *   GLB                magic bytes ('glTF'), so the name is not consulted
  *   binary STL         84 + 50 x triangleCount must equal the file size —
  *                      a renamed .exe does not satisfy that identity
  *   ASCII STL / OBJ    valid UTF-8 whose first meaningful line is the token
- *                      the format requires
+ *   AMF / glTF / STEP  the format requires. STEP is accepted as a REFERENCE:
+ *                      Levonis cannot measure boundary-representation CAD
+ *                      without a geometry kernel, and says so rather than
+ *                      pricing a guess (worker/lib/modelGeometry.ts)
  *
  * And whatever survives that, nothing but an image is ever served inline.
  * A model file comes back as an attachment with `nosniff`, so even a file
@@ -107,6 +111,15 @@ export function classifyAttachment(buf: Uint8Array, fileName = ''): Attachment |
   if (starts(buf, [0x50, 0x4b, 0x03, 0x04]) && ext === '3mf') {
     return { ext: '3mf', mime: 'model/3mf', kind: 'model', inline: false };
   }
+  // A zipped AMF, same reasoning: the extension has to agree with the ZIP.
+  if (starts(buf, [0x50, 0x4b, 0x03, 0x04]) && ext === 'amf') {
+    return { ext: 'amf', mime: 'application/x-amf', kind: 'model', inline: false };
+  }
+  // glTF binary declares itself in its first four bytes — a real magic number,
+  // so the extension is not consulted at all.
+  if (starts(buf, [0x67, 0x6c, 0x54, 0x46])) {
+    return { ext: 'glb', mime: 'model/gltf-binary', kind: 'model', inline: false };
+  }
   if (isBinaryStl(buf) && (ext === 'stl' || ext === '')) {
     return { ext: 'stl', mime: 'model/stl', kind: 'model', inline: false };
   }
@@ -119,6 +132,19 @@ export function classifyAttachment(buf: Uint8Array, fileName = ''): Attachment |
     }
     if (ext === 'obj' && /^(v|vn|vt|f|o|g|mtllib|usemtl)\s/i.test(line)) {
       return { ext: 'obj', mime: 'model/obj', kind: 'model', inline: false };
+    }
+    // STEP names itself on its first line: the ISO part number is the format's
+    // own signature, and no other file begins that way by accident.
+    if ((ext === 'step' || ext === 'stp') && /^ISO-10303-21/i.test(line)) {
+      return { ext: 'step', mime: 'model/step', kind: 'model', inline: false };
+    }
+    // AMF and glTF-JSON are XML and JSON respectively, so the first meaningful
+    // token is checked rather than trusted from the name.
+    if (ext === 'amf' && /^<\?xml|^<\s*amf/i.test(line)) {
+      return { ext: 'amf', mime: 'application/x-amf', kind: 'model', inline: false };
+    }
+    if (ext === 'gltf' && /^\{/.test(line) && /"asset"/.test(text)) {
+      return { ext: 'gltf', mime: 'model/gltf+json', kind: 'model', inline: false };
     }
   }
 

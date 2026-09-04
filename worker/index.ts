@@ -26,6 +26,9 @@ import { warrantyAdminRoutes, warrantyPublicRoutes } from './routes/warranty';
 import { adminImportRoutes } from './routes/adminImport';
 import { adminProductRelationsRoutes } from './routes/adminProductRelations';
 import { adminPriceGridRoutes } from './routes/adminPriceGrid';
+import { printRequestRoutes } from './routes/printRequests';
+import { notificationRoutes } from './routes/notifications';
+import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
@@ -156,10 +159,22 @@ app.route('/api/studio', studioRoutes);
 // Merchant store administration. Scoped to the caller's OWN store on every
 // route — deliberately not under /api/admin, which is the platform's.
 app.route('/api/merchant', merchantRoutes);
+// Printers and request-notification preferences: what a shop can make, and
+// which of those jobs it wants to hear about.
+app.route('/api/merchant', merchantPrinterRoutes);
 // The public shopfront: readable by anyone, on any host.
 app.route('/api/storefront', storefrontRoutes);
+// The print journey EXTENDS the marketplace rather than starting a second one:
+// it adds measuring, estimating, publishing and matching to the same requests.
+// Mounted BEFORE the marketplace for the same reason the product routes put
+// /brands before /:id — the more specific prefix is registered first so it can
+// never be shadowed by a parameterised route above it.
+app.route('/api/marketplace/print', printRequestRoutes);
 // The customer-request marketplace: requests, offers, escrowed community orders.
 app.route('/api/marketplace', marketplaceRoutes);
+// The in-app notification inbox. General, not print-specific: it is what was
+// missing when a merchant needed to be told a matching request had been posted.
+app.route('/api/notifications', notificationRoutes);
 // Checkout for merchant store products — the other merchant commerce path.
 app.route('/api/store-orders', storeOrderRoutes);
 // Customer-side reviews and store follows.

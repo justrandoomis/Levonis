@@ -1,5 +1,8 @@
 import { safeParse } from './types';
 import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
+import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type PrintMaterial } from './printPricing';
+import { DEFAULT_MATCH_WEIGHTS, type MatchWeights } from './printMatching';
+import { DEFAULT_LINK_PROVIDERS, type LinkProviderConfig } from './externalModels';
 
 /** Typed access to the admin_settings key/value store, with safe defaults. */
 
@@ -180,6 +183,42 @@ export const SETTING_DEFAULTS = {
     setup_fee_iqd: null,
     margin_percent: null,
   } as { machine_iqd_per_hour: number | null; setup_fee_iqd: number | null; margin_percent: number | null },
+
+  /**
+   * THE PRINT-REQUEST COST MODEL. Every rate, factor and threshold the estimate
+   * is built from — labour, machine hours, energy, waste, supports, purge,
+   * failure risk, complexity, the margin floor and the minimum job.
+   *
+   * NOT PUBLIC, and `printServicePricing` above is left exactly as it was. That
+   * one IS in PUBLIC_SETTING_KEYS, so anything added to it would be readable by
+   * a signed-out visitor — and a competitor should not be able to download the
+   * owner's cost structure by opening the site.
+   */
+  printPricingConfig: DEFAULT_PRICING as PrintPricingConfig,
+
+  /**
+   * The material catalogue: reference price, density, waste factor, support
+   * factor and minimum economic cost per filament and resin, exactly as the
+   * owner listed them. Also NOT public — a merchant's buying price is not
+   * customer-facing. The wizard receives a stripped projection (names and ids
+   * only) from the print API instead.
+   */
+  printMaterials: DEFAULT_MATERIALS as PrintMaterial[],
+
+  /** What each matching signal is worth. Tuning these re-ranks who hears about
+   *  a request; it can never make an incompatible merchant eligible. */
+  printMatchWeights: DEFAULT_MATCH_WEIGHTS as MatchWeights,
+
+  /** How many merchants one published request may notify. A cap, not a filter:
+   *  everyone eligible can still find it on the public board. */
+  printMatchNotifyLimit: 25,
+
+  /**
+   * External model providers. `api_url` is EMPTY by default on purpose: Levonis
+   * knows what a MakerWorld permalink looks like, and the owner decides whether
+   * and where to ask MakerWorld about it. Nothing is scraped, ever.
+   */
+  printLinkProviders: DEFAULT_LINK_PROVIDERS as LinkProviderConfig[],
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

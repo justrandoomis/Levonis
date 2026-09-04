@@ -42,11 +42,27 @@ const FORBIDDEN_MODULES = ['three-slicer', 'occt-import-js', 'three', 'vinext', 
  *  That is product-catalogue packaging, not slicer payload — no mesh, no 3MF,
  *  no G-code passes through it — so it is the same justification the two
  *  entries below already carry, for the file that replaces them as the
- *  primary flow. */
+ *  primary flow.
+ *
+ *  worker/lib/modelGeometry.ts measures a customer's uploaded model so a print
+ *  request can be priced. A 3MF file IS a ZIP archive whose payload is one XML
+ *  part, so unzipping it is not an optional convenience — it is the only way to
+ *  read the geometry at all, and the same is true of a zipped AMF. This is the
+ *  ONE case where fflate touches a mesh, and it is admitted deliberately: the
+ *  rule this list enforces is "no slicer ENGINE in the store", and a 60-line
+ *  vertex reader with no `three`, no WASM and no engine coupling is the exact
+ *  opposite of the payload the rule was written against. The file imports
+ *  nothing else and is served entirely by the Worker.
+ *
+ *  NOTE THE ABSENCE OF A CLIENT-SIDE ENTRY. The browser never parses a model:
+ *  measurement decides a price, so it happens on the server where the customer
+ *  cannot edit it, and the viewer receives a derived mesh rather than a parser.
+ *  That is why this entry is under worker/ and there is no src/ counterpart. */
 const FFLATE_ALLOWLIST = new Set([
   join('src', 'components', 'adminProducts', 'ImportPanel.tsx'),
   join('worker', 'routes', 'template.ts'),
   join('worker', 'routes', 'adminImport.ts'),
+  join('worker', 'lib', 'modelGeometry.ts'),
 ]);
 
 const SCAN_DIRS = ['src', 'worker'];
