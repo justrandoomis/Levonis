@@ -14,7 +14,7 @@ import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps'
 import { awardOrderPoints } from '../lib/pointsOps';
 import { walletTxPublic, credit } from '../lib/wallet';
 import { productPublic } from './products';
-import { orderPublic } from './orders';
+import { orderPublic, shippingConfigFrom } from './orders';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
 import {
@@ -1664,6 +1664,16 @@ adminRoutes.put('/settings/:key', async (c) => {
     // admits endpoint paths and field-name maps, and secrets belong in Worker
     // secrets where no admin screen can read them back.
     value = resolveWire(value);
+  } else if (key === 'shippingPolicy') {
+    // THE GLOBAL SHIPPING RULES, normalized by the SAME function the checkout
+    // reads them with. Anything the engine cannot use is dropped here rather
+    // than stored and quietly ignored later, and a fee that is not a
+    // non-negative whole number becomes null — "not configured", which the
+    // quote reports honestly — instead of a number nobody chose.
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw badRequest('shippingPolicy must be an object');
+    }
+    value = shippingConfigFrom(value);
   } else if (key === 'minMarginPercent') {
     // The profit guard's floor. null clears it, which is not the same as zero:
     // "no floor configured" leaves only the below-cost warning, while a floor

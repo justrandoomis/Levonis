@@ -43,6 +43,13 @@ interface CheckoutQuoteDto {
   subtotal_iqd: number;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
+  /** The protected-delivery add-on: offered only when the owner priced it. */
+  protected_delivery?: {
+    available: boolean;
+    selected: boolean;
+    fee_iqd: number | null;
+    waived: boolean;
+  };
   coupon: { code?: string; discount_iqd?: number } | null;
   /** §3.3 attribution — always `discount_iqd: 0`; it is not a discount. */
   support: { referrer_username: string; ref: string; discount_iqd: number } | null;
@@ -76,6 +83,9 @@ const STRINGS = {
     implicitNote: 'لا توجد سياسات منشورة تتطلب الموافقة حالياً.',
     supportLine: (name: string) => `كود دعم: ${name}`,
     supportZero: 'لا يغيّر سعر طلبك (0 د.ع)',
+    protectedTitle: 'توصيل محمي',
+    protectedDesc: 'تغليف وحماية إضافية للطرد أثناء النقل.',
+    protectedFree: 'مجاني مع اشتراكك',
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -94,6 +104,9 @@ const STRINGS = {
     implicitNote: 'No published policies currently require acceptance.',
     supportLine: (name: string) => `Support code: ${name}`,
     supportZero: 'does not change your price (0 IQD)',
+    protectedTitle: 'Protected delivery',
+    protectedDesc: 'Extra packaging and handling so the parcel survives the trip.',
+    protectedFree: 'Free with your membership',
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -112,6 +125,9 @@ const STRINGS = {
     implicitNote: 'لە ئێستادا هیچ سیاسەتێکی بڵاوکراوە پێویستی بە ڕەزامەندی نییە.',
     supportLine: (name: string) => `کۆدی پاڵپشتی: ${name}`,
     supportZero: 'نرخەکەت ناگۆڕێت (0 د.ع)',
+    protectedTitle: 'گەیاندنی پارێزراو',
+    protectedDesc: 'پاکەتکردن و پاراستنی زیاتر بۆ پاکەتەکە لە کاتی گواستنەوە.',
+    protectedFree: 'بێبەرامبەر لەگەڵ ئەندامێتییەکەت',
   },
 };
 
@@ -166,6 +182,9 @@ export default function Checkout() {
   const [couponCode, setCouponCode] = useState<string>(() => readStoredPromo());
   const [couponError, setCouponError] = useState('');
   const [quote, setQuote] = useState<CheckoutQuoteDto | null>(null);
+  /** The protected-delivery add-on. The SERVER prices and charges it; this is
+   *  only the customer's answer to "do you want it?", sent with every quote. */
+  const [protectedDelivery, setProtectedDelivery] = useState(false);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
@@ -274,6 +293,7 @@ export default function Checkout() {
         itemIds: items.map((i) => i.id),
         usePoints,
         useWallet: useWalletBalance,
+        protectedDelivery,
         supportCode: supportRef || undefined,
         couponCode: couponCode || undefined,
       })
@@ -316,7 +336,7 @@ export default function Checkout() {
         if (seq === quoteSeqRef.current) setQuoteLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, itemIdsKey, supportRef, couponCode]);
+  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, itemIdsKey, supportRef, couponCode]);
 
   const walletBalanceIQD = usdCentsToIqd(balanceUsdCents, exchangeRate);
 
@@ -390,6 +410,7 @@ export default function Checkout() {
       const data = await api.post<{ order: ApiOrder; invoice_no?: string | null }>('/api/orders', {
         addressId: selectedAddressId,
         deliveryMethodId: deliveryMethod,
+        protectedDelivery,
         paymentMethodId: paymentMethod,
         useWallet: isWalletActive,
         usePoints,
@@ -801,6 +822,37 @@ export default function Checkout() {
                 <span className="text-white font-normal">{formatIqd(shippingIqd)}</span>
               )}
             </div>
+
+            {/* Protected delivery — offered only when the owner priced it, so
+                the customer never sees a switch that cannot be honoured. */}
+            {quote?.protected_delivery?.available && (
+              <label
+                className="flex items-start gap-3 rounded-lg bg-white/[0.03] border border-white/5 p-3 cursor-pointer"
+                data-checkout="protected-delivery"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 shrink-0 accent-[#ef233c]"
+                  checked={protectedDelivery}
+                  onChange={(e) => setProtectedDelivery(e.target.checked)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-white font-normal">{S.protectedTitle}</span>
+                    <span className="text-xs font-normal shrink-0">
+                      {quote.protected_delivery.waived ? (
+                        <span className="text-emerald-400">{S.protectedFree}</span>
+                      ) : (
+                        <span className="text-zinc-300">
+                          + {formatIqd(quote.protected_delivery.fee_iqd ?? 0)}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  <span className="block text-xs text-zinc-400 font-light mt-0.5">{S.protectedDesc}</span>
+                </span>
+              </label>
+            )}
 
             {/* Server quote transparency: WHY a fee/waiver applies (§6.3). */}
             {quote && quote.shipping.reasons.length > 0 && (

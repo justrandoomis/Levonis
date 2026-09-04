@@ -1278,3 +1278,110 @@ test('re-importing keeps the ids of specs, labels, plans and guide steps', () =>
     (first.doc.usage_guide as { steps: Array<{ id: string }> }).steps.map((x) => x.id)
   );
 });
+
+// ---------------------------------------------------------------------------
+// 0043 fields must survive the WHOLE import, not just the file layer.
+//
+// serializeProducts wrote availability_type / lead_time / variant_key and
+// parseImport read them back, so the round-trip test above passed — but
+// resolveProduct built its option payload without them, and
+// planRelationsWrite normalises a missing value to '' and WRITES it. A store
+// re-importing its own export for a price change therefore reset every option
+// to "inherit", wiped its lead time, and lost the link between the A1 and the
+// A1 Combo rows. These tests pin the fields at the layer that actually writes.
+// ---------------------------------------------------------------------------
+
+/** parsedSample() with per-option availability, as the A1 case really looks. */
+const parsedVariantSample = () => {
+  const p = parsedSample();
+  p.options[0] = {
+    ...p.options[0],
+    availability_type: 'pre_order',
+    lead_time_text: '25-40 يوم',
+    lead_time_min_days: 25,
+    lead_time_max_days: 40,
+    variant_key: 'a1',
+    variant_label: 'A1',
+  };
+  p.options[1] = {
+    ...p.options[1],
+    availability_type: 'direct_sale',
+    variant_key: 'a1',
+    variant_label: 'A1',
+  };
+  return p;
+};
+
+test('resolveProduct carries per-option availability, lead time and variant key', () => {
+  const r = resolveProduct(parsedVariantSample(), null, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(r.issues, []);
+  const groups = r.relations.groups as Array<{ values: Array<Record<string, unknown>> }>;
+  const [a1, mini] = groups[0].values;
+  assert.equal(a1.availability_type, 'pre_order');
+  assert.equal(a1.lead_time_text, '25-40 يوم');
+  assert.equal(a1.lead_time_min_days, 25);
+  assert.equal(a1.lead_time_max_days, 40);
+  assert.equal(a1.variant_key, 'a1');
+  assert.equal(a1.variant_label, 'A1');
+  assert.equal(mini.availability_type, 'direct_sale');
+  assert.equal(mini.variant_key, 'a1');
+
+  // The legacy JSON mirror carries them too, because deriveSaleTypes reads
+  // that mirror for a product with no relational rows.
+  const mirrored = r.doc.options as Array<Record<string, unknown>>;
+  assert.equal(mirrored[0].availability_type, 'pre_order');
+  assert.equal(mirrored[0].variant_key, 'a1');
+});
+
+test('sale_types is DERIVED from the options, not taken from the sheet', () => {
+  // The sheet says direct_sale only (the fixture's own value); the options say
+  // one pre-order and one direct. §2: the options win, and nothing writes the
+  // word "mixed" — it is the pair of types.
+  const p = parsedVariantSample();
+  p.sale_types = ['direct_sale'];
+  const r = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
+  const st = r.doc.sale_types as string[];
+  assert.deepEqual([...st].sort(), ['direct_sale', 'pre_order']);
+  assert.equal(st.includes('mixed'), false);
+});
+
+test('an inactive option does not vote for a sale type', () => {
+  const p = parsedVariantSample();
+  p.options[0] = { ...p.options[0], active: false };
+  p.sale_types = ['direct_sale'];
+  const r = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(r.doc.sale_types, ['direct_sale']);
+});
+
+test('a sheet with no sale_types cell preserves the stored value', () => {
+  // ABSENT MEANS PRESERVE. A narrow "prices only" sheet used to reset every
+  // pre-order product to direct_sale, which changes its stages, its cart
+  // shipping type and whether a transport is demanded.
+  const p = parsedSample();
+  p.sale_types = [];
+  p.options = [];
+  const stored: ExistingShape = {
+    id: 'prod_1',
+    slug: 'stored-product',
+    inventory_mode: 'product',
+    doc: { sale_types: ['pre_order'] } as Record<string, unknown>,
+    groups: [],
+    values: [],
+    colors: [],
+    images: [],
+    variants: [],
+  };
+  const r = resolveProduct(p, stored, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(r.doc.sale_types, ['pre_order']);
+
+  // With nothing stored either, the old default still applies.
+  const fresh = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
+  assert.deepEqual(fresh.doc.sale_types, ['direct_sale']);
+});
+
+test('bundle survives an options-derived sale type', () => {
+  const p = parsedVariantSample();
+  p.sale_types = ['direct_sale', 'bundle'];
+  const r = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
+  assert.equal((r.doc.sale_types as string[]).includes('bundle'), true);
+});

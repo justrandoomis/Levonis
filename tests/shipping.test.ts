@@ -20,6 +20,7 @@ const cfg = (over: Partial<ShippingConfig> = {}): ShippingConfig => ({
   carton_threshold_spools: 10,
   carton_fee_iqd: 3000,
   printer_advance_required: true,
+  protected_iqd: 4000,
   ...over,
 });
 
@@ -170,5 +171,140 @@ test('PRO keeps its own 75,000 threshold and full waiver — PRIME does not chan
   });
   assert.equal(q.pro_waiver_applied, true);
   assert.equal(q.waiver_source, 'pro');
+  assert.equal(q.total_iqd, 0);
+});
+
+// ---------------------------------------------------------------------------
+// PROTECTED SHIPPING — the owner's rule list, in order:
+//   standard shipping · protected shipping · PRIME free standard ·
+//   PRO free standard AND protected.
+//
+// The point of these tests is the asymmetry between the two memberships. PRO
+// is told both are free; PRIME is told the standard fee is free and nothing
+// else. A waiver that quietly covered protected for PRIME too would look like
+// generosity and read as a pricing bug on every invoice.
+// ---------------------------------------------------------------------------
+
+const ordinaryItem: ShippingItem[] = [{ product_id: 'p1', qty: 1, size_class: 'ordinary' }];
+
+const fee = (q: ReturnType<typeof quoteShipping>, kind: string) =>
+  q.components.find((c) => c.kind === kind) ?? null;
+
+test('protected shipping is an add-on ON TOP of the standard fee, not instead of it', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 30000,
+    tier: 'free',
+    tierActive: false,
+    atApprovedDefaultAddress: false,
+    protectedDelivery: true,
+    config: cfg(),
+  });
+  assert.equal(fee(q, 'ordinary')?.fee_iqd, 5000);
+  assert.equal(fee(q, 'protected')?.fee_iqd, 4000);
+  assert.equal(q.total_iqd, 9000);
+});
+
+test('not asking for it charges nothing for it', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 30000,
+    tier: 'free',
+    tierActive: false,
+    atApprovedDefaultAddress: false,
+    config: cfg(),
+  });
+  assert.equal(fee(q, 'protected'), null);
+  assert.equal(q.total_iqd, 5000);
+});
+
+test('an unpriced protected option is refused honestly, never guessed at', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 30000,
+    tier: 'free',
+    tierActive: false,
+    atApprovedDefaultAddress: false,
+    protectedDelivery: true,
+    config: cfg({ protected_iqd: null }),
+  });
+  assert.equal(fee(q, 'protected'), null);
+  assert.equal(q.needs_config.includes('protected_fee_unconfigured'), true);
+  assert.equal(q.total_iqd, 5000);
+});
+
+test('an eligible PRO pays for neither the standard fee nor the protection', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 80000, // strictly above 75,000
+    tier: 'pro',
+    tierActive: true,
+    atApprovedDefaultAddress: true,
+    protectedDelivery: true,
+    config: cfg(),
+  });
+  assert.equal(fee(q, 'ordinary')?.waived, true);
+  assert.equal(fee(q, 'protected')?.waived, true);
+  assert.equal(q.total_iqd, 0);
+});
+
+test('a PRO below the threshold pays for both, as for any other customer', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 75000, // 75,000 itself does not qualify
+    tier: 'pro',
+    tierActive: true,
+    atApprovedDefaultAddress: true,
+    protectedDelivery: true,
+    config: cfg(),
+  });
+  assert.equal(q.total_iqd, 9000);
+});
+
+test('PRIME gets the standard fee free and still pays for protection', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 200000,
+    primeMerchandiseIqd: 200000,
+    tier: 'prime',
+    tierActive: true,
+    atApprovedDefaultAddress: false,
+    protectedDelivery: true,
+    config: cfg(),
+  });
+  assert.equal(q.prime_waiver_applied, true);
+  assert.equal(fee(q, 'ordinary')?.waived, true);
+  assert.equal(fee(q, 'protected')?.waived, false);
+  assert.equal(q.total_iqd, 4000);
+});
+
+test('prime_waiver_covers=all does not reach protected shipping either', () => {
+  // The knob is about the printer and carton SURCHARGES in a mixed cart. It is
+  // not a licence to hand PRIME a benefit the owner listed under PRO.
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 200000,
+    primeMerchandiseIqd: 200000,
+    tier: 'prime',
+    tierActive: true,
+    atApprovedDefaultAddress: false,
+    protectedDelivery: true,
+    config: cfg({ prime_waiver_covers: 'all' }),
+  });
+  assert.equal(fee(q, 'protected')?.waived, false);
+  assert.equal(q.total_iqd, 4000);
+});
+
+test('an approved promotion covers protection the same way it covers delivery', () => {
+  const q = quoteShipping({
+    items: ordinaryItem,
+    merchandiseIqd: 10000,
+    tier: 'free',
+    tierActive: false,
+    atApprovedDefaultAddress: false,
+    independentFreeDelivery: true,
+    protectedDelivery: true,
+    config: cfg(),
+  });
   assert.equal(q.total_iqd, 0);
 });

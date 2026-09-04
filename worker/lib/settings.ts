@@ -130,6 +130,11 @@ export const SETTING_DEFAULTS = {
     carton_threshold_spools: null, // >10 spools MAY incur a carton fee — amount pending
     carton_fee_iqd: null,
     printer_advance_required: true,
+    // Protected (boxed/insured) delivery as an opt-in add-on ON TOP of the
+    // ordinary tariff. null = the owner has not priced it, so the option is
+    // not offered at checkout at all — an unpriced benefit is not a benefit,
+    // and inventing a number here would charge a fee nobody set.
+    protected_iqd: null,
   } as {
     ordinary_iqd: number;
     printer_small_iqd: number | null;
@@ -142,6 +147,7 @@ export const SETTING_DEFAULTS = {
     carton_threshold_spools: number | null;
     carton_fee_iqd: number | null;
     printer_advance_required: boolean;
+    protected_iqd: number | null;
   },
   // Points for approved NON-printer product reviews (final-phase §5). The
   // value is an owner decision (decision row 20) — disabled and unpriced

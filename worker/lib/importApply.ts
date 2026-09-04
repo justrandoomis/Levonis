@@ -35,6 +35,8 @@
  * typed in the form.
  */
 
+import { deriveSaleTypes } from './availability';
+import type { AvailabilityType } from './availability';
 import { normalizeHashtag } from './hashtags';
 import type { ParsedProduct, RowIssue } from './importCsv';
 
@@ -253,6 +255,18 @@ export function resolveProduct(
       prime_adjust_iqd: o.prime_adjust_iqd,
       pro_adjust_iqd: o.pro_adjust_iqd,
       cost_adjust_iqd: opts.money ? o.cost_adjust_iqd : null,
+      // 0043 — how THIS option is fulfilled, and which variant it belongs to.
+      // parseImport reads these columns and serializeProducts writes them, so
+      // dropping them here made a re-import of the store's OWN export reset
+      // every option to 'inherit', wipe its lead time and re-derive
+      // variant_key from the option name. planRelationsWrite normalises a
+      // missing value to '' and writes it, so silence is not "leave alone".
+      availability_type: o.availability_type,
+      lead_time_text: o.lead_time_text,
+      lead_time_min_days: o.lead_time_min_days,
+      lead_time_max_days: o.lead_time_max_days,
+      variant_key: o.variant_key,
+      variant_label: o.variant_label,
     });
   }
 
@@ -445,7 +459,24 @@ export function resolveProduct(
   // Built ON TOP of the stored doc, never from scratch: labels, warranty
   // plans, content blocks and the rest are not in the template, and rebuilding
   // the doc from the CSV alone would erase them on every re-import.
-  const saleTypes = p.sale_types.length ? p.sale_types : ['direct_sale'];
+  // §2 — THE SELLING TYPE IS DERIVED, NOT DECLARED.
+  //
+  // Two separate bugs used to live on this one line. First, an empty cell
+  // meant 'direct_sale', so a narrow "prices only" sheet with no sale_types
+  // column silently converted every pre-order product — the exact opposite of
+  // this file's ABSENT MEANS PRESERVE rule. Second, the sheet's own word won
+  // over the options, so a file could ship a product whose options say
+  // pre-order and whose stages, cart shipping type and transports say direct
+  // sale. deriveSaleTypes settles it the same way the form and the relations
+  // writer do: options decide when any of them declares, otherwise the
+  // declared (or stored) value stands, and 'bundle' survives either way.
+  const declaredSaleTypes = p.sale_types.length
+    ? p.sale_types
+    : ((existing?.doc.sale_types as string[] | undefined) ?? ['direct_sale']);
+  const saleTypes = deriveSaleTypes(
+    groups.flatMap((g) => g.values as Array<{ availability_type?: AvailabilityType; active?: boolean }>),
+    declaredSaleTypes
+  );
 
   // SPEC FIELDS MERGE, THEY DO NOT REPLACE. A sheet only carries the columns
   // its section declares, so overwriting the whole map would silently erase a
@@ -688,6 +719,15 @@ export function resolveProduct(
         pro_adjust_iqd: v.pro_adjust_iqd,
         cost_adjust_iqd: v.cost_adjust_iqd,
         active: v.active,
+        // Mirrored too: deriveSaleTypes reads the JSON options for a product
+        // that has no relational rows, so an availability written only to the
+        // relational side would be invisible to it.
+        availability_type: v.availability_type,
+        lead_time_text: v.lead_time_text,
+        lead_time_min_days: v.lead_time_min_days,
+        lead_time_max_days: v.lead_time_max_days,
+        variant_key: v.variant_key,
+        variant_label: v.variant_label,
       }))
     ),
     colors: colors.map((col) => ({

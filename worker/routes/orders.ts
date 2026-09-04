@@ -238,6 +238,7 @@ const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
   carton_threshold_spools: null,
   carton_fee_iqd: null,
   printer_advance_required: true,
+  protected_iqd: null,
 };
 
 /** Coerces the stored shippingPolicy setting (possibly partial) into a full config. */
@@ -258,6 +259,7 @@ export function shippingConfigFrom(raw: unknown): ShippingConfig {
     carton_threshold_spools: intOrNull(o.carton_threshold_spools),
     carton_fee_iqd: intOrNull(o.carton_fee_iqd),
     printer_advance_required: o.printer_advance_required !== false,
+    protected_iqd: intOrNull(o.protected_iqd),
   };
 }
 
@@ -323,6 +325,9 @@ interface CheckoutInput {
   useWallet: boolean;
   /** §3.3 support code — attribution only, never a discount. */
   supportRef: string;
+  /** The customer asked for protected (boxed) delivery — a paid add-on on top
+   *  of the standard tariff, free for an eligible PRO. */
+  protectedDelivery: boolean;
 }
 
 interface ComputedLine {
@@ -356,6 +361,8 @@ interface CheckoutComputation {
   address: Record<string, unknown>;
   delivery: DeliveryMethod;
   payment: CheckoutPaymentMethod | null;
+  /** The owner's global shipping rules as this order actually saw them. */
+  shippingConfig: ShippingConfig;
   exchangeRate: number;
   tierStatus: TierStatus;
   atApprovedDefault: boolean;
@@ -577,6 +584,9 @@ async function computeCheckout(
       tierActive: tierStatus.active && !gatedBenefits.has(deliveryGate),
       atApprovedDefaultAddress: atApprovedDefault,
       independentFreeDelivery,
+      // Store pickup has no last mile, so nothing to protect; the flag is
+      // dropped rather than charged for a delivery that does not happen.
+      protectedDelivery: input.protectedDelivery && !isPickup,
       config: configForOrder,
     });
 
@@ -695,6 +705,7 @@ async function computeCheckout(
     address,
     delivery,
     payment,
+    shippingConfig: configForOrder,
     exchangeRate,
     tierStatus,
     atApprovedDefault,
@@ -741,6 +752,7 @@ function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolea
     // Accepted from either field name; resolved server-side and worth exactly
     // 0 IQD to the buyer — it only attributes the order to a supporter.
     supportRef: str(body.supportCode ?? body.supportRef, 'supportCode', { max: 60, required: false }),
+    protectedDelivery: body.protectedDelivery === true,
   };
 }
 
@@ -817,6 +829,19 @@ orderRoutes.post('/quote', async (c) => {
       subtotal_iqd: comp.subtotal,
       shipping: comp.shipping,
       is_pickup: comp.isPickup,
+      /**
+       * Whether the protected-delivery add-on can be offered at all, and what
+       * it costs THIS customer. The fee is quoted even when the toggle is off,
+       * because "protect my parcel for 4,000 IQD" is a decision the customer
+       * makes from the price — and `waived` is how an eligible PRO learns the
+       * answer is free rather than being shown a fee it will never pay.
+       */
+      protected_delivery: {
+        available: comp.shippingConfig.protected_iqd !== null && !comp.isPickup,
+        selected: input.protectedDelivery && !comp.isPickup,
+        fee_iqd: comp.shippingConfig.protected_iqd,
+        waived: comp.shipping.components.some((k) => k.kind === 'protected' && k.waived),
+      },
       coupon: comp.couponSnapshot ? safeParse(comp.couponSnapshot, null) : null,
       // §5 unified snapshot, preview edition: the eligible basis the cap and
       // the accrual both come from is shown, so the customer sees WHY the

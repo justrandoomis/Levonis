@@ -16,6 +16,15 @@
  *    actual mapping is owner configuration; never invented, never both.
  *  - More than N filament spools MAY add a carton fee — amount/threshold
  *    are owner configuration; no fee is charged while unconfigured.
+ *  - PROTECTED SHIPPING is an opt-in ADD-ON on top of the standard tariff,
+ *    not a replacement for it: the parcel is boxed and handled so it survives
+ *    the trip. It is charged only when the customer asks for it AND the owner
+ *    has priced it; an unpriced protected option is not offered rather than
+ *    guessed at. PRO gets it free alongside its standard delivery — the
+ *    owner's list is "PRO: free standard + protected". PRIME's benefit is
+ *    "free standard" and stops there, so a PRIME member who wants the parcel
+ *    protected pays for that part, which is also what prime_waiver_covers
+ *    ='ordinary_only' has always meant.
  *  - LEVO PRIME (product-form mandate §5) gets free delivery ONLY when the
  *    eligible merchandise total — after product discounts, coupons AND points,
  *    before delivery — is STRICTLY greater than 150,000 IQD. 150,000 itself is
@@ -41,6 +50,8 @@ export interface ShippingConfig {
   carton_threshold_spools: number | null;
   carton_fee_iqd: number | null;
   printer_advance_required: boolean;
+  /** Opt-in protected-delivery add-on. null = not priced, so not offered. */
+  protected_iqd: number | null;
 }
 
 export interface ShippingItem {
@@ -53,7 +64,7 @@ export interface ShippingItem {
 }
 
 export interface ShippingComponent {
-  kind: 'ordinary' | 'printer_small' | 'printer_large' | 'carton';
+  kind: 'ordinary' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
   fee_iqd: number;
   waived: boolean;
   units: number;
@@ -91,6 +102,8 @@ export function quoteShipping(input: {
   primeMerchandiseIqd?: number;
   /** independent promo/referral free-delivery (kept distinct from the PRO rule) */
   independentFreeDelivery?: boolean;
+  /** The customer asked for the parcel to be protected. */
+  protectedDelivery?: boolean;
   config: ShippingConfig;
 }): ShippingQuote {
   const { config } = input;
@@ -154,6 +167,37 @@ export function quoteShipping(input: {
     const waived = waiverOrdinary || independent;
     components.push({ kind: 'ordinary', fee_iqd: config.ordinary_iqd, waived, units: ordinaryUnits, advance_required: false });
     if (independent && !proEligible) reasons.push('Free delivery applied from an approved promotion/referral.');
+  }
+
+  /**
+   * Protected delivery: one flat add-on per order, ON TOP of the standard
+   * tariff, and only when both the customer asked and the owner priced it.
+   *
+   * Its waiver is deliberately NOT `waiverOrdinary`: that one covers PRIME
+   * too, and the owner's membership list gives PRIME free STANDARD delivery
+   * only. It is also not tied to `pro_waiver_covers`, which is the unresolved
+   * question about printer and carton surcharges in mixed carts — protecting
+   * a parcel is part of the delivery PRO is told is free, not a surcharge on
+   * a bulky item.
+   */
+  if (input.protectedDelivery) {
+    if (config.protected_iqd === null) {
+      needs.push('protected_fee_unconfigured');
+      reasons.push('Protected shipping is not priced yet — no fee was charged for it.');
+    } else {
+      const waived = proEligible || independent;
+      components.push({
+        kind: 'protected',
+        fee_iqd: config.protected_iqd,
+        waived,
+        units: 1,
+        advance_required: false,
+      });
+      if (proEligible) reasons.push('LEVO PRO covers protected shipping as well as the standard fee.');
+      else if (primeEligible) {
+        reasons.push('LEVO PRIME covers the standard delivery fee; protected shipping is charged separately.');
+      }
+    }
   }
 
   // Printer components: per-unit fee by size class; fee paid in advance.

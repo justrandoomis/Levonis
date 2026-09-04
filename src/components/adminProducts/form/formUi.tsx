@@ -248,22 +248,29 @@ export function CheckCard({
   onChange,
   title,
   sub,
+  disabled,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   title: string;
   sub?: string;
+  /** A card whose answer is decided elsewhere: shown, readable, not clickable. */
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={checked}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`min-w-0 text-start rounded-lg border p-2.5 transition-colors ${
+        disabled ? 'opacity-70 cursor-default' : ''
+      } ${
         checked
           ? 'bg-[#6B46FF]/10 border-[#6B46FF]/60'
-          : 'bg-zinc-800/30 border-zinc-700 hover:border-zinc-600'
+          : `bg-zinc-800/30 border-zinc-700 ${disabled ? '' : 'hover:border-zinc-600'}`
       }`}
     >
       <span className="flex items-center gap-2 min-w-0">

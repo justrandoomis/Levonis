@@ -92,8 +92,25 @@ export const DEVICES: TemplateFamilyDef = {
       t('compatibility', 'التوافق', 'Compatibility'),
       t('display', 'الشاشة', 'Display'),
       t('camera', 'الكاميرا', 'Camera', 'select', { options: ['Yes', 'No', 'Optional'] }),
+      /*
+       * The camera's NUMBERS, separate from whether one exists. Two people ask
+       * two different questions — "does it watch the print?" and "can I read a
+       * failure from the timelapse?" — and a single Yes/No answered only the
+       * first. Kept as free text because vendors quote it in incompatible
+       * shapes (1080p, 1920x1080, 3 MP) and normalising them here would be
+       * inventing a spec the box does not carry.
+       */
+      t('camera_resolution', 'دقة الكاميرا', 'Camera resolution', 'text', {
+        hint_ar: 'مثال: 1080p أو 1920×1080',
+      }),
+      t('camera_fps', 'إطارات الكاميرا', 'Camera frame rate', 'number', { unit: 'fps' }),
       t('noise_level', 'مستوى الضجيج', 'Noise level', 'number', { unit: 'dB' }),
       t('slicer_software', 'برامج التقطيع المدعومة', 'Slicer software'),
+      /* The phone/desktop app is a separate answer from the slicer: a machine
+         can be driven by OrcaSlicer and still have no app of its own. */
+      t('companion_app', 'التطبيق المرافق', 'Companion app', 'text', {
+        hint_ar: 'تطبيق الهاتف أو سطح المكتب الخاص بالجهاز، إن وُجد',
+      }),
       t('assembly', 'الحالة عند التسليم', 'Assembly', 'select', {
         options: ['Pre-assembled', 'Partially assembled', 'Kit'],
       }),
@@ -118,6 +135,41 @@ export const DEVICES: TemplateFamilyDef = {
         t('motion_system', 'نظام الحركة', 'Motion system', 'text', { hint_ar: 'مثال: CoreXY أو Bed slinger' }),
         t('filament_diameter', 'قطر الفلامنت', 'Filament diameter', 'text', { unit: 'mm' }),
         t('max_flow_rate', 'أقصى معدل تدفق', 'Max flow rate', 'number', { unit: 'mm³/s' }),
+        /*
+         * The specs a buyer compares two machines by, and the reason this
+         * group grew rather than a new system appearing: they are ordinary
+         * spec rows, so they ride the existing spec_groups storage, the
+         * existing template round-trip and the existing storefront table
+         * without a single new column.
+         */
+        t('max_acceleration', 'أقصى تسارع', 'Maximum acceleration', 'number', { unit: 'mm/s²' }),
+        /* PLURAL, and deliberately not the same field as `nozzle`: that one is
+           the diameter SHIPPED, this is the set the machine accepts. */
+        t('supported_nozzle_sizes', 'مقاسات النوزل المدعومة', 'Supported nozzle sizes', 'text', {
+          unit: 'mm',
+          hint_ar: 'مثال: 0.2 / 0.4 / 0.6 / 0.8',
+        }),
+        t('build_plate', 'سطح الطباعة', 'Build plate', 'text', {
+          hint_ar: 'مثال: PEI مزدوج الوجه، قابل للإزالة',
+        }),
+        t('filament_sensor', 'حساس الفلامنت', 'Filament sensor', 'select', {
+          options: ['Yes', 'No', 'Optional'],
+        }),
+        t('power_loss_recovery', 'الاستئناف بعد انقطاع الكهرباء', 'Power-loss recovery', 'select', {
+          options: ['Yes', 'No'],
+        }),
+        t('input_shaping', 'Input shaping', 'Input shaping', 'select', {
+          options: ['Yes', 'No'],
+        }),
+        /* AMS compatibility is not the same question as `multi_color`: a
+           machine can print multi-colour by hand-swapping and still not take
+           an AMS, and the buyer of an AMS needs the second answer. */
+        t('ams_compatibility', 'التوافق مع AMS', 'AMS compatibility', 'text', {
+          hint_ar: 'مثال: AMS / AMS lite / غير مدعوم',
+        }),
+        t('supported_filaments', 'الفلامنتات المدعومة', 'Supported filaments', 'text', {
+          hint_ar: 'مثال: PLA, PETG, ABS, ASA, TPU, PA-CF',
+        }),
       ],
     },
     'resin-printers': {
@@ -462,4 +514,111 @@ export function fieldsFor(family: 'devices' | 'materials', sectionSlugs: string[
 /** Flat field list, in render/column order. */
 export function flatFields(groups: TemplateGroup[]): TemplateField[] {
   return groups.flatMap((g) => g.fields);
+}
+
+/**
+ * THE SPEC FIELDS, AS THE CUSTOMER SEES THEM.
+ *
+ * Everything above is admin-side: it decides which inputs the form renders and
+ * which columns the import sheet carries. But a spec nobody can read is not a
+ * spec, and the storefront only ever knew how to render `spec_groups` — the
+ * free-form table an admin types by hand — so a printer could have its maximum
+ * acceleration, its supported nozzle sizes and its AMS compatibility filled in
+ * and show the customer none of them.
+ *
+ * This turns the stored `spec_fields` map into exactly that same
+ * `spec_groups` shape, using the family definition for the labels, the unit
+ * and the ORDER. No new storage, no new renderer, no second vocabulary — the
+ * product page's existing specifications table simply receives more groups.
+ *
+ * Both families are searched rather than the product's own, because a field
+ * keeps its value when a product moves between sections (see importApply's
+ * spec-merge rule) and a label is better than a bare key either way. A field
+ * the definitions no longer contain is skipped: it is a leftover, and showing
+ * a raw id like `max_flow_rate` to a customer is worse than showing nothing.
+ *
+ * `exclude` is for values the page already renders its own way — `in_the_box`
+ * is a bullet list under the gallery, and repeating it as a table row would
+ * show the same text twice.
+ */
+export interface DerivedSpecRow {
+  id: string;
+  label_ar: string;
+  label_en: string;
+  label_ckb: string;
+  value_ar: string;
+  value_en: string;
+  value_ckb: string;
+  unit: string;
+  order: number;
+}
+
+export interface DerivedSpecGroup {
+  id: string;
+  title_ar: string;
+  title_en: string;
+  title_ckb: string;
+  order: number;
+  rows: DerivedSpecRow[];
+}
+
+/** Every group of both families, in definition order, deduplicated by id. */
+const ALL_GROUPS: TemplateGroup[] = (() => {
+  const seen = new Set<string>();
+  const out: TemplateGroup[] = [];
+  for (const fam of [DEVICES, MATERIALS]) {
+    for (const g of [fam.common, ...Object.values(fam.sections)]) {
+      if (seen.has(g.id)) continue;
+      seen.add(g.id);
+      out.push(g);
+    }
+  }
+  return out;
+})();
+
+export function specGroupsFromFields(
+  values: Record<string, string> | null | undefined,
+  exclude: readonly string[] = ['in_the_box']
+): DerivedSpecGroup[] {
+  if (!values) return [];
+  const skip = new Set(exclude);
+  const groups: DerivedSpecGroup[] = [];
+  const used = new Set<string>();
+
+  for (const g of ALL_GROUPS) {
+    const rows: DerivedSpecRow[] = [];
+    for (const f of g.fields) {
+      // A field id can legitimately appear in two groups of two families; the
+      // first group that claims it wins, so the value is never shown twice.
+      if (skip.has(f.id) || used.has(f.id)) continue;
+      const raw = values[f.id];
+      if (raw === undefined || String(raw).trim() === '') continue;
+      used.add(f.id);
+      const value = String(raw).trim();
+      rows.push({
+        id: `sf_${f.id}`,
+        label_ar: f.label_ar,
+        label_en: f.label_en,
+        // Values are entered in English only (§3) and the labels have no
+        // Kurdish in the definition, so the English label stands in rather
+        // than a translation nobody wrote.
+        label_ckb: f.label_en,
+        value_ar: value,
+        value_en: value,
+        value_ckb: value,
+        unit: f.unit ?? '',
+        order: rows.length,
+      });
+    }
+    if (rows.length === 0) continue;
+    groups.push({
+      id: `sg_${g.id}`,
+      title_ar: g.label_ar,
+      title_en: g.label_en,
+      title_ckb: g.label_en,
+      order: groups.length,
+      rows,
+    });
+  }
+  return groups;
 }

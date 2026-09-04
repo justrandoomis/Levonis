@@ -444,6 +444,10 @@ export interface CellChange {
   /** The EFFECTIVE price before and after — what a customer would be charged. */
   from_iqd: number | null;
   to_iqd: number | null;
+  /** The stored ADJUSTMENT the cell carried before the change, so undo can put
+   *  an adjustment back as an adjustment instead of pinning it to a number.
+   *  null = the cell was not in adjust mode (or carried no adjustment). */
+  from_adjust: number | null;
   /** The stored value that actually changes, so the writer needs no second pass. */
   write_value: number | null;
   write_adjust: number | null;
@@ -586,6 +590,7 @@ export function previewBulk(
         to_mode: toMode,
         from_iqd: before,
         to_iqd: after,
+        from_adjust: cell.adjust,
         write_value: writeValue,
         write_adjust: writeAdjust,
       });
@@ -693,6 +698,7 @@ export function previewCopy(
         to_mode: from.mode,
         from_iqd: to.effective,
         to_iqd: after,
+        from_adjust: to.adjust,
         write_value: writeValue,
         write_adjust: writeAdjust,
       });

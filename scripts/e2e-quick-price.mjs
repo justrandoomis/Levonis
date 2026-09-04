@@ -648,6 +648,124 @@ async function main() {
     JSON.stringify(rowOf(rg, `option:ov-${rnd}-dir`)?.cells.regular)
   );
 
+  // -------------------------------------------------------------------------
+  console.log('\n16. availability, stock and active change from the SAME drawer');
+  // The owner asked for Direct/Pre-order to be changeable "very fast from the
+  // product list". The prices already were; these three were not.
+  let tg = await grid(admin, relProduct.id);
+  const dirRow = rowOf(tg, `option:ov-${rnd}-dir`);
+  const preRow = rowOf(tg, `option:ov-${rnd}-pre`);
+  check('the grid reports each option\'s route', !!dirRow && !!preRow,
+    JSON.stringify(tg.rows.map((x) => `${x.id}:${x.availability_type}`)));
+  const beforeTypes = query(`SELECT sale_types FROM products WHERE id='${relProduct.id}'`)[0]?.sale_types;
+  check('the product starts mixed', String(beforeTypes).includes('pre_order') && String(beforeTypes).includes('direct_sale'),
+    String(beforeTypes));
+
+  // Flip the pre-order option to direct sale: the product must stop being mixed.
+  r = await admin.call('PATCH', `/api/admin/products/${relProduct.id}/price-grid/traits`, {
+    traits: [{ level: 'option', id: `ov-${rnd}-pre`, field: 'availability_type', value: 'direct_sale' }],
+  });
+  check('the traits patch succeeds', r.status === 200 && r.data?.changed === 1,
+    `${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
+  check('and it re-derives the product\'s sale types', r.data?.sale_types_changed === true,
+    JSON.stringify(r.data?.sale_types));
+  const afterTypes = query(`SELECT sale_types, selling_type FROM products WHERE id='${relProduct.id}'`)[0];
+  check('so the stored product is no longer mixed',
+    !String(afterTypes?.sale_types).includes('pre_order'), JSON.stringify(afterTypes));
+  check('and the scalar follows it', afterTypes?.selling_type === 'direct_sale', String(afterTypes?.selling_type));
+
+  // The inverse the drawer needs for undo.
+  check('the response carries the exact inverse', Array.isArray(r.data?.undo) && r.data.undo.length === 1
+    && r.data.undo[0].value === 'pre_order', JSON.stringify(r.data?.undo));
+  r = await admin.call('PATCH', `/api/admin/products/${relProduct.id}/price-grid/traits`, { traits: r.data.undo });
+  check('applying it puts the route back', r.status === 200 && r.data?.changed === 1, `${r.status}`);
+  const restored = query(`SELECT sale_types FROM products WHERE id='${relProduct.id}'`)[0]?.sale_types;
+  check('and the product is mixed again', String(restored).includes('pre_order') && String(restored).includes('direct_sale'),
+    String(restored));
+
+  // Stock and active, on the same path.
+  r = await admin.call('PATCH', `/api/admin/products/${relProduct.id}/price-grid/traits`, {
+    traits: [
+      { level: 'option', id: `ov-${rnd}-dir`, field: 'stock', value: 7 },
+      { level: 'option', id: `ov-${rnd}-dir`, field: 'active', value: false },
+    ],
+  });
+  check('stock and active change together', r.status === 200 && r.data?.changed === 2, `${r.status}`);
+  const row = query(`SELECT stock, active FROM product_option_values WHERE id='ov-${rnd}-dir'`)[0];
+  check('the stock is written', Number(row?.stock) === 7, JSON.stringify(row));
+  // The bug this pins: the JSON store reads `active !== false`, so a 0 written
+  // as a number would read back as ACTIVE. Both stores must mean the same "off".
+  check('and OFF really means off', Number(row?.active) === 0, JSON.stringify(row));
+  tg = await grid(admin, relProduct.id);
+  check('the grid agrees', rowOf(tg, `option:ov-${rnd}-dir`)?.active === false,
+    JSON.stringify(rowOf(tg, `option:ov-${rnd}-dir`)?.active));
+  // An option switched off stops voting on the sale types, per deriveSaleTypes.
+  const offTypes = query(`SELECT sale_types FROM products WHERE id='${relProduct.id}'`)[0]?.sale_types;
+  check('a switched-off option stops voting on the sale types',
+    !String(offTypes).includes('direct_sale'), String(offTypes));
+
+  // Refusals.
+  r = await admin.call('PATCH', `/api/admin/products/${relProduct.id}/price-grid/traits`, {
+    traits: [{ level: 'product', id: '', field: 'availability_type', value: 'pre_order' }],
+  });
+  check('the product itself has no route to set', r.status === 400 && r.data?.code === 'BAD_LEVEL', `${r.status} ${r.data?.code}`);
+  r = await admin.call('PATCH', `/api/admin/products/${relProduct.id}/price-grid/traits`, {
+    traits: [{ level: 'option', id: `ov-${rnd}-dir`, field: 'stock', value: -3 }],
+  });
+  check('a negative stock is refused', r.status === 400 && r.data?.code === 'BAD_STOCK', `${r.status} ${r.data?.code}`);
+  r = await admin.call('PATCH', `/api/admin/products/${relProduct.id}/price-grid/traits`, {
+    traits: [{ level: 'option', id: `ov-${rnd}-dir`, field: 'availability_type', value: 'someday' }],
+  });
+  check('an unknown route is refused', r.status === 400 && r.data?.code === 'BAD_AVAILABILITY', `${r.status} ${r.data?.code}`);
+
+  // ------------------------------- 17. undo puts an ADJUSTMENT back as one
+  //
+  // price_history stores a price as a number, and a number cannot tell an
+  // inherited 950,000 from a pinned 950,000 from a +50,000 adjustment. Undo
+  // used to re-derive the mode from that number and always wrote
+  // write_adjust: null, so undoing a bulk change on an adjusted cell PINNED
+  // it: the difference stopped following the base price, silently, on the one
+  // action an admin presses when something has just gone wrong. 0046 records
+  // the mode, so undo restores it instead of guessing.
+  console.log('\n17. undo restores the MODE, not just the number');
+  await admin.patch(`/api/admin/products/${productId}/price-grid`, {
+    cells: [{ level: 'option', id: `${slug}-combo-dir`, field: 'regular', mode: 'adjust', value: 40000 }],
+  });
+  let g17 = await grid(admin, productId);
+  const adjCell = () => rowOf(g17, `option:${slug}-combo-dir`)?.cells.regular;
+  check('the cell is an adjustment to start with',
+    adjCell()?.mode === 'adjust' && adjCell()?.adjust === 40000, JSON.stringify(adjCell()));
+  const baseBefore = adjCell()?.inherited;
+
+  r = await admin.post(`/api/admin/products/${productId}/price-grid/bulk`, {
+    op: 'add', value: 15000, fields: ['regular'], levels: ['option'], apply: true,
+  });
+  const bulkBatch = r.data?.batch_id;
+  check('a bulk move over it succeeds', r.status === 200 && !!bulkBatch, `${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
+
+  r = await admin.post(`/api/admin/products/${productId}/price-grid/undo`, { batch_id: bulkBatch });
+  check('the undo succeeds', r.status === 200 && r.data?.changed > 0, `${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
+
+  g17 = await grid(admin, productId);
+  check('the cell is an ADJUSTMENT again, not a pinned number',
+    adjCell()?.mode === 'adjust', `mode=${adjCell()?.mode} value=${adjCell()?.value} adjust=${adjCell()?.adjust}`);
+  check('with the same difference it had', adjCell()?.adjust === 40000, `adjust=${adjCell()?.adjust}`);
+  check('and the stored fixed value is cleared, so it still follows the base',
+    adjCell()?.value === null, `value=${adjCell()?.value}`);
+  check('the effective price is back where it started',
+    adjCell()?.effective === (baseBefore ?? 0) + 40000,
+    `effective=${adjCell()?.effective} base=${baseBefore}`);
+
+  // The point of an adjustment is that it MOVES when the base moves. The new
+  // base is deliberately far from where the cell sat, so a cell that had been
+  // PINNED by the undo cannot pass this by arithmetic coincidence.
+  await admin.patch(`/api/admin/products/${productId}/price-grid`, {
+    cells: [{ level: 'product', id: '', field: 'regular', mode: 'fixed', value: 1250000 }],
+  });
+  g17 = await grid(admin, productId);
+  check('and it still follows the base after the base changes',
+    adjCell()?.effective === 1250000 + 40000, `effective=${adjCell()?.effective}`);
+
   report();
 }
 

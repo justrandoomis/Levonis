@@ -114,6 +114,22 @@ interface SaveResponse {
   guards?: Guard[];
 }
 
+/** What PATCH /price-grid/traits answers. `undo` is the exact inverse batch. */
+interface TraitPatch {
+  level: 'option' | 'color';
+  id: string;
+  field: 'availability_type' | 'stock' | 'active';
+  value: unknown;
+}
+
+interface TraitsResponse {
+  changed: number;
+  rows: Row[];
+  undo: TraitPatch[];
+  sale_types: string[];
+  sale_types_changed?: boolean;
+}
+
 // ------------------------------------------------------------------ strings
 
 const STRINGS = {
@@ -192,6 +208,13 @@ const STRINGS = {
     shorthandHint: '950K أو 1.25M مقبولة',
     costHidden: 'التكلفة غير متاحة لحسابك',
     stock: 'المخزون',
+    route: 'طريقة البيع',
+    followProduct: 'يتبع المنتج',
+    activeOn: 'مفعّل',
+    activeOff: 'موقوف',
+    stockUntracked: 'غير محسوب',
+    saleTypesDerived: (types: string) => `تم تحديث نوع البيع للمنتج: ${types}`,
+    mixedSale: 'مختلط (مباشر + مسبق)',
   },
   en: {
     title: 'Quick price edit',
@@ -268,12 +291,29 @@ const STRINGS = {
     shorthandHint: '950K and 1.25M are accepted',
     costHidden: 'Cost is not available to your account',
     stock: 'Stock',
+    route: 'Sold as',
+    followProduct: 'Follow the product',
+    activeOn: 'Active',
+    activeOff: 'Off',
+    stockUntracked: 'Untracked',
+    saleTypesDerived: (types: string) => `The product's selling type is now: ${types}`,
+    mixedSale: 'Mixed (direct + pre-order)',
   },
 };
 
 // ------------------------------------------------------------------ helpers
 
 const rowKey = (r: { level: Level; id: string }) => `${r.level}:${r.id}`;
+
+/** The derived selling type, in words. Nothing stores "mixed" — it is the
+ *  name for a product whose options answer both ways (worker/lib/availability). */
+const saleTypesText = (t: Strings, types: readonly string[]): string => {
+  const pre = types.includes('pre_order');
+  const direct = types.includes('direct_sale') || types.includes('bundle');
+  if (pre && direct) return t.mixedSale;
+  if (pre) return t.preOrder;
+  return t.directSale;
+};
 const cellKey = (r: { level: Level; id: string }, f: Field) => `${rowKey(r)}:${f}`;
 
 /**
@@ -347,6 +387,12 @@ export default function QuickPricePanel({
   const [toast, setToast] = useState('');
   const [guards, setGuards] = useState<Guard[]>([]);
   const [lastBatch, setLastBatch] = useState('');
+  /**
+   * Traits are not prices, so they are not in price_history and have no
+   * batch_id — the endpoint hands back the exact inverse instead. Undo has one
+   * button, so it undoes whichever of the two happened LAST.
+   */
+  const [lastTraits, setLastTraits] = useState<TraitPatch[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
 
   const dirtyCount = Object.keys(draft).length;
@@ -406,6 +452,7 @@ export default function QuickPricePanel({
         setDraft({});
         setGuards([]);
         setLastBatch(res.batch_id || '');
+        setLastTraits([]);
         setToast(res.changed ? t.saved(res.changed) : t.nothing);
         if (res.changed) onChanged?.();
       } catch (e) {
@@ -421,11 +468,65 @@ export default function QuickPricePanel({
     [buildCells, onChanged, productId, t]
   );
 
+  /**
+   * Availability / stock / active, from the same drawer as the prices.
+   *
+   * These write through PATCH /price-grid/traits, which re-derives the
+   * product's sale_types from what its options will say AFTER the change —
+   * §2's rule that the selling type is a CONCLUSION, never a choice. It is
+   * deliberately NOT the relations PUT: that one rewrites the whole option
+   * tree, and a drawer sending a partial body would delete it.
+   *
+   * A trait applies immediately. There is no dirty state for it because
+   * "moved this variant to pre-order" is one decision, not part of a price
+   * edit the admin is still composing — and the undo button takes it back.
+   */
+  const patchTraits = useCallback(
+    async (traits: TraitPatch[]) => {
+      if (traits.length === 0) return;
+      setSaving(true);
+      setError('');
+      try {
+        const res = await api.patch<TraitsResponse>(
+          `/api/admin/products/${productId}/price-grid/traits`,
+          { traits }
+        );
+        if (res.rows) setData((d) => (d ? { ...d, rows: res.rows, product: { ...d.product, sale_types: res.sale_types } } : d));
+        setLastTraits(res.undo ?? []);
+        setLastBatch('');
+        setToast(
+          res.changed === 0
+            ? t.nothing
+            : res.sale_types_changed
+              ? t.saleTypesDerived(saleTypesText(t, res.sale_types))
+              : t.saved(res.changed)
+        );
+        if (res.changed) onChanged?.();
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : 'error');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onChanged, productId, t]
+  );
+
   const undo = useCallback(async () => {
-    if (!lastBatch) return;
     setSaving(true);
     setError('');
     try {
+      if (lastTraits.length > 0) {
+        const res = await api.patch<TraitsResponse>(
+          `/api/admin/products/${productId}/price-grid/traits`,
+          { traits: lastTraits }
+        );
+        if (res.rows) setData((d) => (d ? { ...d, rows: res.rows, product: { ...d.product, sale_types: res.sale_types } } : d));
+        setLastTraits([]);
+        setToast(`${t.undone} (${res.changed})`);
+        onChanged?.();
+        return;
+      }
+      if (!lastBatch) return;
       const res = await api.post<SaveResponse>(`/api/admin/products/${productId}/price-grid/undo`, { batch_id: lastBatch });
       if (res.rows) setData((d) => (d ? { ...d, rows: res.rows } : d));
       setLastBatch('');
@@ -436,7 +537,7 @@ export default function QuickPricePanel({
     } finally {
       setSaving(false);
     }
-  }, [lastBatch, onChanged, productId, t]);
+  }, [lastBatch, lastTraits, onChanged, productId, t]);
 
   // Enter saves everything pending. Escape throws it away — but only the
   // dialog can hear Escape (it stops the key in the capture phase), so that
@@ -524,6 +625,8 @@ export default function QuickPricePanel({
           selected={selected}
           setSelected={setSelected}
           minMargin={data.min_margin_percent}
+          onTrait={(patches) => void patchTraits(patches)}
+          busy={saving}
         />
       )}
       {tab === 'bulk' && (
@@ -590,7 +693,7 @@ export default function QuickPricePanel({
               <X className="w-3.5 h-3.5" /> {t.cancel}
             </button>
           )}
-          {lastBatch && dirtyCount === 0 && (
+          {(lastBatch || lastTraits.length > 0) && dirtyCount === 0 && (
             <button type="button" className={T.btnGhostSm} data-qp="undo" onClick={() => void undo()} disabled={saving}>
               <RotateCcw className="w-3.5 h-3.5" /> {t.undo}
             </button>
@@ -624,6 +727,8 @@ function GridTab({
   selected,
   setSelected,
   minMargin,
+  onTrait,
+  busy,
 }: {
   t: Strings;
   rows: Row[];
@@ -633,6 +738,8 @@ function GridTab({
   selected: string[];
   setSelected: React.Dispatch<React.SetStateAction<string[]>>;
   minMargin: number | null;
+  onTrait?: (patches: TraitPatch[]) => void;
+  busy?: boolean;
 }) {
   const toggle = (key: string) =>
     setSelected((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
@@ -669,7 +776,7 @@ function GridTab({
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <RowLabel t={t} row={r} />
+                  <RowLabel t={t} row={r} onTrait={onTrait} busy={busy} />
                 </td>
                 {fields.map((f) => (
                   <td key={f} className="px-2 py-2">
@@ -691,7 +798,7 @@ function GridTab({
         {rows.map((r) => (
           <div key={rowKey(r)} data-qp-card={rowKey(r)} className={`${T.surface} p-3`}>
             <div className="flex items-start justify-between gap-2">
-              <RowLabel t={t} row={r} />
+              <RowLabel t={t} row={r} onTrait={onTrait} busy={busy} />
               {r.level !== 'product' && (
                 <input
                   type="checkbox"
@@ -720,9 +827,36 @@ function GridTab({
   );
 }
 
-function RowLabel({ t, row }: { t: Strings; row: Row }) {
+/**
+ * The row's identity AND the three things about it that are not prices.
+ *
+ * Availability, stock and active used to be read-only here, so moving one
+ * variant from pre-order to direct sale meant leaving the drawer and opening
+ * the eight-section product form — the round trip this drawer exists to
+ * remove. They write through PATCH /price-grid/traits, which re-derives the
+ * product's sale types from its options; the admin never types "mixed".
+ *
+ * `variant_label` stays TEXT, never a control: it is the link between the A1
+ * and the A1 Combo rows and it is edited where variants are, in the form.
+ */
+function RowLabel({
+  t,
+  row,
+  onTrait,
+  busy,
+}: {
+  t: Strings;
+  row: Row;
+  onTrait?: (patches: TraitPatch[]) => void;
+  busy?: boolean;
+}) {
   const availability =
     row.availability_type === 'direct_sale' ? t.directSale : row.availability_type === 'pre_order' ? t.preOrder : '';
+  const editable = !!onTrait && row.level !== 'product';
+  const level = row.level as 'option' | 'color';
+  const send = (field: TraitPatch['field'], value: unknown) =>
+    onTrait?.([{ level, id: row.id, field, value }]);
+
   return (
     <div className="min-w-0">
       <p className="text-[13px] font-semibold text-[var(--ap-text-1)] truncate" dir="auto">
@@ -733,16 +867,111 @@ function RowLabel({ t, row }: { t: Strings; row: Row }) {
           />
         )}
         {row.level === 'product' ? t.base : row.label_ar || row.label_en}
-        {!row.active && <span className={`${T.kbdTiny} ms-1.5`}>{t.inactive}</span>}
+        {!editable && !row.active && <span className={`${T.kbdTiny} ms-1.5`}>{t.inactive}</span>}
       </p>
-      {(row.variant_label || availability || row.stock !== null) && (
+
+      {!editable && (row.variant_label || availability || row.stock !== null) && (
         <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5 truncate">
           {[row.variant_label, availability, row.stock === null ? '' : `${t.stock}: ${row.stock}`]
             .filter(Boolean)
             .join(' · ')}
         </p>
       )}
+
+      {editable && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5" data-qp-traits={rowKey(row)}>
+          {row.variant_label && <span className={T.kbdTiny}>{row.variant_label}</span>}
+
+          {/* Only an option carries a fulfilment route; a colour inherits the
+              option it hangs from, so it is not offered one. */}
+          {row.level === 'option' && (
+            <select
+              className={`${T.selectSm} h-7 px-1.5`}
+              value={row.availability_type}
+              disabled={busy}
+              data-qp-availability={row.id}
+              aria-label={t.route}
+              onChange={(e) => send('availability_type', e.target.value)}
+            >
+              <option value="">{t.followProduct}</option>
+              <option value="direct_sale">{t.directSale}</option>
+              <option value="pre_order">{t.preOrder}</option>
+            </select>
+          )}
+
+          <StockTrait t={t} row={row} busy={busy} onCommit={(v) => send('stock', v)} />
+
+          <button
+            type="button"
+            className={`${T.chip} h-7 px-2 text-[11px]`}
+            aria-pressed={row.active}
+            disabled={busy}
+            data-qp-active={rowKey(row)}
+            onClick={() => send('active', !row.active)}
+          >
+            {row.active ? t.activeOn : t.activeOff}
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+/**
+ * Stock as a number the admin types, where EMPTY IS A REAL ANSWER: it means
+ * "we do not count these", which is not the same as zero ("sold out"). The
+ * input is uncontrolled between edits so a slow round trip cannot swallow a
+ * digit; it re-syncs whenever the server's value changes.
+ */
+function StockTrait({
+  t,
+  row,
+  busy,
+  onCommit,
+}: {
+  t: Strings;
+  row: Row;
+  busy?: boolean;
+  onCommit: (value: number | null) => void;
+}) {
+  const stored = row.stock === null ? '' : String(row.stock);
+  const [text, setText] = useState(stored);
+  useEffect(() => setText(stored), [stored]);
+
+  const commit = () => {
+    const trimmed = text.trim();
+    if (trimmed === '') {
+      if (row.stock !== null) onCommit(null);
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isInteger(n) || n < 0) {
+      setText(stored);
+      return;
+    }
+    if (n !== row.stock) onCommit(n);
+  };
+
+  return (
+    <label className="inline-flex items-center gap-1 text-[11px] text-[var(--ap-text-3)]">
+      <span>{t.stock}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        className={`${T.input} h-7 w-16 px-1.5 text-[11px] text-center`}
+        value={text}
+        disabled={busy}
+        placeholder={t.stockUntracked}
+        data-qp-stock={rowKey(row)}
+        aria-label={`${t.stock} — ${row.label_ar || row.label_en}`}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') setText(stored);
+        }}
+      />
+    </label>
   );
 }
 

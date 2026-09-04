@@ -29,6 +29,7 @@ import {
   variantKeyFrom,
   variantLabelFallback,
 } from './availability';
+import { specGroupsFromFields } from './templateFamilies';
 
 export const DOC_VERSION = 2;
 
@@ -951,9 +952,24 @@ export function projectAdmin(doc: ProductDoc) {
   return doc;
 }
 
+/**
+ * Removes EVERY cost field, not just the one that existed when this was
+ * written.
+ *
+ * 0044 added `cost_adjust_iqd` and this stripper did not learn about it, so a
+ * signed cost move was served to anyone who opened a product page — the shop's
+ * margin, in the public payload. Naming the two explicitly and destructuring
+ * both is what fixes it today; the `COST_KEYS` list is what stops the next
+ * cost column repeating the mistake, because
+ * tests/publicProjection.test.ts asserts the projection carries no key
+ * containing "cost" at all.
+ */
+const COST_KEYS = ['cost_iqd', 'cost_adjust_iqd'] as const;
+
 const stripCostFields = <T extends PriceFields>(x: T) => {
-  const { cost_iqd, ...rest } = x;
-  return rest;
+  const rest = { ...x } as Record<string, unknown>;
+  for (const k of COST_KEYS) delete rest[k];
+  return rest as Omit<T, (typeof COST_KEYS)[number]>;
 };
 
 /**
@@ -992,7 +1008,19 @@ export function projectPublic(doc: ProductDoc) {
     images: doc.media.map((m) => m.url), // legacy string[] compatibility
     options: doc.options.filter((o) => o.active).map(stripCostFields),
     colors: doc.colors.filter((c) => c.active).map(stripCostFields),
-    spec_groups: doc.spec_groups,
+    /**
+     * The hand-typed groups first, then the family's own filled-in fields
+     * (printer specs: maximum acceleration, supported nozzle sizes, build
+     * plate, filament sensor, power-loss recovery, input shaping, camera
+     * resolution/FPS, AMS compatibility, supported filaments, slicer/app).
+     *
+     * They were storable, importable and exportable but invisible: the
+     * storefront's specifications table renders `spec_groups` and nothing
+     * read `spec_fields` except the in-the-box bullet list. Deriving them
+     * here, in the same shape, means the page needed no new renderer and the
+     * admin needed no second place to type a spec.
+     */
+    spec_groups: [...doc.spec_groups, ...specGroupsFromFields(doc.spec_fields)],
     labels: doc.labels.filter((l) => l.visible),
     warranty_plans: doc.warranty_plans.filter((w) => w.active),
     content_blocks: doc.content_blocks,

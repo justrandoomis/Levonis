@@ -369,6 +369,39 @@ async function loadProductDoc(db: D1Database, id: string): Promise<ProductDoc | 
   return row ? parseProductRow(row) : null;
 }
 
+/**
+ * DOES THIS PRODUCT KEEP ITS STRUCTURE IN THE RELATIONAL TABLES?
+ *
+ * The TXT template is a JSON-column format: it reads `products` and writes
+ * `products`, and its options/colours land in the JSON mirrors. Every product
+ * built in the current admin form stores its option tree, colours and images
+ * in product_option_values / product_colors / product_images instead, and the
+ * storefront, the cart, the quote and the price grid all read THOSE whenever
+ * they exist (worker/lib/productOverlay.ts applyRelations).
+ *
+ * So for such a product the TXT path would export an empty option list and
+ * "apply" an option tree into a column nothing reads — reporting "applied, N
+ * fields" while the customer's price does not move. That is worse than a
+ * refusal, so the structure keys are refused and the CSV/ZIP path, which does
+ * write the relational tables, is named instead. The scalar fields (names,
+ * description, prices, classification) are unaffected either way.
+ */
+async function hasRelationalStructure(db: D1Database, productId: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM product_option_values v
+            JOIN product_option_groups g ON g.id = v.group_id WHERE g.product_id = ?) AS values_n,
+         (SELECT COUNT(*) FROM product_colors WHERE product_id = ?) AS colors_n`
+    )
+    .bind(productId, productId)
+    .first<{ values_n: number; colors_n: number }>();
+  return (row?.values_n ?? 0) > 0 || (row?.colors_n ?? 0) > 0;
+}
+
+/** The template keys that describe structure rather than scalar fields. */
+const STRUCTURE_GROUPS = ['options', 'colors'] as const;
+
 /** Resolves brand/catalog slug-or-id references against the DB. Unknown
  *  values become needs_review entries — the change is withheld entirely
  *  (no partial catalog list, no silently created brand). */
@@ -936,6 +969,26 @@ templateRoutes.post('/apply', async (c) => {
         409
       );
     }
+    // A product whose structure lives in the relational tables cannot be
+    // updated through this format without lying about what happened.
+    if (await hasRelationalStructure(c.env.DB, existing.id)) {
+      const touched = STRUCTURE_GROUPS.filter(
+        (g) => (a.parsed.groups[g]?.length ?? 0) > 0 || !!a.parsed.groupClears[g]
+      );
+      if (touched.length > 0) {
+        throw badRequest(
+          `هذا المنتج يحفظ خياراته وألوانه في الجداول العلائقية، ولا يستطيع قالب TXT الكتابة فيها. ` +
+            `احذف مفاتيح (${touched.join('، ')}) من الملف — بقية الحقول تُطبَّق كالمعتاد — ` +
+            `أو استخدم استيراد CSV/ZIP الذي يكتب هذه الجداول فعلاً.`,
+          'TXT_CANNOT_WRITE_RELATIONS'
+        );
+      }
+      warnings.push(
+        'خيارات وألوان هذا المنتج مخزّنة في الجداول العلائقية ولم يصدّرها هذا الملف؛ ' +
+          'التعديلات المطبَّقة هنا تخصّ الحقول الأساسية فقط.'
+      );
+    }
+
     doc.id = existing.id;
     if (!doc.slug) doc.slug = existing.slug; // slug stability (toDocBody enforces allow_slug_change)
 

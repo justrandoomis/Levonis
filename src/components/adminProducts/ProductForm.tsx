@@ -381,6 +381,67 @@ export default function ProductForm({
   const errorList = Object.values(errors);
   const err = (k: string) => (showErrors ? (errors[k] ?? null) : null);
 
+  /**
+   * 0043 — THE SALE TYPES ARE READ OFF THE OPTIONS, HERE TOO.
+   *
+   * `worker/lib/availability.ts` already derives the product's sale types from
+   * its options and lets the options WIN whenever any of them declares one.
+   * This form, though, still asked the admin to tick the same answer by hand,
+   * which meant the screen could show "direct sale" while the saved product
+   * was a pre-order — the checkbox was a lie the moment an option disagreed
+   * with it, and it made the admin choose "both" for a mix the options had
+   * already described.
+   *
+   * So the checkboxes stand down as soon as any ACTIVE option has an opinion,
+   * and what is shown is what the server will conclude. The rule and its order
+   * are the server's, copied deliberately rather than invented: an option that
+   * is switched off is not consulted, and `bundle` is a catalogue label that no
+   * option ever claims, so it survives whatever the options say.
+   *
+   * A product with no options at all keeps the manual choice, because that is
+   * the only place its route can come from — and that is every product written
+   * before options carried an availability type.
+   */
+  const optionSaleTypes = (() => {
+    const declared = new Set<SaleType>();
+    for (const g of rel.groups) {
+      for (const v of g.values) {
+        if (v.active === false) continue;
+        if (v.availability_type === 'direct_sale' || v.availability_type === 'pre_order') {
+          declared.add(v.availability_type);
+        }
+      }
+    }
+    return declared;
+  })();
+  const saleTypesAreDerived = optionSaleTypes.size > 0;
+  const derivedSaleTypes: SaleType[] = saleTypesAreDerived
+    ? (SALE_TYPES.map((t) => t.id).filter((id) => optionSaleTypes.has(id)) as SaleType[])
+    : [];
+
+  /**
+   * Keep the saved document equal to what the server will derive, so the
+   * summary line, the surcharge panels below and the eventual save all agree.
+   * `bundle` is preserved: it is not a fulfilment route.
+   */
+  useEffect(() => {
+    if (!saleTypesAreDerived) return;
+    setDoc((d) => {
+      const keptBundle = d.sale_types.includes('bundle' as SaleType) ? ['bundle' as SaleType] : [];
+      const next = [...derivedSaleTypes, ...keptBundle];
+      const same = next.length === d.sale_types.length && next.every((t, i) => d.sale_types[i] === t);
+      if (same) return d;
+      return {
+        ...d,
+        sale_types: next as EditorDoc['sale_types'],
+        selling_type: (next[0] ?? 'direct_sale') as EditorDoc['selling_type'],
+      };
+    });
+    // derivedSaleTypes is rebuilt every render from rel; comparing its join
+    // keeps this to the transitions that actually change the answer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saleTypesAreDerived, derivedSaleTypes.join(',')]);
+
   const setSale = (t: SaleType, on: boolean) =>
     setDoc((d) => {
       const next = on ? [...new Set([...d.sale_types, t])] : d.sale_types.filter((x) => x !== t);
@@ -908,13 +969,26 @@ export default function ProductForm({
               checked={doc.sale_types.includes(t.id)}
               onChange={(on) => setSale(t.id, on)}
               title={t.ar}
-              sub={t.sub}
+              sub={saleTypesAreDerived ? 'من الخيارات' : t.sub}
+              disabled={saleTypesAreDerived}
             />
           ))}
         </div>
-        <p className="text-[11px] text-zinc-500 mb-3">
-          يمكن تفعيل النوعين معًا. الافتراضي للعميل: بيع مباشر عند توفر المخزون، وإلا الطلب المسبق.
-        </p>
+        {saleTypesAreDerived ? (
+          <p className="text-[11px] text-zinc-400 mb-3" data-form="sale-types-derived">
+            نوع البيع مأخوذ من خياراتك تلقائيًا:{' '}
+            <b className="text-zinc-200">
+              {derivedSaleTypes.map((t) => SALE_TYPES.find((s) => s.id === t)?.ar ?? t).join(' + ')}
+            </b>
+            {derivedSaleTypes.length > 1 ? ' (مختلط)' : ''} — لتغييره، غيّر «نوع التوفر» داخل الخيارات
+            في قسم ٥. لا حاجة لاختيار «مختلط» يدويًا.
+          </p>
+        ) : (
+          <p className="text-[11px] text-zinc-500 mb-3">
+            يمكن تفعيل النوعين معًا. الافتراضي للعميل: بيع مباشر عند توفر المخزون، وإلا الطلب المسبق.
+            وإذا حدّدت «نوع التوفر» داخل الخيارات، فسيُشتق النوع منها تلقائيًا.
+          </p>
+        )}
 
         {/* Availability pricing — the owner's model: immediacy has a price
             the way each journey has one. Direct +X, and each pre-order

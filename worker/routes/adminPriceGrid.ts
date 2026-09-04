@@ -5,7 +5,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
-import { normalizeAvailability, type AvailabilityType } from '../lib/availability';
+import { normalizeAvailability, deriveSaleTypes, type AvailabilityType } from '../lib/availability';
+import { normalizeSaleTypes } from '../lib/productModel';
 import { ADJUST_OF } from '../lib/pricing';
 import {
   buildGrid,
@@ -27,6 +28,7 @@ import {
   type GridRow,
   type Level,
 } from '../lib/priceGrid';
+import type { PriceMode } from '../lib/pricing';
 
 /**
  * QUICK EDIT — one product's whole price table, read and written in a single
@@ -236,7 +238,17 @@ interface Write {
   level: Level;
   id: string;
   column: string;
-  value: number | null;
+  /**
+   * Traits widened this from `number | null`: availability is a string and
+   * `active` is a boolean.
+   *
+   * A BOOLEAN IS CARRIED AS A BOOLEAN ON PURPOSE. The two stores disagree about
+   * how "off" is spelled: the relational tables hold INTEGER 0/1, while the
+   * JSON column is read with `o.active !== false`, under which the integer 0 is
+   * TRUTHY and an option switched off would come back on. So the value stays a
+   * boolean here and each branch of {@link applyWrites} spells it its own way.
+   */
+  value: number | string | boolean | null;
 }
 
 /** A history row, in the shape price_history has held since 0003. */
@@ -245,6 +257,9 @@ interface HistoryRow {
   field: Field;
   old_iqd: number | null;
   new_iqd: number | null;
+  /** 0046 — what the cell WAS, so undo restores it rather than guessing. */
+  old_mode: PriceMode;
+  old_adjust_iqd: number | null;
 }
 
 const historyKeyOf = (level: Level, id: string) => (level === 'product' ? '' : `${level}:${id}`);
@@ -282,6 +297,8 @@ function planWrites(changes: CellChange[]): { writes: Write[]; history: HistoryR
       field: ch.field,
       old_iqd: ch.from_iqd,
       new_iqd: ch.to_iqd,
+      old_mode: ch.from_mode,
+      old_adjust_iqd: ch.from_adjust,
     });
   }
   return { writes, history };
@@ -308,13 +325,16 @@ function applyWrites(
 ): D1PreparedStatement[] {
   const stmts: D1PreparedStatement[] = [];
 
+  /** D1 cannot bind a boolean; SQLite's own spelling of it is 1 and 0. */
+  const forSql = (v: Write['value']) => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
+
   const productCols = writes.filter((w) => w.level === 'product');
   if (productCols.length) {
     const sets = productCols.map((w) => `${w.column} = ?`).join(', ');
     stmts.push(
       db
         .prepare(`UPDATE products SET ${sets}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`)
-        .bind(...productCols.map((w) => w.value), productId)
+        .bind(...productCols.map((w) => forSql(w.value)), productId)
     );
   }
 
@@ -336,7 +356,7 @@ function applyWrites(
       stmts.push(
         db
           .prepare(`UPDATE ${TABLE_OF[level]} SET ${sets} WHERE id = ? AND product_id = ?`)
-          .bind(...group.map((w) => w.value), id, productId)
+          .bind(...group.map((w) => forSql(w.value)), id, productId)
       );
     }
   } else if (byRow.size) {
@@ -388,9 +408,11 @@ function historyStatements(
   return rows.map((h) =>
     db
       .prepare(
-        'INSERT INTO price_history (product_id, variant_key, field, old_iqd, new_iqd, changed_by, batch_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        `INSERT INTO price_history
+           (product_id, variant_key, field, old_iqd, new_iqd, changed_by, batch_id, old_mode, old_adjust_iqd)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(productId, h.variant_key, h.field, h.old_iqd, h.new_iqd, actorId, batchId)
+      .bind(productId, h.variant_key, h.field, h.old_iqd, h.new_iqd, actorId, batchId, h.old_mode, h.old_adjust_iqd)
   );
 }
 
@@ -603,6 +625,7 @@ adminPriceGridRoutes.patch('/:id/price-grid', async (c) => {
       to_mode: p.mode,
       from_iqd: cell.effective,
       to_iqd: after,
+      from_adjust: cell.adjust,
       write_value: writeValue,
       write_adjust: writeAdjust,
     });
@@ -682,6 +705,198 @@ const BULK_OPS: BulkOp[] = ['add', 'subtract', 'add_percent', 'subtract_percent'
  * and the write are provably the same computation over the same input: the
  * apply path calls previewBulk and writes exactly what it returned.
  */
+// ---------------------------------------------------------------- traits
+//
+// The three answers about a row that are NOT prices: what fulfilment route it
+// is, how many there are, and whether it is on sale at all.
+
+type TraitField = 'availability_type' | 'stock' | 'active';
+const TRAIT_FIELDS: TraitField[] = ['availability_type', 'stock', 'active'];
+
+interface TraitPatch {
+  level: Exclude<Level, 'product'>;
+  id: string;
+  field: TraitField;
+  value: unknown;
+}
+
+interface TraitChange {
+  level: Exclude<Level, 'product'>;
+  id: string;
+  label: string;
+  field: TraitField;
+  before: string | number | boolean | null;
+  after: string | number | boolean | null;
+}
+
+/**
+ * Change availability / stock / active from the SAME drawer as the prices.
+ *
+ * WHY IT IS NOT A CELL. The price grid's cells are money: they carry an
+ * inherit/adjust/fixed mode, a guard against selling under cost, and a row in
+ * `price_history`. None of that is true of "is this option a pre-order". Trying
+ * to force availability through the cell path would have meant either a mode
+ * that means nothing or a history table with a text column bolted on — so this
+ * is a sibling list on the same request, sharing the same load, the same
+ * authorisation and the same audit line.
+ *
+ * WHY IT REDERIVES sale_types. `products.sale_types` is read off the options
+ * (worker/lib/availability.ts), and everything downstream — the storefront's
+ * chooser, the cart's stage set, the pre-order transports — reads THAT. The
+ * price grid writes option columns directly, so without this an admin could
+ * flip an option to pre-order here and leave a product that still called
+ * itself direct sale. The recomputation happens in the same batch as the
+ * write, so the two can never be half-applied.
+ *
+ * WHY THE UNDO IS RETURNED, NOT STORED. `price_history` is a price log with
+ * INTEGER columns; a fulfilment route is not a price and does not belong in
+ * it. The response carries the exact inverse patch instead, which is what the
+ * drawer needs to offer "undo" and is honest about its lifetime: it lasts as
+ * long as the screen does, and the audit line is the durable record.
+ */
+adminPriceGridRoutes.patch('/:id/price-grid/traits', async (c) => {
+  const admin = c.get('user')!;
+  const productId = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const raw = Array.isArray(body.traits) ? body.traits : [];
+  if (raw.length === 0) throw badRequest('No traits to change', 'NO_TRAITS');
+  if (raw.length > 500) throw badRequest('Too many traits in one request', 'TOO_MANY_TRAITS');
+
+  const patches: TraitPatch[] = [];
+  for (const item of raw as Array<Record<string, unknown>>) {
+    const level = String(item.level ?? '');
+    if (level !== 'option' && level !== 'color') {
+      // The product itself has no availability of its own to set here: it is
+      // the CONCLUSION of its options, and `status` is a different question
+      // answered by the product form.
+      throw badRequest(`Traits are per option or colour, not ${String(item.level)}`, 'BAD_LEVEL');
+    }
+    const field = String(item.field ?? '') as TraitField;
+    if (!TRAIT_FIELDS.includes(field)) throw badRequest(`Unknown trait: ${String(item.field)}`, 'BAD_TRAIT');
+    if (field === 'availability_type' && level !== 'option') {
+      throw badRequest('Only an option carries a fulfilment route', 'AVAILABILITY_IS_PER_OPTION');
+    }
+    patches.push({ level, id: String(item.id ?? ''), field, value: item.value });
+  }
+
+  const loaded = await loadProduct(c.env.DB, productId);
+  const rows = buildGrid(loaded.input);
+  const byKey = new Map(rows.map((r) => [`${r.level}:${r.id}`, r]));
+
+  const writes: Write[] = [];
+  const changes: TraitChange[] = [];
+  const undo: Array<{ level: string; id: string; field: TraitField; value: unknown }> = [];
+  const nextAvailability = new Map<string, AvailabilityType>();
+
+  for (const p of patches) {
+    const row = byKey.get(`${p.level}:${p.id}`);
+    if (!row) throw badRequest(`No such row in this product: ${p.level}:${p.id}`, 'ROW_NOT_FOUND');
+    const label = row.label_ar || row.label_en || row.id;
+
+    if (p.field === 'availability_type') {
+      const before = row.availability_type;
+      // '' is a real answer, not a missing one: it means "inherit whatever the
+      // product says", which is what every option written before 0043 does.
+      const after: AvailabilityType = p.value === '' || p.value === null || p.value === undefined
+        ? ''
+        : normalizeAvailability(p.value);
+      if (after === '' && p.value !== '' && p.value !== null && p.value !== undefined) {
+        throw badRequest(`${label}: unknown availability "${String(p.value)}"`, 'BAD_AVAILABILITY');
+      }
+      if (before === after) continue;
+      writes.push({ level: p.level, id: p.id, column: 'availability_type', value: after });
+      changes.push({ level: p.level, id: p.id, label, field: p.field, before, after });
+      undo.push({ level: p.level, id: p.id, field: p.field, value: before });
+      nextAvailability.set(p.id, after);
+      continue;
+    }
+
+    if (p.field === 'stock') {
+      const before = row.stock;
+      let after: number | null;
+      if (p.value === null || p.value === undefined || p.value === '') {
+        // Empty means UNTRACKED, which is not the same as zero — zero is "sold
+        // out", untracked is "we do not count these".
+        after = null;
+      } else {
+        const parsed = Number(p.value);
+        if (!Number.isInteger(parsed) || parsed < 0) {
+          throw badRequest(`${label}: stock must be a whole number of pieces, or empty`, 'BAD_STOCK');
+        }
+        after = parsed;
+      }
+      if (before === after) continue;
+      writes.push({ level: p.level, id: p.id, column: 'stock', value: after });
+      changes.push({ level: p.level, id: p.id, label, field: p.field, before, after });
+      undo.push({ level: p.level, id: p.id, field: p.field, value: before });
+      continue;
+    }
+
+    const before = row.active;
+    const after = p.value === true || p.value === 1 || p.value === '1' || p.value === 'true';
+    if (before === after) continue;
+    writes.push({ level: p.level, id: p.id, column: 'active', value: after });
+    changes.push({ level: p.level, id: p.id, label, field: p.field, before, after });
+    undo.push({ level: p.level, id: p.id, field: p.field, value: before });
+    // An option switched off stops voting on the product's sale types, exactly
+    // as deriveSaleTypes says, so this counts as an availability change too.
+    if (p.level === 'option') nextAvailability.set(p.id, after ? row.availability_type : '');
+  }
+
+  if (!changes.length) {
+    return c.json({ success: true, changed: 0, changes: [], undo: [], sale_types: loaded.input.sale_types ?? [] });
+  }
+
+  const stmts = applyWrites(c.env.DB, loaded, productId, writes);
+
+  /**
+   * Re-derive the product's sale types from what the options will say AFTER
+   * this batch, using the same function the product save uses so the two can
+   * never disagree.
+   */
+  const declared = loaded.input.options.map((o) => {
+    const flippedActive = changes.find((ch) => ch.id === o.id && ch.field === 'active');
+    const active = flippedActive ? flippedActive.after === true : o.active !== false;
+    const availability = nextAvailability.has(o.id)
+      ? nextAvailability.get(o.id)!
+      : normalizeAvailability(o.availability_type);
+    return { availability_type: active ? availability : '', active };
+  });
+  const fallback = normalizeSaleTypes(
+    loaded.input.sale_types,
+    String(loaded.input.selling_type ?? 'direct_sale')
+  );
+  const derived = normalizeSaleTypes(deriveSaleTypes(declared, fallback), fallback[0] ?? 'direct_sale');
+  const saleTypesChanged = derived.join(',') !== fallback.join(',');
+  if (saleTypesChanged) {
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE products SET sale_types = ?, selling_type = ?,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+      ).bind(JSON.stringify(derived), derived[0] ?? 'direct_sale', productId)
+    );
+  }
+
+  await c.env.DB.batch(stmts);
+  await audit(c.env.DB, admin.id, 'product.traits_quick_edit', productId, {
+    changes: changes.map((ch) => ({ level: ch.level, id: ch.id, field: ch.field, before: ch.before, after: ch.after })),
+    sale_types: derived,
+  });
+
+  const after = buildGrid((await loadProduct(c.env.DB, productId)).input);
+  return c.json({
+    success: true,
+    changed: changes.length,
+    changes,
+    /** The exact inverse, for the drawer's undo button. */
+    undo,
+    sale_types: derived,
+    sale_types_changed: saleTypesChanged,
+    rows: projectGrid(c.env, admin, after),
+  });
+});
+
 adminPriceGridRoutes.post('/:id/price-grid/bulk', async (c) => {
   const admin = c.get('user')!;
   const productId = c.req.param('id');
@@ -850,10 +1065,18 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
   const batchId = str(body.batch_id, 'batch_id', { min: 3, max: 64 });
 
   const { results } = await c.env.DB.prepare(
-    'SELECT variant_key, field, old_iqd, new_iqd FROM price_history WHERE product_id = ? AND batch_id = ? ORDER BY id DESC'
+    `SELECT variant_key, field, old_iqd, new_iqd, old_mode, old_adjust_iqd
+       FROM price_history WHERE product_id = ? AND batch_id = ? ORDER BY id DESC`
   )
     .bind(productId, batchId)
-    .all<{ variant_key: string; field: Field; old_iqd: number | null; new_iqd: number | null }>();
+    .all<{
+      variant_key: string;
+      field: Field;
+      old_iqd: number | null;
+      new_iqd: number | null;
+      old_mode: string | null;
+      old_adjust_iqd: number | null;
+    }>();
   const back = results ?? [];
   if (back.length === 0) throw notFound('No such price change to undo');
   assertMayWrite(
@@ -868,7 +1091,7 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
 
   const changes: CellChange[] = [];
   const missing: string[] = [];
-  const restoredAs: Array<{ where: string; field: Field; as: 'inherit' | 'fixed' }> = [];
+  const restoredAs: Array<{ where: string; field: Field; as: PriceMode }> = [];
   const seen = new Set<string>();
 
   for (const h of back) {
@@ -891,10 +1114,33 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
     }
     const target = h.old_iqd;
     const canInherit = !(row.level === 'product' && h.field === 'regular');
-    const toMode: 'inherit' | 'fixed' =
-      canInherit && (target === null || (row.level !== 'product' && target === cell.inherited)) ? 'inherit' : 'fixed';
+
+    /**
+     * RESTORE THE MODE, DO NOT RE-DERIVE IT.
+     *
+     * 0046 records what the cell was. When the row knows, undo puts it back
+     * exactly — an adjustment returns as an adjustment and keeps following the
+     * level above, instead of being pinned to the number it happened to show.
+     * Rows written before 0046 carry old_mode = '' and honestly do not know,
+     * so they keep the original inherit-or-fixed reasoning; that is the same
+     * behaviour those batches have always had, not a regression introduced
+     * here.
+     */
+    const recorded: PriceMode | '' =
+      h.old_mode === 'inherit' || h.old_mode === 'adjust' || h.old_mode === 'fixed' ? h.old_mode : '';
+    // The base regular price has nothing above it, so it can be neither
+    // inherited nor adjusted however the row is labelled.
+    const toMode: PriceMode = recorded
+      ? recorded !== 'fixed' && !canInherit
+        ? 'fixed'
+        : recorded
+      : canInherit && (target === null || (row.level !== 'product' && target === cell.inherited))
+        ? 'inherit'
+        : 'fixed';
+
     const writeValue = toMode === 'fixed' ? target : null;
-    if (cell.mode === toMode && cell.value === writeValue && cell.adjust === null) continue;
+    const writeAdjust = toMode === 'adjust' ? h.old_adjust_iqd : null;
+    if (cell.mode === toMode && cell.value === writeValue && cell.adjust === writeAdjust) continue;
 
     restoredAs.push({ where: row.label_ar || row.label_en || row.id, field: h.field, as: toMode });
     changes.push({
@@ -906,9 +1152,10 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
       from_mode: cell.mode,
       to_mode: toMode,
       from_iqd: cell.effective,
-      to_iqd: toMode === 'inherit' ? cell.inherited : target,
+      to_iqd: toMode === 'fixed' ? target : toMode === 'adjust' ? cell.inherited : cell.inherited,
+      from_adjust: cell.adjust,
       write_value: writeValue,
-      write_adjust: null,
+      write_adjust: writeAdjust,
     });
   }
 
