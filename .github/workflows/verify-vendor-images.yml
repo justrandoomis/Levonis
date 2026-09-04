@@ -68,5 +68,7 @@ jobs:
             echo "| the extractor finds product images on real vendor pages | ${{ steps.extract.outcome }} |"
             echo ''
             echo 'Read-only: GET on public product pages, HEAD on the images they name. Nothing was stored.'
-            echo 'A page that answered 403/429 is reported as refused, not counted as a failure.'
+            echo 'A page that answered 403/429 is the vendor'"'"'s bot policy and is reported, not failed.'
+            echo 'A 404 means the default URL moved — that vendor is UNVERIFIED until a current URL is'
+            echo 'passed as the `pages` input. The step log names which vendors were actually proven.'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -28,6 +28,9 @@ let readable = 0;
 let withImages = 0;
 let unreachable = 0;
 let failed = 0;
+/** Vendors this run could say nothing about. Named, never glossed over. */
+const unverified = [];
+const verified = [];
 
 for (const url of PAGES) {
   console.log(`\n=== ${url}`);
@@ -54,8 +57,17 @@ for (const url of PAGES) {
     continue;
   }
   if (!res.ok) {
-    console.log(`  SKIP HTTP ${res.status} — the vendor refused the request, not an extractor defect`);
+    // 403/429 is the vendor's bot policy. 404 is OUR problem: the default URL
+    // moved, and this run proves nothing about that vendor until it is
+    // replaced. Both are reported rather than failed, and both are named.
+    console.log(
+      res.status === 404
+        ? `  SKIP HTTP 404 — this product URL no longer exists. Pass the current one as a workflow input; ` +
+            `until then this vendor is UNVERIFIED.`
+        : `  SKIP HTTP ${res.status} — the vendor refused the request, which is its bot policy, not an extractor defect`
+    );
     unreachable += 1;
+    unverified.push(host);
     continue;
   }
   const html = await res.text();
@@ -69,6 +81,7 @@ for (const url of PAGES) {
     continue;
   }
   withImages += 1;
+  verified.push(host);
   console.log(`  ${found.length} candidate(s):`);
   let verified = 0;
   for (const img of found.slice(0, 4)) {
@@ -106,6 +119,10 @@ console.log(
   `\nsummary: ${PAGES.length} page(s) — ${readable} read, ${withImages} yielded images, ` +
     `${unreachable} unreachable/refused, ${failed} failed`
 );
+console.log(`proven on real HTML: ${verified.length ? verified.join(', ') : 'none'}`);
+if (unverified.length) {
+  console.log(`NOT proven (unreachable or the URL moved): ${unverified.join(', ')}`);
+}
 if (failed > 0) process.exit(1);
 if (readable === 0) {
   console.log('NOTE: no page could be read, so this run proved nothing about the extractor.');
