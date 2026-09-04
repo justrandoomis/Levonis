@@ -3,8 +3,10 @@
 # ---------------------------------------------------------------------------
 # Read-only proof that the التصنيفات (taxonomy) admin round is actually live:
 # the routes are mounted and guarded, the hashtag vocabulary table exists in
-# the database the live Worker is bound to, and the shipped bundle carries the
-# new screen.
+# the database the live Worker is bound to, the shipped bundle carries the
+# new screen, and the admin tables keep their actions column (تعديل / حذف)
+# inside the viewport on a narrow RTL screen instead of pushing it off the
+# left edge.
 #
 # WHAT IT WRITES: nothing. Every HTTP call is a GET made ANONYMOUSLY, and
 # every D1 statement is a SELECT. It deliberately does NOT sign in as an
@@ -154,7 +156,11 @@ jobs:
           # first match, the writer takes SIGPIPE, and `pipefail` then reads a
           # successful match as a failed pipeline.
           want() { # marker, what it is
-            hit=$(grep -l "$1" $all 2>/dev/null | head -1 || true)
+            # -F: the markers below are Tailwind arbitrary variants full of
+            # [ ] * & — as a regex `[&_tr>*:last-child]` is a bracket
+            # expression matching ONE character, so an unanchored grep would
+            # report a miss on a bundle that carries the class verbatim.
+            hit=$(grep -lF "$1" $all 2>/dev/null | head -1 || true)
             if [ -n "$hit" ]; then
               echo "  ok   $2 — in $(basename "$hit")"
             else
@@ -165,6 +171,14 @@ jobs:
           want 'data-tax-tab'        'the التصنيفات screen'
           want 'data-quick-add-open' "the product form's quick-add"
           want 'lookups-toggle'      "the import panel's accepted-values box"
+          # The owner could not press تعديل or حذف on an iPad: those buttons sit
+          # in the LAST column, and a table wider than the viewport pushes the
+          # last column off the LEFT edge under RTL. The fix pins that column to
+          # the inline end. Two different literals ship it — the taxonomy and
+          # products tables use the design tokens, المستخدمون the zinc palette —
+          # so both are checked, or half the fix could be missing and unnoticed.
+          want '[&_tbody_tr>*:last-child]:bg-[var(--ap-surface-1)]' 'التصنيفات and المنتجات keep their actions column on screen'
+          want '[&_thead_tr>*:last-child]:bg-zinc-800'              'المستخدمون keeps its actions column on screen'
           exit $fail
 
       - name: Result

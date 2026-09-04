@@ -6,11 +6,15 @@
 #   1. the product form no longer carries the «الفلاتر» block,
 #   2. its save bar is the flush-to-the-edge one, not the floating card,
 #   3. the import/export template is offered per product type, and the type
-#      endpoint exists and is admin-gated.
+#      endpoint exists and is admin-gated,
+#   4. the TXT export reads the RELATIONAL options/colours/images rather than
+#      the products row alone, and gates the cost on the admin's permission.
 #
 # WHAT IT WRITES: nothing. Every request is an anonymous GET; the admin
 # endpoints are probed only for their refusal, which is what proves they are
-# both deployed and still closed.
+# both deployed and still closed. Check 4 additionally reads the deployed
+# Worker script over the Cloudflare API — a GET — and prints verdicts only,
+# never the script.
 name: 22 - Verify Live Product Form & Import Template (read-only)
 
 on:
@@ -29,6 +33,8 @@ jobs:
     timeout-minutes: 10
     env:
       APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +58,7 @@ jobs:
           refuse '/api/admin/import/template?type=filament'      'the filament template'
           refuse '/api/admin/import/lookups'                     'the classification lookups'
           refuse '/api/admin/taxonomy/catalogs'                  'the section tree'
+          refuse '/api/admin/template/export/no-such-product'    'the TXT export'
           exit $fail
 
       - name: Read every module the deployed app serves
@@ -185,6 +192,62 @@ jobs:
           fi
           exit $fail
 
+      # ------------------------------------------------------- worker source
+      # The two checks above read the BROWSER bundle. The TXT export is server
+      # code, and no anonymous request can show what it puts in the file: the
+      # route is admin-only, and this job deliberately holds no admin
+      # credentials. So the deployed Worker script itself is read — a GET
+      # against the Cloudflare API with the token this repository already uses
+      # to deploy — and the two lines that were wrong are located inside it.
+      #
+      # The script is NEVER printed. Only the verdicts below reach the log.
+      - name: The deployed TXT export reads the relational tables and gates the cost
+        id: exportcode
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/worker.bundle -w '%{http_code}' --max-time 60 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging" || echo 000)
+          if [ "$code" != "200" ]; then
+            echo "  FAIL could not read the deployed Worker script (HTTP $code)"
+            exit 1
+          fi
+          echo "  read the deployed script ($(wc -c < /tmp/worker.bundle) bytes)"
+          node -e "
+            const fs = require('fs');
+            const s = fs.readFileSync('/tmp/worker.bundle', 'utf8');
+            let fail = 0;
+            const ok = (m) => console.log('  ok   ' + m);
+            const no = (m) => { console.log('  FAIL ' + m); fail = 1; };
+
+            // A positive control first. If the script we downloaded does not
+            // even contain the export route, every miss below would be a miss
+            // for the wrong reason.
+            if (s.includes('/export/:productId')) ok('the TXT export route is in the deployed script');
+            else { no('the deployed script has no TXT export route — the checks below prove nothing'); process.exit(1); }
+
+            // 1. The bug the owner hit: the export loaded the products ROW and
+            //    stopped there, so a product whose options, colours and images
+            //    live in the relational tables exported as a near-empty file.
+            const i = s.indexOf('async function loadProductDoc(');
+            if (i < 0) no('loadProductDoc is not in the deployed script');
+            else {
+              const body = s.slice(i, i + 600);
+              if (body.includes('loadRelationsView')) ok('the export reads the relational tables');
+              else no('the export still reads only the products row — options/colours/images would be missing');
+              if (body.includes('applyRelations')) ok('it overlays them the same way the storefront does');
+              else no('the relational rows are read but not overlaid onto the document');
+            }
+
+            // 2. §11: the TXT file used to carry every cost to anyone who could
+            //    reach the button. CSV always gated it; TXT did not.
+            const j = s.indexOf('/export/:productId');
+            const route = s.slice(j, j + 500);
+            if (route.includes('includeCost')) ok('the TXT export asks whether this admin may see cost');
+            else no('the TXT export does not gate the cost — it would leak to any staff account');
+            process.exit(fail);
+          "
+
       - name: Result
         if: always()
         run: |
@@ -199,10 +262,11 @@ jobs:
             echo "| the import panel offers the four product types | ${{ steps.types.outcome }} |"
             echo "| per-option availability, lead time and model key ship | ${{ steps.availability.outcome }} |"
             echo "| a public product payload still carries no cost | ${{ steps.costsafety.outcome }} |"
+            echo "| the deployed TXT export reads relations and gates cost | ${{ steps.exportcode.outcome }} |"
             echo ''
             echo 'Read-only: every request was an anonymous GET; the admin endpoints were probed only for their refusal.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail the run if any check failed
-        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success' || steps.availability.outcome != 'success' || steps.costsafety.outcome != 'success'
+        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success' || steps.availability.outcome != 'success' || steps.costsafety.outcome != 'success' || steps.exportcode.outcome != 'success'
         run: exit 1
