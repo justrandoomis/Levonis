@@ -8,8 +8,10 @@
 #      profit column and the preview-before-apply gate,
 #   3. the products list carries the quick-price button and the inline price
 #      field,
-#   4. and the migration that adjustments depend on has been applied — proved
-#      through behaviour, since the database is not readable from here.
+#   4. and the code serving the site declares the four adjustment fields, so an
+#      import carrying them is validated rather than refused. (That the 0044
+#      migration RAN is proved by the deploy workflow's own migration step,
+#      which fails the deploy if it cannot apply — not by anything here.)
 #
 # WHAT IT WRITES: nothing. Every request is an anonymous GET; the admin
 # endpoints are probed only for their refusal, which is what proves they are
@@ -120,15 +122,17 @@ jobs:
           want 'PROFIT_GUARD'    'the drawer knows the guard refusal by code'
           exit $fail
 
-      - name: The adjustment columns reached the live database
+      - name: The deployed template declares the adjustment fields
         run: |
           set -euo pipefail
-          # The database is not readable from here, so this is proved through
-          # BEHAVIOUR: the import template is generated from the field specs and
-          # served to admins only, but the blank template is public. If 0044 had
-          # not been applied the endpoints above would still answer — so what is
-          # checked instead is that the deployed template DECLARES the fields,
-          # which is the contract an importer is validated against.
+          # WHAT THIS DOES NOT PROVE, said plainly: it does not read the live
+          # database, so it is not evidence that migration 0044 ran. That
+          # evidence is the deploy workflow's own step, "Apply any pending
+          # migrations BEFORE the code that needs them", which runs
+          # `wrangler d1 migrations apply --remote` and fails the deploy if it
+          # cannot. What IS checked here is the other half — that the CODE now
+          # serving the site declares the four fields, so an import file
+          # carrying them is validated rather than rejected as unknown.
           fail=0
           code=$(curl -s -o /tmp/blank.txt -w '%{http_code}' --max-time 25 "$APEX/api/admin/template/blank" || echo 000)
           if [ "$code" = "200" ]; then
