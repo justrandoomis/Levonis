@@ -138,6 +138,53 @@ jobs:
           fi
           exit $fail
 
+      - name: Per-option availability is live — 0043
+        id: availability
+        run: |
+          set -euo pipefail
+          fail=0
+          present() { # marker, what it is
+            hit=$(grep -l "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
+            if [ -n "$hit" ]; then
+              echo "  ok   $2 — in $(basename "$hit")"
+            else
+              echo "  FAIL $2 is not in any served module"; fail=1
+            fi
+          }
+          # The storefront's two-step chooser: pick the model, then pick how to
+          # get it. Attribute VALUES are what survive minification; the
+          # authored data-* form becomes an object key and would not match.
+          present 'variant-chooser'      'the model chooser ships'
+          present 'availability-chooser' 'the availability chooser ships'
+          present 'variant_key'          'options carry their model key'
+          present 'availability_type'    'options carry their own availability'
+          present 'lead_time_text'       'the pre-order lead time reaches the customer'
+          # The admin editor's per-option availability control.
+          present 'option-availability'  'the admin option editor asks the question'
+          exit $fail
+
+      - name: The pre-order lead time is customer-facing, the cost is not
+        id: costsafety
+        run: |
+          set -euo pipefail
+          fail=0
+          # A public product payload must never carry a cost at ANY level, and
+          # the 0043 fields must not have smuggled one in beside them. This
+          # reads a real storefront product anonymously.
+          slug=$(curl -s --compressed --max-time 25 "$APEX/api/products?limit=1" \
+            | grep -oE '"slug":"[^"]+"' | head -1 | cut -d'"' -f4 || true)
+          if [ -z "$slug" ]; then
+            echo "  ok   no public product to read — nothing to leak"
+            exit 0
+          fi
+          body=$(curl -s --compressed --max-time 25 "$APEX/api/products/$slug")
+          if printf '%s' "$body" | grep -q 'cost_iqd'; then
+            echo "  FAIL a public product payload carries cost_iqd"; fail=1
+          else
+            echo "  ok   the public payload for \"$slug\" carries no cost at any level"
+          fi
+          exit $fail
+
       - name: Result
         if: always()
         run: |
@@ -150,10 +197,12 @@ jobs:
             echo "| the filters block is gone from the form | ${{ steps.filters.outcome }} |"
             echo "| the save bar is the flush-to-the-edge one | ${{ steps.savebar.outcome }} |"
             echo "| the import panel offers the four product types | ${{ steps.types.outcome }} |"
+            echo "| per-option availability, lead time and model key ship | ${{ steps.availability.outcome }} |"
+            echo "| a public product payload still carries no cost | ${{ steps.costsafety.outcome }} |"
             echo ''
             echo 'Read-only: every request was an anonymous GET; the admin endpoints were probed only for their refusal.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail the run if any check failed
-        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success'
+        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success' || steps.availability.outcome != 'success' || steps.costsafety.outcome != 'success'
         run: exit 1
