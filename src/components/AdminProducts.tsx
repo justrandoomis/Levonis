@@ -29,13 +29,14 @@ import {
   Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
   AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
   Copy, ChevronRight, ChevronLeft, Package, PackageX, ShoppingBag, Check, Pencil,
-  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag,
+  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag, FileDown,
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import type { ListingItem, ListingResponse, DeleteResponse } from './adminProducts/types';
 import { Modal, ErrorBanner, fmtDate } from './adminProducts/ui';
 import { Spark } from './ui/statCards';
+import { downloadAdminFile, DownloadError } from './adminProducts/download';
 import * as T from './adminProducts/theme';
 import './adminProducts/theme.css';
 
@@ -419,6 +420,36 @@ export default function AdminProducts() {
     }
   };
 
+  /**
+   * Download ONE product as the editable .txt template.
+   *
+   * The route has existed since the template shipped; nothing ever called it,
+   * so the only .txt an owner could get from the admin was a blank form. The
+   * file this writes carries the product's real options, colours, prices,
+   * costs and pictures, and applying it back through «استيراد» updates them.
+   */
+  const exportTxt = async (p: ListingItem) => {
+    setBusyId(p.id);
+    try {
+      const out = await downloadAdminFile(
+        `/api/admin/template/export/${encodeURIComponent(p.id)}`,
+        `levonis-${p.slug || p.id}.txt`,
+        { accept: 'text/plain', ext: 'txt', type: 'text/plain;charset=utf-8' }
+      );
+      setNotice(
+        loc(
+          `نُزّل ${out.filename} — عدّله ثم ارفعه من «استيراد».`,
+          `Downloaded ${out.filename} — edit it, then upload it from Import.`,
+          `دابەزێنرا ${out.filename}`
+        )
+      );
+    } catch (e) {
+      setNotice(e instanceof DownloadError || e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const productUrl = (p: ListingItem) => `${window.location.origin}/product/${p.slug}`;
 
   const resetFilters = () => {
@@ -553,6 +584,23 @@ export default function AdminProducts() {
                   setMenuFor('');
                   navigator.clipboard?.writeText(productUrl(p)).catch(() => {});
                 }}
+              />
+              {/*
+                THE EXPORT HAD NO BUTTON.
+                `GET /api/admin/template/export/:productId` writes the product
+                as an editable .txt, and nothing in the admin ever called it:
+                the import window offered only the BLANK template and the
+                example. The owner reporting «الاستخراج فيها مشاكل» was looking
+                at a blank form, not at their product. This is the way in.
+              */}
+              <MenuItem
+                icon={<FileDown className="w-3.5 h-3.5" />}
+                label={loc('تصدير كملف TXT', 'Export as TXT', 'هەناردە وەک TXT')}
+                onClick={() => {
+                  setMenuFor('');
+                  void exportTxt(p);
+                }}
+                disabled={busyId === p.id}
               />
               {compact && (
                 <MenuItem

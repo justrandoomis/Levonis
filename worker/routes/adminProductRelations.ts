@@ -504,6 +504,16 @@ export async function planRelationsWrite(
       color_id: colorId,
       variant_id: variantId,
       content_type: str(img.content_type, `${where}.content_type`, { max: 100, required: false }) ?? '',
+      // ---- 0048 -----------------------------------------------------------
+      // The template has always advertised alt_ar, alt_ckb, key and source_url
+      // for an image; the table had nowhere to put them, so the overlay filled
+      // the Arabic and Kurdish alt with the ENGLISH one and reported the other
+      // two as empty. Now they are real columns, and a vendor photo keeps a
+      // record of the page it came from.
+      alt_ar: str(img.alt_ar, `${where}.alt_ar`, { max: 300, required: false }) ?? '',
+      alt_ckb: str(img.alt_ckb, `${where}.alt_ckb`, { max: 300, required: false }) ?? '',
+      r2_key: str(img.r2_key, `${where}.r2_key`, { max: 400, required: false }) ?? '',
+      source_url: str(img.source_url, `${where}.source_url`, { max: 1000, required: false }) ?? '',
       width: nullableInt(img.width, `${where}.width`, 100000),
       height: nullableInt(img.height, `${where}.height`, 100000),
       bytes: nullableInt(img.bytes, `${where}.bytes`, 1_000_000_000),
@@ -789,19 +799,21 @@ export async function planRelationsWrite(
         .prepare(
           `INSERT INTO product_images
              (id, product_id, url, alt_en, sort_order, is_primary, option_value_id, color_id, variant_id,
-              width, height, bytes, content_type)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              width, height, bytes, content_type, alt_ar, alt_ckb, r2_key, source_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
              url = excluded.url, alt_en = excluded.alt_en, sort_order = excluded.sort_order,
              is_primary = excluded.is_primary, option_value_id = excluded.option_value_id,
              color_id = excluded.color_id, variant_id = excluded.variant_id,
              width = excluded.width, height = excluded.height, bytes = excluded.bytes,
-             content_type = excluded.content_type`
+             content_type = excluded.content_type, alt_ar = excluded.alt_ar,
+             alt_ckb = excluded.alt_ckb, r2_key = excluded.r2_key, source_url = excluded.source_url`
         )
         .bind(
           img.id, productId, img.url, img.alt_en, img.sort_order, img.is_primary,
           img.option_value_id, img.color_id, img.variant_id,
-          img.width, img.height, img.bytes, img.content_type
+          img.width, img.height, img.bytes, img.content_type,
+          img.alt_ar, img.alt_ckb, img.r2_key, img.source_url
         )
     );
   }

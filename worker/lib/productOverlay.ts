@@ -66,6 +66,14 @@ export interface ImageRow {
   variant_id: string | null;
   width: number | null;
   height: number | null;
+  // ---- 0048 ------------------------------------------------------------
+  // Optional in the TYPE because a Worker deployed before the migration ran
+  // reads rows that have no such column; `?? ''` at every use site keeps that
+  // deploy serving instead of crashing on undefined.
+  alt_ar?: string | null;
+  alt_ckb?: string | null;
+  r2_key?: string | null;
+  source_url?: string | null;
 }
 
 export interface ProductRelationsView {
@@ -264,11 +272,32 @@ const truthy = (v: number | boolean) => v !== 0 && v !== false;
  * validateSelection instead, so the old field can never claim a constraint
  * narrower or wider than the real one.
  */
-export function applyRelations(doc: ProductDoc, view: ProductRelationsView): ProductDoc {
+export interface OverlayOpts {
+  /**
+   * Show rows the storefront must not see.
+   *
+   * The customer-facing overlay drops inactive options and colours and reports
+   * `active: true` for the survivors, which is right for a shop page. It is
+   * wrong for the ADMIN export: an option the owner switched off then vanishes
+   * from the .txt, so «ويفعل الخيارات» — re-enable the options by editing the
+   * file — is impossible, and re-importing that file would delete the
+   * disabled rows outright. Admin readers pass true and get every row with its
+   * REAL active flag.
+   */
+  includeInactive?: boolean;
+}
+
+export function applyRelations(
+  doc: ProductDoc,
+  view: ProductRelationsView,
+  opts: OverlayOpts = {}
+): ProductDoc {
   if (!view.has_relations) return doc;
+  const showAll = opts.includeInactive === true;
+  const groupNameById = new Map(view.groups.map((g) => [g.id, g.name_en]));
 
   const options: OptionV2[] = view.values
-    .filter((v) => truthy(v.active))
+    .filter((v) => showAll || truthy(v.active))
     .map((v) => ({
       id: v.id,
       name_ar: v.name_en,
@@ -276,7 +305,10 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
       name_ckb: v.name_en,
       image: v.image,
       order: v.sort,
-      active: true,
+      active: showAll ? truthy(v.active) : true,
+      group_en: groupNameById.get(v.group_id) ?? '',
+      sku_part: v.sku_part ?? '',
+      low_stock_threshold: v.low_stock_threshold ?? null,
       regular_price_iqd: v.regular_price_iqd,
       prime_price_iqd: v.prime_price_iqd,
       pro_price_iqd: v.pro_price_iqd,
@@ -310,7 +342,7 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
   }
 
   const colors: ColorV2[] = view.colors
-    .filter((x) => truthy(x.active))
+    .filter((x) => showAll || truthy(x.active))
     .map((x) => {
       const linked = linksByColor.get(x.id) ?? [];
       return {
@@ -321,8 +353,13 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
         hex: x.hex,
         image: x.image,
         option_id: linked.length === 1 ? linked[0] : null,
+        // The FULL link set, which `option_id` can only express when there is
+        // exactly one. Admin readers restore the real constraint from this.
+        option_ids: linked,
         order: x.sort,
-        active: true,
+        active: showAll ? truthy(x.active) : true,
+        stock: x.stock ?? null,
+        low_stock_threshold: x.low_stock_threshold ?? null,
         regular_price_iqd: x.regular_price_iqd,
         prime_price_iqd: x.prime_price_iqd,
         pro_price_iqd: x.pro_price_iqd,
@@ -356,16 +393,21 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
       ? view.images.map((i) => ({
           id: i.id,
           url: i.url,
-          key: '',
+          key: i.r2_key ?? '',
           role: 'gallery' as const,
-          alt_ar: i.alt_en,
+          alt_ar: i.alt_ar ?? '',
           alt_en: i.alt_en,
-          alt_ckb: i.alt_en,
+          alt_ckb: i.alt_ckb ?? '',
           order: i.sort_order,
           primary: i.is_primary === 1,
           width: i.width,
           height: i.height,
-          source_url: '',
+          source_url: i.source_url ?? '',
+          // WHAT THE PICTURE IS OF. Dropped before 0048 existed, which is why
+          // exporting and re-importing unbound every option and colour photo.
+          option_value_id: i.option_value_id ?? '',
+          color_id: i.color_id ?? '',
+          variant_id: i.variant_id ?? '',
         }))
       : doc.media;
 

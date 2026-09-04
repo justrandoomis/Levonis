@@ -156,6 +156,17 @@ const GROUP_SPECS: GroupSpec[] = [
       f('alt_ckb', 'string', 'media', 'دەقی جێگرەوە بە کوردی', { lang: 'ckb' }),
       f('primary', 'bool', 'media', 'الصورة الرئيسية — exactly one image should be primary'),
       f('source_url', 'string', 'media', 'الرابط المصدر الأصلي عند الاستيراد — original remote source'),
+      // ---- WHAT THE PICTURE IS OF -------------------------------------
+      // product_images has carried these three columns since 0018 and the
+      // form writes them, but the template had no key for any of them: the
+      // store's own export turned every option and colour photo into a plain
+      // gallery image, and re-importing it unbound them for good. At most one
+      // may be set on a row.
+      f('option_value_id', 'string', 'media', 'صورة تخص هذا الخيار — bind to ONE option by its options.N.id; فارغ = صورة عامة'),
+      f('color_id', 'string', 'media', 'صورة تخص هذا اللون — bind to ONE colour by its colors.N.id; فارغ = صورة عامة'),
+      f('variant_id', 'string', 'media', 'صورة تخص تركيبة محددة — bind to one modelled combination by its id'),
+      f('width', 'int', 'media', 'عرض الصورة بالبكسل إن كان معروفًا — pixel width; فارغ = غير معروف', { nullable: true, min: 1, max: 100_000 }),
+      f('height', 'int', 'media', 'ارتفاع الصورة بالبكسل إن كان معروفًا — pixel height', { nullable: true, min: 1, max: 100_000 }),
     ],
   },
   {
@@ -163,6 +174,11 @@ const GROUP_SPECS: GroupSpec[] = [
     titleAr: 'الخيارات', titleEn: 'Options (variants)',
     fields: [
       f('id', 'string', 'options', 'معرف ثابت — stable id; needed for merge-by-id and for colors.*.option_id links'),
+      // The relational model is GROUPS → values. Every flat consumer sees only
+      // the values, so a product with «1 مجموعة · 4 قيمة» used to export as
+      // four ungrouped options and re-import as four separate groups. Rows
+      // sharing a group name belong to one group, in first-appearance order.
+      f('group', 'string', 'options', 'اسم مجموعة الخيارات التي ينتمي إليها هذا الصف (مثل Model أو التوفر) — الصفوف التي تحمل نفس الاسم تُجمع في مجموعة واحدة. فارغ = المجموعة الافتراضية.'),
       f('name_ar', 'string', 'options', 'اسم الخيار بالعربية', { required: true, lang: 'ar' }),
       f('name_en', 'string', 'options', 'Option name (English)', { lang: 'en' }),
       f('name_ckb', 'string', 'options', 'ناوی هەڵبژاردە بە کوردی', { lang: 'ckb' }),
@@ -188,6 +204,8 @@ const GROUP_SPECS: GroupSpec[] = [
       f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام للطلب المسبق', { nullable: true, min: 0, max: 3650 }),
       f('variant_key', 'string', 'options', 'مفتاح النسخة — a1 / a1-combo. هو ما يجمع «A1 طلب مسبق» و«A1 بيع مباشر» تحت نسخة واحدة؛ اتركه فارغًا ليُشتق من variant_label.'),
       f('variant_label', 'string', 'options', 'اسم النسخة كما يقرؤه الزبون — A1 / A1 Combo. فارغًا يُشتق من اسم الخيار بعد حذف لاحقة نوع التوفر.'),
+      f('sku_part', 'string', 'options', 'الجزء الذي يضيفه هذا الخيار إلى رمز المنتج — SKU fragment'),
+      f('low_stock_threshold', 'int', 'options', 'حد التنبيه لمخزون هذا الخيار — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
     ],
   },
   {
@@ -202,6 +220,13 @@ const GROUP_SPECS: GroupSpec[] = [
       f('image', 'string', 'colors', 'صورة اللون — color image URL'),
       f('option_id', 'string', 'colors', 'ربط بخيار واحد عبر معرفه — link to ONE option by its id; __NULL__ = متاح لكل الخيارات', { nullable: true }),
       f('option_index', 'int', 'colors', 'بديل استيراد فقط: رقم الخيار في هذا القالب (colors.N.option_index=2 يربط بالخيار options.2) — import-only, never exported', { min: 1, max: 999, exported: false }),
+      // option_id can only name ONE option, so a colour offered for two of
+      // four options exported as "available to all" and came back wrong. This
+      // carries every link, comma separated; it wins over option_id when both
+      // are present.
+      f('option_ids', 'csv', 'colors', 'كل الخيارات التي يتوفر لها هذا اللون، مفصولة بفواصل — the FULL link set; يتقدّم على option_id. فارغ = متاح لكل الخيارات.'),
+      f('stock', 'int', 'colors', 'مخزون هذا اللون — __NULL__ = لا يُتتبع على مستوى اللون', { nullable: true, min: 0, max: 1_000_000 }),
+      f('low_stock_threshold', 'int', 'colors', 'حد التنبيه لمخزون هذا اللون — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
       f('active', 'bool', 'colors', 'فعال — active'),
       f('regular_price_iqd', 'iqd', 'colors', 'يستبدل السعر (لون ← خيار ← أساسي) — REPLACES; __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('pro_price_iqd', 'iqd', 'colors', 'سعر PRO للون — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
@@ -663,6 +688,10 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   push('price_iqd', String(doc.price_iqd));
   push('pro_price_iqd', numStr(doc.pro_price_iqd));
   push('prime_price_iqd', numStr(doc.prime_price_iqd));
+  // Declared in the registry, taught by the blank template and the example —
+  // and never written by the exporter until now, so the owner could not see
+  // the struck-through price they had set, let alone edit it.
+  push('original_price_iqd', numStr(doc.original_price_iqd));
   if (money) push('product_cost_iqd', numStr(doc.product_cost_iqd));
   // classification
   if (opts.brand !== undefined) push('brand', opts.brand);
@@ -700,11 +729,37 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.alt_ckb`, mItem.alt_ckb);
     push(`${p}.primary`, boolStr(mItem.primary));
     push(`${p}.source_url`, mItem.source_url);
+    push(`${p}.option_value_id`, mItem.option_value_id ?? '');
+    push(`${p}.color_id`, mItem.color_id ?? '');
+    push(`${p}.variant_id`, mItem.variant_id ?? '');
+    push(`${p}.width`, numStr(mItem.width));
+    push(`${p}.height`, numStr(mItem.height));
   });
 
-  sorted(doc.options).forEach((o, i) => {
+  /**
+   * Options are listed GROUP BY GROUP, not by a global sort number.
+   *
+   * `order` is the position WITHIN a group, so sorting the flat list by it
+   * interleaves the groups — "Model / A1", "Nozzle / 0.6", "Model / A1 Combo".
+   * The file is meant to be read and edited by a person, and rows that belong
+   * together must sit together; the importer rebuilds the groups from the
+   * `group` column either way, so this is presentation, not semantics.
+   */
+  const groupOrder = new Map<string, number>();
+  for (const o of doc.options) {
+    const g = o.group_en ?? '';
+    if (!groupOrder.has(g)) groupOrder.set(g, groupOrder.size);
+  }
+  const optionsInOrder = [...doc.options].sort(
+    (a, b) =>
+      (groupOrder.get(a.group_en ?? '') ?? 0) - (groupOrder.get(b.group_en ?? '') ?? 0) ||
+      (a.order ?? 0) - (b.order ?? 0) ||
+      String(a.id).localeCompare(String(b.id))
+  );
+  optionsInOrder.forEach((o, i) => {
     const p = `options.${i + 1}`;
     push(`${p}.id`, o.id);
+    push(`${p}.group`, o.group_en ?? '');
     push(`${p}.name_ar`, o.name_ar);
     push(`${p}.name_en`, o.name_en);
     push(`${p}.name_ckb`, o.name_ckb);
@@ -729,6 +784,8 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.lead_time_max_days`, numStr(o.lead_time_max_days ?? null));
     push(`${p}.variant_key`, o.variant_key ?? '');
     push(`${p}.variant_label`, o.variant_label ?? '');
+    push(`${p}.sku_part`, o.sku_part ?? '');
+    push(`${p}.low_stock_threshold`, numStr(o.low_stock_threshold ?? null));
   });
 
   sorted(doc.colors).forEach((cItem, i) => {
@@ -740,6 +797,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.hex`, cItem.hex);
     push(`${p}.image`, cItem.image);
     push(`${p}.option_id`, cItem.option_id ?? null);
+    push(`${p}.option_ids`, (cItem.option_ids ?? []).join(','));
+    push(`${p}.stock`, numStr(cItem.stock ?? null));
+    push(`${p}.low_stock_threshold`, numStr(cItem.low_stock_threshold ?? null));
     push(`${p}.active`, boolStr(cItem.active));
     push(`${p}.regular_price_iqd`, numStr(cItem.regular_price_iqd));
     push(`${p}.pro_price_iqd`, numStr(cItem.pro_price_iqd));

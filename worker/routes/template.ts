@@ -34,7 +34,9 @@ import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, oneOf, str, HttpError } from '../lib/http';
-import { applyRelations, loadRelationsView } from '../lib/productOverlay';
+import { applyRelations, loadRelationsView, type ProductRelationsView } from '../lib/productOverlay';
+import { relationsBodyFromDoc } from '../lib/templateRelations';
+import { planRelationsWrite } from './adminProductRelations';
 import { canViewFinancials } from '../lib/adminScope';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -388,11 +390,27 @@ export function templateDownloadDiagnostics(): {
  * export exactly as before.
  */
 async function loadProductDoc(db: D1Database, id: string): Promise<ProductDoc | null> {
+  const loaded = await loadProductDocWithView(db, id);
+  return loaded ? loaded.doc : null;
+}
+
+/**
+ * The same read, keeping the relational view the caller needs to write back.
+ *
+ * `includeInactive` is what separates the admin view from the shop's: an
+ * option the owner switched off must appear in the .txt with `active=false`,
+ * or «ويفعل الخيارات» — turn the options back on by editing the file — is
+ * impossible, and re-applying the file would delete every disabled row.
+ */
+async function loadProductDocWithView(
+  db: D1Database,
+  id: string
+): Promise<{ doc: ProductDoc; view: ProductRelationsView; row: Record<string, unknown> } | null> {
   const row = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!row) return null;
   const doc = parseProductRow(row);
   const view = await loadRelationsView(db, id, row.inventory_mode);
-  return applyRelations(doc, view);
+  return { doc: applyRelations(doc, view, { includeInactive: true }), view, row };
 }
 
 /**
@@ -418,11 +436,16 @@ async function hasRelationalStructure(db: D1Database, productId: string): Promis
       `SELECT
          (SELECT COUNT(*) FROM product_option_values v
             JOIN product_option_groups g ON g.id = v.group_id WHERE g.product_id = ?) AS values_n,
-         (SELECT COUNT(*) FROM product_colors WHERE product_id = ?) AS colors_n`
+         (SELECT COUNT(*) FROM product_colors WHERE product_id = ?) AS colors_n,
+         -- A product can be relational through its PICTURES alone: the gallery
+         -- is read from product_images the moment one row exists, so a TXT
+         -- image edit written to the JSON column would be invisible. Counting
+         -- images here is what routes it to the relational writer instead.
+         (SELECT COUNT(*) FROM product_images WHERE product_id = ?) AS images_n`
     )
-    .bind(productId, productId)
-    .first<{ values_n: number; colors_n: number }>();
-  return (row?.values_n ?? 0) > 0 || (row?.colors_n ?? 0) > 0;
+    .bind(productId, productId, productId)
+    .first<{ values_n: number; colors_n: number; images_n: number }>();
+  return (row?.values_n ?? 0) > 0 || (row?.colors_n ?? 0) > 0 || (row?.images_n ?? 0) > 0;
 }
 
 /** The template keys that describe structure rather than scalar fields. */
@@ -1000,23 +1023,59 @@ templateRoutes.post('/apply', async (c) => {
         409
       );
     }
-    // A product whose structure lives in the relational tables cannot be
-    // updated through this format without lying about what happened.
-    if (await hasRelationalStructure(c.env.DB, existing.id)) {
-      const touched = STRUCTURE_GROUPS.filter(
-        (g) => (a.parsed.groups[g]?.length ?? 0) > 0 || !!a.parsed.groupClears[g]
+    /**
+     * THE STRUCTURE GOES WHERE THE PRODUCT ACTUALLY KEEPS IT.
+     *
+     * This used to throw TXT_CANNOT_WRITE_RELATIONS, because the TXT path
+     * could only write the `products` JSON mirror and nothing reads that once
+     * relational rows exist. Then the export was taught to read those tables —
+     * so the store's own export named options and colours, and applying it
+     * came back refused. Download → edit → upload was impossible for exactly
+     * the products the owner builds in the form.
+     *
+     * Now the parsed document is translated into the SAME wire body the admin
+     * form PUTs and handed to `planRelationsWrite`, the one writer the form
+     * and the CSV importer already share. Its statements join the product
+     * UPDATE in ONE batch, so a product and its options can never half-land.
+     */
+    let relationStmts: D1PreparedStatement[] = [];
+    const structureTouched = STRUCTURE_GROUPS.filter(
+      (g) => (a.parsed.groups[g]?.length ?? 0) > 0 || !!a.parsed.groupClears[g]
+    );
+    const mediaTouched = (a.parsed.groups.images?.length ?? 0) > 0 || !!a.parsed.groupClears.images;
+    const relational = await hasRelationalStructure(c.env.DB, existing.id);
+    if (relational && (structureTouched.length > 0 || mediaTouched)) {
+      const current = await loadProductDocWithView(c.env.DB, existing.id);
+      if (!current) throw notFound('Product not found');
+      const plan = await planRelationsWrite(
+        c.env.DB,
+        existing.id,
+        relationsBodyFromDoc(doc, current.view),
+        // §11: an assistant admin who cannot see cost must not be able to
+        // OVERWRITE it either — the writer keeps the stored cost when money
+        // is false, exactly as it does for the form and the CSV importer.
+        { money: canViewFinancials(c.env, adminUser) }
       );
-      if (touched.length > 0) {
+      if (!plan.stmts) {
         throw badRequest(
-          `هذا المنتج يحفظ خياراته وألوانه في الجداول العلائقية، ولا يستطيع قالب TXT الكتابة فيها. ` +
-            `احذف مفاتيح (${touched.join('، ')}) من الملف — بقية الحقول تُطبَّق كالمعتاد — ` +
-            `أو استخدم استيراد CSV/ZIP الذي يكتب هذه الجداول فعلاً.`,
-          'TXT_CANNOT_WRITE_RELATIONS'
+          `تعذّر حفظ الخيارات/الألوان/الصور: ${plan.errors.join(' — ')}`,
+          'RELATIONS_VALIDATION'
         );
       }
+      relationStmts = plan.stmts;
+      if (current.view.variants.length > 0) {
+        warnings.push(
+          `التركيبات المسعّرة (${current.view.variants.length}) لا يعبّر عنها قالب TXT، ` +
+            'فقد نُقلت كما هي دون تغيير.'
+        );
+      }
+    } else if (relational) {
+      // The old warning here claimed the export did not carry options and
+      // colours. It has since — so the honest message is that THIS file left
+      // them out, and that leaving a group out preserves it.
       warnings.push(
-        'خيارات وألوان هذا المنتج مخزّنة في الجداول العلائقية ولم يصدّرها هذا الملف؛ ' +
-          'التعديلات المطبَّقة هنا تخصّ الحقول الأساسية فقط.'
+        'لم يحمل هذا الملف مفاتيح الخيارات أو الألوان أو الصور، فبقيت كما هي؛ ' +
+          'طُبِّقت الحقول الأساسية فقط.'
       );
     }
 
@@ -1035,7 +1094,14 @@ templateRoutes.post('/apply', async (c) => {
     const sql = `UPDATE products SET ${cols.map((k) => `${k} = ?`).join(', ')},
                  updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`;
     try {
-      await c.env.DB.prepare(sql).bind(...cols.map((k) => (serialized as Record<string, unknown>)[k]), doc.id).run();
+      const productStmt = c.env.DB
+        .prepare(sql)
+        .bind(...cols.map((k) => (serialized as Record<string, unknown>)[k]), doc.id);
+      // ONE batch: the product row and its option tree either both land or
+      // neither does. A product whose price moved but whose options did not
+      // would price the customer wrongly until someone noticed.
+      if (relationStmts.length > 0) await c.env.DB.batch([productStmt, ...relationStmts]);
+      else await productStmt.run();
     } catch (e) {
       // The write did not happen — free the fingerprint so a corrected retry
       // is not mistaken for a double submission.

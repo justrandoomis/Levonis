@@ -110,6 +110,22 @@ export interface OptionV2 extends PriceFields {
   variant_label?: string;
   /** Sellable units at this level; null = this level does not track stock. */
   stock?: number | null;
+  // ---- carried for the ADMIN surfaces only; pricing never reads them ------
+  /**
+   * The option GROUP this value belongs to ("Model", "Availability", …).
+   *
+   * The relational model is groups → values; every flat consumer — pricing,
+   * the cart, the TXT template — sees only the values. Without this the group
+   * a value came from is unrecoverable, so a product with «1 مجموعة · 4 قيمة»
+   * exported as four ungrouped options and re-imported as four separate
+   * groups. Carrying the NAME (not the id) also means the template can name a
+   * group that does not exist yet and have it created.
+   */
+  group_en?: string;
+  /** The fragment this option contributes to a built SKU. */
+  sku_part?: string;
+  /** Warn level for this option's own stock; null = no warning configured. */
+  low_stock_threshold?: number | null;
 }
 
 export interface ColorV2 extends PriceFields {
@@ -122,6 +138,19 @@ export interface ColorV2 extends PriceFields {
   option_id: string | null; // linked to one option, or null = available to all
   order: number;
   active: boolean;
+  // ---- carried for the ADMIN surfaces only; pricing never reads them ------
+  /**
+   * EVERY option this colour is available for, not just the one `option_id`
+   * can hold. A colour linked to two of four options is the normal case in the
+   * admin form, and `option_id` is deliberately left null for it (see
+   * applyRelations) — so without this list the template could neither show nor
+   * restore that constraint.
+   */
+  option_ids?: string[];
+  /** Sellable units of this colour; null = this level does not track stock. */
+  stock?: number | null;
+  /** Warn level for this colour's own stock; null = none configured. */
+  low_stock_threshold?: number | null;
 }
 
 export interface TransportOffer {

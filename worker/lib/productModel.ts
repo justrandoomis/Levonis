@@ -46,6 +46,20 @@ export interface MediaV2 {
   width: number | null;
   height: number | null;
   source_url: string; // original remote source when imported
+  /**
+   * WHAT THIS PICTURE IS OF.
+   *
+   * `product_images` has carried these three columns since 0018 and the admin
+   * form writes them — an image can be bound to an option value, a colour or a
+   * modelled combination, and the product page swaps to it when the customer
+   * picks that one. MediaV2 had no field for any of them, so the overlay threw
+   * the binding away and the TXT template exported every picture as a plain
+   * gallery image: re-importing the store's own export UNBOUND every option
+   * and colour photo. At most one is ever set; '' = a general gallery image.
+   */
+  option_value_id: string;
+  color_id: string;
+  variant_id: string;
 }
 
 export interface SpecRowV2 {
@@ -161,6 +175,18 @@ export interface ProductDoc {
    *  PRIME discount is never invented. */
   prime_price_iqd: number | null;
   product_cost_iqd: number | null; // internal, admin-only
+  /**
+   * THE PRICE BEFORE THE DISCOUNT — the struck-through number.
+   *
+   * `products.original_price_iqd` has existed since migration 0001 and the
+   * storefront reads it (worker/routes/storefront.ts) to render "was X, now
+   * Y" and to build the discounted list. It was never on ProductDoc, so the
+   * TXT template declared `original_price_iqd`, taught it in the blank file
+   * and the example, PARSED it — and then dropped it on the floor, because
+   * neither validateProductDoc nor serializeDoc had ever heard of it. The
+   * owner could type it and nothing happened. null = no compare-at price.
+   */
+  original_price_iqd: number | null;
   /** Legacy scalar, kept as sale_types[0] so pre-0018 readers keep working. */
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
   /** §6: a product may offer several sale types at once. Never empty. */
@@ -250,6 +276,7 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
         id: `img_legacy_${i}`, url: item, key: item.startsWith('/files/') ? item.slice(7) : '',
         role: 'gallery', alt_ar: '', alt_en: '', alt_ckb: '', order: i, primary: i === 0,
         width: null, height: null, source_url: '',
+        option_value_id: '', color_id: '', variant_id: '',
       });
     } else if (item && typeof item === 'object') {
       const m = item as Partial<MediaV2>;
@@ -264,6 +291,9 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
         primary: !!m.primary,
         width: num(m.width), height: num(m.height),
         source_url: s(m.source_url, 1000),
+        option_value_id: s(m.option_value_id, 60),
+        color_id: s(m.color_id, 60),
+        variant_id: s(m.variant_id, 60),
       });
     }
   });
@@ -359,6 +389,15 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
       lead_time_max_days: num(o.lead_time_max_days),
       variant_key: s(o.variant_key, 80) || variantKeyFrom(label),
       variant_label: label,
+      // ---- carried for the admin surfaces (TXT template, CSV) -------------
+      // These were dropped here, so a template that named an option's group,
+      // its SKU fragment or its warn level had them silently discarded on the
+      // way to the writer — and the group in particular could not survive a
+      // round trip at all. `group` is the template's spelling, `group_en` the
+      // model's; both are read so either shape parses.
+      group_en: s(o.group_en ?? o.group, 80),
+      sku_part: s(o.sku_part, 40),
+      low_stock_threshold: num(o.low_stock_threshold),
     };
   }).sort((a, b) => a.order - b.order);
 }
@@ -383,6 +422,19 @@ export function upgradeColors(raw: unknown): ColorV2[] {
       order: typeof c.order === 'number' ? (c.order as number) : i,
       active: c.active !== false,
       ...upgradePriceFields(c),
+      // The FULL link set. `option_id` above keeps the single-link legacy
+      // meaning; this is what a colour offered for two of four options needs,
+      // and it is what the relational writer actually stores. A comma string
+      // is accepted because that is how the TXT template writes a list.
+      option_ids: Array.isArray(c.option_ids)
+        ? (c.option_ids as unknown[]).filter((x): x is string => typeof x === 'string' && !!x)
+        : typeof c.option_ids === 'string'
+          ? (c.option_ids as string).split(',').map((x) => x.trim()).filter(Boolean)
+          : optionId
+            ? [optionId]
+            : [],
+      stock: num(c.stock),
+      low_stock_threshold: num(c.low_stock_threshold),
     };
   }).sort((a, b) => a.order - b.order);
 }
@@ -572,6 +624,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     pro_price_iqd: num(row.pro_price_iqd),
     prime_price_iqd: num(row.prime_price_iqd),
     product_cost_iqd: num(row.product_cost_iqd),
+    original_price_iqd: num(row.original_price_iqd),
     selling_type: row.selling_type === 'pre_order' || row.selling_type === 'bundle' ? row.selling_type : 'direct_sale',
     sale_types: normalizeSaleTypes(row.sale_types, String(row.selling_type ?? 'direct_sale')),
     preorder_transports: upgradeTransports(row.preorder_transports),
@@ -821,6 +874,12 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
     optionalPrice(body.product_cost_iqd, 'product_cost_iqd')
   );
+  // The compare-at price is only VALIDATED here (non-negative integer, via
+  // optionalPrice below); it is deliberately not fed into priceRules, whose
+  // ladder is about what a buyer pays. The storefront already shows it only
+  // when it is above the selling price, so a lower one is dead data rather
+  // than a save-blocking error.
+
   for (const o of options) {
     priceRules(`options.${o.id}`, o.regular_price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd);
   }
@@ -844,6 +903,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     pro_price_iqd: optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
     prime_price_iqd: optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
     product_cost_iqd: optionalPrice(body.product_cost_iqd, 'product_cost_iqd'),
+    original_price_iqd: optionalPrice(body.original_price_iqd, 'original_price_iqd'),
     // The legacy scalar tracks the reconciled list, exactly as it has since
     // 0018 — and it can never be 'mixed', which the column's CHECK forbids.
     selling_type: saleTypesForTransport[0] as ProductDoc['selling_type'],
@@ -913,6 +973,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     pro_price_iqd: doc.pro_price_iqd,
     prime_price_iqd: doc.prime_price_iqd,
     product_cost_iqd: doc.product_cost_iqd,
+    original_price_iqd: doc.original_price_iqd,
     // Kept in sync with sale_types[0] so every pre-0018 reader still sees a
     // valid scalar; sale_types is the authority.
     selling_type: doc.sale_types[0] ?? doc.selling_type,
@@ -1037,7 +1098,7 @@ export function projectPublic(doc: ProductDoc) {
 export const PRODUCT_COLUMNS = [
   'id','slug','status','doc_version','content_rev','name','name_ar','name_ku',
   'description','description_ar','description_ku','price_iqd','pro_price_iqd',
-  'prime_price_iqd','product_cost_iqd','selling_type','sale_types','preorder_transports',
+  'prime_price_iqd','product_cost_iqd','original_price_iqd','selling_type','sale_types','preorder_transports',
   'direct_surcharge_iqd','stock','low_stock_threshold','brand_id','category_id','sub_category_id',
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','content_blocks','translation_meta','is_featured',
