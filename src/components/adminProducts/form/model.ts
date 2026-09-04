@@ -35,6 +35,15 @@ export interface FormValue extends FormPrices {
   active: boolean;
   stock: number | null;
   low_stock_threshold: number | null;
+  /** 0043. '' = inherit the product's sale types, which is what every option
+   *  saved before this field existed does. */
+  availability_type: '' | 'direct_sale' | 'pre_order';
+  lead_time_text: string;
+  lead_time_min_days: number | null;
+  lead_time_max_days: number | null;
+  /** The MODEL this option is a fulfilment of — A1 vs A1 Combo. */
+  variant_key: string;
+  variant_label: string;
 }
 
 export interface FormGroup {
@@ -123,6 +132,14 @@ interface WireValue extends FormPrices {
   active: number;
   stock: number | null;
   low_stock_threshold: number | null;
+  /** 0043 — optional on the wire so this client still reads a response from a
+   *  server that has not deployed them yet. */
+  availability_type?: string;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  variant_key?: string;
+  variant_label?: string;
 }
 interface WireGroup {
   id: string;
@@ -178,6 +195,10 @@ export interface RelationsResponse {
   images?: WireImage[];
 }
 
+/** Anything the server might hold, narrowed to what the editor can render. */
+const readAvailability = (raw: unknown): '' | 'direct_sale' | 'pre_order' =>
+  raw === 'direct_sale' || raw === 'pre_order' ? raw : '';
+
 const prices = (x: FormPrices): FormPrices => ({
   regular_price_iqd: x.regular_price_iqd ?? null,
   prime_price_iqd: x.prime_price_iqd ?? null,
@@ -225,6 +246,12 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
           stock: v.stock,
           low_stock_threshold: v.low_stock_threshold,
           ...prices(v),
+          availability_type: readAvailability(v.availability_type),
+          lead_time_text: v.lead_time_text ?? '',
+          lead_time_min_days: v.lead_time_min_days ?? null,
+          lead_time_max_days: v.lead_time_max_days ?? null,
+          variant_key: v.variant_key ?? '',
+          variant_label: v.variant_label ?? '',
         })),
     })),
     colors: (r.colors ?? []).map((c) => ({
@@ -304,6 +331,15 @@ export function relationsToWire(rel: RelationsState) {
         stock: v.stock,
         low_stock_threshold: v.low_stock_threshold,
         ...prices(v),
+        availability_type: v.availability_type,
+        // A direct-sale option has nothing to wait for; sending a lead time
+        // with it would be refused by the server, so the form clears it here
+        // rather than letting the admin hit an error they cannot see.
+        lead_time_text: v.availability_type === 'direct_sale' ? '' : v.lead_time_text,
+        lead_time_min_days: v.availability_type === 'direct_sale' ? null : v.lead_time_min_days,
+        lead_time_max_days: v.availability_type === 'direct_sale' ? null : v.lead_time_max_days,
+        variant_key: v.variant_key,
+        variant_label: v.variant_label,
       })),
     })),
     colors: rel.colors.map((c, ci) => ({

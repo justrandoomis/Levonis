@@ -3,6 +3,8 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from '../lib/availability';
+import { normalizeSaleTypes } from '../lib/productModel';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import {
   isValidHex,
@@ -291,6 +293,16 @@ export async function planRelationsWrite(
     .prepare('SELECT * FROM product_images WHERE product_id = ?')
     .bind(productId)
     .all<{ id: string }>();
+  // What the product declares about itself today — the floor the derived sale
+  // types fall back to when no option has an opinion.
+  const productRow = await db
+    .prepare('SELECT sale_types, selling_type FROM products WHERE id = ?')
+    .bind(productId)
+    .first<{ sale_types: string; selling_type: string }>();
+  const existingSaleTypes = normalizeSaleTypes(
+    productRow?.sale_types,
+    String(productRow?.selling_type ?? 'direct_sale')
+  ) as string[];
 
   const errors: string[] = [];
 
@@ -324,16 +336,44 @@ export async function planRelationsWrite(
     stock: number | null;
     low_stock_threshold: number | null;
     prices: PriceInput;
+    availability_type: string;
+    lead_time_text: string;
+    lead_time_min_days: number | null;
+    lead_time_max_days: number | null;
+    variant_key: string;
+    variant_label: string;
   }> = [];
   for (const g of groupInputs) {
     g.values.forEach((v, i) => {
       const where = `${g.name_en}[${i}]`;
       const prices = readPrices(v, where);
       errors.push(...validatePriceLadder(prices, where));
+      const name = str(v.name_en, `${where}.name_en`, { max: 80 });
+      // 0043. Unknown words become '' (inherit) rather than an error: this
+      // endpoint is also how an old client saves an old product, and refusing
+      // a field it has never heard of would break editing the catalogue.
+      const availability = normalizeAvailability(v.availability_type);
+      const leadText = str(v.lead_time_text, `${where}.lead_time_text`, { max: 120, required: false }) ?? '';
+      const leadMin = nullableInt(v.lead_time_min_days, `${where}.lead_time_min_days`, 3650);
+      const leadMax = nullableInt(v.lead_time_max_days, `${where}.lead_time_max_days`, 3650);
+      if (leadMin !== null && leadMax !== null && leadMin > leadMax) {
+        errors.push(`${where}: lead_time_min_days is after lead_time_max_days`);
+      }
+      // A direct-sale option has no journey to wait for, so a lead time on one
+      // is a contradiction the admin should see rather than a value to store.
+      if (availability === 'direct_sale' && (leadText.trim() || leadMin !== null || leadMax !== null)) {
+        errors.push(`${where}: a direct-sale option has no lead time`);
+      }
+      const label = str(v.variant_label, `${where}.variant_label`, { max: 80, required: false }) ?? '';
+      const key = str(v.variant_key, `${where}.variant_key`, { max: 60, required: false }) ?? '';
+      // The label falls back to the option's own name with the availability
+      // suffix removed, and the key to that label's slug — so a product saved
+      // by a client that does not know these fields still groups correctly.
+      const effectiveLabel = label.trim() || variantLabelFallback(name);
       valueInputs.push({
         id: typeof v.id === 'string' && v.id ? v.id : newId('ov'),
         group_id: g.id,
-        name_en: str(v.name_en, `${where}.name_en`, { max: 80 }),
+        name_en: name,
         sku_part: str(v.sku_part, `${where}.sku_part`, { max: 40, required: false }) ?? '',
         image: str(v.image, `${where}.image`, { max: 500, required: false }) ?? '',
         sort: int(v.sort, `${where}.sort`, { min: 0, max: 10000, def: i }),
@@ -341,6 +381,12 @@ export async function planRelationsWrite(
         stock: nullableInt(v.stock, `${where}.stock`, 10_000_000),
         low_stock_threshold: nullableInt(v.low_stock_threshold, `${where}.low_stock_threshold`, 10_000_000),
         prices,
+        availability_type: availability,
+        lead_time_text: leadText,
+        lead_time_min_days: availability === 'direct_sale' ? null : leadMin,
+        lead_time_max_days: availability === 'direct_sale' ? null : leadMax,
+        variant_key: key.trim() || variantKeyFrom(effectiveLabel),
+        variant_label: effectiveLabel,
       });
     });
   }
@@ -542,6 +588,41 @@ export async function planRelationsWrite(
 
   stmts.push(db.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(mode, productId));
 
+  /**
+   * 0043 — THE PRODUCT FOLLOWS ITS OPTIONS.
+   *
+   * `sale_types` decides real things downstream: which order stages a purchase
+   * walks through, which shipping type the cart locks to, whether a transport
+   * must be chosen. If an admin marks one option pre-order and the product
+   * still says direct sale, the buyer gets direct-sale stages for a parcel
+   * that is weeks away — so the product is DERIVED from its options here
+   * rather than validated against them, and the two cannot drift.
+   *
+   * A product whose options all stay silent keeps exactly what it declared,
+   * which is every product that existed before this migration. `selling_type`
+   * is refreshed alongside as sale_types[0], the same legacy-scalar contract
+   * productModel.ts has kept since 0018.
+   */
+  const declaredSaleTypes = deriveSaleTypes(
+    valueInputs.map((v) => ({
+      availability_type: normalizeAvailability(v.availability_type),
+      active: v.active === 1,
+    })),
+    existingSaleTypes
+  );
+  if (declaredSaleTypes.join(',') !== existingSaleTypes.join(',')) {
+    stmts.push(
+      db
+        .prepare('UPDATE products SET sale_types = ?, selling_type = ? WHERE id = ?')
+        .bind(
+          JSON.stringify(declaredSaleTypes),
+          // The CHECK on selling_type only admits the three original words.
+          declaredSaleTypes.find((t) => t === 'direct_sale' || t === 'pre_order' || t === 'bundle') ?? 'direct_sale',
+          productId
+        )
+    );
+  }
+
   // Links are rebuilt wholesale; they are pure join rows with no state.
   stmts.push(
     db
@@ -582,20 +663,30 @@ export async function planRelationsWrite(
         .prepare(
           `INSERT INTO product_option_values
              (id, product_id, group_id, name_en, sku_part, image, sort, active, stock, low_stock_threshold,
-              regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
+              availability_type, lead_time_text, lead_time_min_days, lead_time_max_days,
+              variant_key, variant_label)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
              group_id = excluded.group_id, name_en = excluded.name_en, sku_part = excluded.sku_part,
              image = excluded.image, sort = excluded.sort, active = excluded.active,
              stock = excluded.stock, low_stock_threshold = excluded.low_stock_threshold,
              regular_price_iqd = excluded.regular_price_iqd, prime_price_iqd = excluded.prime_price_iqd,
-             pro_price_iqd = excluded.pro_price_iqd${money ? ', cost_iqd = excluded.cost_iqd' : ''}`
+             pro_price_iqd = excluded.pro_price_iqd,
+             availability_type = excluded.availability_type,
+             lead_time_text = excluded.lead_time_text,
+             lead_time_min_days = excluded.lead_time_min_days,
+             lead_time_max_days = excluded.lead_time_max_days,
+             variant_key = excluded.variant_key,
+             variant_label = excluded.variant_label${money ? ', cost_iqd = excluded.cost_iqd' : ''}`
         )
         .bind(
           v.id, productId, v.group_id, v.name_en, v.sku_part, v.image, v.sort, v.active,
           v.stock, v.low_stock_threshold,
           v.prices.regular_price_iqd, v.prices.prime_price_iqd, v.prices.pro_price_iqd,
-          money ? v.prices.cost_iqd : null
+          money ? v.prices.cost_iqd : null,
+          v.availability_type, v.lead_time_text, v.lead_time_min_days, v.lead_time_max_days,
+          v.variant_key, v.variant_label
         )
     );
   }

@@ -199,6 +199,14 @@ interface MediaItem {
 }
 interface OptionItem {
   id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string; image?: string;
+  /** 0043. Absent on every product written before per-option availability,
+   *  which is exactly why the two-step chooser below is opt-in. */
+  availability_type?: '' | 'direct_sale' | 'pre_order';
+  variant_key?: string;
+  variant_label?: string;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
 }
 interface ColorItem {
   id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string;
@@ -729,6 +737,51 @@ export default function Product() {
   // rather than duplicated.
 
   // ------------------------------------------------------------ loading/error
+  /**
+   * TWO STEPS INSTEAD OF FOUR CARDS — but only when the data says so.
+   *
+   * The owner asked not to show "A1 pre-order / A1 direct / A1 Combo
+   * pre-order / A1 Combo direct" as four flat chips. So when the options carry
+   * a model key AND at least one of them names its own availability, they are
+   * folded into: pick the model, then pick how to get it.
+   *
+   * When they do NOT — every product in the catalogue before this feature —
+   * the flat chip list below renders exactly as it always has. That is the
+   * whole backward-compatibility story on this page: one boolean, and no old
+   * product takes the new path.
+   */
+  const tr = (ar: string, en: string, ckb: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb : ar);
+
+  const models = useMemo(() => {
+    const options = product?.options ?? [];
+    const declared = options.some((o) => o.availability_type === 'pre_order' || o.availability_type === 'direct_sale');
+    if (!declared) return null;
+    const byKey = new Map<string, { key: string; label: string; options: OptionItem[] }>();
+    for (const o of options) {
+      const key = o.variant_key || o.id;
+      const entry = byKey.get(key);
+      if (entry) entry.options.push(o);
+      else byKey.set(key, { key, label: o.variant_label || pickName(o.name_en, o.name, o.name_ar) || key, options: [o] });
+    }
+    return [...byKey.values()];
+  }, [product]);
+
+  const selectedOption = useMemo(
+    () => (optionId ? (product?.options ?? []).find((o) => o.id === optionId) ?? null : null),
+    [product, optionId]
+  );
+  const [modelKey, setModelKey] = useState('');
+  // The chosen option decides the model, so a deep link or a restored cart
+  // lands on the right step without the page guessing.
+  useEffect(() => {
+    if (selectedOption) setModelKey(selectedOption.variant_key || selectedOption.id);
+  }, [selectedOption]);
+  // With exactly one model there is no first step to take.
+  useEffect(() => {
+    if (models && models.length === 1 && !modelKey) setModelKey(models[0].key);
+  }, [models, modelKey]);
+
+
   if (loading || !product) {
     return (
       <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
@@ -967,9 +1020,105 @@ export default function Product() {
     </div>
   );
 
+  const activeModel = models?.find((m) => m.key === modelKey) ?? null;
+
   const selectionBlocks = (
     <>
-      {options.length > 0 ? (
+      {models ? (
+        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4" data-variant-chooser>
+          <legend className="px-1 text-white font-bold text-[14px]">
+            {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
+            {!modelKey ? <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span> : null}
+          </legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {models.map((m) => {
+              const selected = modelKey === m.key;
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  data-variant-model={m.key}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setModelKey(selected ? '' : m.key);
+                    // Changing the model invalidates the availability chosen
+                    // under the previous one.
+                    setOptionId('');
+                  }}
+                  className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 text-sm font-bold transition-colors ${
+                    selected
+                      ? 'border-gold bg-gold/15 text-gold'
+                      : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
+                  }`}
+                >
+                  {m.options[0]?.image ? (
+                    <img
+                      src={m.options[0].image}
+                      alt=""
+                      aria-hidden="true"
+                      className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : null}
+                  <span className="block truncate max-w-[12rem] text-start">{m.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeModel ? (
+            <div className="mt-4 border-t border-zinc-800/70 pt-3" data-availability-chooser>
+              <p className="text-white font-bold text-[13px] mb-2">
+                {tr('طريقة التوفر', 'How to get it', 'چۆنیەتی بەردەستبوون')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {activeModel.options.map((opt) => {
+                  const selected = optionId === opt.id;
+                  const isPre = opt.availability_type === 'pre_order';
+                  const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
+                  const wait = (opt.lead_time_text ?? '').trim();
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      data-availability-option={opt.id}
+                      data-availability={opt.availability_type || 'inherit'}
+                      aria-pressed={selected}
+                      onClick={() => {
+                        const next = selected ? '' : opt.id;
+                        setOptionId(next);
+                        // The option now decides the route, so the page stops
+                        // asking the fulfilment question separately: a direct
+                        // option clears any transport, a pre-order one keeps
+                        // the transport picker below for the journey.
+                        if (next && opt.availability_type === 'direct_sale') setTransportMethod('');
+                        if (next) setWantPreorder(opt.availability_type === 'pre_order');
+                      }}
+                      className={`min-h-[44px] px-3 rounded-xl border text-start transition-colors ${
+                        selected
+                          ? 'border-gold bg-gold/15 text-gold'
+                          : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
+                      }`}
+                    >
+                      <span className="block text-sm font-bold">
+                        {isPre
+                          ? tr('طلب مسبق', 'Pre-order', 'پێش-داواکاری')
+                          : tr('بيع مباشر', 'Direct sale', 'فرۆشتنی ڕاستەوخۆ')}
+                      </span>
+                      {isPre && wait ? (
+                        <span className="block text-[11px] font-medium text-amber-300/90 leading-tight">{wait}</span>
+                      ) : null}
+                      {chip ? (
+                        <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </fieldset>
+      ) : options.length > 0 ? (
         <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.options}

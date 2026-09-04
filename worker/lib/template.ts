@@ -16,6 +16,7 @@
  */
 
 import { newId } from './crypto';
+import { isMixed } from './availability';
 import type {
   ProductDoc,
   TranslationMeta,
@@ -128,7 +129,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('is_featured', 'bool', 'classification', 'منتج مميز — featured flag (true/false)'),
   f('display_order', 'int', 'classification', 'ترتيب العرض — display order (integer, lower = earlier)', { min: -100_000, max: 100_000 }),
   // selling
-  f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle', { enumValues: ['direct_sale', 'pre_order', 'bundle'] as const }),
+  f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. والأدق أن تترك الخيارات تقرر: أنواع البيع تُشتق من availability_type لكل خيار.', { enumValues: ['direct_sale', 'pre_order', 'bundle', 'mixed'] as const }),
   f('stock', 'int', 'selling', 'المخزون — stock count; __NULL__ = not tracked', { nullable: true, min: 0, max: 1_000_000 }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
 ];
@@ -172,6 +173,14 @@ const GROUP_SPECS: GroupSpec[] = [
       f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للخيار — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
       f('compare_at_iqd', 'iqd', 'options', 'سعر المقارنة للخيار — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'options', 'كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
+      // ---- 0043: this option's own availability, stock and lead time ------
+      f('availability_type', 'enum', 'options', 'نوع التوفر لهذا الخيار — direct_sale | pre_order. اتركه فارغًا ليرث نوع بيع المنتج (وهو ما تفعله كل الخيارات القديمة).', { enumValues: ['', 'direct_sale', 'pre_order'] as const }),
+      f('stock', 'int', 'options', 'مخزون هذا الخيار — __NULL__ = لا يُتتبع (الطلب المسبق عادةً). البيع المباشر يضع رقمًا.', { nullable: true, min: 0, max: 1_000_000 }),
+      f('lead_time_text', 'string', 'options', 'مدة الطلب المسبق كما تُعرض للزبون — مثال: 3-4 weeks. النص يسبق الأرقام دائمًا.'),
+      f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام للطلب المسبق — للترتيب والتقدير، لا للعرض', { nullable: true, min: 0, max: 3650 }),
+      f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام للطلب المسبق', { nullable: true, min: 0, max: 3650 }),
+      f('variant_key', 'string', 'options', 'مفتاح النسخة — a1 / a1-combo. هو ما يجمع «A1 طلب مسبق» و«A1 بيع مباشر» تحت نسخة واحدة؛ اتركه فارغًا ليُشتق من variant_label.'),
+      f('variant_label', 'string', 'options', 'اسم النسخة كما يقرؤه الزبون — A1 / A1 Combo. فارغًا يُشتق من اسم الخيار بعد حذف لاحقة نوع التوفر.'),
     ],
   },
   {
@@ -635,7 +644,11 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   push('is_featured', boolStr(doc.is_featured));
   push('display_order', String(doc.display_order));
   // selling
-  push('selling_type', doc.selling_type);
+  // A product selling both ways exports the word `mixed` — the scalar alone
+  // would say 'direct_sale' and a re-import of the store's own export would
+  // quietly halve the product. The importer expands it back, and the options'
+  // own availability types are the authority either way.
+  push('selling_type', isMixed(doc.sale_types) ? 'mixed' : doc.selling_type);
   push('stock', numStr(doc.stock));
   push('payment_options', doc.payment_options.join(','));
 
@@ -673,6 +686,17 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.pro_price_iqd`, numStr(o.pro_price_iqd));
     push(`${p}.prime_price_iqd`, numStr(o.prime_price_iqd));
     push(`${p}.cost_iqd`, numStr(o.cost_iqd));
+    // 0043. Exported unconditionally, including as empty strings, because an
+    // export is the bulk-EDIT path: a field the file omits is one the importer
+    // PRESERVES, so a silently-absent availability could never be cleared by
+    // editing the file the store itself produced.
+    push(`${p}.availability_type`, o.availability_type ?? '');
+    push(`${p}.stock`, numStr(o.stock ?? null));
+    push(`${p}.lead_time_text`, o.lead_time_text ?? '');
+    push(`${p}.lead_time_min_days`, numStr(o.lead_time_min_days ?? null));
+    push(`${p}.lead_time_max_days`, numStr(o.lead_time_max_days ?? null));
+    push(`${p}.variant_key`, o.variant_key ?? '');
+    push(`${p}.variant_label`, o.variant_label ?? '');
   });
 
   sorted(doc.colors).forEach((cItem, i) => {

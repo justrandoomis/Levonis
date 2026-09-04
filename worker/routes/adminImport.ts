@@ -476,6 +476,16 @@ async function exportProducts(
         prime_price_iqd: n(v.prime_price_iqd),
         pro_price_iqd: n(v.pro_price_iqd),
         cost_iqd: money0(v.cost_iqd),
+        // 0043. An export is the bulk-EDIT path, so every one of these ships
+        // even when empty: an omitted column is one the importer PRESERVES,
+        // and a silently absent availability could never be cleared by editing
+        // the very file the store produced.
+        availability_type: (v.availability_type as string) ?? '',
+        lead_time_text: (v.lead_time_text as string) ?? '',
+        lead_time_min_days: n(v.lead_time_min_days),
+        lead_time_max_days: n(v.lead_time_max_days),
+        variant_key: (v.variant_key as string) ?? '',
+        variant_label: (v.variant_label as string) ?? '',
       })),
       colors: colors
         .filter((col) => col.product_id === pid)

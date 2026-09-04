@@ -62,6 +62,7 @@ import {
   type ProductTypeId,
   type TemplateField,
 } from './templateFamilies';
+import { AVAILABILITY_TYPES, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
 import type { Lookups } from './lookups';
 
 export type RowType =
@@ -190,6 +191,13 @@ export const BASE_COLUMNS = [
   'direct_surcharge_iqd',
   'stock',
   'low_stock_threshold',
+  // ---- 0043: an option answers for itself (blank = inherit the product's)
+  'availability_type',
+  'lead_time_text',
+  'lead_time_min_days',
+  'lead_time_max_days',
+  'variant_key',
+  'variant_label',
   'payment_options',
   // ---- section 7: how it is used
   'how_to_use',
@@ -391,6 +399,13 @@ export interface ParsedOption {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0043: how THIS option is fulfilled. '' = inherit the product's. */
+  availability_type: string;
+  lead_time_text: string;
+  lead_time_min_days: number | null;
+  lead_time_max_days: number | null;
+  variant_key: string;
+  variant_label: string;
 }
 
 export interface ParsedColor {
@@ -740,6 +755,29 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         issues.push({ line, severity: 'error', message: 'سطر option يحتاج group و value' });
         continue;
       }
+      // 0043. An unknown word is refused by name rather than silently
+      // inherited: in a spreadsheet a typo like "preordr" is the likeliest
+      // mistake there is, and quietly selling a pre-order as direct stock is
+      // the worst way to find out.
+      const availabilityRaw = cell(r, 'availability_type');
+      const availability = normalizeAvailability(availabilityRaw);
+      if (availabilityRaw && !availability) {
+        issues.push({
+          line,
+          severity: 'error',
+          message: `availability_type: "${availabilityRaw}" غير مقبول — القيم المتاحة: ${AVAILABILITY_TYPES.join(' / ')}`,
+        });
+      }
+      const leadText = cell(r, 'lead_time_text');
+      const leadMin = intCell(cell(r, 'lead_time_min_days'), line, 'lead_time_min_days', issues);
+      const leadMax = intCell(cell(r, 'lead_time_max_days'), line, 'lead_time_max_days', issues);
+      if (leadMin !== null && leadMax !== null && leadMin > leadMax) {
+        issues.push({ line, severity: 'error', message: 'lead_time_min_days: أكبر من lead_time_max_days' });
+      }
+      if (availability === 'direct_sale' && (leadText || leadMin !== null || leadMax !== null)) {
+        issues.push({ line, severity: 'error', message: 'lead_time_text: خيار بيع مباشر بلا مدة انتظار — احذف المدة أو اجعله طلبًا مسبقًا' });
+      }
+      const variantLabel = cell(r, 'variant_label') || variantLabelFallback(value);
       parent.options.push({
         line,
         group,
@@ -749,6 +787,12 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         active,
         ...counts(),
         ...money(),
+        availability_type: availability,
+        lead_time_text: leadText,
+        lead_time_min_days: availability === 'direct_sale' ? null : leadMin,
+        lead_time_max_days: availability === 'direct_sale' ? null : leadMax,
+        variant_key: cell(r, 'variant_key') || variantKeyFrom(variantLabel),
+        variant_label: variantLabel,
       });
       continue;
     }
@@ -1194,6 +1238,20 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         prime_price_iqd: num(o.prime_price_iqd),
         pro_price_iqd: num(o.pro_price_iqd),
         cost_iqd: num(o.cost_iqd),
+        // 0043 — written even when blank, so the exported sheet is editable
+        // in both directions: an omitted cell is one the importer preserves.
+        //
+        // The variant pair is DERIVED here when it is missing, with exactly
+        // the fallback the parser uses. Without that the round trip is not a
+        // fixed point: the parser would fill a key the export left blank, and
+        // exporting the result would differ from the file it came from — which
+        // is precisely the drift tests/importCsv.test.ts exists to catch.
+        availability_type: o.availability_type,
+        lead_time_text: o.lead_time_text,
+        lead_time_min_days: num(o.lead_time_min_days),
+        lead_time_max_days: num(o.lead_time_max_days),
+        variant_key: o.variant_key || variantKeyFrom(o.variant_label || variantLabelFallback(o.value)),
+        variant_label: o.variant_label || variantLabelFallback(o.value),
       });
     }
     for (const c of p.colors) {
@@ -1635,7 +1693,7 @@ ${def.hint_ar}
 ------------
 ${[
     rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, payment_options, how_to_use, usage_url, spec.*'),
-    rowType('option', 'قيمة واحدة من مجموعة خيارات', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
+    rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('image', 'صورة واحدة في المعرض', 'image, alt, primary, links (color:Name أو option:Group:Value)'),

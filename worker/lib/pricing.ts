@@ -28,6 +28,7 @@
  */
 
 import { safeParse } from './types';
+import { effectiveAvailability } from './availability';
 
 export type Tier = 'free' | 'plus' | 'pro' | 'prime';
 
@@ -51,6 +52,22 @@ export interface OptionV2 extends PriceFields {
   image: string;
   order: number;
   active: boolean;
+  /**
+   * HOW THIS ONE OPTION IS FULFILLED. '' (or absent) = inherit the product's
+   * sale_types, which is what every option written before this feature does —
+   * so an old product behaves exactly as it always did. See
+   * worker/lib/availability.ts for the inheritance rule.
+   */
+  availability_type?: '' | 'direct_sale' | 'pre_order';
+  /** Shown when this option is a pre-order. Prose wins over the day numbers. */
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  /** The MODEL this option is a fulfilment of — 'a1' vs 'a1-combo'. */
+  variant_key?: string;
+  variant_label?: string;
+  /** Sellable units at this level; null = this level does not track stock. */
+  stock?: number | null;
 }
 
 export interface ColorV2 extends PriceFields {
@@ -213,7 +230,26 @@ export function resolveUnitPrice(input: {
   // Preorder transport commission — added on top; waived for active PRO.
   let transport: ResolvedPrice['transport'] = null;
   const method = (input.transportMethod ?? '').trim();
-  const saleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
+  const productSaleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
+
+  /**
+   * THE CHOSEN OPTION MAY DECIDE HOW THIS LINE IS FULFILLED.
+   *
+   * Until now a line's route came only from the product: a pre-order-only
+   * product demanded a transport, a direct-only one refused it, and a product
+   * selling both ways let the transport selection decide. That is still
+   * exactly what happens when the option has no opinion — which is every
+   * option that existed before this feature, so no priced line changes.
+   *
+   * When the option DOES declare itself, it narrows the line to its own route
+   * and nothing else: choosing "A1 Combo — Direct Sale" cannot be turned into
+   * a pre-order by adding a transport to the request, and choosing
+   * "A1 Combo — Pre-order" cannot skip one. That is what makes the four
+   * cells of the owner's grid genuinely independent rather than four labels
+   * over one shared fulfilment decision.
+   */
+  const optionAvailability = effectiveAvailability(option, productSaleTypes);
+  const saleTypes = optionAvailability ? [optionAvailability] : productSaleTypes;
   if (saleTypes.includes('pre_order') && (saleTypes.length === 1 || method)) {
     if (!method) {
       errors.push('TRANSPORT_REQUIRED');
@@ -248,7 +284,11 @@ export function resolveUnitPrice(input: {
   // فقط مع الزياده»), so the premium folds into unit_subtotal_iqd exactly
   // like the commission and is never waived by membership.
   let direct: ResolvedPrice['direct'] = null;
-  const directEnabled = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const directEnabled =
+    saleTypes.includes('direct_sale') ||
+    // A bundle is a catalogue classification, not a route, so it only enables
+    // direct fulfilment while the OPTION has not named a route of its own.
+    (!optionAvailability && productSaleTypes.includes('bundle'));
   const directSurcharge = product.direct_surcharge_iqd ?? null;
   if (!method && directEnabled && typeof directSurcharge === 'number' && Number.isInteger(directSurcharge) && directSurcharge > 0) {
     direct = { surcharge_iqd: directSurcharge };

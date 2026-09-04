@@ -236,6 +236,14 @@ const sample: ExportProduct = {
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      // 0043: this fixture predates per-option availability; blank means
+      // 'inherit the product', which is what every old option does.
+      availability_type: '',
+      lead_time_text: '',
+      lead_time_min_days: null,
+      lead_time_max_days: null,
+      variant_key: '',
+      variant_label: '',
     },
     {
       group: 'Printer',
@@ -249,6 +257,14 @@ const sample: ExportProduct = {
       prime_price_iqd: 700000,
       pro_price_iqd: 690000,
       cost_iqd: 500000,
+      // 0043: this fixture predates per-option availability; blank means
+      // 'inherit the product', which is what every old option does.
+      availability_type: '',
+      lead_time_text: '',
+      lead_time_min_days: null,
+      lead_time_max_days: null,
+      variant_key: '',
+      variant_label: '',
     },
     {
       group: 'Plug',
@@ -262,6 +278,14 @@ const sample: ExportProduct = {
       prime_price_iqd: null,
       pro_price_iqd: null,
       cost_iqd: null,
+      // 0043: this fixture predates per-option availability; blank means
+      // 'inherit the product', which is what every old option does.
+      availability_type: '',
+      lead_time_text: '',
+      lead_time_min_days: null,
+      lead_time_max_days: null,
+      variant_key: '',
+      variant_label: '',
     },
   ],
   colors: [

@@ -155,6 +155,11 @@ const valueWith = (stock: number | null) => ({
   id: 'v1', name_en: 'A1', sku_part: '', image: '', sort: 0, active: true,
   stock, low_stock_threshold: null,
   regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
+  // 0043: silent about its own availability, which is what these
+  // inventory-mode tests are about — the derivation must not care.
+  availability_type: '' as const, lead_time_text: '',
+  lead_time_min_days: null, lead_time_max_days: null,
+  variant_key: '', variant_label: '',
 });
 
 const colorWith = (stock: number | null) => ({

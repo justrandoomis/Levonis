@@ -47,6 +47,15 @@ export interface OptionValueRow {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  /** 0043. Optional on the type because a row read from a database that has
+   *  not run 0043 yet simply will not have them, and the overlay must not
+   *  crash a storefront over a column that is only ever an enrichment. */
+  availability_type?: string;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  variant_key?: string;
+  variant_label?: string;
 }
 
 export interface ColorRow {

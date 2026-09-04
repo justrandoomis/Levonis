@@ -32,6 +32,12 @@ import {
   type OptionValueRow,
 } from './productRelations';
 import { isInventoryMode, type InventoryMode, type InventorySnapshot } from './inventory';
+import {
+  availabilityFromName,
+  normalizeAvailability,
+  variantKeyFrom,
+  variantLabelFallback,
+} from './availability';
 
 export interface VariantRow {
   id: string;
@@ -275,6 +281,19 @@ export function applyRelations(doc: ProductDoc, view: ProductRelationsView): Pro
       prime_price_iqd: v.prime_price_iqd,
       pro_price_iqd: v.pro_price_iqd,
       cost_iqd: v.cost_iqd,
+      // 0043. The label falls back to the option's own name so a row written
+      // before variant_key existed still names its model; the KEY falls back
+      // to that label's slug rather than to name parsing, so grouping is
+      // stable even for a legacy row.
+      availability_type: normalizeAvailability(v.availability_type) || availabilityFromName(v.name_en),
+      lead_time_text: v.lead_time_text ?? '',
+      lead_time_min_days: v.lead_time_min_days ?? null,
+      lead_time_max_days: v.lead_time_max_days ?? null,
+      variant_label: (v.variant_label ?? '').trim() || variantLabelFallback(v.name_en),
+      variant_key:
+        (v.variant_key ?? '').trim() ||
+        variantKeyFrom((v.variant_label ?? '').trim() || variantLabelFallback(v.name_en)),
+      stock: v.stock,
     }));
 
   const linksByColor = new Map<string, string[]>();

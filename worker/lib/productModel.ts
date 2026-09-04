@@ -22,6 +22,13 @@ import { badRequest } from './http';
 import { newId } from './crypto';
 import { dedupeHashtags, normalizeHashtag } from './hashtags';
 import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields } from './pricing';
+import {
+  deriveSaleTypes,
+  expandSellingType,
+  normalizeAvailability,
+  variantKeyFrom,
+  variantLabelFallback,
+} from './availability';
 
 export const DOC_VERSION = 2;
 
@@ -314,6 +321,13 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
   const arr = safeParseArr(raw);
   return arr.map((item, i) => {
     const o = item as Record<string, unknown>;
+    // 0043. The label falls back to the option's own name with an availability
+    // suffix stripped, and the key to that label's slug, so an option stored
+    // before these fields existed still groups into the right model instead of
+    // becoming its own. An unknown availability word reads as '' = inherit,
+    // never as an error: this function also parses rows nobody is editing.
+    const name = s(o.name_ar, 200) || s(o.name_en ?? o.name, 200);
+    const label = s(o.variant_label, 200) || variantLabelFallback(name);
     return {
       id: ensureId(o.id, 'opt'),
       name_ar: s(o.name_ar, 200),
@@ -323,6 +337,13 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
       order: typeof o.order === 'number' ? (o.order as number) : i,
       active: o.active !== false,
       ...upgradePriceFields(o),
+      availability_type: normalizeAvailability(o.availability_type),
+      stock: num(o.stock),
+      lead_time_text: s(o.lead_time_text, 200),
+      lead_time_min_days: num(o.lead_time_min_days),
+      lead_time_max_days: num(o.lead_time_max_days),
+      variant_key: s(o.variant_key, 80) || variantKeyFrom(label),
+      variant_label: label,
     };
   }).sort((a, b) => a.order - b.order);
 }
@@ -654,10 +675,56 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
   // had every transport offer silently deactivated on save — and then refused
   // every pre-order add with TRANSPORT_NOT_OFFERED. The multi-select in §6 is
   // exactly the case that produces that combination.
-  const saleTypesForTransport = normalizeSaleTypes(body.sale_types, sellingType as string);
+  /**
+   * 0043 — THE SALE TYPES ARE READ OFF THE OPTIONS.
+   *
+   * Three inputs are reconciled here, in this order:
+   *   1. `mixed`, which the TXT template accepts as a word for "both". It is
+   *      expanded, never stored: products.selling_type is pinned by a CHECK
+   *      written in 0001 that only admits the three original values.
+   *   2. `sale_types`, the array that has been the authority since 0018.
+   *   3. the OPTIONS' own availability types, which win when any option has
+   *      one — otherwise an option marked pre-order on a product still saying
+   *      direct sale would give its buyer direct-sale stages for a parcel
+   *      that is weeks away.
+   * A product whose options are all silent keeps exactly what it declared,
+   * which is every product written before this feature.
+   */
+  const mixedExpansion = expandSellingType(body.selling_type);
+  const declaredSaleTypes = normalizeSaleTypes(
+    mixedExpansion ?? body.sale_types,
+    mixedExpansion ? 'direct_sale' : (sellingType as string)
+  );
+  const saleTypesForTransport = normalizeSaleTypes(
+    deriveSaleTypes(options, declaredSaleTypes),
+    declaredSaleTypes[0]
+  );
   if (!saleTypesForTransport.includes('pre_order') && transports.some((t) => t.active)) {
     // Transport offers are meaningless outside preorder — kept stored but inactive.
     transports.forEach((t) => (t.active = false));
+  }
+
+  /**
+   * A pre-order option with no lead time is not refused — the owner asked for
+   * "required or strongly recommended", and refusing would make an import of a
+   * real catalogue fail over a marketing string. A DIRECT option carrying one
+   * IS refused, because that is not an omission, it is a contradiction: a
+   * thing shipping from the shelf has no wait to describe.
+   */
+  for (const o of options) {
+    const availability = normalizeAvailability(o.availability_type);
+    if (availability === 'direct_sale') {
+      const hasLead = !!(o.lead_time_text ?? '').trim() || o.lead_time_min_days !== null || o.lead_time_max_days !== null;
+      if (hasLead) fail(`options.${o.id}.lead_time_text`, 'a direct-sale option has no lead time');
+    }
+    const min = o.lead_time_min_days ?? null;
+    const max = o.lead_time_max_days ?? null;
+    if (min !== null && max !== null && min > max) {
+      fail(`options.${o.id}.lead_time_min_days`, 'is after lead_time_max_days');
+    }
+    if (o.stock !== null && o.stock !== undefined && (!Number.isInteger(o.stock) || o.stock < 0)) {
+      fail(`options.${o.id}.stock`, 'must be a non-negative integer or null (untracked)');
+    }
   }
 
   for (const w of warranty) {
@@ -762,8 +829,12 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     pro_price_iqd: optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
     prime_price_iqd: optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
     product_cost_iqd: optionalPrice(body.product_cost_iqd, 'product_cost_iqd'),
-    selling_type: sellingType as ProductDoc['selling_type'],
-    sale_types: normalizeSaleTypes(body.sale_types, sellingType as string),
+    // The legacy scalar tracks the reconciled list, exactly as it has since
+    // 0018 — and it can never be 'mixed', which the column's CHECK forbids.
+    selling_type: saleTypesForTransport[0] as ProductDoc['selling_type'],
+    // The reconciled list computed above — `mixed` expanded and the options'
+    // own availability types honoured — not the raw body field.
+    sale_types: saleTypesForTransport,
     preorder_transports: transports,
     direct_surcharge_iqd: optionalPrice(body.direct_surcharge_iqd, 'direct_surcharge_iqd'),
     stock: stock as number | null,
