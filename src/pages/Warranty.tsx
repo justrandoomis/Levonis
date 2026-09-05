@@ -40,6 +40,14 @@ export default function Warranty() {
   const { lang, dir } = useLanguage();
   const s = WARRANTY_STRINGS[lang];
 
+  const goBack = () => {
+    // navigate(-1) is a no-op when the page was opened directly (deep link,
+    // refresh) — fall back to home instead of a dead button.
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else navigate('/');
+  };
+
   // ------------------------------------------------------------- devices
   const [mine, setMine] = useState<MineResponse | null>(null);
   const [devicesLoading, setDevicesLoading] = useState(true);
@@ -180,7 +188,7 @@ export default function Warranty() {
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={goBack}
           aria-label={s.back}
           className={`p-2 bg-zinc-900/80 rounded-full hover:bg-zinc-800 transition-colors ${FOCUS}`}
         >

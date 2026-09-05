@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw, AlertCircle, Camera, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
 import { api, ApiError, ApiOrder, formatIqd, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { daysLeftLabel, formatDate } from '../orders/format';
 
 /**
  * Returns section for ONE order (final-phase §6.2) — wired into the Orders
@@ -53,9 +54,9 @@ const STRINGS = {
     windowClosed: 'انتهت نافذة الإرجاع (7 أيام من الاستلام) لهذا الطلب.',
     windowUnknown: 'لم نتمكن من تحديد تاريخ الاستلام الفعلي لهذا الطلب، لذا لا نستطيع حساب الأيام المتبقية هنا. يمكنك إرسال الطلب وسيحكم النظام على المدة عند الاستلام.',
     itemClosed: 'انتهت نافذة الإرجاع لهذا المنتج.',
-    daysLeft: (n: number) => (n === 1 ? 'يوم واحد متبقٍ لطلب الإرجاع' : `${n} أيام متبقية لطلب الإرجاع`),
+    daysLeft: (n: number) => `${daysLeftLabel(n, 'ar')} لطلب الإرجاع`,
     request: 'طلب إرجاع',
-    loading: 'جارٍ التحميل...',
+    loading: 'جارٍ التحميل…',
     loadError: 'تعذّر تحميل حالات الإرجاع.',
     retry: 'إعادة المحاولة',
     noCases: 'لا توجد طلبات إرجاع لهذا الطلب.',
@@ -69,13 +70,14 @@ const STRINGS = {
       shipping_damage: 'ضرر أثناء الشحن',
     } as Record<string, string>,
     descLabel: 'وصف المشكلة',
-    descPlaceholder: 'اشرح المشكلة بدقة...',
+    descPlaceholder: 'اشرح المشكلة بدقة…',
     evidence: 'صور توضيحية (خاصة — تُعرض للإدارة فقط)',
     addPhoto: 'إضافة صورة',
-    uploading: 'جارٍ الرفع...',
+    uploading: 'جارٍ الرفع…',
     submit: 'إرسال طلب الإرجاع',
-    submitting: 'جارٍ الإرسال...',
+    submitting: 'جارٍ الإرسال…',
     cancel: 'إلغاء',
+    removePhoto: 'إزالة الصورة',
     caseTitle: 'حالة إرجاع',
     states: {
       requested: 'مُقدَّم',
@@ -104,9 +106,9 @@ const STRINGS = {
     windowClosed: 'The 7-day return window (from delivery) for this order has closed.',
     windowUnknown: 'We could not determine the actual delivery date of this order, so the days left cannot be shown here. You can still submit a request — the server judges the window when it is filed.',
     itemClosed: 'The return window for this item has closed.',
-    daysLeft: (n: number) => (n === 1 ? '1 day left to request a return' : `${n} days left to request a return`),
+    daysLeft: (n: number) => `${daysLeftLabel(n, 'en')} to request a return`,
     request: 'Request return',
-    loading: 'Loading...',
+    loading: 'Loading…',
     loadError: 'Could not load return cases.',
     retry: 'Retry',
     noCases: 'No return requests for this order.',
@@ -120,13 +122,14 @@ const STRINGS = {
       shipping_damage: 'Shipping damage',
     } as Record<string, string>,
     descLabel: 'Describe the problem',
-    descPlaceholder: 'Explain the issue precisely...',
+    descPlaceholder: 'Explain the issue precisely…',
     evidence: 'Photos (private — visible to staff only)',
     addPhoto: 'Add photo',
-    uploading: 'Uploading...',
+    uploading: 'Uploading…',
     submit: 'Submit return request',
-    submitting: 'Submitting...',
+    submitting: 'Submitting…',
     cancel: 'Cancel',
+    removePhoto: 'Remove photo',
     caseTitle: 'Return case',
     states: {
       requested: 'Requested',
@@ -155,9 +158,9 @@ const STRINGS = {
     windowClosed: 'ماوەی گەڕاندنەوە (7 ڕۆژ لە وەرگرتن) بۆ ئەم داواکارییە تەواو بووە.',
     windowUnknown: 'نەمانتوانی بەرواری ڕاستەقینەی وەرگرتنی ئەم داواکارییە دیاری بکەین، بۆیە ڕۆژە ماوەکان لێرە نیشان نادرێن. هێشتا دەتوانیت داواکە بنێریت — ڕاژەکار ماوەکە لە کاتی ناردن هەڵدەسەنگێنێت.',
     itemClosed: 'ماوەی گەڕاندنەوە بۆ ئەم کاڵایە تەواو بووە.',
-    daysLeft: (n: number) => `${n} ڕۆژ ماوە بۆ داوای گەڕاندنەوە`,
+    daysLeft: (n: number) => `${daysLeftLabel(n, 'ckb')} بۆ داوای گەڕاندنەوە`,
     request: 'داوای گەڕاندنەوە',
-    loading: 'بارکردن...',
+    loading: 'بارکردن…',
     loadError: 'حاڵەتەکانی گەڕاندنەوە بارنەکران.',
     retry: 'هەوڵدانەوە',
     noCases: 'هیچ داوایەکی گەڕاندنەوە نییە بۆ ئەم داواکارییە.',
@@ -171,13 +174,14 @@ const STRINGS = {
       shipping_damage: 'زیانی گەیاندن',
     } as Record<string, string>,
     descLabel: 'کێشەکە باس بکە',
-    descPlaceholder: 'کێشەکە بە وردی ڕوون بکەرەوە...',
+    descPlaceholder: 'کێشەکە بە وردی ڕوون بکەرەوە…',
     evidence: 'وێنەکان (تایبەت — تەنها بۆ ستاف)',
     addPhoto: 'زیادکردنی وێنە',
-    uploading: 'بارکردن...',
+    uploading: 'بارکردن…',
     submit: 'ناردنی داوای گەڕاندنەوە',
-    submitting: 'ناردن...',
+    submitting: 'ناردن…',
     cancel: 'هەڵوەشاندنەوە',
+    removePhoto: 'لابردنی وێنە',
     caseTitle: 'حاڵەتی گەڕاندنەوە',
     states: {
       requested: 'پێشکەشکراوە',
@@ -386,7 +390,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                         <p className="text-[11px] text-zinc-500 font-light">
                           {S.reasons[c.reason === 'wrong_item' ? 'wrong_product' : c.reason] ?? c.reason}
                           {' · '}
-                          {S.requestedAt}: {new Date(c.requested_at).toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-IQ')}
+                          {S.requestedAt}: {formatDate(c.requested_at, lang)}
                         </p>
                       </div>
                       <span
@@ -526,8 +530,8 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, evidence: form.evidence.filter((x) => x !== k) })}
-                        className="text-zinc-500 hover:text-white"
-                        aria-label={S.cancel}
+                        className="text-zinc-500 hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        aria-label={S.removePhoto}
                       >
                         <X className="w-3 h-3" strokeWidth={1.5} />
                       </button>

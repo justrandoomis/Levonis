@@ -74,6 +74,24 @@ const ACTION =
   'inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border text-[12.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50';
 const ACTION_QUIET = `${ACTION} border-zinc-800 text-zinc-200 hover:bg-zinc-800`;
 
+/**
+ * What is still owed at the door. `due_on_delivery_iqd` is the checkout-time
+ * cash-on-delivery figure and is never zeroed, so read alone it keeps
+ * announcing a balance on orders long since paid or cancelled. The server's
+ * financial snapshot (§5) says what is actually outstanding; the raw field is
+ * trusted only for an order still on its way that carries no snapshot.
+ */
+function dueOnDelivery(order: ApiOrder): number {
+  if (order.status === 'cancelled') return 0;
+  const fin = order.financial;
+  if (fin) {
+    if (fin.payment_state === 'paid') return 0;
+    return Number(fin.outstanding_iqd) || 0;
+  }
+  if (order.status === 'delivered') return 0;
+  return Number(order.due_on_delivery_iqd) || 0;
+}
+
 export default function OrderCard({
   order,
   reviewedProductIds,
@@ -95,7 +113,7 @@ export default function OrderCard({
   const count = countItems(order.items, order.item_count);
   const stack = order.items.slice(0, 3);
   const extraLines = Math.max(0, order.items.length - 1);
-  const due = Number(order.due_on_delivery_iqd) || 0;
+  const due = dueOnDelivery(order);
   const canReview =
     order.status === 'delivered' &&
     (reviewedProductIds === null ||
@@ -179,8 +197,11 @@ export default function OrderCard({
         {order.membership_gift && (
           <div className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
             <p className="text-[12.5px] font-bold text-emerald-300">{s.giftTitle}</p>
+            {/* The server stores the gift's label in Arabic only
+                (entitlements.ts PreorderGiftSnapshot); every other language
+                gets the component's own wording rather than Arabic text. */}
             <p className="text-[12px] text-emerald-200/85 mt-0.5">
-              {order.membership_gift.label_ar || s.giftDefault}
+              {(asLang(lang) === 'ar' && order.membership_gift.label_ar) || s.giftDefault}
               {order.membership_gift.qty > 1 && ` × ${order.membership_gift.qty}`}
             </p>
           </div>

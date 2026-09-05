@@ -377,6 +377,22 @@ function TicketForm({
       .catch(() => {});
   }, []);
 
+  // A prefilled id that is not among the loaded rows — the order list is
+  // capped at 20, a device may no longer be linked — gets an option of its
+  // own, labelled with the id, so what the select shows is what the form
+  // sends. Without it the browser displays the first option while the form
+  // still posts the handed-over id.
+  const prefillOrderId = initial?.orderId;
+  const prefillUnitId = initial?.unitId;
+  const orderOptions: OrderOption[] =
+    prefillOrderId && !orders.some((o) => o.id === prefillOrderId)
+      ? [{ id: prefillOrderId, status: '', total_iqd: 0, created_at: '' }, ...orders]
+      : orders;
+  const deviceOptions: DeviceOption[] =
+    prefillUnitId && !devices.some((d) => d.unit_id === prefillUnitId)
+      ? [{ unit_id: prefillUnitId, product: { name: prefillUnitId, name_ar: prefillUnitId }, serial: null }, ...devices]
+      : devices;
+
   const goConfirm = () => {
     if (subject.trim().length < 3) {
       setError(s.subjectRequired);
@@ -444,9 +460,10 @@ function TicketForm({
                 className="w-full appearance-none bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"
               >
                 <option value="">{s.noLink}</option>
-                {orders.map((o) => (
+                {orderOptions.map((o) => (
                   <option key={o.id} value={o.id}>
-                    {o.id} · {fmtDate(o.created_at, lang)}
+                    {o.id}
+                    {o.created_at ? ` · ${fmtDate(o.created_at, lang)}` : ''}
                   </option>
                 ))}
               </select>
@@ -462,7 +479,7 @@ function TicketForm({
                 className="w-full appearance-none bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"
               >
                 <option value="">{s.noLink}</option>
-                {devices.map((d) => (
+                {deviceOptions.map((d) => (
                   <option key={d.unit_id} value={d.unit_id}>
                     {loc(d.product.name_ar, d.product.name, d.product.name_ckb)} {d.serial ? `(${d.serial})` : ''}
                   </option>

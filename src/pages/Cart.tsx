@@ -108,7 +108,7 @@ const SUPPORT_STRINGS = {
 
 export default function Cart() {
   const navigate = useNavigate();
-  const { t, lang, dir } = useLanguage();
+  const { t, lang, dir, loc } = useLanguage();
   const sc = SUPPORT_STRINGS[lang] ?? SUPPORT_STRINGS.ar;
   const { user } = useAuth();
   const { cartShippingMethods, checkoutDeliveryMethods, pointBalance } = useWallet();
@@ -688,7 +688,7 @@ export default function Cart() {
                         >
                           <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-zinc-300'}`}>
                             {incomplete
-                              ? dir === 'rtl' ? 'اختر الخيار أولًا' : 'Choose an option first'
+                              ? loc('اختر الخيار أولًا', 'Choose an option first', 'سەرەتا هەڵبژاردەیەک هەڵبژێرە')
                               : item.variantLabel || (dir === 'rtl' ? 'اختر الخيارات' : 'Choose options')}
                           </span>
                           <ChevronRight className="w-3 h-3 text-zinc-500" />

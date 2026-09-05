@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { Overlay } from './ui/Overlay';
+import { dateLocale } from './orders/format';
 
 /**
  * Admin — serialized devices: order-units view with serial entry, per-unit
@@ -41,8 +42,13 @@ const STRINGS = {
     deliveryPrompt: 'تاريخ/وقت التسليم الصحيح لهذه الوحدة (ISO مثل 2026-08-20T14:00:00Z):',
     warrantyEnd: 'نهاية الضمان',
     replace: 'استبدال',
-    replaceSerialPrompt: 'الرقم التسلسلي للجهاز البديل (اتركه فارغًا للتعيين لاحقًا):',
     replaceNote: 'الاستبدال يحمل تاريخ نهاية الضمان الأصلي (قاعدة "المتبقي مقابل الجديد" بانتظار قرار المالك).',
+    reassignTitle: 'إعادة تعيين الرقم التسلسلي؟',
+    confirmReassign: 'إعادة التعيين',
+    replaceTitle: 'استبدال هذا الجهاز؟',
+    replaceBody: 'الاستبدال إجراء مُدقَّق يتطلب سببًا يُسجَّل في سجل التدقيق.',
+    replaceSerialLabel: 'الرقم التسلسلي للجهاز البديل (اختياري — يمكن تعيينه لاحقًا)',
+    working: 'جارٍ التنفيذ…',
     registered: 'مُفعَّل',
     notRegistered: 'غير مُفعَّل',
     stActive: 'ساري',
@@ -107,8 +113,13 @@ const STRINGS = {
     deliveryPrompt: 'Correct delivery timestamp for THIS unit (ISO, e.g. 2026-08-20T14:00:00Z):',
     warrantyEnd: 'Warranty end',
     replace: 'Replace',
-    replaceSerialPrompt: 'Serial of the replacement device (leave empty to assign later):',
     replaceNote: 'The replacement carries the ORIGINAL warranty end date (remaining-vs-new rule pending owner decision).',
+    reassignTitle: 'Reassign this serial?',
+    confirmReassign: 'Reassign',
+    replaceTitle: 'Replace this device?',
+    replaceBody: 'Replacement is an audited action that requires a reason, recorded in the audit trail.',
+    replaceSerialLabel: 'Serial of the replacement device (optional — can be assigned later)',
+    working: 'Working…',
     registered: 'Registered',
     notRegistered: 'Not registered',
     stActive: 'Active',
@@ -173,8 +184,13 @@ const STRINGS = {
     deliveryPrompt: 'کاتی گەیاندنی ڕاست بۆ ئەم یەکەیە (ISO وەک 2026-08-20T14:00:00Z):',
     warrantyEnd: 'کۆتایی گەرەنتی',
     replace: 'گۆڕینەوە',
-    replaceSerialPrompt: 'ژمارە زنجیرەیی ئامێرە نوێیەکە (بەتاڵی بهێڵەوە بۆ دواتر):',
     replaceNote: 'گۆڕینەوەکە هەمان بەرواری کۆتایی گەرەنتی ڕەسەن هەڵدەگرێت (یاسای "ماوە بەرامبەر نوێ" چاوەڕوانی بڕیاری خاوەنە).',
+    reassignTitle: 'ئەم ژمارە زنجیرەییە دووبارە دیاری بکرێت؟',
+    confirmReassign: 'دووبارە دیاریکردن',
+    replaceTitle: 'ئەم ئامێرە بگۆڕدرێتەوە؟',
+    replaceBody: 'گۆڕینەوە کردارێکی وردبینیکراوە و هۆکاری دەوێت کە لە تۆماری وردبینیدا تۆماردەکرێت.',
+    replaceSerialLabel: 'ژمارە زنجیرەیی ئامێرە نوێیەکە (ئارەزوومەندانە — دواتر دەکرێت دیاری بکرێت)',
+    working: 'جێبەجێدەکرێت…',
     registered: 'چالاککراوە',
     notRegistered: 'چالاک نەکراوە',
     stActive: 'کارا',
@@ -242,6 +258,11 @@ interface AdminDevice {
   holder?: AdminAccount | null;
 }
 
+/** An audited unit action waiting on the admin's confirmation and reason. */
+type PendingUnitAction =
+  | { kind: 'reassign'; device: AdminDevice; serial: string; detail: string }
+  | { kind: 'replace'; device: AdminDevice };
+
 interface AdminAccount {
   id: string;
   email: string | null;
@@ -306,10 +327,12 @@ const STAGE_CLS: Record<string, string> = {
   resolved: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
 };
 
-function fmtDate(iso: string | null): string {
+function fmtDate(iso: string | null, lang: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString(dateLocale(lang), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)[Lang] }) {
@@ -357,6 +380,15 @@ export default function AdminSerials() {
   const [unlinkReason, setUnlinkReason] = useState('');
   const [unlinkBusy, setUnlinkBusy] = useState(false);
   const [unlinkError, setUnlinkError] = useState('');
+
+  // Serial reassignment and unit replacement are audited too: each confirms
+  // in an in-app window that also collects the required reason — never a
+  // browser confirm() or prompt().
+  const [pending, setPending] = useState<PendingUnitAction | null>(null);
+  const [pendingReason, setPendingReason] = useState('');
+  const [pendingSerial, setPendingSerial] = useState('');
+  const [pendingBusy, setPendingBusy] = useState(false);
+  const [pendingError, setPendingError] = useState('');
 
   const loadBySerial = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -469,24 +501,52 @@ export default function AdminSerials() {
       refreshCurrent();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'REASSIGN_REQUIRED') {
-        if (window.confirm(`${e.message}\n\n${s.reassignConfirm}`)) {
-          const reason = window.prompt(s.reasonPrompt) || '';
-          if (reason.trim().length < 5) {
-            setUnitsError(s.reasonRequired);
-          } else {
-            try {
-              await api.post(`/api/devices/admin/units/${device.unit_id}/serial`, { serial, reassign: true, reason: reason.trim() });
-              setSerialDrafts((d) => ({ ...d, [device.unit_id]: '' }));
-              refreshCurrent();
-            } catch (e2) {
-              setUnitsError(e2 instanceof ApiError ? e2.message : s.error);
-            }
-          }
-        }
+        // The server names the clash; the admin confirms it, with a reason,
+        // in the window below.
+        openPending({ kind: 'reassign', device, serial, detail: e.message });
       } else {
         setUnitsError(e instanceof ApiError ? e.message : s.error);
       }
     } finally {
+      setBusyUnit(null);
+    }
+  };
+
+  const openPending = (action: PendingUnitAction) => {
+    setPending(action);
+    setPendingReason('');
+    setPendingSerial('');
+    setPendingError('');
+  };
+
+  const confirmPending = async () => {
+    if (!pending || pendingBusy) return;
+    const reason = pendingReason.trim();
+    if (reason.length < 5) {
+      setPendingError(s.reasonRequired);
+      return;
+    }
+    setPendingBusy(true);
+    setPendingError('');
+    setBusyUnit(pending.device.unit_id);
+    setUnitsError('');
+    try {
+      if (pending.kind === 'reassign') {
+        await api.post(`/api/devices/admin/units/${pending.device.unit_id}/serial`, { serial: pending.serial, reassign: true, reason });
+        setSerialDrafts((d) => ({ ...d, [pending.device.unit_id]: '' }));
+      } else {
+        const res = await api.post<{ note: string }>(`/api/devices/admin/units/${pending.device.unit_id}/replace`, {
+          new_serial: pendingSerial.trim() || undefined,
+          reason,
+        });
+        setUnitsNotice(res.note);
+      }
+      setPending(null);
+      refreshCurrent();
+    } catch (e) {
+      setPendingError(e instanceof ApiError ? e.message : s.error);
+    } finally {
+      setPendingBusy(false);
       setBusyUnit(null);
     }
   };
@@ -511,29 +571,7 @@ export default function AdminSerials() {
     }
   };
 
-  const replaceUnit = async (device: AdminDevice) => {
-    if (!window.confirm(`${s.replaceNote}\n\n${s.reassignConfirm}`)) return;
-    const newSerial = window.prompt(s.replaceSerialPrompt) ?? '';
-    const reason = window.prompt(s.reasonPrompt) || '';
-    if (reason.trim().length < 5) {
-      setUnitsError(s.reasonRequired);
-      return;
-    }
-    setBusyUnit(device.unit_id);
-    setUnitsError('');
-    try {
-      const res = await api.post<{ note: string }>(`/api/devices/admin/units/${device.unit_id}/replace`, {
-        new_serial: newSerial.trim() || undefined,
-        reason: reason.trim(),
-      });
-      setUnitsNotice(res.note);
-      refreshCurrent();
-    } catch (e) {
-      setUnitsError(e instanceof ApiError ? e.message : s.error);
-    } finally {
-      setBusyUnit(null);
-    }
-  };
+  const replaceUnit = (device: AdminDevice) => openPending({ kind: 'replace', device });
 
   // ------------------------------------------------------------ claims tab
   const [claims, setClaims] = useState<AdminClaim[]>([]);
@@ -666,6 +704,7 @@ export default function AdminSerials() {
                         className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono w-44 outline-none focus:border-olive/60"
                       />
                       <button
+                        type="button"
                         onClick={() => assignSerial(u)}
                         disabled={busyUnit === u.unit_id || !(serialDrafts[u.unit_id] ?? '').trim()}
                         className="text-xs font-bold bg-olive/20 text-olive border border-olive/30 rounded-lg px-2.5 py-1.5 hover:bg-olive/30 disabled:opacity-40 transition-colors"
@@ -676,7 +715,7 @@ export default function AdminSerials() {
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.delivered_at)}</div>
+                  <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.delivered_at, lang)}</div>
                   {!u.replaced_by_unit_id && (
                     <button
                       onClick={() => correctDelivery(u)}
@@ -688,7 +727,7 @@ export default function AdminSerials() {
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.warranty.end_at)}</div>
+                  <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.warranty.end_at, lang)}</div>
                   <div className="text-[11px] text-zinc-500">
                     {u.warranty.base_months !== null ? `${u.warranty.base_months}m` : '—'}
                     {u.warranty.ext_months > 0 ? ` +${u.warranty.ext_months}m` : ''}
@@ -711,7 +750,7 @@ export default function AdminSerials() {
                       </div>
                       {u.holder && u.registration && !u.registration.revoked_at && (
                         <div className="text-zinc-500 whitespace-nowrap">
-                          {s.registeredAt}: <span className="text-zinc-300">{fmtDate(u.registration.registered_at)}</span>
+                          {s.registeredAt}: <span className="text-zinc-300">{fmtDate(u.registration.registered_at, lang)}</span>
                         </div>
                       )}
                     </>
@@ -723,6 +762,7 @@ export default function AdminSerials() {
                   <div className="flex flex-col items-start gap-1.5">
                     {!u.replaced_by_unit_id && (
                       <button
+                        type="button"
                         onClick={() => replaceUnit(u)}
                         disabled={busyUnit === u.unit_id}
                         className="inline-flex items-center gap-1 text-xs font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-lg px-2.5 py-1.5 hover:bg-purple-500/20 disabled:opacity-40 transition-colors"
@@ -823,7 +863,7 @@ export default function AdminSerials() {
                 <span className="font-mono text-white font-bold">{orderData.order.id}</span>
                 <span className="text-zinc-400">{s.customer}: <span className="text-zinc-200">{orderData.order.email || orderData.order.user_id}</span></span>
                 <span className="text-zinc-400 capitalize">{orderData.order.status}</span>
-                <span className="text-zinc-400">{s.delivered}: {fmtDate(orderData.order.delivered_at)}</span>
+                <span className="text-zinc-400">{s.delivered}: {fmtDate(orderData.order.delivered_at, lang)}</span>
               </div>
               {orderData.items.some((it) => it.serialized) ? (
                 <>
@@ -927,6 +967,108 @@ export default function AdminSerials() {
         </div>
       </Overlay>
 
+      {/* SERIAL REASSIGNMENT / UNIT REPLACEMENT — audited actions with a
+          required reason, confirmed in an in-app window rather than a browser
+          confirm()/prompt() pair. The scrim and Escape are inert while the
+          request is in flight. */}
+      <Overlay
+        open={!!pending}
+        onClose={() => { if (!pendingBusy) setPending(null); }}
+        labelledBy="admin-unit-action-title"
+        dismissOnScrim={!pendingBusy}
+        dismissOnEscape={!pendingBusy}
+        z={60}
+        testId="admin-unit-action"
+        panelClassName="w-full max-w-md"
+      >
+        <div className="p-6 space-y-4">
+          <button
+            type="button"
+            onClick={() => setPending(null)}
+            disabled={pendingBusy}
+            aria-label={s.close}
+            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+          <div className="pe-10">
+            <h3 id="admin-unit-action-title" className="text-white text-base font-bold">
+              {pending?.kind === 'replace' ? s.replaceTitle : s.reassignTitle}
+            </h3>
+            {pending && (
+              <p className="text-zinc-400 text-[12px] mt-1">
+                {pending.device.product.name_ar || pending.device.product.name}
+                {' · '}
+                <span className="font-mono" dir="ltr">#{pending.device.unit_index} · {pending.device.unit_id}</span>
+                {pending.kind === 'reassign' && (
+                  <>
+                    {' · '}{s.serial}: <span className="font-mono text-zinc-200" dir="ltr">{pending.serial}</span>
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+          <p className="text-zinc-400 text-sm leading-relaxed">
+            {pending?.kind === 'replace' ? `${s.replaceBody} ${s.replaceNote}` : s.reassignConfirm}
+          </p>
+          {/* The server's own account of the clash — which unit holds the serial today. */}
+          {pending?.kind === 'reassign' && pending.detail && (
+            <p className="text-zinc-500 text-[12px] leading-relaxed" dir="auto">{pending.detail}</p>
+          )}
+          {pending?.kind === 'replace' && (
+            <div>
+              <label htmlFor="admin-unit-action-serial" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.replaceSerialLabel}</label>
+              <input
+                id="admin-unit-action-serial"
+                value={pendingSerial}
+                onChange={(e) => setPendingSerial(e.target.value)}
+                maxLength={120}
+                autoComplete="off"
+                spellCheck={false}
+                dir="ltr"
+                disabled={pendingBusy}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              />
+            </div>
+          )}
+          <div>
+            <label htmlFor="admin-unit-action-reason" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.reasonLabel}</label>
+            <textarea
+              id="admin-unit-action-reason"
+              value={pendingReason}
+              onChange={(e) => setPendingReason(e.target.value)}
+              minLength={5}
+              maxLength={500}
+              rows={3}
+              required
+              disabled={pendingBusy}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369] resize-none"
+            />
+          </div>
+          {pendingError && (
+            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[13px] font-medium">{pendingError}</div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPending(null)}
+              disabled={pendingBusy}
+              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              {s.cancel}
+            </button>
+            <button
+              type="button"
+              onClick={confirmPending}
+              disabled={pendingBusy || pendingReason.trim().length < 5}
+              className="min-h-[44px] rounded-xl bg-[#ef233c] text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              {pendingBusy ? s.working : pending?.kind === 'replace' ? s.replace : s.confirmReassign}
+            </button>
+          </div>
+        </div>
+      </Overlay>
+
       {tab === 'claims' && (
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
@@ -963,7 +1105,7 @@ export default function AdminSerials() {
                   <div className="min-w-0">
                     <div className="text-white font-bold text-sm">{cl.subject}</div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
-                      {cl.product_name} · {cl.email || '—'} · {cl.serial ? <span className="font-mono">{cl.serial}</span> : '—'} · {fmtDate(cl.created_at)}
+                      {cl.product_name} · {cl.email || '—'} · {cl.serial ? <span className="font-mono">{cl.serial}</span> : '—'} · {fmtDate(cl.created_at, lang)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

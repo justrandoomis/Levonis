@@ -35,6 +35,18 @@ const STRINGS = {
     goCart: 'الانتقال إلى السلة',
     types: { direct: 'مباشر', preorder_air: 'طلب مسبق جوي', preorder_sea: 'طلب مسبق بحري', preorder_land: 'طلب مسبق بري' } as Record<string, string>,
     failed: 'تعذّرت الإضافة',
+    codes: {
+      OPTION_REQUIRED: 'يلزم اختيار خيار للمنتج أولًا',
+      COLOR_REQUIRED: 'يلزم اختيار لون أولًا',
+      TRANSPORT_REQUIRED: 'يلزم اختيار طريقة شحن للطلب المسبق',
+      TRANSPORT_NOT_OFFERED: 'طريقة الشحن هذه لم تعد متاحة لهذا المنتج',
+      SELECTION_INCOMPLETE: 'اختيار المنتج غير مكتمل — افتح صفحة المنتج واختر من جديد',
+      CART_SHIPPING_CONFLICT: 'نوع شحنه يختلف عمّا في سلتك',
+      CART_SELLER_CONFLICT: 'من متجر يختلف عمّا في سلتك',
+      UNAVAILABLE: 'غير متاح للطلب حاليًا',
+      OUT_OF_STOCK: 'نفدت الكمية',
+      QTY_UNAVAILABLE: 'الكمية المطلوبة غير متاحة حاليًا',
+    } as Record<string, string>,
   },
   en: {
     buyAgain: 'Buy again',
@@ -50,6 +62,18 @@ const STRINGS = {
     goCart: 'Go to cart',
     types: { direct: 'direct', preorder_air: 'air pre-order', preorder_sea: 'sea pre-order', preorder_land: 'land pre-order' } as Record<string, string>,
     failed: 'Could not add',
+    codes: {
+      OPTION_REQUIRED: 'An option has to be chosen first',
+      COLOR_REQUIRED: 'A colour has to be chosen first',
+      TRANSPORT_REQUIRED: 'A shipping method has to be chosen for the pre-order',
+      TRANSPORT_NOT_OFFERED: 'That shipping method is no longer offered for this product',
+      SELECTION_INCOMPLETE: 'The selection is incomplete — open the product page and choose again',
+      CART_SHIPPING_CONFLICT: 'Its shipping type differs from your cart',
+      CART_SELLER_CONFLICT: 'It comes from a different store than your cart',
+      UNAVAILABLE: 'Not available to order right now',
+      OUT_OF_STOCK: 'Out of stock',
+      QTY_UNAVAILABLE: 'The requested quantity is not available right now',
+    } as Record<string, string>,
   },
   ckb: {
     buyAgain: 'دووبارە کڕین',
@@ -65,8 +89,50 @@ const STRINGS = {
     goCart: 'بڕۆ بۆ سەبەتە',
     types: { direct: 'ڕاستەوخۆ', preorder_air: 'پێشداواکاری ئاسمانی', preorder_sea: 'پێشداواکاری دەریایی', preorder_land: 'پێشداواکاری وشکانی' } as Record<string, string>,
     failed: 'زیاد نەکرا',
+    codes: {
+      OPTION_REQUIRED: 'سەرەتا پێویستە هەڵبژاردەیەک هەڵبژێردرێت',
+      COLOR_REQUIRED: 'سەرەتا پێویستە ڕەنگێک هەڵبژێردرێت',
+      TRANSPORT_REQUIRED: 'پێویستە ڕێگای گەیاندن بۆ پێشداواکاری هەڵبژێردرێت',
+      TRANSPORT_NOT_OFFERED: 'ئەم ڕێگای گەیاندنە بۆ ئەم کاڵایە بەردەست نەماوە',
+      SELECTION_INCOMPLETE: 'هەڵبژاردنەکە تەواو نییە — پەڕەی کاڵاکە بکەرەوە و دووبارە هەڵبژێرە',
+      CART_SHIPPING_CONFLICT: 'جۆری گەیاندنی لەگەڵ سەبەتەکەت جیاوازە',
+      CART_SELLER_CONFLICT: 'لە فرۆشگایەکی جیاوازە لە سەبەتەکەت',
+      UNAVAILABLE: 'ئێستا بۆ داواکردن بەردەست نییە',
+      OUT_OF_STOCK: 'کۆگا بەتاڵە',
+      QTY_UNAVAILABLE: 'ژمارەی داواکراو ئێستا بەردەست نییە',
+    } as Record<string, string>,
   },
 } as const;
+
+type Strings = (typeof STRINGS)[keyof typeof STRINGS];
+
+/**
+ * Selection codes the resolver (pricing.ts / products.ts) can raise. Most
+ * reach the client as the refusal's own `code`; a pricing-resolver failure
+ * travels as code VALIDATION with the codes only inside the message
+ * ("Invalid selection: TRANSPORT_REQUIRED"), so that message is scanned for
+ * exactly these words.
+ */
+const SELECTION_CODES = ['OPTION_REQUIRED', 'COLOR_REQUIRED', 'TRANSPORT_REQUIRED', 'TRANSPORT_NOT_OFFERED', 'SELECTION_INCOMPLETE'] as const;
+
+/**
+ * A refused line is named in the customer's language when the server's code
+ * is one this component knows; an unknown code keeps the server's own words —
+ * a specific refusal in English beats a vague one in the right language.
+ */
+function lineError(e: unknown, s: Strings): string {
+  if (e instanceof ApiError) {
+    const known = e.code ? s.codes[e.code] : undefined;
+    if (known) return known;
+    if (e.code === 'NOT_FOUND' || e.status === 404) return s.gone;
+    if (e.code === 'VALIDATION') {
+      const hit = SELECTION_CODES.find((c) => new RegExp(`\\b${c}\\b`).test(e.message));
+      if (hit) return s.codes[hit];
+    }
+    return e.message || s.failed;
+  }
+  return e instanceof Error && e.message ? e.message : s.failed;
+}
 
 interface LineResult {
   item: ApiOrderItem;
@@ -132,7 +198,7 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
           setBusy(false);
           return;
         }
-        out.push({ item: it, ok: false, error: e instanceof Error && e.message ? e.message : s.failed });
+        out.push({ item: it, ok: false, error: lineError(e, s) });
       }
     }
     setBusy(false);

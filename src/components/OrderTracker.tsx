@@ -24,6 +24,9 @@ import { useEffect, useState } from 'react';
 import { Check, Circle, Loader2, Truck } from 'lucide-react';
 import { api } from '../lib/api';
 import type { OrderTrackingPublic } from '../lib/api';
+// Dates take the order screens' shared locale (Latin digits in every
+// language), so a card holding this tracker never mixes two digit systems.
+import { formatDateTime } from './orders/format';
 
 export type Tracking = OrderTrackingPublic;
 
@@ -32,15 +35,6 @@ const STRINGS = {
   en: { loading: 'Loading tracking…', failed: 'Shipping status could not be loaded.', tracking: 'Tracking number', expected: 'Expected', title: 'Shipment tracking' },
   ckb: { loading: 'بارکردنی بەدواداچوون…', failed: 'دۆخی گەیاندن بار نەکرا.', tracking: 'ژمارەی بەدواداچوون', expected: 'چاوەڕوانکراو', title: 'بەدواداچوونی بار' },
 } as const;
-
-function when(iso: string | null, lang: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString(lang === 'ar' ? 'ar-IQ' : lang === 'ckb' ? 'ar-IQ' : 'en-GB', {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-}
 
 export default function OrderTracker({
   orderId,
@@ -128,7 +122,7 @@ export default function OrderTracker({
                 <p className={`text-[13px] leading-tight ${step.current ? 'text-white font-bold' : step.reached ? 'text-zinc-200' : 'text-zinc-500'}`}>
                   {step.label}
                 </p>
-                {step.at && <p className="text-zinc-500 text-[10.5px] mt-0.5">{when(step.at, lang)}</p>}
+                {step.at && <p className="text-zinc-500 text-[10.5px] mt-0.5">{formatDateTime(step.at, lang)}</p>}
               </div>
             </li>
           );
@@ -144,7 +138,7 @@ export default function OrderTracker({
           person or on the courier carries no time, and none is invented. */}
       {data.next_stage_at && (
         <p className="text-zinc-500 text-[10.5px] mt-1">
-          {s.expected}: {when(data.next_stage_at, lang)}
+          {s.expected}: {formatDateTime(data.next_stage_at, lang)}
         </p>
       )}
     </div>
