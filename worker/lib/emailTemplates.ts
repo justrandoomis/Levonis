@@ -89,6 +89,7 @@ interface Copy {
   unitPriceLabel: string;
   lineTotalLabel: string;
   transportFeeLabel: string;
+  directFeeLabel: string;
   warrantyFeeLabel: string;
   subtotalLabel: string;
   deliveryLabel: string;
@@ -149,6 +150,7 @@ const COPY_AR: Copy = {
   unitPriceLabel: 'سعر الوحدة',
   lineTotalLabel: 'الإجمالي',
   transportFeeLabel: 'عمولة النقل (طلب مسبق)',
+  directFeeLabel: 'زيادة البيع المباشر',
   warrantyFeeLabel: 'رسوم تمديد الضمان',
   subtotalLabel: 'مجموع المنتجات',
   deliveryLabel: 'رسوم التوصيل',
@@ -217,6 +219,7 @@ const COPY_EN: Copy = {
   unitPriceLabel: 'Unit price',
   lineTotalLabel: 'Total',
   transportFeeLabel: 'Transport commission (preorder)',
+  directFeeLabel: 'Direct-sale surcharge',
   warrantyFeeLabel: 'Warranty extension fee',
   subtotalLabel: 'Items subtotal',
   deliveryLabel: 'Delivery fee',
@@ -287,6 +290,7 @@ const COPY_CKB: Copy = {
   unitPriceLabel: 'نرخی یەکە',
   lineTotalLabel: 'کۆ',
   transportFeeLabel: 'کرێی گواستنەوە (پێش‌داواکاری)',
+  directFeeLabel: 'زیادەی فرۆشتنی ڕاستەوخۆ',
   warrantyFeeLabel: 'کرێی درێژکردنەوەی گەرەنتی',
   subtotalLabel: 'کۆی کاڵاکان',
   deliveryLabel: 'کرێی گەیاندن',
@@ -437,9 +441,12 @@ export interface InvoiceEmailLine {
   name: string;
   variant: string; // human-readable option/color label ('' when none)
   qty: number;
-  unit_price_iqd: number; // includes per-unit transport commission + warranty fee
+  unit_price_iqd: number; // includes per-unit availability fee (commission OR direct premium) + warranty fee
   line_total_iqd: number;
   transport_commission_iqd: number; // per-unit effective commission (0 = none/waived)
+  /** Per-unit direct-sale premium actually charged (0 = none, or waived for
+   *  PRO). Optional: invoices issued before the field existed have none. */
+  direct_surcharge_iqd?: number;
   warranty_fee_iqd: number; // per-unit warranty extension fee (0 = none)
   warranty_label: string;
 }
@@ -497,6 +504,8 @@ function invoiceLinesHtml(t: Copy, inv: InvoiceEmailData): string {
       if (l.variant) details.push(escapeHtml(l.variant));
       if (l.transport_commission_iqd > 0)
         details.push(`${escapeHtml(t.transportFeeLabel)}: <span dir="ltr">${escapeHtml(iqd(l.transport_commission_iqd))}</span>`);
+      if ((l.direct_surcharge_iqd ?? 0) > 0)
+        details.push(`${escapeHtml(t.directFeeLabel)}: <span dir="ltr">${escapeHtml(iqd(l.direct_surcharge_iqd ?? 0))}</span>`);
       if (l.warranty_fee_iqd > 0)
         details.push(
           `${escapeHtml(t.warrantyFeeLabel)}${l.warranty_label ? ` (${escapeHtml(l.warranty_label)})` : ''}: <span dir="ltr">${escapeHtml(iqd(l.warranty_fee_iqd))}</span>`

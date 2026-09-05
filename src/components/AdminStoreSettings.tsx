@@ -126,6 +126,13 @@ export default function AdminStoreSettings() {
   const [gift, setGift] = useState<PreorderGift | null>(null);
   const [giftState, setGiftState] = useState<SaveState>('idle');
   const [giftError, setGiftError] = useState<string | null>(null);
+  // The printer home-delivery NOTE (customer-facing copy, never a charge):
+  // the amount the customer is told to have ready when asking for home
+  // delivery of a printer. Read here so the owner can change it without a
+  // deploy; the product page, cart, checkout and order detail render it.
+  const [printerNote, setPrinterNote] = useState<number | null>(null);
+  const [printerNoteState, setPrinterNoteState] = useState<SaveState>('idle');
+  const [printerNoteError, setPrinterNoteError] = useState<string | null>(null);
 
   // The policy is admin-only, so it is not in the wallet context with the
   // public checkout methods — it is read straight from the admin settings.
@@ -139,6 +146,8 @@ export default function AdminStoreSettings() {
         setPolicy({ ...SHIPPING_DEFAULTS, ...raw });
         const rawGift = (res.settings?.preorderGiftConfig ?? {}) as Partial<PreorderGift>;
         setGift({ ...GIFT_DEFAULTS, ...rawGift });
+        const rawNote = Number(res.settings?.printerHomeDeliveryNoteIqd);
+        setPrinterNote(Number.isFinite(rawNote) && rawNote >= 0 ? Math.round(rawNote) : 50000);
       } catch {
         if (alive) {
           setPolicy({ ...SHIPPING_DEFAULTS });
@@ -163,6 +172,19 @@ export default function AdminStoreSettings() {
       setPolicyError(e instanceof ApiError ? e.message : 'Save failed');
     }
   }, [policy]);
+
+  const savePrinterNote = useCallback(async () => {
+    if (printerNote === null) return;
+    setPrinterNoteState('saving');
+    setPrinterNoteError(null);
+    try {
+      await api.put('/api/admin/settings/printerHomeDeliveryNoteIqd', { value: printerNote });
+      setPrinterNoteState('saved');
+    } catch (e) {
+      setPrinterNoteState('error');
+      setPrinterNoteError(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }, [printerNote]);
 
   const saveGift = useCallback(async () => {
     if (!gift) return;
@@ -619,6 +641,28 @@ export default function AdminStoreSettings() {
           </div>
           <div className="mt-5">
             <SaveButton state={giftState} onClick={() => void saveGift()} error={giftError} />
+          </div>
+        </div>
+      )}
+
+      {printerNote !== null && (
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="printer-home-delivery-note">
+          <h2 className="text-xl font-bold mb-1">ملاحظة توصيل الطابعات إلى المنزل</h2>
+          <p className="text-sm text-zinc-400 mb-4">
+            ملاحظة فقط، لا تُضاف إلى أي مبلغ: تظهر للزبون على صفحة الطابعة وفي السلة وعند الدفع وفي تفاصيل الطلب،
+            وتخبره بالمبلغ الذي يُدفع عند طلب التوصيل إلى المنزل (البيع المباشر، والطلب المسبق عند الدفع عند الاستلام).
+            الصفر يُخفي الملاحظة.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <MoneyField
+              label="المبلغ المذكور في الملاحظة (د.ع)"
+              hint="الافتراضي 50,000 د.ع"
+              value={printerNote}
+              onChange={(v) => { setPrinterNote(v ?? 0); setPrinterNoteState('idle'); }}
+            />
+          </div>
+          <div className="mt-5">
+            <SaveButton state={printerNoteState} onClick={() => void savePrinterNote()} error={printerNoteError} />
           </div>
         </div>
       )}

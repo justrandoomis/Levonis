@@ -186,7 +186,7 @@ async function main() {
   await user.post('/api/cart/items', { productId, qty: 1 });
   r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'nope', paymentMethodId: 'cash', useWallet: false, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-2` });
   check('invalid delivery method rejected', r.status === 400);
-  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'full_advance', useWallet: true, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-3` });
+  r = await user.post('/api/orders', { policyAcceptance: POLICY_ACC, addressId, deliveryMethodId: 'standard', paymentMethodId: 'wallet', useWallet: true, usePoints: false, itemIds: [], idempotencyKey: `test-${rnd}-3` });
   check('advance payment without balance rejected', r.status === 400 && r.data?.code === 'INSUFFICIENT_BALANCE', JSON.stringify(r.data));
 
   console.log('\n— cross-user access (IDOR)');

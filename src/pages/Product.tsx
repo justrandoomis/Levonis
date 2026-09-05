@@ -39,6 +39,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import ShippingConflictDialog from '../components/cart/ShippingConflictDialog';
 import { useAuth } from '../AuthContext';
+import { useWallet } from '../WalletContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package,
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
@@ -47,9 +48,11 @@ import {
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import ReviewSection from '../components/reviews/ReviewSection';
 import SafeImage from '../components/ui/SafeImage';
+import Note from '../components/ui/Note';
 import { Overlay } from '../components/ui/Overlay';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
+import { monthsLabel } from '../components/orders/format';
 import { captureSupportRefFromSearch } from './Referrals';
 
 // ------------------------------------------------------------------ strings
@@ -66,8 +69,14 @@ const STRINGS = {
     options: 'الخيارات المتاحة', colors: 'الألوان المتاحة', chooseOption: 'اختر خيارًا',
     chooseColor: 'اختر لونًا', transport: 'وسيلة النقل للطلب المسبق', chooseTransport: 'اختر وسيلة النقل',
     transportAir: 'شحن جوي', transportSea: 'شحن بحري', transportLand: 'شحن بري',
-    transportUnset: 'العمولة غير مُعدّة', warranty: 'خطة الضمان', noWarranty: 'بدون خطة إضافية',
+    transportUnset: 'العمولة غير مُعدّة', warranty: 'الضمان الممدد', noWarranty: 'بدون ضمان ممدد',
     months: 'شهرًا', extension: 'تمديد', total: 'إجمالي',
+    warrantyIntro: (base: string) => `الضمان الأساسي ${base} من التسليم. أضف تمديدًا الآن أو من السلة — قبل إتمام الطلب فقط.`,
+    warrantyIntroNoBase: 'يُشترى التمديد الآن أو من السلة — قبل إتمام الطلب فقط.',
+    extendedPlan: (ext: string) => `+${ext}`,
+    extendedTotal: (total: string) => `${total} إجمالًا`,
+    warrantyPolicy: 'شروط الضمان الممدد',
+    WARRANTY_NOT_PRINTER: 'الضمان الممدد متاح للطابعات فقط.',
     qty: 'الكمية', increase: 'زيادة الكمية', decrease: 'إنقاص الكمية',
     addToCart: 'أضف إلى السلة', adding: 'جارٍ الإضافة…', added: 'تمت الإضافة إلى السلة',
     viewCart: 'عرض السلة', signInToBuy: 'سجّل الدخول للشراء',
@@ -78,7 +87,11 @@ const STRINGS = {
     untracked: 'التوفر غير مرتبط بعدّاد مخزون',
     qtyCapped: 'المتاح الآن {n} فقط — لم نضف الباقي كطلب مسبق',
     unitBreakdown: 'تفصيل سعر الوحدة', itemPrice: 'سعر المنتج', transportFee: 'عمولة النقل',
+    directFee: 'زيادة البيع المباشر',
     warrantyFee: 'رسوم الضمان', waivedPro: 'معفاة لعضوية PRO', lineTotal: 'إجمالي البنود',
+    preorderCodHint: 'الدفع مقدمًا من المحفظة يُبقي هذا السعر؛ الدفع عند الاستلام يُسعَّر كبيع مباشر ويبقى الطلب طلبًا مسبقًا.',
+    CART_WARRANTY_CONFLICT: 'هذه الطابعة في سلتك بخيار ضمان ممدد مختلف — غيّره من السلة.',
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
     description: 'وصف المنتج', noDescription: 'لا يوجد وصف لهذا المنتج بعد',
     specs: 'المواصفات التقنية', media: 'الصور والفيديو', reviews: 'التقييمات',
     howToUse: 'طريقة الاستخدام', inTheBox: 'محتويات العلبة', setupTitle: 'التركيب والتنصيب',
@@ -110,8 +123,14 @@ const STRINGS = {
     options: 'Options', colors: 'Colours', chooseOption: 'Choose an option',
     chooseColor: 'Choose a colour', transport: 'Pre-order transport', chooseTransport: 'Choose transport',
     transportAir: 'Air freight', transportSea: 'Sea freight', transportLand: 'Land freight',
-    transportUnset: 'Commission not configured', warranty: 'Warranty plan', noWarranty: 'No extra plan',
+    transportUnset: 'Commission not configured', warranty: 'Extended Warranty', noWarranty: 'No extended warranty',
     months: 'months', extension: 'extension', total: 'total',
+    warrantyIntro: (base: string) => `${base} base warranty from delivery. Add an extension now or in the cart — before placing the order only.`,
+    warrantyIntroNoBase: 'An extension is bought now or in the cart — before placing the order only.',
+    extendedPlan: (ext: string) => `+${ext}`,
+    extendedTotal: (total: string) => `${total} total`,
+    warrantyPolicy: 'Extended warranty terms',
+    WARRANTY_NOT_PRINTER: 'Extended warranty is available for printers only.',
     qty: 'Quantity', increase: 'Increase quantity', decrease: 'Decrease quantity',
     addToCart: 'Add to cart', adding: 'Adding…', added: 'Added to your cart',
     viewCart: 'View cart', signInToBuy: 'Sign in to buy',
@@ -122,7 +141,11 @@ const STRINGS = {
     untracked: 'Availability is not tied to a stock counter',
     qtyCapped: 'Only {n} available now — the rest was not turned into a pre-order',
     unitBreakdown: 'Unit price breakdown', itemPrice: 'Item price', transportFee: 'Transport commission',
+    directFee: 'Direct-sale surcharge',
     warrantyFee: 'Warranty fee', waivedPro: 'Waived for PRO', lineTotal: 'Line total',
+    preorderCodHint: 'Paying in advance from the wallet keeps this price; cash on delivery is priced as a direct sale while the order stays a pre-order.',
+    CART_WARRANTY_CONFLICT: 'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
     description: 'Description', noDescription: 'No description for this product yet',
     specs: 'Specifications', media: 'Photos & video', reviews: 'Reviews',
     howToUse: 'How to use', inTheBox: 'In the box', setupTitle: 'Setup & installation',
@@ -153,8 +176,14 @@ const STRINGS = {
     options: 'هەڵبژاردەکان', colors: 'ڕەنگەکان', chooseOption: 'هەڵبژاردەیەک هەڵبژێرە',
     chooseColor: 'ڕەنگێک هەڵبژێرە', transport: 'گواستنەوەی پێشداواکاری', chooseTransport: 'شێوازی گواستنەوە هەڵبژێرە',
     transportAir: 'بار بە ئاسمان', transportSea: 'بار بە دەریا', transportLand: 'بار بە وشکانی',
-    transportUnset: 'کۆمیشن ڕێکنەخراوە', warranty: 'پلانی گەرەنتی', noWarranty: 'بێ پلانی زیادە',
+    transportUnset: 'کۆمیشن ڕێکنەخراوە', warranty: 'گەرەنتی درێژکراوە', noWarranty: 'بێ گەرەنتی درێژکراوە',
     months: 'مانگ', extension: 'درێژکردنەوە', total: 'کۆ',
+    warrantyIntro: (base: string) => `گەرەنتی بنەڕەتی ${base} لە گەیاندنەوە. درێژکردنەوە ئێستا یان لە سەبەتە زیاد بکە — تەنها پێش تەواوکردنی داواکاری.`,
+    warrantyIntroNoBase: 'درێژکردنەوە ئێستا یان لە سەبەتە دەکڕدرێت — تەنها پێش تەواوکردنی داواکاری.',
+    extendedPlan: (ext: string) => `+${ext}`,
+    extendedTotal: (total: string) => `${total} کۆی گشتی`,
+    warrantyPolicy: 'مەرجەکانی گەرەنتی درێژکراوە',
+    WARRANTY_NOT_PRINTER: 'گەرەنتی درێژکراوە تەنها بۆ پرینتەرەکانە.',
     qty: 'بڕ', increase: 'زیادکردنی بڕ', decrease: 'کەمکردنی بڕ',
     addToCart: 'زیادکردن بۆ سەبەتە', adding: 'زیاد دەکرێت…', added: 'زیادکرا بۆ سەبەتەکەت',
     viewCart: 'بینینی سەبەتە', signInToBuy: 'بچۆ ژوورەوە بۆ کڕین',
@@ -165,7 +194,11 @@ const STRINGS = {
     untracked: 'بەردەستی بە ژمێرەری کۆگا نەبەستراوە',
     qtyCapped: 'تەنها {n} بەردەستە ئێستا — ئەوەی ماوە نەکرا بە پێشداواکاری',
     unitBreakdown: 'وردەکاری نرخی یەکە', itemPrice: 'نرخی بەرهەم', transportFee: 'کۆمیشنی گواستنەوە',
+    directFee: 'زیادەی فرۆشتنی ڕاستەوخۆ',
     warrantyFee: 'کرێی گەرەنتی', waivedPro: 'بۆ PRO بەخشراوە', lineTotal: 'کۆی گشتی',
+    preorderCodHint: 'پارەدانی پێشوەخت لە جزدانەوە ئەم نرخە دەهێڵێتەوە؛ پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت و داواکارییەکە وەک پێش-داواکاری دەمێنێتەوە.',
+    CART_WARRANTY_CONFLICT: 'ئەم پرینتەرە پێشتر لە سەبەتەکەتدایە بە هەڵبژاردەیەکی جیاوازی گەرەنتی درێژکراوە — لە سەبەتەوە بیگۆڕە.',
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
     description: 'باسکردن', noDescription: 'هێشتا باسکردنێک بۆ ئەم بەرهەمە نییە',
     specs: 'تایبەتمەندییە تەکنیکییەکان', media: 'وێنە و ڤیدیۆ', reviews: 'پێداچوونەوەکان',
     howToUse: 'شێوازی بەکارهێنان', inTheBox: 'ناو سندوقەکە', setupTitle: 'دامەزراندن و ڕێکخستن',
@@ -187,7 +220,7 @@ const STRINGS = {
   },
 } as const;
 
-type Strings = { readonly [K in keyof typeof STRINGS['ar']]: string };
+type Strings = { readonly [K in keyof typeof STRINGS['ar']]: (typeof STRINGS)['ar'][K] extends string ? string : (typeof STRINGS)['ar'][K] };
 
 // -------------------------------------------------------------------- types
 
@@ -212,9 +245,13 @@ interface ColorItem {
   id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string;
   hex?: string; image?: string; option_id?: string | null;
 }
+/** A plan as the server prices it for a selection (worker/lib/warrantyPlans.ts
+ *  pricedPlans): `fee_iqd` is already the resolved dinar, `total_months` the
+ *  coverage it yields — the page shows both and computes neither. */
 interface WarrantyPlanItem {
   id: string; title_ar?: string; title_en?: string; title_ckb?: string;
   duration_months: number; duration_kind: 'total' | 'extension' | string; fee_iqd: number;
+  fee_percent?: number | null; basis_iqd?: number; base_months?: number | null; total_months?: number | null;
 }
 interface SpecRow {
   id?: string; label_ar?: string; label_en?: string; label_ckb?: string;
@@ -230,13 +267,13 @@ interface ProductDetail {
   description?: string; description_ar?: string; description_en?: string; description_ckb?: string;
   price_iqd: number; pro_price_iqd?: number | null; prime_price_iqd?: number | null;
   selling_type?: string;
-  /** Availability premium on direct (from-stock) lines — used ONLY to show
-   *  the direct pill's FINAL price before a quote lands; the charged number
-   *  is always the server quote. */
-  direct_surcharge_iqd?: number | null;
+  /** The owner's catalog flag; the printer home-delivery note keys off it. */
+  is_printer?: boolean;
   media?: MediaItem[]; images?: string[];
   options?: OptionItem[]; colors?: ColorItem[];
   warranty_plans?: WarrantyPlanItem[];
+  /** Base coverage in months from delivery (printers: 12); null = not configured. */
+  warranty_base_months?: number | null;
   spec_groups?: SpecGroup[]; specifications?: Array<{ key: string; value: string }>;
   description_images?: string[]; description_videos?: string[];
   how_to_use?: string; brand?: string; stock?: number | null;
@@ -291,10 +328,43 @@ interface Availability {
 interface Quote {
   regular_iqd: number; pro_iqd: number | null; prime_iqd: number | null; applied_iqd: number;
   applied_tier: 'regular' | 'pro' | 'prime'; price_source: string;
-  transport: { method: string; commission_iqd: number; waived: boolean } | null;
-  direct?: { surcharge_iqd: number } | null;
-  warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
+  transport: { method: string; commission_iqd: number; waived: boolean; waived_by?: string } | null;
+  /** The direct-sale premium that applies; `waived` = an active PRO pays 0 of it. */
+  direct?: { surcharge_iqd: number; waived: boolean } | null;
+  pricing_basis?: 'direct' | 'preorder';
+  warranty: {
+    plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string;
+    fee_percent?: number | null; total_months?: number | null; base_months?: number | null;
+  } | null;
   unit_subtotal_iqd: number; errors: string[]; qty: number; line_total_iqd: number;
+}
+
+/**
+ * The FINAL price of every way to get the selection, as the SERVER priced it
+ * (worker/routes/products.ts `pricingModes`): the direct pill, each pre-order
+ * journey paid in advance or cash on delivery, and whether cash changes the
+ * number at all. The page lays these out and computes none of them — the PRO
+ * exemptions are already applied exactly as the checkout applies them.
+ */
+interface PricingModes {
+  direct: { unit_subtotal_iqd: number; direct: { surcharge_iqd: number; waived: boolean } | null } | null;
+  preorder: Array<{
+    method: string;
+    prepaid: { unit_subtotal_iqd: number } | null;
+    cod: { unit_subtotal_iqd: number; pricing_basis?: 'direct' | 'preorder' } | null;
+    cod_reprices: boolean;
+  }>;
+  cod_reprices: boolean;
+}
+
+/** `active` is the membership; `pricing_active` is what the figures on the
+ *  same response were priced with (a PRO outside the PRO purchase context —
+ *  default address not approved — is active, and priced as ordinary). */
+interface ViewerTier {
+  tier: 'free' | 'plus' | 'pro' | 'prime';
+  active: boolean;
+  pricing_active?: boolean;
+  pro_benefits_context?: boolean;
 }
 
 interface DetailResponse {
@@ -303,13 +373,19 @@ interface DetailResponse {
   favorite: boolean;
   relations?: RelationsPayload | null;
   availability?: Availability;
-  viewer_tier?: { tier: 'free' | 'plus' | 'pro' | 'prime'; active: boolean };
+  /** The ways to buy the BASE selection, priced by the server. */
+  pricing_modes?: PricingModes;
+  viewer_tier?: ViewerTier;
 }
 
 interface QuoteResponse {
   quote: Quote;
   availability: Availability;
-  viewer_tier?: { tier: 'free' | 'plus' | 'pro' | 'prime'; active: boolean };
+  /** The extended-warranty options re-priced for THIS selection's regular price. */
+  warranty_plans?: WarrantyPlanItem[];
+  /** The ways to buy THIS selection, priced by the server. */
+  pricing_modes?: PricingModes;
+  viewer_tier?: ViewerTier;
 }
 
 // ------------------------------------------------------------------ helpers
@@ -428,13 +504,25 @@ export default function Product() {
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const { settings: publicSettings } = useWallet();
   const s = STRINGS[lang as Lang];
+  // The printer home-delivery note amount — the owner's public setting. null
+  // when unset: the note is never shown with an invented figure.
+  const printerNoteIqd = (() => {
+    const n = publicSettings?.printerHomeDeliveryNoteIqd;
+    return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null;
+  })();
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [source, setSource] = useState<ProductSource>('catalog');
   const [relations, setRelations] = useState<RelationsPayload | null>(null);
   const [baseAvailability, setBaseAvailability] = useState<Availability | null>(null);
-  const [viewerTier, setViewerTier] = useState<{ tier: string; active: boolean } | null>(null);
+  const [viewerTier, setViewerTier] = useState<ViewerTier | null>(null);
+  // The server's per-mode prices: the detail's base-selection set until a
+  // quote for the current selection lands, then that quote's. Nothing here
+  // is ever added up in the browser.
+  const [detailModes, setDetailModes] = useState<PricingModes | null>(null);
+  const [quotedModes, setQuotedModes] = useState<PricingModes | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -456,6 +544,11 @@ export default function Product() {
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [liveAvailability, setLiveAvailability] = useState<Availability | null>(null);
+  // The extended-warranty options as the LAST quote priced them for the
+  // current option/colour (a percent fee follows the regular price of the
+  // selection). Null until a quote lands; the detail's base-selection list is
+  // the fallback, so the chooser is never empty for a printer.
+  const [quotedPlans, setQuotedPlans] = useState<WarrantyPlanItem[] | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<unknown>(null);
   const [quoteToken, setQuoteToken] = useState(0);
@@ -506,8 +599,11 @@ export default function Product() {
         setRelations(data.relations ?? null);
         setBaseAvailability(data.availability ?? null);
         setViewerTier(data.viewer_tier ?? null);
+        setDetailModes(data.pricing_modes ?? null);
+        setQuotedModes(null);
         setLiveAvailability(null);
         setQuote(null);
+        setQuotedPlans(null);
         setQuoteError(null);
         setGalleryIndex(0);
         setQty(1);
@@ -568,6 +664,8 @@ export default function Product() {
         if (cancelled) return;
         setQuote(res.quote);
         setLiveAvailability(res.availability);
+        if (Array.isArray(res.warranty_plans)) setQuotedPlans(res.warranty_plans);
+        if (res.pricing_modes) setQuotedModes(res.pricing_modes);
         setQuoteError(null);
       } catch (err) {
         if (cancelled) return;
@@ -720,13 +818,20 @@ export default function Product() {
           });
           return;
         }
+        // The same printer is already in the cart with a different
+        // extended-warranty choice; the server refuses to rewrite it silently
+        // and the fix is named in the customer's language.
+        if (err instanceof ApiError && err.code === 'CART_WARRANTY_CONFLICT') {
+          setActionError(s.CART_WARRANTY_CONFLICT);
+          return;
+        }
         setActionError(err instanceof Error ? err.message : 'Failed to add to cart');
       } finally {
         addInFlight.current = false;
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, colorId, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added]
+    [product, qty, optionId, colorId, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added, s.CART_WARRANTY_CONFLICT]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -861,7 +966,11 @@ export default function Product() {
     if (n <= 5) return { text: s.levelLeft.replace('{n}', String(n)), cls: 'text-amber-300' };
     return { text: s.levelAvail.replace('{n}', String(n)), cls: 'text-emerald-300' };
   };
-  const warrantyPlans = product.warranty_plans ?? [];
+  // The plans priced for the CURRENT selection once a quote landed, else the
+  // base-selection list the detail endpoint priced. Either way the dinar beside
+  // each option is the server's.
+  const warrantyPlans = quotedPlans ?? product.warranty_plans ?? [];
+  const warrantyBase = product.warranty_base_months ?? warrantyPlans.find((w) => typeof w.base_months === 'number')?.base_months ?? null;
   const specGroups = (product.spec_groups ?? []).filter((g) => (g.rows ?? []).length > 0);
   const legacySpecs = product.specifications ?? [];
   const descriptionImages = product.description_images ?? [];
@@ -922,25 +1031,31 @@ export default function Product() {
 
   // Fulfilment choice (owner's model): when direct sale AND pre-order are
   // both genuinely usable the buyer picks one, and every choice shows its
-  // FINAL price — never "+X". The numbers here are previews built from the
-  // same server-resolved parts (applied price, per-method commission with
-  // the PRO waiver, the direct premium); the charged price is always the
-  // server quote that follows the pick.
+  // FINAL price — never "+X". Every figure is the SERVER's (`pricing_modes`
+  // on the detail and on each quote): the direct price with the premium and
+  // its PRO exemption, each journey's prepaid price with the commission and
+  // its waiver — judged in the same PRO purchase context the checkout uses,
+  // so a PRO whose default address is not approved sees the surcharge here
+  // too. The page adds nothing to anything.
   const modesArr = availability?.modes ?? [];
   const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
   const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
   const bothUsable = directUsable && preUsable;
   const showTransports = (bothUsable ? wantPreorder : mode === 'preorder') && (availability?.preorder.transports.length ?? 0) > 0;
-  const appliedBase = quote && quote.errors.length === 0 ? quote.applied_iqd : product.display_price_iqd ?? product.price_iqd;
-  const directFinal = appliedBase + (product.direct_surcharge_iqd ?? 0);
+  const pricingModes = quotedModes ?? detailModes;
+  const directFinal: number | null = pricingModes?.direct?.unit_subtotal_iqd ?? null;
   const transportFinal = (t: TransportView): number | null =>
-    t.configured ? appliedBase + (isPro ? 0 : t.commission_iqd ?? 0) : null;
+    t.configured ? pricingModes?.preorder.find((m) => m.method === t.method)?.prepaid?.unit_subtotal_iqd ?? null : null;
   const preorderFromFinal = (() => {
     const finals = (availability?.preorder.transports ?? [])
       .map(transportFinal)
       .filter((n): n is number => n !== null);
     return finals.length ? Math.min(...finals) : null;
   })();
+  // Cash on delivery changes the pre-order price ONLY when the product has a
+  // direct premium this customer pays (H1: with none, the commission stays).
+  // The explanation appears only where the number would actually move.
+  const codReprices = pricingModes?.cod_reprices === true;
 
   // ------------------------------------------------------------ sub-renders
   const priceBlock = (
@@ -996,7 +1111,7 @@ export default function Product() {
       ) : null}
 
       {/* Unit breakdown — every added fee is named, never folded silently. */}
-      {priceIsAuthoritative && (quote!.transport || quote!.warranty) ? (
+      {priceIsAuthoritative && (quote!.transport || quote!.direct || quote!.warranty) ? (
         <dl className="mt-3 pt-3 border-t border-zinc-800/70 space-y-1.5 text-[13px]">
           <div className="flex justify-between gap-3">
             <dt className="text-zinc-400">{s.itemPrice}</dt>
@@ -1012,13 +1127,37 @@ export default function Product() {
               </dd>
             </div>
           ) : null}
+          {/* The direct-sale surcharge, with the same PRO exemption as the
+              commission — shown as the server resolved it, never inferred. */}
+          {quote!.direct ? (
+            <div className="flex justify-between gap-3" data-direct-surcharge={quote!.direct.waived ? 'waived' : 'charged'}>
+              <dt className="text-zinc-400">{s.directFee}</dt>
+              <dd className="text-zinc-200 tabular-nums">
+                {quote!.direct.waived ? s.waivedPro : formatIqd(quote!.direct.surcharge_iqd)}
+              </dd>
+            </div>
+          ) : null}
           {quote!.warranty ? (
-            <div className="flex justify-between gap-3">
-              <dt className="text-zinc-400">{s.warrantyFee}</dt>
+            <div className="flex justify-between gap-3" data-warranty-fee-row>
+              <dt className="text-zinc-400">
+                {s.warranty}
+                {quote!.warranty.duration_kind === 'extension'
+                  ? ` · ${s.extendedPlan(monthsLabel(quote!.warranty.duration_months, lang))}`
+                  : ''}
+              </dt>
               <dd className="text-zinc-200 tabular-nums">{formatIqd(quote!.warranty.fee_iqd)}</dd>
             </div>
           ) : null}
         </dl>
+      ) : null}
+
+      {/* The printer home-delivery note (owner mandate): a fact beside the
+          price, from the server's catalog flag and the server's amount. It is
+          never added to any figure on this page. */}
+      {source === 'catalog' && product.is_printer === true && printerNoteIqd !== null ? (
+        <Note tone="gold" animate={false} icon={<Truck className="w-4 h-4" />} className="mt-3" testId="product-printer-note">
+          {s.printerNote(formatIqd(printerNoteIqd))}
+        </Note>
       ) : null}
     </div>
   );
@@ -1240,7 +1379,9 @@ export default function Product() {
               <span className="min-w-0 flex-1">
                 <span className="block">{s.directSale}</span>
                 <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
-                <span className="block tabular-nums text-[14px] font-bold mt-1">{formatIqd(directFinal)}</span>
+                {directFinal !== null ? (
+                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{formatIqd(directFinal)}</span>
+                ) : null}
               </span>
             </button>
             <button
@@ -1269,6 +1410,15 @@ export default function Product() {
               </span>
             </button>
           </div>
+          {/* The pre-order price above is the PREPAID one. Paying cash on
+              delivery re-prices the line as a direct sale at checkout (owner
+              mandate) — said here so the number never surprises later, and
+              ONLY when the server says the number would actually move. */}
+          {codReprices ? (
+            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
+              {s.preorderCodHint}
+            </p>
+          ) : null}
         </fieldset>
       ) : null}
 
@@ -1306,21 +1456,40 @@ export default function Product() {
               );
             })}
           </div>
+          {/* A pre-order-only product has no fulfilment pill to carry the
+              hint, so it sits under the journeys instead — once, not twice,
+              and only when cash on delivery would change the price (a
+              product with no direct premium keeps its commission either way). */}
+          {!bothUsable && codReprices ? (
+            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
+              {s.preorderCodHint}
+            </p>
+          ) : null}
         </fieldset>
       ) : null}
 
+      {/* EXTENDED WARRANTY — printers only (owner mandate). The server sends
+          the plans it will actually sell for this selection, each with its fee
+          already resolved (a percent of the regular price, rounded once on the
+          server) and the total months it yields; this block only lays those
+          facts out. A plan can be chosen here or later in the cart, and only
+          before the order is placed — the policy link says the rest. */}
       {warrantyPlans.length > 0 ? (
-        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+        <fieldset className="rounded-2xl border border-gold/25 bg-gold/[0.04] p-4" data-extended-warranty>
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
-            <ShieldCheck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+            <ShieldCheck aria-hidden="true" className="w-4 h-4 text-gold" />
             {s.warranty}
           </legend>
-          <div className="mt-2 flex flex-col gap-2">
+          <p className="mt-1 text-[12px] text-zinc-400 leading-relaxed">
+            {warrantyBase !== null ? s.warrantyIntro(monthsLabel(warrantyBase, lang)) : s.warrantyIntroNoBase}
+          </p>
+          <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label={s.warranty}>
             <button
               type="button"
-              aria-pressed={!warrantyPlanId}
+              role="radio"
+              aria-checked={!warrantyPlanId}
               onClick={() => setWarrantyPlanId('')}
-              className={`min-h-[44px] px-3 rounded-xl border text-sm text-start transition-colors ${
+              className={`min-h-[44px] px-3 rounded-xl border text-sm text-start transition-colors press-scale ${
                 !warrantyPlanId
                   ? 'border-gold bg-gold/15 text-gold font-bold'
                   : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
@@ -1330,30 +1499,57 @@ export default function Product() {
             </button>
             {warrantyPlans.map((w) => {
               const selected = warrantyPlanId === w.id;
-              const title = pick(lang as Lang, w.title_ar, w.title_en, w.title_ckb) || w.id;
+              const extension = w.duration_kind === 'extension';
+              const headline = extension
+                ? s.extendedPlan(monthsLabel(w.duration_months, lang))
+                : pick(lang as Lang, w.title_ar, w.title_en, w.title_ckb) || w.id;
+              const total = typeof w.total_months === 'number' ? w.total_months : null;
               return (
                 <button
                   key={w.id}
                   type="button"
-                  aria-pressed={selected}
+                  role="radio"
+                  aria-checked={selected}
+                  data-warranty-plan={w.id}
                   onClick={() => setWarrantyPlanId(selected ? '' : w.id)}
-                  className={`min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-sm text-start transition-colors ${
+                  className={`min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-sm text-start transition-colors press-scale ${
                     selected
                       ? 'border-gold bg-gold/15 text-gold font-bold'
                       : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
                   }`}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate">{title}</span>
-                    <span className="block text-[12px] text-zinc-400">
-                      {w.duration_months} {s.months} · {w.duration_kind === 'extension' ? s.extension : s.total}
+                    <span className="block truncate">
+                      <span dir="ltr" className="tabular-nums">{headline}</span>
+                      {total !== null ? (
+                        <span className={`ms-1.5 text-[12px] font-normal ${selected ? 'text-gold/80' : 'text-zinc-400'}`}>
+                          {/* The arrow follows the reading direction: from the
+                              extension to the total in both scripts. */}
+                          {dir === 'rtl' ? '←' : '→'} {s.extendedTotal(monthsLabel(total, lang))}
+                        </span>
+                      ) : null}
                     </span>
+                    {!extension ? (
+                      <span className="block text-[12px] text-zinc-400">
+                        {monthsLabel(w.duration_months, lang)} · {s.total}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="tabular-nums text-[13px] shrink-0">+{formatIqd(w.fee_iqd)}</span>
+                  <span className="tabular-nums text-[13px] shrink-0" aria-busy={quoteLoading || undefined}>
+                    +{formatIqd(w.fee_iqd)}
+                  </span>
                 </button>
               );
             })}
           </div>
+          <Link
+            to="/policies/extended_warranty"
+            className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+            data-warranty-policy-link
+          >
+            <FileText aria-hidden="true" className="w-3.5 h-3.5" />
+            {s.warrantyPolicy}
+          </Link>
         </fieldset>
       ) : null}
     </>

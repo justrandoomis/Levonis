@@ -231,11 +231,17 @@ const A1 = () =>
     const freePre = resolveUnitPrice({ product: A1(), optionId: 'a1-preorder', transportMethod: 'air', ...free });
     const freeDirect = resolveUnitPrice({ product: A1(), optionId: 'a1-direct', ...free });
     assert.notEqual(freePre.unit_subtotal_iqd, freeDirect.unit_subtotal_iqd);
-    // ...and for PRO too, the moment the owner prices immediacy.
+    // ...but NOT for PRO, even once the owner prices immediacy: «Pro Card
+    // users are exempt from this additional shipping-type cost», so the
+    // premium is reported as waived and the PRO total stays 799,000 both ways.
     const withPremium = A1();
     withPremium.direct_surcharge_iqd = 50_000;
     const proDirect = resolveUnitPrice({ product: withPremium, optionId: 'a1-direct', ...pro });
-    assert.equal(proDirect.unit_subtotal_iqd, 849_000);
+    assert.deepEqual(proDirect.direct, { surcharge_iqd: 50_000, waived: true });
+    assert.equal(proDirect.unit_subtotal_iqd, 799_000);
+    // A regular customer pays it: 950,000 + 50,000.
+    const freeDirectPremium = resolveUnitPrice({ product: withPremium, optionId: 'a1-direct', ...free });
+    assert.equal(freeDirectPremium.unit_subtotal_iqd, 1_000_000);
   });
 
   test('PRO has the air commission waived; a free customer pays it', () => {

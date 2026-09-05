@@ -67,10 +67,11 @@ test('color overrides option overrides base — per field, and a colour surcharg
 
 // ------------------------- the owner's rule: surcharges are paid by every tier
 
-test("OWNER: options, colours and availability are additional costs for every tier", () => {
+test("OWNER: options and colours are additional costs for every tier; the availability premium is waived for PRO", () => {
   // Regular 150,000 / PRIME 125,000 / PRO 100,000. Option 2 adds 25,000 →
-  // 175,000 / 150,000 / 125,000. Direct sale adds 100,000 on top →
-  // 275,000 / 250,000 / 225,000.
+  // 175,000 / 150,000 / 125,000. Direct sale adds 100,000 on top for the
+  // regular and PRIME customer → 275,000 / 250,000 — and «Pro Card users are
+  // exempt from this additional shipping-type cost», so PRO stays at 125,000.
   const p = product({
     price_iqd: 150_000,
     prime_price_iqd: 125_000,
@@ -84,11 +85,114 @@ test("OWNER: options, colours and availability are additional costs for every ti
   assert.equal(at('prime').prime_iqd, 150_000);
   assert.equal(at('pro').pro_iqd, 125_000);
   assert.deepEqual([at('free').applied_iqd, at('prime').applied_iqd, at('pro').applied_iqd], [175_000, 150_000, 125_000]);
-  // The direct-sale premium is added after the tier price, for every tier.
+  // The direct-sale premium is added after the tier price — and waived for PRO.
   assert.deepEqual(
     [at('free').unit_subtotal_iqd, at('prime').unit_subtotal_iqd, at('pro').unit_subtotal_iqd],
-    [275_000, 250_000, 225_000]
+    [275_000, 250_000, 125_000]
   );
+  assert.deepEqual(at('free').direct, { surcharge_iqd: 100_000, waived: false });
+  assert.deepEqual(at('prime').direct, { surcharge_iqd: 100_000, waived: false });
+  assert.deepEqual(at('pro').direct, { surcharge_iqd: 100_000, waived: true });
+  for (const tier of ['free', 'prime', 'pro'] as const) assert.equal(at(tier).pricing_basis, 'direct');
+});
+
+// --------------------------- payment method × availability (owner mandate)
+
+test('PRO is exempt from the direct-sale surcharge on the SAME gate as the commission waiver', () => {
+  const p = product({ direct_surcharge_iqd: 50_000 });
+  const asPro = resolveUnitPrice({ product: p, ...pro });
+  assert.deepEqual(asPro.direct, { surcharge_iqd: 50_000, waived: true });
+  assert.equal(asPro.unit_subtotal_iqd, 100_000);
+  // An INACTIVE PRO (lapsed, or outside the approved-address context the
+  // checkout expresses through tierActive) pays it like everyone else.
+  const lapsed = resolveUnitPrice({ product: p, tier: 'pro', tierActive: false });
+  assert.deepEqual(lapsed.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.equal(lapsed.unit_subtotal_iqd, 150_000);
+});
+
+test('PRIME still pays the direct-sale surcharge — §5 gives PRIME no PRO benefit', () => {
+  const r = resolveUnitPrice({ product: product({ direct_surcharge_iqd: 50_000 }), ...prime });
+  assert.deepEqual(r.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.equal(r.unit_subtotal_iqd, 150_000);
+});
+
+test('a pre-order line paid CASH ON DELIVERY is priced like a direct sale, and stays a pre-order', () => {
+  const p = product({
+    selling_type: 'pre_order',
+    direct_surcharge_iqd: 50_000,
+    preorder_transports: [{ method: 'sea', commission_iqd: 15_000, active: true }],
+  });
+  const prepaid = resolveUnitPrice({ product: p, transportMethod: 'sea', ...free });
+  assert.equal(prepaid.unit_subtotal_iqd, 115_000, 'prepaid keeps the configured pre-order price');
+  assert.equal(prepaid.pricing_basis, 'preorder');
+  assert.equal(prepaid.direct, null);
+  assert.deepEqual(prepaid.transport, { method: 'sea', commission_iqd: 15_000, waived: false });
+
+  const cod = resolveUnitPrice({ product: p, transportMethod: 'sea', preorderPricing: 'cod', ...free });
+  assert.deepEqual(cod.errors, []);
+  // base + the direct premium, NOT the commission — never both.
+  assert.equal(cod.unit_subtotal_iqd, 150_000);
+  assert.equal(cod.pricing_basis, 'direct');
+  assert.deepEqual(cod.direct, { surcharge_iqd: 50_000, waived: false });
+  // The transport is KEPT with its method — shipping_type, the fourteen
+  // stages and tracking derive from it — and says why it charges nothing.
+  assert.deepEqual(cod.transport, { method: 'sea', commission_iqd: 15_000, waived: true, waived_by: 'cod_direct_pricing' });
+  // The default is prepaid, so nothing that never heard of the input changes.
+  assert.deepEqual(resolveUnitPrice({ product: p, transportMethod: 'sea', preorderPricing: 'prepaid', ...free }), prepaid);
+});
+
+test('PRO + cash on delivery on a pre-order pays the base only', () => {
+  const p = product({
+    selling_type: 'pre_order',
+    direct_surcharge_iqd: 50_000,
+    preorder_transports: [{ method: 'air', commission_iqd: 25_000, active: true }],
+  });
+  const r = resolveUnitPrice({ product: p, transportMethod: 'air', preorderPricing: 'cod', ...pro });
+  assert.equal(r.unit_subtotal_iqd, 100_000);
+  assert.equal(r.pricing_basis, 'direct');
+  assert.deepEqual(r.direct, { surcharge_iqd: 50_000, waived: true });
+  assert.equal(r.transport?.method, 'air');
+  assert.equal(r.transport?.waived, true);
+  assert.equal(r.transport?.waived_by, 'cod_direct_pricing');
+  // …and the prepaid PRO line names the PRO waiver as its reason.
+  const prepaid = resolveUnitPrice({ product: p, transportMethod: 'air', ...pro });
+  assert.equal(prepaid.transport?.waived_by, 'pro');
+  assert.equal(prepaid.pricing_basis, 'preorder');
+});
+
+test('cash on delivery on a pre-order with NO direct premium configured KEEPS the commission (H1)', () => {
+  // "Priced as a direct sale" needs a direct-sale premium to price WITH. A
+  // pre-order-only product normally has none — so the commission stays, the
+  // basis stays 'preorder', nothing is waived, and the door is never cheaper
+  // than the wallet (the earlier reading dropped 10,000 and charged nothing).
+  const p = product({
+    selling_type: 'pre_order',
+    preorder_transports: [{ method: 'land', commission_iqd: 10_000, active: true }],
+  });
+  const prepaid = resolveUnitPrice({ product: p, transportMethod: 'land', ...free });
+  const cod = resolveUnitPrice({ product: p, transportMethod: 'land', preorderPricing: 'cod', ...free });
+  assert.equal(cod.unit_subtotal_iqd, 110_000);
+  assert.equal(cod.direct, null);
+  assert.equal(cod.pricing_basis, 'preorder');
+  assert.deepEqual(cod.transport, { method: 'land', commission_iqd: 10_000, waived: false });
+  assert.deepEqual(cod, prepaid, 'identical to the prepaid line');
+  // A zero premium is "none configured" too.
+  const zero = resolveUnitPrice({ product: product({ ...p, direct_surcharge_iqd: 0 }), transportMethod: 'land', preorderPricing: 'cod', ...free });
+  assert.equal(zero.unit_subtotal_iqd, 110_000);
+  assert.equal(zero.pricing_basis, 'preorder');
+  // …and a PRO is unchanged: the commission is waived by PRO, not by the method.
+  const proCod = resolveUnitPrice({ product: p, transportMethod: 'land', preorderPricing: 'cod', ...pro });
+  assert.equal(proCod.unit_subtotal_iqd, 100_000);
+  assert.equal(proCod.pricing_basis, 'preorder');
+  assert.equal(proCod.transport?.waived_by, 'pro');
+});
+
+test('preorderPricing is ignored on a direct line', () => {
+  const p = product({ direct_surcharge_iqd: 50_000 });
+  const a = resolveUnitPrice({ product: p, ...free });
+  const b = resolveUnitPrice({ product: p, preorderPricing: 'cod', ...free });
+  assert.deepEqual(a, b);
+  assert.equal(a.pricing_basis, 'direct');
 });
 
 test('OWNER: a FIXED option price is the same surcharge as an adjustment of the same size', () => {
@@ -210,6 +314,7 @@ test('PRIME does NOT inherit the PRO preorder-commission waiver', () => {
   });
   const r = resolveUnitPrice({ product: p, transportMethod: 'sea', ...prime });
   assert.equal(r.transport?.waived, false);
+  assert.equal(r.transport?.waived_by, undefined);
   assert.equal(r.unit_subtotal_iqd, 115_000);
 });
 
@@ -256,13 +361,73 @@ test('PRO waives the preorder commission but NEVER the warranty fee', () => {
     preorder_transports: [{ method: 'air', commission_iqd: 25_000, active: true }],
     warranty_plans: [{
       id: 'w2', title_ar: 'سنتان', title_en: '2 years', title_ckb: '', terms_ar: '', terms_en: '', terms_ckb: '',
-      duration_months: 24, duration_kind: 'total', fee_iqd: 20_000, order: 0, active: true,
+      duration_months: 24, duration_kind: 'total', fee_iqd: 20_000, fee_percent: null, order: 0, active: true,
     }],
   });
   const r = resolveUnitPrice({ product: p, transportMethod: 'air', warrantyPlanId: 'w2', ...pro });
   assert.equal(r.transport?.waived, true);
+  assert.equal(r.transport?.waived_by, 'pro');
   assert.equal(r.warranty?.fee_iqd, 20_000);
   assert.equal(r.unit_subtotal_iqd, 100_000 + 0 + 20_000); // no PRO price → regular + waived commission + warranty
+});
+
+// ------------------------------------------- extended warranty (printers)
+//
+// The owner's model: a printer's extension is priced as a PERCENT of the
+// printer price. The basis is the line's REGULAR price — never the member
+// price — so the fee is the same dinar for a guest, a PRIME and a PRO, which
+// is the "never waived by membership" rule above, kept under percent pricing.
+
+const EXT12 = {
+  id: 'wp_ext12', title_ar: 'ضمان ممدد +12', title_en: 'Extended warranty +12 months', title_ckb: '',
+  terms_ar: '', terms_en: '', terms_ckb: '',
+  duration_months: 12, duration_kind: 'extension' as const, fee_iqd: 0, fee_percent: 7.5, order: 0, active: true,
+};
+const EXT24 = { ...EXT12, id: 'wp_ext24', title_en: 'Extended warranty +24 months', duration_months: 24, fee_percent: 10, order: 1 };
+
+test('a percent warranty fee is round(regular × pct) and identical for free, PRIME and PRO', () => {
+  const p = product({
+    price_iqd: 899_000, prime_price_iqd: 885_000, pro_price_iqd: 799_000,
+    warranty_plans: [EXT12, EXT24], warranty_base_months: 12,
+  });
+  for (const who of [free, prime, pro]) {
+    const r = resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext12', ...who });
+    assert.equal(r.warranty?.fee_iqd, 67_425, `7.5% of the REGULAR 899,000 for ${who.tier}`);
+    assert.equal(r.warranty?.basis_iqd, 899_000);
+    assert.equal(r.warranty?.fee_percent, 7.5);
+    assert.equal(r.unit_subtotal_iqd, r.applied_iqd + 67_425, 'the fee sits on top of whatever the tier pays');
+  }
+  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext24', ...pro }).warranty?.fee_iqd, 89_900);
+});
+
+test("the percent follows the SELECTION's regular price — an option surcharge moves the fee", () => {
+  const p = product({
+    price_iqd: 899_000,
+    options: [baseOption({ id: 'combo', regular_price_iqd: 1_099_000 })],
+    warranty_plans: [EXT12], warranty_base_months: 12,
+  });
+  const r = resolveUnitPrice({ product: p, optionId: 'combo', warrantyPlanId: 'wp_ext12', ...free });
+  assert.equal(r.regular_iqd, 1_099_000);
+  assert.equal(r.warranty?.fee_iqd, 82_425);
+  assert.equal(r.warranty?.basis_iqd, 1_099_000);
+});
+
+test('+12 → 24 total and +24 → 36 total ride in the resolved warranty, so the snapshot carries the promise', () => {
+  const p = product({ warranty_plans: [EXT12, EXT24], warranty_base_months: 12 });
+  const a = resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext12', ...free }).warranty!;
+  assert.deepEqual([a.base_months, a.duration_months, a.total_months], [12, 12, 24]);
+  const b = resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext24', ...free }).warranty!;
+  assert.deepEqual([b.base_months, b.duration_months, b.total_months], [12, 24, 36]);
+  // No configured base → no total is invented; the unit will say needs_config.
+  const c = resolveUnitPrice({ product: product({ warranty_plans: [EXT12] }), warrantyPlanId: 'wp_ext12', ...free }).warranty!;
+  assert.deepEqual([c.base_months, c.total_months], [null, null]);
+});
+
+test('a plan without a percent charges its fixed fee verbatim; an unknown plan is still refused', () => {
+  const fixed = { ...EXT12, id: 'wp_fixed', fee_percent: null, fee_iqd: 45_000 };
+  const p = product({ warranty_plans: [fixed] });
+  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_fixed', ...pro }).warranty?.fee_iqd, 45_000);
+  assert.ok(resolveUnitPrice({ product: p, warrantyPlanId: 'nope', ...free }).errors.includes('WARRANTY_PLAN_NOT_FOUND'));
 });
 
 test('transport commission inherits admin default when null', () => {

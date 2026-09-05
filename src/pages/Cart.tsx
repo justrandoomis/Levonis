@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { useLanguage } from '../LanguageContext';
-import { ArrowLeft, ArrowRight, Trash2, ChevronRight, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info } from 'lucide-react';
-import { useAuth } from '../AuthContext';
+import {
+  ArrowLeft, ArrowRight, Trash2, ChevronRight, ChevronDown, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
+  ShieldCheck, FileText,
+} from 'lucide-react';
 import { useWallet } from '../WalletContext';
+import { useMotion } from '../lib/motion';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import type { CartWarrantyPlan } from '../lib/api';
+import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
+import { asLang, monthsLabel } from '../components/orders/format';
+import Note from '../components/ui/Note';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField from '../components/PromoCodeField';
 import Spinner from '../components/ui/Spinner';
@@ -106,17 +114,117 @@ const SUPPORT_STRINGS = {
   },
 } as const;
 
+/** The printer home-delivery note, beside a printer line (owner mandate: a note, never a fee). */
+const PRINTER_NOTE = {
+  ar: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+  en: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+  ckb: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+} as const;
+
+/**
+ * The cart prices a pre-order line as PAID IN ADVANCE; cash on delivery is
+ * priced as a direct sale at checkout (owner mandate). Said beside a line
+ * ONLY when the server says the number would actually move there
+ * (`cod_reprices`) — a pre-order with no direct premium keeps its commission
+ * under either method, and a customer exempt from the premium pays the same
+ * either way, so neither is told about a difference that does not exist.
+ */
+const COD_HINT = {
+  ar: 'السعر المعروض للدفع مقدمًا من المحفظة؛ الدفع عند الاستلام يُسعَّر كبيع مباشر عند إتمام الطلب.',
+  en: 'Shown as paid in advance from the wallet; cash on delivery is priced as a direct sale at checkout.',
+  ckb: 'نرخەکە بۆ پارەدانی پێشوەخت لە جزدانەوەیە؛ پارەدان لە کاتی گەیاندن لە کاتی تەواوکردنی داواکاری وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت.',
+} as const;
+
+/**
+ * The EXTENDED WARRANTY disclosure on a PRINTER line (owner mandate): a small
+ * collapsed row that opens into the extensions the store sells — +12 months
+ * (24 in total) and +24 months (36 in total) — each priced by the SERVER
+ * against this line's regular price, so the dinar beside an option is the
+ * dinar the cart charges. One plan per line, applied to every unit of the
+ * line; chosen here or on the product page, and only before the order is
+ * placed — after checkout nothing can add one. Arabic is the source; Sorani
+ * is written, never generated.
+ */
+const EXT_WARRANTY = {
+  ar: {
+    title: 'الضمان الممدد',
+    none: 'بدون ضمان ممدد',
+    noneHint: 'الضمان الأساسي فقط',
+    plan: (ext: string) => `+${ext}`,
+    total: (total: string) => `${total} إجمالًا`,
+    includes: 'يشمل الضمان الممدد',
+    perLine: (qty: number) =>
+      qty > 1 ? `خطة واحدة للبند — تُطبَّق على كل وحدة من وحداته الـ${qty}.` : 'خطة واحدة للبند — تُطبَّق على كل وحدة فيه.',
+    beforeOrder: 'تُشترى قبل إتمام الطلب فقط، ولا تُضاف بعد تأكيده.',
+    policy: 'شروط الضمان الممدد',
+    errors: {
+      notPrinter: 'الضمان الممدد متاح للطابعات فقط.',
+      planGone: 'هذه الخطة لم تعد معروضة — أعد تحميل السلة.',
+      generic: 'تعذّر تحديث الضمان الممدد — حاول مجددًا.',
+    },
+  },
+  en: {
+    title: 'Extended Warranty',
+    none: 'No extended warranty',
+    noneHint: 'Base warranty only',
+    plan: (ext: string) => `+${ext}`,
+    total: (total: string) => `${total} total`,
+    includes: 'Includes extended warranty',
+    perLine: (qty: number) =>
+      qty > 1 ? `One plan per line — it applies to each of the ${qty} units.` : 'One plan per line — it applies to every unit of the line.',
+    beforeOrder: 'Bought before the order is placed only; it cannot be added afterwards.',
+    policy: 'Extended warranty terms',
+    errors: {
+      notPrinter: 'Extended warranty is available for printers only.',
+      planGone: 'This plan is no longer offered — reload the cart.',
+      generic: 'Could not update the extended warranty — please try again.',
+    },
+  },
+  ckb: {
+    title: 'گەرەنتی درێژکراوە',
+    none: 'بێ گەرەنتی درێژکراوە',
+    noneHint: 'تەنها گەرەنتی بنەڕەتی',
+    plan: (ext: string) => `+${ext}`,
+    total: (total: string) => `${total} کۆی گشتی`,
+    includes: 'گەرەنتی درێژکراوە لەخۆ دەگرێت',
+    perLine: (qty: number) =>
+      qty > 1 ? `یەک پلان بۆ بڕگەکە — بۆ هەر یەکێک لە ${qty} یەکەکە جێبەجێ دەبێت.` : 'یەک پلان بۆ بڕگەکە — بۆ هەموو یەکەکانی جێبەجێ دەبێت.',
+    beforeOrder: 'تەنها پێش تەواوکردنی داواکاری دەکڕدرێت و دواتر زیاد ناکرێت.',
+    policy: 'مەرجەکانی گەرەنتی درێژکراوە',
+    errors: {
+      notPrinter: 'گەرەنتی درێژکراوە تەنها بۆ پرینتەرەکانە.',
+      planGone: 'ئەم پلانە چیتر پێشکەش ناکرێت — سەبەتەکە دووبارە بار بکە.',
+      generic: 'نوێکردنەوەی گەرەنتی درێژکراوە سەرکەوتوو نەبوو — دووبارە هەوڵ بدەوە.',
+    },
+  },
+} as const;
+
+/**
+ * The journey a cart line is on, from the column that has always held it.
+ * Mirrors worker/lib/shippingType.ts typeForTransport: '' (or anything
+ * unknown) is a direct line; air/sea/land is a pre-order.
+ */
+function typeForTransport(method: unknown): ShippingType {
+  return method === 'air' ? 'preorder_air' : method === 'sea' ? 'preorder_sea' : method === 'land' ? 'preorder_land' : 'direct';
+}
+
 export default function Cart() {
   const navigate = useNavigate();
   const { t, lang, dir, loc } = useLanguage();
   const sc = SUPPORT_STRINGS[lang] ?? SUPPORT_STRINGS.ar;
-  const { user } = useAuth();
-  const { cartShippingMethods, checkoutDeliveryMethods, pointBalance } = useWallet();
-
-  // Subscription plan comes exclusively from the server-side user record.
-  const plan = user?.membership_tier ?? 'free';
-  const planActive =
-    !!user && plan !== 'free' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
+  const { cartShippingMethods, checkoutDeliveryMethods, pointBalance, settings } = useWallet();
+  // The owner's configured note amount; null = nothing to show, never a guess.
+  const printerNoteIqd = (() => {
+    const n = settings?.printerHomeDeliveryNoteIqd;
+    return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null;
+  })();
+  const printerNoteText = PRINTER_NOTE[lang] ?? PRINTER_NOTE.ar;
+  const codHint = COD_HINT[asLang(lang)];
+  const ew = EXT_WARRANTY[asLang(lang)];
+  const m = useMotion();
+  // "+12 months → 24 months total": the arrow follows the reading direction,
+  // so it points from the extension to the total in both scripts.
+  const arrow = dir === 'rtl' ? '←' : '→';
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,6 +265,14 @@ export default function Cart() {
 
   const [dealsExpanded, setDealsExpanded] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
+
+  // Extended-warranty disclosures: which lines are open, which one is saving
+  // (the PATCH re-prices the line, so the group waits for the server), and
+  // the last refusal per line — shown inside the panel, next to the choice.
+  const [warrantyOpen, setWarrantyOpen] = useState<Set<string>>(() => new Set());
+  const [warrantySavingId, setWarrantySavingId] = useState<string | null>(null);
+  const [warrantyPendingPlan, setWarrantyPendingPlan] = useState<string>('');
+  const [warrantyErrors, setWarrantyErrors] = useState<Record<string, string>>({});
 
   // ---------------------------------------------------------- support code
   //
@@ -269,7 +385,12 @@ export default function Cart() {
   // shipping choice the customer is in the middle of making.
   useFreshOnReturn(() => loadCart({ silent: true }), {
     enabled:
-      !variantModalOpen && !shippingModalOpen && !variantSaving && !shippingSaving && !actionBusyRef.current,
+      !variantModalOpen &&
+      !shippingModalOpen &&
+      !variantSaving &&
+      !shippingSaving &&
+      warrantySavingId === null &&
+      !actionBusyRef.current,
     minIntervalMs: 8_000,
     // For the customer who simply leaves the cart in front of them.
     pollWhileVisibleMs: 60_000,
@@ -447,12 +568,65 @@ export default function Cart() {
     }
   };
 
-  const shippingLabel = (item: CartItem) => {
-    const globalMethod = cartShippingMethods.find((m) => m.id === item.shipping_method_id);
-    if (globalMethod) return dir === 'rtl' ? globalMethod.titleAr : globalMethod.titleEn;
-    const own = (item.shipping_methods ?? []).find((m) => m.id === item.shipping_method_id);
-    if (own?.method) return own.method;
-    return dir === 'rtl' ? 'شحن مباشر' : 'Direct';
+  // The line's JOURNEY, from `transport_method` — the column the server prices
+  // and locks the cart on (§1). The legacy `shipping_method_id` is no longer
+  // priced and used to mislabel every pre-order line as "direct".
+  const shippingLabel = (item: CartItem) => shippingTypeLabel(typeForTransport(item.transport_method), lang);
+
+  // ------------------------------------------------- extended warranty
+  //
+  // The server sends `warranty_plans` only for a printer line, each with its
+  // fee already resolved against the line's regular price; a plan is set or
+  // cleared with the same PATCH the variant and shipping sheets use, and the
+  // returned cart (re-priced by the resolver) is what the screen paints.
+  const toggleWarranty = (itemId: string) =>
+    setWarrantyOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+
+  const chooseWarranty = async (item: CartItem, planId: string) => {
+    if (warrantySavingId !== null) return;
+    if ((item.warranty_plan_id ?? '') === planId) return;
+    setWarrantySavingId(item.id);
+    setWarrantyPendingPlan(planId);
+    setWarrantyErrors((prev) => {
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
+    actionBusyRef.current = true;
+    try {
+      const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { warrantyPlanId: planId });
+      applyItems(data.items || []);
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : '';
+      const text = err instanceof Error ? err.message : '';
+      const message =
+        code === 'WARRANTY_NOT_PRINTER'
+          ? ew.errors.notPrinter
+          : text.includes('WARRANTY_PLAN_NOT_FOUND')
+            ? ew.errors.planGone
+            : ew.errors.generic;
+      setWarrantyErrors((prev) => ({ ...prev, [item.id]: message }));
+    } finally {
+      setWarrantySavingId(null);
+      setWarrantyPendingPlan('');
+      actionBusyRef.current = false;
+    }
+  };
+
+  /** "+12 months → 24 months total" for an extension; a legacy plan's title. */
+  const warrantyPlanLabel = (w: Pick<CartWarrantyPlan, 'duration_months' | 'duration_kind' | 'total_months' | 'title_ar' | 'title_en' | 'title_ckb'>) => {
+    if (w.duration_kind !== 'extension') {
+      return loc(w.title_ar || w.title_en || '', w.title_en || w.title_ar || '', w.title_ckb || w.title_ar || '');
+    }
+    const ext = ew.plan(monthsLabel(w.duration_months, lang));
+    return typeof w.total_months === 'number' && w.total_months > 0
+      ? `${ext} ${arrow} ${ew.total(monthsLabel(w.total_months, lang))}`
+      : ext;
   };
 
   // ------------------------------------------------- support-code handlers
@@ -524,20 +698,14 @@ export default function Cart() {
   const totalOriginalPrice = subtotal + discounts;
   const selectedCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
-  // Shipping preview only — the final shipping cost is the delivery method
-  // chosen at checkout, priced server-side when the order is placed.
+  // Shipping preview only — the standard delivery method's configured price,
+  // a server setting. The final figure, and every waiver (PRO, PRIME, a
+  // referred friend's printer), is the checkout quote's: the thresholds live
+  // in the server's shipping policy and are not repeated here, because a
+  // browser-side copy of them had already drifted from the real rule once.
   const standardDelivery =
     checkoutDeliveryMethods.find((m) => m.id === 'standard') ?? checkoutDeliveryMethods[0];
-  let shipping = selectedCount > 0 ? standardDelivery?.price_iqd ?? 0 : 0;
-  let shippingMsg = '';
-
-  if (planActive && plan === 'pro' && subtotal >= 50000) {
-    shipping = 0;
-    shippingMsg = dir === 'rtl' ? 'توصيل مجاني (Pro)' : 'Free Shipping (Pro)';
-  } else if (planActive && plan === 'plus' && subtotal >= 150000) {
-    shipping = 0;
-    shippingMsg = dir === 'rtl' ? 'توصيل مجاني (Plus)' : 'Free Shipping (Plus)';
-  }
+  const shipping = selectedCount > 0 ? standardDelivery?.price_iqd ?? 0 : 0;
 
   const pointsDiscount = usePoints ? Math.min(pointBalance, subtotal) : 0;
   const total = subtotal + shipping - pointsDiscount;
@@ -695,14 +863,26 @@ export default function Cart() {
                         </button>
                       )}
 
-                      {hasShippingOptions && (
+                      {/* The line's journey — direct, or pre-order by air /
+                          sea / land — read from the transport the server
+                          priced. The legacy shipping sheet stays reachable
+                          only where a product still lists legacy methods. */}
+                      {hasShippingOptions ? (
                         <button
+                          type="button"
                           onClick={() => openShippingModal(item)}
                           className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max"
                         >
                           <span className="text-[12px] text-zinc-300">{shippingLabel(item)}</span>
                           <ChevronRight className="w-3 h-3 text-zinc-500" />
                         </button>
+                      ) : (
+                        <span
+                          data-cart-shipping-type={typeForTransport(item.transport_method)}
+                          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-zinc-300"
+                        >
+                          {shippingLabel(item)}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -716,6 +896,151 @@ export default function Cart() {
                       </>
                     )}
                   </div>
+
+                  {/* The fee line: the unit price above already INCLUDES the
+                      chosen extension, so this names the part of it that is
+                      warranty — the resolver's dinar, never re-computed. */}
+                  {item.breakdown?.warranty && (
+                    <p className="-mt-1.5 mb-2 text-[11.5px] text-zinc-400 tabular-nums flex items-center gap-1.5" data-cart-warranty-fee={item.id}>
+                      <ShieldCheck className="w-3 h-3 text-gold shrink-0" aria-hidden="true" />
+                      <span className="truncate">
+                        {ew.includes} · +{formatIqd(item.breakdown.warranty.fee_iqd)}
+                      </span>
+                    </p>
+                  )}
+
+                  {(item.warranty_plans ?? []).length > 0 && (() => {
+                    const plans = item.warranty_plans ?? [];
+                    const open = warrantyOpen.has(item.id);
+                    const current = plans.find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
+                    const panelId = `ext-warranty-${item.id}`;
+                    const saving = warrantySavingId === item.id;
+                    const radio = (checked: boolean) =>
+                      `w-full min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-start text-[13px] transition-colors press-scale disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
+                        checked ? 'border-gold bg-gold/15 text-gold font-bold' : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
+                      }`;
+                    return (
+                      <div className="mb-2" data-cart-ext-warranty={item.id}>
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          aria-controls={panelId}
+                          onClick={() => toggleWarranty(item.id)}
+                          className={`w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
+                            current ? 'border-gold/40 bg-gold/[0.06]' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
+                          }`}
+                        >
+                          <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-zinc-400'}`} aria-hidden="true" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[12px] font-bold text-zinc-200 leading-tight">{ew.title}</span>
+                            <span className={`block text-[11px] leading-tight truncate tabular-nums ${current ? 'text-gold/90' : 'text-zinc-500'}`}>
+                              {current ? `${warrantyPlanLabel(current)} · +${formatIqd(current.fee_iqd)}` : ew.none}
+                            </span>
+                          </span>
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 text-zinc-500 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+                            aria-hidden="true"
+                          />
+                        </button>
+
+                        {/* The panel unfolds on the house `quick` spring and folds
+                            back the same way; under reduced motion it cross-fades.
+                            The id lives on the always-present wrapper so
+                            aria-controls resolves whether the panel is open or not. */}
+                        <div id={panelId}>
+                          <AnimatePresence initial={false}>
+                            {open && (
+                              <motion.div
+                                key="panel"
+                                initial={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                                animate={m.reduced ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
+                                exit={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                                transition={m.spring('quick')}
+                                className="overflow-hidden"
+                              >
+                                <div
+                                  role="radiogroup"
+                                  aria-label={ew.title}
+                                  aria-busy={saving || undefined}
+                                  className="mt-1.5 rounded-xl border border-zinc-800 bg-black/30 p-2 flex flex-col gap-1.5"
+                                >
+                                  <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={!current}
+                                    disabled={saving}
+                                    onClick={() => chooseWarranty(item, '')}
+                                    className={radio(!current)}
+                                    data-cart-warranty-plan=""
+                                  >
+                                    <span className="min-w-0">
+                                      <span className="block truncate">{ew.none}</span>
+                                      <span className={`block text-[11px] font-normal ${!current ? 'text-gold/80' : 'text-zinc-500'}`}>{ew.noneHint}</span>
+                                    </span>
+                                    {saving && warrantyPendingPlan === '' ? <Spinner size="xs" delayMs={0} decorative /> : null}
+                                  </button>
+                                  {plans.map((w) => {
+                                    const checked = current?.id === w.id;
+                                    return (
+                                      <button
+                                        key={w.id}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={checked}
+                                        disabled={saving}
+                                        onClick={() => chooseWarranty(item, w.id)}
+                                        className={radio(checked)}
+                                        data-cart-warranty-plan={w.id}
+                                      >
+                                        <span className="min-w-0 truncate tabular-nums">{warrantyPlanLabel(w)}</span>
+                                        <span className="tabular-nums shrink-0 text-[12.5px]">
+                                          {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${formatIqd(w.fee_iqd)}`}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                  <p className="text-[11px] text-zinc-500 leading-relaxed px-0.5">
+                                    {ew.perLine(item.qty)} {ew.beforeOrder}
+                                  </p>
+                                  {warrantyErrors[item.id] && (
+                                    <p role="alert" className="text-[11.5px] text-red-400 px-0.5">
+                                      {warrantyErrors[item.id]}
+                                    </p>
+                                  )}
+                                  <Link
+                                    to="/policies/extended_warranty"
+                                    className="inline-flex items-center gap-1.5 self-start px-0.5 min-h-[32px] text-[11.5px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                                    data-cart-warranty-policy
+                                  >
+                                    <FileText className="w-3.5 h-3.5" aria-hidden="true" />
+                                    {ew.policy}
+                                  </Link>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* A pre-order line whose price would change under cash on
+                      delivery: the server's `cod_reprices`, never inferred. */}
+                  {item.cod_reprices === true && (
+                    <p className="-mt-1 mb-2 text-[11px] text-zinc-500 leading-relaxed" data-cart-cod-hint={item.id}>
+                      {codHint}
+                    </p>
+                  )}
+
+                  {/* A printer going to a home address: the owner's note, from
+                      the server's flag and the server's amount — shown, never
+                      added to the total. Gold: the store's own terms, the
+                      same tone the product page and the order use. */}
+                  {item.is_printer && printerNoteIqd !== null && (
+                    <Note tone="gold" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2" testId="cart-printer-note">
+                      {printerNoteText(formatIqd(printerNoteIqd))}
+                    </Note>
+                  )}
 
                   {/* The price moved since this cart was opened. The new one is
                       what the shop charges, so it is already applied — this
@@ -1011,7 +1336,7 @@ export default function Cart() {
             </span>
             <span className="text-zinc-200 text-[14px] font-medium">
               {shipping === 0 ? (
-                <span className="text-green-500">{shippingMsg || (dir === 'rtl' ? 'مجاني' : 'Free')}</span>
+                <span className="text-green-500">{dir === 'rtl' ? 'مجاني' : 'Free'}</span>
               ) : (
                 formatIqd(shipping)
               )}

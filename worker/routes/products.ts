@@ -21,7 +21,7 @@ import { parseProductRow, projectPublic, projectAdmin } from '../lib/productMode
 import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
-import { effectiveTier } from '../lib/entitlements';
+import { pricingTierContext } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
 import { resolveStock, isLowStock } from '../lib/inventory';
 import type { InventorySnapshot } from '../lib/inventory';
@@ -35,6 +35,8 @@ import {
   snapshotFrom,
 } from '../lib/productOverlay';
 import type { ProductRelationsView } from '../lib/productOverlay';
+import { isPrinterProduct } from '../lib/printerIdentity';
+import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
 
 export const productRoutes = new Hono<AppContext>();
 
@@ -62,7 +64,15 @@ export function transportDefaultsFrom(value: unknown): Array<{ method: string; c
 
 interface PricingCtx {
   tier: Tier;
+  /** What the resolver is told: the membership's activity, except that a PRO
+   *  is active for PRICING only inside the PRO purchase context (approved
+   *  default address, benefits not restricted) — the checkout's own gate. */
   tierActive: boolean;
+  /** The membership itself is active (a PRO outside the context still IS a
+   *  PRO — the page must not ask them to subscribe). */
+  membershipActive: boolean;
+  /** PRO purchase benefits apply to this viewer's quotes. */
+  proContext: boolean;
   proPolicy: ProPricingPolicy;
   transportDefaults: Array<{ method: string; commission_iqd: number }>;
 }
@@ -364,19 +374,38 @@ export function communityAvailability(): SaleAvailability {
   };
 }
 
-/** Viewer tier comes ONLY from the server-side session/memberships ledger. */
+/**
+ * Viewer tier comes ONLY from the server-side session/memberships ledger —
+ * through the SAME PRO purchase context the cart and the checkout use
+ * (worker/lib/entitlements.ts `pricingTierContext`), judged at the viewer's
+ * default address. So a PRO whose default address is not the approved one is
+ * shown the surcharge here, exactly as the door will charge it.
+ */
 export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
   const user = c.get('user');
   const [tierInfo, settings] = await Promise.all([
-    user ? effectiveTier(c.env, user) : Promise.resolve({ tier: 'free' as Tier, active: false }),
+    user ? pricingTierContext(c.env.DB, user.id) : Promise.resolve(null),
     getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
   ]);
   const s = settings as Record<string, unknown>;
   return {
-    tier: tierInfo.tier,
-    tierActive: tierInfo.active,
+    tier: tierInfo ? tierInfo.tierStatus.tier : 'free',
+    tierActive: tierInfo ? tierInfo.pricingTierActive : false,
+    membershipActive: tierInfo ? tierInfo.tierStatus.active : false,
+    proContext: tierInfo ? tierInfo.proContext : false,
     proPolicy: 'proPricingPolicy' in s ? proPolicyFrom(s.proPricingPolicy) : DEFAULT_PRO_POLICY,
     transportDefaults: transportDefaultsFrom(s.preorderTransportDefaults),
+  };
+}
+
+/** The viewer's tier as the storefront may know it — never a browser input. */
+function viewerTier(ctx: PricingCtx) {
+  return {
+    tier: ctx.tier,
+    active: ctx.membershipActive,
+    /** The tier the figures on this response were priced with. */
+    pricing_active: ctx.tierActive,
+    pro_benefits_context: ctx.proContext,
   };
 }
 
@@ -385,6 +414,73 @@ function publicQuote(r: ResolvedPrice) {
   const { cost_iqd, ...rest } = r;
   void cost_iqd;
   return rest;
+}
+
+/**
+ * THE FINAL PRICE OF EVERY WAY TO GET THIS SELECTION, computed here so the
+ * product page never does its own "applied + surcharge" arithmetic: the
+ * direct pill, each pre-order journey (as paid in advance, and as paid cash
+ * on delivery) and whether cash on delivery changes the number at all — with
+ * the PRO exemptions exactly as the checkout applies them. The warranty plan
+ * is left out on purpose: these are the prices of the WAYS TO BUY, and the
+ * chooser adds its fee beside them. Selection-validity errors (a colour on
+ * the wrong option) are not this function's business — only the numbers.
+ */
+export interface PricingModes {
+  /** A direct sale of this selection, or null when the line cannot be fulfilled from stock. */
+  direct: { unit_subtotal_iqd: number; direct: ResolvedPrice['direct'] } | null;
+  preorder: Array<{
+    method: string;
+    /** Paid in advance: the configured pre-order price. null = commission unconfigured. */
+    prepaid: { unit_subtotal_iqd: number; transport: ResolvedPrice['transport'] } | null;
+    /** Paid cash on delivery: priced as a direct sale WHEN the product has a direct premium. */
+    cod: { unit_subtotal_iqd: number; direct: ResolvedPrice['direct']; pricing_basis: ResolvedPrice['pricing_basis'] } | null;
+    /** The two figures above differ. */
+    cod_reprices: boolean;
+  }>;
+  /** Any journey on which cash on delivery changes the price. */
+  cod_reprices: boolean;
+}
+
+export function pricingModes(
+  doc: ProductDoc,
+  ctx: PricingCtx,
+  sel: { optionId: string | null; colorId: string | null },
+  isPrinter: boolean
+): PricingModes {
+  const resolve = (transportMethod: string | null, preorderPricing: 'prepaid' | 'cod') =>
+    resolveUnitPrice({
+      product: doc,
+      optionId: sel.optionId,
+      colorId: sel.colorId,
+      transportMethod,
+      tier: ctx.tier,
+      tierActive: ctx.tierActive,
+      proPolicy: ctx.proPolicy,
+      transportDefaults: ctx.transportDefaults,
+      preorderPricing,
+      isPrinter,
+    });
+  const d = resolve(null, 'prepaid');
+  const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd, direct: d.direct };
+  const unusable = new Set(['TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
+  const preorder: PricingModes['preorder'] = [];
+  for (const t of doc.preorder_transports) {
+    if (t.active === false) continue;
+    const prepaid = resolve(t.method, 'prepaid');
+    if (prepaid.errors.some((e) => unusable.has(e))) {
+      preorder.push({ method: t.method, prepaid: null, cod: null, cod_reprices: false });
+      continue;
+    }
+    const cod = resolve(t.method, 'cod');
+    preorder.push({
+      method: t.method,
+      prepaid: { unit_subtotal_iqd: prepaid.unit_subtotal_iqd, transport: prepaid.transport },
+      cod: { unit_subtotal_iqd: cod.unit_subtotal_iqd, direct: cod.direct, pricing_basis: cod.pricing_basis },
+      cod_reprices: cod.unit_subtotal_iqd !== prepaid.unit_subtotal_iqd,
+    });
+  }
+  return { direct, preorder, cod_reprices: preorder.some((m) => m.cod_reprices) };
 }
 
 /** Legacy flat [{key,value}] view of the v2 spec groups (old UI compatibility). */
@@ -636,7 +732,7 @@ productRoutes.get('/:slug', async (c) => {
     const user = c.get('user');
     const parsed = parseProductRow(row);
 
-    const [ctx, favRow, brandRow, relations] = await Promise.all([
+    const [ctx, favRow, brandRow, relations, isPrinter] = await Promise.all([
       pricingCtx(c),
       user
         ? c.env.DB.prepare('SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?')
@@ -652,6 +748,9 @@ productRoutes.get('/:slug', async (c) => {
       // Migration 0022 gave every existing product its rows, so this is the
       // single source of truth, not a second one.
       loadRelationsView(c.env.DB, String(row.id), row.inventory_mode),
+      // The owner's catalog flag: the page shows the printer home-delivery
+      // note off it (worker/lib/printerIdentity.ts) — never off ops_policy.
+      isPrinterProduct(c.env.DB, String(row.id)),
     ]);
     const doc = applyRelations(parsed, relations);
 
@@ -661,6 +760,7 @@ productRoutes.get('/:slug', async (c) => {
       tierActive: ctx.tierActive,
       proPolicy: ctx.proPolicy,
       transportDefaults: ctx.transportDefaults,
+      isPrinter,
     });
     // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
     // cheapest way to buy the product — everywhere else it appears, and this
@@ -671,6 +771,15 @@ productRoutes.get('/:slug', async (c) => {
     // quote is still returned, unchanged, as `pricing` — that is what the
     // page prices with until the customer picks an option.
     const out = publicWithDisplayPrice(row, ctx, relations);
+    // A fact about the product, not a price: the storefront renders the
+    // home-delivery note beside a printer's price block from this flag.
+    out.is_printer = isPrinter;
+    // The extended-warranty options with their fee resolved against the BASE
+    // selection's regular price (the quote re-prices them per selection), and
+    // the total months each yields — so "+12 months → 24 total · +67,425"
+    // is the server's sentence, never the browser's arithmetic. Empty for a
+    // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
+    out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
 
     return c.json({
       success: true,
@@ -683,6 +792,10 @@ productRoutes.get('/:slug', async (c) => {
       // images. Null when the product has no relational rows at all.
       relations: publicRelations(relations),
       pricing: publicQuote(resolved), // base-selection resolver result, cost-free
+      // The final price of every way to get the BASE selection (the quote
+      // re-computes them per selection) — the page's fulfilment pills and
+      // transport rows read these, and compute nothing.
+      pricing_modes: pricingModes(doc, ctx, { optionId: null, colorId: null }, isPrinter),
       // §7.2 — the sale mode the page may DEFAULT to, derived from the real
       // stock model and the admin pre-order policy (never from the browser).
       availability: saleAvailability(doc, {
@@ -693,7 +806,7 @@ productRoutes.get('/:slug', async (c) => {
           low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
         }),
       }),
-      viewer_tier: { tier: ctx.tier, active: ctx.tierActive },
+      viewer_tier: viewerTier(ctx),
     });
   }
 
@@ -753,25 +866,36 @@ productRoutes.post('/:slug/quote', async (c) => {
   // as the detail endpoint reads them. Quoting from the bare row made every
   // option saved through the current admin form (whose structure lives ONLY
   // in the tables) answer OPTION_NOT_FOUND, and per-colour stock invisible.
-  const relations = await loadRelationsView(c.env.DB, String(row.id), row.inventory_mode);
+  const [relations, ctx, isPrinter] = await Promise.all([
+    loadRelationsView(c.env.DB, String(row.id), row.inventory_mode),
+    pricingCtx(c), // tier ONLY from the session, never the body
+    isPrinterProduct(c.env.DB, String(row.id)),
+  ]);
   const doc = applyRelations(parseProductRow(row), relations);
-  const ctx = await pricingCtx(c); // tier ONLY from the session, never the body
 
   const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
   const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
   const transportMethod = typeof body.transportMethod === 'string' ? body.transportMethod : null;
+  const warrantyPlanId = typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null;
 
   const resolved = resolveUnitPrice({
     product: doc,
     optionId,
     colorId,
     transportMethod,
-    warrantyPlanId: typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null,
+    warrantyPlanId,
     tier: ctx.tier,
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
+    isPrinter,
   });
+  // The same printers-only rule the cart enforces, reported the way the page
+  // reports every other selection error — so the button disables here rather
+  // than the add failing a moment later.
+  if (warrantyPlanId && !isPrinter && !resolved.errors.includes(WARRANTY_NOT_PRINTER)) {
+    resolved.errors.push(WARRANTY_NOT_PRINTER);
+  }
 
   return c.json({
     success: true,
@@ -780,6 +904,14 @@ productRoutes.post('/:slug/quote', async (c) => {
       qty,
       line_total_iqd: resolved.unit_subtotal_iqd * qty,
     },
+    // The final price of every way to get THIS selection — direct, and each
+    // pre-order journey paid in advance or cash on delivery — so the page's
+    // pills show the server's numbers and never their own arithmetic.
+    pricing_modes: pricingModes(doc, ctx, { optionId, colorId }, isPrinter),
+    // Every extended-warranty option priced for THIS selection's regular price
+    // (an option surcharge moves a percent fee), so the chooser can show the
+    // exact dinar of each plan before one is picked.
+    warranty_plans: pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
     // Availability for THIS selection — changing option/color re-checks it,
     // against the REAL inventory snapshot and colour links, and asking for a
     // transport is asking for the pre-order journey (same rule as the cart).
@@ -796,7 +928,7 @@ productRoutes.post('/:slug/quote', async (c) => {
       links: relations.links,
       preferredType: transportMethod ? 'pre_order' : null,
     }),
-    viewer_tier: { tier: ctx.tier, active: ctx.tierActive },
+    viewer_tier: viewerTier(ctx),
   });
 });
 

@@ -18,6 +18,7 @@
 import type { Env, SessionUser } from './types';
 import { safeParse } from './types';
 import type { Tier } from './pricing';
+import { normalizePhone } from './phone';
 
 export interface LaunchConfig {
   launch_at: string | null;
@@ -138,6 +139,107 @@ export async function effectiveTier(env: Env, user: SessionUser): Promise<{ tier
   return { tier: s.tier, active: s.active };
 }
 
+// ------------------------------------------------- the PRO purchase context
+
+const collapse = (s: unknown) => String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+function phoneKey(raw: unknown): string {
+  const s = String(raw ?? '');
+  return normalizePhone(s) ?? s.replace(/\D+/g, '');
+}
+
+/**
+ * Is this address the customer's current APPROVED default PRO address
+ * (approved_addresses, 0003)? Read-only: approval/change flows live in the
+ * PRO administration module. Matching normalizes harmless whitespace/case and
+ * phone formats — it never mutates anything. No approved row (non-PRO users,
+ * or PRO before approval) → false.
+ */
+export async function isApprovedDefaultAddress(
+  db: D1Database,
+  userId: string,
+  address: Record<string, unknown>
+): Promise<boolean> {
+  const approved = await db
+    .prepare(
+      `SELECT name, phone_e164, address, landmark FROM approved_addresses
+        WHERE user_id = ? AND state = 'approved'
+        ORDER BY version DESC LIMIT 1`
+    )
+    .bind(userId)
+    .first<{ name: string; phone_e164: string; address: string; landmark: string }>();
+  if (!approved) return false;
+  return (
+    collapse(address.name) === collapse(approved.name) &&
+    collapse(address.address) === collapse(approved.address) &&
+    phoneKey(address.phone) === phoneKey(approved.phone_e164)
+  );
+}
+
+/** The customer's default address (the first one when none is marked). */
+export async function defaultAddressOf(db: D1Database, userId: string): Promise<Record<string, unknown> | null> {
+  return db
+    .prepare('SELECT * FROM addresses WHERE user_id = ? ORDER BY is_default DESC, created_at ASC LIMIT 1')
+    .bind(userId)
+    .first<Record<string, unknown>>();
+}
+
+/**
+ * THE ONE PRO PURCHASE CONTEXT — computed the same way on every surface that
+ * prices a line: the product page, the product quote, the cart and the
+ * checkout. CONFIRMED §6.3: PRO purchase benefits (PRO product prices, the
+ * pre-order commission waiver, the direct-sale premium waiver, the shipping
+ * waiver, priority) exist only at the single approved default PRO address;
+ * anywhere else the whole pricing context is ordinary. Active restriction
+ * cases (§10) pause the pricing benefits without touching the membership —
+ * the resolver applies PRO prices and both availability waivers through one
+ * flag, so gating either 'proPricing' or 'noPreorderCommission' pauses that
+ * whole context.
+ *
+ * `address` is the address the money is being quoted FOR: the checkout passes
+ * the one the customer selected; the product page and the cart, which have no
+ * selection yet, pass nothing and are judged at the customer's DEFAULT
+ * address — the address a checkout would open on. So a PRO whose default
+ * address is not (yet) approved sees the surcharge on the product page, in
+ * the cart and at the checkout alike, instead of a price the door will not
+ * honour. Recomputed per request, never stored.
+ */
+export interface PricingTierContext {
+  tierStatus: TierStatus;
+  /** The judged address matches the approved default PRO address. */
+  atApprovedDefault: boolean;
+  /** PRO purchase benefits apply to THIS quote. */
+  proContext: boolean;
+  /** What the resolver is told as `tierActive`: PRO only inside proContext. */
+  pricingTierActive: boolean;
+}
+
+export async function pricingTierContext(
+  db: D1Database,
+  userId: string,
+  address?: Record<string, unknown> | null
+): Promise<PricingTierContext> {
+  const tierStatus = await getTierStatus(db, userId);
+  let atApprovedDefault = false;
+  if (tierStatus.tier === 'pro' && tierStatus.active) {
+    const judged = address === undefined ? await defaultAddressOf(db, userId) : address;
+    atApprovedDefault = judged ? await isApprovedDefaultAddress(db, userId, judged) : false;
+  }
+  const gated = new Set(tierStatus.gated_benefits ?? []);
+  const proContext =
+    tierStatus.tier === 'pro' &&
+    tierStatus.active &&
+    atApprovedDefault &&
+    !gated.has('proPricing') &&
+    !gated.has('noPreorderCommission');
+  return {
+    tierStatus,
+    atApprovedDefault,
+    proContext,
+    pricingTierActive: tierStatus.tier === 'pro' ? proContext : tierStatus.active,
+  };
+}
+
 // Benefit checks — single definitions so PLUS/PRO gates never drift apart.
 // Every check honors gated_benefits: an active restriction case pauses the
 // specific benefit without touching the paid membership record itself.
@@ -179,9 +281,14 @@ export const benefits = {
   /** Gets a dedicated storefront subdomain. */
   merchantSubdomain: (t: TierStatus) =>
     t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantSubdomain'),
-  /** PLUS+PRO: eligibility for PLUS-only coupons where the owner configures them. */
+  /** PLUS+PRIME+PRO: eligibility for tier-required coupons where the owner
+   *  configures them (coupons.tier_required plus|prime|pro). WHICH tier a
+   *  coupon needs is the ladder in worker/lib/membershipOps.ts validateCoupon
+   *  (pricing.TIER_RANK: pro > prime > plus); this gate only says whether the
+   *  member's coupon benefit is switched on at all, so an admin restriction
+   *  on 'exclusiveCoupons' pauses every member coupon at once. */
   exclusiveCoupons: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'exclusiveCoupons'),
+    t.active && (t.tier === 'plus' || t.tier === 'prime' || t.tier === 'pro') && notGated(t, 'exclusiveCoupons'),
   /** PLUS+PRIME+PRO: exclusive sections (bundles, random filament, special
    *  offers). PRIME was added by the owner's bundles mandate: «هذه الميزه
    *  تظهر لمشتركين فقط البلس والبريميوم والبرو» — every paid tier sees the
@@ -190,7 +297,10 @@ export const benefits = {
     t.active && (t.tier === 'plus' || t.tier === 'prime' || t.tier === 'pro') && notGated(t, 'exclusiveSections'),
   /** PRO: explicit/policy product discounts (resolver applies pricing). */
   proPricing: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proPricing'),
-  /** PRO: free last-mile delivery on all orders. */
+  /** PRO: free last-mile delivery — worker/lib/shipping.ts applies the owner's
+   *  conditions (approved default address, merchandise STRICTLY above the
+   *  configured pro_threshold_iqd); this flag only says the member is eligible
+   *  to be tested against them. */
   freeDelivery: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'freeDelivery'),
   /** PRO: preorder transport commission waived. */
   noPreorderCommission: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'noPreorderCommission'),

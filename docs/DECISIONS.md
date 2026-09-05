@@ -14,7 +14,7 @@
 | 5 | هدية PLUS المجانية عند شراء أي طابعة: المدة، ولحظة المنح (عند الدفع أم التسليم)، ومعاملة عضو PLUS/PRO فعّال، وتعدد المشتريات | 🔴 للهدية (معطّلة الآن printerGiftConfig.enabled=false) | الإعداد printerGiftConfig + تعليم كتالوجات الطابعات is_printer_catalog |
 | 6 | سعر الصرف المعتمد (1 USD = X IQD) وسياسة التقريب الحالية (سقف للسنتات) هل تُعتمد؟ | 🟡 (1400 افتراضيًا) | الإدارة → إعدادات المحفظة |
 | 7 | سياسة خصم PRO العامة للمنتجات بلا سعر PRO صريح (نسبة؟ استثناءات؟). الافتراضي الآن: **لا خصم مُختلق** (explicit_only) | 🟡 | الإعداد proPricingPolicy |
-| 8 | عمولات النقل المسبق جو/بحر/بر (مبالغ IQD ثابتة أو أساس نسبة) ورسوم خطط الضمان وشروط تغطيتها | 🔴 لعرض طلب مسبق مكتمل | الإعداد preorderTransportDefaults + محرر المنتج (لكل منتج) |
+| 8 | عمولات النقل المسبق جو/بحر/بر (مبالغ IQD ثابتة أو أساس نسبة) ورسوم خطط الضمان وشروط تغطيتها. **حُسم نصف الضمان (2026-09-05، الصف 91):** رسم التمديد **نسبة من سعر الطابعة الاعتيادي** لكل خطة (`fee_percent`، مثال المالك 7.5–10%) تُقرَّب إلى دينار صحيح ولا تُعفى بالعضوية، ورسم ثابت بديل حين لا توجد نسبة؛ الشروط في وثيقة `extended_warranty`. عمولات النقل تبقى مبالغ ثابتة كما هي | 🔴 لعمولات النقل؛ ✅ رسوم الضمان الممدد | الإعداد preorderTransportDefaults + محرر المنتج (لكل منتج) |
 | 9 | منطقة خدمة التوصيل، وحدث بدء وعد **12 ساعة** وتغطيته، وصياغة الطلب المسبق (لا يمكن وعد 12 ساعة لطلب مسبق) | 🔴 لإعلان الوعد | نص/سياسة تُضاف عند الاستلام؛ علم الأولوية على الطلبات يعمل الآن |
 | 10 | قواعد **الشراء الآن والدفع لاحقًا**: الأهلية، السقوف، المواعيد، الرسوم، السياسة القانونية | 🔴 (البنية جاهزة والدفع بها معطّل) | جداول bnpl_* + تفعيل لاحق |
 | 11 | الإحالات: نافذة الإسناد وأولويتها، تعدد الطابعات/التسليم الجزئي (الافتراضي: مكافأة واحدة لكل عملية مؤهلة + مراجعة إدارية)، تجميع الحملتين بمشترى واحد، توقيت مكافأة إحالة PRO نسبةً للدفع/التفعيل/الاسترجاع، مخزون البكرات المؤهل، وكلفة توصيل المكافأة | 🟡 (التصميم الافتراضي مطبق والصرف يدوي إداري) | مراجعة الإدارة → الإحالات |
@@ -22,9 +22,9 @@
 | 13 | خصومات الصيانة وقطع الغيار لمشتري الطابعات (PRO): النسب، المدة، المنتجات المشمولة، وخصم الاستبدال لسوء الاستخدام | 🔴 | إعدادات تُضاف عند الاستلام |
 | 14 | Resend: إضافة أسرار GitHub باسم `EMAIL_API_KEY` و`EMAIL_FROM` (عنوان مرسل من نطاق موثّق في Resend) و`EMAIL_TEST_RECIPIENT` (بريد الاختبار المعتمد للـ staging) | 🔴 لإعادة تعيين كلمة المرور | GitHub → Secrets ثم إعادة نشر staging |
 | 15 | **مؤكَّد — لا يُسأل مجددًا**: التوصيل العادي 5,000 د.ع. توصيل PRO المجاني حصرًا: عضو PRO فعّال + العنوان الافتراضي الوحيد المعتمد + قيمة بضاعة **أكبر تمامًا من 75,000 د.ع** (75,000 بالضبط لا يؤهل). عنوان بديل = تسعير عادي، ويعود الإعفاء تلقائيًا عند العودة للعنوان الافتراضي | ✅ مؤكد ومنفَّذ (`worker/lib/shipping.ts`) | — |
-| 16 | رسوم توصيل الطابعات 25,000/50,000 د.ع: **خريطة الحجم** (أي طابعة صغيرة وأي كبيرة)، ورسوم الكرتونة لطلب أكثر من 10 بكرات | 🔴 لعرض رسوم الطابعات (تظهر الآن "بحاجة إعداد" بصدق) | الإعداد shippingPolicy (printer_small/large + carton) |
+| 16 | رسوم توصيل الطابعات 25,000/50,000 د.ع: **خريطة الحجم** (أي طابعة صغيرة وأي كبيرة)، ورسوم الكرتونة لطلب أكثر من 10 بكرات. **تمييز (2026-09-05):** ما طلبه المالك في تكليف طرق الدفع — «للطابعات تظهر ملاحظة أن 50,000 د.ع تُدفع عند طلب التوصيل للمنزل — كملاحظة فقط» — نُفِّذ كـ**ملاحظة** لا كرسم: الإعداد العام `printerHomeDeliveryNoteIqd` (افتراضيًا 50,000) يُعرض بجانب كل طابعة (صفحة المنتج، السلة، الدفع، تفاصيل الطلب) ولا يُضاف إلى أي مجموع، ويُقرأ من علم الكتالوج `is_printer_catalog` لا من `ops_policy.size_class` كي لا يُفعِّل محرك الرسوم غير المُهيَّأ. خريطة الرسوم نفسها تبقى قرارًا معلّقًا | 🔴 لعرض رسوم الطابعات (تظهر الآن "بحاجة إعداد" بصدق)؛ ✅ الملاحظة منفَّذة | الإعداد shippingPolicy (printer_small/large + carton)؛ الملاحظة: printerHomeDeliveryNoteIqd |
 | 17 | أساس عتبة 75,000: قيمة البضاعة قبل الخصومات أم بعدها؟ وهل يغطي الإعفاء كامل السلة المختلطة (طابعة + مواد) أم البنود العادية فقط؟ الافتراضي الحالي: بعد الخصومات، ويغطي الكل | 🟡 | الإعداد shippingPolicy (threshold_basis / pro_waiver_covers) |
-| 18 | ضمان وحدة AMS: هل مدتها 12 شهرًا كالطابعات؟ وتمديدا +12/+24 شهرًا عند الشراء فقط: أسعارهما | 🔴 لبيع التمديدات | إعدادات الضمان لكل منتج |
+| 18 | ضمان وحدة AMS: هل مدتها 12 شهرًا كالطابعات؟ وتمديدا +12/+24 شهرًا عند الشراء فقط: أسعارهما. **حُسم للطابعات (2026-09-05، الصف 91):** الأساسي 12 شهرًا من التسليم (`warranty_base_months`)، والتمديدان +12 → 24 و+24 → 36 فقط، يُشتريان **قبل إتمام الطلب فقط** (صفحة المنتج أو السلة) بنسبة من سعر الطابعة يحددها المالك لكل طابعة في محرر المنتج/القالب. **AMS ليست طابعة**: لا تمديد لها (النظام للطابعات فقط)، ومدة ضمانها الأساسي تبقى قرارًا | 🔴 لمدة AMS؛ ✅ تمديدات الطابعات | محرر المنتج (قسم البيع → الضمان الممدد)، القالب TXT/CSV |
 | 19 | هدايا مراجعة الطابعة: محتوى صناديق كل مستوى 1..N وأعدادها ومخزونها | 🔴 لتفعيل الهدايا | جداول gift_pools (الإدارة) |
 | 20 | النقاط: تعريف "الإنفاق المؤهل" (هل يشمل رسوم التوصيل والعمولات؟ الافتراضي: البضاعة فقط)، وسقف الصرف لكل طلب إن وجد | 🟡 (1,000 د.ع = 1 نقطة، 1 نقطة = 1 د.ع مطبق) | إعدادات النقاط |
 | 21 | BNPL (لأعضاء PRO فقط، سقف 200,000 د.ع إجمالي، ≤7 أيام): متى يبدأ العد — عند الطلب أم التسليم؟ ومرجع "الشهر الواحد" المذكور | 🔴 (البنية جاهزة والتفعيل معطّل) | جداول bnpl_* |
@@ -129,6 +129,8 @@
 **ومراجعة خصوم من ستّ زوايا** (كل اكتشاف حاكمه ثلاثة مشكّكين بعدسات مختلفة: الصحّة، وإمكان إعادة الإنتاج، وهل هو محسوم سلفًا) أضافت ما يلي قبل النشر، وكلٌّ منها أُعيد إنتاجه فعلًا قبل إصلاحه: (أ) **استبدال الجهاز كان يترك ورقته حيّة** — مسار الاستبدال ينشئ الوحدة الجديدة ولا يمسّ `warranty_receipts` إطلاقًا، فالرقم التسلسلي القديم يبقى «مغطّى» على صفحة التحقق لجهاز لم يعد موجودًا، وحالة `replaced` التي يعرّفها المخطط لم يكن يكتبها أي مسار؛ صار تقاعد الوصل يحدث في **الدفعة نفسها** التي تستبدل الجهاز، وإصدار وصل البديل يغلق السلسلة في الاتجاهين ويسجّل `warranty.replaced` بالرقمين معًا. (ب) **الوثيقة الإنجليزية كانت تطبع النوع والتغطية بالعربية** لأن الإصدار لم يلتقط سوى `type_ar` و`coverage_ar`؛ صار الجدول يحمل اللغتين (`*_en`) وتقرأ الوثيقة اللغة المطلوبة — ودائمًا صياغة الإصدار لا صياغة اليوم. (ج) **الورقة كانت تخرج على ورقتين**: 366مم مقاسة في المتصفح مقابل 273مم متاحة في A4 بهوامش 12مم؛ صارت 244مم بعد ضبط مقاس الخط والحشوات وتقسيم العمودين **بالارتفاع المقاس لا بالموضوع** (الضمان + الشروط في عمود واحد هو ما دفعها للورقة الثانية)، والمسبار صار يقيس الارتفاع ويفشل فوق 273مم. (د) **إعادة إصدار وصل ملغى كانت تُحييه** ضمانًا ساريًا بصمت — الإلغاء قرار متعمَّد والتراجع عنه يكون بإصدار جديد لا بإحياء القديم؛ يُرفض الآن بـ`RECEIPT_VOID`. (هـ) **عدّاد اليوم كان يُرتَّب كنص**: مع حشو ثلاث خانات يعلو «999» على «1000»، فالوصل الألف في يوم واحد يُمنح رقمًا موجودًا ثم تفشل كل محاولة بعده إلى الأبد؛ صار الترتيب بالطول أولًا. (و) **تواريخ الضمان كانت تُقبل كنصوص أيًّا كانت** فتُطبع «Invalid Date» على ورقة يحملها زبون؛ تُحلَّل الآن وتُفحص مداها، ونهاية قبل بدايتها تُرفض. (ز) **المسودّة كانت تُجيب بجملة «غير موجود» مختلفة** عن جملة الرقم غير الموجود، فيستدلّ الغريب على أن الوصل حقيقي لكنه غير مُصدَر؛ صار الجوابان من دالة واحدة حرفًا بحرف. (ح) **الطباعة من اللوحة لم تكن تُعدّ ولا تُدقَّق**، بينما شاشة الطلب كانت تعدّ **قبل** فتح النافذة فتسجّل نسخًا لم يرها أحد حين يمنع المتصفح النافذة المنبثقة؛ الشاشتان الآن على دالة واحدة: النسخة تُعدّ بعد أن تُفتح النافذة فعلًا، والمعاينة ليست نسخة. (ط) **صف السعر كان يفرض `dir="ltr"` على الخلية** فيقلب «د.ع» إلى «ع.د»؛ صار الرقم معزولًا بـU+2066/U+2069 والوحدة تتبع اتجاه الوثيقة. (ي) **الوصل كان يعيد حساب نهايته** بدل قراءة نهاية سجل الجهاز — وتعليق الوحدة نفسه يقول إنه لا يفعل؛ صار سجل الجهاز هو المرجع ما لم يذكر المدير تاريخًا. وصغائر: الإنجليزية صارت على بُعد نقرة من الوثيقة نفسها، وحوار التفصيل يعرض الحالة مترجمة لا القيمة المخزّنة، وصفحة التحقق العامة تُبقي الصندوق متسقًا مع العنوان ولم تعد ترسل كل استعلام مرتين مقابل حدّ 30/دقيقة، و«إنشاء» لم يعد يستبدل توقيت التسليم الدقيق بمنتصف ليل UTC حين لا يعدّل المدير التاريخ. **(ك) وانحراف اللقطة بعد التصحيح**: تصحيح رقم تسلسلي أو تاريخ تسليم على الجهاز كان يترك الوصل الحي يسمّي رقمًا لم يعد للجهاز، بلا شيء يشير إلى ذلك — واللقطة مقصودة لكن الصمت ليس منها؛ صار الخادم يقارن الوصل الحي بسجل الجهاز ويعيد `drift`، وقسم الطلب يقول بالضبط ما اختلف، و**إعادة الإصدار تقرأ سجل الجهاز من جديد** فتطبع الحالي لا المنسوخ وتسجّل ما صُحِّح. |
 | 88 | **تغيير السعر لم يكن يصل إلى السلة — والسبب ليس السلة**: بلّغ المالك أن المنتج الموجود في سلة زبون يبقى بالسعر القديم ويُطلب به. التحقيق أثبت أن السلة **لا تخزّن سعرًا إطلاقًا** (`cart_items` بلا عمود سعر) وتُعيد التسعير عند كل قراءة، والطلب يُسعَّر على الخادم ولا يثق برقم من المتصفح، ولا يوجد أي تخزين مؤقت للأسعار في العامل ولا في المتصفح ولا ترويسة `Cache-Control` على مسارات المنتجات أو السلة. **القديم هو صف الخيار**: الخيار أو اللون أو التركيبة قد يحمل `regular_price_iqd` خاصًا، و`pricing.ts` يعامله **بديلًا** عن الأساسي لا إضافةً عليه (سلّم لكل حقل: تركيبة ← لون ← خيار ← أساسي)، فتغيير الأساسي لا يمسّه. أُعيد إنتاجه عبر مسار الإدارة الحقيقي: بعد رفع الأساسي من 200,000 إلى 350,000 تعرض صفحة المنتج **350,000** وتُحاسِب السلة **200,000**. القرارات: (١) **لا إعادة كتابة تلقائية**: «Large سعره 300,000» و«Large أغلى بـ 60,000» نيّتان لا يفرّقهما إلا المالك، وتحريك رقم كتبه بيده دون سؤاله عطبٌ آخر أهدأ صوتًا؛ ورُفض تحويل الأسعار الخاصة إلى «زيادات» لأنه يكسر قيود الجدول وحماية السعر وسلّم PRO/PRIME وقالب الاستيراد، وكان سيعيد تسعير كل منتج له خيارات دفعة واحدة. (٢) **يُسأل المالك بالأرقام في اللحظة نفسها**: لوحة تحت حقل السعر تظهر فور اختلافه عمّا فُتح عليه المنتج، تقول كم صفًا لن يتبع **وتسمّيها واحدًا واحدًا** بسعر كلٍّ اليوم وأين سيصل، بثلاثة أجوبة — «اجعلها تتبع الأساسي» (تُمسح فيصير للمنتج سعر واحد ويصل كل تغيير قادم تلقائيًا، وهي المقدَّمة)، «حرّكها بنفس الفرق»، «حرّكها بنفس النسبة» — ورابعٌ صريح هو «اتركها كما هي». الاختيار يعدّل النموذج فقط، وحفظة واحدة تكتب **المخزنين معًا** (أعمدة JSON على `products` والجداول العلائقية) فلا يفترقان. (٣) **الخادم يقول الحقيقة لأي عميل**: استجابة `POST /products-v2` صارت تحمل `pinned_prices` بالعدد والأسماء والقيم حين يتغيّر الأساسي وتبقى صفوف لا تتبعه — فلا يعتمد الصدق على نموذج الإدارة وحده. (٤) **مسار متعمَّد للتحريك**: `POST /products-v2/:id/reprice` بأوضاع `delta`/`percent`/`inherit`، يكتب المخزنين ويسجّل في التدقيق كل قيمة قبل وبعد، ولا يعمل من تلقاء نفسه أبدًا. (٥) **سلّم العضويات يُحمى بالتقريب**: PRO ≤ PRIME ≤ الاعتيادي يُقصّ بعد أي تحريك بالنسبة، والتكلفة لا تتحرك مع الأسعار لأن تحريكها يزوّر الهامش، والنسبة على أساس صفر تترك الرقم كما هو بدل اختراع نسبة. ما لم يُمسّ: إعادة تسعير السلة عند كل قراءة (ليست العطب)، ولقطة `order_items.unit_price_iqd` فالطلب المُنشأ لا يُعاد تسعيره أبدًا (مثبَّت باختبار). الدليل: `tests/pinnedPrices.test.ts` (١٦)، `scripts/e2e-price-change.mjs` (٢٤ فحصًا للرحلة كاملة)، ومسبار متصفح ١٨ فحصًا يفتح المنتج ويغيّر الرقم ويرى التحذير بالأسماء ويعاين ويطبّق ويحفظ مرة واحدة فتتبع سلة زبون حقيقي — مع `e2e-product-form` (٦٧) و`e2e-taxonomy` (٦٩) و`e2e-warranty` (٧٨) و`e2e-ui` (٣٦) و`api-tests-v2` (٣٧) و`e2e-integrated` (٤١) واختبارات الوحدة. **وبلاغ مفتوح خارج هذا الإصلاح**: الأسعار تُقرأ من مخزنين في أماكن مختلفة — بطاقات الصفحة الرئيسية ومعاينة السعر في الإدارة وحماية السعر خلال سبعة أيام و`price_history` ومساعد الدعم ما تزال تقرأ أعمدة JSON وحدها، وتوحيدها جولة مستقلة. |
 | 89 | **التصفح كزائر — بلا تسجيل دخول**: طلب المالك أن يعمل التصفح بلا حساب، وسمّى صفحة المجتمع «وغيرها». المفارقة التي كشفها الفحص أن **معظم تلك الصفحات كانت جاهزة للزائر أصلًا** ولا يمنعها إلا `ProtectedRoute`: قراءات المجتمع الثلاث عامة على الخادم وكتابته الوحيدة تدعو للدخول قبل أن تفشل، وصفحة النقاط تتخطّى طلبها بلا مستخدم وتعرض لوحة «سجّل الدخول» لم يكن أحد يصل إليها، وخطط العضوية عامة والصفحة تتخطّى `/mine`، ولوحة الترتيب مكتوبة لزائر بصور وأسماء بديلة، والألعاب والأدوات لا تُجري طلبًا شبكيًا ولا تقرأ المستخدم إطلاقًا. القرارات: (١) **فُتحت ست صفحات عرض**: المجتمع، العضويات، النقاط، الأدوات، الألعاب، الترتيب — كلها إما بلا طلب، أو تُصيب نقطة عامة، أو تتخطّى طلبها الشخصي بلا جلسة. (٢) **بقيت خمس عشرة صفحة شخصية خلف الدخول** (الطلبات، المحفظة، العناوين، الإعدادات، تعديل الملف، الإحالات، الهدايا، مركز الضمان، السلة، الدفع، دفع المتجر، الاستثمار، لوحة التاجر، المحادثة الفردية، الترحيب) — كلٌّ لا تقرأ إلا صفوف صاحبها ويرفضها الخادم للزائر على أي حال؛ الحارس راحة لا حماية. (٣) **دعوة دخول تتذكّر الطريق**: `src/lib/guest.ts` بدالة `useSignInPrompt()` تحمل الصفحة الحالية إلى `/auth` فيعود إليها الزائر بعد الدخول — سبع نداءات `navigate('/auth')` كانت تُسقط الطريق. **ولم يُستحدث نمط جديد**: `UnauthorizedState` موجود ويأخذ الوجهة، فاستُعمل هو بدل ثالثٍ يشبهه. (٤) **صدق ما يراه الزائر**: بطاقة العضوية لم تعد ترتدي اسمًا مُختلقًا («Levo User» و`@username`) لمن لا حساب له؛ وتبويب «طلباتي» لم يعد يقول لزائر «لم تنشئ أي طلب بعد» بل يعرض لوحة دخول، وزر «طلب جديد» صار ظاهرًا يدعوه بدل أن يختفي بصمت؛ ومتابعة متجر لم تعد ترسل طلبًا مضمون الفشل ثم تترك الزائر عالقًا؛ و`StoreCta` توقّف عن إطلاق `/api/merchant/me` عند كل زيارة زائر. (٥) **تصحيحان في الهيكل**: `/chats` كان مُدرجًا في قائمة الشريط السفلي كصفحة محمية وهو غير محمي إطلاقًا، فكان يُرسل الزائر إلى تسجيل الدخول لصفحة يقرأها؛ وزر العضويات في الترويسة كان يمرّ به عبر `/auth` قبل أن يريه السعر. (٦) **عطبٌ دقيق**: مُصنِّف الصفحات الكاملة في `App.tsx` حسّاس لحالة الأحرف بينما موجِّه React ليس كذلك، فكان `/Points` يُخدَّم من كتلة مسارات مختلفة عن `/points`؛ صار الطرفان يقارنان بحروف صغيرة وحُذف المسار المكرر الذي صار غير قابل للوصول. **ما لم يتغيّر**: السلة تبقى تحتاج حسابًا — سلة الزائر تعني جلسة سلة على الخادم، وهي بنية جديدة لا رفع حارس؛ أُبلغ عنها ولم تُنفَّذ. الدليل: `scripts/e2e-guest.mjs` (٣٤ فحصًا في متصفح بلا أي كوكي: كل صفحة مفتوحة تُعرض بمحتوى فعلي، وكل صفحة شخصية ما تزال تسأل من أنت، ولا اسم مُختلق، والإجراء المحجوز يدعو للدخول حاملًا طريق العودة، وروابط الشريط تطابق ما يفتحه الزائر فعلًا) مع `e2e-permissions` (٤٦) و`e2e-integrated` (٤١) و`e2e-ui` (٣٦) واختبارات الوحدة ٩٧٢. |
+| 91 | **الضمان الممدد للطابعات (تكليف المالك، 2026-09-05)**: (١) **للطابعات فقط** — هوية الطابعة علم الكتالوج `is_printer_catalog` عبر `worker/lib/printerIdentity.ts`؛ منتج ليس طابعة يحمل خططًا يُرفض على كل مسار كتابة (حفظ الإدارة، تحليل/تطبيق TXT، معاينة/تأكيد CSV) وعند التشغيل (إضافة السلة وتعديلها والدفع) بـ`WARRANTY_NOT_PRINTER`؛ البيانات القديمة تبقى تُسعَّر عند القراءة. (٢) **الشكل**: `extension` بمدة 12 أو 24 فقط، خطة لكل مدة — «+12 → 24 إجمالًا» و«+24 → 36 إجمالًا» فوق الأساسي 12 (`warranty_base_months` و`serialized` صارا حقلَي منتج في النموذج والقالبَين، يُكتبان في `ops_policy` عبر كاتب واحد). (٣) **الرسم نسبة من السعر الاعتيادي** للاختيار (`fee_percent`، `planFee` = round(basis × pct / 100) بنقاط الأساس) — متساوٍ للزائر وPRIME وPRO لأن رسم الضمان لا يُعفى بالعضوية؛ 7.5–10% تلميح في النموذج لا سقف؛ `fee_iqd` رسم ثابت بديل. (٤) **قبل الطلب فقط**: يُختار في صفحة المنتج أو من «الضمان الممدد» المنطوي في السلة (خطة واحدة للبند تُطبَّق على كل وحداته)؛ الدفع يجمّد `warranty_snapshot` بالنسبة والأساس والأشهر الإجمالية ولا يكتبه أي مسار بعده، وعند التسليم يفضّل `computeCoverage` إجمالي اللقطة فيسجَّل 24/36 على الوحدة. (٥) **سياسة `extended_warranty`** بصياغة LEVONIS في اللغات الثلاث (الأهلية، الخياران، نافذة الشراء، السعر، التغطية، الاستثناءات، المطالبات، الانتقال) — لم تُنسخ من أي مصنّع؛ الوصل يطبع سطر التمديد والمركز يعرض الأساسي + التمديد. **تعديل المراجعة العدائية (2026-09-05 لاحقًا):** (٦) **افتراضات عند القراءة** (`effectiveDevicePolicy`): طابعة `ops_policy`ها بلا المفتاحين (`'{}'` أو أساس فقط — صفوف قبل هذه الجولة) تُقرأ مسلسَلة بأساس 12 في المحلّل و`pricedPlans` والسلة و`createUnitsOnDelivery`، فتحمل اللقطة 12/24 و36 وتُنشأ الوحدات عند التسليم؛ `serialized: false` الصريح كلمة المالك ويبقى؛ لا هجرة تعيد كتابة الصفوف. (٧) إعادة إضافة الطابعة نفسها **لا تعيد كتابة خطة الضمان بصمت**: خطة مختلفة عمّا يحمله البند (أو بند بلا خطة) تُرفض `409 CART_WARRANTY_CONFLICT` باسم الحل («غيّره من السلة»)، وإضافة بلا خطة تُبقي خطة البند. (٨) المسار القديم `POST /api/admin/products` يشغّل حارس الطابعة نفسه (`WARRANTY_NOT_PRINTER` / `WARRANTY_PLAN_INVALID`)، ومسار `ops-policy` يرفض `serialized: false` لطابعة بخطط نشطة | ✅ منفَّذ (`tests/extendedWarranty.test.ts`، `tests/pricing.test.ts`، `tests/cartUpsert.test.ts`، اختبارات القالب وCSV) | worker/lib/warrantyPlans.ts، pricing.ts، deviceOps.ts، routes/cart.ts، orders.ts، products.ts، admin.ts، devices.ts؛ src/pages/Cart.tsx، Product.tsx، form/WarrantySection.tsx |
+| 90 | **طريقة الدفع × تسعير التوفر × نوع الطلب (تكليف المالك، 2026-09-05)**: (١) **عضو PRO الفعّال معفى من زيادة البيع المباشر** كما هو معفى من عمولة النقل، وعلى البوابة نفسها (العنوان الافتراضي المعتمد، بلا قيود دعم) — مثال المالك يصير 275,000 / 250,000 / **125,000**. (٢) **الطلب المسبق يُدفع مقدمًا من المحفظة أو نقدًا عند الاستلام**: المقدّم يُبقي تسعير الطلب المسبق كما هو مُعدّ؛ الدفع عند الاستلام **يُسعَّر كبيع مباشر** (الأساس + زيادة البيع المباشر، بلا عمولة — لا يجتمعان أبدًا) بينما يبقى الطلب طلبًا مسبقًا: `shipping_type` = `preorder_*`، أربع عشرة مرحلة، التتبع والهدية كما هي (الهدية تشترط صفر مستحق عند الاستلام فلا تُمنح لطلب مسبق نقدي). المحلّل يحمل `preorderPricing` ويقرّ `pricing_basis` و`direct.waived` و`transport.waived_by` في اللقطة والفاتورة. (٣) **معرّفات الدفع المعروضة `wallet` و`cash` لكل نوع شحن** (`worker/lib/paymentPolicy.ts`)؛ `full_advance` مقبول كاسم بديل لـ`wallet` لطلبات مخزّنة وسكربتات ولا يُعرض؛ `half_advance` مرفوض بـ`400 PAYMENT_METHOD_NOT_ALLOWED` («أبقِ النظام بسيطًا»). لا يُعاد تسمية أي معرّف. (٤) **ملاحظة توصيل الطابعة 50,000 د.ع ملاحظة فقط** (الصف 16): إعداد عام `printerHomeDeliveryNoteIqd` وهوية الطابعة من علم الكتالوج (`worker/lib/printerIdentity.ts`)، تُعرض في صفحة المنتج والسلة والدفع وتفاصيل الطلب ولا تدخل أي مجموع. (٥) شاشة الدفع تعرض ما يسمح به الخادم فقط وتُظهر أسعار عرض السعر لا أسعار السلة. **تعديل المراجعة العدائية (2026-09-05 لاحقًا):** (٦) «يُسعَّر كبيع مباشر» لا ينطبق إلا حين يحمل المنتج زيادة بيع مباشر فعلًا (`direct_surcharge_iqd > 0`)؛ منتج بلا زيادة (الشكل الطبيعي لطلب مسبق فقط) لا يوجد ما يُسعَّر به «كمباشر»، فتبقى عمولة النقل و`pricing_basis = 'preorder'` بلا إعفاء — وإلا خسر المتجر العمولة وصار الدفع عند الاستلام أرخص من المحفظة، عكس نية المالك (115,000 للطريقتين). (٧) طلب نقدي تغطيه المحفظة **بالكامل** (`due_on_delivery_iqd = 0`) طلبٌ مدفوع مقدمًا أيًّا كان الزر المضغوط: يُعاد تسعيره بقاعدة الطلب المسبق (الرقم الأقل، والمحفظة تغطيه)، `prepaid_by_wallet: true` على عرض السعر مع ملاحظة في شاشة الدفع، و`payment_method_id` يبقى `cash`؛ تغطية جزئية تُبقي تسعير الاستلام. (٨) عرض السعر يحمل `cod_reprices`، وعرض سعر المنتج `pricing_modes` (مباشر، ولكل رحلة مقدّم/استلام)، وبند السلة `cod_reprices` — فيُشرح حكم الاستلام **حيث يتغيّر الرقم فقط**، وصفحة المنتج لا تحسب شيئًا في المتصفح. (٩) سياق PRO واحد على كل السطوح (`pricingTierContext`): صفحة المنتج والسلة يحكمان بالعنوان الافتراضي، والدفع بالعنوان المختار — فـPRO بعنوان افتراضي غير معتمد يدفع الزيادة في الثلاثة معًا | ✅ منفَّذ (`tests/checkoutPayment.test.ts`، `tests/pricing.test.ts`) | worker/lib/pricing.ts، paymentPolicy.ts، printerIdentity.ts، entitlements.ts، routes/orders.ts، cart.ts، products.ts |
 
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
@@ -277,8 +279,126 @@ unchanged" reading (rows 70 and 88). Implemented once in `pricing.ts`
 validators through `derivedRung`; the cheapest-base normaliser moves PRIME/PRO
 with the base so member offsets survive a rewrite. A reduction that swallows a
 member price is refused at write time unless the row states its own member
-price. PRO's pre-order commission waiver and the never-waived direct premium
-are unchanged.
+price. PRO's pre-order commission waiver is unchanged. The direct premium was
+"never waived" at the time of this entry; the payment-method mandate later the
+same day made an active PRO exempt from it too — see the entry below and the
+register row 90.
+
+## 2026-09-05 — payment method × availability pricing × order type
+
+The owner's mandate, verbatim in substance: the shipping-type surcharge (direct
+sale's premium, a pre-order's commission) is an additional cost, **Pro Card
+users are exempt from it**; for a pre-order only, the customer chooses to pay
+in advance or cash on delivery — in advance keeps the pre-order pricing exactly
+as configured, cash on delivery must follow the direct-sale pricing rules,
+while the order **still follows the pre-order stages and remains a pre-order**;
+direct sale offers the wallet or cash on delivery; for printers a 50,000 IQD
+home-delivery note, only as a note; keep the system simple.
+
+Decisions taken and implemented. (1) `resolveUnitPrice` gained
+`preorderPricing: 'prepaid' | 'cod'` and reports `pricing_basis`,
+`direct: {surcharge_iqd, waived}` and `transport.waived_by: 'pro' |
+'cod_direct_pricing'`: a COD pre-order line keeps its transport object (so
+`shipping_type`, the fourteen stages, tracking and the gift rule derive from
+it unchanged) and is charged the direct premium instead of the commission;
+never both. The PRO exemption from the premium hangs on the same `isPro` /
+`proContext` gate as the commission waiver, so a PRO at an alternate address
+pays both as an ordinary customer. (2) `worker/lib/paymentPolicy.ts`: the
+offered ids are `wallet` (pay in advance) and `cash` (cash on delivery) for
+every shipping type; `full_advance` is tolerated as an alias of `wallet` for
+stored orders and the API scripts and is not offered; `half_advance` is
+refused (`400 PAYMENT_METHOD_NOT_ALLOWED`) — it is neither of the owner's two
+words. Ids are never renamed. (3) The checkout quote returns
+`allowed_payment_methods`, `pricing_basis`, `shipping_type` and its priced
+`lines`, which the checkout screen renders as the price authority (the cart
+prices a pre-order line as prepaid and says so). (4) Printer identity is one
+function over the owner's `is_printer_catalog` flag
+(`worker/lib/printerIdentity.ts`), exposed as `is_printer` on the product,
+the cart line, the quote line and the order item; the note amount is the
+public setting `printerHomeDeliveryNoteIqd` (default 50,000), rendered by the
+shared `Note` component on the product page, the cart, the checkout summary
+(home delivery only) and the order detail, and added to no total. (5) The
+pre-order gift still requires nothing due at the door, so a COD pre-order
+earns none — the mandate said the difference is only the pricing logic.
+
+**Amended later the same day, after the adversarial review.** Two readings of
+the mandate were wrong in the store's disfavour and the customer's confusion.
+(a) A pre-order product with **no** direct-sale premium (the normal shape of a
+pre-order-only product) was, under cash on delivery, having its commission
+waived with nothing charged in its place — 100,000 at the door against
+115,000 from the wallet. Decision: "priced as a direct sale" applies only when
+the product actually has a direct-sale premium (`direct_surcharge_iqd > 0`);
+with none there is nothing to price the line "as direct" with, so the
+commission stays, `pricing_basis` stays `'preorder'`, `transport.waived` is
+false and nothing carries `waived_by`. (b) A cash order whose wallet payment
+settled the **whole** total (`due_on_delivery_iqd = 0`) was priced as COD.
+Decision: an order with nothing left to collect at the door is a prepaid order
+whatever button was pressed — `computeCheckout` re-prices the lines under the
+pre-order rule (the cheaper figure, still covered), reports `prepaid_by_wallet:
+true`, the checkout renders «مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب
+المسبق», and `payment_method_id` stays as sent; a partial wallet stays
+COD-priced. (c) The product page was waiving the premium for ANY active PRO
+while the checkout waived it only in the PRO purchase context. Decision: one
+exported `pricingTierContext` (entitlements.ts) — the checkout judges the
+selected address, the product page/quote and the cart judge the default
+address — and the product page shows only the server's per-mode figures
+(`pricing_modes`), computing nothing. The screens explain the cash rule only
+where `cod_reprices` says the number would move.
+
+## 2026-09-05 — extended warranty for printers: +12 → 24, +24 → 36, before the order only
+
+The owner's mandate: extended warranty plans for printers, in the product
+editor and the import template, optional, purchasable only before the order;
++12 months (24 total) or +24 months (36 total); offered on the product page or
+as a small expandable "Extended Warranty" option in the cart; each option
+priced as a percentage of the printer price (e.g. 7.5–10 %); never after the
+order; the policy structured like a manufacturer's EU extended-warranty page;
+printers only.
+
+Decisions taken and implemented. (1) `worker/lib/warrantyPlans.ts` holds the
+constants (12-month base; 12 and 24 the only extensions), the percent rules
+(0.01–100, two decimals; 7.5–10 a hint in the form, not a cap), `planFee`
+(the ONE fee computation, `round(regular × pct / 100)` through basis points)
+and `planTotalMonths`. (2) The basis is the selection's REGULAR price, so the
+fee is tier-neutral and the "warranty fee never waived by membership" rule
+survives percent pricing; `ResolvedPrice.warranty` carries `fee_percent`,
+`basis_iqd`, `base_months`, `total_months` and the checkout snapshot inherits
+them. (3) `warranty_base_months` and `serialized` became first-class product
+fields (form, TXT, CSV), written into `products.ops_policy` through one
+writer shared with the admin ops-policy route; a printer defaults to 12 and
+true. (4) One async guard (`applyPrinterWarrantyRules`, on the catalog flag)
+runs on every write path, and `refuseNonPrinterWarranty` in cart add/PATCH
+and checkout; legacy stored plans keep resolving on read. (5) The cart got a
+collapsed per-line "Extended Warranty" disclosure (aria-expanded, chevron,
+radio panel on the `quick` spring, cross-fade under reduced motion) that
+PATCHes `warrantyPlanId` and says one plan per line covers every unit; the
+product block was relabelled "Extended Warranty" with "+12 months → 24 total ·
++fee" from the server's per-plan fee and a link to
+`/policies/extended_warranty`, which now opens directly. (6) The policy text
+is LEVONIS's own — the manufacturer's page could not be fetched from this
+network and would not have been copied anyway; only its structure (scope,
+options, purchase window, price, coverage, exclusions, claims, transfer) was
+followed. The legacy `worker/routes/admin.ts` v1 product route, left
+unvalidated at first, now runs the same `applyPrinterWarrantyRules` guard
+(closed by the adversarial review the same day — see below and row 91).
+
+**Amended later the same day, after the adversarial review.** (a) A printer
+whose `ops_policy` was stored before the rules (`'{}'`, or only a base) still
+sold +12/+24 plans while `createUnitsOnDelivery` created no unit for it and
+the snapshot carried `base_months null / total_months null`: the customer paid
+for coverage no unit would record. Decision: read-time defaults in one helper
+(`warrantyPlans.ts` `effectiveDevicePolicy` / `effectiveBaseMonths`) used by
+the resolver, `pricedPlans`, the cart and `deviceOps` — a printer is serialized
+with the 12-month base unless the owner explicitly stored `false`; nothing is
+invented for a non-printer; no migration rewrites old rows. (b) Re-adding the
+same printer merged into the existing line and rewrote its plan: decision, an
+add naming a plan different from the line's (including a line with none) is
+refused `409 CART_WARRANTY_CONFLICT` naming the fix, an add naming none keeps
+the line's plan (a `CASE` in the upsert), and the plan changes only through
+the cart's own PATCH. (c) The admin ops-policy route could set `serialized:
+false` on a printer with active plans; it now runs `printerWarrantyRules`
+against the stored plans and refuses with `WARRANTY_PLAN_INVALID`, for a
+printer only.
 
 ## 2026-09-05 — sign-up: the password is chosen at the link, not at the form
 

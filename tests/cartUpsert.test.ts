@@ -55,7 +55,9 @@ const LEVONIS_ADD = `
   DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                 option_value_ids = excluded.option_value_ids,
                 transport_method = excluded.transport_method,
-                warranty_plan_id = excluded.warranty_plan_id`;
+                warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
+                                        THEN cart_items.warranty_plan_id
+                                        ELSE excluded.warranty_plan_id END`;
 
 const MERCHANT_ADD = `
   INSERT INTO cart_items
@@ -65,8 +67,8 @@ const MERCHANT_ADD = `
     WHERE community_product_id IS NOT NULL
   DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`;
 
-const addLevonis = (raw: DatabaseSync, id: string, qty = 1, opt = '', color = '') =>
-  raw.prepare(LEVONIS_ADD).run(id, 'u1', 'p1', opt, '[]', color, '', '', qty);
+const addLevonis = (raw: DatabaseSync, id: string, qty = 1, opt = '', color = '', plan = '') =>
+  raw.prepare(LEVONIS_ADD).run(id, 'u1', 'p1', opt, '[]', color, '', plan, qty);
 
 const addMerchant = (raw: DatabaseSync, id: string, qty = 1, opt = '', color = '') =>
   raw.prepare(MERCHANT_ADD).run(id, 'u1', 'm1', 's1', 'cp1', opt, color, qty);
@@ -101,6 +103,31 @@ test('the quantity is capped at the column CHECK rather than violating it', () =
   addLevonis(raw, 'ci1', 60);
   addLevonis(raw, 'ci2', 60);
   assert.equal(rows(raw)[0].qty, 99);
+});
+
+test('a merge never blanks the line’s extended-warranty plan: an add without a plan keeps it, an add with one sets it', () => {
+  // The warranty is not part of the merge key, so the second add lands on the
+  // same line. The route refuses a DIFFERENT plan before this statement runs
+  // (409 CART_WARRANTY_CONFLICT, tests/extendedWarranty.test.ts); what the SQL
+  // itself must guarantee is that an add naming NO plan does not erase the
+  // one the customer chose — the old `warranty_plan_id = excluded.…` did.
+  const raw = db();
+  addLevonis(raw, 'ci1', 1, '', '', 'wp_ext24');
+  addLevonis(raw, 'ci2', 1, '', '', '');
+  let r = rows(raw);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].qty, 2);
+  assert.equal(r[0].warranty_plan_id, 'wp_ext24', 'a plain re-add kept the chosen plan');
+  addLevonis(raw, 'ci3', 1, '', '', 'wp_ext24');
+  r = rows(raw);
+  assert.equal(r[0].qty, 3);
+  assert.equal(r[0].warranty_plan_id, 'wp_ext24');
+  // A line with no plan takes the plan an add names (the route only lets
+  // this statement see a plan that matches the line's, or a line with none
+  // being given one is refused upstream — the SQL still behaves sensibly).
+  raw.exec("UPDATE cart_items SET warranty_plan_id = '' WHERE id = 'ci1'");
+  addLevonis(raw, 'ci4', 1, '', '', 'wp_ext12');
+  assert.equal(rows(raw)[0].warranty_plan_id, 'wp_ext12');
 });
 
 test('a different option, colour or shipping method is a DIFFERENT line', () => {

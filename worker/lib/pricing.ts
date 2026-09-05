@@ -14,7 +14,10 @@
  *    that EVERY tier pays — see "the member ladder follows the regular one"
  *    below. Base 150,000 / PRIME 125,000 / PRO 100,000 with an option
  *    +25,000 sells at 175,000 / 150,000 / 125,000; add a direct-sale
- *    premium of 100,000 and the line is 275,000 / 250,000 / 225,000.
+ *    premium of 100,000 and the line is 275,000 / 250,000 / 125,000 — the
+ *    availability premium is the one surcharge an active PRO does NOT pay
+ *    (the owner: «Pro Card users are exempt from this additional
+ *    shipping-type cost»), on the same gate as the commission waiver.
  *  - PRO members pay the resolved PRO price when one exists; otherwise the
  *    configured store-wide PRO policy applies; otherwise the PRIME price when
  *    one exists on the line (a PRO member never pays more than a PRIME
@@ -32,13 +35,30 @@
  *    Compare-at price من الواجهة ومن منطق العرض"). products.original_price_iqd
  *    still exists in the schema but nothing reads it any more; a later
  *    migration drops the column.
- *  - Fees: preorder transport commission (added; waived for PRO) and the
- *    selected warranty fee (added; NEVER waived by membership) compose the
- *    unit subtotal. Last-mile delivery is order-level (waived for PRO).
+ *  - Fees: the availability fee — EITHER the pre-order transport commission
+ *    OR the direct-sale premium, never both, both waived for an active PRO —
+ *    and the selected warranty fee (added; NEVER waived by membership)
+ *    compose the unit subtotal. Last-mile delivery is order-level (waived
+ *    for PRO). A printer's extended-warranty plan may be priced as a PERCENT
+ *    of the line's REGULAR price (worker/lib/warrantyPlans.ts `planFee`) —
+ *    tier-neutral by construction, rounded once to an integer dinar here.
+ *  - Payment method × availability (owner mandate): a pre-order line paid in
+ *    advance keeps its transport commission; a pre-order line paid CASH ON
+ *    DELIVERY is priced exactly like a direct sale (base + direct premium),
+ *    while the line stays a pre-order — its transport, journey, stages and
+ *    tracking are untouched. `preorderPricing` carries that choice in and
+ *    `pricing_basis` reports which rule priced the line; the transport object
+ *    is kept with its method and marked `waived_by: 'cod_direct_pricing'`.
+ *    "Priced as a direct sale" needs a direct-sale premium to price WITH: a
+ *    product that has none configured (the normal shape of a pre-order-only
+ *    product) keeps its commission under cash on delivery — otherwise the
+ *    store would lose the commission and charge nothing in its place, making
+ *    the door cheaper than the wallet, the opposite of the owner's intent.
  */
 
 import { safeParse } from './types';
 import { effectiveAvailability } from './availability';
+import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlans';
 
 export type Tier = 'free' | 'plus' | 'pro' | 'prime';
 
@@ -181,7 +201,18 @@ export interface WarrantyPlanV2 {
   terms_ckb: string;
   duration_months: number;
   duration_kind: 'total' | 'extension';
+  /** Fixed fee in IQD — the charged amount when `fee_percent` is null, and
+   *  the honest fallback a template or CSV may still write. */
   fee_iqd: number;
+  /**
+   * PERCENT-BASED FEE (the owner's model for printer extensions: e.g. 7.5% or
+   * 10% of the printer price). Applied to the line's REGULAR price — the
+   * price before any membership — and rounded to an integer dinar by
+   * worker/lib/warrantyPlans.ts `planFee`, so the fee is identical for a
+   * guest, a PRIME and a PRO member (the warranty fee is never waived). null =
+   * this plan charges its fixed `fee_iqd`.
+   */
+  fee_percent: number | null;
   order: number;
   active: boolean;
 }
@@ -206,13 +237,45 @@ export interface PricingProduct {
   /** Availability premium for DIRECT fulfilment (from-stock, ships now).
    *  The owner prices immediacy the way transports price their journey:
    *  e.g. base 100k — direct +50k, land +15k, air +25k, sea +0. NULL/0 =
-   *  no premium. Applies only to a direct line (no transport selected);
-   *  a pre-order line pays its transport commission instead, never both. */
+   *  no premium. Applies to a direct line (no transport selected) and to a
+   *  pre-order line paid cash on delivery (`preorderPricing: 'cod'`); a
+   *  prepaid pre-order line pays its transport commission instead — never
+   *  both. With NO premium configured, cash on delivery has nothing to price
+   *  the pre-order line "as direct" with, so the commission stays. Waived
+   *  for an active PRO, like the commission. */
   direct_surcharge_iqd?: number | null;
   options: OptionV2[];
   colors: ColorV2[];
   preorder_transports: TransportOffer[];
   warranty_plans: WarrantyPlanV2[];
+  /**
+   * The product's configured BASE coverage in months (products.ops_policy
+   * `warranty_base_months`; a printer defaults to 12 on write). An extension
+   * plan's total is base + extension; with no configured base the total is
+   * null — honest, never assumed.
+   */
+  warranty_base_months?: number | null;
+}
+
+/**
+ * The chosen warranty plan, resolved for THIS line and frozen verbatim into
+ * order_items.warranty_snapshot at checkout. `fee_iqd` is the integer dinar
+ * actually charged (percent plans already applied to `basis_iqd`, the line's
+ * regular price); `base_months` / `total_months` are what the delivered unit
+ * will record (deviceOps.computeCoverage prefers them over a later change of
+ * the product's policy), so "+12 → 24 total" survives the cart.
+ */
+export interface ResolvedWarranty {
+  plan_id: string;
+  title_ar: string;
+  title_en: string;
+  fee_iqd: number;
+  duration_months: number;
+  duration_kind: string;
+  fee_percent: number | null;
+  basis_iqd: number;
+  base_months: number | null;
+  total_months: number | null;
 }
 
 export interface ResolvedPrice {
@@ -223,13 +286,33 @@ export interface ResolvedPrice {
   applied_tier: 'regular' | 'pro' | 'prime';
   cost_iqd: number | null; // admin only — strip before public serialization
   price_source: 'color' | 'option' | 'base';
-  transport: { method: string; commission_iqd: number; waived: boolean } | null;
-  /** Direct-fulfilment premium actually charged on this line (null = none). */
-  direct: { surcharge_iqd: number } | null;
-  warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
-  unit_subtotal_iqd: number; // applied + effective commission + direct surcharge + warranty fee
+  /**
+   * The pre-order journey this line is on (null on a direct line). The
+   * method is what shipping_type, the stage path, tracking and the pre-order
+   * gift are derived from, so it is KEPT even when the commission is not
+   * charged; `waived_by` says why it is not: the PRO waiver, or the line
+   * being priced as a direct sale because it is paid cash on delivery.
+   */
+  transport: {
+    method: string;
+    commission_iqd: number;
+    waived: boolean;
+    waived_by?: 'pro' | 'cod_direct_pricing';
+  } | null;
+  /** Direct-sale premium that APPLIES to this line (null = none configured or
+   *  not a direct-priced line). `waived` = an active PRO pays 0 of it. */
+  direct: { surcharge_iqd: number; waived: boolean } | null;
+  /** Which rule priced the availability fee: 'preorder' = the transport
+   *  commission; 'direct' = the direct-sale premium (a direct line, or a
+   *  pre-order line paid cash on delivery). */
+  pricing_basis: 'direct' | 'preorder';
+  warranty: ResolvedWarranty | null;
+  unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee
   errors: string[]; // non-empty = selection invalid, reject server-side
 }
+
+/** How a pre-order line is being paid, which decides its availability fee. */
+export type PreorderPricing = 'prepaid' | 'cod';
 
 type PriceSource = 'color' | 'option' | 'base';
 
@@ -445,10 +528,30 @@ export function resolveUnitPrice(input: {
   tierActive: boolean;
   proPolicy?: ProPricingPolicy;
   transportDefaults?: Array<{ method: string; commission_iqd: number }>;
+  /**
+   * How a PRE-ORDER line is paid. 'prepaid' (the default, and the only thing
+   * the cart and the product page can know) keeps the commission pricing;
+   * 'cod' — the checkout's answer once the customer picked cash on delivery —
+   * prices the line as a direct sale WHEN the product carries a direct-sale
+   * premium (see `codDirectPricing` below). Ignored on a direct line.
+   */
+  preorderPricing?: PreorderPricing;
+  /**
+   * The owner's catalog flag (worker/lib/printerIdentity.ts). A printer whose
+   * ops_policy never stated a base is read with the 12-month printer default,
+   * so its extension's total is 24/36 here exactly as it will be on the unit.
+   * Absent = not a printer: nothing is assumed.
+   */
+  isPrinter?: boolean;
 }): ResolvedPrice {
   const { product } = input;
   const proPolicy = input.proPolicy ?? DEFAULT_PRO_POLICY;
+  const preorderPricing: PreorderPricing = input.preorderPricing === 'cod' ? 'cod' : 'prepaid';
   const errors: string[] = [];
+  // The direct-sale premium, read once: it decides both what a direct-priced
+  // line pays and whether cash on delivery can re-price a pre-order at all.
+  const directSurcharge = product.direct_surcharge_iqd ?? null;
+  const hasDirectPremium = typeof directSurcharge === 'number' && Number.isInteger(directSurcharge) && directSurcharge > 0;
 
   const option = input.optionId
     ? product.options.find((o) => o.id === input.optionId) ?? null
@@ -512,7 +615,9 @@ export function resolveUnitPrice(input: {
     appliedTier = 'prime';
   }
 
-  // Preorder transport commission — added on top; waived for active PRO.
+  // Preorder transport commission — added on top; waived for active PRO, and
+  // not charged at all when the line is paid cash on delivery (priced as a
+  // direct sale below — the transport itself stays, because the journey does).
   let transport: ResolvedPrice['transport'] = null;
   const method = (input.transportMethod ?? '').trim();
   const productSaleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
@@ -550,10 +655,21 @@ export function resolveUnitPrice(input: {
         }
         if (commission === null || commission === undefined) {
           errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
+        } else if (preorderPricing === 'cod' && hasDirectPremium) {
+          // Cash on delivery: the owner's rule is that this line follows the
+          // DIRECT-SALE pricing, so the commission is not the fee here — the
+          // direct premium below is. The method stays: shipping_type, the
+          // fourteen stages, tracking and the gift rule all read it. Only
+          // when there IS a direct premium to price the line with: a product
+          // with none keeps its commission (the branch below), so the door is
+          // never cheaper than the wallet.
+          transport = { method, commission_iqd: commission, waived: true, waived_by: 'cod_direct_pricing' };
         } else {
           // §5: "لا تمنح PRIME أي ميزة PRO أخرى تلقائيًا" — the preorder
           // commission waiver stays PRO-only.
-          transport = { method, commission_iqd: commission, waived: isPro };
+          transport = isPro
+            ? { method, commission_iqd: commission, waived: true, waived_by: 'pro' }
+            : { method, commission_iqd: commission, waived: false };
         }
       }
     }
@@ -562,43 +678,65 @@ export function resolveUnitPrice(input: {
     errors.push('TRANSPORT_NOT_APPLICABLE');
   }
 
-  // Direct-fulfilment premium: only when this line is actually fulfilled
-  // from stock — direct sale enabled and no transport chosen. A pre-order
-  // line pays its transport commission instead; the two never stack. The
+  // Direct-sale premium. It applies on a line PRICED as a direct sale: one
+  // actually fulfilled from stock (direct sale enabled, no transport chosen),
+  // or a pre-order line paid cash on delivery (`codDirectPricing` — the
+  // transport resolved above and the commission stepped aside). A prepaid
+  // pre-order line pays its commission instead; the two never stack. The
   // customer is shown only the FINAL price (mandate: «يظهر له السعر النهائي
   // فقط مع الزياده»), so the premium folds into unit_subtotal_iqd exactly
-  // like the commission and is never waived by membership.
+  // like the commission — and, like the commission, an active PRO is exempt
+  // from it (the owner: «Pro Card users are exempt from this additional
+  // shipping-type cost»). The resolver's `isPro` is already the checkout's
+  // proContext gate (approved default address, benefits not restricted), so
+  // the two waivers can never disagree about who is PRO.
   let direct: ResolvedPrice['direct'] = null;
   const directEnabled =
     saleTypes.includes('direct_sale') ||
     // A bundle is a catalogue classification, not a route, so it only enables
     // direct fulfilment while the OPTION has not named a route of its own.
     (!optionAvailability && productSaleTypes.includes('bundle'));
-  const directSurcharge = product.direct_surcharge_iqd ?? null;
-  if (!method && directEnabled && typeof directSurcharge === 'number' && Number.isInteger(directSurcharge) && directSurcharge > 0) {
-    direct = { surcharge_iqd: directSurcharge };
+  const codDirectPricing = transport !== null && transport.waived_by === 'cod_direct_pricing';
+  const directPriced = (!method && directEnabled) || codDirectPricing;
+  if (directPriced && hasDirectPremium) {
+    direct = { surcharge_iqd: directSurcharge as number, waived: isPro };
   }
+  // 'preorder' only while the commission is the fee actually in force.
+  const pricingBasis: ResolvedPrice['pricing_basis'] = transport !== null && !codDirectPricing ? 'preorder' : 'direct';
 
   // Warranty fee — added on top of the resolved price; never waived by tier.
+  // A percent plan is priced on the REGULAR price of this exact selection
+  // (option and colour surcharges included), so a PRO and a guest pay the
+  // same dinar for the same extension; the rounding happens once, here, and
+  // the product page, the cart and the checkout all read this number.
   let warranty: ResolvedPrice['warranty'] = null;
   if (input.warrantyPlanId) {
     const plan = product.warranty_plans.find((w) => w.id === input.warrantyPlanId && w.active !== false);
     if (!plan) {
       errors.push('WARRANTY_PLAN_NOT_FOUND');
     } else {
+      // A printer's base defaults to 12 months when its ops_policy never said
+      // (worker/lib/warrantyPlans.ts) — the same answer the delivered unit
+      // will record, so the snapshot's 24/36 promise is one the store keeps.
+      const baseMonths = effectiveBaseMonths(product.warranty_base_months ?? null, input.isPrinter === true);
       warranty = {
         plan_id: plan.id,
         title_ar: plan.title_ar,
-        fee_iqd: plan.fee_iqd,
+        title_en: plan.title_en,
+        fee_iqd: planFee(plan, regularIqd),
         duration_months: plan.duration_months,
         duration_kind: plan.duration_kind,
+        fee_percent: plan.fee_percent ?? null,
+        basis_iqd: regularIqd,
+        base_months: baseMonths,
+        total_months: planTotalMonths(plan, baseMonths),
       };
     }
   }
 
   const commissionEffective = transport && !transport.waived ? transport.commission_iqd : 0;
   const warrantyFee = warranty ? warranty.fee_iqd : 0;
-  const directFee = direct ? direct.surcharge_iqd : 0;
+  const directFee = direct && !direct.waived ? direct.surcharge_iqd : 0;
   const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
 
   return {
@@ -611,6 +749,7 @@ export function resolveUnitPrice(input: {
     price_source: regular.source,
     transport,
     direct,
+    pricing_basis: pricingBasis,
     warranty,
     unit_subtotal_iqd: unitSubtotal,
     errors,

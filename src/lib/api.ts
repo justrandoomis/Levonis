@@ -131,9 +131,13 @@ export interface ApiProduct {
   display_pro_iqd?: number | null;
   /** True when variants differ in price — the card may say «يبدأ من». */
   display_from?: boolean;
-  /** Availability premium charged on direct (from-stock) lines; folded into
+  /** Availability premium charged on direct-priced lines (a direct sale, or a
+   *  pre-order paid cash on delivery); waived for an active PRO. Folded into
    *  the quote's final price server-side, shown only as the final number. */
   direct_surcharge_iqd?: number | null;
+  /** The owner's catalog flag (catalogs.is_printer_catalog) — the printer
+   *  home-delivery note keys off this, never off a fee mapping. */
+  is_printer?: boolean;
   product_cost_iqd?: number | null;
   membership_prices: { plus?: number; pro?: number };
   payment_options: string[];
@@ -157,6 +161,36 @@ export interface ApiProduct {
   merchant?: { id: string; name: string; verified: boolean };
 }
 
+/** One extended-warranty option as GET /api/cart lists it for a printer line. */
+export interface CartWarrantyPlan {
+  id: string;
+  title_ar?: string;
+  title_en?: string;
+  title_ckb?: string;
+  duration_months: number;
+  duration_kind: 'total' | 'extension' | string;
+  /** Resolved by the server against this line's regular price — the exact dinar charged. */
+  fee_iqd: number;
+  fee_percent?: number | null;
+  basis_iqd?: number;
+  base_months?: number | null;
+  total_months?: number | null;
+}
+
+/** The chosen plan as the resolver priced it for the line (frozen at checkout). */
+export interface CartWarrantySnapshot {
+  plan_id: string;
+  title_ar?: string;
+  title_en?: string;
+  fee_iqd: number;
+  duration_months?: number;
+  duration_kind?: string;
+  fee_percent?: number | null;
+  basis_iqd?: number;
+  base_months?: number | null;
+  total_months?: number | null;
+}
+
 export interface CartItem {
   id: string;
   productId: string;
@@ -167,8 +201,18 @@ export interface CartItem {
   qty: number;
   option_id: string;
   color_id: string;
+  /** Legacy column; the line's journey is `transport_method`. */
   shipping_method_id: string;
+  /** '' = direct sale; air | sea | land = the pre-order journey (§1). */
+  transport_method?: string;
+  /** From catalogs.is_printer_catalog — shows the home-delivery note. */
+  is_printer?: boolean;
+  /** Cash on delivery would change THIS pre-order line's price (it carries a
+   *  direct premium this customer pays). The cart explains the rule only then. */
+  cod_reprices?: boolean;
   variantLabel: string;
+  /** The cart prices a pre-order line as PREPAID; the checkout quote is the
+   *  authority once a payment method is chosen. */
   unit_price_iqd: number;
   /** Server-resolved price breakdown for this line. `regular_iqd` vs
    *  `applied_iqd` is the only honest saving to display (§4 retired
@@ -178,10 +222,24 @@ export interface CartItem {
     applied_tier: 'regular' | 'pro' | 'prime';
     regular_iqd: number;
     prime_iqd: number | null;
+    pro_iqd?: number | null;
+    transport?: OrderItemTransport | null;
+    /** The direct-sale premium that applies; `waived` = an active PRO pays 0. */
+    direct?: { surcharge_iqd: number; waived: boolean } | null;
+    /** Which availability fee priced the line. */
+    pricing_basis?: 'direct' | 'preorder';
+    /** The extended-warranty plan on this line, as the resolver priced it. */
+    warranty?: CartWarrantySnapshot | null;
     unit_subtotal_iqd: number;
     price_source: string;
     errors: string[];
   };
+  /** The chosen extended-warranty plan id ('' = none). One plan per line,
+   *  applied to every unit of the line. */
+  warranty_plan_id?: string;
+  /** The plans this PRINTER line may carry, each with its fee already resolved
+   *  against the line's regular price. Empty for a non-printer. */
+  warranty_plans?: CartWarrantyPlan[];
   stock: number | null;
   /** Server verdict for THIS selection: stock at the authoritative level and
    *  whether the line has chosen everything the product requires. */
@@ -218,6 +276,19 @@ export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | '
 /** The four journeys an order can be on (worker/lib/shippingType.ts). */
 export type OrderShippingType = 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land';
 
+/**
+ * The pre-order journey of a line, frozen at checkout. The method is kept even
+ * when the commission was not charged; `waived_by` says why it was not — the
+ * PRO waiver, or the line having been priced as a direct sale because it was
+ * paid cash on delivery.
+ */
+export interface OrderItemTransport {
+  method?: string;
+  commission_iqd?: number;
+  waived?: boolean;
+  waived_by?: 'pro' | 'cod_direct_pricing' | string;
+}
+
 /** Per-line price breakdown frozen at checkout (cost fields stripped). */
 export interface OrderItemPricing {
   applied_iqd?: number;
@@ -225,6 +296,12 @@ export interface OrderItemPricing {
   regular_iqd?: number;
   prime_iqd?: number | null;
   pro_iqd?: number | null;
+  transport?: OrderItemTransport | null;
+  /** The direct-sale premium that applied; `waived` = an active PRO paid 0 of it. */
+  direct?: { surcharge_iqd: number; waived: boolean } | null;
+  /** 'direct' = priced by the direct-sale rule (a direct line, or a pre-order
+   *  paid cash on delivery); 'preorder' = the transport commission applied. */
+  pricing_basis?: 'direct' | 'preorder' | string;
   unit_subtotal_iqd?: number;
   price_source?: string;
 }
@@ -250,14 +327,24 @@ export interface ApiOrderItem {
   unit_price_iqd: number;
   line_total_iqd: number;
   pricing?: OrderItemPricing | null;
+  /** The extended-warranty plan frozen at checkout; `total_months` /
+   *  `base_months` are present on orders placed since the extension round. */
   warranty?: {
     plan_id?: string;
     title_ar?: string;
+    title_en?: string;
     fee_iqd?: number;
     duration_months?: number;
     duration_kind?: string;
+    fee_percent?: number | null;
+    basis_iqd?: number;
+    base_months?: number | null;
+    total_months?: number | null;
   } | null;
-  transport?: { method?: string; commission_iqd?: number; waived?: boolean } | null;
+  transport?: OrderItemTransport | null;
+  /** From catalogs.is_printer_catalog; present when the customer routes
+   *  loaded the item — never assumed when absent. */
+  is_printer?: boolean;
   selection?: OrderItemSelection;
 }
 
@@ -543,6 +630,9 @@ export interface PublicSettings {
   homeBanners: Record<string, HomeBanner[]>;
   homeSectionItems: Record<string, HomeSectionItem[]>;
   homeAds: Array<{ id: string; text: string; animation: string }>;
+  /** The printer home-delivery NOTE amount — informational, never a fee, and
+   *  rendered only when the server sent a positive integer. */
+  printerHomeDeliveryNoteIqd?: number | null;
 }
 
 /** Owner-authored copy, one string per language. Never machine-translated —

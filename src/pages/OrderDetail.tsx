@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Truck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import { useWallet } from '../WalletContext';
 import { api, formatIqd } from '../lib/api';
+import Note from '../components/ui/Note';
 import type { ApiOrder, OrderTrackingPublic, OrderUnitPublic } from '../lib/api';
 import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { classifyError, ErrorState, NotFoundState } from '../components/ui/AsyncStates';
@@ -19,7 +21,7 @@ import PriceProtection from '../components/orders/PriceProtection';
 import SupportActions from '../components/orders/SupportActions';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
 import ReviewSheet from '../components/orders/ReviewSheet';
-import { asLang, countItems, formatDate, itemCountLabel, statusLabel, statusStyle } from '../components/orders/format';
+import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -59,6 +61,12 @@ const STRINGS = {
     financialUnavailable: 'ملخص الدفع غير متاح لهذا الطلب.',
     transport: { air: 'شحن جوي', sea: 'شحن بحري', land: 'شحن بري' } as Record<string, string>,
     warrantyMonths: (n: number) => `ضمان ${n} شهرًا`,
+    // The extension frozen at checkout: "+12 months (24 in total)" — the
+    // total is the snapshot's, never re-added here.
+    warrantyExtended: (ext: string, total: string | null) =>
+      total ? `ضمان ممدد +${ext} (الإجمالي ${total})` : `ضمان ممدد +${ext}`,
+    codDirectPricing: 'سُعِّر كبيع مباشر (الدفع عند الاستلام)',
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
     cancelledNotice: 'أُلغي الطلب.',
     reviewThanks: 'شكرًا — مراجعتك بانتظار الاعتماد.',
     linkedNotice: 'تم ربط الجهاز بحسابك.',
@@ -81,6 +89,10 @@ const STRINGS = {
     financialUnavailable: 'The payment summary is not available for this order.',
     transport: { air: 'Air freight', sea: 'Sea freight', land: 'Land freight' } as Record<string, string>,
     warrantyMonths: (n: number) => `${n}-month warranty`,
+    warrantyExtended: (ext: string, total: string | null) =>
+      total ? `Extended warranty +${ext} (${total} in total)` : `Extended warranty +${ext}`,
+    codDirectPricing: 'Priced as a direct sale (cash on delivery)',
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
     cancelledNotice: 'The order was cancelled.',
     reviewThanks: 'Thank you — your review is awaiting approval.',
     linkedNotice: 'The device is now linked to your account.',
@@ -103,6 +115,10 @@ const STRINGS = {
     financialUnavailable: 'کورتەی پارەدان بۆ ئەم داواکارییە بەردەست نییە.',
     transport: { air: 'گواستنەوەی ئاسمانی', sea: 'گواستنەوەی دەریایی', land: 'گواستنەوەی وشکانی' } as Record<string, string>,
     warrantyMonths: (n: number) => `گەرەنتی ${n} مانگ`,
+    warrantyExtended: (ext: string, total: string | null) =>
+      total ? `گەرەنتی درێژکراوە +${ext} (کۆی گشتی ${total})` : `گەرەنتی درێژکراوە +${ext}`,
+    codDirectPricing: 'وەک فرۆشتنی ڕاستەوخۆ نرخ کراوە (پارەدان لە کاتی گەیاندن)',
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
     cancelledNotice: 'داواکارییەکە هەڵوەشێنرایەوە.',
     reviewThanks: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
     linkedNotice: 'ئامێرەکە بە هەژمارەکەت بەسترا.',
@@ -149,6 +165,13 @@ export default function OrderDetail() {
   const location = useLocation();
   const { lang, dir } = useLanguage();
   const s = STRINGS[asLang(lang)];
+  // The printer home-delivery note amount, the owner's setting. null = no
+  // note; the figure is never invented and never enters a total.
+  const { settings } = useWallet();
+  const printerNoteIqd = (() => {
+    const n = settings?.printerHomeDeliveryNoteIqd;
+    return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null;
+  })();
 
   const tab = useMemo(() => parseTab(new URLSearchParams(location.search).get('tab')), [location.search]);
   const setTab = (t: Tab) =>
@@ -346,9 +369,38 @@ export default function OrderDetail() {
                       const unitPrice = it.pricing?.unit_subtotal_iqd ?? it.unit_price_iqd;
                       const extras: string[] = [];
                       const months = it.warranty?.duration_months;
-                      if (it.warranty && typeof months === 'number' && months > 0) extras.push(s.warrantyMonths(months));
+                      if (it.warranty && typeof months === 'number' && months > 0) {
+                        // An EXTENSION is "+N months", with the total the
+                        // checkout froze beside it — printing the extension's
+                        // months as the whole warranty misled the customer.
+                        if (it.warranty.duration_kind === 'extension') {
+                          const total = it.warranty.total_months;
+                          extras.push(
+                            s.warrantyExtended(
+                              monthsLabel(months, lang),
+                              typeof total === 'number' && total > 0 ? monthsLabel(total, lang) : null
+                            )
+                          );
+                        } else {
+                          extras.push(s.warrantyMonths(months));
+                        }
+                      }
                       const method = it.transport?.method;
                       if (method && s.transport[method]) extras.push(s.transport[method]);
+                      // A pre-order paid cash on delivery: the line kept its
+                      // journey but was priced by the direct-sale rule — the
+                      // frozen snapshot says so, and the customer is told.
+                      if (method && it.pricing?.pricing_basis === 'direct') extras.push(s.codDirectPricing);
+                      // The home-delivery note is about a delivery still to
+                      // come: a delivered order has paid it (or not), and a
+                      // cancelled one will never be delivered — neither is
+                      // told to keep money ready at the door.
+                      const showPrinterNote =
+                        it.is_printer === true &&
+                        printerNoteIqd !== null &&
+                        order.delivery_method?.id !== 'pickup' &&
+                        order.status !== 'delivered' &&
+                        order.status !== 'cancelled';
                       return (
                         <li key={it.id} data-order-item={it.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3">
                           <div className="flex gap-3">
@@ -372,6 +424,12 @@ export default function OrderDetail() {
                             </div>
                             <p className="text-[13.5px] text-white font-bold tabular-nums shrink-0">{formatIqd(it.line_total_iqd)}</p>
                           </div>
+
+                          {showPrinterNote && (
+                            <Note tone="gold" compact animate={false} icon={<Truck className="w-3.5 h-3.5" aria-hidden />} className="mt-3" testId="order-printer-note">
+                              {s.printerNote(formatIqd(printerNoteIqd))}
+                            </Note>
+                          )}
 
                           {order.status === 'delivered' && it.product_id && (
                             <div className="mt-3">

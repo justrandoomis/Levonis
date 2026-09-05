@@ -11,6 +11,7 @@ import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
+import Note from '../components/ui/Note';
 
 /**
  * The refusal codes validateCoupon can produce. A quote that fails with one
@@ -38,9 +39,51 @@ interface ShippingQuoteDto {
   reasons: string[];
 }
 
+/** One priced line of the quote — the number the order will actually charge. */
+interface CheckoutQuoteLineDto {
+  cart_item_id: string;
+  product_id: string;
+  name: string;
+  name_ar: string;
+  variant: string;
+  qty: number;
+  unit_price_iqd: number;
+  line_total_iqd: number;
+  is_printer: boolean;
+  breakdown?: {
+    applied_iqd: number;
+    unit_subtotal_iqd: number;
+    direct?: { surcharge_iqd: number; waived: boolean } | null;
+    transport?: { method: string; commission_iqd: number; waived: boolean; waived_by?: string } | null;
+    pricing_basis?: 'direct' | 'preorder';
+  };
+}
+
 interface CheckoutQuoteDto {
+  /**
+   * THE PRICE AUTHORITY once it exists. The cart prices a pre-order line as
+   * prepaid; these lines are priced for the payment method actually chosen
+   * (cash on delivery prices a pre-order like a direct sale), so the summary
+   * renders them — not the cart's numbers — the moment a quote is loaded.
+   */
+  lines: CheckoutQuoteLineDto[];
   merchandise_iqd: number;
   subtotal_iqd: number;
+  /** §1: the journey this cart is on — unchanged by how it is paid. */
+  shipping_type?: 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land' | string;
+  /** The payment ids the server allows for this cart; the screen offers exactly these. */
+  allowed_payment_methods?: string[];
+  /** 'direct' = priced by the direct-sale rule (a direct cart, or a pre-order
+   *  paid cash on delivery); 'preorder' = the transport commission applies. */
+  pricing_basis?: 'direct' | 'preorder';
+  /** Cash on delivery changes a line's price on this cart (a pre-order line
+   *  with a direct premium this customer pays). False → nothing to explain. */
+  cod_reprices?: boolean;
+  /** A cash order the wallet settled in full was priced as the PREPAID
+   *  pre-order it is — nothing is collected at the door. */
+  prepaid_by_wallet?: boolean;
+  /** Informational notes — never part of any total. */
+  notes?: { printer_home_delivery_iqd: number | null };
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
   /** The protected-delivery add-on: offered only when the owner priced it. */
@@ -86,6 +129,14 @@ const STRINGS = {
     protectedTitle: 'توصيل محمي',
     protectedDesc: 'تغليف وحماية إضافية للطرد أثناء النقل.',
     protectedFree: 'مجاني مع اشتراكك',
+    paymentHint: {
+      wallet: 'الدفع مقدمًا بالكامل من محفظتك',
+      cash: 'تدفع المبلغ نقدًا عند الاستلام',
+    } as Record<string, string>,
+    codDirectPricing: 'اختيار الدفع عند الاستلام يُسعَّر كبيع مباشر؛ يبقى طلبك طلبًا مسبقًا بمراحله ووسيلة نقله كما هي.',
+    prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
+    prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -107,6 +158,14 @@ const STRINGS = {
     protectedTitle: 'Protected delivery',
     protectedDesc: 'Extra packaging and handling so the parcel survives the trip.',
     protectedFree: 'Free with your membership',
+    paymentHint: {
+      wallet: 'Pay the full amount in advance from your wallet',
+      cash: 'Pay in cash when the order is delivered',
+    } as Record<string, string>,
+    codDirectPricing: 'Cash on delivery is priced as a direct sale; your order stays a pre-order, on its journey and its stages.',
+    prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
+    prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -128,8 +187,19 @@ const STRINGS = {
     protectedTitle: 'گەیاندنی پارێزراو',
     protectedDesc: 'پاکەتکردن و پاراستنی زیاتر بۆ پاکەتەکە لە کاتی گواستنەوە.',
     protectedFree: 'بێبەرامبەر لەگەڵ ئەندامێتییەکەت',
+    paymentHint: {
+      wallet: 'تەواوی بڕەکە پێشوەخت لە جزدانەکەتەوە بدە',
+      cash: 'پارەکە بە کاش لە کاتی گەیاندن بدە',
+    } as Record<string, string>,
+    codDirectPricing: 'پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت؛ داواکارییەکەت وەک پێش-داواکاری دەمێنێتەوە بە قۆناغەکانی و شێوازی گواستنەوەی خۆی.',
+    prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
+    prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
   },
 };
+
+/** What the server offers when no quote has answered yet (worker/lib/paymentPolicy.ts). */
+const DEFAULT_OFFERED_PAYMENT_IDS = ['wallet', 'cash'];
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -143,7 +213,6 @@ export default function Checkout() {
     exchangeRate,
     refreshWallet,
   } = useWallet();
-  const filteredPaymentMethods = checkoutPaymentMethods.filter(m => m.id !== 'card' && m.id !== 'wallet');
 
   // Selected cart line ids and points choice arrive from the Cart page via
   // router state; with no state we fall back to the whole cart.
@@ -265,9 +334,24 @@ export default function Checkout() {
   useEffect(() => {
     if (!deliveryMethod && checkoutDeliveryMethods.length > 0) setDeliveryMethod(checkoutDeliveryMethods[0].id);
   }, [checkoutDeliveryMethods, deliveryMethod]);
+
+  // THE SCREEN OFFERS EXACTLY WHAT THE SERVER ALLOWS. The owner's rule is two
+  // ways to pay — in advance from the wallet, or cash on delivery — for every
+  // shipping type; the quote names them and the settings rows supply the
+  // owner's own titles. An id the settings still list but the server does not
+  // offer (a half advance) is simply not drawn. Cash is the resting default
+  // because the wallet method REQUIRES the whole total to be covered, and a
+  // screen that opens on a refusal is a poor first impression.
+  const offeredPaymentIds = quote?.allowed_payment_methods ?? DEFAULT_OFFERED_PAYMENT_IDS;
+  const filteredPaymentMethods = checkoutPaymentMethods.filter((m) => offeredPaymentIds.includes(m.id));
+  const offeredKey = filteredPaymentMethods.map((m) => m.id).join(',');
   useEffect(() => {
-    if (!paymentMethod && filteredPaymentMethods.length > 0) setPaymentMethod(filteredPaymentMethods[0].id);
-  }, [filteredPaymentMethods, paymentMethod]);
+    if (filteredPaymentMethods.length === 0) return;
+    if (!paymentMethod || !filteredPaymentMethods.some((m) => m.id === paymentMethod)) {
+      setPaymentMethod(filteredPaymentMethods.find((m) => m.id === 'cash')?.id ?? filteredPaymentMethods[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offeredKey, paymentMethod]);
 
   // Re-quote on every relevant selection change. The response is the ONLY
   // source of truth for shipping/waivers/policies — local math is a fallback
@@ -355,7 +439,57 @@ export default function Checkout() {
   // subtotal + delivery, minus points, then wallet. The authoritative amounts
   // come from the server quote whenever one is loaded; the order itself is
   // always recomputed server-side when placed.
-  const total = items.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
+  //
+  // THE QUOTE'S LINES ARE THE PRICE AUTHORITY. The cart prices a pre-order
+  // line as prepaid, but the server re-prices it for the payment method the
+  // customer picked (cash on delivery prices a pre-order like a direct sale),
+  // so once a quote exists both the per-line totals and the subtotal come from
+  // it — showing cart-basis prices beside a quote-basis total would be two
+  // different orders on one screen.
+  const cartSubtotal = items.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
+  const total = quote ? quote.subtotal_iqd : cartSubtotal;
+  const cartById = new Map(items.map((i) => [i.id, i] as const));
+  const summaryLines: Array<{ key: string; image: string; name: string; variant: string; qty: number; lineTotal: number; isPrinter: boolean }> =
+    quote
+      ? quote.lines.map((l) => ({
+          key: l.cart_item_id,
+          image: cartById.get(l.cart_item_id)?.image ?? '',
+          name: l.name,
+          variant: l.variant,
+          qty: l.qty,
+          lineTotal: l.line_total_iqd,
+          isPrinter: l.is_printer,
+        }))
+      : items.map((i) => ({
+          key: i.id,
+          // §3/§12: the product name is English in every language and is never translated.
+          image: i.image,
+          name: i.name,
+          variant: i.variantLabel,
+          qty: i.qty,
+          lineTotal: i.unit_price_iqd * i.qty,
+          isPrinter: i.is_printer === true,
+        }));
+  // A pre-order cart: which pricing rule is in force, said once, in one line,
+  // and ONLY when there is something to say. Read from the quote, never
+  // inferred here: a cash order the wallet settled in full is a prepaid one
+  // (`prepaid_by_wallet`); cash on delivery priced the lines as a direct sale
+  // (`pricing_basis`); paying in advance kept the pre-order price where cash
+  // WOULD have changed it (`cod_reprices`). A pre-order whose lines carry no
+  // direct premium says nothing — the number is the same either way.
+  const isPreorderCart = !!quote?.shipping_type && quote.shipping_type.startsWith('preorder_');
+  const codDirectPricing = isPreorderCart && quote?.pricing_basis === 'direct';
+  const prepaidByWallet = isPreorderCart && quote?.prepaid_by_wallet === true;
+  const pricingBasisLine = !isPreorderCart || !quote || prepaidByWallet
+    ? null
+    : codDirectPricing
+      ? S.codDirectPricing
+      : quote.cod_reprices === true
+        ? S.prepaidPreorder
+        : null;
+  // The printer note — the server echoes the amount only when a line is a
+  // printer, a home delivery is requested and the owner configured a number.
+  const printerNoteIqd = quote?.notes?.printer_home_delivery_iqd ?? null;
   const selectedDelivery = checkoutDeliveryMethods.find(m => m.id === deliveryMethod);
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
@@ -376,10 +510,11 @@ export default function Checkout() {
   const pointsDiscount = quote ? quote.points.applied_iqd : localPoints;
   const orderTotal = quote ? quote.total_iqd : beforeDiscounts - localPoints;
 
-  // Advance payment logic
-  let requiredAdvance = 0;
-  if (paymentMethod === 'half_advance') requiredAdvance = Math.ceil(orderTotal / 2);
-  if (paymentMethod === 'full_advance') requiredAdvance = orderTotal;
+  // Advance payment logic: "pay in advance" is the wallet method (the legacy
+  // `full_advance` id means the same thing), and it covers the whole total —
+  // the server refuses a half advance (worker/lib/paymentPolicy.ts).
+  const isPrepaidMethod = paymentMethod === 'wallet' || paymentMethod === 'full_advance';
+  const requiredAdvance = isPrepaidMethod ? orderTotal : 0;
   const isAdvanceRequired = requiredAdvance > 0;
 
   // Force wallet usage if advance is required
@@ -452,9 +587,6 @@ export default function Checkout() {
       setSubmitting(false);
     }
   };
-
-  // §3/§12: the product name is English in every language and is never translated.
-  const itemName = (item: CartItem) => item.name;
 
   // Versioned-policy consent block (§7): unchecked by default, links to the
   // published documents, resets on material quote changes. Rendered above
@@ -722,6 +854,9 @@ export default function Checkout() {
                       <h3 className={`font-normal text-base ${paymentMethod === method.id ? 'text-white' : 'text-zinc-300'}`}>
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                       </h3>
+                      {S.paymentHint[method.id] && (
+                        <p className="text-xs text-zinc-500 mt-0.5 font-light">{S.paymentHint[method.id]}</p>
+                      )}
                     </div>
                   </div>
                   <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ${paymentMethod === method.id ? 'border-white' : 'border-zinc-700'}`}>
@@ -778,23 +913,23 @@ export default function Checkout() {
             {dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}
           </h2>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar lg:pr-2 mb-8 space-y-3">
-            {items.map(item => (
-                <div key={item.id} className="flex gap-4 p-3 rounded-xl bg-[#050505] border border-white/5 relative overflow-hidden group">
+          <div className="flex-1 overflow-y-auto custom-scrollbar lg:pe-2 mb-8 space-y-3">
+            {summaryLines.map((line) => (
+                <div key={line.key} data-checkout-line={line.key} className="flex gap-4 p-3 rounded-xl bg-[#050505] border border-white/5 relative overflow-hidden group">
                   <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0 border border-white/5">
-                    {item.image ? (
-                      <img referrerPolicy="no-referrer" src={item.image} alt={itemName(item)} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
+                    {line.image ? (
+                      <img referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full bg-zinc-900" />
                     )}
-                    <span className="absolute top-1 right-1 w-5 h-5 bg-white text-black rounded flex items-center justify-center text-[10px] font-medium shadow-md">{item.qty}</span>
+                    <span className="absolute top-1 end-1 w-5 h-5 bg-white text-black rounded flex items-center justify-center text-[10px] font-medium shadow-md">{line.qty}</span>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <h4 className="text-sm font-normal text-white line-clamp-1 mb-0.5">{itemName(item)}</h4>
-                    {item.variantLabel && (
-                      <p className="text-xs text-zinc-500 mb-1.5 font-light">{item.variantLabel}</p>
+                    <h4 className="text-sm font-normal text-white line-clamp-1 mb-0.5">{line.name}</h4>
+                    {line.variant && (
+                      <p className="text-xs text-zinc-500 mb-1.5 font-light">{line.variant}</p>
                     )}
-                    <span className="text-sm font-medium text-white">{formatIqd(item.unit_price_iqd * item.qty)}</span>
+                    <span className="text-sm font-medium text-white tabular-nums">{formatIqd(line.lineTotal)}</span>
                   </div>
                 </div>
             ))}
@@ -803,8 +938,29 @@ export default function Checkout() {
           <div className="space-y-4 pt-6 border-t border-white/5 mt-auto text-sm">
             <div className="flex justify-between items-center text-zinc-400">
               <span className="font-light">{dir === 'rtl' ? 'المجموع الفرعي' : 'Subtotal'}</span>
-              <span className="text-white font-normal">{formatIqd(total)}</span>
+              <span className="text-white font-normal tabular-nums">{formatIqd(total)}</span>
             </div>
+            {/* One line about the pricing rule in force on a pre-order cart:
+                cash on delivery prices the lines as a direct sale while the
+                order keeps its journey; paying in advance keeps the configured
+                pre-order price. Read from the quote, never inferred here, and
+                only when cash on delivery would change the number at all. */}
+            {pricingBasisLine && quote && (
+              <p
+                className="text-[11.5px] text-zinc-500 font-light leading-relaxed"
+                data-checkout-pricing-basis={quote.pricing_basis}
+              >
+                {pricingBasisLine}
+              </p>
+            )}
+            {/* The wallet settled the whole cash order: nothing is collected at
+                the door, so the server priced it as the prepaid pre-order it
+                is — and the customer is told why the total moved. */}
+            {prepaidByWallet && (
+              <Note tone="gold" icon={<Wallet className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-prepaid-by-wallet">
+                <span className="font-light">{S.prepaidByWallet}</span>
+              </Note>
+            )}
             <div className="flex justify-between items-center text-zinc-400">
               <span className="font-light">{dir === 'rtl' ? 'الشحن' : 'Shipping'}</span>
               {quoteLoading ? (
@@ -868,6 +1024,15 @@ export default function Checkout() {
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 {S.advanceDue(formatIqd(quote.shipping.advance_due_iqd))}
               </p>
+            )}
+            {/* The printer home-delivery NOTE (owner mandate) — informational
+                only, never added to a total. The amount is the server's
+                (settings), echoed on the quote only for a printer line going
+                to a home address; a store pickup gets no note. */}
+            {printerNoteIqd !== null && summaryLines.some((l) => l.isPrinter) && (
+              <Note tone="gold" icon={<Truck className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-printer-note">
+                <span className="font-light">{S.printerNote(formatIqd(printerNoteIqd))}</span>
+              </Note>
             )}
             {shippingNeedsConfig && (
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex gap-2 text-amber-400">

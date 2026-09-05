@@ -45,6 +45,14 @@ see "The member ladder follows the regular one" below.
 > 250,000 / 225,000. Options, colours, availability and shipping are
 > **additional costs for every tier**.
 
+**Amended by the payment-method mandate (2026-09-05):** «Pro Card users are
+exempt from this additional shipping-type cost.» Options and colours still
+cost every tier the same, but the *availability* fee — the direct-sale premium
+exactly like the pre-order commission — is **waived for an active PRO**, on the
+same gate (`proContext`: approved default address, benefits not restricted).
+The owner's example therefore ends **275,000 / 250,000 / 125,000**: the PRO
+member pays the option surcharge and nothing for immediacy.
+
 Implemented in `worker/lib/pricing.ts` `memberAtRung`, mirrored by the Quick
 Edit grid (`priceGrid.ts step/cellOf`) and the write-time validators
 (`derivedRung`). At each rung (option, then colour) a PRIME/PRO field that
@@ -244,9 +252,15 @@ no misleading strikethroughs.
 ## Fee composition (unit)
 
 ```
-chosen selling price   (color/option/base; regular or PRO)
-+ preorder transport commission   (air/sea/land; product override else
-                                   admin default; WAIVED for active PRO)
+chosen selling price   (color/option/base; regular, PRIME or PRO)
++ ONE availability fee, never both:
+    preorder transport commission   (air/sea/land; product override else
+                                     admin default; WAIVED for active PRO)
+    — on a pre-order line paid in advance
+    direct-sale surcharge           (products.direct_surcharge_iqd;
+                                     WAIVED for active PRO, same gate as
+                                     the commission)
+    — on a direct line, and on a pre-order line paid CASH ON DELIVERY
 + selected warranty fee           (added on top; NEVER waived by membership)
 = unit subtotal
 ```
@@ -254,9 +268,139 @@ chosen selling price   (color/option/base; regular or PRO)
 Then, at order level: × quantity → coupon discount (if valid) → points
 (1 pt = 1 IQD) → wallet application → **last-mile delivery** (chosen
 delivery method price; **0 + `delivery_waived`=1 for active PRO**, or for a
-referred friend's qualifying printer purchase). Preorder procurement
-commissions, last-mile delivery, and warranty fees are three distinct
-charges — a waiver of one never touches the others.
+referred friend's qualifying printer purchase). The availability fee,
+last-mile delivery and warranty fees are three distinct charges — a waiver of
+one never touches the others.
+
+The resolver reports which rule priced the line as `pricing_basis`
+(`'preorder'` = the commission is the fee; `'direct'` = the surcharge is), and
+`direct: { surcharge_iqd, waived }` / `transport: { …, waived, waived_by }`
+so every surface can name the fee instead of folding it silently. The printer
+home-delivery **note** (setting `printerHomeDeliveryNoteIqd`, default 50,000)
+is not in this list on purpose: it is shown, never added.
+
+## Extended warranty (printers only — owner mandate, 2026-09-05)
+
+`worker/lib/warrantyPlans.ts` is the one place the rules live;
+`tests/extendedWarranty.test.ts` runs them through the real cart, product,
+checkout and policy routes.
+
+- **Eligibility**: a product filed under a printer catalog
+  (`catalogs.is_printer_catalog`, answered by `worker/lib/printerIdentity.ts`).
+  Anything else is refused a plan on every write path (admin save, TXT
+  analyze/apply, CSV preview/confirm → `400 WARRANTY_NOT_PRINTER`) and at
+  runtime (cart add/update, checkout → `WARRANTY_NOT_PRINTER`; the quote
+  reports it in `errors`). Stored legacy plans keep resolving on read.
+- **Shape**: `duration_kind = 'extension'`, `duration_months ∈ {12, 24}`, one
+  plan per duration — "+12 months → 24 months total", "+24 → 36" over the
+  12-month base (`warranty_base_months`, a printer's default; `serialized`
+  defaults to true so a unit row exists for the coverage to attach to).
+  **Read-time defaults** (`effectiveDevicePolicy` / `effectiveBaseMonths`):
+  a printer whose stored `ops_policy` lacks the keys (`'{}'`, or only a
+  base — rows written before this round) is READ as serialized with the
+  12-month base by the resolver, `pricedPlans`, the cart and
+  `deviceOps.createUnitsOnDelivery`, so its snapshot carries `base_months
+  12 / total_months 24|36` and its delivery creates the units; an explicit
+  `serialized: false` is the owner's word and is kept. No migration rewrites
+  old rows. The admin ops-policy route refuses `serialized: false` on a
+  printer with active plans (`400 WARRANTY_PLAN_INVALID`), as the form does,
+  and the legacy `POST /api/admin/products` runs the same printer guard.
+- **One plan per line, the customer's to change**: re-adding the same
+  printer merges into the existing line; an add that names a different plan
+  than the line holds (including a line with none) is refused `409
+  CART_WARRANTY_CONFLICT` ("already in your cart with a different
+  extended-warranty choice — change it from the cart"); an add naming no plan
+  keeps the line's plan. The plan changes only through `PATCH
+  /api/cart/items/:id`.
+- **Fee** = `round(REGULAR price of the selection × fee_percent / 100)` in
+  integer IQD (basis points, one rounding), else the fixed `fee_iqd`. The
+  basis is the regular price — never the member price — so a guest, a PRIME
+  and a PRO pay the same dinar for the same extension; the warranty fee is
+  still **never waived by membership**. An option or colour surcharge moves
+  the basis (A1 899,000 × 7.5 % = 67,425; Combo 1,099,000 → 82,425). The
+  owner's 7.5–10 % is a hint the admin form shows, not a server cap
+  (0.01–100, ≤ 2 decimals).
+- **Where it is chosen**: the product page (before add-to-cart) or the cart's
+  "Extended Warranty" disclosure, through `warrantyPlanId` on
+  `POST /api/cart/items` and `PATCH /api/cart/items/:id`. One plan per line,
+  applied to every unit of the line. `GET /api/products/:slug`,
+  `POST /api/products/:slug/quote` and `GET /api/cart` serve each plan with
+  its `fee_iqd` already resolved for the selection's regular price plus
+  `basis_iqd`, `base_months`, `total_months` — the storefront never computes a
+  fee.
+- **Before the order only**: checkout freezes `ResolvedPrice.warranty`
+  (`plan_id, title_ar, title_en, fee_iqd, duration_months, duration_kind,
+  fee_percent, basis_iqd, base_months, total_months`) into
+  `order_items.warranty_snapshot`; no route writes that column afterwards.
+  At delivery `deviceOps.computeCoverage` prefers the snapshot's
+  `total_months`/`base_months`, so the 24/36 promise survives a later product
+  edit. The fee counts as a fee (`fees_iqd`), earns no points, and is invoiced
+  under the plan's own title.
+- **Policy text**: `policy_documents` key `extended_warranty` (LEVONIS's own
+  draft in ar/en/ckb, seeded and published like every other policy); the
+  storefront links to `/policies/extended_warranty` beside the chooser.
+
+## Payment method × shipping type (owner mandate, 2026-09-05)
+
+`worker/lib/paymentPolicy.ts` is the one place the rule lives; `computeCheckout`
+applies it and `tests/checkoutPayment.test.ts` runs it through the real routes.
+
+| Cart | Pay in advance (`wallet`) | Cash on delivery (`cash`) |
+| --- | --- | --- |
+| Direct sale | base + direct surcharge (PRO: base) | the same — the method never changes a direct line |
+| Pre-order (air/sea/land), product **with** a direct surcharge | base + transport commission (PRO: base) — **exactly as configured** | **priced as a direct sale**: base + direct surcharge (PRO: base); the commission is not charged |
+| Pre-order, product with **no** direct surcharge (`direct_surcharge_iqd` null/0 — the normal pre-order-only shape) | base + transport commission (PRO: base) | **the same** — there is no direct premium to price the line "as direct" with, so the commission stays, `pricing_basis` stays `'preorder'`, nothing is waived |
+| Pre-order paid `cash` but the wallet settles the **whole** total (`due_on_delivery_iqd = 0`) | — | **a prepaid order**: re-priced under the pre-order rule (the cheaper figure, still covered), `prepaid_by_wallet: true` on the quote; `payment_method_id` stays `cash` |
+
+- **Decisions from the adversarial review (2026-09-05).** (a) "Priced as a
+  direct sale" applies only when the product actually carries a direct-sale
+  premium; with none, cash on delivery would otherwise drop the commission
+  and charge nothing in its place — the store loses the commission and the
+  door becomes cheaper than the wallet, the opposite of the owner's intent.
+  (b) «مدفوع مقدمًا» means nothing is left to collect at the door: a cash
+  order the wallet covers in full is a prepaid order whatever button was
+  pressed, so it gets pre-order pricing (and, for a PRO at the approved
+  address, the prepaid gift); a cash order the wallet covers only in part
+  stays COD-priced. `computeCheckout` prices the cart under the requested
+  basis, and re-settles it as prepaid when that condition holds.
+- The quote also says whether the method matters at all: `cod_reprices` is
+  true only when some line's price differs between prepaid and cash (a direct
+  premium this customer pays). The product quote's `pricing_modes` (direct,
+  and per journey prepaid/cod with `cod_reprices`) and the cart line's
+  `cod_reprices` carry the same fact, so the product page, the cart and the
+  checkout explain the cash rule **only where the number would move** — and
+  the product page computes none of its figures (no browser arithmetic).
+- The offered ids are `wallet` and `cash` for **every** shipping type
+  (`allowedPaymentMethods`), echoed on the quote as `allowed_payment_methods`;
+  the storefront draws exactly those. `full_advance` is tolerated as an alias
+  of `wallet` (stored orders, API scripts) and never offered; `half_advance`
+  is refused with `400 PAYMENT_METHOD_NOT_ALLOWED`. No id is ever renamed —
+  `cash` stays the platform COD id the admin labels and stickers branch on.
+- A cash-on-delivery pre-order **stays a pre-order**: the resolver keeps the
+  transport object with its method (`waived: true, waived_by:
+  'cod_direct_pricing'`), so `orders.shipping_type` is still `preorder_*`, the
+  order walks the fourteen pre-order stages, tracking labels the freight, and
+  "buy again" repeats the pre-order line. Only the commission/pricing logic
+  differs, which is what the owner asked for.
+- The pre-order gift («PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية») still requires
+  `due_on_delivery_iqd = 0`, so a COD pre-order earns none — unchanged.
+- The cart and the product page know no payment method, so they show the
+  **prepaid** pre-order price and say so; the checkout quote's `lines` and
+  `subtotal_iqd` are the price authority once a method is chosen, and the
+  checkout screen renders those, never the cart's numbers, beside the total.
+- **One PRO purchase context on every surface** (`worker/lib/entitlements.ts`
+  `pricingTierContext`): PRO prices and both availability waivers apply only
+  at the approved default PRO address with benefits not restricted. The
+  checkout judges the address the customer selected; the product page, the
+  product quote and the cart — which have no selection yet — judge the
+  customer's DEFAULT address. So an active PRO whose default address is not
+  approved sees the surcharge on the product page, in the cart and at the
+  checkout alike (`viewer_tier.pricing_active` / `pro_benefits_context` say
+  so), never a price the door will not honour.
+- Snapshots: `pricing_snapshot` carries `direct.waived`, `transport.waived_by`
+  and `pricing_basis`; the invoice line carries `direct_surcharge_iqd` (0 when
+  none or waived) beside `transport_commission_iqd` (0 when waived, for either
+  reason). An order can therefore explain its own price after the cart is gone.
 
 Validation errors (`OPTION_NOT_FOUND`, `COLOR_OPTION_MISMATCH`,
 `TRANSPORT_REQUIRED`, `TRANSPORT_NOT_OFFERED`,
@@ -272,18 +416,33 @@ selection server-side; the UI mirrors them but is never the enforcement.
    every tier, inherited per-field from the option.
 2b. Base 150,000 / 125,000 / 100,000, option +25,000, direct-sale premium
    100,000 → 175,000 / 150,000 / 125,000 for the item and 275,000 / 250,000 /
-   225,000 per unit.
+   **125,000** per unit — the PRO member is exempt from the premium.
 3. Preorder, sea commission 15,000, free tier → unit subtotal 115,000.
+3b. The same pre-order line paid **cash on delivery**, direct premium 50,000
+   → 150,000 (base + premium; the commission steps aside); PRO → 100,000. The
+   order is still `preorder_sea` with fourteen stages.
+3c. A pre-order line with **no** direct premium paid cash on delivery →
+   115,000, identical to prepaid: the commission stays (`pricing_basis:
+   'preorder'`, `cod_reprices: false`). PRO → 100,000 (`waived_by: 'pro'`).
+3d. The 3b line paid `cash` with a wallet that covers the whole 155,000 →
+   re-priced as prepaid: 115,000 + 5,000 delivery = 120,000, all from the
+   wallet, `due_on_delivery_iqd: 0`, `prepaid_by_wallet: true`. A wallet that
+   covers only 70,000 of it stays COD-priced: 150,000, 85,000 due at the door.
 4. PRO + air commission 25,000 + 2-year warranty 20,000, no PRO price →
    100,000 + 0 (waived) + 20,000 = 120,000.
+4b. Printer 899,000 (PRIME 885,000 / PRO 799,000), extension +12 at 7.5 % →
+   the fee is 67,425 for every tier (7.5 % of the REGULAR 899,000): free
+   966,425 / PRIME 952,425 / PRO 866,425; +24 at 10 % → 89,900. Total
+   coverage 24 / 36 months, frozen in the snapshot.
 5. PRO with `explicit_only` policy and no explicit PRO price → pays the
    regular price; the UI shows no PRO discount.
 
 ## Snapshots
 
 Each order line stores `pricing_snapshot` (the resolver output minus cost
-fields), `warranty_snapshot` and `transport_snapshot`; the order stores
-`membership_tier_snapshot`, `exchange_rate`, `delivery_waived`,
+fields — including `direct.waived`, `transport.waived_by` and
+`pricing_basis`), `warranty_snapshot` and `transport_snapshot`; the order
+stores `membership_tier_snapshot`, `exchange_rate`, `delivery_waived`,
 `coupon_snapshot`. Later edits to products, prices, policies or the
 exchange rate never alter historical orders.
 

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { isPrinterProduct } from '../lib/printerIdentity';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import {
@@ -92,18 +93,6 @@ interface EligibilityFacts {
 interface MediaEntry {
   key: string;
   kind: 'image' | 'video';
-}
-
-async function isPrinterProduct(db: D1Database, productId: string): Promise<boolean> {
-  const hit = await db
-    .prepare(
-      `SELECT 1 AS x FROM product_catalogs pc
-         JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-        WHERE pc.product_id = ? LIMIT 1`
-    )
-    .bind(productId)
-    .first();
-  return !!hit;
 }
 
 /**

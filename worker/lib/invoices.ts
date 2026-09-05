@@ -105,12 +105,25 @@ export interface InvoiceSnapshotV1 {
 }
 
 function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
-  const warranty = safeParse<{ title_ar?: string; fee_iqd?: number } | null>(it.warranty_snapshot, null);
+  const warranty = safeParse<{ title_ar?: string; title_en?: string; fee_iqd?: number } | null>(it.warranty_snapshot, null);
+  // `waived` covers both reasons a commission is not charged — the PRO waiver
+  // and a pre-order paid cash on delivery (transport.waived_by explains which
+  // in the snapshot); the invoice only needs the effective figure.
   const transport = safeParse<{ method?: string; commission_iqd?: number; waived?: boolean } | null>(
     it.transport_snapshot,
     null
   );
   const effectiveCommission = transport && transport.waived !== true ? Number(transport.commission_iqd) || 0 : 0;
+  // The direct-sale premium lives in the pricing snapshot (pricing.ts
+  // `direct`); 0 when none applied or when an active PRO was exempt, so the
+  // invoice for a cash-on-delivery pre-order can show WHY its unit price is
+  // the direct-sale number. Rows written before the field existed have none.
+  const pricing = safeParse<{ direct?: { surcharge_iqd?: number; waived?: boolean } | null } | null>(
+    it.pricing_snapshot,
+    null
+  );
+  const direct = pricing?.direct ?? null;
+  const effectiveDirect = direct && direct.waived !== true ? Number(direct.surcharge_iqd) || 0 : 0;
   return {
     order_item_id: it.id,
     product_id: it.product_id,
@@ -120,8 +133,11 @@ function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
     unit_price_iqd: Number(it.unit_price_iqd) || 0,
     line_total_iqd: Number(it.line_total_iqd) || 0,
     transport_commission_iqd: effectiveCommission,
+    direct_surcharge_iqd: effectiveDirect,
     warranty_fee_iqd: warranty ? Number(warranty.fee_iqd) || 0 : 0,
-    warranty_label: warranty?.title_ar || '',
+    // The plan's own title, as frozen at checkout — Arabic first, the English
+    // title when the plan was authored without one.
+    warranty_label: warranty?.title_ar || warranty?.title_en || '',
   };
 }
 

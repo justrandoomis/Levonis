@@ -9,7 +9,7 @@
  */
 import { Coins, Clock, CheckCircle2, Ban } from 'lucide-react';
 import { formatIqd } from '../../lib/api';
-import type { ApiOrder, OrderFinancial } from '../../lib/api';
+import type { ApiOrder, ApiOrderItem, OrderFinancial } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, formatDate } from './format';
 
@@ -17,7 +17,9 @@ const STRINGS = {
   ar: {
     title: 'ملخص الدفع',
     merchandise: 'المنتجات',
-    fees: 'رسوم الشحن الدولي والضمان',
+    fees: 'رسوم التوفر والشحن الدولي والضمان',
+    feeKinds: { direct: 'زيادة البيع المباشر', transport: 'عمولة النقل', warranty: 'الضمان' } as Record<FeeKind, string>,
+    feesOf: (kinds: string) => `رسوم: ${kinds}`,
     coupon: 'كوبون',
     pointsUsed: 'نقاط مستخدمة',
     shipping: 'التوصيل',
@@ -40,7 +42,9 @@ const STRINGS = {
   en: {
     title: 'Payment summary',
     merchandise: 'Merchandise',
-    fees: 'Transport & warranty fees',
+    fees: 'Availability, transport & warranty fees',
+    feeKinds: { direct: 'direct-sale surcharge', transport: 'transport commission', warranty: 'warranty' } as Record<FeeKind, string>,
+    feesOf: (kinds: string) => `Fees: ${kinds}`,
     coupon: 'Coupon',
     pointsUsed: 'Points used',
     shipping: 'Delivery',
@@ -63,7 +67,9 @@ const STRINGS = {
   ckb: {
     title: 'کورتەی پارەدان',
     merchandise: 'کاڵاکان',
-    fees: 'کرێی گواستنەوە و گەرەنتی',
+    fees: 'کرێی بەردەستبوون و گواستنەوە و گەرەنتی',
+    feeKinds: { direct: 'زیادەی فرۆشتنی ڕاستەوخۆ', transport: 'کرێی گواستنەوە', warranty: 'گەرەنتی' } as Record<FeeKind, string>,
+    feesOf: (kinds: string) => `کرێ: ${kinds}`,
     coupon: 'کۆپۆن',
     pointsUsed: 'خاڵی بەکارهاتوو',
     shipping: 'گەیاندن',
@@ -84,6 +90,29 @@ const STRINGS = {
     support: (u: string) => `پشتگیری @${u} — بێ هیچ داشکاندنێک`,
   },
 } as const;
+
+type FeeKind = 'direct' | 'transport' | 'warranty';
+
+/**
+ * WHICH fees make up `fees_iqd`, read off the frozen line snapshots — so the
+ * row can NAME them ("Fees: direct-sale surcharge · warranty") instead of one
+ * label that fits every order. Only the kinds actually charged are named: a
+ * PRO's waived commission or premium is not a fee the customer paid, and a
+ * cash-on-delivery pre-order names the direct-sale surcharge, not the
+ * commission it did not pay. Naming only — the AMOUNT stays the server's
+ * `fees_iqd`; nothing is added up here.
+ */
+export function feeKindsOf(items: ApiOrderItem[] | undefined): FeeKind[] {
+  const kinds = new Set<FeeKind>();
+  for (const it of items ?? []) {
+    const direct = it.pricing?.direct;
+    if (direct && direct.waived !== true && (direct.surcharge_iqd ?? 0) > 0) kinds.add('direct');
+    const t = it.transport ?? it.pricing?.transport;
+    if (t && t.waived !== true && (t.commission_iqd ?? 0) > 0) kinds.add('transport');
+    if ((it.warranty?.fee_iqd ?? 0) > 0) kinds.add('warranty');
+  }
+  return (['direct', 'transport', 'warranty'] as FeeKind[]).filter((k) => kinds.has(k));
+}
 
 function Row({ label, value, strong = false, muted = false, negative = false }: { label: string; value: string; strong?: boolean; muted?: boolean; negative?: boolean }) {
   return (
@@ -110,6 +139,10 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
         : 'bg-zinc-800 text-zinc-300 border-zinc-700';
   const points = f.points ?? null;
   const showEarned = !!points && points.state !== 'none' && (points.pending > 0 || points.released > 0 || points.state === 'cancelled');
+  // Name the fees when the line snapshots say which ones were charged; a
+  // legacy order with no snapshots keeps the generic label.
+  const feeKinds = feeKindsOf(order.items);
+  const feesLabel = feeKinds.length > 0 ? s.feesOf(feeKinds.map((k) => s.feeKinds[k]).join(' · ')) : s.fees;
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4" aria-labelledby="payment-title">
@@ -122,7 +155,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
 
       <dl className="mt-3 divide-y divide-zinc-800/60">
         <Row label={s.merchandise} value={formatIqd(f.merchandise_iqd)} />
-        {f.fees_iqd > 0 && <Row label={s.fees} value={formatIqd(f.fees_iqd)} />}
+        {f.fees_iqd > 0 && <Row label={feesLabel} value={formatIqd(f.fees_iqd)} />}
         {f.coupon_discount_iqd > 0 && <Row label={`${s.coupon}${couponCode}`} value={formatIqd(f.coupon_discount_iqd)} negative />}
         {f.points_value_iqd > 0 && <Row label={`${s.pointsUsed} (${f.points_used})`} value={formatIqd(f.points_value_iqd)} negative />}
         <Row

@@ -2,9 +2,11 @@
  * The owner's availability-pricing round, pinned:
  *
  *  1. The DIRECT premium (products.direct_surcharge_iqd) — immediacy priced
- *     like a transport journey. It lands in unit_subtotal on direct lines
- *     only and NEVER stacks with a pre-order commission (the customer pays
- *     the journey they picked, not both).
+ *     like a transport journey. It lands in unit_subtotal on direct-priced
+ *     lines (a direct sale, or a pre-order paid cash on delivery) and NEVER
+ *     stacks with a pre-order commission (the customer pays the journey they
+ *     picked, not both). An active PRO is exempt from it, exactly as from
+ *     the commission (owner mandate).
  *  2. The card price is the CHEAPEST way to buy the product: display_* on
  *     listings is the minimum tier-resolved price across base/options/
  *     colours, with each tier's cheapest teaser price alongside.
@@ -44,7 +46,8 @@ const pro = { tier: 'pro' as const, tierActive: true };
 test('direct premium: added to unit_subtotal on a direct line, reported in `direct`', () => {
   const r = resolveUnitPrice({ product: product({ direct_surcharge_iqd: 50_000 }), ...free });
   assert.equal(r.applied_iqd, 100_000); // the item price itself is untouched
-  assert.deepEqual(r.direct, { surcharge_iqd: 50_000 });
+  assert.deepEqual(r.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.equal(r.pricing_basis, 'direct');
   assert.equal(r.unit_subtotal_iqd, 150_000); // the FINAL number the customer sees
 });
 
@@ -58,11 +61,20 @@ test('direct premium: never stacks with a pre-order commission', () => {
   // premium does not.
   const landLine = resolveUnitPrice({ product: p, transportMethod: 'land', ...free });
   assert.equal(landLine.direct, null);
+  assert.equal(landLine.pricing_basis, 'preorder');
   assert.equal(landLine.unit_subtotal_iqd, 115_000);
   // The buyer picked immediacy: the premium applies, no commission.
   const directLine = resolveUnitPrice({ product: p, ...free });
   assert.equal(directLine.transport, null);
   assert.equal(directLine.unit_subtotal_iqd, 150_000);
+  // The buyer picked the land journey but pays cash on delivery: the premium
+  // applies INSTEAD of the commission — still never both — and the journey
+  // is kept with its method.
+  const codLand = resolveUnitPrice({ product: p, transportMethod: 'land', preorderPricing: 'cod', ...free });
+  assert.equal(codLand.unit_subtotal_iqd, 150_000);
+  assert.equal(codLand.pricing_basis, 'direct');
+  assert.equal(codLand.transport?.method, 'land');
+  assert.equal(codLand.transport?.waived_by, 'cod_direct_pricing');
 });
 
 test('direct premium: sea at zero commission still beats direct at +50k (the owner\'s example)', () => {
@@ -88,9 +100,16 @@ test('direct premium: never invented — null/0 add nothing, a pre-order-only pr
   assert.equal(r.unit_subtotal_iqd, 125_000);
 });
 
-test('direct premium: not waived by PRO (only the pre-order commission waiver is PRO\'s)', () => {
+test('direct premium: WAIVED for an active PRO, on the same gate as the commission waiver', () => {
+  // «Pro Card users are exempt from this additional shipping-type cost.» The
+  // premium is still REPORTED (the line explains itself) but charges nothing.
   const r = resolveUnitPrice({ product: product({ direct_surcharge_iqd: 50_000 }), ...pro });
-  assert.equal(r.unit_subtotal_iqd, 150_000);
+  assert.deepEqual(r.direct, { surcharge_iqd: 50_000, waived: true });
+  assert.equal(r.unit_subtotal_iqd, 100_000);
+  // PRIME is not PRO (§5): it pays the premium.
+  const asPrime = resolveUnitPrice({ product: product({ direct_surcharge_iqd: 50_000 }), tier: 'prime', tierActive: true });
+  assert.deepEqual(asPrime.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.equal(asPrime.unit_subtotal_iqd, 150_000);
 });
 
 // -------------------------------------- 2. card price = cheapest variant
@@ -111,8 +130,10 @@ const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   ...over,
 });
 
-const freeCtx = { tier: 'free' as const, tierActive: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [] };
-const primeCtx = { tier: 'prime' as const, tierActive: true, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [] };
+// The storefront's pricing context (worker/routes/products.ts): `tierActive` is
+// what the resolver is told, `membershipActive`/`proContext` what the viewer is.
+const freeCtx = { tier: 'free' as const, tierActive: false, membershipActive: false, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [] };
+const primeCtx = { tier: 'prime' as const, tierActive: true, membershipActive: true, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [] };
 
 test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»', () => {
   const out = publicWithDisplayPrice(row(), freeCtx);

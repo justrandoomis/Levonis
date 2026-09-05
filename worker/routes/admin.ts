@@ -16,7 +16,9 @@ import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps'
 import { awardOrderPoints } from '../lib/pointsOps';
 import { walletTxPublic, credit } from '../lib/wallet';
 import { productPublic } from './products';
-import { orderPublic, shippingConfigFrom } from './orders';
+import { parseProductRow } from '../lib/productModel';
+import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
 import {
@@ -363,6 +365,21 @@ adminRoutes.post('/products', async (c) => {
   const p = validateProductBody(body);
   const id = typeof body.id === 'string' && body.id ? str(body.id, 'id', { max: 60 }) : newId('prd');
 
+  // EXTENDED WARRANTY IS FOR PRINTERS (owner mandate) — on THIS legacy route
+  // too, with the same guard and the same 400 codes as adminProducts.ts
+  // (WARRANTY_NOT_PRINTER / WARRANTY_PLAN_INVALID). Printer-ness is the
+  // stored catalog placement (this route names no catalogs), so a product
+  // that is not filed under a printer catalog cannot be given plans here,
+  // and a printer's plans must be the +12 / +24 extensions. The document is
+  // built over the stored row so the stored ops_policy (serialized, base)
+  // is what the rules judge.
+  const stored = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  await applyPrinterWarrantyRules(
+    c.env.DB,
+    parseProductRow({ ...(stored ?? {}), ...p, id, slug: p.slug }),
+    undefined
+  );
+
   const cols = Object.keys(p);
   const sql = `INSERT INTO products (id, ${cols.join(', ')})
                VALUES (?, ${cols.map(() => '?').join(', ')})
@@ -544,8 +561,10 @@ adminRoutes.get('/orders', async (c) => {
   const ids = results.map((o) => String(o.id));
   const byOrder = new Map<string, Record<string, unknown>[]>(ids.map((id) => [id, []]));
   if (ids.length > 0) {
+    // The same item projection the customer routes use, so the admin sees
+    // the same is_printer flag (and product slug) the customer payload carries.
     const { results: items } = await c.env.DB.prepare(
-      `SELECT * FROM order_items WHERE order_id IN (${ids.map(() => '?').join(',')}) ORDER BY rowid`
+      `${ORDER_ITEMS_SELECT} WHERE oi.order_id IN (${ids.map(() => '?').join(',')}) ORDER BY oi.rowid`
     )
       .bind(...ids)
       .all<Record<string, unknown>>();
@@ -606,7 +625,7 @@ adminRoutes.get('/orders/:id', async (c) => {
   };
 
   const [{ results: items }, snaps, units, invoice, chat, stageHistory] = await Promise.all([
-    c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid').bind(id).all<Record<string, unknown>>(),
+    c.env.DB.prepare(`${ORDER_ITEMS_SELECT} WHERE oi.order_id = ? ORDER BY oi.rowid`).bind(id).all<Record<string, unknown>>(),
     soft('points', () => getOrderPointsSnapshots(c.env, [id]), new Map()),
     // Serialized units matter on the fulfilment screen: a printer that needs a
     // serial written on the warranty slip is a different packing job from a
@@ -896,7 +915,7 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
   const o = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!o) throw notFound('Order not found');
   const [{ results: items }, invoice] = await Promise.all([
-    c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid').bind(id).all<Record<string, unknown>>(),
+    c.env.DB.prepare(`${ORDER_ITEMS_SELECT} WHERE oi.order_id = ? ORDER BY oi.rowid`).bind(id).all<Record<string, unknown>>(),
     c.env.DB.prepare('SELECT invoice_no FROM invoices WHERE order_id = ? ORDER BY revision DESC LIMIT 1')
       .bind(id).first<{ invoice_no: string }>().catch(() => null),
   ]);

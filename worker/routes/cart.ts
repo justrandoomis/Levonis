@@ -12,7 +12,7 @@ import {
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, int, str, oneOf } from '../lib/http';
+import { requireAuth, badRequest, conflict, notFound, int, str, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import { parseProductRow, type ProductDoc } from '../lib/productModel';
@@ -48,15 +48,33 @@ export function refuseIncompleteSelection(availability: SaleAvailability, label?
 import {
   resolveUnitPrice,
   proPolicyFrom,
+  type PreorderPricing,
   type ProPricingPolicy,
   type ResolvedPrice,
   type Tier,
 } from '../lib/pricing';
-import { effectiveTier } from '../lib/entitlements';
+import { pricingTierContext } from '../lib/entitlements';
 import { supportEligibleProductIds } from '../lib/membershipOps';
+import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
+import { pricedPlans, refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
+
+/** 409 when a re-add would silently change the line's extended-warranty choice. */
+export const CART_WARRANTY_CONFLICT = 'CART_WARRANTY_CONFLICT';
+
+/**
+ * The tier the cart prices with — the SAME PRO purchase context the product
+ * page and the checkout use (worker/lib/entitlements.ts), judged at the
+ * customer's default address: an active PRO whose default address is not the
+ * approved one sees the surcharge here exactly as the door will charge it.
+ */
+async function cartTier(c: Context<AppContext>): Promise<{ tier: Tier; active: boolean }> {
+  const user = c.get('user')!;
+  const ctx = await pricingTierContext(c.env.DB, user.id);
+  return { tier: ctx.tierStatus.tier, active: ctx.pricingTierActive };
+}
 
 /**
  * SUPPORT CODES AND THIS FILE (integrated mandate §3.3).
@@ -132,6 +150,16 @@ export interface CartSelection {
 /**
  * Resolves one cart/checkout line through the central resolver — the ONLY
  * pricing path. Never trusts a client-sent price.
+ *
+ * `preorderPricing` is the checkout's knowledge of HOW the customer pays: a
+ * pre-order line paid cash on delivery is priced as a direct sale (owner
+ * mandate). The cart itself never knows a payment method, so it always prices
+ * 'prepaid' — the configured pre-order price — and the checkout quote is the
+ * authority the moment a method is chosen.
+ *
+ * `isPrinter` is the owner's catalog flag for the line's product: a printer
+ * with no configured warranty base is priced with the 12-month default, so
+ * the plan's total months here are the ones its delivered unit will record.
  */
 export function resolveCartLine(
   row: Record<string, unknown>,
@@ -139,7 +167,9 @@ export function resolveCartLine(
   tier: Tier,
   tierActive: boolean,
   ctx: PricingContext,
-  view?: ProductRelationsView
+  view?: ProductRelationsView,
+  preorderPricing: PreorderPricing = 'prepaid',
+  isPrinter = false
 ): { doc: ProductDoc; resolved: ResolvedPrice; variantLabel: string; selectionErrors: string[] } {
   // Options and colours come from the relational tables when the product has
   // them (migration 0022 gave every existing product its rows), so the cart
@@ -165,6 +195,8 @@ export function resolveCartLine(
     tierActive,
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
+    preorderPricing,
+    isPrinter,
   });
 
   // With relational links present, the real AND/OR algebra decides whether the
@@ -205,6 +237,12 @@ export function publicBreakdown(r: ResolvedPrice) {
     prime_iqd: r.prime_iqd,
     pro_iqd: r.pro_iqd,
     transport: r.transport,
+    // The direct-sale premium, named — with `waived` for a PRO — so a cart or
+    // checkout line can explain its final number instead of folding the
+    // premium silently into unit_subtotal_iqd.
+    direct: r.direct,
+    /** Which availability fee priced the line: commission or direct premium. */
+    pricing_basis: r.pricing_basis,
     warranty: r.warranty,
     unit_subtotal_iqd: r.unit_subtotal_iqd,
     price_source: r.price_source,
@@ -236,7 +274,7 @@ export function selectionFromCartRow(row: Record<string, unknown>): CartSelectio
 async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
   const [{ tier, active: tierActive }, ctx] = await Promise.all([
-    effectiveTier(c.env, user),
+    cartTier(c),
     loadPricingContext(c.env.DB),
   ]);
   const { results } = await c.env.DB.prepare(
@@ -251,10 +289,13 @@ async function loadCart(c: Context<AppContext>) {
   // Display-only: which lines carry the explicit support-gift eligibility
   // flag. One extra query for the whole cart, never per line, and it feeds
   // no price anywhere.
-  const eligibleIds = await supportEligibleProductIds(
-    c.env.DB,
-    results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''))
-  );
+  const activeIds = results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''));
+  const [eligibleIds, printerIds] = await Promise.all([
+    supportEligibleProductIds(c.env.DB, activeIds),
+    // Which lines are printers (owner's catalog flag), so the cart can show
+    // the home-delivery note beside them. Informational — never a price.
+    printerProductIds(c.env.DB, activeIds),
+  ]);
 
   // One batched read of every product's relational structure — never N+1.
   const views = await loadRelationsViews(
@@ -267,7 +308,24 @@ async function loadCart(c: Context<AppContext>) {
     if (row.status !== 'active') continue; // hidden products drop out of the cart view
     const view = views.get(String(row.id));
     const sel = selectionFromCartRow(row);
-    const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(row, sel, tier, tierActive, ctx, view);
+    const isPrinter = printerIds.has(String(row.id ?? ''));
+    const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
+      row,
+      sel,
+      tier,
+      tierActive,
+      ctx,
+      view,
+      'prepaid',
+      isPrinter
+    );
+    // Would cash on delivery change THIS line's price? Only when the product
+    // carries a direct premium this customer pays — the same rule the checkout
+    // applies — so the cart explains the cash rule only where it bites.
+    const codReprices = sel.transportMethod
+      ? resolveCartLine(row, sel, tier, tierActive, ctx, view, 'cod', isPrinter).resolved.unit_subtotal_iqd !==
+        resolved.unit_subtotal_iqd
+      : false;
     // What this exact line can actually be sold as, from the authoritative
     // stock level — not from products.stock when the product tracks elsewhere.
     const availability = saleAvailability(doc, {
@@ -304,7 +362,15 @@ async function loadCart(c: Context<AppContext>) {
       // buyer: it marks the line the support-gift program evaluates for the
       // REFERRER after delivery and payment settlement.
       support_gift_eligible: eligibleIds.has(String(row.id ?? '')),
-      // Legacy field kept for existing UI: the full per-unit amount.
+      /** From catalogs.is_printer_catalog — the printer home-delivery note keys off this. */
+      is_printer: isPrinter,
+      /** Cash on delivery would change this pre-order line's price (it carries
+       *  a direct premium this customer pays). False on a direct line and on a
+       *  pre-order line with no premium — the cart says nothing there. */
+      cod_reprices: codReprices,
+      // Legacy field kept for existing UI: the full per-unit amount. The cart
+      // prices a pre-order line as PREPAID (its configured pre-order price);
+      // the checkout quote re-prices it once a payment method is chosen.
       unit_price_iqd: resolved.unit_subtotal_iqd,
       breakdown: publicBreakdown(resolved),
       // Legacy field: the base row. `availability.stock` is the authoritative
@@ -316,7 +382,12 @@ async function loadCart(c: Context<AppContext>) {
       relations: publicRelations(view ?? EMPTY_RELATIONS),
       options: doc.options.filter((o) => o.active).map(stripCost),
       colors: doc.colors.filter((col) => col.active).map(stripCost),
-      warranty_plans: doc.warranty_plans.filter((w) => w.active),
+      // The extended-warranty options for THIS line, each with its fee already
+      // resolved against the line's regular price (a percent plan) and the
+      // total it yields — what the cart's "Extended Warranty" disclosure
+      // shows before the customer picks one. Printers only; the cart refuses
+      // a plan on anything else (WARRANTY_NOT_PRINTER).
+      warranty_plans: pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
       preorder_transports: doc.preorder_transports.filter((t) => t.active),
       shipping_methods: safeParse(row.shipping_methods, []), // legacy UI compatibility
     });
@@ -421,11 +492,15 @@ cartRoutes.post('/items', async (c) => {
     .first<Record<string, unknown>>();
   if (!product) throw notFound('Product not found or unavailable');
 
-  const [{ tier, active: tierActive }, ctx, views] = await Promise.all([
-    effectiveTier(c.env, user),
+  const [{ tier, active: tierActive }, ctx, views, isPrinter] = await Promise.all([
+    cartTier(c),
     loadPricingContext(c.env.DB),
     loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
+    // The owner's catalog flag decides whether an extended warranty may ride
+    // on this line at all — "this system applies to printers only".
+    warrantyPlanId ? isPrinterProduct(c.env.DB, productId) : Promise.resolve(false),
   ]);
+  refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
   const view = views.get(productId);
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
@@ -433,7 +508,9 @@ cartRoutes.post('/items', async (c) => {
     tier,
     tierActive,
     ctx,
-    view
+    view,
+    'prepaid',
+    isPrinter
   );
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
@@ -545,6 +622,29 @@ cartRoutes.post('/items', async (c) => {
   // the first value for the pre-0018 UNIQUE key and every legacy reader.
   const canonical = [...optionValueIds].sort();
   const primaryOption = canonical[0] ?? '';
+
+  // ONE PLAN PER LINE, AND THE LINE'S PLAN IS THE CUSTOMER'S TO CHANGE. The
+  // merge key (user, product, option, colour) says nothing about the warranty,
+  // so a second add of the same printer lands on the existing line — and must
+  // not rewrite its extended-warranty choice on the way in: a chosen +24 would
+  // vanish from both units, or a plan would be applied to a unit the customer
+  // never picked it for. An add that names a DIFFERENT plan than the line
+  // holds (including a line with none) is refused, naming the fix; an add that
+  // names none keeps the line's plan (the CASE in the upsert below).
+  const existingLine = await c.env.DB
+    .prepare(
+      `SELECT id, warranty_plan_id FROM cart_items
+        WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = ? AND shipping_method_id = ''`
+    )
+    .bind(user.id, productId, primaryOption, colorId)
+    .first<{ id: string; warranty_plan_id: string | null }>();
+  if (existingLine && warrantyPlanId && warrantyPlanId !== String(existingLine.warranty_plan_id ?? '')) {
+    throw conflict(
+      'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
+      CART_WARRANTY_CONFLICT
+    );
+  }
+
   await c.env.DB.prepare(
     `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                              shipping_method_id, transport_method, warranty_plan_id, qty)
@@ -554,7 +654,9 @@ cartRoutes.post('/items', async (c) => {
      DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                    option_value_ids = excluded.option_value_ids,
                    transport_method = excluded.transport_method,
-                   warranty_plan_id = excluded.warranty_plan_id`
+                   warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
+                                           THEN cart_items.warranty_plan_id
+                                           ELSE excluded.warranty_plan_id END`
   )
     .bind(
       newId('ci'), user.id, productId, primaryOption, JSON.stringify(canonical), colorId,
@@ -629,11 +731,15 @@ cartRoutes.patch('/items/:id', async (c) => {
   // validation (previous behavior silently accepted any selection here).
   if (!product) throw badRequest('This product no longer exists — please remove it from your cart');
 
-  const [{ tier, active: tierActive }, ctx, views] = await Promise.all([
-    effectiveTier(c.env, user),
+  const [{ tier, active: tierActive }, ctx, views, isPrinter] = await Promise.all([
+    cartTier(c),
     loadPricingContext(c.env.DB),
     loadRelationsViews(c.env.DB, [{ id: String(existing.product_id), inventory_mode: product.inventory_mode }]),
+    // Setting or changing the plan from the cart's disclosure runs the same
+    // printers-only gate as the add; clearing it ('') needs no check.
+    warrantyPlanId ? isPrinterProduct(c.env.DB, String(existing.product_id)) : Promise.resolve(false),
   ]);
+  refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
   const view = views.get(String(existing.product_id));
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
@@ -641,7 +747,9 @@ cartRoutes.patch('/items/:id', async (c) => {
     tier,
     tierActive,
     ctx,
-    view
+    view,
+    'prepaid',
+    isPrinter
   );
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');

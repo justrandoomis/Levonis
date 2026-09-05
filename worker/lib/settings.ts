@@ -163,6 +163,17 @@ export const SETTING_DEFAULTS = {
     printer_advance_required: boolean;
     protected_iqd: number | null;
   },
+  /**
+   * THE PRINTER HOME-DELIVERY NOTE — «for printers, show a note stating that
+   * 50,000 IQD must be paid when requesting home delivery — only as a note».
+   *
+   * An amount shown beside a printer on the product page, in the cart, at
+   * checkout and on the order; it is never added to any total by any code
+   * path, and it is not the printer delivery FEE mapping (shippingPolicy
+   * printer_small/large_iqd, decision row 16), which stays unconfigured. The
+   * owner named the number, so 50,000 is a real default, editable here.
+   */
+  printerHomeDeliveryNoteIqd: 50000,
   // Points for approved NON-printer product reviews (final-phase §5). The
   // value is an owner decision (decision row 20) — disabled and unpriced
   // until configured; reviews.ts reads it and shows an honest pending state.
@@ -241,6 +252,17 @@ export const SETTING_DEFAULTS = {
   printLinkProviders: DEFAULT_LINK_PROVIDERS as LinkProviderConfig[],
 };
 
+/**
+ * The printer note amount as stored, or null when nothing usable is
+ * configured. The admin settings endpoint stores this key generically, so the
+ * read side is where a blank, a zero or a stray string becomes "no note"
+ * rather than a fabricated figure on a customer's screen.
+ */
+export function printerNoteIqdFrom(value: unknown): number | null {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null;
+}
+
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export const SETTING_KEYS = Object.keys(SETTING_DEFAULTS) as SettingKey[];
 
@@ -260,6 +282,9 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // The calculator is a public tool; the rates on it are a published price
   // list, not internal policy.
   'printServicePricing',
+  // The printer note is customer-facing copy: the product page and the cart
+  // read it before any quote exists.
+  'printerHomeDeliveryNoteIqd',
   // NOTE: proPricingPolicy, preorderTransportDefaults, launchConfig and
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];

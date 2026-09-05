@@ -4,15 +4,26 @@ import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, notFound, str, int } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
-import { getSettings } from '../lib/settings';
+import { getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
 import { resolveCartLine, pricingContextFrom, publicBreakdown, selectionFromCartRow, refuseIncompleteSelection } from './cart';
+import {
+  allowedPaymentMethods,
+  isCod,
+  isPaymentMethodAllowed,
+  isPrepaid,
+  preorderPricingFor,
+  PAYMENT_METHOD_NOT_ALLOWED,
+} from '../lib/paymentPolicy';
+import type { PreorderPricing } from '../lib/pricing';
+import { printerProductIds } from '../lib/printerIdentity';
+import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { saleAvailability } from './products';
 import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
 import { planInventory, resolveStock } from '../lib/inventory';
 import { returnOrderStock } from '../lib/orderInventory';
 import type { StockMove, StockTarget } from '../lib/inventory';
-import { getTierStatus, preorderGiftFor } from '../lib/entitlements';
+import { pricingTierContext, preorderGiftFor } from '../lib/entitlements';
 import type { PreorderGiftConfig, TierStatus } from '../lib/entitlements';
 import {
   referralFreeDeliveryApplies,
@@ -42,7 +53,7 @@ import { notifyAdmins } from '../lib/telegram';
 import { quoteShipping } from '../lib/shipping';
 import type { ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
 import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
-import { typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
+import { cartShippingType, typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
 import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
 import type { OrderStage } from '../lib/orderStages';
@@ -50,7 +61,6 @@ import { coverageState, maskSerial } from '../lib/deviceOps';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
-import { normalizePhone } from '../lib/phone';
 
 export const orderRoutes = new Hono<AppContext>();
 orderRoutes.use('*', requireAuth);
@@ -242,6 +252,13 @@ export function orderPublic(
         /** Present when the items were loaded with the products join (the
          *  customer routes); the storefront links to /product/:slug with it. */
         product_slug: (it.product_slug as string | null | undefined) ?? null,
+        /**
+         * Printer or not, from the owner's catalog flag (ORDER_ITEMS_SELECT
+         * computes it). Present ONLY when the loader asked: a caller that
+         * selected the bare row gets no field rather than an assumed `false`,
+         * because the customer's screen shows the home-delivery note off it.
+         */
+        ...(it.is_printer === undefined || it.is_printer === null ? {} : { is_printer: !!Number(it.is_printer) }),
         name: it.name_snapshot,
         image: it.image_snapshot,
         variant: it.option_snapshot,
@@ -276,8 +293,13 @@ export function orderPublic(
   };
 }
 
-/** Items with the product's current slug beside the frozen snapshot. */
-const ORDER_ITEMS_SELECT = `SELECT oi.*, p.slug AS product_slug
+/** Items with the product's current slug beside the frozen snapshot, and
+ *  whether the product is a printer (worker/lib/printerIdentity.ts — the
+ *  same catalog flag, as one correlated EXISTS instead of a second round trip). */
+export const ORDER_ITEMS_SELECT = `SELECT oi.*, p.slug AS product_slug,
+            EXISTS (SELECT 1 FROM product_catalogs pc
+                      JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                     WHERE pc.product_id = oi.product_id) AS is_printer
        FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id`;
 
 async function loadOrder(db: D1Database, orderId: string) {
@@ -344,44 +366,11 @@ function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['s
   };
 }
 
-// -------------------------------------------------- approved PRO address
-
-const collapse = (s: unknown) => String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-
-function phoneKey(raw: unknown): string {
-  const s = String(raw ?? '');
-  return normalizePhone(s) ?? s.replace(/\D+/g, '');
-}
-
-/**
- * Is the SELECTED checkout address the customer's current APPROVED default
- * PRO address (approved_addresses, 0003)? Read-only: approval/change flows
- * live in the PRO administration module. Matching normalizes harmless
- * whitespace/case and phone formats — it never mutates anything.
- * No approved row (non-PRO users, or PRO before approval) → false.
- */
-async function isApprovedDefaultAddress(
-  db: D1Database,
-  userId: string,
-  address: Record<string, unknown>
-): Promise<boolean> {
-  const approved = await db
-    .prepare(
-      `SELECT name, phone_e164, address, landmark FROM approved_addresses
-        WHERE user_id = ? AND state = 'approved'
-        ORDER BY version DESC LIMIT 1`
-    )
-    .bind(userId)
-    .first<{ name: string; phone_e164: string; address: string; landmark: string }>();
-  if (!approved) return false;
-  return (
-    collapse(address.name) === collapse(approved.name) &&
-    collapse(address.address) === collapse(approved.address) &&
-    phoneKey(address.phone) === phoneKey(approved.phone_e164)
-  );
-}
-
 // -------------------------------------------------- shared checkout compute
+//
+// The approved-default-address check and the PRO purchase context used to
+// live here; they are worker/lib/entitlements.ts `pricingTierContext` now, so
+// the product page, the cart and this checkout judge PRO with ONE function.
 
 interface CheckoutInput {
   addressId: string;
@@ -423,6 +412,10 @@ interface ComputedLine {
   warranty_snapshot: string | null;
   transport_snapshot: string | null;
   breakdown: ReturnType<typeof publicBreakdown>;
+  /** catalogs.is_printer_catalog — drives the home-delivery NOTE, never a fee. */
+  is_printer: boolean;
+  /** Which availability fee priced this line (worker/lib/pricing.ts). */
+  pricing_basis: 'direct' | 'preorder';
 }
 
 interface CheckoutComputation {
@@ -435,6 +428,25 @@ interface CheckoutComputation {
   tierStatus: TierStatus;
   atApprovedDefault: boolean;
   proContext: boolean; // PRO purchase benefits apply to THIS order
+  /** §1: the one journey every line in this cart is on. */
+  shippingType: ShippingType;
+  /** The payment ids the storefront may offer for this cart (worker/lib/paymentPolicy.ts). */
+  allowedPaymentMethods: string[];
+  /** 'direct' when the lines were priced by the direct-sale rule — a direct
+   *  cart, or a pre-order cart paid cash on delivery; 'preorder' otherwise. */
+  pricingBasis: 'direct' | 'preorder';
+  /** Whether choosing cash on delivery changes ANY line's price on this
+   *  pre-order cart (a line with a direct premium the customer would pay);
+   *  false on a direct cart, and on a pre-order cart whose lines have no
+   *  premium or whose customer is exempt from it. The screens explain the
+   *  cash rule only when this is true. */
+  codReprices: boolean;
+  /** A cash order the wallet settled in full: nothing is left to collect at
+   *  the door, so it was priced as a PREPAID pre-order (H2) — whatever button
+   *  was pressed. payment_method_id stays as sent. */
+  prepaidByWallet: boolean;
+  /** The printer home-delivery note amount (settings), or null when unset. */
+  printerNoteIqd: number | null;
   lines: ComputedLine[];
   productIds: string[];
   subtotal: number; // Σ unit_subtotal × qty (incl. commissions/warranty fees)
@@ -485,6 +497,7 @@ async function computeCheckout(
     'printerGiftConfig',
     'preorderGiftConfig',
     'shippingPolicy',
+    'printerHomeDeliveryNoteIqd',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -498,28 +511,19 @@ async function computeCheckout(
   const shippingConfig = shippingConfigFrom(settings.shippingPolicy);
 
   // Effective tier from the memberships ledger — never the client, never the
-  // legacy users.* cache.
-  const tierStatus = await getTierStatus(c.env.DB, user.id);
-
-  // CONFIRMED §6.3: PRO purchase benefits exist only at the single approved
-  // default PRO address. At any alternate address the WHOLE checkout context
-  // is ordinary (no PRO product prices, no preorder-commission waiver, no
-  // shipping waiver, no priority). Returning to the approved address restores
-  // benefits automatically — this flag is recomputed per request, never stored.
-  const atApprovedDefault =
-    tierStatus.tier === 'pro' && tierStatus.active
-      ? await isApprovedDefaultAddress(c.env.DB, user.id, address)
-      : false;
-  // Active restriction cases (§10) pause specific benefits without touching
-  // the paid membership. Granularity note: the pricing resolver applies PRO
-  // prices and the preorder-commission waiver through one flag, so gating
-  // either 'proPricing' or 'noPreorderCommission' pauses that whole pricing
-  // context; 'freeDelivery' gates only the shipping waiver below.
+  // legacy users.* cache — and the PRO purchase context judged at the address
+  // the customer SELECTED (worker/lib/entitlements.ts `pricingTierContext`,
+  // the same function the product page and the cart use at the default
+  // address): CONFIRMED §6.3, PRO purchase benefits exist only at the single
+  // approved default PRO address, and an active restriction case on
+  // 'proPricing' / 'noPreorderCommission' pauses the whole pricing context.
+  // 'freeDelivery' gates only the shipping waiver below.
+  const { tierStatus, atApprovedDefault, proContext, pricingTierActive } = await pricingTierContext(
+    c.env.DB,
+    user.id,
+    address
+  );
   const gatedBenefits = new Set(tierStatus.gated_benefits ?? []);
-  const proContext =
-    tierStatus.tier === 'pro' && tierStatus.active && atApprovedDefault &&
-    !gatedBenefits.has('proPricing') && !gatedBenefits.has('noPreorderCommission');
-  const pricingTierActive = tierStatus.tier === 'pro' ? proContext : tierStatus.active;
 
   // Load and price the cart lines server-side.
   let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
@@ -534,114 +538,202 @@ async function computeCheckout(
   const { results: rows } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
   if (rows.length === 0) throw badRequest('Your cart is empty');
 
+  // §1: the cart rule guarantees one shipping type across the lines, so the
+  // first line speaks for the cart — the same derivation POST / freezes onto
+  // the order. It decides which payment methods may be offered, and how a
+  // pre-order line is priced once the method is known.
+  const shippingType: ShippingType = cartShippingType(rows) ?? 'direct';
+  const allowedMethods = allowedPaymentMethods(shippingType);
+  // The owner's rule: pay in advance from the wallet, or cash on delivery.
+  // An id the settings still list but the policy does not accept (a
+  // half-advance) is refused with the offered list beside the refusal, so
+  // the client can repaint its choices instead of guessing. Quote mode with
+  // no id yet stays allowed and prices as prepaid.
+  if (input.paymentMethodId && !isPaymentMethodAllowed(input.paymentMethodId, shippingType)) {
+    throw badRequest(
+      'This payment method is not available for this order — pay in advance from your wallet or choose cash on delivery.',
+      PAYMENT_METHOD_NOT_ALLOWED,
+      { payment_method_id: input.paymentMethodId, allowed_payment_methods: allowedMethods, shipping_type: shippingType }
+    );
+  }
+  // «If the customer chooses Cash on Delivery, the price must follow the same
+  // pricing rules as Direct Sale.» The resolver is told how the customer pays
+  // and answers with the right availability fee; the transport method itself
+  // is untouched, so the order below is still a pre-order on its journey.
+  const requestedPricing = preorderPricingFor(input.paymentMethodId);
+  const isPreorderCart = shippingType !== 'direct';
+
   // One batched read of every product's relational structure. Options,
   // colours and the authoritative stock level all come from here — checkout
   // and the storefront cannot disagree because they read the same rows.
-  const views = await loadRelationsViews(
-    c.env.DB,
-    rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
-  );
+  const [views, printerIds] = await Promise.all([
+    loadRelationsViews(
+      c.env.DB,
+      rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
+    ),
+    // Which lines are printers (catalog flag) — for the home-delivery NOTE on
+    // the quote and the order, the printers-only warranty gate, and the
+    // printer's 12-month warranty base. One query for the whole cart; never
+    // a fee.
+    printerProductIds(c.env.DB, rows.map((r) => String(r.id))),
+  ]);
 
-  let subtotal = 0;
-  let merchandise = 0;
-  const productIds: string[] = [];
-  const lines: ComputedLine[] = [];
-  const shippingItems: ShippingItem[] = [];
-  for (const row of rows) {
-    const displayName = String(row.name_ar || row.name);
-    if (row.status !== 'active') throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
-    const view = views.get(String(row.id));
-    const sel = selectionFromCartRow(row);
-    const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
-      row,
-      sel,
-      tierStatus.tier,
-      pricingTierActive,
-      pricingCtx,
-      view
-    );
-    if (resolved.errors.length > 0) {
-      throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
-    }
-    if (selectionErrors.length > 0) {
-      throw badRequest(`"${displayName}": ${selectionErrors.join(', ')}`, 'VALIDATION');
-    }
-    const qty = Number(row.qty);
-
-    // §7: the ONE authoritative stock level for this exact selection. The base
-    // row is not consulted when the product tracks stock elsewhere, so an
-    // exhausted colour stops the order even with base stock in hand.
-    const snapshot = snapshotFrom(view ?? EMPTY_RELATIONS, {
-        stock: doc.stock,
-      reserved: Number(row.stock_reserved ?? 0),
-      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
-    });
-    // The checkout must not trust a cart row written before the cart refused
-    // incomplete selections (or one a product acquired options after): a
-    // legacy JSON-column line with no option is refused here with the same
-    // rule the cart applies, instead of being priced at the base and stored
-    // with an empty option_id.
-    refuseIncompleteSelection(
-      saleAvailability(doc, {
-        optionValueIds: sel.optionValueIds ?? [],
-        colorId: sel.colorId || null,
-        qty,
-        transportDefaults: pricingCtx.transportDefaults,
-        inventory: snapshot,
-        links: view?.links,
-        preferredType: sel.transportMethod ? 'pre_order' : null,
-      }),
-      displayName
-    );
-    const stockRes = resolveStock(snapshot, {
-      option_value_ids: sel.optionValueIds ?? [],
-      color_id: sel.colorId || null,
-    });
-    if (stockRes.error === 'VARIANT_NOT_MODELLED') {
-      throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
-    }
-    if (stockRes.available !== null && stockRes.available < qty) {
-      throw badRequest(`Only ${stockRes.available} of "${displayName}" left in stock`, 'OUT_OF_STOCK');
-    }
-    const unit = resolved.unit_subtotal_iqd;
-    const line = unit * qty;
-    subtotal += line;
-    merchandise += resolved.applied_iqd * qty;
-    productIds.push(String(row.id));
-    const facts = shippingFactsFrom(row.ops_policy);
-    shippingItems.push({ product_id: String(row.id), qty, size_class: facts.size_class, is_spool: facts.is_spool });
-    // Persisted resolver snapshot: cost fields must NEVER be stored on the
-    // order (it is served back to the buyer).
-    const { cost_iqd, ...pricingSnapshot } = resolved;
-    void cost_iqd;
-    lines.push({
-      cart_item_id: String(row.cart_item_id),
-      id: newId('oi'),
-      product_id: String(row.id),
-      option_value_ids: sel.optionValueIds ?? [],
-      stock_targets: stockRes.targets,
-      name: String(row.name),
-      name_ar: String(row.name_ar ?? ''),
-      image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
-      variant: variantLabel,
-      option_id: String(row.option_id ?? ''),
-      color_id: String(row.color_id ?? ''),
-      shipping_method_id: String(row.shipping_method_id ?? ''),
-      qty,
-      unit,
-      line,
-      applied_iqd: resolved.applied_iqd,
-      tracked: stockRes.tracked,
-      pricing_snapshot: JSON.stringify(pricingSnapshot),
-      warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
-      transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
-      breakdown: publicBreakdown(resolved),
-    });
+  interface PricedLines {
+    lines: ComputedLine[];
+    subtotal: number;
+    merchandise: number;
+    productIds: string[];
+    shippingItems: ShippingItem[];
+    /** One cart, one type, one payment method — so every line shares a basis;
+     *  reading it back off the lines keeps this true by construction. */
+    pricingBasis: 'direct' | 'preorder';
   }
 
+  /**
+   * Prices every cart line for ONE pre-order pricing basis. Pure over the rows
+   * already loaded (the resolver, the stock check and the selection guards are
+   * all synchronous), so the checkout can price the cart under the requested
+   * basis AND under the alternative — to say honestly whether cash on
+   * delivery changes the price at all, and to re-price a cash order the
+   * wallet settled in full as the prepaid order it actually is.
+   */
+  const priceLines = (preorderPricing: PreorderPricing): PricedLines => {
+    let subtotal = 0;
+    let merchandise = 0;
+    const productIds: string[] = [];
+    const lines: ComputedLine[] = [];
+    const shippingItems: ShippingItem[] = [];
+    for (const row of rows) {
+      const displayName = String(row.name_ar || row.name);
+      if (row.status !== 'active') throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
+      const view = views.get(String(row.id));
+      const sel = selectionFromCartRow(row);
+      const isPrinter = printerIds.has(String(row.id));
+      const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
+        row,
+        sel,
+        tierStatus.tier,
+        pricingTierActive,
+        pricingCtx,
+        view,
+        preorderPricing,
+        isPrinter
+      );
+      if (resolved.errors.length > 0) {
+        throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
+      }
+      if (selectionErrors.length > 0) {
+        throw badRequest(`"${displayName}": ${selectionErrors.join(', ')}`, 'VALIDATION');
+      }
+      const qty = Number(row.qty);
+
+      // §7: the ONE authoritative stock level for this exact selection. The
+      // base row is not consulted when the product tracks stock elsewhere, so
+      // an exhausted colour stops the order even with base stock in hand.
+      const snapshot = snapshotFrom(view ?? EMPTY_RELATIONS, {
+        stock: doc.stock,
+        reserved: Number(row.stock_reserved ?? 0),
+        low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+      });
+      // The checkout must not trust a cart row written before the cart refused
+      // incomplete selections (or one a product acquired options after): a
+      // legacy JSON-column line with no option is refused here with the same
+      // rule the cart applies, instead of being priced at the base and stored
+      // with an empty option_id.
+      refuseIncompleteSelection(
+        saleAvailability(doc, {
+          optionValueIds: sel.optionValueIds ?? [],
+          colorId: sel.colorId || null,
+          qty,
+          transportDefaults: pricingCtx.transportDefaults,
+          inventory: snapshot,
+          links: view?.links,
+          preferredType: sel.transportMethod ? 'pre_order' : null,
+        }),
+        displayName
+      );
+      // An extended warranty is a PRINTER's option (owner mandate). The cart
+      // already refuses it elsewhere; the checkout re-checks the stored row so
+      // a line written before the rule, or a product that left the printer
+      // catalog since, cannot buy one at the door. The order is the last
+      // moment a plan can be attached — nothing after this writes
+      // warranty_snapshot.
+      refuseNonPrinterWarranty(isPrinter, sel.warrantyPlanId, displayName);
+      const stockRes = resolveStock(snapshot, {
+        option_value_ids: sel.optionValueIds ?? [],
+        color_id: sel.colorId || null,
+      });
+      if (stockRes.error === 'VARIANT_NOT_MODELLED') {
+        throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
+      }
+      if (stockRes.available !== null && stockRes.available < qty) {
+        throw badRequest(`Only ${stockRes.available} of "${displayName}" left in stock`, 'OUT_OF_STOCK');
+      }
+      const unit = resolved.unit_subtotal_iqd;
+      const line = unit * qty;
+      subtotal += line;
+      merchandise += resolved.applied_iqd * qty;
+      productIds.push(String(row.id));
+      const facts = shippingFactsFrom(row.ops_policy);
+      shippingItems.push({ product_id: String(row.id), qty, size_class: facts.size_class, is_spool: facts.is_spool });
+      // Persisted resolver snapshot: cost fields must NEVER be stored on the
+      // order (it is served back to the buyer). It carries `direct.waived`,
+      // `transport.waived_by` and `pricing_basis`, so an invoice, a refund or
+      // an admin can later explain WHY this line's fee is what it is — a
+      // cash-on-delivery pre-order priced as a direct sale must stay legible
+      // after the cart that produced it is gone.
+      const { cost_iqd, ...pricingSnapshot } = resolved;
+      void cost_iqd;
+      lines.push({
+        cart_item_id: String(row.cart_item_id),
+        id: newId('oi'),
+        product_id: String(row.id),
+        option_value_ids: sel.optionValueIds ?? [],
+        stock_targets: stockRes.targets,
+        name: String(row.name),
+        name_ar: String(row.name_ar ?? ''),
+        image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
+        variant: variantLabel,
+        option_id: String(row.option_id ?? ''),
+        color_id: String(row.color_id ?? ''),
+        shipping_method_id: String(row.shipping_method_id ?? ''),
+        qty,
+        unit,
+        line,
+        applied_iqd: resolved.applied_iqd,
+        tracked: stockRes.tracked,
+        pricing_snapshot: JSON.stringify(pricingSnapshot),
+        warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
+        transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
+        breakdown: publicBreakdown(resolved),
+        is_printer: isPrinter,
+        pricing_basis: resolved.pricing_basis,
+      });
+    }
+    return {
+      lines,
+      subtotal,
+      merchandise,
+      productIds,
+      shippingItems,
+      pricingBasis: lines.some((l) => l.pricing_basis === 'preorder') ? 'preorder' : 'direct',
+    };
+  };
+
+  // The cart under the requested basis, and — for a pre-order cart — under
+  // the other one, so the screens can say whether cash on delivery changes a
+  // single dinar here (it does not when no line carries a direct premium, or
+  // when this customer is exempt from it).
+  let priced = priceLines(requestedPricing);
+  const prepaidPriced = isPreorderCart ? (requestedPricing === 'prepaid' ? priced : priceLines('prepaid')) : priced;
+  const codPriced = isPreorderCart ? (requestedPricing === 'cod' ? priced : priceLines('cod')) : priced;
+  const codReprices =
+    isPreorderCart && prepaidPriced.lines.some((l, i) => l.unit !== codPriced.lines[i].unit);
+
   // Independent promo path: referral free delivery — a SEPARATE policy from
-  // the PRO waiver, passed into the quote so it is never doubled.
-  const independentFreeDelivery = await referralFreeDeliveryApplies(c.env, user.id, productIds);
+  // the PRO waiver, passed into the quote so it is never doubled. The same
+  // products whichever basis priced them.
+  const independentFreeDelivery = await referralFreeDeliveryApplies(c.env, user.id, priced.productIds);
 
   // Store pickup: no last-mile delivery happens, so no delivery fees at all.
   const isPickup = delivery.id === 'pickup';
@@ -659,132 +751,179 @@ async function computeCheckout(
   const deliveryGate =
     tierStatus.tier === 'prime' ? 'primeDeliveryEligible' : 'freeDelivery';
 
-  /** `primeBasisIqd` is the §5 basis — merchandise after product discounts,
-   *  coupons AND points, before delivery — which is a different number from
-   *  the PRO rule's configurable basis. */
-  const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
-    quoteShipping({
-      items: shippingItems,
-      merchandiseIqd: basisIqd,
-      primeMerchandiseIqd: primeBasisIqd,
-      tier: tierStatus.tier,
-      tierActive: tierStatus.active && !gatedBenefits.has(deliveryGate),
-      atApprovedDefaultAddress: atApprovedDefault,
-      independentFreeDelivery,
-      // Store pickup has no last mile, so nothing to protect; the flag is
-      // dropped rather than charged for a delivery that does not happen.
-      protectedDelivery: input.protectedDelivery && !isPickup,
-      config: configForOrder,
-    });
-
-  const emptyQuote: ShippingQuote = {
-    components: [],
-    total_iqd: 0,
-    total_before_waiver_iqd: 0,
-    advance_due_iqd: 0,
-    pro_waiver_applied: false,
-    prime_waiver_applied: false,
-    waiver_source: 'none',
-    waiver_basis_iqd: merchandise,
-    needs_config: [],
-    assumptions: [],
-    reasons: ['Store pickup — no delivery fee.'],
-  };
-
-  // Pass 1 (before coupon) prices the shipping used to validate the coupon;
-  // the FINAL quote then applies the configured threshold basis.
-  let shipping = isPickup ? emptyQuote : runQuote(merchandise);
-
-  // Coupon — validated against the honest payable total (subtotal + the
-  // delivery actually charged); applied FIRST: coupon, then points, then wallet.
-  let couponDiscount = 0;
-  let couponId: string | null = null;
-  let couponSnapshot: string | null = null;
-  if (input.couponCode) {
-    const check = await validateCoupon(c.env, user.id, input.couponCode, subtotal + shipping.total_iqd);
-    if (!check.ok || !check.coupon_id) {
-      const reason = check.reason ?? 'COUPON_INVALID';
-      throw badRequest(`Coupon could not be applied (${reason})`, reason);
-    }
-    couponId = check.coupon_id;
-    couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), subtotal + shipping.total_iqd));
-    couponSnapshot = JSON.stringify({
-      coupon_id: check.coupon_id,
-      code: check.code ?? input.couponCode.toUpperCase(),
-      discount_iqd: couponDiscount,
-    });
-  }
-
   // Spendable balances only (mandate §11.1/§4.4: pending deposits and pending
   // points are NEVER spendable). getAvailableBalances is the wallet slice's
-  // frozen contract — settled minus active holds/reservations.
+  // frozen contract — settled minus active holds/reservations. Read once —
+  // the balance does not change with the pricing basis.
   const available = await getAvailableBalances(c.env, user.id);
   const walletBalanceIqd = Math.floor((available.usd_cents_available * exchangeRate) / 100);
 
-  // §4.4 redemption: "use my points" applies ALL available points, capped at
-  // the ELIGIBLE MERCHANDISE value after product/membership/coupon discounts —
-  // never delivery, never transport commissions or warranty fees, never
-  // community-store lines (community_products have no checkout path here; all
-  // cart lines come from the official `products` catalogue). The amount is
-  // EXACT: 739 available against a 75,000 basis redeems 739 IQD.
-  //
-  // Computed BEFORE the final shipping quote because the LEVO PRIME waiver is
-  // tested against merchandise after coupons AND points (product-form §5).
-  // There is no circularity: neither the coupon cap nor the points cap depends
-  // on the delivery fee.
-  const eligibleMerchandise = Math.max(0, merchandise - Math.min(couponDiscount, merchandise));
-  let pointsDiscount = 0;
-  if (input.usePoints && available.points_available > 0) {
-    pointsDiscount = capRedeemablePoints(available.points_available, eligibleMerchandise);
-  }
-
-  // Final quote with the configured threshold basis (decision row 17 default:
-  // merchandise AFTER coupon discounts, before shipping) for the PRO rule, and
-  // the after-coupon-and-points basis for the PRIME rule.
-  if (!isPickup) {
-    const basis =
-      configForOrder.threshold_basis === 'merchandise_after_coupon'
-        ? eligibleMerchandise
-        : merchandise;
-    shipping = runQuote(basis, Math.max(0, eligibleMerchandise - pointsDiscount));
-  }
-
-  const beforeDiscounts = Math.max(0, subtotal + shipping.total_iqd - couponDiscount);
-  const afterPoints = beforeDiscounts - pointsDiscount;
-
-  // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one
-  // floor at the end) at the rate in force for THIS purchase instant.
+  // §4.2 accrual rule at the rate in force for THIS purchase instant, and the
+  // §3.3 support attribution — resolved server-side, zero monetary effect.
   const ruleConfig = await getPointsRuleConfig(c.env);
   const pointsRule = resolvePointsRule(ruleConfig, new Date().toISOString());
-  const netEligible = netEligibleIqd(merchandise, couponDiscount, pointsDiscount);
-  const pointsEarnPending = pointsForEligibleIqd(netEligible, pointsRule.iqd_per_point);
-
-  // §3.3 support attribution — resolved server-side, zero monetary effect.
   const supportSnapshot = await buildSupportSnapshot(c.env, user.id, input.supportRef || null);
 
-  // Advance-payment requirements are paid from the wallet. Printer delivery
-  // fees are payable in advance (§6.3) on top of the payment method's rule.
-  let requiredAdvance = 0;
-  if (input.paymentMethodId === 'half_advance') requiredAdvance = Math.ceil(afterPoints / 2);
-  if (input.paymentMethodId === 'full_advance' || input.paymentMethodId === 'wallet') requiredAdvance = afterPoints;
-  requiredAdvance = Math.min(Math.max(requiredAdvance, shipping.advance_due_iqd), afterPoints);
+  /**
+   * Everything from the priced lines to the money due — shipping, coupon,
+   * points, wallet — for ONE pricing of the cart. Kept as a function of the
+   * priced lines so a cash order the wallet settles in full can be re-settled
+   * as the prepaid order it is, with every dependent figure (coupon minimum,
+   * PRIME waiver basis, accrual) recomputed on the price actually charged
+   * rather than patched.
+   */
+  const settle = async (p: PricedLines) => {
+    const { subtotal, merchandise, shippingItems } = p;
 
-  let walletApplied = 0;
-  if (requiredAdvance > 0 || input.useWallet) {
-    walletApplied = Math.min(walletBalanceIqd, afterPoints);
+    /** `primeBasisIqd` is the §5 basis — merchandise after product discounts,
+     *  coupons AND points, before delivery — which is a different number from
+     *  the PRO rule's configurable basis. */
+    const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
+      quoteShipping({
+        items: shippingItems,
+        merchandiseIqd: basisIqd,
+        primeMerchandiseIqd: primeBasisIqd,
+        tier: tierStatus.tier,
+        tierActive: tierStatus.active && !gatedBenefits.has(deliveryGate),
+        atApprovedDefaultAddress: atApprovedDefault,
+        independentFreeDelivery,
+        // Store pickup has no last mile, so nothing to protect; the flag is
+        // dropped rather than charged for a delivery that does not happen.
+        protectedDelivery: input.protectedDelivery && !isPickup,
+        config: configForOrder,
+      });
+
+    const emptyQuote: ShippingQuote = {
+      components: [],
+      total_iqd: 0,
+      total_before_waiver_iqd: 0,
+      advance_due_iqd: 0,
+      pro_waiver_applied: false,
+      prime_waiver_applied: false,
+      waiver_source: 'none',
+      waiver_basis_iqd: merchandise,
+      needs_config: [],
+      assumptions: [],
+      reasons: ['Store pickup — no delivery fee.'],
+    };
+
+    // Pass 1 (before coupon) prices the shipping used to validate the coupon;
+    // the FINAL quote then applies the configured threshold basis.
+    let shipping = isPickup ? emptyQuote : runQuote(merchandise);
+
+    // Coupon — validated against the honest payable total (subtotal + the
+    // delivery actually charged); applied FIRST: coupon, then points, then wallet.
+    let couponDiscount = 0;
+    let couponId: string | null = null;
+    let couponSnapshot: string | null = null;
+    if (input.couponCode) {
+      const check = await validateCoupon(c.env, user.id, input.couponCode, subtotal + shipping.total_iqd);
+      if (!check.ok || !check.coupon_id) {
+        const reason = check.reason ?? 'COUPON_INVALID';
+        throw badRequest(`Coupon could not be applied (${reason})`, reason);
+      }
+      couponId = check.coupon_id;
+      couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), subtotal + shipping.total_iqd));
+      couponSnapshot = JSON.stringify({
+        coupon_id: check.coupon_id,
+        code: check.code ?? input.couponCode.toUpperCase(),
+        discount_iqd: couponDiscount,
+      });
+    }
+
+    // §4.4 redemption: "use my points" applies ALL available points, capped at
+    // the ELIGIBLE MERCHANDISE value after product/membership/coupon discounts —
+    // never delivery, never transport commissions or warranty fees, never
+    // community-store lines (community_products have no checkout path here; all
+    // cart lines come from the official `products` catalogue). The amount is
+    // EXACT: 739 available against a 75,000 basis redeems 739 IQD.
+    //
+    // Computed BEFORE the final shipping quote because the LEVO PRIME waiver is
+    // tested against merchandise after coupons AND points (product-form §5).
+    // There is no circularity: neither the coupon cap nor the points cap depends
+    // on the delivery fee.
+    const eligibleMerchandise = Math.max(0, merchandise - Math.min(couponDiscount, merchandise));
+    let pointsDiscount = 0;
+    if (input.usePoints && available.points_available > 0) {
+      pointsDiscount = capRedeemablePoints(available.points_available, eligibleMerchandise);
+    }
+
+    // Final quote with the configured threshold basis (decision row 17 default:
+    // merchandise AFTER coupon discounts, before shipping) for the PRO rule, and
+    // the after-coupon-and-points basis for the PRIME rule.
+    if (!isPickup) {
+      const basis =
+        configForOrder.threshold_basis === 'merchandise_after_coupon'
+          ? eligibleMerchandise
+          : merchandise;
+      shipping = runQuote(basis, Math.max(0, eligibleMerchandise - pointsDiscount));
+    }
+
+    const beforeDiscounts = Math.max(0, subtotal + shipping.total_iqd - couponDiscount);
+    const afterPoints = beforeDiscounts - pointsDiscount;
+
+    // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one
+    // floor at the end).
+    const netEligible = netEligibleIqd(merchandise, couponDiscount, pointsDiscount);
+    const pointsEarnPending = pointsForEligibleIqd(netEligible, pointsRule.iqd_per_point);
+
+    // Advance-payment requirements are paid from the wallet: "pay in advance"
+    // means the whole payable total (worker/lib/paymentPolicy.ts — a half
+    // advance is refused above). Printer delivery fees are payable in advance
+    // (§6.3) on top of the payment method's rule.
+    let requiredAdvance = 0;
+    if (isPrepaid(input.paymentMethodId)) requiredAdvance = afterPoints;
+    requiredAdvance = Math.min(Math.max(requiredAdvance, shipping.advance_due_iqd), afterPoints);
+
+    let walletApplied = 0;
+    if (requiredAdvance > 0 || input.useWallet) {
+      walletApplied = Math.min(walletBalanceIqd, afterPoints);
+    }
+    if (walletApplied < requiredAdvance) {
+      throw badRequest('Insufficient wallet balance for the required advance payment', 'INSUFFICIENT_BALANCE');
+    }
+    const walletUsdCents = walletApplied > 0 ? iqdToUsdCents(walletApplied, exchangeRate) : 0;
+    if (walletUsdCents > available.usd_cents_available) {
+      // Rounding pushed us past the balance; scale back to what the balance covers.
+      walletApplied = Math.floor((available.usd_cents_available * exchangeRate) / 100);
+      if (walletApplied < requiredAdvance) throw badRequest('Insufficient wallet balance', 'INSUFFICIENT_BALANCE');
+    }
+    const finalWalletUsdCents =
+      walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
+    const dueOnDelivery = afterPoints - walletApplied;
+
+    return {
+      shipping,
+      couponId,
+      couponDiscount,
+      couponSnapshot,
+      pointsDiscount,
+      eligibleMerchandise,
+      netEligible,
+      pointsEarnPending,
+      walletApplied,
+      walletUsdCents: finalWalletUsdCents,
+      requiredAdvance,
+      totalIqd: afterPoints,
+      dueOnDelivery,
+    };
+  };
+
+  let settled = await settle(priced);
+
+  // «مدفوع مقدمًا» means nothing is left to collect at the door. A cash-on-
+  // delivery pre-order whose wallet payment settles the WHOLE total is a
+  // prepaid order whatever button was pressed, so it is re-priced under the
+  // pre-order rule — the cheaper figure, which the wallet still covers — and
+  // recorded as prepaid by wallet. payment_method_id stays as sent; the
+  // lines' pricing_basis says 'preorder'. A cash order the wallet covers only
+  // in part stays COD-priced: money is still collected at the door.
+  let prepaidByWallet = false;
+  if (isPreorderCart && isCod(input.paymentMethodId) && priced.pricingBasis === 'direct' && settled.dueOnDelivery === 0) {
+    priced = prepaidPriced;
+    settled = await settle(priced);
+    prepaidByWallet = settled.dueOnDelivery === 0;
   }
-  if (walletApplied < requiredAdvance) {
-    throw badRequest('Insufficient wallet balance for the required advance payment', 'INSUFFICIENT_BALANCE');
-  }
-  const walletUsdCents = walletApplied > 0 ? iqdToUsdCents(walletApplied, exchangeRate) : 0;
-  if (walletUsdCents > available.usd_cents_available) {
-    // Rounding pushed us past the balance; scale back to what the balance covers.
-    walletApplied = Math.floor((available.usd_cents_available * exchangeRate) / 100);
-    if (walletApplied < requiredAdvance) throw badRequest('Insufficient wallet balance', 'INSUFFICIENT_BALANCE');
-  }
-  const finalWalletUsdCents =
-    walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
-  const dueOnDelivery = afterPoints - walletApplied;
 
   const policies = await getRequiredCheckoutPolicies(c.env);
 
@@ -797,29 +936,35 @@ async function computeCheckout(
     tierStatus,
     atApprovedDefault,
     proContext,
-    lines,
-    productIds,
-    subtotal,
-    merchandise,
-    shipping,
+    shippingType,
+    allowedPaymentMethods: allowedMethods,
+    pricingBasis: priced.pricingBasis,
+    codReprices,
+    prepaidByWallet,
+    printerNoteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
+    lines: priced.lines,
+    productIds: priced.productIds,
+    subtotal: priced.subtotal,
+    merchandise: priced.merchandise,
+    shipping: settled.shipping,
     isPickup,
     independentFreeDelivery,
-    couponId,
-    couponDiscount,
-    couponSnapshot,
+    couponId: settled.couponId,
+    couponDiscount: settled.couponDiscount,
+    couponSnapshot: settled.couponSnapshot,
     pointsBalance: available.points_available,
-    pointsDiscount,
-    eligibleMerchandise,
-    netEligible,
+    pointsDiscount: settled.pointsDiscount,
+    eligibleMerchandise: settled.eligibleMerchandise,
+    netEligible: settled.netEligible,
     pointsRule,
-    pointsEarnPending,
+    pointsEarnPending: settled.pointsEarnPending,
     supportSnapshot,
     walletBalanceIqd,
-    walletApplied,
-    walletUsdCents: finalWalletUsdCents,
-    requiredAdvance,
-    totalIqd: afterPoints,
-    dueOnDelivery,
+    walletApplied: settled.walletApplied,
+    walletUsdCents: settled.walletUsdCents,
+    requiredAdvance: settled.requiredAdvance,
+    totalIqd: settled.totalIqd,
+    dueOnDelivery: settled.dueOnDelivery,
     policies,
     printerGiftConfig: settings.printerGiftConfig,
     preorderGiftConfig: settings.preorderGiftConfig,
@@ -970,6 +1115,12 @@ orderRoutes.post('/quote', async (c) => {
   return c.json({
     success: true,
     quote: {
+      /**
+       * THE PRICE AUTHORITY for the checkout screen. The cart prices a
+       * pre-order line as prepaid; these lines are priced for the payment
+       * method actually chosen, so the summary must render them — not the
+       * cart's numbers — the moment a quote exists.
+       */
       lines: comp.lines.map((l) => ({
         cart_item_id: l.cart_item_id,
         product_id: l.product_id,
@@ -979,10 +1130,41 @@ orderRoutes.post('/quote', async (c) => {
         qty: l.qty,
         unit_price_iqd: l.unit,
         line_total_iqd: l.line,
+        is_printer: l.is_printer,
         breakdown: l.breakdown,
       })),
       merchandise_iqd: comp.merchandise,
       subtotal_iqd: comp.subtotal,
+      /** §1: the journey this cart is on — unchanged by how it is paid. */
+      shipping_type: comp.shippingType,
+      /** The payment ids the storefront may offer for this cart. */
+      allowed_payment_methods: comp.allowedPaymentMethods,
+      /** 'direct' when the lines were priced by the direct-sale rule (a direct
+       *  cart, or a pre-order cart paid cash on delivery); 'preorder' when the
+       *  transport commission applies. */
+      pricing_basis: comp.pricingBasis,
+      /**
+       * Does cash on delivery change a single dinar on THIS cart? False on a
+       * direct cart, on a pre-order cart whose lines carry no direct premium
+       * (the commission stays either way), and for a customer exempt from the
+       * premium. The screen explains the cash rule only when this is true.
+       */
+      cod_reprices: comp.codReprices,
+      /**
+       * A cash order the wallet settled in full was re-priced as the PREPAID
+       * pre-order it is (nothing is collected at the door), so the lines
+       * above carry the pre-order figure. The screen says so.
+       */
+      prepaid_by_wallet: comp.prepaidByWallet,
+      /**
+       * Informational notes, never part of any total. The printer note is
+       * echoed only when a line is a printer AND a home delivery is requested
+       * (no note for store pickup) AND the owner has an amount configured.
+       */
+      notes: {
+        printer_home_delivery_iqd:
+          !comp.isPickup && comp.lines.some((l) => l.is_printer) ? comp.printerNoteIqd : null,
+      },
       shipping: comp.shipping,
       is_pickup: comp.isPickup,
       /**
@@ -1349,6 +1531,11 @@ orderRoutes.post('/', async (c) => {
   await audit(c.env.DB, user.id, 'order.create', orderId, {
     total_iqd: comp.totalIqd, wallet_applied_iqd: comp.walletApplied, points: comp.pointsDiscount,
     payment: input.paymentMethodId, coupon_iqd: comp.couponDiscount,
+    // Which availability rule priced the lines, beside the journey they are
+    // on: a pre-order paid cash on delivery reads 'direct' + 'preorder_*';
+    // one the wallet settled in full reads 'preorder' + prepaid_by_wallet.
+    pricing_basis: comp.pricingBasis, shipping_type: orderShippingType,
+    prepaid_by_wallet: comp.prepaidByWallet,
     tier: comp.tierStatus.active ? comp.tierStatus.tier : 'free',
     pro_context: comp.proContext, at_approved_default: comp.atApprovedDefault,
     shipping_iqd: shippingTotal, delivery_waived: deliveryWaived,
