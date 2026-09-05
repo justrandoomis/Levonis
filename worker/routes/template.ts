@@ -47,6 +47,7 @@ import {
   exportProduct,
   generateBlankTemplate,
   toDocBody,
+  touchesPricingStructure,
   docToEntries,
   translationBookkeeping,
   deriveSlug,
@@ -586,7 +587,8 @@ interface Analysis {
 async function analyzeTemplate(
   db: D1Database,
   text: string,
-  target?: string | null
+  target?: string | null,
+  opts: { money: boolean } = { money: true }
 ): Promise<Analysis> {
   const parsed = parseTemplate(text);
   const a: Analysis = { parsed, refs: {}, existing: null, merge: null, doc: null, validation_error: null };
@@ -611,14 +613,46 @@ async function analyzeTemplate(
   body.translation_meta = bookkeeping.translation_meta;
   try {
     const validated = validateProductDoc(body);
-    // THE OWNER'S FORM IS WHAT GETS STORED: cheapest sellable price as the
-    // base, every option and colour an increase over it (cheapestBase.ts). A
-    // file that states fixed option prices is re-expressed here — the resolved
-    // price of every option × colour × tier is unchanged — and the preview's
-    // warnings and key-by-key diff show exactly what will be written.
-    const norm = normalizeCheapestBase(validated);
-    a.doc = norm.doc;
-    merge.warnings.push(...norm.warnings);
+    a.doc = validated;
+    /**
+     * THE OWNER'S FORM IS WHAT GETS STORED: cheapest sellable price as the
+     * base, every option and colour an increase over it (cheapestBase.ts). A
+     * file that states fixed option prices is re-expressed here — the resolved
+     * price of every option × colour × tier is unchanged — and the preview's
+     * warnings and key-by-key diff show exactly what will be written.
+     *
+     * ONLY WHEN THE FILE WRITES THE ROWS. The rewrite moves the base and the
+     * option/colour rows together. A file carrying no options.N or colors.N keys
+     * leaves the stored rows alone (the relational writer does not run), so
+     * lowering the base by itself would change what every inheriting option
+     * sells for. Such a file is applied as written.
+     *
+     * AND ONLY IF THE RESULT VALIDATES. The rewrite is built to pass the
+     * write-time ladder, but the validator is the authority: a normalized
+     * document it refuses is not stored — the file is applied as written and
+     * the preview says so.
+     */
+    if (touchesPricingStructure(parsed)) {
+      const norm = normalizeCheapestBase(validated, { money: opts.money });
+      if (norm.changed.length > 0) {
+        try {
+          a.doc = validateProductDoc({
+            ...body,
+            price_iqd: norm.doc.price_iqd,
+            options: norm.doc.options,
+            colors: norm.doc.colors,
+          });
+          merge.warnings.push(...norm.warnings);
+        } catch (e) {
+          if (!(e instanceof HttpError)) throw e;
+          merge.warnings.push(
+            `لم يُعَد التعبير عن الأسعار كزيادات فوق الأرخص لأن النتيجة لا تجتاز قواعد التسعير (${e.message}) — طُبِّق الملف كما كُتب.`
+          );
+        }
+      } else {
+        merge.warnings.push(...norm.warnings);
+      }
+    }
   } catch (e) {
     if (e instanceof HttpError) a.validation_error = { message: e.message, code: e.code };
     else throw e;
@@ -873,9 +907,12 @@ async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fin
  *  but almost never intended, so it is surfaced instead of assumed. */
 function priceWarnings(doc: ProductDoc): string[] {
   const out: string[] = [];
+  // A row priced as "+N over the base" is a price too — the owner's form
+  // writes every option that way, so a base of 0 under +50,000 rows is not
+  // an unpriced product.
   const anyVariantPrice =
-    doc.options.some((o) => o.regular_price_iqd !== null) ||
-    doc.colors.some((cl) => cl.regular_price_iqd !== null);
+    doc.options.some((o) => o.regular_price_iqd !== null || (o.regular_adjust_iqd ?? null) !== null) ||
+    doc.colors.some((cl) => cl.regular_price_iqd !== null || (cl.regular_adjust_iqd ?? null) !== null);
   if (doc.price_iqd === 0 && !anyVariantPrice) {
     out.push(
       'price_iqd = 0 ولا يوجد سعر خيار/لون يستبدله — تأكد أن هذا مقصود قبل تفعيل المنتج / base price is an explicit zero and no option/colour price replaces it'
@@ -993,7 +1030,7 @@ templateRoutes.post('/parse', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
   const text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
 
-  const a = await analyzeTemplate(c.env.DB, text);
+  const a = await analyzeTemplate(c.env.DB, text, undefined, { money: canViewFinancials(c.env, c.get('user')) });
   const needsReview = [...(a.merge?.needs_review ?? a.refs.needs_review ?? [])];
   // Every error / warning / needs-review entry is returned in full — the UI
   // must be able to show ALL rejected rows with their reason (§6.1), never a
@@ -1053,7 +1090,8 @@ templateRoutes.post('/apply', async (c) => {
   // Always re-parse server-side — client-prebuilt documents are never trusted.
   // Update mode follows the template's product_id; draft mode forces a create
   // merge (a stray product_id is ignored — create means a new identity).
-  let a = await analyzeTemplate(c.env.DB, text, mode === 'update' ? undefined : null);
+  const money = canViewFinancials(c.env, c.get('user'));
+  let a = await analyzeTemplate(c.env.DB, text, mode === 'update' ? undefined : null, { money });
   if (a.parsed.errors.length > 0) {
     return c.json(
       { success: false, error: 'Template has errors — nothing was written', code: 'TEMPLATE_ERRORS', errors: a.parsed.errors },
@@ -1093,7 +1131,7 @@ templateRoutes.post('/apply', async (c) => {
     }
     if (dup && duplicateChoice === 'update_existing') {
       // Re-run the merge against the existing product (omitted-preserved).
-      a = await analyzeTemplate(c.env.DB, text, dup.id);
+      a = await analyzeTemplate(c.env.DB, text, dup.id, { money });
       if (a.parsed.errors.length > 0) {
         return c.json(
           { success: false, error: 'Template has errors — nothing was written', code: 'TEMPLATE_ERRORS', errors: a.parsed.errors },

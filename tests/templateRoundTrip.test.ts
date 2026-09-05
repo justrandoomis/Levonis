@@ -552,6 +552,36 @@ test('a signed number on the PRODUCT price is refused — there is nothing benea
   assert.match(parsed.errors[0].message, /signed value/);
 });
 
+test('a surcharge may be written with the plus the guides use — it is just the number', () => {
+  const parsed = parseTemplate(
+    'template_version=2\nname_ar=x\nprice_iqd=100000\ndirect_surcharge_iqd=+51000\n' +
+      'transports.1.method=land\ntransports.1.surcharge_iqd=+15000\ntransports.1.active=true\n'
+  );
+  assert.deepEqual(parsed.errors, []);
+  const built = validateProductDoc(toDocBody(parsed, null, { brand_id: null, catalog_ids: [] }).body);
+  assert.equal(built.direct_surcharge_iqd, 51_000);
+  assert.equal(built.preorder_transports[0].commission_iqd, 15_000);
+});
+
+test('REVIEW: the apply re-expresses prices only when the file writes the option/colour rows', async () => {
+  // A relational product's rows live in their own tables and are rewritten
+  // only when the file carries options.*/colors.* keys. A file that renames
+  // the product must not lower products.price_iqd and leave the inheriting
+  // rows behind — that would change what they sell for.
+  const { touchesPricingStructure } = await import('../worker/lib/template');
+  assert.equal(touchesPricingStructure(parseTemplate('template_version=2\nname_ar=x\nprice_iqd=1\n')), false);
+  assert.equal(touchesPricingStructure(parseTemplate('template_version=2\noptions.1.name_ar=a\n')), true);
+  assert.equal(touchesPricingStructure(parseTemplate('template_version=2\ncolors.1.name_ar=a\n')), true);
+  assert.equal(touchesPricingStructure(parseTemplate('template_version=2\noptions=__CLEAR__\n')), true);
+});
+
+test('a usage step with neither title nor body is warned about, not silently dropped', () => {
+  const parsed = parseTemplate('template_version=2\nname_ar=x\nprice_iqd=1\nusage_steps.1.kind=setup\nusage_steps.1.images=https://img.example/a.jpg\n');
+  const merge = toDocBody(parsed, null, { brand_id: null, catalog_ids: [] });
+  assert.ok(merge.warnings.some((w) => w.startsWith('usage_steps.1:')), merge.warnings.join('\n'));
+  assert.equal(validateProductDoc(merge.body).usage_guide.steps.length, 0);
+});
+
 test('the transport surcharge may be written with the word the form uses', () => {
   const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
   const text = exportProduct(doc, { includeCost: true })

@@ -78,7 +78,9 @@ pipeline**, so everything you write is applied literally.
   The base price is the CHEAPEST sellable item; options and colours are
   increases over it (`regular_adjust_iqd`, or a signed `+N` on the price
   key). A plain fixed number is still accepted and re-expressed as an
-  increase on import — the resolved prices never change.
+  increase on import — the resolved prices never change. (The rewrite runs
+  only when the file carries `options.*`/`colors.*` rows; `+N` on the price
+  line wins over an untouched `*_adjust_iqd=__NULL__` line beneath it.)
 - **التوفر حسب المنتج.** اترك `options.N.availability_type` فارغًا؛ فرق البيع
   المباشر زيادة على المنتج (`direct_surcharge_iqd`) وكل طريقة طلب مسبق زيادة
   (`transports.N.commission_iqd`، وتُقبل بكلمة الواجهة `surcharge_iqd`) —

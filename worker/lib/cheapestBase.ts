@@ -11,34 +11,46 @@
  * of whatever option the customer picks, so they need nothing here.
  *
  * WHAT THIS CHANGES AND WHAT IT NEVER CHANGES. The stored model has two ways
- * to price a row: a FIXED number that replaces the base, or an ADJUSTMENT
- * that follows it (pricing.ts, `pick`). Both resolve to a number at checkout.
- * This module re-expresses a product in the owner's form — lowest resolved
- * regular price as the base, every other regular price as an adjustment —
- * and the resolved price of EVERY option × colour × tier is identical before
- * and after (tests/cheapestBase.test.ts proves it against resolveUnitPrice).
- * It is a change of representation, not of what anyone pays.
+ * to price a row: a FIXED number that replaces the level beneath, or an
+ * ADJUSTMENT that follows it (pricing.ts, `pick`). Both resolve to a number at
+ * checkout. This module re-expresses a product in the owner's form — lowest
+ * resolved regular price as the base, every other regular price as an
+ * adjustment — and the resolved price of EVERY sellable option × colour × tier
+ * is identical before and after (tests/cheapestBase.test.ts proves it against
+ * resolveUnitPrice). It is a change of representation, not of what anyone
+ * pays.
  *
  * Only the REGULAR ladder is touched. PRIME, PRO and cost keep whatever mode
- * they have: a member price is a discount, not a surcharge, and the owner
- * did not ask for it to move.
+ * they have: a member price is a discount, not a surcharge.
+ *
+ * WHERE EACH ROW'S ANCHOR IS — the fact the whole rewrite turns on:
+ *  - An OPTION anchors on the base. When the base moves by Δ, every option
+ *    that inherited or adjusted must move by -Δ to keep its price, and a
+ *    fixed option becomes (its price − new base). Exact, always.
+ *  - A COLOUR anchors on the OPTION the customer picked (pricing.ts walks
+ *    base → option → colour). Options keep their resolved prices through the
+ *    rewrite, so on a product WITH options a colour's anchor does not move and
+ *    an inheriting or adjusting colour is left exactly as it is. A fixed
+ *    colour becomes an increase only when there is ONE number it could be an
+ *    increase to and that number is the base itself — then the write-time
+ *    validator, which measures a colour against the base, reads the same
+ *    figure the resolver charges. Otherwise it stays fixed and says why.
+ *  - On a product WITHOUT options a colour anchors on the base, and moves
+ *    with it like an option does.
  *
  * WHEN IT HOLDS BACK, AND SAYS SO:
  *  - The base is never RAISED. A base below every option is the owner's
- *    "starting from" number; raising it silently would change the listing
- *    price. It is a candidate for the minimum like everything else.
- *  - The base is not lowered below the product's own PRIME/PRO price or
- *    onto its cost: the write-time ladder (productModel priceRules) would
- *    refuse the result. A warning names the member price to fix first.
- *  - A colour's fixed price is turned into an adjustment only when there is
- *    ONE number it could be an adjustment to — no options, or options that
- *    all inherit the base. A colour on a product whose options price
- *    differently keeps its fixed price: an adjustment there would be right
- *    for one option and wrong for the rest.
+ *    "starting from" number; it is a candidate for the minimum like any row.
+ *  - The base is not lowered where the write-time ladder (productModel
+ *    priceRules) would then refuse the document: under the product's own
+ *    PRIME/PRO price, onto its cost, or under a fixed PRIME/PRO price carried
+ *    by a colour that keeps inheriting (the validator measures that colour
+ *    against the base). A warning names what to change first.
  *
  * Pure: no DB, no I/O. Used by the TXT export (so the file the owner reads is
- * in this form) and by the TXT apply (so what the file says is what is
- * stored). Idempotent: normalizing twice is the same as once.
+ * in this form) and by the TXT apply when the file carries the option or
+ * colour rows (so what the file says is what is stored — and never on a file
+ * that would leave the stored rows untouched). Idempotent.
  */
 
 import type { ColorV2, OptionV2 } from './pricing';
@@ -53,14 +65,25 @@ export interface CheapestBaseDoc {
   colors: ColorV2[];
 }
 
+export interface CheapestBaseOptions {
+  /**
+   * §11: whether the reader may see cost. When false, no warning names or
+   * implies the cost figure — an assistant admin reads these in the export's
+   * comments and in the apply preview.
+   */
+  money?: boolean;
+}
+
 export interface CheapestBaseResult<T extends CheapestBaseDoc> {
   doc: T;
   base_before: number;
   base_after: number;
   /** Rows whose REPRESENTATION changed (never their resolved price). */
   changed: string[];
-  /** Arabic-first, for the apply preview and the export's comments. */
+  /** Arabic-first, for the apply preview; colour notes are prefixed `colors.N.regular_price_iqd:` by INPUT index. */
   warnings: string[];
+  /** The same colour notes keyed by colour id, for a writer that numbers rows its own way. */
+  colorNotes: Array<{ id: string; text: string }>;
 }
 
 const iqd = (n: number): string => n.toLocaleString('en-US');
@@ -73,19 +96,31 @@ function regularOf(row: { regular_price_iqd: number | null; regular_adjust_iqd?:
   return beneath;
 }
 
+const isFixed = (row: { regular_price_iqd: number | null }): boolean =>
+  row.regular_price_iqd !== null && row.regular_price_iqd !== undefined;
+
 /** Writes a regular price as "this many dinars over the number beneath". */
 function asAdjustment<T extends { regular_price_iqd: number | null; regular_adjust_iqd?: number | null }>(row: T, over: number): T {
   return { ...row, regular_price_iqd: null, regular_adjust_iqd: over === 0 ? null : over };
 }
 
-export function normalizeCheapestBase<T extends CheapestBaseDoc>(input: T): CheapestBaseResult<T> {
+const sameShape = (row: { regular_price_iqd: number | null; regular_adjust_iqd?: number | null }, over: number): boolean =>
+  !isFixed(row) && (row.regular_adjust_iqd ?? null) === (over === 0 ? null : over);
+
+export function normalizeCheapestBase<T extends CheapestBaseDoc>(
+  input: T,
+  opts: CheapestBaseOptions = {}
+): CheapestBaseResult<T> {
+  const money = opts.money !== false;
   const base = input.price_iqd;
   const warnings: string[] = [];
+  const colorNotes: Array<{ id: string; text: string }> = [];
   const changed: string[] = [];
 
   const options = input.options ?? [];
   const colors = input.colors ?? [];
   const activeOptions = options.filter((o) => o.active !== false);
+  const hasOptions = activeOptions.length > 0;
   const activeIds = new Set(activeOptions.map((o) => o.id));
   // What every option costs TODAY — the numbers that must survive untouched.
   const optionRegular = new Map(options.map((o) => [o.id, regularOf(o, base)]));
@@ -93,84 +128,104 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(input: T): Chea
   /** The active options a colour can be bought with (its link set, else all). */
   const optionsFor = (c: ColorV2): string[] => {
     const declared = c.option_ids && c.option_ids.length > 0 ? c.option_ids : c.option_id ? [c.option_id] : [];
-    const linked = declared.filter((id) => activeIds.has(id));
-    return declared.length > 0 ? linked : [...activeIds];
+    return declared.length > 0 ? declared.filter((id) => activeIds.has(id)) : [...activeIds];
   };
+  /** What a colour's anchor resolves to, one entry per option it can go with. */
+  const anchorsOf = (c: ColorV2): number[] =>
+    hasOptions ? optionsFor(c).map((id) => optionRegular.get(id) as number) : [base];
 
   // ---- the cheapest sellable regular price -------------------------------
   const candidates: number[] = [base];
   for (const o of activeOptions) candidates.push(optionRegular.get(o.id) as number);
   for (const c of colors) {
     if (c.active === false) continue;
-    if (c.regular_price_iqd !== null && c.regular_price_iqd !== undefined) {
-      candidates.push(c.regular_price_iqd);
-      continue;
-    }
-    const anchors = activeOptions.length ? optionsFor(c).map((id) => optionRegular.get(id) as number) : [base];
+    const anchors = anchorsOf(c);
     if (anchors.length === 0) continue; // linked only to switched-off options: not sellable
-    for (const a of anchors) candidates.push(regularOf(c, a));
+    if (isFixed(c)) candidates.push(c.regular_price_iqd as number);
+    else for (const a of anchors) candidates.push(regularOf(c, a));
   }
   let newBase = Math.min(...candidates);
 
   // ---- never onto a number the ladder refuses ------------------------------
-  const memberFloor = Math.max(input.pro_price_iqd ?? 0, input.prime_price_iqd ?? 0);
-  if (newBase < base && newBase < memberFloor) {
-    const which = (input.prime_price_iqd ?? 0) >= (input.pro_price_iqd ?? 0) ? 'PRIME' : 'PRO';
-    warnings.push(
-      `price_iqd: أرخص صنف هو ${iqd(newBase)} د.ع، لكن سعر ${which} للمنتج (${iqd(memberFloor)}) أعلى منه — ` +
-        `بقي السعر الأساسي ${iqd(base)}؛ اخفض سعر ${which} أولًا ليصبح الأساسي هو الأرخص.`
-    );
-    newBase = base;
-  } else if (newBase < base && input.product_cost_iqd !== null && newBase === input.product_cost_iqd) {
-    warnings.push(
-      `price_iqd: أرخص صنف (${iqd(newBase)} د.ع) يساوي كلفة المنتج، ولا يجوز أن يساوي سعر البيع الكلفة — بقي السعر الأساسي ${iqd(base)}.`
-    );
-    newBase = base;
+  if (newBase < base) {
+    // The product's own member prices…
+    let floor = Math.max(input.pro_price_iqd ?? 0, input.prime_price_iqd ?? 0);
+    let floorName = (input.prime_price_iqd ?? 0) >= (input.pro_price_iqd ?? 0) ? 'PRIME للمنتج' : 'PRO للمنتج';
+    // …and a fixed member price on a colour that keeps following the base
+    // through an option: the validator measures it against base + its own
+    // adjustment, so lowering the base under it refuses the document.
+    if (hasOptions) {
+      for (const c of colors) {
+        if (isFixed(c)) continue;
+        const member = Math.max(c.pro_price_iqd ?? 0, c.prime_price_iqd ?? 0);
+        if (member === 0) continue;
+        const need = member - (c.regular_adjust_iqd ?? 0);
+        if (need > floor) {
+          floor = need;
+          floorName = `${(c.prime_price_iqd ?? 0) >= (c.pro_price_iqd ?? 0) ? 'PRIME' : 'PRO'} للون «${c.name_ar || c.name_en}»`;
+        }
+      }
+    }
+    if (newBase < floor) {
+      warnings.push(
+        `price_iqd: أرخص صنف هو ${iqd(newBase)} د.ع، لكن سعر ${floorName} (${iqd(floor)}) أعلى منه — ` +
+          `بقي السعر الأساسي ${iqd(base)}؛ اخفض سعر العضوية ذاك أولًا ليصبح الأساسي هو الأرخص.`
+      );
+      newBase = base;
+    } else if (input.product_cost_iqd !== null && newBase === input.product_cost_iqd) {
+      warnings.push(
+        money
+          ? `price_iqd: أرخص صنف (${iqd(newBase)} د.ع) يساوي كلفة المنتج، ولا يجوز أن يساوي سعر البيع الكلفة — بقي السعر الأساسي ${iqd(base)}.`
+          : `price_iqd: تعذّر جعل الأساسي هو الأرخص (${iqd(newBase)} د.ع) بسبب قاعدة تسعير داخلية — بقي السعر الأساسي ${iqd(base)}؛ يراجعها مدير مالي.`
+      );
+      newBase = base;
+    }
   }
 
   // ---- options: every one becomes "so much over the base" ----------------
   const nextOptions = options.map((o, i) => {
-    const resolved = optionRegular.get(o.id) as number;
-    const over = resolved - newBase;
-    const already =
-      (o.regular_price_iqd === null || o.regular_price_iqd === undefined) &&
-      ((o.regular_adjust_iqd ?? null) === (over === 0 ? null : over));
-    if (already) return o;
+    const over = (optionRegular.get(o.id) as number) - newBase;
+    if (sameShape(o, over)) return o;
     changed.push(`options.${i + 1}.regular_price_iqd`);
     return asAdjustment(o, over);
   });
 
-  // ---- colours: an adjustment only when there is one number to adjust ----
-  // The anchor of a colour is the option the customer picked. Only when every
-  // option it can be bought with inherits the base — or there are no options
-  // — is that anchor a single known number (the base itself).
+  // ---- colours -----------------------------------------------------------
+  const note = (i: number, c: ColorV2, text: string) => {
+    warnings.push(`colors.${i + 1}.regular_price_iqd: ${text}`);
+    colorNotes.push({ id: c.id, text });
+  };
   const nextColors = colors.map((c, i) => {
-    const anchorsResolved = activeOptions.length
-      ? optionsFor(c).map((id) => optionRegular.get(id) as number)
-      : [base];
-    const singleAnchor = anchorsResolved.length > 0 && anchorsResolved.every((a) => a === anchorsResolved[0]);
-    const anchorIsBase = singleAnchor && anchorsResolved[0] === base;
-    if (c.regular_price_iqd !== null && c.regular_price_iqd !== undefined) {
-      if (!anchorIsBase) {
-        if (!singleAnchor) {
-          warnings.push(
-            `colors.${i + 1}.regular_price_iqd: أُبقي سعر اللون «${c.name_ar || c.name_en}» ثابتًا (${iqd(c.regular_price_iqd)}) ` +
-              'لأن الخيارات التي يتوفر لها تختلف في السعر، فلا توجد زيادة واحدة تعبّر عنه.'
-          );
-        }
-        return c;
-      }
+    const name = c.name_ar || c.name_en;
+    if (!hasOptions) {
+      // Anchored on the base, which may just have moved: keep the price.
+      const over = regularOf(c, base) - newBase;
+      if (sameShape(c, over)) return c;
       changed.push(`colors.${i + 1}.regular_price_iqd`);
-      return asAdjustment(c, c.regular_price_iqd - newBase);
+      return asAdjustment(c, over);
     }
-    // Inheriting or adjusting FROM THE BASE: keep the same resolved number
-    // when the base moved beneath it.
-    if (anchorIsBase && newBase !== base) {
-      const resolved = regularOf(c, base);
-      changed.push(`colors.${i + 1}.regular_adjust_iqd`);
-      return asAdjustment(c, resolved - newBase);
+    // Anchored on the option the customer picks — unchanged by the rewrite.
+    if (!isFixed(c)) return c;
+    const anchors = anchorsOf(c);
+    const fixed = c.regular_price_iqd as number;
+    if (anchors.length === 0) {
+      note(i, c, `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأنه لا يتوفر لأي خيار فعّال، فلا شيء يُقاس الفرق عنه.`);
+      return c;
     }
-    return c;
+    if (!anchors.every((a) => a === anchors[0])) {
+      note(i, c, `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن الخيارات التي يتوفر لها تختلف في السعر، فلا توجد زيادة واحدة تعبّر عنه.`);
+      return c;
+    }
+    if (anchors[0] !== newBase) {
+      note(
+        i, c,
+        `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن الخيار الذي يتوفر له يُسعَّر فوق الأساسي (${iqd(anchors[0])})؛ ` +
+          'زيادة اللون تُقاس عند التحقق من السعر الأساسي، فرقم ثابت هنا هو الصادق.'
+      );
+      return c;
+    }
+    changed.push(`colors.${i + 1}.regular_price_iqd`);
+    return asAdjustment(c, fixed - anchors[0]);
   });
 
   if (newBase !== base) changed.unshift('price_iqd');
@@ -183,5 +238,5 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(input: T): Chea
         : `${rows} من أسعار الخيارات/الألوان الثابتة أُعيد التعبير عنها كزيادة فوق السعر الأساسي — ما يدفعه الزبون لم يتغير.`
     );
   }
-  return { doc, base_before: base, base_after: newBase, changed, warnings };
+  return { doc, base_before: base, base_after: newBase, changed, warnings, colorNotes };
 }

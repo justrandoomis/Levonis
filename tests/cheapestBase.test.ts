@@ -42,12 +42,14 @@ function product(base: number, options: OptionV2[], colors: ColorV2[] = [], extr
 /**
  * Every price the shop could ever charge for this product, as one table.
  *
- * SELLABLE selections only, as the cart defines them (productRelations.ts
- * validateSelection): a product with an active option group demands a
- * choice (OPTION_GROUP_REQUIRED) and one with active colours demands a
- * colour (COLOR_REQUIRED). "No option" on a product that has options is not
- * a line anyone can buy — its number IS the base, and moving the base is
- * the whole point.
+ * SELLABLE selections only, as the relational cart defines them
+ * (productRelations.ts validateSelection): a product with an active option
+ * group demands a choice (OPTION_GROUP_REQUIRED) and one with active colours
+ * demands a colour (COLOR_REQUIRED). "No option" on a product that has
+ * options is not a line anyone can buy — its number IS the base, and moving
+ * the base is the whole point. (A legacy JSON-column product's cart path
+ * does not enforce the choice; the apply therefore only re-expresses a
+ * product when the file itself rewrites its option/colour rows.)
  */
 function everyPrice(p: Doc) {
   const out: Record<string, unknown> = {};
@@ -195,9 +197,71 @@ test('a colour linked only to some options is measured against those options', (
   // fixed 65,000 could be "+5,000 over b" — but b is not the base, and an
   // adjustment is written against the base in validation; it stays fixed.
   const before = product(50_000, [opt('a'), opt('b', { regular_adjust_iqd: 10_000 })], [col('k', { regular_price_iqd: 65_000 }, { option_ids: ['b'] })]);
-  const { doc } = normalizeCheapestBase(before);
+  const { doc, warnings } = normalizeCheapestBase(before);
   assert.equal(doc.colors[0].regular_price_iqd, 65_000);
+  assert.ok(warnings.some((w) => w.startsWith('colors.1.regular_price_iqd:') && w.includes('فوق الأساسي')), warnings.join('\n'));
   assertSamePrices(before, doc);
+});
+
+// ---- the review's three counter-examples: a colour anchors on the OPTION, not the base
+
+test('REVIEW: when the base moves under inheriting options, colours on them are left alone', () => {
+  // base 60,000; a and b inherit; colour k FIXED 50,000 sets the new base;
+  // colour m inherits. After: a and b are +10,000 (still 60,000), k must be
+  // -10,000 relative to the OPTION (still 50,000) and m must not move at all.
+  const before = product(60_000, [opt('a'), opt('b')], [col('k', { regular_price_iqd: 50_000 }), col('m')]);
+  const { doc, base_after } = normalizeCheapestBase(before);
+  assert.equal(base_after, 50_000);
+  assertSamePrices(before, doc);
+  const [k, m] = doc.colors;
+  assert.equal(m.regular_price_iqd, null);
+  assert.equal(m.regular_adjust_iqd ?? null, null, 'an inheriting colour on a product with options is untouched');
+  assert.equal(k.regular_price_iqd, 50_000, 'k stays fixed: its anchor (60,000) is not the new base');
+});
+
+test('REVIEW: a colour linked to one inheriting option keeps its price when the base moves', () => {
+  const before = product(50_000, [opt('o0'), opt('o1', { regular_price_iqd: 40_000 }), opt('o2', { regular_price_iqd: 60_000 })],
+    [col('c0', { regular_price_iqd: 55_000 }, { option_id: 'o0' })]);
+  const { doc, base_after } = normalizeCheapestBase(before);
+  assert.equal(base_after, 40_000);
+  assertSamePrices(before, doc);
+});
+
+test('REVIEW: adjusting colours on an inheriting option are not double-shifted', () => {
+  const before = product(60_000, [opt('a')], [col('k', { regular_adjust_iqd: -5_000 }), col('m', { regular_adjust_iqd: 2_000 }), col('z', { regular_price_iqd: 40_000 })]);
+  const { doc } = normalizeCheapestBase(before);
+  assertSamePrices(before, doc);
+  assert.equal(doc.colors[0].regular_adjust_iqd, -5_000);
+  assert.equal(doc.colors[1].regular_adjust_iqd, 2_000);
+});
+
+test('REVIEW: a fixed PRIME/PRO on an inheriting colour floors the base — the validator measures it against the base', () => {
+  // base 60,000; a FIXED 50,000; b inherits; colour k inherits regular with
+  // PRO 58,000. Lowering the base to 50,000 would make the validator refuse
+  // k (PRO 58,000 > 50,000), so the base stays and the file says why.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 }), opt('b')], [col('k', { pro_price_iqd: 58_000 })]);
+  assert.doesNotThrow(() => validateProductDoc(asBody(before)));
+  const { doc, base_after, warnings } = normalizeCheapestBase(before);
+  assert.equal(base_after, 60_000);
+  assert.ok(warnings.some((w) => w.includes('PRO للون')), warnings.join('\n'));
+  assertSamePrices(before, doc);
+  assert.doesNotThrow(() => validateProductDoc(asBody(doc)), 'what is written still validates');
+});
+
+test('a colour that no active option offers is kept, and told that — not that "the options differ"', () => {
+  const before = product(50_000, [opt('a'), opt('b', {}, { active: false })], [col('k', { regular_price_iqd: 55_000 }, { option_ids: ['b'] })]);
+  const { doc, warnings } = normalizeCheapestBase(before);
+  assert.equal(doc.colors[0].regular_price_iqd, 55_000);
+  assert.ok(warnings.some((w) => w.includes('لا يتوفر لأي خيار فعّال')), warnings.join('\n'));
+});
+
+test('§11: an assistant admin is not told the cost through the "equals the cost" warning', () => {
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [], { product_cost_iqd: 50_000 });
+  const forOwner = normalizeCheapestBase(before, { money: true });
+  const forAssistant = normalizeCheapestBase(before, { money: false });
+  assert.ok(forOwner.warnings.some((w) => w.includes('كلفة')));
+  assert.ok(!forAssistant.warnings.some((w) => w.includes('كلفة') || w.includes('50,000 د.ع) يساوي')), forAssistant.warnings.join('\n'));
+  assert.equal(forAssistant.base_after, 60_000, 'same decision, different words');
 });
 
 // -------------------------------------------------- the validator's half

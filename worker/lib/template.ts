@@ -73,6 +73,12 @@ export interface FieldSpec {
   adjustKey?: string;
   /** Import-only synonym: the value is written to THIS key of the item. */
   aliasOf?: string;
+  /**
+   * A surcharge field: the guides call it «زيادة», so `+51000` is the natural
+   * way to write it. The plus sign is accepted and means nothing more than
+   * the number (there is no adjustment twin to route to).
+   */
+  plusIsPlain?: boolean;
 }
 
 export interface GroupSpec {
@@ -169,7 +175,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // Real money on a direct line, added on top of the price. Exporting a file
   // that showed a price the customer never pays was the quiet half of the
   // owner's complaint about the numbers in the export.
-  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون (لا تُعفى بالعضوية)؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX }),
+  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون (لا تُعفى بالعضوية)؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
   // usage guide — the steps are the `usage_steps` group below
   f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
@@ -181,10 +187,10 @@ const GROUP_SPECS: GroupSpec[] = [
     titleAr: 'شحن الطلب المسبق', titleEn: 'Pre-order transports',
     fields: [
       f('method', 'enum', 'transports', 'air | sea | land — طريقة الطلب المسبق؛ زيادتها تُضاف فوق سعر الخيار/اللون المختار وتُعفى لأعضاء PRO الفعالين', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
-      f('commission_iqd', 'iqd', 'transports', 'الزيادة بالدينار فوق السعر عند الطلب المسبق بهذه الطريقة (البري مثلًا) — __NULL__ = القيمة الافتراضية من الإعدادات', { nullable: true, min: 0, max: IQD_MAX }),
+      f('commission_iqd', 'iqd', 'transports', 'الزيادة بالدينار فوق السعر عند الطلب المسبق بهذه الطريقة (البري مثلًا) — __NULL__ = القيمة الافتراضية من الإعدادات', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
       // The form calls this number «الزيادة بالدينار». The file accepts that
       // word too, so the owner can write what the screen says.
-      f('surcharge_iqd', 'iqd', 'transports', 'مرادف لـ commission_iqd بكلمة الواجهة: الزيادة بالدينار لهذه الطريقة — import-only, never exported; يتقدّم على commission_iqd إذا وُجد الاثنان', { nullable: true, min: 0, max: IQD_MAX, exported: false, aliasOf: 'commission_iqd' }),
+      f('surcharge_iqd', 'iqd', 'transports', 'مرادف لـ commission_iqd بكلمة الواجهة: الزيادة بالدينار لهذه الطريقة — import-only, never exported; يتقدّم على commission_iqd إذا وُجد الاثنان', { nullable: true, min: 0, max: IQD_MAX, exported: false, aliasOf: 'commission_iqd', plusIsPlain: true }),
       f('active', 'bool', 'transports', 'معروض للزبائن — offered to customers'),
     ],
   },
@@ -335,7 +341,7 @@ const GROUP_SPECS: GroupSpec[] = [
       f('terms_ckb', 'text', 'warranty', 'مەرجەکان بە کوردی', { lang: 'ckb' }),
       f('duration_months', 'int', 'warranty', 'مدة الضمان بالأشهر 1..240', { required: true, min: 1, max: 240 }),
       f('duration_kind', 'enum', 'warranty', 'total (المدة الكلية) | extension (تمديد فوق ضمان المصنع)', { enumValues: ['total', 'extension'] as const }),
-      f('fee_iqd', 'iqd', 'warranty', 'رسم الضمان بالدينار — يُضاف على السعر ولا يُعفى أبداً بالعضوية; 0 = مجاني صراحةً', { required: true, min: 0, max: IQD_MAX }),
+      f('fee_iqd', 'iqd', 'warranty', 'رسم الضمان بالدينار — يُضاف على السعر ولا يُعفى أبداً بالعضوية; 0 = مجاني صراحةً', { required: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
       f('active', 'bool', 'warranty', 'معروضة — offered'),
     ],
   },
@@ -481,6 +487,9 @@ function coerce(
       // level beneath («زيادة فوق السعر»), routed to the adjustment twin. On
       // any other price it is refused rather than read as a price: the sign
       // says the writer meant a difference, and there is nothing to differ from.
+      // A surcharge written as `+51000`: the sign only says what the field
+      // already is, so it is dropped rather than refused.
+      if (spec.plusIsPlain && /^\+\d+$/.test(raw)) raw = raw.slice(1);
       if (/^[+-]\d+$/.test(raw)) {
         if (spec.adjustKey) {
           const n = parseInt(raw, 10);
@@ -1248,7 +1257,7 @@ function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> 
  * way.
  */
 export function exportProduct(input: ProductDoc, opts: ExportOpts = {}): string {
-  const norm = normalizeCheapestBase(input);
+  const norm = normalizeCheapestBase(input, { money: opts.includeCost !== false });
   const doc = norm.doc;
   const lines: string[] = [
     '# قالب منتج ليفونيس — الإصدار 2 / Levonis product template, version 2',
@@ -1285,8 +1294,19 @@ export function exportProduct(input: ProductDoc, opts: ExportOpts = {}): string 
     beside('price_iqd', 'أسعار ثابتة للخيارات/الألوان في المخزن تظهر هنا كزيادات فوق الأساسي؛ إعادة الاستيراد تُخزّنها هكذا وما يدفعه الزبون لا يتغير.');
   }
   for (const w of norm.warnings) {
-    const m = /^([a-z_]+(?:\.\d+\.[a-z_]+)?):\s*/.exec(w);
-    if (m) beside(m[1], w.slice(m[0].length));
+    if (w.startsWith('price_iqd: ')) beside('price_iqd', w.slice('price_iqd: '.length));
+  }
+  // Colour notes are keyed by id: the file numbers colours in ITS order
+  // (order, then id — the same sort docToEntries uses), which is not
+  // necessarily the order the document listed them in.
+  const colorIndex = new Map(
+    [...doc.colors]
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)))
+      .map((c, i) => [c.id, i + 1])
+  );
+  for (const n of norm.colorNotes) {
+    const i = colorIndex.get(n.id);
+    if (i) beside(`colors.${i}.regular_price_iqd`, n.text);
   }
   let currentSection = '';
   const sectionOf = (key: string): string => {
@@ -1404,6 +1424,20 @@ export function generateBlankTemplate(): string {
   }
   lines.push('');
   return lines.join('\n');
+}
+
+/**
+ * Does this file WRITE the option or colour rows? Only then may the apply
+ * re-express the product's prices (cheapestBase.ts): the rewrite moves the
+ * base AND rewrites the rows relative to it, and a file that carries no rows
+ * leaves the stored rows untouched — lowering the base alone would change
+ * what every inheriting option sells for. The same test the apply route uses
+ * to decide whether the relational writer runs.
+ */
+export function touchesPricingStructure(parsed: ParsedTemplate): boolean {
+  return (['options', 'colors'] as const).some(
+    (g) => (parsed.groups[g]?.length ?? 0) > 0 || !!parsed.groupClears[g]
+  );
 }
 
 // ---------------------------------------------------------------- to doc body
@@ -1865,6 +1899,17 @@ export function toDocBody(
           });
         }
         delete target.option_index;
+      });
+    }
+    if (nested) {
+      // upgradeUsageGuide keeps a step only when it has a title or a body;
+      // one that has neither would vanish without a word.
+      templateItems.forEach((it, i) => {
+        const built = items[i];
+        const has = (k: string) => typeof built?.[k] === 'string' && (built[k] as string).trim() !== '';
+        if (built && !has('title') && !has('body')) {
+          result.warnings.push(`usage_steps.${it.index}: الخطوة بلا عنوان ولا شرح فلن تُحفَظ — أضف title أو body`);
+        }
       });
     }
     writeItems(items);
