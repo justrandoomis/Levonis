@@ -61,6 +61,7 @@ test('restriction allowlists cover the mandated shapes', () => {
   assert.deepEqual(
     [...RESTRICTABLE_BENEFITS].sort(),
     [
+      'exclusiveCoupons',
       'exclusiveSections',
       'freeDelivery',
       'merchantProfile',

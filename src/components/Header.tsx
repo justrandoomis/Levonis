@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Check, Globe, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import { tierLabel, tierMetaFor } from './subscription/tierMeta';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { Anchored } from './ui/Overlay';
@@ -24,6 +25,10 @@ export default function Header() {
     (user.subscription_expiry === 0 || user.subscription_expiry > now)
       ? user.membership_tier
       : 'free';
+  // The tier's own colours, from the one table every surface reads — PRIME is
+  // gold here as everywhere else, not PLUS green (it used to be a pro/else
+  // test on the hex values).
+  const tierMeta = tierMetaFor(subTier);
 
 
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -189,11 +194,11 @@ export default function Header() {
               subTier !== 'free' ? 'p-[1.5px]' : 'border border-zinc-800/60'
             }`}
           >
-            {subTier !== 'free' && (
-              <div 
+            {tierMeta && (
+              <div
                 className="absolute top-1/2 left-1/2 w-[300%] h-[300%] -translate-x-1/2 -translate-y-1/2 animate-spin pointer-events-none"
-                style={{ 
-                  backgroundImage: subTier === 'pro' ? 'conic-gradient(from 0deg, transparent 70%, #7f1d1d 85%, #B03142 100%)' : 'conic-gradient(from 0deg, transparent 70%, var(--color-olive-light) 85%, #59A846 100%)',
+                style={{
+                  backgroundImage: `conic-gradient(from 0deg, transparent 70%, ${tierMeta.accentDeep} 85%, ${tierMeta.hex} 100%)`,
                   animationDuration: '3s'
                 }}
               />
@@ -207,9 +212,9 @@ export default function Header() {
               <span className={`text-[13px] tracking-wide capitalize ${
                 subTier !== 'free' ? 'text-white font-bold' : 'text-zinc-300 font-medium'
               }`}>
-                {subTier}
+                {subTier === 'free' ? subTier : tierLabel(subTier)}
               </span>
-              {subTier !== 'free' && <Check className={`w-4 h-4 ${subTier === 'pro' ? 'text-[#B03142]' : 'text-[#59A846]'}`} strokeWidth={3} />}
+              {tierMeta && <Check className="w-4 h-4" style={{ color: tierMeta.hex }} strokeWidth={3} aria-hidden="true" />}
             </div>
           </Link>
         </div>
@@ -253,18 +258,16 @@ export default function Header() {
 
       {/* Subscription-based border line when scrolled */}
       <div className={`absolute bottom-0 left-0 right-0 h-[2px] w-full overflow-hidden transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>
-         {subTier === 'free' ? (
+         {!tierMeta ? (
            <div className="w-full h-full bg-zinc-800/80" />
          ) : (
-           <div 
-             className="w-[200%] h-full" 
-             style={{ 
-               background: subTier === 'pro'
-                 ? 'linear-gradient(to right, #ff0000, #ff4d4d, #B03142, #7f1d1d, #B03142, #ff4d4d, #ff0000)'
-                 : 'linear-gradient(to right, #59A846, #a3e635, var(--color-olive-light), var(--color-olive), var(--color-olive-light), #a3e635, #59A846)',
+           <div
+             className="w-[200%] h-full"
+             style={{
+               background: `linear-gradient(to right, ${tierMeta.hex}, ${tierMeta.accentLight}, ${tierMeta.accentDeep}, ${tierMeta.hex}, ${tierMeta.accentDeep}, ${tierMeta.accentLight}, ${tierMeta.hex})`,
                backgroundSize: '50% 100%',
                animation: 'rainbow 3s linear infinite'
-             }} 
+             }}
            />
          )}
       </div>

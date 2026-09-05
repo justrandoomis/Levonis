@@ -10,8 +10,10 @@
  */
 
 import type { Env } from './types';
+import { printerProductIds } from './printerIdentity';
 import { getSetting } from './settings';
-import { getLaunchConfig, getTierStatus } from './entitlements';
+import { benefits, getLaunchConfig, getTierStatus } from './entitlements';
+import { TIER_RANK } from './pricing';
 import { newId } from './crypto';
 import { audit } from './audit';
 import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
@@ -40,18 +42,15 @@ function isUniqueViolation(e: unknown): boolean {
 
 /** True when any of the order's items belongs to a printer catalog. */
 async function orderHasPrinterProduct(db: D1Database, orderId: string): Promise<boolean> {
-  const hit = await db
-    .prepare(
-      `SELECT 1 AS x
-         FROM order_items oi
-         JOIN product_catalogs pc ON pc.product_id = oi.product_id
-         JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-        WHERE oi.order_id = ?
-        LIMIT 1`
-    )
+  // "Is this a printer" is answered in one place (worker/lib/printerIdentity.ts)
+  // so the gift, the reviews reward, the home-delivery note and the extended
+  // warranty can never disagree about which products are printers.
+  const { results } = await db
+    .prepare('SELECT DISTINCT product_id FROM order_items WHERE order_id = ?')
     .bind(orderId)
-    .first();
-  return !!hit;
+    .all<{ product_id: string }>();
+  const printers = await printerProductIds(db, results.map((r) => r.product_id));
+  return printers.size > 0;
 }
 
 /**
@@ -59,6 +58,13 @@ async function orderHasPrinterProduct(db: D1Database, orderId: string): Promise<
  * (mandate §8.2), when printerGiftConfig.enabled and the order contains a
  * product from a printer catalog. Safe to call multiple times per order.
  * Returns the membership id when a grant happened, else null.
+ *
+ * ONE MEMBERSHIP AT A TIME (migration 0052): an account that already holds a
+ * live membership — active or reserved for the launch — cannot receive a
+ * second live row, so the gift is NOT written for it; the skip is audited
+ * (`membership.gift_skipped`) so an admin can see it and comp the account by
+ * hand if that is wanted. A gift's `credit_basis_iqd` is 0: it is worth
+ * nothing toward a later paid upgrade.
  */
 export async function grantPrinterGiftIfEligible(env: Env, orderId: string): Promise<string | null> {
   const cfg = await getSetting(env.DB, 'printerGiftConfig');
@@ -82,11 +88,36 @@ export async function grantPrinterGiftIfEligible(env: Env, orderId: string): Pro
   const launch = await getLaunchConfig(env.DB);
   const nowIso = new Date().toISOString();
   const id = `gift_${orderId}`;
+  const skipped = async (live: { id: string; tier: string; state: string } | null) => {
+    await audit(env.DB, null, 'membership.gift_skipped', orderId, {
+      user_id: order.user_id,
+      plan_id: plan.id,
+      reason: 'account already holds a live membership',
+      live,
+    });
+    return null;
+  };
+  // Already granted for this order → a quiet no-op, exactly as before. This
+  // comes BEFORE the live-row check: the live row a replay would find is the
+  // gift itself, and that is not a skip worth an audit entry.
+  const granted = await env.DB.prepare('SELECT id FROM memberships WHERE id = ?').bind(id).first();
+  if (granted) return null;
+  const live = await env.DB
+    .prepare("SELECT id, tier, state FROM memberships WHERE user_id = ? AND state IN ('active','prepaid_pending_launch') LIMIT 1")
+    .bind(order.user_id)
+    .first<{ id: string; tier: string; state: string }>();
+  if (live) return skipped(live);
   try {
+    // The state is decided inside the statement: a live row that appeared
+    // since the SELECT above turns it into 'conflict', which the CHECK refuses
+    // — the same guard the purchase path uses (routes/memberships.ts).
     await env.DB.prepare(
       `INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months,
-         price_paid_iqd, starts_at, expires_at, source, source_ref)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'gift_printer', ?)`
+         price_paid_iqd, credit_basis_iqd, credit_applied_iqd, starts_at, expires_at, source, source_ref)
+       SELECT ?1, ?2, ?3, ?4,
+         CASE WHEN EXISTS (SELECT 1 FROM memberships l WHERE l.user_id = ?2 AND l.state IN ('active','prepaid_pending_launch'))
+              THEN 'conflict' ELSE ?5 END,
+         ?6, 0, 0, 0, ?7, ?8, 'gift_printer', ?9`
     )
       .bind(
         id,
@@ -101,6 +132,14 @@ export async function grantPrinterGiftIfEligible(env: Env, orderId: string): Pro
       )
       .run();
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if ((msg.includes('UNIQUE') && msg.includes('memberships.user_id')) || (msg.includes('CHECK') && msg.includes('state IN'))) {
+      const now = await env.DB
+        .prepare("SELECT id, tier, state FROM memberships WHERE user_id = ? AND state IN ('active','prepaid_pending_launch') LIMIT 1")
+        .bind(order.user_id)
+        .first<{ id: string; tier: string; state: string }>();
+      return skipped(now);
+    }
     if (isUniqueViolation(e)) return null; // already granted for this order
     throw e;
   }
@@ -287,13 +326,20 @@ export async function validateCoupon(env: Env, userId: string, code: string, tot
   if (coupon.tier_required) {
     // Server-side tier check — never a client-supplied flag.
     //
-    // A LADDER, not an equality test. This compared tiers by name, which
-    // meant a PRIME member — the TOP tier — was refused a discount every PRO
-    // member got, because `status.tier === 'pro'` is false for them. A higher
-    // tier satisfies every requirement below it, which is what "higher" means.
+    // A LADDER, not an equality test: a higher tier satisfies every
+    // requirement below it. The ladder is pricing.TIER_RANK (pro > prime >
+    // plus) — the SAME order the price resolver and getTierStatus use — so a
+    // PRO member can use a PRIME-required coupon and a PRIME member a
+    // PLUS-required one. (This used to carry its own private ranking with
+    // prime above pro, which refused PRO members the PRIME coupons.)
+    //
+    // And it goes through benefits.exclusiveCoupons first, so an admin's
+    // restriction case gating 'exclusiveCoupons' actually pauses the coupons
+    // instead of being a flag nothing reads.
     const status = await getTierStatus(env.DB, userId);
-    const rank: Record<string, number> = { free: 0, plus: 1, pro: 2, prime: 3 };
-    const tierOk = status.active && (rank[status.tier] ?? 0) >= (rank[coupon.tier_required] ?? 99);
+    const tierOk =
+      benefits.exclusiveCoupons(status) &&
+      (TIER_RANK[status.tier] ?? 0) >= (TIER_RANK[coupon.tier_required] ?? Number.POSITIVE_INFINITY);
     if (!tierOk) return { ok: false, reason: 'TIER_REQUIRED' };
   }
 

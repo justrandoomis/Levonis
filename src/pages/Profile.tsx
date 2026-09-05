@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
+import { tierLabel } from '../components/subscription/tierMeta';
 import { useNavigate } from 'react-router-dom';
 import {
   Headset, Settings, MapPin, QrCode, Store,
@@ -321,7 +322,7 @@ export default function Profile() {
                   <>
                     {memTier !== 'free' ? (
                       <button type="button" onClick={() => navigate('/subscription')} className="bg-[#ebd197] text-[#5c3e03] text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-1 font-bold shadow-sm hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity">
-                        <span>{memTier === 'pro' ? loc('عضو PRO', 'PRO Member', 'ئەندامی PRO') : loc('عضو PLUS', 'PLUS Member', 'ئەندامی PLUS')}</span>
+                        <span>{loc(`عضو ${tierLabel(memTier)}`, `${tierLabel(memTier)} Member`, `ئەندامی ${tierLabel(memTier)}`)}</span>
                         {memExpiry && (
                           <span className="font-medium opacity-80">· {loc('حتى', 'until', 'تا')} {fmtDate(memExpiry)}</span>
                         )}
@@ -333,7 +334,7 @@ export default function Profile() {
                     )}
                     {memPendingLaunch && (
                       <button type="button" onClick={() => navigate('/subscription')} className="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity">
-                        <span>{(memPendingLaunch.tier === 'pro' ? 'PRO' : 'PLUS') + ' — ' + t('pendingLaunch')}</span>
+                        <span>{tierLabel(memPendingLaunch.tier) + ' — ' + t('pendingLaunch')}</span>
                       </button>
                     )}
                     <button type="button" onClick={() => navigate('/followed-stores')} className="bg-white/50 dark:bg-black/30 backdrop-blur-sm text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-1 font-medium shadow-sm text-black dark:text-white hover:bg-white/70 dark:hover:bg-black/50 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors">

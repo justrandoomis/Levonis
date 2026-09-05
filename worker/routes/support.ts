@@ -69,6 +69,7 @@ export const RESTRICTABLE_BENEFITS = [
   'merchantProfile',
   'exclusiveSections',
   'verifiedMerchant',
+  'exclusiveCoupons',
 ] as const;
 
 export const RESTRICTION_CASE_TYPES = [

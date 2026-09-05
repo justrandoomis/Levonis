@@ -25,6 +25,7 @@ import { Hono } from 'hono';
 import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
+import { classifyHost } from '../worker/lib/hosts';
 import { membershipsRoutes } from '../worker/routes/memberships';
 
 function setup(launched = true) {
@@ -50,13 +51,19 @@ function app(db: D1Database, role = 'admin') {
   const a = new Hono<AppContext>();
   a.use('*', async (c, next) => {
     c.set('user', { id: 'boss', role } as never);
+    // The admin routes are main-host only (worker/index.ts sets this per request).
+    c.set('host', classifyHost('levonis-iq.com', 'levonis-iq.com'));
     c.env = { DB: db } as never;
     await next();
   });
   a.route('/api/memberships', membershipsRoutes);
   a.onError((err, c) => {
     if (err instanceof HttpError) {
-      return c.json({ success: false, error: err.message, code: err.code }, err.status as 400);
+      // Mirrors worker/index.ts: a refusal's machine-readable context travels with it.
+      return c.json(
+        { success: false, error: err.message, code: err.code, ...(err.details ? { details: err.details } : {}) },
+        err.status as 400
+      );
     }
     throw err;
   });
@@ -97,10 +104,11 @@ test('NO MONEY MOVES — that is the whole point', async () => {
   const { db, raw } = setup();
   await grant(app(db), ok);
 
-  const m = raw.prepare('SELECT price_paid_iqd, wallet_tx_id FROM memberships WHERE user_id = ?').get('u1') as
-    { price_paid_iqd: number; wallet_tx_id: string | null };
+  const m = raw.prepare('SELECT price_paid_iqd, wallet_tx_id, credit_basis_iqd FROM memberships WHERE user_id = ?').get('u1') as
+    { price_paid_iqd: number; wallet_tx_id: string | null; credit_basis_iqd: number };
   assert.equal(Number(m.price_paid_iqd), 0);
   assert.equal(m.wallet_tx_id, null);
+  assert.equal(Number(m.credit_basis_iqd), 0, 'a grant is worth nothing toward a later paid upgrade');
 
   const wallet = raw.prepare('SELECT COUNT(*) AS n FROM wallet_transactions').get() as { n: number };
   assert.equal(Number(wallet.n), 0, 'a grant wrote a wallet transaction');
@@ -142,13 +150,56 @@ test('a double-tapped grant produces ONE membership', async () => {
   assert.equal(Number(n.n), 1);
 });
 
-test('a DIFFERENT key is a different, deliberate grant', async () => {
+test('a DIFFERENT key is a different, deliberate grant — once the account holds no live membership', async () => {
   const { db, raw } = setup();
   const a = app(db);
   await grant(a, ok);
-  await grant(a, { ...ok, idempotencyKey: 'grantkey2', reason: 'extended by another month' });
+  // ONE MEMBERSHIP AT A TIME applies to grants too: while the first is live,
+  // a second is refused rather than stacked (migration 0052's index would
+  // refuse the row anyway; the route says why first).
+  const stacked = await grant(a, { ...ok, idempotencyKey: 'grantkey2', reason: 'extended by another month' });
+  assert.equal(stacked.status, 409);
+  const body = (await stacked.json()) as Record<string, unknown>;
+  assert.equal(body.code, 'ALREADY_SUBSCRIBED');
+  assert.match(String(body.error), /cancel it first/i);
+  assert.equal(Number((raw.prepare('SELECT COUNT(*) AS n FROM memberships WHERE user_id = ?').get('u1') as { n: number }).n), 1);
+
+  // After the first is cancelled, the second key is a new, deliberate grant.
+  raw.exec("UPDATE memberships SET state = 'cancelled' WHERE user_id = 'u1'");
+  const second = await grant(a, { ...ok, idempotencyKey: 'grantkey2', reason: 'extended by another month' });
+  assert.equal(second.status, 200);
   const n = raw.prepare('SELECT COUNT(*) AS n FROM memberships WHERE user_id = ?').get('u1') as { n: number };
   assert.equal(Number(n.n), 2);
+  assert.equal(Number((raw.prepare("SELECT COUNT(*) AS n FROM memberships WHERE user_id = 'u1' AND state = 'active'").get() as { n: number }).n), 1);
+});
+
+test('a grant over a paid membership is refused — the customer is not silently double-covered', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at)
+    VALUES ('paid', 'u1', 'prime_12mo', 'prime', 'active', 12, 99000, '2026-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z');
+  `);
+  const res = await grant(app(db), { ...ok, planId: 'pro_12mo' });
+  assert.equal(res.status, 409);
+  const body = (await res.json()) as Record<string, unknown>;
+  assert.match(String(body.error), /PRIME/);
+  assert.deepEqual(body.details, { membership_id: 'paid', tier: 'prime', state: 'active' });
+  // A replay of an EARLIER grant is still a replay, whatever the account holds now.
+  raw.exec("INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months) VALUES ('mem_grant_grantkey1', 'u1', 'plus_1mo', 'plus', 'expired', 1)");
+  const replay = await grant(app(db), ok);
+  assert.equal(replay.status, 200);
+  assert.equal(((await replay.json()) as Record<string, unknown>).replayed, true);
+});
+
+test('before launch a grant is refused while a reservation is waiting, with the prepaid code', async () => {
+  const { db, raw } = setup(false);
+  raw.exec(`
+    INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd)
+    VALUES ('res', 'u1', 'plus_12mo', 'plus', 'prepaid_pending_launch', 12, 29000);
+  `);
+  const res = await grant(app(db), ok);
+  assert.equal(res.status, 409);
+  assert.equal(((await res.json()) as Record<string, unknown>).code, 'ALREADY_PREPAID');
 });
 
 // ---------------------------------------------------------- the launch gate

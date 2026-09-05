@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, formatIqd, newIdempotencyKey } from '../lib/api';
-import { RefreshCw, Users, Inbox, ShieldAlert, ChevronDown, X, MessageSquare } from 'lucide-react';
+import { RefreshCw, Users, Inbox, ShieldAlert, ChevronDown, X, MessageSquare, CreditCard, Rocket } from 'lucide-react';
+import { Overlay } from './ui/Overlay';
+import { tierLabel, tierMetaFor } from './subscription/tierMeta';
 
 /**
  * PRO-operations console (final-phase brief §10):
@@ -421,6 +423,7 @@ const BENEFIT_LABELS: Record<string, { ar: string; en: string; ckb: string }> = 
   merchantProfile: { ar: 'ملف التاجر', en: 'Merchant profile', ckb: 'پرۆفایلی بازرگان' },
   exclusiveSections: { ar: 'الأقسام الحصرية', en: 'Exclusive sections', ckb: 'بەشە تایبەتەکان' },
   verifiedMerchant: { ar: 'شارة التاجر الموثّق', en: 'Verified merchant badge', ckb: 'نیشانەی بازرگانی پشتڕاستکراو' },
+  exclusiveCoupons: { ar: 'كوبونات الأعضاء', en: 'Member coupons', ckb: 'کۆپۆنی ئەندامان' },
 };
 
 const CASE_TYPES = ['dropshipping_suspected', 'repeated_refusal', 'abuse', 'debt'] as const;
@@ -663,13 +666,15 @@ function MemberDetail({
     load();
   }, [load]);
 
-  const resumeCase = async (rc: RestrictionCase) => {
-    const reason = window.prompt(s.resumeReason);
-    if (!reason || reason.trim().length < 3) return;
+  // Resuming a paused benefit asks for its reason in the house window (no
+  // browser prompt): the case is remembered while the window is open.
+  const [resumeTarget, setResumeTarget] = useState<RestrictionCase | null>(null);
+  const resumeCase = async (rc: RestrictionCase, reason: string) => {
     setRowBusy(rc.id);
     setRowError('');
     try {
-      await api.patch(`/api/support/admin/restrictions/${rc.id}`, { action: 'resume', reason: reason.trim() });
+      await api.patch(`/api/support/admin/restrictions/${rc.id}`, { action: 'resume', reason });
+      setResumeTarget(null);
       await load();
       onChanged();
     } catch (e) {
@@ -902,7 +907,8 @@ function MemberDetail({
                     </div>
                     {rc.state === 'active' && (
                       <button
-                        onClick={() => resumeCase(rc)}
+                        type="button"
+                        onClick={() => setResumeTarget(rc)}
                         disabled={rowBusy === rc.id}
                         className="mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 disabled:opacity-50"
                       >
@@ -916,6 +922,18 @@ function MemberDetail({
           </div>
         </>
       )}
+      <ReasonWindow
+        open={!!resumeTarget}
+        busy={!!resumeTarget && rowBusy === resumeTarget.id}
+        title={s.resume}
+        body={s.resumeReason}
+        confirmLabel={s.resume}
+        error={rowError}
+        onClose={() => setResumeTarget(null)}
+        onConfirm={(reason) => {
+          if (resumeTarget) void resumeCase(resumeTarget, reason);
+        }}
+      />
     </div>
   );
 }
@@ -956,20 +974,20 @@ function GrantMembership({ userId, onGranted }: { userId: string; onGranted: () 
       .catch(() => setPlans([]));
   }, []);
 
-  async function grant() {
-    const reason = window.prompt(
-      loc('سبب المنح (مطلوب — يُسجَّل):', 'Reason for the grant (required — it is recorded):', 'هۆکاری پێدان (پێویستە):')
-    );
-    if (!reason?.trim() || reason.trim().length < 3) return;
+  // The reason is asked for in the house window, not a browser prompt.
+  const [askOpen, setAskOpen] = useState(false);
+  const grantBtnRef = useRef<HTMLButtonElement>(null);
 
+  async function grant(reason: string) {
     setBusy(true);
     setError('');
     setDone('');
     try {
       const r = await api.post<{ replayed: boolean; tier?: string; active?: boolean; note?: string }>(
         '/api/memberships/admin/grant',
-        { userId, planId, reason: reason.trim(), idempotencyKey: newIdempotencyKey() }
+        { userId, planId, reason, idempotencyKey: newIdempotencyKey() }
       );
+      setAskOpen(false);
       setDone(
         r.replayed
           ? loc('هذا المنح مسجّل مسبقًا.', 'That grant was already recorded.', 'ئەم پێدانە پێشتر تۆمارکراوە.')
@@ -1000,15 +1018,32 @@ function GrantMembership({ userId, onGranted }: { userId: string; onGranted: () 
           ))}
         </select>
         <button
-          onClick={grant}
+          ref={grantBtnRef}
+          type="button"
+          onClick={() => setAskOpen(true)}
           disabled={busy || !planId}
           className="min-h-[34px] px-3 rounded-lg bg-olive text-white text-xs font-bold disabled:opacity-40"
         >
           {busy
-            ? loc('جارٍ...', 'Working…', 'خەریکە...')
+            ? loc('جارٍ…', 'Working…', 'خەریکە…')
             : loc('منح اشتراك بدون دفع', 'Grant without payment', 'بەخشینی بەشداری')}
         </button>
       </div>
+      <ReasonWindow
+        open={askOpen}
+        busy={busy}
+        anchor={grantBtnRef}
+        title={loc('منح اشتراك بدون دفع', 'Grant without payment', 'بەخشینی بەشداری')}
+        body={loc(
+          'سبب المنح مطلوب ويُسجَّل في سجل التدقيق. لا تُسجَّل أي حركة في المحفظة.',
+          'The reason for the grant is required and is kept in the audit log. No wallet movement is recorded.',
+          'هۆکاری پێدان پێویستە و لە تۆماری وردبینی هەڵدەگیرێت. هیچ جووڵەیەکی جزدان تۆمار ناکرێت.'
+        )}
+        confirmLabel={loc('منح', 'Grant', 'پێدان')}
+        error={error}
+        onClose={() => setAskOpen(false)}
+        onConfirm={(reason) => void grant(reason)}
+      />
       <p className="text-[11px] text-zinc-600 mt-1.5">
         {loc(
           'منح صلاحية وليس عملية مالية — لا تُسجَّل أي حركة في المحفظة، والسبب يُحفظ في سجل التدقيق.',
@@ -1424,17 +1459,453 @@ function QueueSection({ s }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
   );
 }
 
+
+// ================================================================== plans
+
+/**
+ * The plan catalogue and the launch switch — the two admin endpoints that
+ * existed (PATCH /admin/plans/:id, POST /admin/activate-launch) but had no
+ * screen, so prices and the launch could only be changed with curl.
+ *
+ * A price is data: an empty field means UNPRICED, which the storefront shows
+ * as "price to be announced" and refuses to sell. The launch activation is
+ * irreversible and starts every prepaid membership, so it asks for the word
+ * ACTIVATE to be typed into an in-app window — no browser prompt.
+ */
+const PLAN_STRINGS = {
+  ar: {
+    tab: 'الخطط والإطلاق',
+    title: 'خطط العضوية',
+    intro: 'السعر بالدينار العراقي (عدد صحيح). اترك الحقل فارغًا ليصبح "غير مسعّر" — لا يُباع ويظهر للزبون بأن السعر يُعلن لاحقًا.',
+    tier: 'الفئة',
+    duration: 'المدة',
+    price: 'السعر (د.ع)',
+    active: 'نشطة',
+    inactive: 'موقوفة',
+    purchasable: 'قابلة للشراء',
+    unpriced: 'غير مسعّرة',
+    save: 'حفظ',
+    saved: 'تم الحفظ',
+    months: 'شهر',
+    loading: 'جارٍ التحميل…',
+    loadError: 'تعذر تحميل الخطط',
+    retry: 'إعادة المحاولة',
+    badPrice: 'السعر يجب أن يكون عددًا صحيحًا غير سالب',
+    launchTitle: 'إطلاق العضويات',
+    launchActive: 'الإطلاق مُفعّل',
+    launchInactive: 'الإطلاق غير مُفعّل — كل الاشتراكات المدفوعة تبقى محجوزة حتى التفعيل.',
+    launchAt: 'تاريخ الإطلاق المعلن',
+    activatedAt: 'فُعّل في',
+    notSet: 'غير محدد',
+    activate: 'تفعيل الإطلاق',
+    activateTitle: 'تفعيل إطلاق العضويات',
+    activateBody: 'هذا الإجراء نهائي ويبدأ عدّاد كل اشتراك مدفوع مسبقًا من هذه اللحظة. اكتب ACTIVATE للتأكيد.',
+    typeHere: 'اكتب ACTIVATE',
+    confirm: 'تفعيل الآن',
+    cancel: 'إلغاء',
+    working: 'جارٍ التنفيذ…',
+    activated: (n: number) => `تم التفعيل — ${n} اشتراكًا بدأ الآن.`,
+    alreadyActivated: (n: number) => `الإطلاق كان مُفعّلًا مسبقًا — ${n} اشتراكًا متأخرًا بدأ الآن.`,
+  },
+  en: {
+    tab: 'Plans & launch',
+    title: 'Membership plans',
+    intro: 'Price in IQD (a whole number). Leave the field empty to make a plan UNPRICED — it cannot be bought and the customer sees "price to be announced".',
+    tier: 'Tier',
+    duration: 'Duration',
+    price: 'Price (IQD)',
+    active: 'Active',
+    inactive: 'Inactive',
+    purchasable: 'Purchasable',
+    unpriced: 'Unpriced',
+    save: 'Save',
+    saved: 'Saved',
+    months: 'mo',
+    loading: 'Loading…',
+    loadError: 'The plans could not be loaded',
+    retry: 'Retry',
+    badPrice: 'The price must be a non-negative whole number',
+    launchTitle: 'Membership launch',
+    launchActive: 'Launch activated',
+    launchInactive: 'Launch not activated — every paid membership stays reserved until it is.',
+    launchAt: 'Announced launch date',
+    activatedAt: 'Activated at',
+    notSet: 'Not set',
+    activate: 'Activate launch',
+    activateTitle: 'Activate the membership launch',
+    activateBody: 'This is final and starts the clock on every prepaid membership from this moment. Type ACTIVATE to confirm.',
+    typeHere: 'Type ACTIVATE',
+    confirm: 'Activate now',
+    cancel: 'Cancel',
+    working: 'Working…',
+    activated: (n: number) => `Activated — ${n} memberships started now.`,
+    alreadyActivated: (n: number) => `The launch was already active — ${n} straggling memberships started now.`,
+  },
+  ckb: {
+    tab: 'پلان و دەستپێکردن',
+    title: 'پلانەکانی ئەندامێتی',
+    intro: 'نرخ بە دیناری عێراقی (ژمارەی تەواو). خانەکە بەتاڵ بهێڵەرەوە بۆ ئەوەی پلانەکە "بێ نرخ" بێت — نافرۆشرێت و کڕیار دەبینێت نرخ دواتر ڕادەگەیەنرێت.',
+    tier: 'ئاست',
+    duration: 'ماوە',
+    price: 'نرخ (د.ع)',
+    active: 'چالاک',
+    inactive: 'ناچالاک',
+    purchasable: 'دەکڕدرێت',
+    unpriced: 'بێ نرخ',
+    save: 'پاشەکەوت',
+    saved: 'پاشەکەوت کرا',
+    months: 'مانگ',
+    loading: 'باردەکرێت…',
+    loadError: 'پلانەکان بار نەکران',
+    retry: 'دووبارە هەوڵبدەرەوە',
+    badPrice: 'نرخ دەبێت ژمارەیەکی تەواوی نا-نەرێنی بێت',
+    launchTitle: 'دەستپێکردنی ئەندامێتییەکان',
+    launchActive: 'دەستپێکردن چالاک کراوە',
+    launchInactive: 'دەستپێکردن چالاک نەکراوە — هەموو ئەندامێتییە پارەدراوەکان پارێزراو دەمێننەوە تا چالاک دەکرێت.',
+    launchAt: 'بەرواری ڕاگەیەنراوی دەستپێکردن',
+    activatedAt: 'چالاک کرا لە',
+    notSet: 'دیاری نەکراوە',
+    activate: 'چالاککردنی دەستپێکردن',
+    activateTitle: 'چالاککردنی دەستپێکردنی ئەندامێتی',
+    activateBody: 'ئەمە کۆتاییە و کاتژمێری هەموو ئەندامێتییەکی پێشپارەدراو لەم ساتەوە دەست پێدەکات. ACTIVATE بنووسە بۆ پشتڕاستکردنەوە.',
+    typeHere: 'ACTIVATE بنووسە',
+    confirm: 'ئێستا چالاک بکە',
+    cancel: 'پاشگەزبوونەوە',
+    working: 'جێبەجێ دەکرێت…',
+    activated: (n: number) => `چالاک کرا — ${n} ئەندامێتی ئێستا دەستی پێکرد.`,
+    alreadyActivated: (n: number) => `دەستپێکردن پێشتر چالاک بوو — ${n} ئەندامێتیی دواکەوتوو ئێستا دەستی پێکرد.`,
+  },
+};
+
+type PS = (typeof PLAN_STRINGS)['en'];
+
+interface AdminPlan {
+  id: string;
+  tier: string;
+  duration_months: number;
+  price_iqd: number | null;
+  purchasable: boolean;
+  active: boolean;
+  sort: number;
+}
+interface AdminLaunch {
+  launch_at: string | null;
+  activated: boolean;
+  activated_at: string | null;
+}
+
+function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
+  const ps: PS = PLAN_STRINGS[lang] ?? PLAN_STRINGS.ar;
+  const [plans, setPlans] = useState<AdminPlan[] | null>(null);
+  const [launch, setLaunch] = useState<AdminLaunch | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [rowNote, setRowNote] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [activating, setActivating] = useState(false);
+  const [launchNote, setLaunchNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const activateBtnRef = useRef<HTMLButtonElement>(null);
+
+  const load = useCallback(async () => {
+    setLoadError('');
+    try {
+      const d = await api.get<{ plans: AdminPlan[]; launch: AdminLaunch }>('/api/memberships/admin/plans');
+      setPlans(d.plans);
+      setLaunch(d.launch);
+      const next: Record<string, string> = {};
+      for (const p of d.plans) next[p.id] = p.price_iqd === null ? '' : String(p.price_iqd);
+      setDrafts(next);
+    } catch (e) {
+      setLoadError(e instanceof ApiError ? e.message : ps.loadError);
+      setPlans([]);
+    }
+  }, [ps.loadError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function patch(plan: AdminPlan, body: { price_iqd?: number | null; active?: boolean }) {
+    setRowBusy(plan.id);
+    setRowNote((n) => ({ ...n, [plan.id]: { ok: true, text: '' } }));
+    try {
+      const r = await api.patch<{ plan: AdminPlan }>(`/api/memberships/admin/plans/${encodeURIComponent(plan.id)}`, body);
+      setPlans((cur) => (cur ? cur.map((p) => (p.id === plan.id ? { ...p, ...r.plan } : p)) : cur));
+      setDrafts((d) => ({ ...d, [plan.id]: r.plan.price_iqd === null ? '' : String(r.plan.price_iqd) }));
+      setRowNote((n) => ({ ...n, [plan.id]: { ok: true, text: ps.saved } }));
+    } catch (e) {
+      setRowNote((n) => ({ ...n, [plan.id]: { ok: false, text: e instanceof ApiError ? e.message : ps.loadError } }));
+    } finally {
+      setRowBusy(null);
+    }
+  }
+
+  function savePrice(plan: AdminPlan) {
+    const raw = (drafts[plan.id] ?? '').replace(/[,\s]/g, '');
+    if (raw === '') {
+      void patch(plan, { price_iqd: null });
+      return;
+    }
+    if (!/^\d+$/.test(raw)) {
+      setRowNote((n) => ({ ...n, [plan.id]: { ok: false, text: ps.badPrice } }));
+      return;
+    }
+    void patch(plan, { price_iqd: Number(raw) });
+  }
+
+  async function activateLaunch() {
+    if (confirmText !== 'ACTIVATE' || activating) return;
+    setActivating(true);
+    try {
+      const r = await api.post<{ already_activated: boolean; converted: number; activated_at: string }>(
+        '/api/memberships/admin/activate-launch',
+        { confirm: 'ACTIVATE' }
+      );
+      setLaunchNote({ ok: true, text: r.already_activated ? ps.alreadyActivated(r.converted) : ps.activated(r.converted) });
+      setActivateOpen(false);
+      setConfirmText('');
+      await load();
+    } catch (e) {
+      setLaunchNote({ ok: false, text: e instanceof ApiError ? e.message : ps.loadError });
+    } finally {
+      setActivating(false);
+    }
+  }
+
+  const inputCls =
+    'min-h-[36px] w-32 rounded-lg bg-zinc-800 border border-zinc-700 px-2 text-white text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]';
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-white font-bold text-base flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-gold" aria-hidden /> {ps.title}
+            </h3>
+            <p className="text-zinc-500 text-xs mt-1 max-w-2xl leading-relaxed">{ps.intro}</p>
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            aria-label={ps.retry}
+            className="p-2 min-h-[36px] min-w-[36px] bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white"
+          >
+            <RefreshCw className={`w-4 h-4 ${plans === null ? 'animate-spin' : ''}`} aria-hidden />
+          </button>
+        </div>
+
+        {loadError && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-sm">
+            {loadError}{' '}
+            <button type="button" onClick={load} className="underline">
+              {ps.retry}
+            </button>
+          </div>
+        )}
+
+        {plans === null ? (
+          <p className="text-zinc-500 text-sm py-6">{ps.loading}</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="bg-zinc-900/60 text-zinc-400 text-[11px] uppercase">
+                <tr>
+                  <th className="text-start py-2.5 px-3 font-bold">{ps.tier}</th>
+                  <th className="text-start py-2.5 px-3 font-bold">{ps.duration}</th>
+                  <th className="text-start py-2.5 px-3 font-bold">{ps.price}</th>
+                  <th className="text-start py-2.5 px-3 font-bold">{ps.active}</th>
+                  <th className="py-2.5 px-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {plans.map((p) => {
+                  const meta = tierMetaFor(p.tier);
+                  const note = rowNote[p.id];
+                  const busy = rowBusy === p.id;
+                  return (
+                    <tr key={p.id} data-admin-plan={p.id}>
+                      <td className="py-2.5 px-3">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-md border ${meta ? meta.chip : 'border-zinc-700 text-zinc-300'}`}>
+                          {meta && <meta.Icon className="w-3.5 h-3.5" aria-hidden />}
+                          {tierLabel(p.tier)}
+                        </span>
+                        <div className="text-[10px] text-zinc-600 font-mono mt-1">{p.id}</div>
+                      </td>
+                      <td className="py-2.5 px-3 text-white tabular-nums" dir="ltr">
+                        {p.duration_months} {ps.months}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input
+                            value={drafts[p.id] ?? ''}
+                            onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') savePrice(p);
+                            }}
+                            inputMode="numeric"
+                            dir="ltr"
+                            placeholder={ps.unpriced}
+                            aria-label={`${ps.price} — ${tierLabel(p.tier)} ${p.duration_months}`}
+                            className={inputCls}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => savePrice(p)}
+                            disabled={busy}
+                            className="min-h-[36px] px-3 rounded-lg bg-[#BAA369] text-black text-xs font-bold disabled:opacity-40"
+                          >
+                            {busy ? ps.working : ps.save}
+                          </button>
+                          <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full border ${p.purchasable ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/30 text-amber-300 bg-amber-500/10'}`}>
+                            {p.purchasable ? `${ps.purchasable} · ${formatIqd(p.price_iqd as number)}` : ps.unpriced}
+                          </span>
+                        </div>
+                        {note?.text && (
+                          <p role={note.ok ? 'status' : 'alert'} className={`text-[11px] mt-1 ${note.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {note.text}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={p.active}
+                          aria-label={`${ps.active} — ${tierLabel(p.tier)} ${p.duration_months}`}
+                          disabled={busy}
+                          onClick={() => patch(p, { active: !p.active })}
+                          className={`min-h-[32px] px-3 rounded-full text-xs font-bold border transition-colors disabled:opacity-40 ${
+                            p.active
+                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                              : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                          }`}
+                        >
+                          {p.active ? ps.active : ps.inactive}
+                        </button>
+                      </td>
+                      <td className="py-2.5 px-3 text-[10px] text-zinc-600 tabular-nums" dir="ltr">
+                        sort {p.sort}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+        <h3 className="text-white font-bold text-base flex items-center gap-2">
+          <Rocket className="w-4 h-4 text-gold" aria-hidden /> {ps.launchTitle}
+        </h3>
+        {launch ? (
+          <div className="text-sm space-y-1.5">
+            <p className={launch.activated ? 'text-emerald-300 font-bold' : 'text-amber-300'}>
+              {launch.activated ? ps.launchActive : ps.launchInactive}
+            </p>
+            <p className="text-zinc-400 text-xs" dir="ltr">
+              {ps.launchAt}: {launch.launch_at ?? ps.notSet}
+            </p>
+            {launch.activated && (
+              <p className="text-zinc-400 text-xs" dir="ltr">
+                {ps.activatedAt}: {launch.activated_at ?? ps.notSet}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-zinc-500 text-sm">{ps.loading}</p>
+        )}
+        <button
+          ref={activateBtnRef}
+          type="button"
+          onClick={() => {
+            setLaunchNote(null);
+            setConfirmText('');
+            setActivateOpen(true);
+          }}
+          disabled={!launch || launch.activated}
+          aria-haspopup="dialog"
+          className="min-h-[40px] px-4 rounded-xl bg-[#B03142] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {ps.activate}
+        </button>
+        {launchNote && (
+          <p className={`text-[12.5px] ${launchNote.ok ? 'text-emerald-400' : 'text-red-400'}`}>{launchNote.text}</p>
+        )}
+      </section>
+
+      <Overlay
+        open={activateOpen}
+        onClose={() => {
+          if (!activating) setActivateOpen(false);
+        }}
+        labelledBy="activate-launch-title"
+        label={ps.activateTitle}
+        anchor={activateBtnRef}
+        dismissOnEscape={!activating}
+        dismissOnScrim={!activating}
+        testId="activate-launch"
+        panelClassName="w-full max-w-md"
+      >
+        <div className="p-5 sm:p-6">
+          <h2 id="activate-launch-title" className="text-white font-bold text-lg flex items-center gap-2">
+            <Rocket className="w-5 h-5 text-[#e06070]" aria-hidden /> {ps.activateTitle}
+          </h2>
+          <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{ps.activateBody}</p>
+          <input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') activateLaunch();
+            }}
+            dir="ltr"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={ps.typeHere}
+            aria-label={ps.typeHere}
+            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-[#B03142]"
+          />
+          <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
+            <button
+              type="button"
+              onClick={() => setActivateOpen(false)}
+              disabled={activating}
+              className="flex-1 min-h-[48px] rounded-2xl border border-zinc-700 text-zinc-200 font-semibold hover:bg-zinc-900 disabled:opacity-50"
+            >
+              {ps.cancel}
+            </button>
+            <button
+              type="button"
+              onClick={activateLaunch}
+              disabled={confirmText !== 'ACTIVATE' || activating}
+              className="flex-1 min-h-[48px] rounded-2xl bg-[#B03142] text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {activating ? ps.working : ps.confirm}
+            </button>
+          </div>
+        </div>
+      </Overlay>
+    </div>
+  );
+}
+
 // ==================================================================== root
 
 export default function AdminMemberships() {
   const { lang } = useLanguage();
   const s: S = STRINGS[lang] ?? STRINGS.ar;
-  const [tab, setTab] = useState<'members' | 'queue'>('members');
+  const [tab, setTab] = useState<'members' | 'queue' | 'plans'>('members');
+  const ps: PS = PLAN_STRINGS[lang] ?? PLAN_STRINGS.ar;
 
   return (
     <div className="space-y-5">
-      <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap bg-zinc-900 border border-zinc-800 p-1 rounded-xl w-fit">
         <button
+          type="button"
           onClick={() => setTab('members')}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
             tab === 'members' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
@@ -1444,6 +1915,7 @@ export default function AdminMemberships() {
           {s.tabMembers}
         </button>
         <button
+          type="button"
           onClick={() => setTab('queue')}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
             tab === 'queue' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
@@ -1452,9 +1924,118 @@ export default function AdminMemberships() {
           <Inbox className="w-3.5 h-3.5" />
           {s.tabQueue}
         </button>
+        <button
+          type="button"
+          data-admin-tab="plans"
+          onClick={() => setTab('plans')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
+            tab === 'plans' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <CreditCard className="w-3.5 h-3.5" />
+          {ps.tab}
+        </button>
       </div>
 
-      {tab === 'members' ? <MembersSection s={s} lang={lang} /> : <QueueSection s={s} lang={lang} />}
+      {tab === 'members' ? (
+        <MembersSection s={s} lang={lang} />
+      ) : tab === 'queue' ? (
+        <QueueSection s={s} lang={lang} />
+      ) : (
+        <PlansSection lang={lang} />
+      )}
     </div>
   );
 }
+
+/**
+ * The house question window for an action that must carry a written reason
+ * (a grant, resuming a paused benefit): title, body, a reason field with a
+ * three-character floor, cancel and confirm. Replaces the browser prompt so
+ * the reason is typed inside the page, in the reader's language, with the
+ * server's refusal shown in place.
+ */
+function ReasonWindow({
+  open,
+  busy,
+  anchor,
+  title,
+  body,
+  confirmLabel,
+  error,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  busy: boolean;
+  anchor?: React.RefObject<HTMLElement | null>;
+  title: string;
+  body: string;
+  confirmLabel: string;
+  error?: string;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const { loc } = useLanguage();
+  const [reason, setReason] = useState('');
+  useEffect(() => {
+    if (open) setReason('');
+  }, [open]);
+  const ready = reason.trim().length >= 3 && !busy;
+  const titleId = 'reason-window-title';
+  return (
+    <Overlay
+      open={open}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      labelledBy={titleId}
+      label={title}
+      anchor={anchor}
+      dismissOnEscape={!busy}
+      dismissOnScrim={!busy}
+      panelClassName="w-full max-w-md"
+    >
+      <div className="p-5 sm:p-6">
+        <h2 id={titleId} className="text-white font-bold text-lg">
+          {title}
+        </h2>
+        <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{body}</p>
+        <label className="block mt-4">
+          <span className="block text-xs text-zinc-400 mb-1">{loc('السبب (٣ محارف على الأقل)', 'Reason (at least 3 characters)', 'هۆکار (لانیکەم ٣ پیت)')}</span>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            disabled={busy}
+            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-white text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          />
+        </label>
+        {error && (
+          <p className="text-red-400 text-[12px] mt-2" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="min-h-[40px] px-4 rounded-xl bg-zinc-800 text-zinc-200 text-sm font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            {loc('إلغاء', 'Cancel', 'پاشگەزبوونەوە')}
+          </button>
+          <button
+            type="button"
+            onClick={() => ready && onConfirm(reason.trim())}
+            disabled={!ready}
+            className="min-h-[40px] px-4 rounded-xl bg-olive text-white text-sm font-bold disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            {busy ? loc('جارٍ…', 'Working…', 'خەریکە…') : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
