@@ -640,6 +640,9 @@ export default function Cart() {
               ? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
               : 0;
             const selected = selectedIds.has(item.id);
+            // A line the server will refuse at checkout because it never chose
+            // an option or colour (a row written before the cart enforced it).
+            const incomplete = item.availability?.selection ? !item.availability.selection.complete : false;
             return (
               <div key={item.id} className="px-4 py-2 flex gap-3">
                 {/* Checkbox */}
@@ -678,10 +681,15 @@ export default function Cart() {
                       {hasVariants && (
                         <button
                           onClick={() => openVariantModal(item)}
-                          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max"
+                          aria-invalid={incomplete || undefined}
+                          className={`rounded px-2 py-1 flex items-center gap-1 w-max border ${
+                            incomplete ? 'bg-amber-500/10 border-amber-500/50' : 'bg-zinc-900 border-zinc-800'
+                          }`}
                         >
-                          <span className="text-[12px] text-zinc-300">
-                            {item.variantLabel || (dir === 'rtl' ? 'اختر الخيارات' : 'Choose options')}
+                          <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-zinc-300'}`}>
+                            {incomplete
+                              ? dir === 'rtl' ? 'اختر الخيار أولًا' : 'Choose an option first'
+                              : item.variantLabel || (dir === 'rtl' ? 'اختر الخيارات' : 'Choose options')}
                           </span>
                           <ChevronRight className="w-3 h-3 text-zinc-500" />
                         </button>
@@ -1060,7 +1068,12 @@ export default function Cart() {
               })
             }
             className="bg-[#ef233c] hover:bg-[#d90429] text-white font-bold py-2 sm:py-2.5 px-3 sm:px-5 rounded-lg text-[13px] sm:text-[15px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
-            disabled={selectedCount === 0}
+            disabled={
+              selectedCount === 0 ||
+              // The server refuses an incomplete line at checkout; say so here
+              // instead of letting the button fail a page later.
+              items.some((i) => selectedIds.has(i.id) && i.availability?.selection && !i.availability.selection.complete)
+            }
           >
             {dir === 'rtl' ? `إتمام الطلب (${selectedCount})` : `Checkout (${selectedCount})`}
           </button>

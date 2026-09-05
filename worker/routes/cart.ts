@@ -28,6 +28,23 @@ import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
 import { rateLimit } from '../lib/ratelimit';
 import { saleAvailability } from './products';
+import type { SaleAvailability } from './products';
+
+/**
+ * The one rule for an incomplete selection, shared by add, update and the
+ * checkout revalidation in routes/orders.ts: a product that has active
+ * options demands one (OPTION_REQUIRED), one that has active colours demands
+ * a colour (COLOR_REQUIRED). The code is the first selection error so the
+ * client can point at the right control.
+ */
+export function refuseIncompleteSelection(availability: SaleAvailability, label?: string): void {
+  if (availability.selection.complete) return;
+  const errors = availability.selection.errors;
+  throw badRequest(
+    `${label ? `"${label}": ` : ''}Choose ${errors.includes('OPTION_REQUIRED') ? 'an option' : 'a colour'} before adding this item (${errors.join(', ')})`,
+    errors[0] ?? 'SELECTION_INCOMPLETE'
+  );
+}
 import {
   resolveUnitPrice,
   proPolicyFrom,
@@ -442,6 +459,13 @@ cartRoutes.post('/items', async (c) => {
     links: view?.links,
     preferredType: transportMethod ? 'pre_order' : null,
   });
+  // A product with options or colours is sold as ONE of them. The relational
+  // path enforces that in validateSelection; a legacy JSON-column product
+  // reached this point with no option at all and was added at the base
+  // price — a line the shop never offers. saleAvailability already knows
+  // (it is what disables the storefront button), so the cart listens to it.
+  // Checked before stock so "choose an option" wins over "out of stock".
+  refuseIncompleteSelection(availability);
   if (availability.mode === 'unavailable') {
     throw badRequest(
       availability.reason === 'OUT_OF_STOCK'
@@ -640,6 +664,9 @@ cartRoutes.patch('/items/:id', async (c) => {
     links: view?.links,
     preferredType: transportMethod ? 'pre_order' : null,
   });
+  // An update may also CLEAR a chosen option (an explicit empty list is the
+  // new selection) — the same rule as an add.
+  refuseIncompleteSelection(availability);
   if (availability.mode === 'unavailable') {
     throw badRequest(
       `This item cannot be updated right now (${availability.reason ?? 'UNAVAILABLE'})`,

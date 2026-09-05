@@ -183,6 +183,14 @@ export interface CartItem {
     errors: string[];
   };
   stock: number | null;
+  /** Server verdict for THIS selection: stock at the authoritative level and
+   *  whether the line has chosen everything the product requires. */
+  availability?: {
+    mode?: string;
+    reason?: string | null;
+    qty_ok?: boolean;
+    selection?: { complete: boolean; errors: string[] };
+  };
   options: ApiProduct['options'];
   colors: ApiProduct['colors'];
   shipping_methods: ApiProduct['shipping_methods'];

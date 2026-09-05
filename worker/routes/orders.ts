@@ -6,7 +6,8 @@ import { requireAuth, badRequest, notFound, str, int } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
-import { resolveCartLine, pricingContextFrom, publicBreakdown, selectionFromCartRow } from './cart';
+import { resolveCartLine, pricingContextFrom, publicBreakdown, selectionFromCartRow, refuseIncompleteSelection } from './cart';
+import { saleAvailability } from './products';
 import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
 import { planInventory, resolveStock } from '../lib/inventory';
 import { returnOrderStock } from '../lib/orderInventory';
@@ -516,6 +517,23 @@ async function computeCheckout(
       reserved: Number(row.stock_reserved ?? 0),
       low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
     });
+    // The checkout must not trust a cart row written before the cart refused
+    // incomplete selections (or one a product acquired options after): a
+    // legacy JSON-column line with no option is refused here with the same
+    // rule the cart applies, instead of being priced at the base and stored
+    // with an empty option_id.
+    refuseIncompleteSelection(
+      saleAvailability(doc, {
+        optionValueIds: sel.optionValueIds ?? [],
+        colorId: sel.colorId || null,
+        qty,
+        transportDefaults: pricingCtx.transportDefaults,
+        inventory: snapshot,
+        links: view?.links,
+        preferredType: sel.transportMethod ? 'pre_order' : null,
+      }),
+      displayName
+    );
     const stockRes = resolveStock(snapshot, {
       option_value_ids: sel.optionValueIds ?? [],
       color_id: sel.colorId || null,
