@@ -6,22 +6,38 @@
 -- forgot-password and reset were all made uniform long ago; registration was
 -- the weak link.
 --
--- Closing it means a sign-up with an address never opens a session and never
--- says "taken": the only way to learn whether an address has an account is to
--- read that inbox. But an unconfirmed account must then also REFUSE sign-in —
--- otherwise "register, then try to sign in with my own password" would answer
--- the question instead. This column marks the accounts created under that
--- rule, so every account that existed before it is untouched: they were never
--- asked to confirm before signing in and never will be.
+-- Closing it means an email sign-up creates NOTHING in `users` until the inbox
+-- is proven. The attempt waits here instead. Because nothing lands in `users`,
+-- there is no row for /username-available, /login, the admin list or the
+-- referral count to observe — the only way to learn whether an address has an
+-- account is to read that inbox. An adversarial review of a first attempt that
+-- kept the pending account in `users` (with a flag) found the opposite: the
+-- username was claimed only on the free path, which leaked the answer, and a
+-- stranger's first attempt fixed the row's password so the inbox owner could
+-- confirm an account they did not control. Holding the attempt OUTSIDE `users`
+-- removes both.
 --
---   signup_verification_required = 1 AND email_verified_at IS NULL
---     → sign-in refused (uniformly, like a wrong password) until the emailed
---       link, or a password reset, proves the address.
+--   one row per address (email is the key), so the latest attempt wins —
+--   a re-signup overwrites the previous one and re-issues the link, and no
+--   earlier attempt's password can survive to be confirmed by someone else.
+--   The account, and its username, are created only by /verify-email/confirm.
 --
--- Additive only: defaults to 0 for every existing row.
-ALTER TABLE users ADD COLUMN signup_verification_required INTEGER NOT NULL DEFAULT 0;
+-- Rewritten from an earlier draft of this same migration that added a
+-- users.signup_verification_required column; that column is gone. This file
+-- has never been applied to any live database (nothing on this branch is
+-- deployed), so replacing its body is safe.
+CREATE TABLE pending_signups (
+  email         TEXT PRIMARY KEY,                 -- lowercased; one pending row per address
+  token_hash    TEXT NOT NULL UNIQUE,             -- sha256 of the verification token; rotated on every attempt
+  username      TEXT,                             -- requested handle, claimed at confirm only if still free
+  name          TEXT NOT NULL DEFAULT '',
+  password_hash TEXT NOT NULL,
+  country       TEXT,
+  locale        TEXT NOT NULL DEFAULT 'en',
+  referral_code TEXT NOT NULL DEFAULT '',
+  expires_at    TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
 
--- The sign-in check reads the row it already fetched, so no new lookup; the
--- index keeps "unfinished sign-ups" cheap to list for cleanup.
-CREATE INDEX IF NOT EXISTS idx_users_pending_signup
-  ON users(email) WHERE signup_verification_required = 1 AND email_verified_at IS NULL;
+-- Opportunistic cleanup deletes by expiry; the index keeps that a range scan.
+CREATE INDEX IF NOT EXISTS idx_pending_signups_expires ON pending_signups(expires_at);

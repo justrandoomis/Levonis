@@ -231,19 +231,30 @@ headers (see "Evidence").
 
 ## Completed after the owner's approval
 
-- **Account enumeration at `/register`** (Low) — closed. With a mail service
-  configured, sign-up is *email-first*: a free address and a taken one answer
-  the same body, open no session and do the same password work; the address's
-  owner alone learns what happened (a fresh verification link for an
-  unfinished sign-up, an "account exists" notice — one per address per day —
-  for a real one). Because "register, then sign in with my own password" would
-  otherwise be the oracle, an unconfirmed email-first account is refused at
-  sign-in exactly like a wrong password until the emailed link, or a password
-  reset, proves the inbox; the link itself opens the account (migration 0050,
-  `signup_verification_required`). Every account that existed before is
-  untouched, and a deployment without a mail service keeps the old behaviour.
-  Usernames stay public handles. Test: `tests/registerEmailFirst.test.ts`.
-- **Admin withdrawal path.** The legacy `/wallet-requests/:id/decide` now
+- **Account enumeration at `/register`** (Low) — closed, at the root. An
+  email sign-up now creates NOTHING in `users` until the emailed link proves
+  the inbox; the attempt waits in `pending_signups` (migration 0050, keyed by
+  address so the latest attempt wins). A free address and a taken one return
+  the identical body, open no session and do the same password work, and
+  neither claims a username — so nothing anywhere (the response,
+  `/username-available`, `/login`, the referral count) reveals whether the
+  address has an account; only its owner learns, by reading the inbox (a
+  confirmation link, or an "account exists" notice — one per address per day).
+  `/verify-email/confirm` is the only place the account and its username are
+  created, and the only sign-up path that opens a session; a member's own
+  verification link never does. A first attempt that kept the unconfirmed
+  account in `users` behind a `signup_verification_required` flag was caught by
+  an adversarial re-review (below) as WORSE than the original — it leaked the
+  answer through the username and let a stranger's first attempt fix a password
+  the owner would confirm — and was replaced by this `pending_signups` design.
+  Legacy accounts are untouched; a deployment without a mail service keeps the
+  old immediate-session behaviour. Test: `tests/registerEmailFirst.test.ts`.
+  The same reusable email oracle in `/telegram/complete` (one verified phone
+  challenge could probe many addresses because the check ran before the OTP was
+  consumed) is closed by moving the collision to the post-OTP insert, so each
+  probe burns a fresh code.
+
+- **Admin withdrawal path.**- **Admin withdrawal path.** The legacy `/wallet-requests/:id/decide` now
   refuses a hold-backed withdrawal (`USE_WITHDRAWAL_WORKFLOW`), so a ledger row
   can no longer be flipped with its hold left active; the wallet-request lists
   carry the workflow row, and the admin panels drive

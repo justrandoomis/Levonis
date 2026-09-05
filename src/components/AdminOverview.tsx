@@ -324,6 +324,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                           {req.withdrawal.state} →
                         </button>
                       ) : (
+                      <>
                       <button
                         onClick={() => decideWallet(req, 'approved')}
                         disabled={!!loadingActionId}
@@ -334,7 +335,6 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       >
                         <Check className="w-4 h-4 stroke-[3]" />
                       </button>
-                      )}
                       <button
                         onClick={() => decideWallet(req, 'rejected')}
                         disabled={!!loadingActionId}
@@ -343,6 +343,8 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       >
                         <X className="w-4 h-4 stroke-[3]" />
                       </button>
+                      </>
+                      )}
                     </div>
                   </div>
                   {actionError?.id === req.id && (
