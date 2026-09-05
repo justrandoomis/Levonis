@@ -854,11 +854,18 @@ warrantyAdminRoutes.post('/:id/printed', async (c) => {
 
 /** The A4 document itself. Opened in a tab; `print=1` opens the dialog. */
 /** The printable A4 document for one receipt row — shared by the admin route and the holder's own copy. */
-async function receiptDocument(c: Context<AppContext>, row: WarrantyReceiptRow) {
+async function receiptDocument(c: Context<AppContext>, row: WarrantyReceiptRow, opts: { redactCustomer?: boolean } = {}) {
   const lang = c.req.query('lang') === 'en' ? 'en' : 'ar';
   const autoPrint = c.req.query('print') === '1';
   const now = nowIso();
   const data = docData(row, c, now, lang);
+  if (opts.redactCustomer) {
+    // A later HOLDER of the device gets the coverage proof — never the buyer's
+    // name, address, phone, email or what they paid. The public /verify view
+    // masks the same fields; this copy is for the person holding the printer.
+    data.customer = { name: '—', address: '—', phone: '—', email: '' };
+    data.product.price_iqd = null;
+  }
   if (row.replaces_receipt_id) {
     const prev = await c.env.DB.prepare('SELECT receipt_no FROM warranty_receipts WHERE id = ?')
       .bind(row.replaces_receipt_id)
@@ -908,5 +915,5 @@ warrantyPublicRoutes.get('/receipts/:receiptNo/document', requireAuth, async (c)
     allowed = reg?.user_id === user.id;
   }
   if (!allowed) throw miss();
-  return receiptDocument(c, row);
+  return receiptDocument(c, row, { redactCustomer: row.user_id !== user.id });
 });

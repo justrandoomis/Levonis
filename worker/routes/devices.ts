@@ -4,7 +4,9 @@
  * Customer surface (/api/devices/...):
  *   GET  /mine                       registered devices with honest coverage
  *   POST /register { serial }        non-enumerating registration by serial,
- *                                    receipt number or the receipt's QR link
+ *                                    receipt number or the receipt's QR link —
+ *                                    a never-linked device only by its BUYER;
+ *                                    anyone else only after a release (transfer)
  *   GET  /eligible                   the caller's delivered units not yet linked
  *   POST /units/:unitId/register     link one of those without typing a serial
  *   DELETE /units/:unitId/registration  unlink (the step before a transfer)
@@ -46,6 +48,7 @@ import { safeParse } from '../lib/types';
 import {
   requireAuth,
   requireAdmin,
+  requireMainHost,
   HttpError,
   badRequest,
   notFound,
@@ -79,7 +82,10 @@ import {
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
-deviceRoutes.use('/admin/*', requireAdmin);
+// Admin device routes live under /api/devices, outside the /api/admin/* host
+// guard in worker/index.ts — so they carry their own: main host only, then
+// admin. A merchant subdomain never serves them, even with the shared cookie.
+deviceRoutes.use('/admin/*', requireMainHost, requireAdmin);
 
 // The one non-enumerating answer — unknown, undelivered, replaced, or linked
 // to another account all read the same. Never reveals whether the serial
@@ -148,12 +154,17 @@ interface DeviceRow extends UnitRow {
   images?: string | null;
 }
 
-function devicePublic(row: DeviceRow, opts: { admin?: boolean } = {}) {
+function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string } = {}) {
   const cov = coverageState(row.delivered_at, row.warranty_end_at);
+  // The order belongs to the BUYER. A later holder (a transferred device) gets
+  // the device and its coverage, never the buyer's order identifiers — the
+  // orders routes would 404 them anyway, and an id is still a fact about
+  // someone else's purchase.
+  const buyerView = !!opts.admin || !opts.viewerId || opts.viewerId === row.owner_user_id;
   return {
     unit_id: row.id,
-    order_id: row.order_id,
-    order_item_id: row.order_item_id,
+    order_id: buyerView ? row.order_id : null,
+    order_item_id: buyerView ? row.order_item_id : null,
     unit_index: row.unit_index,
     product: {
       id: row.product_id,
@@ -282,7 +293,7 @@ deviceRoutes.get('/mine', async (c) => {
   const tier = await getTierStatus(c.env.DB, user.id);
   return c.json({
     success: true,
-    devices: results.map((r) => ({ ...devicePublic(r), transferred: r.owner_user_id !== user.id })),
+    devices: results.map((r) => ({ ...devicePublic(r, { viewerId: user.id }), transferred: r.owner_user_id !== user.id })),
     // The PRO membership's warranty perk: priority service on claims. Read
     // here so the page can say it without a second request.
     priority_service: benefits.priorityService(tier),
@@ -343,12 +354,22 @@ deviceRoutes.post('/register', async (c) => {
     const ser = await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(norm).first<{ unit_id: string }>();
     unitId = ser?.unit_id ?? null;
   }
-  if (!unitId) throw SERIAL_NO_MATCH();
-  const row = await loadDevice(c.env.DB, unitId);
+  // The same database work whether or not a unit matched, so a foreign serial
+  // that exists and one that does not take the same time to refuse.
+  const row = await loadDevice(c.env.DB, unitId ?? '');
 
-  // Unknown, undelivered, replaced, or held by another account → the SAME
-  // answer. The holder, the buyer and the order are never revealed.
-  if (!row || !row.delivered_at || row.replaced_by_unit_id) throw SERIAL_NO_MATCH();
+  // Unknown, undelivered, replaced, held by another account, OR never released
+  // by its buyer → the SAME answer. The holder, the buyer and the order are
+  // never revealed.
+  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id) throw SERIAL_NO_MATCH();
+  // A device that was never linked belongs to the account that bought it. A
+  // stranger may take a device only after its holder — or an admin — RELEASED
+  // it (a revoked registration), which is the transfer the owner described.
+  // Receipt numbers are sequential and serials follow factory patterns, so a
+  // typed number alone must never be enough to take a device its buyer never
+  // let go of, nor to read the buyer's receipt through it.
+  const released = !!row.reg_user_id && !!row.revoked_at;
+  if (row.owner_user_id !== user.id && !released) throw SERIAL_NO_MATCH();
   if (row.reg_user_id && row.reg_user_id !== user.id && !row.revoked_at) throw SERIAL_NO_MATCH();
 
   // Idempotent. Registration NEVER touches warranty dates: an expired device
@@ -368,7 +389,7 @@ deviceRoutes.post('/register', async (c) => {
   const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
   return c.json({
     success: true,
-    device: { ...devicePublic(fresh), transferred: fresh.owner_user_id !== user.id },
+    device: { ...devicePublic(fresh, { viewerId: user.id }), transferred: fresh.owner_user_id !== user.id },
     already_registered: alreadyMine,
   });
 });
@@ -470,7 +491,9 @@ deviceRoutes.get('/claims/:id', async (c) => {
     // never from client input.
     warranty_facts: unit
       ? {
-          order_id: unit.order_id,
+          // The buyer's order id is the buyer's (and the admin's) to see; a
+          // later holder gets the coverage facts alone.
+          order_id: isAdmin || unit.owner_user_id === c.get('user')!.id ? unit.order_id : null,
           delivered_at: unit.delivered_at,
           warranty_end_at: unit.warranty_end_at,
           state: cov!.state,
@@ -550,7 +573,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     stage: 'received',
     priority: priority === 1,
     warranty_facts: {
-      order_id: unit.order_id,
+      order_id: unit.owner_user_id === user.id ? unit.order_id : null,
       delivered_at: unit.delivered_at,
       warranty_end_at: unit.warranty_end_at,
       state: cov.state,

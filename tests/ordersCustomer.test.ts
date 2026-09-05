@@ -120,11 +120,11 @@ test('limit/before walk the list newest-first and next_before is null on the las
   const a = appAs(db, buyer);
   const p1 = await json(await a.request('/api/orders?limit=2'));
   assert.deepEqual(p1.orders.map((o: { id: string }) => o.id), ['ORD-5', 'ORD-4']);
-  assert.equal(p1.next_before, '2026-01-04T10:00:00.000Z');
+  assert.equal(p1.next_before, '2026-01-04T10:00:00.000Z|ORD-4', 'the cursor names the row, not only its time');
 
   const p2 = await json(await a.request(`/api/orders?limit=2&before=${encodeURIComponent(p1.next_before)}`));
   assert.deepEqual(p2.orders.map((o: { id: string }) => o.id), ['ORD-3', 'ORD-2']);
-  assert.equal(p2.next_before, '2026-01-02T10:00:00.000Z');
+  assert.equal(p2.next_before, '2026-01-02T10:00:00.000Z|ORD-2');
 
   const p3 = await json(await a.request(`/api/orders?limit=2&before=${encodeURIComponent(p2.next_before)}`));
   assert.deepEqual(p3.orders.map((o: { id: string }) => o.id), ['ORD-1']);
@@ -136,6 +136,23 @@ test('limit/before walk the list newest-first and next_before is null on the las
   assert.equal(all.next_before, null);
   assert.equal((await a.request('/api/orders?limit=51')).status, 400);
   assert.equal((await a.request('/api/orders?before=yesterday')).status, 400);
+  assert.equal((await a.request('/api/orders?before=2026-01-04T10:00:00.000Z|')).status, 400, 'a separator with no id is refused');
+  // A bare timestamp — the cursor an older client stored — still works.
+  const legacy = await json(await a.request(`/api/orders?limit=2&before=${encodeURIComponent('2026-01-04T10:00:00.000Z')}`));
+  assert.deepEqual(legacy.orders.map((o: { id: string }) => o.id), ['ORD-3', 'ORD-2']);
+});
+
+test('two orders in the same millisecond are never skipped at a page boundary', async () => {
+  const { db, raw } = setup();
+  // ORD-4 and ORD-5 share a timestamp: a time-only cursor after ORD-5 would skip ORD-4.
+  raw.prepare("UPDATE orders SET created_at = '2026-01-05T10:00:00.000Z' WHERE id = 'ORD-4'").run();
+  const a = appAs(db, buyer);
+  const p1 = await json(await a.request('/api/orders?limit=1'));
+  assert.deepEqual(p1.orders.map((o: { id: string }) => o.id), ['ORD-5']);
+  const p2 = await json(await a.request(`/api/orders?limit=1&before=${encodeURIComponent(p1.next_before)}`));
+  assert.deepEqual(p2.orders.map((o: { id: string }) => o.id), ['ORD-4'], 'the twin at the same instant is the next row');
+  const p3 = await json(await a.request(`/api/orders?limit=1&before=${encodeURIComponent(p2.next_before)}`));
+  assert.deepEqual(p3.orders.map((o: { id: string }) => o.id), ['ORD-3']);
 });
 
 test('the status filter takes one status or several, and an unknown one matches nothing', async () => {

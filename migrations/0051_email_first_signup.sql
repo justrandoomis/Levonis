@@ -23,10 +23,15 @@
 --     plants a sign-up for someone else's address gains nothing: the owner
 --     either ignores the mail or sets their own password.
 --
--- This branch has never been deployed with a pending_signups table (the earlier
--- 0050 draft was reverted before any deploy; 0050 is now warranty_claims
--- priority), so CREATE TABLE is safe here.
-CREATE TABLE IF NOT EXISTS pending_signups (
+-- An earlier, reverted draft of this table (under the file name
+-- 0050_email_first_signup.sql) carried a password_hash NOT NULL column. Should
+-- any database have run that draft, a plain CREATE IF NOT EXISTS would leave the
+-- old shape in place and every sign-up would fail on the missing password. The
+-- table only ever holds unconfirmed attempts that expire within a day and this
+-- ships before launch, so it is rebuilt outright: the correct shape is the
+-- outcome in every environment.
+DROP TABLE IF EXISTS pending_signups;
+CREATE TABLE pending_signups (
   email         TEXT PRIMARY KEY,                 -- lowercased; one pending row per address
   token_hash    TEXT NOT NULL UNIQUE,             -- sha256 of the link token; rotated on every attempt
   username      TEXT,                             -- requested handle, claimed at completion only if still free

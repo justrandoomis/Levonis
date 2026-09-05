@@ -99,10 +99,14 @@ export function DeviceCard({
           </div>
           <p className="text-zinc-500 text-[12px] mt-0.5 flex items-center gap-1.5 min-w-0">
             <span dir="ltr" className="font-mono tracking-wider shrink-0">{serialLabel}</span>
-            <span aria-hidden="true">·</span>
-            <span className="truncate">
-              {s.orderRef} <span dir="ltr" className="font-mono">{device.order_id}</span>
-            </span>
+            {device.order_id && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="truncate">
+                  {s.orderRef} <span dir="ltr" className="font-mono">{device.order_id}</span>
+                </span>
+              </>
+            )}
           </p>
           {(device.transferred || replaced || device.open_claims > 0) && (
             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -129,7 +133,7 @@ export function DeviceCard({
         )}
         <Link
           to="/support"
-          state={{ unitId: device.unit_id, orderId: device.order_id, subject: supportSubject }}
+          state={{ unitId: device.unit_id, ...(device.order_id ? { orderId: device.order_id } : {}), subject: supportSubject }}
           className={`${BTN_SECONDARY} ${replaced ? 'col-span-2' : ''}`}
         >
           <LifeBuoy aria-hidden="true" className="w-4 h-4" />
@@ -138,10 +142,12 @@ export function DeviceCard({
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <Link to={`/orders/${encodeURIComponent(device.order_id)}`} className={LINK_QUIET}>
-          <Package aria-hidden="true" className="w-3.5 h-3.5" />
-          {s.viewOrder}
-        </Link>
+        {device.order_id && (
+          <Link to={`/orders/${encodeURIComponent(device.order_id)}`} className={LINK_QUIET}>
+            <Package aria-hidden="true" className="w-3.5 h-3.5" />
+            {s.viewOrder}
+          </Link>
+        )}
         {receiptNo && (
           <>
             <Link to={`/warranty/${encodeURIComponent(receiptNo)}`} className={LINK_QUIET}>

@@ -132,8 +132,12 @@ export function ClaimThreadOverlay({
           </div>
           {facts && (
             <p className="text-zinc-500 text-[11px] mt-1 tabular-nums">
-              {s.orderRef}: <span dir="ltr" className="font-mono">{facts.order_id}</span>
-              {' · '}
+              {facts.order_id && (
+                <>
+                  {s.orderRef}: <span dir="ltr" className="font-mono">{facts.order_id}</span>
+                  {' · '}
+                </>
+              )}
               {s.deliveredAt}: {fmtDate(facts.delivered_at, lang)}
               {' · '}
               {s.warrantyEnd}: {fmtDate(facts.warranty_end_at, lang)}

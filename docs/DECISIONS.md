@@ -299,3 +299,18 @@ JSON-column cart line for a product with options could reach checkout with no
 option chosen) was closed the same day in `cart.ts`/`orders.ts` with
 `refuseIncompleteSelection`, for every product regardless of how its options
 are stored.
+
+## 2026-09-05 — a never-linked printer is its buyer's; a transfer needs a release
+
+The security re-review of the warranty centre proved that "one account per
+device, linked by serial or receipt number" was one rule short: a device its
+buyer had never linked could be taken by anyone who typed a serial or walked
+the sequential receipt numbers, and the taker could read the buyer's receipt.
+The rule now has two halves. A device nobody has linked belongs to the account
+that bought it — only the buyer can link it (by serial, receipt, QR, or from
+their orders). A transfer is what the owner described: the current holder
+removes the device from their account (or an admin unlinks it), and only then
+can the new holder link it by its serial or receipt. A later holder gets the
+coverage proof — the receipt document with the customer block and price
+redacted, the coverage timeline, claims — never the buyer's identity or order.
+

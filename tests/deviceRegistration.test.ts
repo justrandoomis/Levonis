@@ -21,6 +21,7 @@ import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { deviceRoutes, SERIAL_NOT_FOUND_OR_IN_USE, receiptNoFrom } from '../worker/routes/devices';
 import { warrantyPublicRoutes } from '../worker/routes/warranty';
+import { classifyHost } from '../worker/lib/hosts';
 
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 
@@ -48,10 +49,13 @@ function setup() {
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 
-function appAs(db: D1Database, user: { id: string; role: string }) {
+function appAs(db: D1Database, user: { id: string; role: string }, host = 'levonis-iq.com') {
   const a = new Hono<AppContext>();
   a.use('*', async (c, next) => {
     c.set('user', { id: user.id, role: user.role, email: `${user.id}@x.co` } as never);
+    // The host classification worker/index.ts computes for every request:
+    // the main site by default, a merchant subdomain when a test asks for one.
+    c.set('host', classifyHost(host, 'levonis-iq.com'));
     c.env = { DB: db, APP_ORIGIN: 'https://levonis-iq.com', STORE_ROOT_DOMAIN: 'levonis-iq.com' } as never;
     await next();
   });
@@ -180,7 +184,11 @@ test('a claim is opened by the account that HOLDS the device, not only by the bu
   // Not linked yet: the buyer is told to link first; the stranger sees nothing.
   assert.equal((await json(await post(b, '/api/devices/units/u1/claims', { subject: 'Nozzle clog', description: 'It stopped extruding after two prints.' }))).code, 'NOT_REGISTERED');
   assert.equal((await post(s, '/api/devices/units/u1/claims', { subject: 'Nozzle clog', description: 'It stopped extruding after two prints.' })).status, 404);
-  // Transferred to the stranger: they may claim; the buyer may not.
+  // Transferred to the stranger — the buyer links and RELEASES it first (a
+  // never-linked device is not a stranger's to take) — then they may claim;
+  // the buyer may not.
+  assert.equal((await post(b, '/api/devices/register', { serial: 'SN-1234-ABCD' })).status, 200);
+  assert.equal((await del(b, '/api/devices/units/u1/registration')).status, 200);
   assert.equal((await post(s, '/api/devices/register', { serial: 'SN-1234-ABCD' })).status, 200);
   assert.equal((await post(s, '/api/devices/units/u1/claims', { subject: 'Nozzle clog', description: 'It stopped extruding after two prints.' })).status, 200);
   assert.equal((await post(b, '/api/devices/units/u1/claims', { subject: 'Nozzle clog', description: 'It stopped extruding after two prints.' })).status, 400);
@@ -229,4 +237,69 @@ test('the buyer or the holder can open their warranty receipt; nobody else can t
   assert.equal((await del(b, '/api/devices/units/u1/registration')).status, 200);
   assert.equal((await post(s, '/api/devices/register', { serial: 'SN-1234-ABCD' })).status, 200);
   assert.equal((await s.request('/api/warranty/receipts/WR-2026-0905-001/document')).status, 200);
+});
+
+// ------------------------------------------------ a never-linked device is its buyer's
+
+test('a never-linked device belongs to its buyer: a stranger with the serial or a guessed receipt number is refused', async () => {
+  const { db } = setup();
+  const s = appAs(db, stranger);
+  // Receipt numbers are WR-YYYY-MMDD-NNN — sequential and guessable — and
+  // serials follow factory patterns. Neither may take a device its buyer never
+  // released, and neither refusal reveals that the device exists.
+  const bySerial = await post(s, '/api/devices/register', { serial: 'SN-1234-ABCD' });
+  const byReceipt = await post(s, '/api/devices/register', { serial: 'WR-2026-0905-001' });
+  const byLink = await post(s, '/api/devices/register', { serial: 'https://levonis-iq.com/warranty/WR-2026-0905-001' });
+  for (const r of [bySerial, byReceipt, byLink]) {
+    assert.equal(r.status, 404);
+    assert.equal((await json(r)).error, SERIAL_NOT_FOUND_OR_IN_USE);
+  }
+  assert.equal((await json(await s.request('/api/devices/mine'))).devices.length, 0, 'nothing was linked');
+  // …and the stranger cannot read the buyer's receipt or open a claim through it.
+  assert.equal((await s.request('/api/warranty/receipts/WR-2026-0905-001/document')).status, 404);
+  assert.equal((await post(s, '/api/devices/units/u1/claims', { subject: 'Nozzle clog', description: 'It stopped extruding after two prints.' })).status, 404);
+  // The buyer, who never linked it, still can — by any of the three ways.
+  const b = appAs(db, buyer);
+  assert.equal((await post(b, '/api/devices/register', { serial: 'WR-2026-0905-001' })).status, 200);
+});
+
+test("a later holder's copy of the receipt proves coverage but carries none of the buyer's details", async () => {
+  const { db, raw } = setup();
+  raw.prepare(
+    "UPDATE warranty_receipts SET customer_name = 'Sara Al-Buyer', customer_phone = '07701234567', customer_address = 'Baghdad, Karrada, House 12', customer_email = 'sara-private@x.co', purchase_price_iqd = 899000 WHERE id = 'wr1'"
+  ).run();
+  const b = appAs(db, buyer);
+  const s = appAs(db, stranger);
+  // The buyer's own copy is complete.
+  const own = await (await b.request('/api/warranty/receipts/WR-2026-0905-001/document?lang=en')).text();
+  assert.match(own, /Sara Al-Buyer/);
+  assert.match(own, /07701234567/);
+  // Transfer: buyer links, releases; the new holder links.
+  assert.equal((await post(b, '/api/devices/register', { serial: 'SN-1234-ABCD' })).status, 200);
+  assert.equal((await del(b, '/api/devices/units/u1/registration')).status, 200);
+  assert.equal((await post(s, '/api/devices/register', { serial: 'SN-1234-ABCD' })).status, 200);
+  const res = await s.request('/api/warranty/receipts/WR-2026-0905-001/document?lang=en');
+  assert.equal(res.status, 200, 'the holder may open the document');
+  const html = await res.text();
+  assert.match(html, /WR-2026-0905-001/);
+  for (const secret of ['Sara Al-Buyer', '07701234567', 'Karrada', 'sara-private@x.co', '899,000', '899000']) {
+    assert.ok(!html.includes(secret), `the holder's copy must not carry "${secret}"`);
+  }
+  // Nor does the holder's device list or claim carry the buyer's order id.
+  const mine = await json(await s.request('/api/devices/mine'));
+  assert.equal(mine.devices[0].transferred, true);
+  assert.equal(mine.devices[0].order_id, null, "the buyer's order is not the holder's to see");
+  const claim = await json(await post(s, '/api/devices/units/u1/claims', { subject: 'Nozzle', description: 'Clogs every print since day one' }));
+  assert.equal(claim.success, true);
+  assert.equal(claim.warranty_facts.order_id, null);
+  assert.ok(claim.warranty_facts.warranty_end_at, 'the coverage facts are there');
+});
+
+test('the admin device routes exist only on the main host — a merchant subdomain answers 404 even to an admin', async () => {
+  const { db } = setup();
+  const onShop = appAs(db, boss, 'shop.levonis-iq.com');
+  assert.equal((await onShop.request('/api/devices/admin/units?serial=SN-1234-ABCD')).status, 404);
+  assert.equal((await post(onShop, '/api/devices/admin/units/u1/unregister', { reason: 'moved away' })).status, 404);
+  const onMain = appAs(db, boss);
+  assert.equal((await onMain.request('/api/devices/admin/units?serial=SN-1234-ABCD')).status, 200);
 });

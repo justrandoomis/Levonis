@@ -19,8 +19,9 @@ export interface DeviceProduct {
 
 export interface Device {
   unit_id: string;
-  order_id: string;
-  order_item_id: string;
+  /** The BUYER's order. Null when the viewer holds a transferred device: the order is someone else's. */
+  order_id: string | null;
+  order_item_id: string | null;
   unit_index: number;
   product: DeviceProduct;
   /** MASKED by the server, e.g. `****ABCD`. */
@@ -92,7 +93,7 @@ export interface ClaimMessage {
 export interface ClaimDetail {
   claim: Claim;
   warranty_facts: {
-    order_id: string;
+    order_id: string | null;
     delivered_at: string | null;
     warranty_end_at: string | null;
     state: string;

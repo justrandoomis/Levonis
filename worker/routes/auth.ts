@@ -385,8 +385,13 @@ authRoutes.post('/register', async (c) => {
   // ignores the mail or sets their own password.
   const emailFirst = !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM);
   if (emailFirst) {
-    // One address must not be floodable from many IPs.
-    await rateLimit(c, 'register-id', 5, 3600, await identifierKey(mail));
+    // One address must not be floodable from many IPs — and since every
+    // attempt for a free address mails a fresh link, the day is capped too, so
+    // nobody can be made to receive a stream of sign-up mail. Both limits run
+    // before the branch, identically for a free and a taken address.
+    const addressKey = await identifierKey(mail);
+    await rateLimit(c, 'register-id', 5, 3600, addressKey);
+    await rateLimit(c, 'register-id-day', 12, 86400, addressKey);
     const mailLang = emailLang(body.lang ?? localeToApi(locale));
     const account = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
     if (account) {
@@ -524,7 +529,17 @@ authRoutes.get('/signup/pending', async (c) => {
   const token = str(c.req.query('token'), 'token', { min: 20, max: 128 });
   const p = await loadPendingSignup(c.env.DB, await sha256Hex(token));
   c.header('Cache-Control', 'no-store');
-  return c.json({ success: true, email: p.email, name: p.name, username: p.username, country: p.country, expires_at: p.expires_at });
+  return c.json({
+    success: true,
+    email: p.email,
+    name: p.name,
+    username: p.username,
+    country: p.country,
+    // Shown on the finish page so the person sees — and may remove — the
+    // referral a sign-up attempt attached to their address.
+    referral_code: p.referral_code,
+    expires_at: p.expires_at,
+  });
 });
 
 /**
@@ -559,6 +574,12 @@ authRoutes.post('/signup/complete', async (c) => {
   const uname = overrideUname ?? p.username;
   const name = typeof body.name === 'string' ? str(body.name, 'name', { min: 0, max: 100, required: false }) : p.name;
   const country = body.country !== undefined ? countryCodeOrNull(body.country) : p.country;
+  // The referral is decided by the person FINISHING, not by whoever submitted
+  // the sign-up: the finish page shows the pending code and sends back what
+  // the person kept (an empty string removes it). Otherwise anyone could plant
+  // sign-ups for other people's addresses and collect the referral on every
+  // one that gets completed. An old client that sends nothing keeps the code.
+  const referral = typeof body.referralCode === 'string' ? referralCodeFrom(body) : p.referral_code;
 
   const hash = await hashPassword(password);
   // Claim the row atomically: exactly one of two concurrent completions wins.
@@ -597,7 +618,7 @@ authRoutes.post('/signup/complete', async (c) => {
       throw e;
     }
   }
-  await tryAttributeReferral(c.env, id, p.referral_code);
+  await tryAttributeReferral(c.env, id, referral);
   await createSession(c, id);
   await audit(c.env.DB, id, 'auth.signup_completed', id, usernameDropped ? { username_dropped: true } : {});
   const user = await getFullUser(c.env.DB, id);

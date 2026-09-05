@@ -410,3 +410,63 @@ test('without a mail service the old behaviour stays: immediate session, passwor
   // The finish endpoints have nothing to finish in this mode.
   assert.equal((await complete(a, 'not-a-real-token-0123456789', PW)).res.status, 400);
 });
+
+// ------------------------------------------------------------ referral is the finisher's
+
+test('the finish page decides the referral: a planted code is shown and can be dropped or replaced', async () => {
+  const mail = captureMail();
+  try {
+    const { raw, d1 } = db();
+    const a = app(d1, MAIL);
+    // The inviter whose code an attacker might plant on other people's addresses.
+    // Referral by username (the site's ref-by-handle rule): the inviter's handle is the code.
+    raw.prepare("INSERT INTO users (id, email, username, name, password_hash) VALUES ('inv','inv@example.com','inviter','Inv','x')").run();
+    await register(a, { email: 'planted@example.com', username: 'planted_h', referralCode: 'inviter' });
+    const token = linkTokenFor(raw, 'planted@example.com')!;
+    const peek = await pending(a, token);
+    assert.equal(peek.body.referral_code, 'inviter', 'the finish page sees the pending code');
+    // The person removes it (an empty string means "none").
+    const done = await complete(a, token, PW, { referralCode: '' });
+    assert.equal(done.res.status, 200);
+    const newId = (done.body.user as { id: string }).id;
+    const attributed = raw.prepare('SELECT COUNT(*) AS n FROM referral_attributions WHERE referred_id = ?').get(newId) as { n: number };
+    assert.equal(attributed.n, 0, 'nothing attributed to the planter');
+  } finally { mail.restore(); }
+});
+
+test('an old client that sends no referral field keeps the code typed at sign-up', async () => {
+  const mail = captureMail();
+  try {
+    const { raw, d1 } = db();
+    const a = app(d1, MAIL);
+    raw.prepare("INSERT INTO users (id, email, username, name, password_hash) VALUES ('inv','inv@example.com','inviter','Inv','x')").run();
+    await register(a, { email: 'kept@example.com', username: 'kept_h', referralCode: 'inviter' });
+    const token = linkTokenFor(raw, 'kept@example.com')!;
+    const done = await complete(a, token, PW);
+    assert.equal(done.res.status, 200);
+    const newId = (done.body.user as { id: string }).id;
+    const attributed = raw.prepare('SELECT COUNT(*) AS n FROM referral_attributions WHERE referred_id = ?').get(newId) as { n: number };
+    assert.ok(attributed.n >= 1, 'the referral the person typed is honoured');
+  } finally { mail.restore(); }
+});
+
+test('one address cannot be made to receive more than a handful of sign-up mails a day, from any number of IPs', async () => {
+  const mail = captureMail();
+  try {
+    const { raw, d1 } = db();
+    const a = app(d1, MAIL);
+    let refused = 0;
+    for (let i = 0; i < 20; i++) {
+      const { ctx, settle } = execCtx();
+      const res = await a.request(`${ORIGIN}/api/auth/register`, {
+        ...json({ email: 'flood@example.com', username: `flood${i}` }),
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': `10.0.${Math.floor(i / 4)}.${i}` },
+      }, undefined, ctx);
+      await settle();
+      if (res.status === 429) refused++;
+    }
+    assert.ok(refused >= 8, `most attempts are refused (got ${refused} refusals)`);
+    const sent = (raw.prepare("SELECT COUNT(*) AS n FROM outbox WHERE recipient = 'flood@example.com'").get() as { n: number }).n;
+    assert.ok(sent <= 12, `at most a dozen mails a day reach the address (got ${sent})`);
+  } finally { mail.restore(); }
+});

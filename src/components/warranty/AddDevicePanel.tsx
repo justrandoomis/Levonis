@@ -238,8 +238,12 @@ export function AddDevicePanel({
                           {productName(u.product, lang)}
                         </div>
                         <div className="text-zinc-500 text-[11px] truncate tabular-nums">
-                          <span dir="ltr" className="font-mono">{u.order_id}</span>
-                          {' · '}
+                          {u.order_id && (
+                            <>
+                              <span dir="ltr" className="font-mono">{u.order_id}</span>
+                              {' · '}
+                            </>
+                          )}
                           {s.unitN(u.unit_index)}
                           {' · '}
                           {s.deliveredAt} {fmtDate(u.delivered_at, lang)}

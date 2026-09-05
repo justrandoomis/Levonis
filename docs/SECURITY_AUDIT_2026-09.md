@@ -304,6 +304,40 @@ regression.
   address raced, expiry, member link opens no session, Kurdish mail on the
   trusted origin, capabilities flag, no-mail fallback).
 
+- **Re-review of the 2026-09-05 batch (orders, warranty centre, email-first
+  sign-up, pricing offsets) — one HIGH found and fixed before deploy.** Two
+  independent adversarial reviewers read the six commits.
+    - HIGH — device takeover through a guessed receipt number. The one-account-
+      per-device change had let ANY signed-in user link a device nobody had
+      linked yet by typing its serial or its receipt number (`WR-YYYY-MMDD-NNN`,
+      a per-day counter), then open the buyer's receipt document (name, phone,
+      address, email, price, full serial) and file claims on it. Fixed: a
+      never-linked device belongs to the account that bought it; a stranger may
+      link a device only after its holder — or an admin — RELEASED it (a revoked
+      registration), which is the transfer the owner described. A later holder's
+      copy of the receipt is redacted (no customer block, no price) and carries
+      no buyer order id; the refusal does the same database work whether the
+      serial exists or not. Tests: `tests/deviceRegistration.test.ts` (never-
+      linked device refused by serial, receipt and QR link; redacted holder copy;
+      no buyer order id to a holder).
+    - LOW — device admin routes reachable on merchant subdomains → now behind
+      `requireMainHost` too (test: a merchant host answers 404 to an admin).
+    - LOW — referral planting on pending sign-ups → the finish page shows the
+      pending code and sends back what the person kept; an empty value removes
+      it (tests: dropped and kept).
+    - LOW — sign-up mail volume → a per-address daily cap (12) on top of the
+      hourly one, applied before the free/taken branch (test).
+    - LOW — serial-lookup timing → equalised.
+    - Migration 0051 now rebuilds `pending_signups` (`DROP TABLE IF EXISTS` then
+      `CREATE`) so a database that ran the reverted draft cannot keep its
+      password column.
+  Everything else attacked was found sound: identical sign-up bodies and limits
+  on both branches, no handle claimed by a pending sign-up, single-use atomic
+  completion that never opens a session into an existing account, CSRF origin
+  check on every new state-changing route, parameterised `IN (...)` builders,
+  masked serials and no holder identity in customer payloads, cost fields
+  stripped everywhere public, member prices clamped at or below regular.
+
 - **`/telegram/complete` email oracle (Medium) — SHIPPED (independent of the
   above).** The email-taken check ran before the OTP was consumed, so one
   verified phone challenge could probe many addresses. It is moved to the

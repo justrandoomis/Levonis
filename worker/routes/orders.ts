@@ -866,8 +866,17 @@ orderRoutes.get('/', async (c) => {
   const user = c.get('user')!;
   const statusRaw = str(c.req.query('status'), 'status', { max: 80, required: false });
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
-  const before = str(c.req.query('before'), 'before', { max: 40, required: false });
-  if (before && !Number.isFinite(Date.parse(before))) throw badRequest('before must be an ISO timestamp');
+  // The cursor is `created_at|id` of the last order shown, so two orders
+  // written in the same millisecond (or legacy rows with second-resolution
+  // timestamps) are never skipped at a page boundary. A bare ISO timestamp is
+  // still accepted for any client that stored the old cursor.
+  const beforeRaw = str(c.req.query('before'), 'before', { max: 120, required: false });
+  const sep = beforeRaw.indexOf('|');
+  const beforeAt = sep >= 0 ? beforeRaw.slice(0, sep) : beforeRaw;
+  const beforeId = sep >= 0 ? beforeRaw.slice(sep + 1) : '';
+  if (beforeRaw && (!Number.isFinite(Date.parse(beforeAt)) || (sep >= 0 && !beforeId))) {
+    throw badRequest('before must be an ISO timestamp, optionally followed by |<order id>');
+  }
 
   let sql = 'SELECT * FROM orders WHERE user_id = ?';
   const params: unknown[] = [user.id];
@@ -883,12 +892,18 @@ orderRoutes.get('/', async (c) => {
     sql += ` AND status IN (${wanted.map(() => '?').join(',')})`;
     params.push(...wanted);
   }
-  if (before) {
-    sql += ' AND created_at < ?';
-    params.push(before);
+  if (beforeRaw) {
+    if (beforeId) {
+      // Same ordering as ORDER BY below: newest first, then id descending.
+      sql += ' AND (created_at < ? OR (created_at = ? AND id < ?))';
+      params.push(beforeAt, beforeAt, beforeId);
+    } else {
+      sql += ' AND created_at < ?';
+      params.push(beforeAt);
+    }
   }
   // One row past the page says whether a next page exists, without a COUNT.
-  sql += ' ORDER BY created_at DESC LIMIT ?';
+  sql += ' ORDER BY created_at DESC, id DESC LIMIT ?';
   params.push(limit + 1);
   const { results: rows } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
   const hasMore = rows.length > limit;
@@ -919,7 +934,7 @@ orderRoutes.get('/', async (c) => {
   return c.json({
     success: true,
     orders: out,
-    next_before: hasMore ? String(orders[orders.length - 1].created_at) : null,
+    next_before: hasMore ? `${String(orders[orders.length - 1].created_at)}|${String(orders[orders.length - 1].id)}` : null,
   });
 });
 

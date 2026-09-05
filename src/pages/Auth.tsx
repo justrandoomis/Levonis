@@ -497,8 +497,14 @@ export default function Auth() {
   // The finish screen (/auth?finish=TOKEN): the pending profile behind the
   // link, read once so the person sees which address they are opening.
   const [finishInfo, setFinishInfo] = useState<{ email: string; name: string; username: string | null } | null>(null);
+  // The referral a sign-up attempt attached to this address. Shown on the
+  // finish screen and sent back explicitly, so the person finishing — not
+  // whoever submitted the sign-up — decides who is credited.
+  const [finishReferral, setFinishReferral] = useState('');
+  const [finishReferralFromLink, setFinishReferralFromLink] = useState(false);
   const [finishState, setFinishState] = useState<'loading' | 'ready' | 'dead'>('loading');
   const [finishLoadFailed, setFinishLoadFailed] = useState(false);
+  const [finishLoadRateLimited, setFinishLoadRateLimited] = useState(false);
   const [serverError, setServerError] = useState('');
   // Set only when the SERVER says phone sign-up needs ownership proof — the
   // page then offers the Telegram verification path instead of pretending.
@@ -546,19 +552,25 @@ export default function Auth() {
     setFinishState('loading');
     setFinishLoadFailed(false);
     api
-      .get<{ email: string; name: string; username: string | null }>(`/api/auth/signup/pending?token=${encodeURIComponent(finishToken)}`)
+      .get<{ email: string; name: string; username: string | null; referral_code?: string | null }>(
+        `/api/auth/signup/pending?token=${encodeURIComponent(finishToken)}`
+      )
       .then((p) => {
         if (!alive) return;
         setFinishInfo({ email: p.email, name: p.name, username: p.username });
+        setFinishReferral(p.referral_code ?? '');
+        setFinishReferralFromLink(!!p.referral_code);
         setFinishState('ready');
       })
       .catch((err) => {
         if (!alive) return;
         // A 400 is the server's one generic "this link is dead"; anything
-        // else (network) still lets the person try — the POST is the judge.
+        // else (a rate limit, the network) still lets the person try — the
+        // POST is the judge — with an honest word about what happened.
         if (err instanceof ApiError && err.status === 400) setFinishState('dead');
         else {
           setFinishLoadFailed(true);
+          setFinishLoadRateLimited(err instanceof ApiError && err.status === 429);
           setFinishState('ready');
         }
       });
@@ -980,7 +992,9 @@ export default function Auth() {
     setVia('form');
     setSubmitting(true);
     try {
-      await api.post('/api/auth/signup/complete', { token: finishToken, password });
+      // referralCode is sent even when empty: an empty string REMOVES a code
+      // the person did not want, whereas an absent field would keep it.
+      await api.post('/api/auth/signup/complete', { token: finishToken, password, referralCode: finishReferral.trim() });
       setPassword('');
       setConfirmPassword('');
       await refreshUser();
@@ -1252,9 +1266,13 @@ export default function Auth() {
           {finishLoadFailed && !serverError && (
             <div className="lv-notice lv-notice--warn" role="status">
               <Info aria-hidden />
-              <p>{s.errNetwork}</p>
+              <p>{finishLoadRateLimited ? s.errTooMany : s.errNetwork}</p>
             </div>
           )}
+          {/* The referral that will be credited, visible and removable. */}
+          <div style={{ marginBottom: 14 }}>
+            <ReferralBar code={finishReferral} onCodeChange={setFinishReferral} fromLink={finishReferralFromLink} disabled={submitting} />
+          </div>
           {errorSummary}
           <div className="lv-fields">
             {passwordField('new-password')}
