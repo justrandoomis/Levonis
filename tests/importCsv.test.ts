@@ -218,6 +218,10 @@ const sample: ExportProduct = {
   direct_surcharge_iqd: 5000,
   stock: 12,
   low_stock_threshold: 3,
+  // Device coverage (products.ops_policy): the 12-month base the extended
+  // warranty adds to, and one unit per printer at delivery.
+  warranty_base_months: 12,
+  serialized: true,
   payment_options: ['cod', 'wallet'],
   how_to_use: 'Level the bed, then print the test model.',
   usage_url: 'https://wiki.bambulab.com/en/a1',
@@ -376,21 +380,25 @@ const sample: ExportProduct = {
     { key: 'warranty_included', text: 'Warranty included', icon: 'shield', visible: true },
     { key: '', text: 'Ships today', icon: '', visible: false },
   ],
+  // Extended warranty is a PRINTER's option: +12 → 24 total and +24 → 36
+  // total, one priced as a share of the printer price, one as a fixed fee.
   warranty_plans: [
     {
-      title: 'One year',
+      title: 'Extended warranty +12 months',
       terms: 'Manufacturing defects only.\nConsumables are not covered.',
       duration_months: 12,
-      duration_kind: 'total',
+      duration_kind: 'extension',
       fee_iqd: 0,
+      fee_percent: 7.5,
       active: true,
     },
     {
-      title: 'Extended',
-      terms: 'Adds a second year.',
-      duration_months: 12,
+      title: 'Extended warranty +24 months',
+      terms: 'Adds two more years.',
+      duration_months: 24,
       duration_kind: 'extension',
       fee_iqd: 45000,
+      fee_percent: null,
       active: true,
     },
   ],
@@ -478,8 +486,8 @@ test('export then import reproduces every field, order and relation', () => {
     sample.labels.map((l) => [l.key, l.text, l.icon, l.visible])
   );
   assert.deepEqual(
-    p.warranty_plans?.map((w) => [w.title, w.terms, w.duration_months, w.duration_kind, w.fee_iqd, w.active]),
-    sample.warranty_plans.map((w) => [w.title, w.terms, w.duration_months, w.duration_kind, w.fee_iqd, w.active])
+    p.warranty_plans?.map((w) => [w.title, w.terms, w.duration_months, w.duration_kind, w.fee_iqd, w.fee_percent, w.active]),
+    sample.warranty_plans.map((w) => [w.title, w.terms, w.duration_months, w.duration_kind, w.fee_iqd, w.fee_percent, w.active])
   );
   assert.deepEqual(
     p.content_blocks?.map((b) => [b.kind, b.body, b.caption, b.url]),
@@ -623,6 +631,8 @@ const catalogPrinters: CatalogRef = {
   name_en: 'Printers',
   name_ar: 'الطابعات',
   template_family: 'devices',
+  // The owner's flag: the sample's extended-warranty rows are legal here.
+  is_printer_catalog: true,
 };
 const catalogFdm: CatalogRef = {
   id: 'cat_printers_fdm',
@@ -1036,7 +1046,21 @@ test('every type ships a worked example of its own that imports cleanly', () => 
     assert.ok((p.transports ?? []).length > 0, `${type.id} example has no transport row`);
     assert.ok((p.specs ?? []).length > 0, `${type.id} example has no spec row`);
     assert.ok((p.labels ?? []).length > 0, `${type.id} example has no label row`);
-    assert.ok((p.warranty_plans ?? []).length > 0, `${type.id} example has no warranty row`);
+    // Extended warranty is offered for PRINTERS only (owner mandate): the
+    // printer example teaches the two plans the store sells (+12 → 24, +24 →
+    // 36, priced as a share of the printer price); every other type ships
+    // none, because importing one for it is refused (WARRANTY_NOT_PRINTER).
+    if (type.id === 'printer') {
+      assert.deepEqual(
+        (p.warranty_plans ?? []).map((w) => [w.duration_months, w.duration_kind, w.fee_percent]),
+        [[12, 'extension', 7.5], [24, 'extension', 10]],
+        'the printer example carries both extensions'
+      );
+      assert.equal(p.warranty_base_months, 12, 'the printer example states its 12-month base');
+      assert.equal(p.serialized, true, 'the printer example is serialized');
+    } else {
+      assert.deepEqual(p.warranty_plans ?? [], [], `${type.id} example must not offer an extended warranty`);
+    }
     assert.ok((p.content_blocks ?? []).length > 0, `${type.id} example has no content row`);
     assert.ok((p.guide_steps ?? []).length > 0, `${type.id} example has no guide row`);
     assert.ok(p.images.length > 0, `${type.id} example has no image row`);
@@ -1068,6 +1092,8 @@ test('every field of the product form is expressible in the sheet', () => {
     product_cost_iqd: 'cost_iqd', direct_surcharge_iqd: 'direct_surcharge_iqd',
     stock: 'stock', low_stock_threshold: 'low_stock_threshold', payment_options: 'payment_options',
     how_to_use: 'how_to_use', spec_fields: 'spec.*',
+    // device coverage (products.ops_policy) — the base the extended warranty adds to
+    warranty_base_months: 'warranty_base_months', serialized: 'serialized',
     // child row types
     options: 'row:option', colors: 'row:color', media: 'row:image',
     preorder_transports: 'row:transport', spec_groups: 'row:spec', labels: 'row:label',
@@ -1209,11 +1235,16 @@ test('the child rows become the document the form would have produced', () => {
     ['', 'Ships today', false, 1],
   ]);
 
-  const plans = r.doc.warranty_plans as Array<{ title_en: string; duration_months: number; duration_kind: string; fee_iqd: number }>;
-  assert.deepEqual(plans.map((w) => [w.title_en, w.duration_months, w.duration_kind, w.fee_iqd]), [
-    ['One year', 12, 'total', 0],
-    ['Extended', 12, 'extension', 45000],
+  const plans = r.doc.warranty_plans as Array<{
+    title_en: string; duration_months: number; duration_kind: string; fee_iqd: number; fee_percent: number | null;
+  }>;
+  assert.deepEqual(plans.map((w) => [w.title_en, w.duration_months, w.duration_kind, w.fee_iqd, w.fee_percent]), [
+    ['Extended warranty +12 months', 12, 'extension', 0, 7.5],
+    ['Extended warranty +24 months', 24, 'extension', 45000, null],
   ]);
+  // The device coverage the plans rest on lands on the document too.
+  assert.equal(r.doc.warranty_base_months, 12);
+  assert.equal(r.doc.serialized, true);
 
   const blocks = r.doc.content_blocks as Array<{ kind: string; body_en: string; url: string }>;
   assert.deepEqual(blocks.map((b) => b.kind), ['text', 'video_embed']);

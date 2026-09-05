@@ -39,6 +39,7 @@ import { deriveSaleTypes } from './availability';
 import type { AvailabilityType } from './availability';
 import { normalizeHashtag } from './hashtags';
 import type { ParsedProduct, RowIssue } from './importCsv';
+import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
 
 export interface CatalogRef {
   id: string;
@@ -47,6 +48,10 @@ export interface CatalogRef {
   name_en: string;
   name_ar: string;
   template_family: string | null;
+  /** The owner's flag: products filed here are printers, and only they may
+   *  carry extended-warranty plans. Optional so older callers still compile;
+   *  absent reads as "not a printer catalog". */
+  is_printer_catalog?: boolean;
 }
 
 export interface ExistingVariant {
@@ -168,12 +173,19 @@ export function resolveProduct(
   // ---- section and sub-section -------------------------------------------
   let categoryId: string | null = (existing?.doc.category_id as string | null) ?? null;
   let subCategoryId: string | null = (existing?.doc.sub_category_id as string | null) ?? null;
+  // Whether the product lands in a printer catalog — read off the SAME refs
+  // the sections resolve to, so the CSV preview can refuse a warranty row on
+  // a filament without a query (the confirm re-checks against the database).
+  let isPrinter = false;
   if (p.category) {
     const cat = maps.catalogs.get(normKey(p.category));
     if (!cat) issues.push(err(p.line, `category: لا يوجد قسم باسم "${p.category}"`));
     else if (maps.ambiguous?.catalogs.has(normKey(p.category))) {
       issues.push(err(p.line, ambiguousMessage('category', p.category)));
-    } else categoryId = cat.id;
+    } else {
+      categoryId = cat.id;
+      if (cat.is_printer_catalog) isPrinter = true;
+    }
   }
   if (p.sub_category) {
     const sub = maps.catalogs.get(normKey(p.sub_category));
@@ -186,9 +198,16 @@ export function resolveProduct(
       issues.push(err(p.line, `sub_category: "${p.sub_category}" ليس قسمًا فرعيًا من "${p.category}"`));
     } else {
       subCategoryId = sub.id;
+      if (sub.is_printer_catalog) isPrinter = true;
     }
   }
   if (!categoryId) issues.push(err(p.line, 'category: القسم الرئيسي مطلوب'));
+  // A sheet that names no section keeps the stored one — and its flag.
+  if (!p.category && !p.sub_category) {
+    for (const ref of maps.catalogs.values()) {
+      if ((ref.id === categoryId || ref.id === subCategoryId) && ref.is_printer_catalog) isPrinter = true;
+    }
+  }
 
   const family =
     (subCategoryId ? maps.familyOf.get(subCategoryId) : null) ??
@@ -580,10 +599,36 @@ export function resolveProduct(
       duration_months: w.duration_months,
       duration_kind: w.duration_kind,
       fee_iqd: w.fee_iqd ?? 0,
+      fee_percent: w.fee_percent,
       order: i,
       active: w.active,
     }));
   }
+
+  // Device coverage: the sheet's cell when it says something, else what is
+  // stored (an empty cell never un-configures a printer from a spreadsheet).
+  // The rest of ops_policy rides along untouched, as every other stored field.
+  const storedOps = readOpsWarranty(existing?.doc.ops_policy ?? {});
+  const coverage = {
+    warranty_base_months: p.warranty_base_months ?? storedOps.warranty_base_months,
+    serialized: p.serialized ?? storedOps.serialized,
+  };
+  // Extended warranty is for printers only (owner mandate). The rules and the
+  // printer defaults (serialized, 12-month base) are applied here so the
+  // PREVIEW refuses a warranty row on a non-printer with its line number; the
+  // confirm re-checks against the catalog table.
+  const guard = {
+    warranty_plans: (Array.isArray(warrantyPlans) ? warrantyPlans : []) as Array<{
+      id: string; duration_months: number; duration_kind: 'total' | 'extension'; fee_iqd: number; fee_percent?: number | null; active: boolean;
+    }>,
+    serialized: coverage.serialized,
+    warranty_base_months: coverage.warranty_base_months,
+  };
+  for (const message of printerWarrantyRules(guard, isPrinter)) {
+    issues.push(err(p.warranty_plans?.[0]?.line ?? p.line, message));
+  }
+  coverage.serialized = guard.serialized;
+  coverage.warranty_base_months = guard.warranty_base_months;
 
   let contentBlocks: unknown = existing?.doc.content_blocks ?? [];
   if (p.content_blocks !== null) {
@@ -684,6 +729,9 @@ export function resolveProduct(
     spec_groups: specGroups,
     labels,
     warranty_plans: warrantyPlans,
+    warranty_base_months: coverage.warranty_base_months,
+    serialized: coverage.serialized,
+    ops_policy: storedOps.policy,
     content_blocks: contentBlocks,
     usage_guide: usageGuide,
     brand_id: brandId,

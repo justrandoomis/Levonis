@@ -44,6 +44,7 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { syncProductTranslations } from '../lib/translate/store';
+import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 
 export const adminProductsRoutes = new Hono<AppContext>();
 
@@ -843,6 +844,21 @@ adminProductsRoutes.post('/', async (c) => {
     // blank a value they were never shown.
     carryStoredCostForward(doc, prev);
   }
+
+  // The stored ops_policy rides along under the two device fields the form
+  // edits, so a save from a client that never saw size_class cannot erase it.
+  if (prev) doc.ops_policy = { ...prev.ops_policy, ...doc.ops_policy };
+
+  // EXTENDED WARRANTY IS FOR PRINTERS (owner mandate). The catalog placement
+  // this save states — or, when it states none, the stored one — decides:
+  // a non-printer carrying plans is refused, a printer's plans must be the
+  // +12 / +24 extensions, and a printer is defaulted to serialized with a
+  // 12-month base so its delivered units can record 24/36 months.
+  await applyPrinterWarrantyRules(
+    c.env.DB,
+    doc,
+    Array.isArray(body.catalog_ids) ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string') : undefined
+  );
 
   // Stale-edit protection: the editor echoes the updated_at it loaded.
   if (prev && typeof body.expected_updated_at === 'string' && body.expected_updated_at) {

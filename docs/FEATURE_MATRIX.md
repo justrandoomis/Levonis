@@ -147,6 +147,7 @@ Data ownership below: "owner" = the signed-in account (server-enforced),
 | PRO 12-month membership, 499,000 IQD, wallet-paid, idempotent purchase | `/api/memberships/subscribe` | ✅ |
 | Pre-launch purchases become `prepaid_pending_launch`; owner-confirmed launch activation flips them atomically | `/api/memberships/admin/activate-launch` | ✅ (both states tested) |
 | PRO checkout entitlements: preorder commission waived, warranty fees kept, free delivery, tier snapshot frozen on the order | `worker/routes/orders.ts` | ✅ |
+| Extended warranty for PRINTERS only: +12 → 24 / +24 → 36 months, percent of the regular price (tier-neutral), chosen on the product page or in the cart's expandable "Extended Warranty" row, frozen at checkout and never attachable afterwards; admin-form block, TXT/CSV fields, `extended_warranty` policy, receipt/centre/order displays | `worker/lib/warrantyPlans.ts`, `routes/cart.ts`, `routes/orders.ts`, `src/pages/Cart.tsx`, `form/WarrantySection.tsx` | ✅ (`tests/extendedWarranty.test.ts`) |
 | Referral programs (printer: reward eligible 7 days after delivery; new-PRO-subscriber), admin-reviewed payout | `worker/lib/membershipOps.ts` | ✅ (API) — payout manual by design (decision #11) |
 | Printer purchase gift (PLUS grant) | `printerGiftConfig` | 🔶 disabled until owner decision #5 |
 | Coupons + redemption in the checkout batch | `/api/orders` | ⚙️ (API-tested; no admin UI for creating coupons yet) |

@@ -62,9 +62,17 @@ import { audit } from '../lib/audit';
 import { rateLimit, rateLimitKey } from '../lib/ratelimit';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { RECEIPT_NO_RE } from '../lib/warranty';
+import {
+  effectiveDevicePolicy,
+  mergeOpsPolicy,
+  printerWarrantyRules,
+  readOpsWarranty,
+  WARRANTY_PLAN_INVALID,
+} from '../lib/warrantyPlans';
+import { upgradeWarranty } from '../lib/productModel';
+import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { sniff } from './uploads';
 import {
-  parseOpsPolicy,
   coverageState,
   normalizeSerial,
   maskSerial,
@@ -675,7 +683,7 @@ deviceRoutes.get('/admin/orders/:orderId/units', async (c) => {
 
   const [{ results: items }, { results: units }] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT oi.id, oi.name_snapshot, oi.qty, oi.warranty_snapshot, p.ops_policy
+      `SELECT oi.id, oi.product_id, oi.name_snapshot, oi.qty, oi.warranty_snapshot, p.ops_policy
          FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
         WHERE oi.order_id = ?`
     )
@@ -697,6 +705,10 @@ deviceRoutes.get('/admin/orders/:orderId/units', async (c) => {
       .bind(orderId)
       .all<DeviceRow>(),
   ]);
+  const printerIds = await printerProductIds(
+    c.env.DB,
+    items.map((it) => String(it.product_id ?? ''))
+  );
 
   return c.json({
     success: true,
@@ -709,14 +721,18 @@ deviceRoutes.get('/admin/orders/:orderId/units', async (c) => {
       delivered_at: order.delivered_at ?? null,
     },
     items: items.map((it) => {
-      const policy = parseOpsPolicy(it.ops_policy);
+      // The policy AS THE DELIVERY HOOK READS IT (worker/lib/deviceOps.ts): a
+      // printer is serialized with a 12-month base unless the owner said
+      // otherwise, so this screen never shows "not serialized" for an item
+      // whose delivery will create units.
+      const policy = effectiveDevicePolicy(it.ops_policy, printerIds.has(String(it.product_id ?? '')));
       const snap = safeParse<WarrantySnapshotLite | null>(it.warranty_snapshot, null);
       return {
         id: it.id,
         name: it.name_snapshot,
         qty: it.qty,
         serialized: policy.serialized,
-        base_months: policy.base_months,
+        base_months: policy.warranty_base_months,
         warranty_plan: snap ? { plan_id: snap.plan_id ?? null, duration_months: snap.duration_months ?? null, duration_kind: snap.duration_kind ?? null } : null,
       };
     }),
@@ -1159,32 +1175,47 @@ deviceRoutes.post('/admin/products/:id/ops-policy', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const product = await c.env.DB.prepare('SELECT id, ops_policy FROM products WHERE id = ?')
+  const product = await c.env.DB.prepare('SELECT id, ops_policy, warranty_plans FROM products WHERE id = ?')
     .bind(id)
-    .first<{ id: string; ops_policy: string | null }>();
+    .first<{ id: string; ops_policy: string | null; warranty_plans: string | null }>();
   if (!product) throw notFound('Product not found');
 
-  const policy = safeParse<Record<string, unknown>>(product.ops_policy, {});
-  const changes: Record<string, unknown> = {};
+  const stored = safeParse<Record<string, unknown>>(product.ops_policy, {});
+  const changes: { serialized?: boolean; warranty_base_months?: number | null } = {};
   if (body.serialized !== undefined) {
     if (typeof body.serialized !== 'boolean') throw badRequest('serialized must be true or false');
-    policy.serialized = body.serialized;
     changes.serialized = body.serialized;
   }
   if (body.warranty_base_months !== undefined) {
-    if (body.warranty_base_months === null) {
-      // Explicitly NOT configured → units render honest needs_config.
-      delete policy.warranty_base_months;
-      delete policy.warranty_months;
-      changes.warranty_base_months = null;
-    } else {
-      const months = int(body.warranty_base_months, 'warranty_base_months', { min: 1, max: 240 });
-      policy.warranty_base_months = months;
-      delete policy.warranty_months; // single canonical key going forward
-      changes.warranty_base_months = months;
-    }
+    // null = explicitly NOT configured → units render honest needs_config.
+    changes.warranty_base_months =
+      body.warranty_base_months === null ? null : int(body.warranty_base_months, 'warranty_base_months', { min: 1, max: 240 });
   }
   if (Object.keys(changes).length === 0) throw badRequest('Nothing to update — send serialized and/or warranty_base_months');
+  // The ONE writer of these keys — shared with the product document's own
+  // serializer (worker/lib/productModel.ts), so the admin form, the TXT/CSV
+  // imports and this route can never spell them differently.
+  const policy = mergeOpsPolicy(stored, changes);
+
+  // The same rule every product writer applies (worker/lib/warrantyPlans.ts):
+  // a printer offering an active extended-warranty plan must stay serialized,
+  // or the units its delivery creates cannot record the coverage it sold.
+  // Judged against the plans actually STORED, with the policy as it would be
+  // written — so this route cannot switch off what the product form refuses.
+  // A non-printer's stored plans are legacy data the product editor owns;
+  // its device keys are not held hostage to them here.
+  if (await isPrinterProduct(c.env.DB, id)) {
+    const next = readOpsWarranty(policy);
+    const issues = printerWarrantyRules(
+      {
+        warranty_plans: upgradeWarranty(product.warranty_plans),
+        serialized: next.serialized,
+        warranty_base_months: next.warranty_base_months,
+      },
+      true
+    );
+    if (issues.length) throw badRequest(issues.join(' | '), WARRANTY_PLAN_INVALID);
+  }
 
   await c.env.DB.prepare("UPDATE products SET ops_policy = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
     .bind(JSON.stringify(policy), id)

@@ -6,9 +6,14 @@
  *
  * Eligibility is EXPLICIT configuration, never name-substring inference: a
  * product is serialized only when its products.ops_policy JSON says
- * {"serialized": true}. Base coverage months come from
- * ops_policy.warranty_base_months (alias: warranty_months). A serialized
- * product with NO configured duration gets warranty_end_at NULL and an
+ * {"serialized": true} — or when it is a PRINTER by the owner's catalog flag
+ * (worker/lib/printerIdentity.ts), which is serialized unless the owner said
+ * `false` and carries the 12-month base unless another is configured
+ * (worker/lib/warrantyPlans.ts `effectiveDevicePolicy`: the read-time twin of
+ * the defaults the product writers fill in, so a printer stored before them
+ * still records the extension it sold). Base coverage months otherwise come
+ * from ops_policy.warranty_base_months (alias: warranty_months). A serialized
+ * non-printer with NO configured duration gets warranty_end_at NULL and an
  * honest 'needs_config' coverage state (decision register row 18) — a
  * duration is never silently assumed.
  *
@@ -20,6 +25,8 @@ import type { Env } from './types';
 import { safeParse } from './types';
 import { addMonths } from './membershipOps';
 import { newId } from './crypto';
+import { printerProductIds } from './printerIdentity';
+import { effectiveDevicePolicy } from './warrantyPlans';
 
 // ---------------------------------------------------------------- policy
 
@@ -47,10 +54,20 @@ export function parseOpsPolicy(raw: unknown): SerializationPolicy {
 export interface WarrantySnapshotLite {
   plan_id?: string;
   title_ar?: string;
+  title_en?: string;
   fee_iqd?: number;
   duration_months?: number;
   duration_kind?: string; // 'total' | 'extension'
+  /** Written by the resolver since the extended-warranty round: the percent
+   *  the fee came from, the regular price it was applied to, and the coverage
+   *  the customer was PROMISED at checkout (base + extension). */
+  fee_percent?: number | null;
+  basis_iqd?: number;
+  base_months?: number | null;
+  total_months?: number | null;
 }
+
+const posInt = (v: unknown): number | null => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null);
 
 export interface CoverageCalc {
   base_months: number | null;
@@ -69,6 +86,11 @@ export interface CoverageCalc {
  *   explicit owner-configured product data, not a guess)
  * - no base and no total plan:  end = null → honest needs_config; an
  *   extension alone cannot produce a total.
+ * - a snapshot that carries `total_months` (written at checkout since the
+ *   extended-warranty round) is the promise the customer paid for and WINS
+ *   over the product's current policy: "+12 → 24 total" survives a later
+ *   edit of the product, and a printer whose ops_policy was never configured
+ *   still delivers the 24/36 months it sold.
  * Month addition clamps to month end and handles leap years (addMonths).
  */
 export function computeCoverage(
@@ -84,6 +106,21 @@ export function computeCoverage(
 
   let ext = 0;
   let total: number | null;
+  const frozenTotal = posInt(snap?.total_months);
+  if (kind !== null && frozenTotal !== null) {
+    // The checkout froze the whole promise; the base it was built on comes
+    // with it (falling back to the product's configured base only when the
+    // snapshot did not record one).
+    total = frozenTotal;
+    const frozenBase = posInt(snap?.base_months) ?? baseMonths;
+    ext = kind === 'extension' ? (dur as number) : Math.max(0, frozenTotal - (frozenBase ?? frozenTotal));
+    return {
+      base_months: frozenBase,
+      ext_months: ext,
+      total_months: total,
+      end_at: addMonths(deliveredAtIso, total),
+    };
+  }
   if (kind === 'extension') {
     ext = dur as number;
     total = baseMonths !== null ? baseMonths + ext : null;
@@ -183,15 +220,24 @@ export async function createUnitsOnDelivery(
     .bind(orderId)
     .all<UnitSourceRow>();
 
+  // Which lines are printers, by the owner's catalog flag — one query for the
+  // whole order. A printer is serialized and 12-month based by default, so a
+  // plan sold on a printer whose ops_policy was never configured still gets
+  // the unit rows it was sold for.
+  const printerIds = await printerProductIds(
+    env.DB,
+    items.map((it) => (it.product_id === null ? '' : String(it.product_id)))
+  );
+
   const stmts: D1PreparedStatement[] = [];
   let serializedItems = 0;
   let planned = 0;
   for (const it of items) {
-    const policy = parseOpsPolicy(it.ops_policy);
+    const policy = effectiveDevicePolicy(it.ops_policy, it.product_id !== null && printerIds.has(String(it.product_id)));
     if (!policy.serialized) continue;
     serializedItems++;
     const snap = safeParse<WarrantySnapshotLite | null>(it.warranty_snapshot, null);
-    const cov = computeCoverage(policy.base_months, snap, deliveredAtIso);
+    const cov = computeCoverage(policy.warranty_base_months, snap, deliveredAtIso);
     const qty = Math.min(Math.max(Number(it.qty) || 0, 0), 500);
     const policyVersion = JSON.stringify({
       v: 1,

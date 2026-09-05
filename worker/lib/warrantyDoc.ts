@@ -49,6 +49,14 @@ export interface WarrantyDocData {
     coverage: string;
     start_at: string | null;
     end_at: string | null;
+    /**
+     * A PURCHASED extension, when the device record carries one: the base the
+     * customer got with the printer and the months they bought on top. Both
+     * optional — receipts issued before the extended-warranty round, and
+     * devices with no extension, print no extension row at all.
+     */
+    base_months?: number | null;
+    ext_months?: number;
   };
   terms: WarrantyDocTerm[];
   retailer: {
@@ -98,6 +106,8 @@ const COPY = {
     signature: 'توقيع الزبون',
     signatureLine: 'الاسم / التاريخ / التوقيع',
     months: (n: number) => (n === 12 ? 'سنة واحدة' : n === 24 ? 'سنتان' : `${n} شهرًا`),
+    extension: 'الضمان الممدد',
+    extendedBy: (base: number, ext: number) => `تمديد مدفوع +${ext} شهرًا فوق الضمان الأساسي (${base} شهرًا)`,
     verify: 'للتحقق من هذا الوصل',
     statusDraft: 'مسودة — غير مُصدَر بعد',
     statusExpired: 'انتهت مدة الضمان',
@@ -139,6 +149,8 @@ const COPY = {
     signature: 'Customer Signature',
     signatureLine: 'Name / Date / Signature',
     months: (n: number) => (n === 12 ? '1 year' : n === 24 ? '2 years' : `${n} months`),
+    extension: 'Extended warranty',
+    extendedBy: (base: number, ext: number) => `Extended by ${ext} months on top of the ${base}-month base warranty`,
     verify: 'Verify this receipt at',
     statusDraft: 'DRAFT — not issued yet',
     statusExpired: 'Warranty period has ended',
@@ -357,8 +369,15 @@ export function renderWarrantyDoc(data: WarrantyDocData, lang: DocLang = 'ar', a
     row(t.purchaseDate, longDate(data.product.purchase_date, lang)) +
     row(t.orderReceipt, data.product.order_receipt_no, { ltr: true });
 
+  // A purchased extension prints as its own row, under the total period, so
+  // the paper says both what the printer came with and what was bought.
+  const ext = data.warranty.ext_months ?? 0;
+  const base = data.warranty.base_months ?? null;
+  const extensionRow =
+    ext > 0 && base !== null ? row(t.extension, t.extendedBy(base, ext)) : '';
   const warranty =
     row(t.period, t.months(data.warranty.months)) +
+    extensionRow +
     row(t.type, data.warranty.type) +
     `<div class="row"><div class="lbl">${escapeHtml(t.coverage)}</div>` +
     `<div class="val coverage">${escapeHtml(data.warranty.coverage)}</div></div>` +

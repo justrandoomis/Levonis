@@ -80,11 +80,27 @@ export interface WarrantyPlanV2 {
   id: string;
   title_ar: string; title_en: string; title_ckb: string;
   terms_ar: string; terms_en: string; terms_ckb: string;
+  /** Printers: 12 or 24 (an extension over the 12-month base → 24 / 36 total). */
   duration_months: number;
   duration_kind: 'total' | 'extension';
+  /** Fixed fee (IQD); the charged amount when `fee_percent` is null. */
   fee_iqd: number;
+  /** Fee as a share of the printer's REGULAR price (7.5 = 7.5%), rounded to
+   *  an integer dinar by the server — the same for every membership. */
+  fee_percent: number | null;
   order: number;
   active: boolean;
+}
+
+/**
+ * A plan as a storefront surface receives it: the server has already resolved
+ * the fee against the selection's regular price and computed the total months.
+ * Nothing here is browser arithmetic.
+ */
+export interface PricedWarrantyPlan extends WarrantyPlanV2 {
+  basis_iqd: number;
+  base_months: number | null;
+  total_months: number | null;
 }
 
 export interface TransportOfferV2 {
@@ -165,6 +181,12 @@ export interface ProductDocV2 {
   spec_groups: SpecGroupV2[];
   labels: LabelV2[];
   warranty_plans: WarrantyPlanV2[];
+  /** Base coverage in months from delivery (printers default to 12); null =
+   *  not configured. Stored in products.ops_policy. */
+  warranty_base_months: number | null;
+  /** Whether a unit is recorded per physical device at delivery (the record an
+   *  extended warranty attaches to). null = not stated; printers default true. */
+  serialized: boolean | null;
   content_blocks: ContentBlockV2[];
   translation_meta?: TranslationMetaV2;
   is_featured: boolean;
@@ -204,9 +226,23 @@ export interface ResolvedPriceV2 {
   applied_tier: 'regular' | 'pro' | 'prime';
   price_source: 'color' | 'option' | 'base';
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
-  warranty: { plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string } | null;
+  warranty: ResolvedWarrantyV2 | null;
   unit_subtotal_iqd: number;
   errors: string[];
+}
+
+/** The chosen plan as the resolver reports it (and as the order freezes it). */
+export interface ResolvedWarrantyV2 {
+  plan_id: string;
+  title_ar: string;
+  title_en?: string;
+  fee_iqd: number;
+  duration_months: number;
+  duration_kind: string;
+  fee_percent?: number | null;
+  basis_iqd?: number;
+  base_months?: number | null;
+  total_months?: number | null;
 }
 
 export interface MembershipPlanV2 {

@@ -26,6 +26,7 @@ export const POLICY_KEYS = [
   'site_terms', // website-use terms (kept separate from sale terms)
   'privacy',
   'warranty', // warranty + extensions
+  'extended_warranty', // the paid printer extension: +12 → 24 / +24 → 36, before the order only
   'returns', // returns and replacement
   'delivery', // delivery and fees
   'price_protection',
@@ -203,6 +204,119 @@ export const POLICY_DRAFTS: PolicyDraft[] = [
 ## داواکارییەکانی گەرەنتی
 - داواکاری گەرەنتی لە هەژماری کڕیارەوە (بەشی گەرەنتی) لەگەڵ وەسف و وێنە/ڤیدیۆ پێشکەش دەکرێت، لەلایەن کارمەندی مۆڵەتدارەوە پێداچوونەوەی بۆ دەکرێت و بڕیارەکە لەگەڵ هۆکارەکەی لە هەژماردا دەردەکەوێت.
 - ئەمە گەرەنتی فرۆشگای LEVONIS ـە؛ جیاوازە لە هەر گەرەنتییەکی کۆمپانیای دروستکەر، و داوای پلەی فرۆشیاری ڕەسمی ناکەین هەتا بە فەرمی ڕانەگەیەنرێت.`,
+    },
+  },
+  // --------------------------------------------------- extended warranty
+  //
+  // The paid printer extension. ORIGINAL LEVONIS text written from what the
+  // code enforces (worker/lib/warrantyPlans.ts, pricing.ts, deviceOps.ts): the
+  // eligibility, the two options, the purchase window, the percent price,
+  // the coverage/exclusions the receipt already prints, the claim path and
+  // the transfer rule. Not copied from any manufacturer's policy.
+  {
+    key: 'extended_warranty',
+    title: {
+      ar: 'سياسة الضمان الممدد للطابعات',
+      en: 'Extended Warranty Policy (Printers)',
+      ckb: 'سیاسەتی گەرەنتی درێژکراوە بۆ پرینتەرەکان',
+    },
+    body: {
+      ar: `${DRAFT_AR}
+
+## من يشمله
+- الضمان الممدد خدمة مدفوعة تخص الطابعات ثلاثية الأبعاد فقط — المنتجات المصنّفة في أقسام الطابعات لدى LEVONIS. لا يُعرض على المواد والقطع والإكسسوارات ولا يمكن إضافته إليها.
+
+## الخياران
+- كل طابعة تأتي بضمان أساسي مدته 12 شهرًا من تاريخ التسليم الموثَّق. يمكن للزبون اختيار أحد تمديدَين: +12 شهرًا فتصبح المدة الإجمالية 24 شهرًا، أو +24 شهرًا فتصبح 36 شهرًا.
+- يعمل التمديد على العدّ نفسه: يبدأ من تاريخ تسليم الجهاز — لا من تاريخ الشراء ولا من انتهاء الضمان الأساسي — وتظهر المدة الإجمالية على وصل الضمان الخاص بالجهاز وفي مركز الضمان.
+- تمديد واحد لكل طابعة، ويُطبَّق الخيار المختار في السلة على كل وحدة في البند نفسه.
+
+## متى يُشترى
+- قبل إتمام الطلب فقط: من صفحة الطابعة قبل إضافتها إلى السلة، أو من داخل السلة عبر خيار «الضمان الممدد». بعد تأكيد الطلب لا يمكن إضافة تمديد أو تغييره أو إلغاؤه منفردًا، ولا يُعرض تمديد لطلبات قائمة أو مُسلَّمة.
+- يُلغى التمديد مع الطلب إذا أُلغي الطلب قبل التسليم، ويتبع إرجاع الطابعة سياسة الإرجاع والاستبدال.
+
+## السعر
+- سعر كل تمديد نسبة مئوية من سعر الطابعة الاعتيادي (السعر قبل خصم أي عضوية)، تُعرض بالدينار العراقي قبل إتمام الطلب، ولا تتغيّر بحسب العضوية: عضو PRO وعضو PRIME والزبون الاعتيادي يدفعون الرسم نفسه للتمديد نفسه.
+- يظهر الرسم كبند مستقل في تفصيل السعر وفي الفاتورة، ولا يدخل في احتساب نقاط المكافآت.
+
+## ما يغطيه
+- التغطية نفسها التي يقدّمها الضمان الأساسي: عيوب التصنيع وأعطال الأجزاء تحت الاستعمال الطبيعي وفق سياسة الضمان لدى LEVONIS، للمدة الإجمالية المشتراة.
+
+## ما لا يغطيه
+- المواد الاستهلاكية والأجزاء المعرّضة للاستهلاك بالاستعمال مثل الفوهات ووحدات التسخين (الهوت إند) وأنابيب PTFE وألواح الطباعة والأحزمة.
+- الضرر الفيزيائي، وسوء الاستعمال، والتعديل أو الإصلاح غير المصرّح به، وأضرار السوائل والحرارة والعوامل البيئية، والأضرار الكهربائية من مصدر طاقة غير مناسب، والتآكل الشكلي الذي لا يؤثر في عمل الجهاز، والعبث بالرقم التسلسلي.
+
+## المطالبات والإصلاح
+- تُقدَّم المطالبات من مركز الضمان في حساب الزبون بعد ربط الجهاز بالحساب (بالرقم التسلسلي أو رقم الوصل)، وتُراجع من موظف مخوَّل ويظهر القرار وسببه في الحساب.
+- لـLEVONIS فحص الجهاز وتشخيصه، والقرار بين الإصلاح والاستبدال يتبع نتيجة الفحص وتقدير LEVONIS؛ والجهاز البديل يكمل المدة المتبقية ما لم تُمدَّد صراحةً.
+
+## انتقال الملكية
+- التغطية تتبع الجهاز لا الحساب: عند نقل الطابعة إلى شخص آخر عبر مركز الضمان (إزالة الجهاز من الحساب الحالي ثم ربطه بالحساب الجديد) تنتقل المدة الإجمالية بما فيها التمديد، بلا إعادة عدّ ولا تغيير في التاريخ.
+- هذا ضمان يقدمه متجر LEVONIS، وهو منفصل عن أي ضمان من الشركة المصنّعة.`,
+      en: `${DRAFT_EN}
+
+## Eligibility
+- The extended warranty is a paid service for 3D printers only — products filed under a printer catalog at LEVONIS. It is not offered on materials, parts or accessories and cannot be added to them.
+
+## The two options
+- Every printer comes with a 12-month base warranty from the documented delivery date. The customer may choose one of two extensions: +12 months, for 24 months in total, or +24 months, for 36 months in total.
+- The extension runs on the same clock: it starts at the device's delivery date — not at purchase and not when the base warranty ends — and the total period is what the device's warranty receipt and the warranty centre show.
+- One extension per printer; the option chosen in the cart applies to every unit of that line.
+
+## When it can be bought
+- Before the order is placed, and only then: on the printer's page before adding it to the cart, or inside the cart through the "Extended Warranty" option. Once the order is confirmed an extension cannot be added, changed or cancelled on its own, and no extension is offered on existing or delivered orders.
+- The extension is cancelled together with the order if the order is cancelled before delivery; returning the printer follows the returns and replacement policy.
+
+## Price
+- Each extension is priced as a percentage of the printer's regular price (the price before any membership discount), shown in Iraqi dinars before checkout, and it does not vary by membership: a PRO member, a PRIME member and a regular customer pay the same fee for the same extension.
+- The fee appears as its own line in the price breakdown and on the invoice, and it does not earn reward points.
+
+## What is covered
+- The same coverage as the base warranty: manufacturing defects and hardware failures under normal use, under the LEVONIS warranty policy, for the whole purchased period.
+
+## What is not covered
+- Consumables and wear parts such as nozzles, hotends, PTFE tubes, build plates and belts.
+- Physical damage, misuse, unauthorised modification or repair, liquid, heat and environmental damage, electrical damage from an improper power source, cosmetic wear that does not affect operation, and serial-number tampering.
+
+## Claims and repair
+- Claims are opened from the warranty centre in the customer's account once the device is linked to it (by serial number or receipt number); they are reviewed by authorised staff and the decision with its reason appears in the account.
+- LEVONIS may inspect and diagnose the device; repair or replacement is decided by the inspection and at LEVONIS's discretion, and a replacement unit continues the remaining period unless explicitly extended.
+
+## Transfer of ownership
+- Coverage follows the device, not the account: when a printer is handed on through the warranty centre (removed from the current account, then linked by the new holder) the whole period, extension included, moves with it — no restart and no change of dates.
+- This is store coverage provided by LEVONIS and is separate from any manufacturer's warranty.`,
+      ckb: `${DRAFT_CKB}
+
+## کێ دەگرێتەوە
+- گەرەنتی درێژکراوە خزمەتگوزارییەکی بە پارەیە تەنها بۆ پرینتەرە سێ ڕەهەندییەکان — ئەو بەرهەمانەی لە بەشەکانی پرینتەری LEVONIS پۆلێن کراون. بۆ کەرەستە و پارچە و پێداویستییەکان پێشکەش ناکرێت و ناتوانرێت زیاد بکرێت.
+
+## دوو هەڵبژاردە
+- هەر پرینتەرێک بە گەرەنتی بنەڕەتی ١٢ مانگ لە ڕێکەوتی گەیاندنی تۆمارکراوەوە دێت. کڕیار دەتوانێت یەکێک لە دوو درێژکردنەوە هەڵبژێرێت: +١٢ مانگ بۆ ٢٤ مانگی کۆی گشتی، یان +٢٤ مانگ بۆ ٣٦ مانگی کۆی گشتی.
+- درێژکردنەوەکە لەسەر هەمان ژماردن کار دەکات: لە ڕێکەوتی گەیاندنی ئامێرەکەوە دەست پێدەکات — نەک لە کاتی کڕین و نەک لە کۆتایی گەرەنتی بنەڕەتی — و ماوەی کۆی گشتی لەسەر پسووڵەی گەرەنتی ئامێرەکە و لە ناوەندی گەرەنتی دەردەکەوێت.
+- یەک درێژکردنەوە بۆ هەر پرینتەرێک؛ هەڵبژاردەی هەڵبژێردراو لە سەبەتەدا بۆ هەموو یەکەکانی هەمان بڕگە جێبەجێ دەبێت.
+
+## کاتی کڕین
+- تەنها پێش تەواوکردنی داواکاری: لە پەڕەی پرینتەرەکە پێش زیادکردنی بۆ سەبەتە، یان لەناو سەبەتەکەوە بە هەڵبژاردەی «گەرەنتی درێژکراوە». دوای پشتڕاستکردنەوەی داواکاری، درێژکردنەوە بە تەنها زیاد ناکرێت و ناگۆڕدرێت و هەڵناوەشێنرێتەوە، و بۆ داواکارییە بەردەست یان گەیەنراوەکان پێشکەش ناکرێت.
+- ئەگەر داواکارییەکە پێش گەیاندن هەڵوەشێنرایەوە، درێژکردنەوەکە لەگەڵی هەڵدەوەشێتەوە؛ گەڕاندنەوەی پرینتەر سیاسەتی گەڕاندنەوە و گۆڕینەوە دەگرێتەبەر.
+
+## نرخ
+- نرخی هەر درێژکردنەوەیەک ڕێژەیەکی سەدییە لە نرخی ئاسایی پرینتەرەکە (نرخ پێش هەر داشکاندنی ئەندامێتی)، بە دیناری عێراقی پێش تەواوکردنی داواکاری پیشان دەدرێت، و بەپێی ئەندامێتی ناگۆڕێت: ئەندامی PRO و ئەندامی PRIME و کڕیاری ئاسایی هەمان کرێ بۆ هەمان درێژکردنەوە دەدەن.
+- کرێیەکە وەک بڕگەیەکی سەربەخۆ لە وردەکاری نرخ و لە پسووڵەدا دەردەکەوێت و خاڵی خەڵات بەدەست ناهێنێت.
+
+## چی دەگرێتەوە
+- هەمان داپۆشینی گەرەنتی بنەڕەتی: کەموکوڕی دروستکردن و تێکچوونی پارچەکان لە بەکارهێنانی ئاساییدا بەپێی سیاسەتی گەرەنتی LEVONIS، بۆ هەموو ماوەی کڕدراو.
+
+## چی ناگرێتەوە
+- کەرەستەی بەکارهێنراو و پارچە خۆرندووەکان وەک نۆزڵ و هۆتئێند و بۆری PTFE و پلێتی چاپکردن و پشتێنەکان.
+- زیانی فیزیکی، بەکارهێنانی هەڵە، دەستکاری یان چاککردنەوەی بێ مۆڵەت، زیانی شلەمەنی و گەرمی و ژینگە، زیانی کارەبایی لە سەرچاوەی وزەی نەگونجاو، خۆرانی ڕواڵەتی کە کار ناکاتە سەر کارکردن، و دەستکاری ژمارە زنجیرەیی.
+
+## داواکاری و چاککردنەوە
+- داواکارییەکان لە ناوەندی گەرەنتی لە هەژماری کڕیارەوە پێشکەش دەکرێن دوای بەستنی ئامێرەکە بە هەژمارەکە (بە ژمارە زنجیرەیی یان ژمارەی پسووڵە)؛ لەلایەن کارمەندی مۆڵەتدارەوە پێداچوونەوەیان بۆ دەکرێت و بڕیارەکە لەگەڵ هۆکارەکەی لە هەژماردا دەردەکەوێت.
+- LEVONIS دەتوانێت ئامێرەکە بپشکنێت و دەستنیشان بکات؛ بڕیاری چاککردنەوە یان گۆڕینەوە بەپێی پشکنین و بە هەڵسەنگاندنی LEVONIS ـە، و ئامێری جێگرەوە ماوەی ماوە تەواو دەکات ئەگەر بە ڕوونی درێژ نەکرابێتەوە.
+
+## گواستنەوەی خاوەندارێتی
+- داپۆشین دوای ئامێرەکە دەکەوێت نەک هەژمارەکە: کاتێک پرینتەرێک لە ڕێگەی ناوەندی گەرەنتییەوە بۆ کەسێکی تر دەگوازرێتەوە (لابردن لە هەژماری ئێستا و پاشان بەستن لەلایەن خاوەنی نوێوە) هەموو ماوەکە بە درێژکردنەوەکەوە لەگەڵی دەگوازرێتەوە — بێ ژماردنەوە لە سەرەتا و بێ گۆڕانی ڕێکەوت.
+- ئەمە گەرەنتی فرۆشگای LEVONIS ـە و جیاوازە لە هەر گەرەنتییەکی کۆمپانیای دروستکەر.`,
     },
   },
   // ------------------------------------------------------------- returns

@@ -189,6 +189,62 @@ export function Money({
   );
 }
 
+/**
+ * A PERCENT input (7.5 → 7.5%) with two decimals at most — the extended
+ * warranty's fee as a share of the printer price. EMPTY is null ("no
+ * percent: the fixed fee applies"); the text is kept while typing so "7."
+ * is not snapped to 7 under the admin's finger, and the model receives only
+ * a finished number.
+ */
+export function Percent({
+  value,
+  onChange,
+  placeholder,
+  id,
+  disabled,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  placeholder?: string;
+  id?: string;
+  disabled?: boolean;
+}) {
+  const [text, setText] = useState(value === null ? '' : String(value));
+  const [touched, setTouched] = useState(false);
+  React.useEffect(() => {
+    if (!touched) setText(value === null ? '' : String(value));
+  }, [value, touched]);
+  return (
+    <div className="relative min-w-0">
+      <input
+        id={id}
+        dir="ltr"
+        inputMode="decimal"
+        disabled={disabled}
+        className={`${field} pe-8`}
+        placeholder={placeholder ?? '7.5'}
+        value={text}
+        onChange={(e) => {
+          // digits, at most one dot, at most two decimals — anything else is
+          // dropped as it is typed rather than refused after the fact.
+          const raw = e.target.value.replace(/[^\d.]/g, '').replace(/^(\d*\.\d{0,2}).*$/, '$1').replace(/(\..*)\./g, '$1');
+          setTouched(true);
+          setText(raw);
+          const n = raw === '' || raw === '.' || raw.endsWith('.') ? null : Number(raw);
+          onChange(n === null || !Number.isFinite(n) ? (raw === '' ? null : value) : n);
+        }}
+        onBlur={() => {
+          setTouched(false);
+          if (text.endsWith('.')) setText(text.slice(0, -1));
+        }}
+      />
+      <span aria-hidden="true" className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[12px] text-zinc-500">
+        %
+      </span>
+    </div>
+  );
+}
+
 /** Integer quantity input with the same null-vs-zero contract. */
 export function Qty({
   value,

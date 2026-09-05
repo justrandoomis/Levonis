@@ -1,15 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, FileText, ScrollText, ShieldCheck, RefreshCw, Eye, Pencil, UploadCloud } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { Overlay, Sheet } from '../components/ui/Overlay';
 
 /**
  * Public trilingual reader for PUBLISHED policy documents, with an honest
  * empty state while none are published, plus an admin-only drafts panel
  * (seed / preview / edit / publish). Drafts are never shown to customers.
+ *
+ * `/policies/:key` opens that document directly — the product page and the
+ * cart link to `/policies/extended_warranty` from the extended-warranty
+ * chooser, so the terms are one tap from the choice. The list keeps the URL
+ * in step (a tap on a row navigates to its key), and the header's back arrow
+ * returns to the list, not out of the page.
  */
 
 const STRINGS = {
@@ -24,6 +30,7 @@ const STRINGS = {
     requiredBadge: 'مطلوبة عند الشراء',
     langFallback: 'النص التالي بالعربية — الترجمة لهذه اللغة غير منشورة بعد.',
     back: 'رجوع',
+    notPublished: 'هذه السياسة غير منشورة بعد — ستظهر هنا فور نشرها رسميًا.',
     // admin
     adminTitle: 'المسودات (للإدارة فقط)',
     adminNote: 'هذه مسودات غير منشورة ولا يراها الزبائن. النشر إجراء دائم ومدقَّق.',
@@ -56,6 +63,7 @@ const STRINGS = {
     requiredBadge: 'Required at checkout',
     langFallback: 'The text below is in Arabic — the translation for this language is not published yet.',
     back: 'Back',
+    notPublished: 'This policy is not published yet — it will appear here as soon as it is officially published.',
     adminTitle: 'Drafts (admin only)',
     adminNote: 'These drafts are unpublished and invisible to customers. Publishing is permanent and audited.',
     seed: 'Seed the original LEVONIS drafts',
@@ -87,6 +95,7 @@ const STRINGS = {
     requiredBadge: 'پێویستە لە کاتی کڕیندا',
     langFallback: 'دەقی خوارەوە بە عەرەبییە — وەرگێڕان بۆ ئەم زمانە هێشتا بڵاونەکراوەتەوە.',
     back: 'گەڕانەوە',
+    notPublished: 'ئەم سیاسەتە هێشتا بڵاونەکراوەتەوە — هەر کە بە فەرمی بڵاوکرایەوە لێرە دەردەکەوێت.',
     adminTitle: 'ڕەشنووسەکان (تەنها بۆ بەڕێوەبەرایەتی)',
     adminNote: 'ئەم ڕەشنووسانە بڵاونەکراونەتەوە و کڕیاران نایانبینن. بڵاوکردنەوە هەمیشەییە و تۆمار دەکرێت.',
     seed: 'دانانی ڕەشنووسە ڕەسەنەکانی LEVONIS',
@@ -172,6 +181,7 @@ function PolicyBody({ body }: { body: string }) {
 
 export default function Policies() {
   const navigate = useNavigate();
+  const { key: routeKey } = useParams<{ key: string }>();
   const { lang } = useLanguage();
   const { user } = useAuth();
   const t = STRINGS[lang] || STRINGS.ar;
@@ -182,6 +192,9 @@ export default function Policies() {
   const [selected, setSelected] = useState<PolicyDoc | null>(null);
   const [docLoadingKey, setDocLoadingKey] = useState('');
   const [actionError, setActionError] = useState('');
+  // A deep link to a document the owner has not published yet is a fact about
+  // the store, not a failure of the page — it is told as a status, not an error.
+  const [notice, setNotice] = useState('');
 
   // Admin drafts panel
   const isAdmin = !!user?.isAdmin;
@@ -223,19 +236,36 @@ export default function Policies() {
     loadAdmin();
   }, [loadAdmin]);
 
-  const openDoc = async (key: string) => {
-    setActionError('');
-    setDocLoadingKey(key);
-    try {
-      const data = await api.get<{ policy: PolicyDoc }>(`/api/policies/${encodeURIComponent(key)}?lang=${lang}`);
-      setSelected(data.policy);
-      window.scrollTo({ top: 0 });
-    } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
-    } finally {
-      setDocLoadingKey('');
-    }
-  };
+  const openDoc = useCallback(
+    async (key: string) => {
+      setActionError('');
+      setNotice('');
+      setDocLoadingKey(key);
+      try {
+        const data = await api.get<{ policy: PolicyDoc }>(`/api/policies/${encodeURIComponent(key)}?lang=${lang}`);
+        setSelected(data.policy);
+        window.scrollTo({ top: 0 });
+      } catch (err) {
+        // A deep link to a document that is not published yet (the
+        // extended-warranty terms before the owner publishes them) is told
+        // so in plain words, not with the server's English sentence — and as
+        // information, not as something that went wrong.
+        if (err instanceof ApiError && err.status === 404) setNotice(t.notPublished);
+        else setActionError((err as Error)?.message || t.actionError);
+      } finally {
+        setDocLoadingKey('');
+      }
+    },
+    [lang, t.actionError, t.notPublished]
+  );
+
+  // The URL is the source of truth for which document is open: /policies/:key
+  // opens it (also on a language change, in that language); /policies shows
+  // the list.
+  useEffect(() => {
+    if (routeKey) void openDoc(routeKey);
+    else setSelected(null);
+  }, [routeKey, openDoc]);
 
   const seedDrafts = async () => {
     setAdminMsg('');
@@ -319,7 +349,8 @@ export default function Policies() {
     <div className="min-h-screen bg-[#0a0a0a] text-white w-full font-sans flex flex-col">
       <div className="flex items-center justify-between p-4 sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-10 border-b border-zinc-900">
         <button
-          onClick={() => (selected ? setSelected(null) : navigate(-1))}
+          type="button"
+          onClick={() => (selected || routeKey ? navigate('/policies') : navigate(-1))}
           className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors"
           aria-label={t.back}
         >
@@ -331,8 +362,17 @@ export default function Policies() {
 
       <div className="p-4 flex-1 max-w-2xl w-full mx-auto">
         {actionError && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mb-4">
+          <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mb-4">
             {actionError}
+          </div>
+        )}
+        {notice && (
+          <div
+            role="status"
+            data-policy-notice
+            className="bg-amber-500/10 border border-amber-500/25 text-amber-200 text-[13px] rounded-2xl p-3 text-center mb-4"
+          >
+            {notice}
           </div>
         )}
 
@@ -379,7 +419,8 @@ export default function Policies() {
                 {list.map((p) => (
                   <button
                     key={p.key}
-                    onClick={() => openDoc(p.key)}
+                    type="button"
+                    onClick={() => navigate(`/policies/${encodeURIComponent(p.key)}`)}
                     disabled={docLoadingKey === p.key}
                     className="w-full text-start bg-zinc-900 border border-zinc-800 hover:border-gold/40 rounded-2xl p-4 flex items-center gap-3 transition-colors disabled:opacity-60"
                   >

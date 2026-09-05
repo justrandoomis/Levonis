@@ -859,6 +859,22 @@ async function receiptDocument(c: Context<AppContext>, row: WarrantyReceiptRow, 
   const autoPrint = c.req.query('print') === '1';
   const now = nowIso();
   const data = docData(row, c, now, lang);
+  // The purchased extension lives on the DEVICE record (order_item_units:
+  // base + ext months, written at delivery from the checkout snapshot). The
+  // receipt row stores only the total it printed, so the extension row is
+  // read off the unit — when the months agree, so a receipt an admin issued
+  // with a different period never claims an extension it did not print.
+  const unit = await c.env.DB.prepare(
+    'SELECT warranty_base_months, warranty_ext_months FROM order_item_units WHERE id = ?'
+  )
+    .bind(row.unit_id)
+    .first<{ warranty_base_months: number | null; warranty_ext_months: number | null }>();
+  const extMonths = Number(unit?.warranty_ext_months ?? 0) || 0;
+  const baseMonths = typeof unit?.warranty_base_months === 'number' ? unit.warranty_base_months : null;
+  if (extMonths > 0 && baseMonths !== null && baseMonths + extMonths === Number(row.warranty_months)) {
+    data.warranty.base_months = baseMonths;
+    data.warranty.ext_months = extMonths;
+  }
   if (opts.redactCustomer) {
     // A later HOLDER of the device gets the coverage proof — never the buyer's
     // name, address, phone, email or what they paid. The public /verify view

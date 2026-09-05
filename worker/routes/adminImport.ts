@@ -85,6 +85,7 @@ import {
 } from '../lib/productModel';
 import { localizeProductDoc } from '../lib/translate/localizeProduct';
 import { syncProductTranslations } from '../lib/translate/store';
+import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 
 export const adminImportRoutes = new Hono<AppContext>();
 adminImportRoutes.use('*', requireAdmin);
@@ -132,11 +133,15 @@ interface CatalogRow {
   name_en: string;
   name_ar: string;
   template_family: string | null;
+  /** 0/1 — the owner's printer flag; extended warranty rides only on these. */
+  is_printer_catalog: number;
 }
 
 async function loadCatalogs(db: D1Database): Promise<CatalogRow[]> {
   const { results } = await db
-    .prepare('SELECT id, parent_id, slug, name_en, name_ar, template_family FROM catalogs ORDER BY sort, name_en')
+    .prepare(
+      'SELECT id, parent_id, slug, name_en, name_ar, template_family, is_printer_catalog FROM catalogs ORDER BY sort, name_en'
+    )
     .all<CatalogRow>();
   return results;
 }
@@ -393,6 +398,8 @@ async function exportProducts(
       direct_surcharge_iqd: doc.direct_surcharge_iqd,
       stock: doc.stock,
       low_stock_threshold: doc.low_stock_threshold,
+      warranty_base_months: doc.warranty_base_months,
+      serialized: doc.serialized,
       payment_options: doc.payment_options,
       how_to_use: doc.how_to_use,
       usage_url: doc.usage_guide?.official_url ?? '',
@@ -423,6 +430,7 @@ async function exportProducts(
         duration_months: w.duration_months,
         duration_kind: w.duration_kind,
         fee_iqd: w.fee_iqd,
+        fee_percent: w.fee_percent,
         active: w.active,
       })),
       content_blocks: doc.content_blocks.map((b) => ({
@@ -771,6 +779,7 @@ async function buildMaps(db: D1Database, images: Map<string, string>): Promise<I
         name_en: row.name_en,
         name_ar: row.name_ar,
         template_family: row.template_family,
+        is_printer_catalog: Number(row.is_printer_catalog) === 1,
       } satisfies CatalogRef;
     },
     catalogs,
@@ -1071,6 +1080,10 @@ adminImportRoutes.post('/confirm', async (c) => {
     try {
       const doc = validateProductDoc(item.doc as Record<string, unknown>);
       doc.id = productId;
+      // Extended warranty is for printers only: the catalogs this row lands
+      // in decide, against the database — the preview's answer came from the
+      // same flag, but the confirm is the write and re-checks for itself.
+      await applyPrinterWarrantyRules(c.env.DB, doc, ((item.catalogIds as string[]) ?? []));
       if (isCreate) {
         doc.slug = await uniqueProductSlug(c.env.DB, doc.name_en || key || productId);
       }

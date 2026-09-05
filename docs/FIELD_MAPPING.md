@@ -72,6 +72,8 @@ id the whole group is **replaced** and the pipeline warns about it.
 | `selling_type` | enum | no | — | not nullable; omitted = keep | direct_sale \| pre_order \| bundle | البيع والمخزون (Selling & stock) | `selling_type` | products.selling_type | Direct sale vs pre-order UI (transport picker) vs bundle |
 | `stock` | int | no | — | `__NULL__` = untracked; 0 is explicit, never blank; omitted = keep | integer 0..1000000 | البيع والمخزون (Selling & stock) | `stock` | products.stock | Stock badge; null = untracked |
 | `payment_options` | csv | no | — | empty = empty list; `__CLEAR__` = empty list; omitted = keep | comma-separated values | البيع والمخزون (Selling & stock) | `payment_options` | products.payment_options (JSON string[]) | Allowed checkout payment methods |
+| `warranty_base_months` | int | no | — | `__NULL__` = not configured (units say needs_config); omitted = keep | integer 1..240 | خطط الضمان (Warranty plans) | `warranty_base_months` | products.ops_policy.warranty_base_months (JSON) | Base coverage from delivery; a PRINTER defaults to 12 on write; an extension plan adds to it (+12 → 24, +24 → 36) and the total rides in the order snapshot |
+| `serialized` | bool | no | — | not nullable; omitted = keep the stored answer | true / false | خطط الضمان (Warranty plans) | `serialized` | products.ops_policy.serialized (JSON) | One `order_item_units` row per physical device at delivery — the record the extended warranty attaches to; a PRINTER defaults to true, and a printer offering plans may not be `false` |
 
 ### Repeatable group `transports.N.*` — شحن الطلب المسبق / Pre-order transports
 
@@ -177,6 +179,21 @@ Stored in products.labels (JSON); served as `labels[]`. Badges on cards/product 
 
 Stored in products.warranty_plans (JSON); served as `warranty_plans[]`. Warranty selector; fee ADDED and never waived by membership; inactive hidden.
 
+**Extended warranty is for PRINTERS only (owner mandate).** A product not filed
+under a printer catalog (`catalogs.is_printer_catalog`) is refused with
+`WARRANTY_NOT_PRINTER` on every write path (admin save, TXT analyze/apply, CSV
+preview/confirm) and at runtime (cart add/update, checkout). A printer's plans
+must be `duration_kind=extension` with `duration_months` 12 or 24 — one plan
+per duration — read as **+12 → 24 months total** and **+24 → 36 months total**
+over the 12-month base (`warranty_base_months`). The fee is a **percent of the
+printer's REGULAR price** (`fee_percent`, e.g. 7.5 or 10; the owner's example
+range 7.5–10 is a hint the form shows, not a cap), rounded once to an integer
+dinar by `worker/lib/warrantyPlans.ts planFee` and identical for a guest, a
+PRIME and a PRO; `fee_iqd` is the fixed fallback for a plan with no percent.
+Legacy `total`-kind plans and non-printer plans already stored keep resolving
+on read; the rules bite only on write. The plan can be bought before the order
+only — nothing after checkout writes `order_items.warranty_snapshot`.
+
 | Template key | Type | Required | Lang | Null behavior | Validation | Editor group | API field | DB storage | Storefront use |
 |---|---|---|---|---|---|---|---|---|---|
 | `warranty_plans.N.id` | string | no | — | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text (single line) | خطط الضمان (Warranty plans) | `warranty_plans[].id` | products.warranty_plans (JSON) | Not shown; selection identity in cart/orders |
@@ -186,9 +203,10 @@ Stored in products.warranty_plans (JSON); served as `warranty_plans[]`. Warranty
 | `warranty_plans.N.terms_ar` | text | no | ar | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text, heredoc for multiline | خطط الضمان (Warranty plans) | `warranty_plans[].terms_ar` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
 | `warranty_plans.N.terms_en` | text | no | en | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text, heredoc for multiline | خطط الضمان (Warranty plans) | `warranty_plans[].terms_en` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
 | `warranty_plans.N.terms_ckb` | text | no | ckb | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text, heredoc for multiline | خطط الضمان (Warranty plans) | `warranty_plans[].terms_ckb` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
-| `warranty_plans.N.duration_months` | int | yes | — | not nullable; omitted = keep current value | integer 1..240 | خطط الضمان (Warranty plans) | `warranty_plans[].duration_months` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
-| `warranty_plans.N.duration_kind` | enum | no | — | not nullable; omitted = keep | total \| extension | خطط الضمان (Warranty plans) | `warranty_plans[].duration_kind` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
-| `warranty_plans.N.fee_iqd` | iqd | yes | — | not nullable; omitted = keep current value | integer IQD 0..2e9 | خطط الضمان (Warranty plans) | `warranty_plans[].fee_iqd` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
+| `warranty_plans.N.duration_months` | int | yes | — | not nullable; omitted = keep current value | integer 1..240; **printers: 12 or 24 only** | خطط الضمان (Warranty plans) | `warranty_plans[].duration_months` | products.warranty_plans (JSON) | "+12 months → 24 total" / "+24 months → 36 total" on the product page, in the cart and on the order |
+| `warranty_plans.N.duration_kind` | enum | no | — | not nullable; omitted = keep | extension \| total; **printers: extension only** (default) | خطط الضمان (Warranty plans) | `warranty_plans[].duration_kind` | products.warranty_plans (JSON) | extension = added to the base; total = legacy whole-period plan, kept readable |
+| `warranty_plans.N.fee_percent` | percent | no | — | `__NULL__` = no percent (the fixed `fee_iqd` applies); omitted = keep | 0.01..100, at most two decimals (7.5, 10); `+7.5` accepted | خطط الضمان (Warranty plans) | `warranty_plans[].fee_percent` | products.warranty_plans (JSON) | Fee = round(regular price of the selection × percent / 100), tier-neutral; the resolved dinar is served per plan (`fee_iqd`) and frozen with `basis_iqd` in the order snapshot |
+| `warranty_plans.N.fee_iqd` | iqd | yes | — | not nullable; omitted = keep current value | integer IQD 0..2e9 | خطط الضمان (Warranty plans) | `warranty_plans[].fee_iqd` | products.warranty_plans (JSON) | Fixed fee, charged when `fee_percent` is null; 0 = explicitly free |
 | `warranty_plans.N.active` | bool | no | — | not nullable; omitted = keep | true / false | خطط الضمان (Warranty plans) | `warranty_plans[].active` | products.warranty_plans (JSON) | Warranty selector; fee ADDED and never waived by membership; inactive hidden |
 
 ### Repeatable group `content_blocks.N.*` — كتل المحتوى / Bottom-of-page content blocks

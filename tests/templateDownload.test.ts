@@ -150,6 +150,22 @@ test('blank template auto-disables only the known unparseable required ints', ()
   );
 });
 
+test('a scalar that lives inside a grouped section is served ONCE — never as a duplicate key', () => {
+  // The device-coverage scalars (`warranty_base_months`, `serialized`) share
+  // the "warranty" section with the repeated `warranty_plans` group, exactly
+  // as the usage URL shares its section with the guide steps. Printing them
+  // in both the scalar pass and the group pass served each key twice; the
+  // parser called the second copy a duplicate and the healer commented it
+  // out — a blank that quietly lost two keys. Pinned here.
+  const text = buildBlankTemplate().text;
+  for (const key of ['warranty_base_months', 'serialized', 'usage_official_url']) {
+    const active = text.split('\n').filter((line) => line.trim().startsWith(`${key}=`));
+    assert.equal(active.length, 1, `${key} must be served exactly once, got ${active.length}`);
+  }
+  assert.ok(text.includes('warranty_base_months=__NULL__'), 'the base is honestly not configured on a blank');
+  assert.ok(text.includes('serialized=false'), 'serialization is stated, not assumed, on a blank');
+});
+
 test('blank template keeps the RICH field set — nothing is slimmed away', () => {
   const text = buildBlankTemplate().text;
   for (const spec of FIELD_REGISTRY.scalars) {

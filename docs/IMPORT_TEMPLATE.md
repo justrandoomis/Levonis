@@ -61,7 +61,7 @@ slug، مكرر في كل أسطر المنتج).
 
 | `row_type` | يحمل | الأعمدة |
 |---|---|---|
-| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, payment_options, how_to_use, usage_url, spec.*` |
+| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*` |
 | `option` | قيمة خيار | `group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd` |
 | `color` | لون وروابطه | `value, hex, sku_part, image, links, active, stock, …الأسعار` |
 | `variant` | توليفة مخزون | `links (Group:Value\|Group:Value\|color:Name), sku_part, active, stock, …الأسعار` |
@@ -69,7 +69,7 @@ slug، مكرر في كل أسطر المنتج).
 | `transport` | شحن الطلب المسبق | `value (air/sea/land), price_iqd (فارغ = العمولة الافتراضية), active` |
 | `spec` | سطر مواصفة | `group (عنوان المجموعة), label, value, unit` |
 | `label` | شارة | `kind (المفتاح المضبوط أو فارغ), value (النص), image (الأيقونة), active` |
-| `warranty` | خطة ضمان | `value (العنوان), body (الشروط), duration_months, kind (total/extension), price_iqd (الرسم), active` |
+| `warranty` | خطة ضمان ممدد — **للطابعات فقط** | `value (العنوان), body (الشروط), duration_months (12 أو 24: +12 → 24 إجمالًا، +24 → 36), kind (extension؛ total للبيانات القديمة), percent (النسبة من سعر الطابعة الاعتيادي، مثال 7.5 أو 10), price_iqd (رسم ثابت حين لا توجد نسبة، 0 = مجاني), active` |
 | `content` | كتلة محتوى | `kind (text/image/video_embed), body, value (تعليق), alt, url, image` |
 | `guide` | خطوة دليل | `kind (setup/usage), value (العنوان), body, image (حتى ٦ بـ \|), url (فيديو), links (رابط المستند)` |
 
@@ -80,11 +80,11 @@ slug، مكرر في كل أسطر المنتج).
 | ١ التصنيف | `brand, category, sub_category, hashtags` |
 | ٢ المعلومات الأساسية | `name, description, status, sku, display_order, is_featured` |
 | ٣ الأسعار والعضويات | `price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd` |
-| ٤ البيع والمخزون | `sale_types, inventory_mode, stock, low_stock_threshold, payment_options` + أسطر `transport` |
+| ٤ البيع والمخزون | `sale_types, inventory_mode, stock, low_stock_threshold, payment_options` + أسطر `transport` + للطابعات `warranty_base_months, serialized` |
 | ٥ الخيارات والألوان | أسطر `option` و`color` و`variant` |
 | ٦ الوسائط | أسطر `image` |
 | ٧ المواصفات والاستخدام | أعمدة `spec.*` + أسطر `spec` + `how_to_use` + `usage_url` + أسطر `guide` |
-| ٨ الشارات والضمان والمحتوى | أسطر `label` و`warranty` و`content` |
+| ٨ الشارات والضمان والمحتوى | أسطر `label` و`warranty` (الطابعات فقط) و`content` |
 
 `id` و`slug` و`doc_version` و`content_rev` و`template_family` و`translation_meta`
 مشتقة ولا تُكتب من الملف. يحرس الخريطةَ اختبارُ «every field of the product
@@ -127,7 +127,16 @@ form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة �
 * حقل مواصفة من نوع `select` لا يقبل إلا إحدى قيمه المعلنة — والرسالة تسردها.
 * حقل `number` لا يقبل إلا رقمًا، وحقل `hex` إلا `#RGB` أو `#RRGGBB`.
 * `kind` في `warranty` و`content` و`guide` و`label` كلٌّ من قائمته.
-* `duration_months` مطلوب بين ١ و٢٤٠ لكل خطة ضمان.
+* `duration_months` مطلوب بين ١ و٢٤٠ لكل خطة ضمان — وللطابعة ١٢ أو ٢٤ فقط
+  (تمديد فوق الضمان الأساسي: +١٢ → ٢٤ إجمالًا، +٢٤ → ٣٦)، بخطة واحدة لكل مدة
+  و`kind=extension`.
+* **الضمان الممدد للطابعات فقط**: سطر `warranty` على منتج ليس في كتالوج طابعات
+  (`is_printer_catalog`) يُرفض في المعاينة وفي التأكيد معًا (`WARRANTY_NOT_PRINTER`).
+* `percent` نسبة بين ٠٫٠١ و١٠٠ بمنزلتين عشريتين على الأكثر (٧٫٥ أو ١٠)؛ الرسم =
+  النسبة × سعر الطابعة **الاعتيادي** مقرَّبًا إلى دينار صحيح، ولا يُعفى بالعضوية.
+  الخلية الفارغة تعني أن `price_iqd` رسم ثابت.
+* `warranty_base_months` و`serialized` على سطر المنتج: الفارغ يُبقي المحفوظ، والطابعة
+  تأخذ ١٢ و`yes` تلقائيًا إن لم يُحفظ شيء؛ طابعة تعرض تمديدًا لا تقبل `serialized=no`.
 * سطر `transport` على منتج لا يبيع بالطلب المسبق يُرفض.
 * توليفة تسمي خيارًا أو لونًا ليس في الملف تُرفض، وتوليفتان بنفس الاختيار تُرفضان.
 * خطتا ضمان بنفس العنوان، أو مواصفتان بنفس الاسم داخل مجموعة واحدة، تُرفضان.

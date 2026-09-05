@@ -124,7 +124,12 @@ export function ProductDetailSkeleton() {
             <Skeleton className="flex-1 h-12 rounded-xl" />
             <Skeleton className="flex-1 h-12 rounded-xl" />
           </div>
+          {/* The buy box's selection blocks — options, then the extended-warranty
+              fieldset a printer carries (legend, intro line, three 44px radios,
+              policy link ≈ 236px). Reserved so a printer page does not jump
+              when its plans arrive. */}
           <Skeleton className="h-14 w-full rounded-xl mb-4" />
+          <Skeleton className="h-[236px] w-full rounded-2xl mb-4" />
           <Skeleton className="h-14 w-full rounded-xl" />
         </div>
       </div>
@@ -149,6 +154,10 @@ export function CartSkeleton({ rows = 3 }: { rows?: number }) {
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-5 w-24 mt-1" />
+            {/* The journey chip and, on a printer line, the collapsed
+                "Extended Warranty" disclosure (36px) — mirrored so the row
+                keeps its height when the line turns out to be a printer. */}
+            <Skeleton className="h-9 w-40 rounded-lg" />
             <div className="flex items-center justify-between mt-auto">
               <Skeleton className="h-8 w-24" />
               <Skeleton className="h-8 w-14" />

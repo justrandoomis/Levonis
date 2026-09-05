@@ -58,6 +58,7 @@ import {
   type ToDocResult,
 } from '../lib/template';
 import { normalizeCheapestBase } from '../lib/cheapestBase';
+import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import {
   parseProductRow,
   validateProductDoc,
@@ -327,15 +328,28 @@ labels.1.text_ar=ضمان سنة
 labels.1.text_en=1-year warranty
 labels.1.visible=true
 
-# ------------------------------ خطط الضمان / warranty plans
-warranty_plans.1.id=wp_example_base
-warranty_plans.1.title_ar=ضمان أساسي
-warranty_plans.1.title_en=Base warranty
-warranty_plans.1.duration_months=12
-warranty_plans.1.duration_kind=total
-# 0 = مجاني صراحةً (وليس "غير محدد")
-warranty_plans.1.fee_iqd=0
-warranty_plans.1.active=true
+# ------------------------------ الضمان الممدد / extended warranty — للطابعات فقط
+# هذا المثال ليس في كتالوج طابعات، فخطط الضمان الممدد محذوفة منه: سطر warranty_plans
+# على منتج ليس طابعة يُرفض (WARRANTY_NOT_PRINTER). لطابعة: الأساسي 12 شهرًا من
+# التسليم (warranty_base_months=12، serialized=true) وخطتان تمديد فقط، رسم كل منهما
+# نسبة من سعر الطابعة الاعتيادي (fee_percent مثل 7.5 أو 10) تُقرَّب إلى دينار صحيح
+# ولا تُعفى بالعضوية. المثال الكامل: docs/examples/bambu-a1.txt
+# warranty_base_months=12
+# serialized=true
+# warranty_plans.1.id=wp_ext12
+# warranty_plans.1.title_en=Extended warranty +12 months (24 months total)
+# warranty_plans.1.duration_months=12
+# warranty_plans.1.duration_kind=extension
+# warranty_plans.1.fee_percent=7.5
+# warranty_plans.1.fee_iqd=0
+# warranty_plans.1.active=true
+# warranty_plans.2.id=wp_ext24
+# warranty_plans.2.title_en=Extended warranty +24 months (36 months total)
+# warranty_plans.2.duration_months=24
+# warranty_plans.2.duration_kind=extension
+# warranty_plans.2.fee_percent=10
+# warranty_plans.2.fee_iqd=0
+# warranty_plans.2.active=true
 
 # ------------------------------ كتل المحتوى / content blocks
 content_blocks.1.id=cb_example_text
@@ -613,6 +627,17 @@ async function analyzeTemplate(
   body.translation_meta = bookkeeping.translation_meta;
   try {
     const validated = validateProductDoc(body);
+    // Extended warranty is for printers only (owner mandate): the catalogs
+    // this file names — or the product's stored placement when it names
+    // none — decide, and the +12/+24 shape and the printer defaults
+    // (serialized, 12-month base) are applied before anything is written.
+    // Runs inside the same try so a refusal is a validation_error the
+    // preview shows, not a 500.
+    await applyPrinterWarrantyRules(
+      db,
+      validated,
+      a.refs.catalog_ids !== undefined ? a.refs.catalog_ids : a.existing ? undefined : []
+    );
     a.doc = validated;
     /**
      * THE OWNER'S FORM IS WHAT GETS STORED: cheapest sellable price as the
@@ -641,6 +666,10 @@ async function analyzeTemplate(
             price_iqd: norm.doc.price_iqd,
             options: norm.doc.options,
             colors: norm.doc.colors,
+            // The printer defaults the first pass filled in (serialized,
+            // base months) are the document's now, not the file's — keep them.
+            serialized: validated.serialized,
+            warranty_base_months: validated.warranty_base_months,
           });
           merge.warnings.push(...norm.warnings);
         } catch (e) {

@@ -1,9 +1,10 @@
 import React from 'react';
-import { ShieldCheck, ShieldOff, Clock, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, ShieldOff, ShieldPlus, Clock, AlertTriangle } from 'lucide-react';
 import type { Language } from '../../translations';
 import type { Device } from './types';
 import { fmtDate, fmtInt } from './types';
 import type { WarrantyStrings } from './strings';
+import { monthsLabel } from '../orders/format';
 
 /**
  * THE WARRANTY TIMELINE. A hairline from the delivery date to the end date,
@@ -53,6 +54,13 @@ export function CoverageBar({
   const remaining = warranty.remaining_days;
   const showTodayLabel = active && fraction > 0.14 && fraction < 0.86;
   const pct = `${Math.round(fraction * 1000) / 10}%`;
+  // A PURCHASED extension (the +12 / +24 bought with the printer): the
+  // device record carries the base and the extension separately, and the
+  // end date under the line already holds their sum — so the split is shown
+  // as two server facts, not re-added here.
+  const extMonths = Number(warranty.ext_months) || 0;
+  const baseMonths = typeof warranty.base_months === 'number' && warranty.base_months > 0 ? warranty.base_months : null;
+  const showSplit = extMonths > 0 && baseMonths !== null;
 
   return (
     <div className={className}>
@@ -114,6 +122,16 @@ export function CoverageBar({
           {s.warrantyEnd} <span className="text-zinc-400">{fmtDate(endIso, lang)}</span>
         </span>
       </div>
+
+      {showSplit && (
+        <p
+          className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0"
+          data-coverage-split={`${baseMonths}+${extMonths}`}
+        >
+          <ShieldPlus aria-hidden="true" className="w-3 h-3 shrink-0 text-[#BAA369]" />
+          <span className="truncate">{s.coverageSplit(monthsLabel(baseMonths, lang), monthsLabel(extMonths, lang))}</span>
+        </p>
+      )}
     </div>
   );
 }

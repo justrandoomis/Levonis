@@ -65,6 +65,7 @@ import {
 } from './templateFamilies';
 import { AVAILABILITY_TYPES, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
 import type { Lookups } from './lookups';
+import { parseFeePercent } from './warrantyPlans';
 
 export type RowType =
   | 'product'
@@ -192,6 +193,10 @@ export const BASE_COLUMNS = [
   'direct_surcharge_iqd',
   'stock',
   'low_stock_threshold',
+  // ---- device coverage (products.ops_policy): the base the extended warranty
+  // adds to (printers default to 12) and whether a unit is recorded per device
+  'warranty_base_months',
+  'serialized',
   // ---- 0044: an ADJUSTMENT instead of a pin — "+60,000 above the base",
   // which keeps following the base instead of freezing away from it.
   'regular_adjust_iqd',
@@ -223,6 +228,9 @@ export const BASE_COLUMNS = [
   'body',
   'url',
   'duration_months',
+  // the extended-warranty fee as a share of the printer price (7.5, 10);
+  // empty = the fixed price_iqd applies
+  'percent',
   'primary',
   'active',
 ] as const;
@@ -311,6 +319,8 @@ export function labelRow(shape: TemplateShape): string[] {
     direct_surcharge_iqd: 'زيادة التوفر الفوري (للبيع المباشر)',
     stock: 'المخزون',
     low_stock_threshold: 'حد التنبيه',
+    warranty_base_months: 'مدة الضمان الأساسي بالأشهر (الطابعات 12؛ فارغ = كما هو محفوظ)',
+    serialized: 'جهاز مُرقَّم — وحدة لكل جهاز عند التسليم (yes/no؛ فارغ = كما هو محفوظ)',
     payment_options: 'طرق الدفع المسموحة (id|id)',
     how_to_use: 'طريقة الاستخدام (نص)',
     usage_url: 'رابط الدليل الرسمي',
@@ -326,7 +336,8 @@ export function labelRow(shape: TemplateShape): string[] {
     kind: 'النوع — يختلف حسب سطر الصف',
     body: 'النص الطويل (شروط الضمان / كتلة المحتوى / خطوة الدليل)',
     url: 'رابط (فيديو أو صورة أو مستند)',
-    duration_months: 'مدة الضمان بالأشهر',
+    duration_months: 'مدة التمديد بالأشهر (الطابعات: 12 أو 24)',
+    percent: 'رسم التمديد كنسبة من سعر الطابعة (مثال 7.5 أو 10؛ فارغ = رسم ثابت price_iqd)',
     primary: 'صورة رئيسية (yes/no)',
     active: 'مفعّل / ظاهر (yes/no)',
   };
@@ -365,6 +376,15 @@ export interface ParsedProduct {
   direct_surcharge_iqd: number | null;
   stock: number | null;
   low_stock_threshold: number | null;
+  /**
+   * Device coverage (products.ops_policy). Both are null when the column is
+   * absent OR the cell is empty — "keep what is stored" — because a blank
+   * here is far more often an older sheet than a decision to un-configure a
+   * printer; clearing is done in the form. A printer gets 12 / yes by default
+   * on import when nothing is stored (worker/lib/warrantyPlans.ts).
+   */
+  warranty_base_months: number | null;
+  serialized: boolean | null;
   /** null when the column is absent, so an older sheet keeps stored values. */
   payment_options: string[] | null;
   how_to_use: string | null;
@@ -498,6 +518,8 @@ export interface ParsedWarranty {
   duration_months: number | null;
   duration_kind: string;
   fee_iqd: number | null;
+  /** The `percent` column — a share of the printer price; null = fixed fee. */
+  fee_percent: number | null;
   active: boolean;
 }
 
@@ -558,6 +580,22 @@ function intCell(v: string, line: number, col: string, issues: RowIssue[]): numb
     return null;
   }
   return Number(s);
+}
+
+/** A share of the price: 0.01..100 with at most two decimals ("7.5", "10"). */
+function percentCell(v: string, line: number, col: string, issues: RowIssue[]): number | null {
+  const s = v.trim();
+  if (s === '') return null;
+  const n = parseFeePercent(s);
+  if (n === null) {
+    issues.push({
+      line,
+      severity: 'error',
+      message: `${col}: "${s}" ليست نسبة صالحة — اكتب رقمًا بين 0.01 و100 بمنزلتين عشريتين على الأكثر (مثال 7.5)`,
+    });
+    return null;
+  }
+  return n;
 }
 
 const splitList = (v: string) =>
@@ -726,6 +764,9 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         ),
         stock: intCell(cell(r, 'stock'), line, 'stock', issues),
         low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
+        warranty_base_months: intCell(cell(r, 'warranty_base_months'), line, 'warranty_base_months', issues),
+        serialized:
+          cell(r, 'serialized') === '' ? null : boolCell(cell(r, 'serialized'), line, 'serialized', issues, false),
         payment_options: index.has('payment_options') ? splitList(cell(r, 'payment_options')) : null,
         how_to_use: index.has('how_to_use') ? cell(r, 'how_to_use') : null,
         usage_url: index.has('usage_url') ? cell(r, 'usage_url') : null,
@@ -959,10 +1000,14 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         title,
         terms: cell(r, 'body'),
         duration_months: months,
-        duration_kind: enumCell(cell(r, 'kind'), WARRANTY_KINDS, line, 'kind', issues, 'total') ?? 'total',
+        // An extension over the base warranty is the only kind a printer may
+        // offer, so it is the default; 'total' stays readable for old data.
+        duration_kind: enumCell(cell(r, 'kind'), WARRANTY_KINDS, line, 'kind', issues, 'extension') ?? 'extension',
         // A warranty fee is never inherited: an empty cell means free, and
         // saying so beats a null that the resolver would have to guess at.
         fee_iqd: fee ?? 0,
+        // The owner's model: a share of the printer price (7.5 → 7.5%).
+        fee_percent: percentCell(cell(r, 'percent'), line, 'percent', issues),
         active,
       });
       continue;
@@ -1256,6 +1301,9 @@ export interface ExportProduct {
   direct_surcharge_iqd: number | null;
   stock: number | null;
   low_stock_threshold: number | null;
+  /** Device coverage; null exports an empty cell ("keep what is stored"). */
+  warranty_base_months: number | null;
+  serialized: boolean | null;
   payment_options: string[];
   how_to_use: string;
   usage_url: string;
@@ -1309,6 +1357,8 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       direct_surcharge_iqd: num(p.direct_surcharge_iqd),
       stock: num(p.stock),
       low_stock_threshold: num(p.low_stock_threshold),
+      warranty_base_months: num(p.warranty_base_months),
+      serialized: p.serialized === null ? '' : bool(p.serialized),
       payment_options: p.payment_options.join('|'),
       how_to_use: p.how_to_use,
       usage_url: p.usage_url,
@@ -1431,6 +1481,7 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         duration_months: num(w.duration_months),
         kind: w.duration_kind,
         price_iqd: num(w.fee_iqd),
+        percent: num(w.fee_percent),
         active: bool(w.active),
       });
     }
@@ -1599,16 +1650,38 @@ export function exampleRows(shape: TemplateShape): Array<Record<string, string>>
     unit: firstSpec?.unit ?? '',
   });
   out.push({ row_type: 'label', key, kind: 'warranty_included', value: 'Warranty included', active: 'yes' });
-  out.push({
-    row_type: 'warranty',
-    key,
-    value: 'One year',
-    body: 'Manufacturing defects only. Consumables are not covered.',
-    duration_months: '12',
-    kind: 'total',
-    price_iqd: '0',
-    active: 'yes',
-  });
+  // Extended warranty is a PRINTER's option (owner mandate): the printer
+  // example carries the two plans the store sells — +12 months (24 total)
+  // and +24 months (36 total), priced as a share of the printer price — and
+  // states the 12-month base and per-device serial tracking they rest on.
+  // The other types carry no warranty row, because importing one for them is
+  // refused (WARRANTY_NOT_PRINTER).
+  if (shape.type === 'printer') {
+    out[0].warranty_base_months = '12';
+    out[0].serialized = 'yes';
+    out.push({
+      row_type: 'warranty',
+      key,
+      value: 'Extended warranty +12 months',
+      body: 'Adds 12 months to the 12-month base warranty (24 months total) — the same manufacturing-defect coverage.',
+      duration_months: '12',
+      kind: 'extension',
+      percent: '7.5',
+      price_iqd: '0',
+      active: 'yes',
+    });
+    out.push({
+      row_type: 'warranty',
+      key,
+      value: 'Extended warranty +24 months',
+      body: 'Adds 24 months to the 12-month base warranty (36 months total) — the same manufacturing-defect coverage.',
+      duration_months: '24',
+      kind: 'extension',
+      percent: '10',
+      price_iqd: '0',
+      active: 'yes',
+    });
+  }
   out.push({ row_type: 'content', key, kind: 'text', body: 'Anything you want under the product page.' });
   out.push({
     row_type: 'guide',
@@ -1792,7 +1865,7 @@ ${def.hint_ar}
 أنواع الأسطر
 ------------
 ${[
-    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, payment_options, how_to_use, usage_url, spec.*'),
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*'),
     rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
@@ -1800,7 +1873,7 @@ ${[
     rowType('transport', 'طريقة شحن للطلب المسبق وعمولتها', `value (${TRANSPORT_METHODS.join(' / ')}), price_iqd (فارغ = العمولة الافتراضية), active`),
     rowType('spec', 'سطر مواصفة داخل مجموعة مواصفات', 'group (عنوان المجموعة), label (اسم المواصفة), value, unit'),
     rowType('label', 'شارة تظهر على بطاقة المنتج', `kind (${LABEL_KEYS.join(' / ')} أو فارغ), value (النص), image (اسم الأيقونة), active`),
-    rowType('warranty', 'خطة ضمان', `value (العنوان), body (الشروط), duration_months, kind (${WARRANTY_KINDS.join(' / ')}), price_iqd (الرسم، 0 = مجاني), active`),
+    rowType('warranty', 'خطة ضمان ممدد — للطابعات فقط', `value (العنوان), body (الشروط), duration_months (12 أو 24: +12 → 24 إجمالًا، +24 → 36), kind (${WARRANTY_KINDS.join(' / ')}), percent (النسبة من سعر الطابعة، مثال 7.5), price_iqd (رسم ثابت عندما لا توجد نسبة، 0 = مجاني), active`),
     rowType('content', 'كتلة محتوى أسفل صفحة المنتج', `kind (${CONTENT_KINDS.join(' / ')}), body, value (التعليق), alt, url, image`),
     rowType('guide', 'خطوة من دليل التركيب والاستخدام', `kind (${GUIDE_KINDS.join(' / ')}), value (العنوان), body, image (حتى ٦ مفصولة بـ |), url (فيديو), links (رابط المستند)`),
   ].join('\n')}
@@ -1825,6 +1898,12 @@ ${[
 * نوع السطر الذي لا يظهر في الملف إطلاقًا يُبقي ما هو محفوظ كما هو. مثلًا:
   ملف بلا أي سطر warranty لا يمس خطط الضمان المخزّنة، بينما ملف صُدِّر من
   المنتج يحمل أسطره كلها — فحذف سطر منه يعني حذفه فعلًا.
+* الضمان الممدد للطابعات فقط: سطر warranty على منتج ليس في كتالوج طابعات
+  يُرفض، وخطط الطابعة تمديد 12 أو 24 شهرًا فوق الضمان الأساسي (24 أو 36
+  إجمالًا) بخطة واحدة لكل مدة. الرسم نسبة من سعر الطابعة (percent، مثال
+  7.5 أو 10) تُقرَّب إلى دينار صحيح ولا تُعفى بالعضوية، أو رسم ثابت في
+  price_iqd. عمودا warranty_base_months وserialized: الفارغ يُبقي المحفوظ،
+  والطابعة تأخذ 12 وyes تلقائيًا إن لم يُحفظ شيء.
 * المعاينة لا تكتب أي شيء في قاعدة البيانات. الكتابة تحدث فقط بعد التأكيد،
   وإعادة التأكيد بنفس import_id لا تكرر شيئًا.
 * الأسطر التي تبدأ بـ # (مثل #labels و #lookup:) يتجاهلها المستورد.

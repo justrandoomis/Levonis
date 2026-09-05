@@ -13,17 +13,24 @@
 #  الجوي تُعفى لأعضاء PRO — قاعدة قائمة.
 #
 #  قاعدة المالك: «سعر المنتج يوضع الأرخص ليكون الخيارات والألوان والتوفر
-#  عبارة عن زيادة». فهذا الملف يقول ثلاثة أشياء فقط:
+#  عبارة عن زيادة». فهذا الملف يقول أربعة أشياء فقط:
 #
 #  1. `price_iqd=899000` هو الأرخص. الـ Combo زيادة فوقه: `+200000`.
 #  2. التوفر حسب المنتج، لا حسب الخيار. `selling_type=mixed` = يُباع بالطريقتين،
 #     و`availability_type` للخيارَين فارغ. لا يوجد خيار «A1 — طلب مسبق» وآخر
 #     «A1 — بيع مباشر»: النسخة واحدة، والطريقة يختارها الزبون في السلة.
 #  3. فرق الطريقة زيادة على المنتج: البيع المباشر `direct_surcharge_iqd=51000`
-#     (لا تُعفى بالعضوية)، والطلب المسبق الجوي `transports.1.commission_iqd=25000`
-#     (تُعفى لأعضاء PRO الفعالين). البري والبحري معطّلان هنا؛ لتفعيل البري اكتب
-#     `transports.3.active=true` وزيادته في `transports.3.commission_iqd`
-#     (أو بكلمة الواجهة `transports.3.surcharge_iqd`).
+#     والطلب المسبق الجوي `transports.1.commission_iqd=25000` — وكلتاهما تُعفى
+#     لأعضاء PRO الفعالين (تكليف طرق الدفع 2026-09-05). طلب مسبق يُدفع نقدًا عند
+#     الاستلام يُسعَّر بزيادة البيع المباشر (51,000) بدل عمولة الشحن (25,000)
+#     لأن هذا المنتج يحمل زيادة بيع مباشر؛ منتج بلا هذه الزيادة يبقى على عمولته.
+#     البري والبحري معطّلان
+#     هنا؛ لتفعيل البري اكتب `transports.3.active=true` وزيادته في
+#     `transports.3.commission_iqd` (أو بكلمة الواجهة `transports.3.surcharge_iqd`).
+#  4. الضمان الممدد (للطابعات فقط) في آخر الملف: الأساسي 12 شهرًا من التسليم،
+#     وتمديدان +12 → 24 و+24 → 36 برسم نسبة من سعر الطابعة الاعتيادي —
+#     7.5% من 899,000 = 67,425 د.ع للـ A1 (82,425 للـ Combo)، و10% = 89,900
+#     (109,900). يُشترى قبل إتمام الطلب فقط ولا يُعفى بالعضوية.
 #
 #  رقم بلا إشارة في regular_price_iqd ما زال مقبولًا كسعر ثابت، ويُعاد
 #  التعبير عنه كزيادة فوق الأساسي عند الاستيراد — ما يدفعه الزبون لا يتغيّر.
@@ -101,3 +108,29 @@ options.2.stock=2
 options.2.regular_price_iqd=+200000
 options.2.cost_iqd=900000
 options.2.active=true
+
+# ------------------------------ الضمان الممدد — للطابعات فقط
+# يُقبل هذا القسم فقط لمنتج في كتالوج طابعات (is_printer_catalog) — وإلا يُرفض الملف
+# بـ WARRANTY_NOT_PRINTER. الضمان الأساسي 12 شهرًا من التسليم، ووحدة لكل طابعة عند
+# التسليم (عليها يُسجَّل الضمان وتمديده).
+warranty_base_months=12
+serialized=true
+# خطتا تمديد لا غير: +12 → 24 شهرًا إجمالًا، +24 → 36 شهرًا إجمالًا. الرسم نسبة من سعر
+# الطابعة الاعتيادي (fee_percent) تُقرَّب إلى دينار صحيح ولا تُعفى بالعضوية؛ fee_iqd=0
+# لأن النسبة هي المعتمدة. يُشترى قبل إتمام الطلب فقط — من صفحة المنتج أو من السلة.
+warranty_plans.1.id=wp_ext12
+warranty_plans.1.title_ar=ضمان ممدد +12 شهرًا (24 شهرًا إجمالًا)
+warranty_plans.1.title_en=Extended warranty +12 months (24 months total)
+warranty_plans.1.duration_months=12
+warranty_plans.1.duration_kind=extension
+warranty_plans.1.fee_percent=7.5
+warranty_plans.1.fee_iqd=0
+warranty_plans.1.active=true
+warranty_plans.2.id=wp_ext24
+warranty_plans.2.title_ar=ضمان ممدد +24 شهرًا (36 شهرًا إجمالًا)
+warranty_plans.2.title_en=Extended warranty +24 months (36 months total)
+warranty_plans.2.duration_months=24
+warranty_plans.2.duration_kind=extension
+warranty_plans.2.fee_percent=10
+warranty_plans.2.fee_iqd=0
+warranty_plans.2.active=true

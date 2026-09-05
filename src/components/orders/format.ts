@@ -107,6 +107,21 @@ export function daysLeftLabel(n: number, lang: string): string {
   return `${n} يومًا متبقيًا`;
 }
 
+/**
+ * "24 months" — Arabic takes its dual and its two plurals honestly (شهر واحد /
+ * شهران / N أشهر / N شهرًا); the digits stay Latin like every other number on
+ * the order and warranty screens.
+ */
+export function monthsLabel(n: number, lang: string): string {
+  const l = asLang(lang);
+  if (l === 'en') return n === 1 ? '1 month' : `${n} months`;
+  if (l === 'ckb') return `${n} مانگ`;
+  if (n === 1) return 'شهر واحد';
+  if (n === 2) return 'شهران';
+  if (n >= 3 && n <= 10) return `${n} أشهر`;
+  return `${n} شهرًا`;
+}
+
 /** Sum of quantities when the server did not send `item_count`. */
 export function countItems(items: Array<{ qty: number }>, fallback?: number): number {
   if (typeof fallback === 'number') return fallback;

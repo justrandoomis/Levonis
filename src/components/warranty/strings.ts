@@ -71,6 +71,11 @@ export interface WarrantyStrings {
   stNeedsConfig: string;
   stNotDelivered: string;
   daysLeft: (n: number, formatted: string) => string;
+  /** A purchased extension on the device: the badge, and the split under the
+   *  timeline ("12 months base + 12 months extended") — both server fields,
+   *  nothing summed in the browser. */
+  extendedBadge: string;
+  coverageSplit: (base: string, ext: string) => string;
   transferredBadge: string;
   replacedBadge: string;
   openClaimsBadge: (n: number, formatted: string) => string;
@@ -185,6 +190,8 @@ const ar: WarrantyStrings = {
     if (n >= 3 && n <= 10) return `${f} أيام متبقية`;
     return `${f} يومًا متبقيًا`;
   },
+  extendedBadge: 'ضمان ممدد',
+  coverageSplit: (base, ext) => `${base} ضمان أساسي + ${ext} تمديد مدفوع`,
   transferredBadge: 'منقولة إليك',
   replacedBadge: 'مُستبدَل',
   openClaimsBadge: (n, f) => (n === 1 ? 'مطالبة مفتوحة' : n === 2 ? 'مطالبتان مفتوحتان' : `${f} مطالبات مفتوحة`),
@@ -301,6 +308,8 @@ const en: WarrantyStrings = {
   stNeedsConfig: 'Warranty duration awaits store configuration',
   stNotDelivered: 'Not delivered yet',
   daysLeft: (n, f) => (n === 1 ? '1 day left' : `${f} days left`),
+  extendedBadge: 'Extended warranty',
+  coverageSplit: (base, ext) => `${base} base warranty + ${ext} purchased extension`,
   transferredBadge: 'Transferred to you',
   replacedBadge: 'Replaced',
   openClaimsBadge: (n, f) => (n === 1 ? '1 open claim' : `${f} open claims`),
@@ -417,6 +426,8 @@ const ckb: WarrantyStrings = {
   stNeedsConfig: 'ماوەی گەرەنتی چاوەڕوانی ڕێکخستنی فرۆشگایە',
   stNotDelivered: 'هێشتا نەگەیەنراوە',
   daysLeft: (_n, f) => `${f} ڕۆژ ماوە`,
+  extendedBadge: 'گەرەنتی درێژکراوە',
+  coverageSplit: (base, ext) => `${base} گەرەنتی بنەڕەتی + ${ext} درێژکردنەوەی کڕدراو`,
   transferredBadge: 'بۆ تۆ گوازراوەتەوە',
   replacedBadge: 'گۆڕدراوەتەوە',
   openClaimsBadge: (_n, f) => `${f} داواکاری کراوە`,

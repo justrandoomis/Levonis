@@ -144,6 +144,42 @@ spec_groups.1.rows.1.unit=mm
   كل حال داخلية ولا تُعرض أبداً. Cost unknown to the external party; it is
   internal-only anyway.
 
+## الضمان الممدد — للطابعات فقط / Extended warranty — printers only
+
+كل طابعة تأتي بضمان أساسي ١٢ شهرًا من التسليم، ويمكن أن تعرض تمديدَين لا غير:
+`+12` (فتصبح ٢٤ شهرًا إجمالًا) و`+24` (فتصبح ٣٦ شهرًا). يُشترى التمديد قبل إتمام
+الطلب فقط. الرسم نسبة من سعر الطابعة الاعتيادي (`fee_percent`، مثال `7.5` أو
+`10`؛ الموصى به ٧٫٥–١٠) تُقرَّب إلى دينار صحيح ولا تُعفى بالعضوية؛ `fee_iqd` رسم
+ثابت يُستخدم فقط حين لا توجد نسبة. المنتج الذي ليس في كتالوج طابعات **لا يقبل**
+هذه الأسطر (يُرفض الملف بـ`WARRANTY_NOT_PRINTER`) — لا تكتبها للمواد والقطع.
+Every printer carries a 12-month base warranty from delivery and may offer
+exactly two extensions: `+12` (24 months in total) and `+24` (36 in total),
+bought before the order only. The fee is a percent of the printer's regular
+price (`fee_percent`, e.g. `7.5` or `10`), rounded to an integer dinar and
+never waived by membership; `fee_iqd` is the fixed fallback when no percent is
+given. A product outside a printer catalog is refused these lines.
+
+```
+warranty_base_months=12
+serialized=true
+warranty_plans.1.id=wp_ext12
+warranty_plans.1.title_ar=ضمان ممدد +12 شهرًا (24 شهرًا إجمالًا)
+warranty_plans.1.title_en=Extended warranty +12 months (24 months total)
+warranty_plans.1.duration_months=12
+warranty_plans.1.duration_kind=extension
+warranty_plans.1.fee_percent=7.5
+warranty_plans.1.fee_iqd=0
+warranty_plans.1.active=true
+warranty_plans.2.id=wp_ext24
+warranty_plans.2.title_ar=ضمان ممدد +24 شهرًا (36 شهرًا إجمالًا)
+warranty_plans.2.title_en=Extended warranty +24 months (36 months total)
+warranty_plans.2.duration_months=24
+warranty_plans.2.duration_kind=extension
+warranty_plans.2.fee_percent=10
+warranty_plans.2.fee_iqd=0
+warranty_plans.2.active=true
+```
+
 ## قائمة تدقيق قبل التسليم / Pre-submission checklist
 
 - [ ] كل سعر عدد صحيح بالدينار، وكل مجهول `__NULL__` وليس صفراً.
@@ -151,6 +187,8 @@ spec_groups.1.rows.1.unit=mm
 - [ ] الاسم العربي موجود ودقيق. Arabic name present and accurate.
 - [ ] أرقام الموديلات منسوخة حرفياً. Model numbers copied exactly.
 - [ ] لا مواصفات أو مدد ضمان مخترعة. No invented specs or warranty terms.
+- [ ] أسطر الضمان الممدد للطابعات فقط، وبمدتَي ١٢ أو ٢٤ ونسبة لكل خطة.
+      Extended-warranty lines only on printers, +12/+24 only, a percent per plan.
 - [ ] روابط الوسائط أصلية وتعمل. Media source URLs are original and working.
 - [ ] كل اللغات المعروفة معبأة، والباقي فارغ بصدق.
       All known languages filled; the rest honestly left empty.

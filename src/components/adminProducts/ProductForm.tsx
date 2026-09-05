@@ -65,6 +65,7 @@ import {
 } from './form/model';
 import { OptionsSection } from './form/OptionsSection';
 import { UsageGuideSection } from './form/UsageGuideSection';
+import { WarrantySection } from './form/WarrantySection';
 import PricePreview from './PricePreview';
 import { ImagesSection } from './form/ImagesSection';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
@@ -363,6 +364,30 @@ export default function ProductForm({
 
   const dirty = baseline !== '' && JSON.stringify({ d: doc, rs: rel }) !== baseline;
 
+  // Extended warranty is a PRINTER's option (owner mandate): the block shows,
+  // and the server accepts plans, only when the chosen section or sub-section
+  // is a printer catalog — the same flag worker/lib/printerIdentity.ts reads.
+  const isPrinterCatalog = useMemo(
+    () => catalogs.some((c) => (c.id === doc.category_id || c.id === doc.sub_category_id) && c.is_printer_catalog),
+    [catalogs, doc.category_id, doc.sub_category_id]
+  );
+  const warrantyInput = useMemo(
+    () => ({
+      isPrinter: isPrinterCatalog,
+      plans: doc.warranty_plans.map((p) => ({
+        id: p.id,
+        duration_months: p.duration_months,
+        duration_kind: p.duration_kind,
+        fee_iqd: p.fee_iqd,
+        fee_percent: p.fee_percent ?? null,
+        active: p.active,
+      })),
+      serialized: doc.serialized ?? null,
+      warranty_base_months: doc.warranty_base_months ?? null,
+    }),
+    [isPrinterCatalog, doc.warranty_plans, doc.serialized, doc.warranty_base_months]
+  );
+
   const errors: FormErrors = useMemo(
     () =>
       validateForm({
@@ -375,8 +400,9 @@ export default function ProductForm({
         sale_types: doc.sale_types as SaleType[],
         rel,
         publishing: doc.status === 'active',
+        warranty: warrantyInput,
       }),
-    [doc, rel]
+    [doc, rel, warrantyInput]
   );
   const errorList = Object.values(errors);
   const err = (k: string) => (showErrors ? (errors[k] ?? null) : null);
@@ -463,6 +489,7 @@ export default function ProductForm({
       sale_types: next.sale_types as SaleType[],
       rel,
       publishing: status === 'active',
+      warranty: warrantyInput,
     });
     if (Object.keys(check).length > 0) {
       setSaveErr('راجع الحقول المعلّمة بالأحمر قبل الحفظ.');
@@ -957,8 +984,15 @@ export default function ProductForm({
           doc.sale_types.map((t) => SALE_TYPES.find((s) => s.id === t)?.ar ?? t).join(' + '),
           rel.inventory_mode,
           doc.stock === null ? 'غير محدود' : `${doc.stock} قطعة`,
+          isPrinterCatalog && doc.warranty_plans.some((p) => p.active)
+            ? `ضمان ممدد ${doc.warranty_plans.filter((p) => p.active).map((p) => `+${p.duration_months}`).join(' / ')}`
+            : undefined,
         ])}
-        error={showErrors && !!errors.sale_types}
+        error={
+          showErrors &&
+          (!!errors.sale_types ||
+            Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized'))
+        }
         {...section(4)}
       >
         {showErrors && errors.sale_types && <Banner kind="error">{errors.sale_types}</Banner>}
@@ -1070,6 +1104,23 @@ export default function ProductForm({
             </div>
           </div>
         )}
+
+        {/* Extended warranty — printers only (owner mandate). Two switches
+            (+12 → 24, +24 → 36), a percent of the printer price each, and the
+            device coverage they rest on. Hidden for anything that is not
+            filed under a printer catalog; a non-printer that still carries
+            plans is told the save will be refused and offered a clear. */}
+        <WarrantySection
+          isPrinter={isPrinterCatalog}
+          plans={doc.warranty_plans}
+          serialized={doc.serialized ?? null}
+          baseMonths={doc.warranty_base_months ?? null}
+          priceIqd={doc.price_iqd}
+          errors={showErrors ? errors : {}}
+          onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
+          onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
+          onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
+        />
 
         <Grid cols={3}>
           <Field

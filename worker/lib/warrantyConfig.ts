@@ -84,6 +84,10 @@ export const DEFAULT_WARRANTY_CONFIG: WarrantyConfig = {
       en: 'A replacement unit continues the remaining original warranty unless the administration explicitly extends it.',
     },
     {
+      ar: 'الضمان الممدد المشترى مع الطابعة يبدأ من تاريخ التسليم نفسه ويُشترى قبل إتمام الطلب فقط؛ المدة الإجمالية هي المطبوعة في هذا الوصل.',
+      en: 'An extended warranty bought with the printer runs from the same delivery date and can only be purchased before the order is placed; the total period is the one printed on this receipt.',
+    },
+    {
       ar: 'يسقط الضمان إذا أُزيل الرقم التسلسلي أو عُبث به.',
       en: 'The warranty is void if the serial number has been removed or altered.',
     },

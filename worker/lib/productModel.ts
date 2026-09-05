@@ -31,6 +31,7 @@ import {
   variantLabelFallback,
 } from './availability';
 import { specGroupsFromFields } from './templateFamilies';
+import { isValidFeePercent, mergeOpsPolicy, parseFeePercent, readOpsWarranty } from './warrantyPlans';
 
 export const DOC_VERSION = 2;
 
@@ -217,6 +218,22 @@ export interface ProductDoc {
   spec_groups: SpecGroupV2[];
   labels: LabelV2[];
   warranty_plans: WarrantyPlanV2[];
+  /**
+   * DEVICE COVERAGE — first-class on the document since the extended-warranty
+   * round, stored in products.ops_policy (the JSON the delivery hook reads:
+   * worker/lib/deviceOps.ts). `warranty_base_months` is the coverage every
+   * unit gets from delivery (a printer defaults to 12 on write; null = not
+   * configured, and the unit honestly says needs_config). `serialized` says
+   * whether a unit row is created per physical device at delivery — the
+   * record an extended warranty attaches to. null = not stated by this
+   * writer (a printer is defaulted to true; anything else keeps what is
+   * stored). `ops_policy` carries the REST of that JSON (size_class, …)
+   * untouched, so a save through this model never erases a key it does not
+   * own.
+   */
+  warranty_base_months: number | null;
+  serialized: boolean | null;
+  ops_policy: Record<string, unknown>;
   content_blocks: ContentBlockV2[];
   translation_meta: TranslationMeta;
   is_featured: boolean;
@@ -519,6 +536,15 @@ export function upgradeWarranty(raw: unknown): WarrantyPlanV2[] {
         duration_months: num(w.duration_months) ?? 12,
         duration_kind: (w.duration_kind === 'extension' ? 'extension' : 'total') as 'total' | 'extension',
         fee_iqd: num(w.fee_iqd) ?? 0,
+        // A percent that fails the rules is kept as typed so the validator can
+        // REFUSE it with its path, rather than silently turning 150% into a
+        // fixed-fee plan. Absent/null/'' stays null (fixed fee applies).
+        fee_percent:
+          w.fee_percent === null || w.fee_percent === undefined || w.fee_percent === ''
+            ? null
+            : typeof w.fee_percent === 'number'
+              ? w.fee_percent
+              : (parseFeePercent(w.fee_percent) ?? Number.NaN),
         order: typeof w.order === 'number' ? (w.order as number) : i,
         active: w.active !== false,
       };
@@ -529,6 +555,7 @@ export function upgradeWarranty(raw: unknown): WarrantyPlanV2[] {
       terms_ar: '', terms_en: '', terms_ckb: '',
       duration_months: 12, duration_kind: 'total' as const,
       fee_iqd: num(w.price_iqd) ?? 0,
+      fee_percent: null,
       order: i, active: true,
     };
   }).sort((a, b) => a.order - b.order);
@@ -613,6 +640,13 @@ export function upgradeUsageGuide(raw: unknown): UsageGuideV2 {
 
 // ---------------------------------------------------------------- row → doc
 
+/** The device keys of products.ops_policy as document fields, plus the rest
+ *  of that JSON carried verbatim (see ProductDoc). */
+function opsFromRow(raw: unknown): Pick<ProductDoc, 'warranty_base_months' | 'serialized' | 'ops_policy'> {
+  const ops = readOpsWarranty(raw);
+  return { warranty_base_months: ops.warranty_base_months, serialized: ops.serialized, ops_policy: ops.policy };
+}
+
 export function parseProductRow(row: Record<string, unknown>): ProductDoc {
   return {
     id: String(row.id),
@@ -650,6 +684,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     spec_groups: upgradeSpecGroups(row.specifications),
     labels: upgradeLabels(row.labels),
     warranty_plans: upgradeWarranty(row.warranty_plans),
+    ...opsFromRow(row.ops_policy),
     content_blocks: upgradeContentBlocks(row.content_blocks),
     translation_meta: safeParse<TranslationMeta>(row.translation_meta, {}),
     is_featured: !!row.is_featured,
@@ -804,7 +839,31 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
   for (const w of warranty) {
     if (w.duration_months <= 0 || w.duration_months > 240) fail(`warranty_plans.${w.id}.duration_months`, 'must be 1..240');
     if (w.fee_iqd < 0) fail(`warranty_plans.${w.id}.fee_iqd`, 'must be >= 0');
+    // A percent fee: 0.01..100 with at most two decimals (7.5, 10). The
+    // printer-only rules and the +12/+24 shape need the catalog flag and live
+    // in worker/lib/warrantyPlans.ts, called by every writer after this.
+    if (w.fee_percent !== null && !isValidFeePercent(w.fee_percent)) {
+      fail(`warranty_plans.${w.id}.fee_percent`, 'must be a percentage between 0.01 and 100 with at most two decimals, or null');
+    }
   }
+
+  // Device coverage fields (stored in ops_policy). `warranty_base_months`:
+  // integer months or null = not configured. `serialized`: an explicit
+  // boolean, or null = not stated (a printer is defaulted to true by the
+  // write-path guard; other products keep what is stored).
+  const baseMonths = body.warranty_base_months;
+  if (baseMonths !== null && baseMonths !== undefined && baseMonths !== '') {
+    if (!Number.isInteger(baseMonths) || (baseMonths as number) < 1 || (baseMonths as number) > 240) {
+      fail('warranty_base_months', 'must be an integer number of months 1..240, or null (not configured)');
+    }
+  }
+  if (body.serialized !== undefined && body.serialized !== null && typeof body.serialized !== 'boolean') {
+    fail('serialized', 'must be true, false or null');
+  }
+  const opsCarried =
+    typeof body.ops_policy === 'object' && body.ops_policy !== null && !Array.isArray(body.ops_policy)
+      ? (body.ops_policy as Record<string, unknown>)
+      : {};
 
   const stock = body.stock === null || body.stock === undefined || body.stock === '' ? null : body.stock;
   if (stock !== null && (!Number.isInteger(stock) || (stock as number) < 0)) fail('stock', 'must be a non-negative integer or null (untracked)');
@@ -1018,6 +1077,10 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     spec_groups: specGroups,
     labels,
     warranty_plans: warranty,
+    warranty_base_months:
+      baseMonths === null || baseMonths === undefined || baseMonths === '' ? null : (baseMonths as number),
+    serialized: typeof body.serialized === 'boolean' ? body.serialized : null,
+    ops_policy: opsCarried,
     content_blocks: blocks,
     translation_meta: (typeof body.translation_meta === 'object' && body.translation_meta !== null
       ? body.translation_meta
@@ -1084,6 +1147,11 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     specifications: JSON.stringify(doc.spec_groups),
     labels: JSON.stringify(doc.labels),
     warranty_plans: JSON.stringify(doc.warranty_plans),
+    // The device keys through the ONE ops_policy writer; every other key of
+    // the stored JSON (size_class, is_spool, …) rides along untouched.
+    ops_policy: JSON.stringify(
+      mergeOpsPolicy(doc.ops_policy ?? {}, { serialized: doc.serialized, warranty_base_months: doc.warranty_base_months })
+    ),
     content_blocks: JSON.stringify(doc.content_blocks),
     translation_meta: JSON.stringify(doc.translation_meta),
     is_featured: doc.is_featured ? 1 : 0,
@@ -1174,6 +1242,9 @@ export function projectPublic(doc: ProductDoc) {
     spec_groups: [...doc.spec_groups, ...specGroupsFromFields(doc.spec_fields)],
     labels: doc.labels.filter((l) => l.visible),
     warranty_plans: doc.warranty_plans.filter((w) => w.active),
+    /** Base coverage from delivery — a fact about the product, so the page can
+     *  say "+12 months → 24 total" without inventing the 12. */
+    warranty_base_months: doc.warranty_base_months,
     content_blocks: doc.content_blocks,
     is_featured: doc.is_featured,
     display_order: doc.display_order,
@@ -1191,6 +1262,6 @@ export const PRODUCT_COLUMNS = [
   'prime_price_iqd','product_cost_iqd','original_price_iqd','selling_type','sale_types','preorder_transports',
   'direct_surcharge_iqd','stock','low_stock_threshold','brand_id','category_id','sub_category_id',
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
-  'warranty_plans','content_blocks','translation_meta','is_featured',
+  'warranty_plans','ops_policy','content_blocks','translation_meta','is_featured',
   'display_order','payment_options','hashtags','how_to_use','usage_guide',
 ] as const;

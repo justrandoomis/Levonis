@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Wrench, LifeBuoy, Receipt, Printer, Package, MoreHorizontal, Unlink, ArrowLeftRight, Repeat, ExternalLink,
+  Wrench, LifeBuoy, Receipt, Printer, Package, MoreHorizontal, Unlink, ArrowLeftRight, Repeat, ExternalLink, ShieldPlus,
 } from 'lucide-react';
 import type { Language } from '../../translations';
 import SafeImage from '../ui/SafeImage';
@@ -55,6 +55,8 @@ export function DeviceCard({
   const supportSubject = `${name} — ${serialLabel}`;
   const docLang = lang === 'en' ? 'en' : 'ar';
   const receiptNo = device.receipt?.receipt_no;
+  // The +12 / +24 bought with the printer, as the device record states it.
+  const extended = (Number(device.warranty.ext_months) || 0) > 0;
 
   return (
     <article className={`${CARD} p-4`} data-unit-id={device.unit_id}>
@@ -108,8 +110,13 @@ export function DeviceCard({
               </>
             )}
           </p>
-          {(device.transferred || replaced || device.open_claims > 0) && (
+          {(extended || device.transferred || replaced || device.open_claims > 0) && (
             <div className="flex flex-wrap gap-1.5 mt-2">
+              {extended && (
+                <Badge icon={ShieldPlus} tone="gold">
+                  {s.extendedBadge}
+                </Badge>
+              )}
               {device.transferred && <Badge icon={ArrowLeftRight}>{s.transferredBadge}</Badge>}
               {replaced && <Badge icon={Repeat}>{s.replacedBadge}</Badge>}
               {device.open_claims > 0 && (

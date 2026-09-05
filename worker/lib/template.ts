@@ -45,6 +45,7 @@ export type TemplateFieldType =
   | 'text'   // may be multiline (heredoc)
   | 'iqd'    // non-negative integer, Iraqi dinars
   | 'int'    // integer
+  | 'percent' // 0.01..100 with at most two decimals (e.g. 7.5) — a fee expressed as a share of the price
   | 'bool'   // true/false
   | 'enum'   // one of enumValues
   | 'csv'    // comma-separated list
@@ -175,8 +176,12 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // Real money on a direct line, added on top of the price. Exporting a file
   // that showed a price the customer never pays was the quiet half of the
   // owner's complaint about the numbers in the export.
-  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون (لا تُعفى بالعضوية)؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
+  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون، وعند الدفع عند الاستلام لطلب مسبق (يُعفى منها عضو PRO الفعّال كعمولة النقل)؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
+  // device coverage (stored in products.ops_policy) — the base the extended
+  // warranty adds to, and whether a unit is recorded per physical device
+  f('warranty_base_months', 'int', 'warranty', 'مدة الضمان الأساسي بالأشهر من التسليم — للطابعات 12 افتراضيًا (التمديد +12 → 24 إجمالًا، +24 → 36)؛ __NULL__ = غير مُعدّة', { nullable: true, min: 1, max: 240 }),
+  f('serialized', 'bool', 'warranty', 'جهاز مُرقَّم — تُنشأ وحدة لكل جهاز عند التسليم ويُربط بها الضمان (الطابعات true تلقائيًا)'),
   // usage guide — the steps are the `usage_steps` group below
   f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
 ];
@@ -339,9 +344,10 @@ const GROUP_SPECS: GroupSpec[] = [
       f('terms_ar', 'text', 'warranty', 'شروط الضمان بالعربية (heredoc للأسطر المتعددة)', { lang: 'ar' }),
       f('terms_en', 'text', 'warranty', 'Terms (English)', { lang: 'en' }),
       f('terms_ckb', 'text', 'warranty', 'مەرجەکان بە کوردی', { lang: 'ckb' }),
-      f('duration_months', 'int', 'warranty', 'مدة الضمان بالأشهر 1..240', { required: true, min: 1, max: 240 }),
-      f('duration_kind', 'enum', 'warranty', 'total (المدة الكلية) | extension (تمديد فوق ضمان المصنع)', { enumValues: ['total', 'extension'] as const }),
-      f('fee_iqd', 'iqd', 'warranty', 'رسم الضمان بالدينار — يُضاف على السعر ولا يُعفى أبداً بالعضوية; 0 = مجاني صراحةً', { required: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
+      f('duration_months', 'int', 'warranty', 'مدة التمديد بالأشهر — للطابعات 12 أو 24 فقط (+12 → 24 إجمالًا، +24 → 36 إجمالًا)', { required: true, min: 1, max: 240 }),
+      f('duration_kind', 'enum', 'warranty', 'extension (تمديد فوق الضمان الأساسي — الوحيد المقبول للطابعات) | total (مدة كلية، بيانات قديمة)', { enumValues: ['extension', 'total'] as const }),
+      f('fee_percent', 'percent', 'warranty', 'رسم التمديد كنسبة من سعر الطابعة الاعتيادي (مثال 7.5 أو 10 — الموصى به 7.5..10)؛ يُقرَّب إلى دينار صحيح ولا يُعفى بالعضوية؛ __NULL__ = رسم ثابت من fee_iqd', { nullable: true, min: 0.01, max: 100 }),
+      f('fee_iqd', 'iqd', 'warranty', 'رسم ثابت بالدينار — يُستخدم عندما لا توجد نسبة؛ يُضاف على السعر ولا يُعفى أبداً بالعضوية; 0 = مجاني صراحةً', { required: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
       f('active', 'bool', 'warranty', 'معروضة — offered'),
     ],
   },
@@ -462,7 +468,7 @@ function coerce(
     return { value: null, clear: false, line };
   }
   if (raw === CLEAR_TOKEN) {
-    if (spec.type === 'iqd' || spec.type === 'int') {
+    if (spec.type === 'iqd' || spec.type === 'int' || spec.type === 'percent') {
       if (!spec.nullable) return err(`${CLEAR_TOKEN} is not allowed — this number is required; set an explicit value`);
       return { value: null, clear: true, line };
     }
@@ -506,6 +512,18 @@ function coerce(
       const min = spec.min ?? (spec.type === 'iqd' ? 0 : Number.MIN_SAFE_INTEGER);
       const max = spec.max ?? Number.MAX_SAFE_INTEGER;
       if (n < min || n > max) return err(`must be between ${min} and ${max}`);
+      return { value: n, clear: false, line };
+    }
+    case 'percent': {
+      // A share of the price: "7.5", "10", "+7.5". Two decimals at most, so
+      // the fee it produces rounds to the same dinar everywhere.
+      if (raw === '') return err(`empty percentage — write a number like 7.5, ${spec.nullable ? `${NULL_TOKEN}, ` : ''}or omit the line to keep the current value`);
+      const text = raw.replace(/^\+/, '');
+      if (!/^\d+(\.\d{1,2})?$/.test(text)) return err('must be a percentage with at most two decimals (e.g. 7.5)');
+      const n = Number(text);
+      const min = spec.min ?? 0.01;
+      const max = spec.max ?? 100;
+      if (!Number.isFinite(n) || n < min || n > max) return err(`must be between ${min} and ${max}`);
       return { value: n, clear: false, line };
     }
     case 'bool': {
@@ -895,6 +913,11 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   push('low_stock_threshold', numStr(doc.low_stock_threshold));
   push('direct_surcharge_iqd', numStr(doc.direct_surcharge_iqd));
   push('payment_options', doc.payment_options.join(','));
+  // Device coverage — written whenever the product states it. A product that
+  // never said whether it is serialized exports no `serialized` line, so a
+  // re-import keeps the stored answer instead of turning silence into false.
+  push('warranty_base_months', numStr(doc.warranty_base_months));
+  if (doc.serialized !== null) push('serialized', boolStr(doc.serialized));
 
   const sorted = <T extends { order?: number; id?: string }>(items: T[]): T[] =>
     [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)));
@@ -1060,6 +1083,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.terms_ckb`, w.terms_ckb);
     push(`${p}.duration_months`, String(w.duration_months));
     push(`${p}.duration_kind`, w.duration_kind);
+    push(`${p}.fee_percent`, w.fee_percent === null || w.fee_percent === undefined ? null : String(w.fee_percent));
     push(`${p}.fee_iqd`, String(w.fee_iqd));
     push(`${p}.active`, boolStr(w.active));
   });
@@ -1346,7 +1370,7 @@ function fieldComment(spec: FieldSpec): string {
 }
 
 function blankValue(spec: FieldSpec): string {
-  if (spec.nullable && (spec.type === 'iqd' || spec.type === 'int' || spec.type === 'ref' || spec.type === 'string')) return NULL_TOKEN;
+  if (spec.nullable && (spec.type === 'iqd' || spec.type === 'int' || spec.type === 'percent' || spec.type === 'ref' || spec.type === 'string')) return NULL_TOKEN;
   switch (spec.type) {
     case 'bool': return spec.key === 'active' || spec.key === 'visible' || spec.key === 'primary' ? 'true' : 'false';
     case 'enum': return spec.enumValues?.[0] ?? '';
@@ -1383,11 +1407,15 @@ export function generateBlankTemplate(): string {
     'slug=',
   ];
 
+  // A scalar whose section also owns a repeated group (the usage guide's
+  // official URL with its steps, the device coverage with the warranty
+  // plans) is printed INSIDE that section's block below, so the section
+  // reads as one and no key is served twice — a duplicate key is a parse
+  // error, and the healer would comment the second copy out.
+  const groupedSections = new Set(GROUP_SPECS.map((g) => g.group));
   let current = '';
   for (const spec of SCALAR_FIELDS) {
-    // The usage guide's scalar is printed with its steps, so the section
-    // reads as one block (see the group loop).
-    if (spec.group === 'usage') continue;
+    if (groupedSections.has(spec.group)) continue;
     if (spec.group !== current) {
       current = spec.group;
       lines.push(...sectionHeader(spec.group));
@@ -1716,6 +1744,12 @@ export function toDocBody(
         spec_groups: existing.spec_groups,
         labels: existing.labels,
         warranty_plans: existing.warranty_plans,
+        // The device coverage the product already states, and the REST of its
+        // ops_policy (size_class, …) — carried so a file that says nothing
+        // about them changes nothing, exactly like every other omitted key.
+        warranty_base_months: existing.warranty_base_months,
+        serialized: existing.serialized,
+        ops_policy: existing.ops_policy,
         preorder_transports: existing.preorder_transports,
         content_blocks: existing.content_blocks,
         translation_meta: existing.translation_meta,

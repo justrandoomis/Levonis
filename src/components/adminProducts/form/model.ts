@@ -142,6 +142,71 @@ export function localId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}${seq}`;
 }
 
+// ------------------------------------------------------- extended warranty
+
+/**
+ * The extended-warranty constants and fee rule, A FAITHFUL COPY of
+ * worker/lib/warrantyPlans.ts (PRINTER_BASE_MONTHS, PRINTER_EXTENSION_MONTHS,
+ * FEE_PERCENT_HINT, planFee). The client cannot import that module — it pulls
+ * the Worker's HTTP helpers — and the server re-validates every save; these
+ * exist so the form flags exactly what the server refuses and previews the
+ * exact dinar the resolver will charge. tests/extendedWarranty.test.ts runs
+ * both copies over the same numbers.
+ */
+export const PRINTER_BASE_MONTHS = 12;
+export const PRINTER_EXTENSION_MONTHS = [12, 24] as const;
+export const FEE_PERCENT_HINT = { min: 7.5, max: 10 } as const;
+
+export function isValidFeePercent(v: unknown): v is number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return false;
+  if (v < 0.01 || v > 100) return false;
+  return Math.round(v * 100) / 100 === v;
+}
+
+/** `round(basis × percent / 100)` through integer basis points, else the fixed fee. */
+export function warrantyFee(plan: { fee_iqd: number; fee_percent: number | null }, basisIqd: number): number {
+  const pct = plan.fee_percent;
+  if (typeof pct === 'number' && Number.isFinite(pct) && pct > 0) {
+    const bp = Math.round(pct * 100);
+    const basis = Number.isFinite(basisIqd) && basisIqd > 0 ? Math.round(basisIqd) : 0;
+    return Math.round((basis * bp) / 10000);
+  }
+  return Number.isInteger(plan.fee_iqd) && plan.fee_iqd >= 0 ? plan.fee_iqd : 0;
+}
+
+/** The form's view of the plans: the server's rules, before the round trip. */
+export interface WarrantyFormInput {
+  isPrinter: boolean;
+  plans: Array<{ id: string; duration_months: number; duration_kind: string; fee_iqd: number; fee_percent: number | null; active: boolean }>;
+  serialized: boolean | null;
+  warranty_base_months: number | null;
+}
+
+function warrantyRules(w: WarrantyFormInput, out: FormErrors): void {
+  if (!w.isPrinter) {
+    if (w.plans.length > 0) out.warranty_plans = 'الضمان الممدد للطابعات فقط — هذا المنتج ليس في قسم طابعات؛ احذف الخطط قبل الحفظ';
+    return;
+  }
+  const seen = new Set<number>();
+  for (const p of w.plans) {
+    if (p.duration_kind !== 'extension' || !(PRINTER_EXTENSION_MONTHS as readonly number[]).includes(p.duration_months)) {
+      out[`warranty_plan:${p.id}`] = 'خطة الطابعة تمديد +12 أو +24 شهرًا فقط';
+    } else if (seen.has(p.duration_months)) {
+      out[`warranty_plan:${p.id}`] = `خطة واحدة لكل مدة (+${p.duration_months} شهرًا مكررة)`;
+    }
+    seen.add(p.duration_months);
+    if (p.fee_percent !== null && !isValidFeePercent(p.fee_percent)) {
+      out[`warranty_percent:${p.id}`] = 'النسبة بين 0.01 و100 بمنزلتين عشريتين على الأكثر (مثال 7.5)';
+    }
+  }
+  if (w.plans.some((p) => p.active) && w.serialized === false) {
+    out.serialized = 'طابعة تعرض ضمانًا ممددًا يجب أن تكون مُرقَّمة — وإلا لا تُسجَّل التغطية على الوحدات';
+  }
+  if (w.warranty_base_months !== null && (!Number.isInteger(w.warranty_base_months) || w.warranty_base_months < 1 || w.warranty_base_months > 240)) {
+    out.warranty_base_months = 'مدة الضمان الأساسي بين 1 و240 شهرًا';
+  }
+}
+
 // ------------------------------------------------------------------ wire IO
 
 interface WireValue extends FormPrices {
@@ -541,8 +606,11 @@ export function validateForm(input: {
   rel: RelationsState;
   /** Publishing enforces more than saving a draft. */
   publishing: boolean;
+  /** The extended-warranty block (printers only); omitted = not checked. */
+  warranty?: WarrantyFormInput;
 }): FormErrors {
   const e: FormErrors = {};
+  if (input.warranty) warrantyRules(input.warranty, e);
   if (!input.name_en.trim()) e.name_en = 'الاسم الإنجليزي مطلوب';
   if (input.price_iqd === null) e.price_iqd = 'السعر الاعتيادي مطلوب';
   if (input.publishing && !input.category_id) e.category_id = 'القسم الرئيسي مطلوب للنشر';
