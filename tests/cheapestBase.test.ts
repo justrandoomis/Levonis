@@ -192,14 +192,50 @@ test('with no options, the cheapest colour is the base and the others are increa
   assertSamePrices(before, doc);
 });
 
-test('a colour linked only to some options is measured against those options', () => {
-  // The colour is for option b only (+10,000). b is the only anchor, so the
-  // fixed 65,000 could be "+5,000 over b" — but b is not the base, and an
-  // adjustment is written against the base in validation; it stays fixed.
+test('a colour linked only to some options still needs EVERY active option at the base to convert', () => {
+  // The colour is for option b only (+10,000). Its link set is honoured by
+  // the relational cart, but a legacy JSON-column product sells it with any
+  // option — so one increase is right for every line only when every option
+  // sits at the base. Here they do not: it stays fixed.
   const before = product(50_000, [opt('a'), opt('b', { regular_adjust_iqd: 10_000 })], [col('k', { regular_price_iqd: 65_000 }, { option_ids: ['b'] })]);
   const { doc, warnings } = normalizeCheapestBase(before);
   assert.equal(doc.colors[0].regular_price_iqd, 65_000);
-  assert.ok(warnings.some((w) => w.startsWith('colors.1.regular_price_iqd:') && w.includes('فوق الأساسي')), warnings.join('\n'));
+  assert.ok(warnings.some((w) => w.startsWith('colors.1.regular_price_iqd:') && w.includes('تختلف')), warnings.join('\n'));
+  assertSamePrices(before, doc);
+});
+
+test('REVIEW: a link-set colour is not converted when a non-linked option prices differently (legacy cart sells it with any option)', () => {
+  // base 60,000; a FIXED 50,000 (the new base); b inherits; colour k fixed
+  // 55,000 linked to a only. Converting k to +5,000 would sell b|k — a line
+  // the JSON-column cart accepts — at 65,000 instead of 55,000.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 }), opt('b')], [col('k', { regular_price_iqd: 55_000 }, { option_ids: ['a'] })]);
+  const { doc, base_after } = normalizeCheapestBase(before);
+  assert.equal(base_after, 50_000);
+  assert.equal(doc.colors[0].regular_price_iqd, 55_000, 'kept fixed');
+  assertSamePrices(before, doc); // everyPrice ignores link sets: every option × colour line
+});
+
+test('REVIEW: with every option switched off, the base and the colours are left alone', () => {
+  // Colours anchor on the base today and on the option the day it is switched
+  // back on; no rewrite is right for both, so nothing moves.
+  const before = product(60_000, [opt('a', {}, { active: false })], [col('k', { regular_price_iqd: 50_000 }), col('m')]);
+  const { doc, base_after, warnings } = normalizeCheapestBase(before);
+  assert.equal(base_after, 60_000);
+  assert.deepEqual(doc.colors, before.colors);
+  assert.ok(warnings.some((w) => w.includes('معطّلة')), warnings.join('\n'));
+  assertSamePrices(before, doc);
+  // …and switching the option back on afterwards charges what it always did.
+  const on = (d: Doc): Doc => ({ ...d, options: d.options.map((o) => ({ ...o, active: true })) });
+  assert.deepEqual(everyPrice(on(doc)), everyPrice(on(before)));
+});
+
+test('REVIEW: the "kept fixed" note names the right direction', () => {
+  // Product PRO 55,000 keeps the base at 60,000 although option a sells at
+  // 50,000; the colour on a is below the base, and the note must say so.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [col('k', { regular_price_iqd: 52_000 })], { pro_price_iqd: 55_000 });
+  const { doc, warnings } = normalizeCheapestBase(before);
+  assert.equal(doc.colors[0].regular_price_iqd, 52_000);
+  assert.ok(warnings.some((w) => w.startsWith('colors.1.') && w.includes('تحت الأساسي')), warnings.join('\n'));
   assertSamePrices(before, doc);
 });
 

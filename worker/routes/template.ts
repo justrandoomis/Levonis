@@ -1412,7 +1412,7 @@ templateRoutes.post('/parse-zip', async (c) => {
   for (const name of names) {
     try {
       const text = decoder.decode(entries[name]);
-      const a = await analyzeTemplate(c.env.DB, text);
+      const a = await analyzeTemplate(c.env.DB, text, undefined, { money: canViewFinancials(c.env, c.get('user')) });
       const needsReview = a.merge?.needs_review ?? a.refs.needs_review ?? [];
       const ok = a.parsed.errors.length === 0 && !a.validation_error;
       files.push({

@@ -134,15 +134,35 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
   const anchorsOf = (c: ColorV2): number[] =>
     hasOptions ? optionsFor(c).map((id) => optionRegular.get(id) as number) : [base];
 
+  /**
+   * EVERY OPTION SWITCHED OFF. The colours then anchor on the base today and
+   * on an option the day one is switched back on — and that is the flow the
+   * export exists for («options.1.active=true» is a one-word edit). No single
+   * rewrite is right before AND after that edit, so the base is left where it
+   * is and the colours untouched; the options themselves are still written
+   * relative to the base.
+   */
+  const frozen = options.length > 0 && !hasOptions;
+
   // ---- the cheapest sellable regular price -------------------------------
   const candidates: number[] = [base];
   for (const o of activeOptions) candidates.push(optionRegular.get(o.id) as number);
+  const colourCandidates: number[] = [];
   for (const c of colors) {
     if (c.active === false) continue;
     const anchors = anchorsOf(c);
     if (anchors.length === 0) continue; // linked only to switched-off options: not sellable
-    if (isFixed(c)) candidates.push(c.regular_price_iqd as number);
-    else for (const a of anchors) candidates.push(regularOf(c, a));
+    if (isFixed(c)) colourCandidates.push(c.regular_price_iqd as number);
+    else for (const a of anchors) colourCandidates.push(regularOf(c, a));
+  }
+  if (frozen) {
+    if (colourCandidates.some((v) => v < base)) {
+      warnings.push(
+        `price_iqd: بقي السعر الأساسي ${iqd(base)} مع أن لونًا يُباع بأقل منه، لأن كل خيارات المنتج معطّلة — يُعاد النظر في الأرخص عند تفعيل خيار.`
+      );
+    }
+  } else {
+    candidates.push(...colourCandidates);
   }
   let newBase = Math.min(...candidates);
 
@@ -195,8 +215,16 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
     warnings.push(`colors.${i + 1}.regular_price_iqd: ${text}`);
     colorNotes.push({ id: c.id, text });
   };
+  // What EVERY active option resolves to. A fixed colour converts only when
+  // all of them sit at the base: its link set (option_ids) is honoured by the
+  // relational cart, but a legacy JSON-column product — which is what a TXT
+  // create produces — sells the colour with any option, so the link set is
+  // not enough to make one increase right for every line.
+  const allActive = activeOptions.map((o) => optionRegular.get(o.id) as number);
+  const allActiveAtBase = allActive.every((a) => a === newBase);
   const nextColors = colors.map((c, i) => {
     const name = c.name_ar || c.name_en;
+    if (frozen) return c;
     if (!hasOptions) {
       // Anchored on the base, which may just have moved: keep the price.
       const over = regularOf(c, base) - newBase;
@@ -212,20 +240,21 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
       note(i, c, `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأنه لا يتوفر لأي خيار فعّال، فلا شيء يُقاس الفرق عنه.`);
       return c;
     }
-    if (!anchors.every((a) => a === anchors[0])) {
-      note(i, c, `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن الخيارات التي يتوفر لها تختلف في السعر، فلا توجد زيادة واحدة تعبّر عنه.`);
+    if (allActiveAtBase) {
+      changed.push(`colors.${i + 1}.regular_price_iqd`);
+      return asAdjustment(c, fixed - newBase);
+    }
+    if (!allActive.every((a) => a === allActive[0])) {
+      note(i, c, `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن خيارات المنتج تختلف في السعر، فلا توجد زيادة واحدة تعبّر عنه.`);
       return c;
     }
-    if (anchors[0] !== newBase) {
-      note(
-        i, c,
-        `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن الخيار الذي يتوفر له يُسعَّر فوق الأساسي (${iqd(anchors[0])})؛ ` +
-          'زيادة اللون تُقاس عند التحقق من السعر الأساسي، فرقم ثابت هنا هو الصادق.'
-      );
-      return c;
-    }
-    changed.push(`colors.${i + 1}.regular_price_iqd`);
-    return asAdjustment(c, fixed - anchors[0]);
+    note(
+      i, c,
+      allActive[0] > newBase
+        ? `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن الخيارات تُسعَّر فوق الأساسي (${iqd(allActive[0])})؛ زيادة اللون تُقاس عند التحقق من السعر الأساسي، فرقم ثابت هنا هو الصادق.`
+        : `أُبقي سعر اللون «${name}» ثابتًا (${iqd(fixed)}) لأن الخيارات تُسعَّر تحت الأساسي (${iqd(allActive[0])}) والأساسي بقي أعلى منها بسبب حد سعر العضوية.`
+    );
+    return c;
   });
 
   if (newBase !== base) changed.unshift('price_iqd');

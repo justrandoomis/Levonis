@@ -489,10 +489,10 @@ function coerce(
       // says the writer meant a difference, and there is nothing to differ from.
       // A surcharge written as `+51000`: the sign only says what the field
       // already is, so it is dropped rather than refused.
-      if (spec.plusIsPlain && /^\+\d+$/.test(raw)) raw = raw.slice(1);
-      if (/^[+-]\d+$/.test(raw)) {
+      const text = spec.plusIsPlain && /^\+\d+$/.test(raw) ? raw.slice(1) : raw;
+      if (/^[+-]\d+$/.test(text)) {
         if (spec.adjustKey) {
-          const n = parseInt(raw, 10);
+          const n = parseInt(text, 10);
           if (!Number.isSafeInteger(n) || Math.abs(n) > IQD_MAX) return err('adjustment out of range');
           return { value: n, clear: false, line, adjust: true };
         }
@@ -500,8 +500,8 @@ function coerce(
           return err(`a signed value (+N / -N) means "over the level beneath" and only option/colour price fields take one — write a plain number here`);
         }
       }
-      if (!/^[+-]?\d+$/.test(raw)) return err(`must be an integer${spec.type === 'iqd' ? ' (IQD, no separators or decimals)' : ''}`);
-      const n = parseInt(raw, 10);
+      if (!/^[+-]?\d+$/.test(text)) return err(`must be an integer${spec.type === 'iqd' ? ' (IQD, no separators or decimals)' : ''}`);
+      const n = parseInt(text, 10);
       if (!Number.isSafeInteger(n)) return err('integer out of range');
       const min = spec.min ?? (spec.type === 'iqd' ? 0 : Number.MIN_SAFE_INTEGER);
       const max = spec.max ?? Number.MAX_SAFE_INTEGER;
