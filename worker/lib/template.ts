@@ -17,6 +17,7 @@
 
 import { newId } from './crypto';
 import { isMixed } from './availability';
+import { normalizeCheapestBase } from './cheapestBase';
 import { buildGrid, COLUMN_OF, FIELDS, type Field } from './priceGrid';
 import type {
   ProductDoc,
@@ -63,6 +64,15 @@ export interface FieldSpec {
   max?: number;
   /** import-only convenience keys are parsed but never exported */
   exported?: boolean;
+  /**
+   * Price fields on options and colours: a value written WITH A SIGN (`+60000`,
+   * `-5000`) is not a price but the increase (or discount) over the level
+   * beneath — the owner's model, «زيادة فوق السعر». It lands in this
+   * adjustment key and the price itself is cleared (applyItemField).
+   */
+  adjustKey?: string;
+  /** Import-only synonym: the value is written to THIS key of the item. */
+  aliasOf?: string;
 }
 
 export interface GroupSpec {
@@ -99,7 +109,7 @@ function f(
 
 const IQD_MAX = 2_000_000_000;
 
-/** The 13 canonical editor groups (Arabic-first labels used in exports). */
+/** The 14 canonical editor groups (Arabic-first labels used in exports). */
 export const TEMPLATE_GROUPS: Array<{ id: string; titleAr: string; titleEn: string }> = [
   { id: 'identity',        titleAr: 'الهوية',                titleEn: 'Identity' },
   { id: 'description',     titleAr: 'الوصف',                 titleEn: 'Description' },
@@ -114,6 +124,9 @@ export const TEMPLATE_GROUPS: Array<{ id: string; titleAr: string; titleEn: stri
   { id: 'labels',          titleAr: 'الشارات',               titleEn: 'Labels' },
   { id: 'warranty',        titleAr: 'خطط الضمان',            titleEn: 'Warranty plans' },
   { id: 'content',         titleAr: 'كتل المحتوى',           titleEn: 'Content blocks' },
+  // The last form section the file could not say: the setup & usage guide
+  // (official link + ordered steps with photos, a video and a doc link).
+  { id: 'usage',           titleAr: 'دليل التركيب والاستخدام', titleEn: 'Setup & usage guide' },
 ];
 
 const SCALAR_FIELDS: FieldSpec[] = [
@@ -128,7 +141,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('description_ckb', 'text', 'description', 'وەسفی کوردی — Kurdish description', { lang: 'ckb' }),
   f('how_to_use', 'text', 'description', 'طريقة الاستخدام — usage instructions (multiline allowed)'),
   // pricing — IQD integers; null = inherit/none, 0 = explicit zero
-  f('price_iqd', 'iqd', 'pricing', 'السعر الأساسي بالدينار — regular base price, REQUIRED integer', { required: true, min: 0, max: IQD_MAX }),
+  f('price_iqd', 'iqd', 'pricing', 'السعر الأساسي بالدينار = أرخص صنف قابل للبيع؛ كل خيار أو لون أو طريقة توفر زيادة فوقه — base price = the CHEAPEST sellable item, REQUIRED integer', { required: true, min: 0, max: IQD_MAX }),
   f('pro_price_iqd', 'iqd', 'pricing', 'سعر PRO الصريح — explicit PRO price; __NULL__ = no explicit price (store policy applies, default: no discount)', { nullable: true, min: 0, max: IQD_MAX }),
   f('prime_price_iqd', 'iqd', 'pricing', 'سعر PRIME الصريح — explicit PRIME price; __NULL__ = none (regular applies)', { nullable: true, min: 0, max: IQD_MAX }),
   f('original_price_iqd', 'iqd', 'pricing', 'السعر قبل الخصم — compare-at price; shown only when above the selling price; __NULL__ = none', { nullable: true, min: 0, max: IQD_MAX }),
@@ -156,8 +169,10 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // Real money on a direct line, added on top of the price. Exporting a file
   // that showed a price the customer never pays was the quiet half of the
   // owner's complaint about the numbers in the export.
-  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف على السعر عند الشراء الفوري من المخزون؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX }),
+  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون (لا تُعفى بالعضوية)؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
+  // usage guide — the steps are the `usage_steps` group below
+  f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
 ];
 
 const GROUP_SPECS: GroupSpec[] = [
@@ -165,8 +180,11 @@ const GROUP_SPECS: GroupSpec[] = [
     name: 'transports', bodyKey: 'preorder_transports', idPrefix: '', mergeKey: 'method', group: 'transports',
     titleAr: 'شحن الطلب المسبق', titleEn: 'Pre-order transports',
     fields: [
-      f('method', 'enum', 'transports', 'air | sea | land — عمولة الشحن تُضاف فوق السعر وتُعفى لأعضاء PRO الفعالين', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
-      f('commission_iqd', 'iqd', 'transports', 'عمولة النقل بالدينار — __NULL__ = يرث الافتراضي الإداري لهذه الطريقة', { nullable: true, min: 0, max: IQD_MAX }),
+      f('method', 'enum', 'transports', 'air | sea | land — طريقة الطلب المسبق؛ زيادتها تُضاف فوق سعر الخيار/اللون المختار وتُعفى لأعضاء PRO الفعالين', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
+      f('commission_iqd', 'iqd', 'transports', 'الزيادة بالدينار فوق السعر عند الطلب المسبق بهذه الطريقة (البري مثلًا) — __NULL__ = القيمة الافتراضية من الإعدادات', { nullable: true, min: 0, max: IQD_MAX }),
+      // The form calls this number «الزيادة بالدينار». The file accepts that
+      // word too, so the owner can write what the screen says.
+      f('surcharge_iqd', 'iqd', 'transports', 'مرادف لـ commission_iqd بكلمة الواجهة: الزيادة بالدينار لهذه الطريقة — import-only, never exported; يتقدّم على commission_iqd إذا وُجد الاثنان', { nullable: true, min: 0, max: IQD_MAX, exported: false, aliasOf: 'commission_iqd' }),
       f('active', 'bool', 'transports', 'معروض للزبائن — offered to customers'),
     ],
   },
@@ -210,20 +228,24 @@ const GROUP_SPECS: GroupSpec[] = [
       f('name_ckb', 'string', 'options', 'ناوی هەڵبژاردە بە کوردی', { lang: 'ckb' }),
       f('image', 'string', 'options', 'صورة الخيار — option image URL'),
       f('active', 'bool', 'options', 'فعال — active'),
-      f('regular_price_iqd', 'iqd', 'options', 'يستبدل السعر الأساسي — REPLACES the base regular price; __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
-      f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للخيار — __NULL__ = inherit per-field (option → base)', { nullable: true, min: 0, max: IQD_MAX }),
-      f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للخيار — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
+      // THE OWNER'S MODEL: the base price is the cheapest item and an option
+      // is an INCREASE over it. `+60000` here is that increase (it lands in
+      // regular_adjust_iqd); a bare number is still accepted as a fixed price
+      // and is re-expressed as an increase when the file is applied.
+      f('regular_price_iqd', 'iqd', 'options', 'الزيادة فوق السعر الأساسي بصيغة +N (مثال +60000)، أو __NULL__ = نفس السعر الأساسي. رقم بلا إشارة = سعر ثابت، ويُعاد التعبير عنه كزيادة عند الاستيراد دون تغيير ما يدفعه الزبون.', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
+      f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للخيار — __NULL__ = وراثة لكل حقل (خيار ← أساسي)؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
+      f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للخيار — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
       f('compare_at_iqd', 'iqd', 'options', 'سعر المقارنة للخيار — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
-      f('cost_iqd', 'iqd', 'options', 'كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
+      f('cost_iqd', 'iqd', 'options', 'كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
       // ---- 0044: an ADJUSTMENT instead of a pin. A row that says "+60,000
       // above the base" keeps following the base; a row that pins a number
       // does not, which is the whole reason pinnedPrices.ts exists.
-      f('regular_adjust_iqd', 'int', 'options', 'فرق السعر عن المستوى الأعلى بالدينار (موجب أو سالب) — يُستخدم فقط عندما يكون regular_price_iqd فارغًا؛ عندها يتبع هذا الصف السعر الأساسي ويبقى الفرق ثابتًا. __NULL__ = بدون فرق.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('regular_adjust_iqd', 'int', 'options', 'الزيادة فوق السعر الأساسي بالدينار — الطريقة المعتمدة لتسعير الخيار: يتبع السعر الأساسي ويبقى الفرق ثابتًا (موجب عادةً؛ سالب مسموح). يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر الأساسي.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('prime_adjust_iqd', 'int', 'options', 'فرق سعر PRIME عن المستوى الأعلى — يُستخدم فقط عندما يكون prime_price_iqd فارغًا. بدون سعر PRIME موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('pro_adjust_iqd', 'int', 'options', 'فرق سعر PRO عن المستوى الأعلى — يُستخدم فقط عندما يكون pro_price_iqd فارغًا. بدون سعر PRO موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('cost_adjust_iqd', 'int', 'options', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       // ---- 0043: this option's own availability, stock and lead time ------
-      f('availability_type', 'enum', 'options', 'نوع التوفر لهذا الخيار — direct_sale | pre_order. اتركه فارغًا ليرث نوع بيع المنتج (وهو ما تفعله كل الخيارات القديمة).', { enumValues: ['', 'direct_sale', 'pre_order'] as const }),
+      f('availability_type', 'enum', 'options', 'نوع التوفر لهذا الخيار — فارغ = حسب المنتج (الموصى به): يُباع كما يُباع المنتج، وفرق البيع المباشر/الطلب المسبق يأتي من direct_surcharge_iqd وزيادات النقل لا من خيارات منفصلة. direct_sale | pre_order فقط عندما يختلف هذا الخيار فعلًا عن المنتج.', { enumValues: ['', 'direct_sale', 'pre_order'] as const }),
       f('stock', 'int', 'options', 'مخزون هذا الخيار — __NULL__ = لا يُتتبع (الطلب المسبق عادةً). البيع المباشر يضع رقمًا.', { nullable: true, min: 0, max: 1_000_000 }),
       f('lead_time_text', 'string', 'options', 'مدة الطلب المسبق كما تُعرض للزبون — مثال: 3-4 weeks. النص يسبق الأرقام دائمًا.'),
       f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام للطلب المسبق — للترتيب والتقدير، لا للعرض', { nullable: true, min: 0, max: 3650 }),
@@ -255,13 +277,13 @@ const GROUP_SPECS: GroupSpec[] = [
       f('stock', 'int', 'colors', 'مخزون هذا اللون — __NULL__ = لا يُتتبع على مستوى اللون', { nullable: true, min: 0, max: 1_000_000 }),
       f('low_stock_threshold', 'int', 'colors', 'حد التنبيه لمخزون هذا اللون — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
       f('active', 'bool', 'colors', 'فعال — active'),
-      f('regular_price_iqd', 'iqd', 'colors', 'يستبدل السعر (لون ← خيار ← أساسي) — REPLACES; __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
-      f('pro_price_iqd', 'iqd', 'colors', 'سعر PRO للون — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
-      f('prime_price_iqd', 'iqd', 'colors', 'سعر PRIME للون — __NULL__ = inherit per-field', { nullable: true, min: 0, max: IQD_MAX }),
+      f('regular_price_iqd', 'iqd', 'colors', 'الزيادة فوق سعر الخيار المختار (أو الأساسي) بصيغة +N، أو __NULL__ = نفس سعر الخيار. رقم بلا إشارة = سعر ثابت يستبدل السعر (لون ← خيار ← أساسي).', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
+      f('pro_price_iqd', 'iqd', 'colors', 'سعر PRO للون — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
+      f('prime_price_iqd', 'iqd', 'colors', 'سعر PRIME للون — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
       f('compare_at_iqd', 'iqd', 'colors', 'سعر المقارنة للون — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
-      f('cost_iqd', 'iqd', 'colors', 'كلفة اللون (داخلي) — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
+      f('cost_iqd', 'iqd', 'colors', 'كلفة اللون (داخلي) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
       // ---- 0044: see the options group above.
-      f('regular_adjust_iqd', 'int', 'colors', 'فرق السعر عن المستوى الأعلى بالدينار (موجب أو سالب) — يُستخدم فقط عندما يكون regular_price_iqd فارغًا؛ عندها يتبع هذا الصف السعر الأساسي ويبقى الفرق ثابتًا. __NULL__ = بدون فرق.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('regular_adjust_iqd', 'int', 'colors', 'الزيادة فوق سعر الخيار المختار (أو الأساسي) بالدينار — الطريقة المعتمدة لتسعير اللون: يتبع ما تحته ويبقى الفرق ثابتًا. يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('prime_adjust_iqd', 'int', 'colors', 'فرق سعر PRIME عن المستوى الأعلى — يُستخدم فقط عندما يكون prime_price_iqd فارغًا. بدون سعر PRIME موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('pro_adjust_iqd', 'int', 'colors', 'فرق سعر PRO عن المستوى الأعلى — يُستخدم فقط عندما يكون pro_price_iqd فارغًا. بدون سعر PRO موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('cost_adjust_iqd', 'int', 'colors', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
@@ -336,6 +358,21 @@ const GROUP_SPECS: GroupSpec[] = [
       f('media_key', 'string', 'content', 'مفتاح R2 عند التخزين الداخلي — internal R2 key'),
     ],
   },
+  {
+    // Lives NESTED in the document (usage_guide.steps), so toDocBody folds it
+    // in and out of `usage_guide` instead of writing body[bodyKey] directly.
+    name: 'usage_steps', bodyKey: 'usage_steps', idPrefix: 'ustep', mergeKey: 'id', group: 'usage',
+    titleAr: 'خطوات التركيب والاستخدام', titleEn: 'Setup & usage steps',
+    fields: [
+      f('id', 'string', 'usage', 'معرف ثابت — stable id for merge-by-id'),
+      f('kind', 'enum', 'usage', 'setup (تركيب) | usage (استخدام)', { required: true, enumValues: ['setup', 'usage'] as const }),
+      f('title', 'string', 'usage', 'عنوان الخطوة (حتى 200 حرف) — step title'),
+      f('body', 'text', 'usage', 'شرح الخطوة (حتى 2000 حرف؛ heredoc للأسطر المتعددة) — step body'),
+      f('images', 'csv', 'usage', 'حتى 6 روابط صور مفصولة بفواصل — up to six image URLs'),
+      f('video_url', 'string', 'usage', 'رابط فيديو (ملف مباشر أو صفحة YouTube/Vimeo) أو فارغ'),
+      f('link_url', 'string', 'usage', 'رابط الوثيقة الرسمية لهذه الخطوة أو فارغ'),
+    ],
+  },
 ];
 
 /** Fields the template can never edit (or only under an explicit flag). */
@@ -365,7 +402,13 @@ const HEADER_KEYS = new Set(['template_version', 'product_id', 'expected_updated
 // ---------------------------------------------------------------- parse
 
 export interface TemplateError { line: number; key: string; message: string }
-export interface ParsedField { value: unknown; clear: boolean; line: number }
+export interface ParsedField {
+  value: unknown;
+  clear: boolean;
+  line: number;
+  /** `+N` / `-N` on a price field: the value is an ADJUSTMENT over the level beneath, not a price. */
+  adjust?: boolean;
+}
 export interface ParsedGroupItem {
   index: number;
   line: number;
@@ -434,7 +477,21 @@ function coerce(
     case 'iqd':
     case 'int': {
       if (raw === '') return err(`empty number — write an integer, ${spec.nullable ? `${NULL_TOKEN}, ` : ''}or omit the line to keep the current value`);
-      if (!/^-?\d+$/.test(raw)) return err(`must be an integer${spec.type === 'iqd' ? ' (IQD, no separators or decimals)' : ''}`);
+      // A SIGNED number on an option/colour price is an increase over the
+      // level beneath («زيادة فوق السعر»), routed to the adjustment twin. On
+      // any other price it is refused rather than read as a price: the sign
+      // says the writer meant a difference, and there is nothing to differ from.
+      if (/^[+-]\d+$/.test(raw)) {
+        if (spec.adjustKey) {
+          const n = parseInt(raw, 10);
+          if (!Number.isSafeInteger(n) || Math.abs(n) > IQD_MAX) return err('adjustment out of range');
+          return { value: n, clear: false, line, adjust: true };
+        }
+        if (spec.type === 'iqd') {
+          return err(`a signed value (+N / -N) means "over the level beneath" and only option/colour price fields take one — write a plain number here`);
+        }
+      }
+      if (!/^[+-]?\d+$/.test(raw)) return err(`must be an integer${spec.type === 'iqd' ? ' (IQD, no separators or decimals)' : ''}`);
       const n = parseInt(raw, 10);
       if (!Number.isSafeInteger(n)) return err('integer out of range');
       const min = spec.min ?? (spec.type === 'iqd' ? 0 : Number.MIN_SAFE_INTEGER);
@@ -1015,6 +1072,20 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.media_key`, b.media_key);
   });
 
+  // The setup & usage guide — the one form section that had no key at all,
+  // so «يملأ جميع الحقول» was structurally impossible for it.
+  push('usage_official_url', doc.usage_guide?.official_url ?? '');
+  sorted(doc.usage_guide?.steps ?? []).forEach((st, i) => {
+    const p = `usage_steps.${i + 1}`;
+    push(`${p}.id`, st.id);
+    push(`${p}.kind`, st.kind);
+    push(`${p}.title`, st.title);
+    push(`${p}.body`, st.body);
+    push(`${p}.images`, st.images.join(','));
+    push(`${p}.video_url`, st.video_url);
+    push(`${p}.link_url`, st.link_url);
+  });
+
   return e;
 }
 
@@ -1166,13 +1237,25 @@ function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> 
   return out;
 }
 
-/** Deterministic full export of a product document (all languages). */
-export function exportProduct(doc: ProductDoc, opts: ExportOpts = {}): string {
+/**
+ * Deterministic full export of a product document (all languages).
+ *
+ * WRITTEN IN THE OWNER'S FORM. The base price is the cheapest sellable item and
+ * every option and colour is an increase over it (cheapestBase.ts). A product
+ * stored with fixed option prices is re-expressed on the way out — the numbers
+ * the customer pays are identical, only the way they are written changes — and
+ * the file says so beside price_iqd, because re-importing it stores it that
+ * way.
+ */
+export function exportProduct(input: ProductDoc, opts: ExportOpts = {}): string {
+  const norm = normalizeCheapestBase(input);
+  const doc = norm.doc;
   const lines: string[] = [
     '# قالب منتج ليفونيس — الإصدار 2 / Levonis product template, version 2',
     '# الأسطر التي تبدأ بـ # تعليقات. القيم الفارغة تبقى فارغة.',
     `# ${NULL_TOKEN} = لا قيمة (وراثة). ${CLEAR_TOKEN} = مسح القيمة الحالية عند التحديث.`,
     '# الحقول المحذوفة من الملف تحافظ على قيمتها الحالية عند التحديث.',
+    '# السعر الأساسي هو الأرخص؛ الخيارات والألوان والبيع المباشر وطرق الطلب المسبق زيادات فوقه.',
     `template_version=${TEMPLATE_VERSION}`,
     `product_id=${doc.id}`,
   ];
@@ -1182,6 +1265,29 @@ export function exportProduct(doc: ProductDoc, opts: ExportOpts = {}): string {
 
   const entries = docToEntries(doc, opts);
   const notes = opts.showEffective === false ? new Map<string, string>() : effectiveNotes(doc, opts);
+
+  // Comments that belong beside a key whatever its value: the pricing model
+  // itself at price_iqd, and what the normalizer changed or could not change.
+  const extra = new Map<string, string[]>();
+  const beside = (key: string, text: string) => extra.set(key, [...(extra.get(key) ?? []), text]);
+  beside(
+    'price_iqd',
+    'أرخص صنف قابل للبيع. كل خيار أو لون زيادة فوقه (regular_adjust_iqd أو +N في regular_price_iqd)؛ ' +
+      'البيع المباشر زيادة (direct_surcharge_iqd) وكل طريقة طلب مسبق زيادة (transports.N.commission_iqd).'
+  );
+  if (norm.base_after !== norm.base_before) {
+    beside(
+      'price_iqd',
+      `المخزّن حاليًا ${iqd(norm.base_before)} د.ع مع أسعار ثابتة؛ هذا الملف يعبّر عنها كزيادات فوق ${iqd(norm.base_after)} — ` +
+        'إعادة استيراده تُخزّنها هكذا وما يدفعه الزبون لا يتغير.'
+    );
+  } else if (norm.changed.length > 0) {
+    beside('price_iqd', 'أسعار ثابتة للخيارات/الألوان في المخزن تظهر هنا كزيادات فوق الأساسي؛ إعادة الاستيراد تُخزّنها هكذا وما يدفعه الزبون لا يتغير.');
+  }
+  for (const w of norm.warnings) {
+    const m = /^([a-z_]+(?:\.\d+\.[a-z_]+)?):\s*/.exec(w);
+    if (m) beside(m[1], w.slice(m[0].length));
+  }
   let currentSection = '';
   const sectionOf = (key: string): string => {
     // `spec.<id>` is a prefix family, not an indexed group, so it needs its
@@ -1202,6 +1308,7 @@ export function exportProduct(doc: ProductDoc, opts: ExportOpts = {}): string {
     // Only annotate a field that is actually inheriting; a row that states its
     // own price does not need to be told what its own price is.
     if (note && entry.value === null) lines.push(`#   ↳ ${note}`);
+    for (const x of extra.get(entry.key) ?? []) lines.push(`#   ↳ ${x}`);
   }
   lines.push('');
   return lines.join('\n');
@@ -1243,7 +1350,9 @@ export function generateBlankTemplate(): string {
     '#  - النص متعدد الأسطر: key=<<<END ثم الأسطر ثم END في سطر مستقل.',
     '#  - المجموعات المتكررة مفهرسة: options.1.name_ar ثم options.2.name_ar وهكذا.',
     '#  - الأسعار أعداد صحيحة بالدينار العراقي فقط (بدون فواصل).',
-    '#  - أسعار الخيار/اللون تستبدل السعر الأساسي (وراثة لكل حقل: لون ← خيار ← أساسي).',
+    '#  - السعر الأساسي (price_iqd) هو الأرخص. الخيارات والألوان زيادات فوقه: regular_adjust_iqd=60000 أو regular_price_iqd=+60000.',
+    '#  - التوفر حسب المنتج: اترك options.N.availability_type فارغًا. البيع المباشر زيادة (direct_surcharge_iqd) وكل طريقة طلب مسبق زيادة (transports.N.commission_iqd).',
+    '#  - سعر ثابت (regular_price_iqd=رقم بلا إشارة) ما زال مقبولًا ويُعاد التعبير عنه كزيادة فوق الأساسي عند الاستيراد دون تغيير ما يدفعه الزبون.',
     '#  - لا تختلق قيماً — إذا كانت المعلومة غير معروفة اترك الحقل فارغاً أو __NULL__.',
     '',
     `template_version=${TEMPLATE_VERSION}`,
@@ -1256,6 +1365,9 @@ export function generateBlankTemplate(): string {
 
   let current = '';
   for (const spec of SCALAR_FIELDS) {
+    // The usage guide's scalar is printed with its steps, so the section
+    // reads as one block (see the group loop).
+    if (spec.group === 'usage') continue;
     if (spec.group !== current) {
       current = spec.group;
       lines.push(...sectionHeader(spec.group));
@@ -1266,6 +1378,11 @@ export function generateBlankTemplate(): string {
 
   for (const g of GROUP_SPECS) {
     lines.push(...sectionHeader(g.group));
+    for (const spec of SCALAR_FIELDS) {
+      if (spec.group !== g.group) continue;
+      lines.push(fieldComment(spec));
+      lines.push(`${spec.key}=${blankValue(spec)}`);
+    }
     lines.push(`# مجموعة متكررة "${g.name}" — كرر بـ ${g.name}.2.… ${g.name}.3.…`);
     lines.push(`# لحذف كل العناصر عند التحديث: ${g.name}=${CLEAR_TOKEN}`);
     for (const spec of g.fields) {
@@ -1319,14 +1436,42 @@ export interface ToDocResult {
 
 type LooseItem = Record<string, unknown>;
 
+/**
+ * Applies every field the file carries for one item, in registry order —
+ * except that a SIGNED price (`regular_price_iqd=+60000`) is applied last.
+ *
+ * An export writes every `*_adjust_iqd=__NULL__` line below its price line.
+ * An owner who edits the price line to `+60000` and leaves the rest alone
+ * must not have that edit silently undone by the untouched `__NULL__` line
+ * beneath it — the sign is the more deliberate statement, so it wins.
+ */
+function applyItemFields(target: LooseItem, specs: FieldSpec[], fields: Record<string, ParsedField>): void {
+  const signed: Array<[FieldSpec, ParsedField]> = [];
+  for (const spec of specs) {
+    const pf = fields[spec.key];
+    if (!pf) continue;
+    if (pf.adjust && spec.adjustKey) signed.push([spec, pf]);
+    else applyItemField(target, spec, pf);
+  }
+  for (const [spec, pf] of signed) applyItemField(target, spec, pf);
+}
+
 function applyItemField(target: LooseItem, spec: FieldSpec, pf: ParsedField): void {
-  if (pf.clear) {
-    if (spec.type === 'iqd' || spec.type === 'int') target[spec.key] = null;
-    else if (spec.type === 'csv') target[spec.key] = [];
-    else target[spec.key] = '';
+  const key = spec.aliasOf ?? spec.key;
+  if (pf.adjust && spec.adjustKey) {
+    // `regular_price_iqd=+60000`: this row FOLLOWS the level beneath by that
+    // much. The price itself is cleared so the adjustment is what resolves.
+    target[key] = null;
+    target[spec.adjustKey] = pf.value;
     return;
   }
-  target[spec.key] = pf.value;
+  if (pf.clear) {
+    if (spec.type === 'iqd' || spec.type === 'int') target[key] = null;
+    else if (spec.type === 'csv') target[key] = [];
+    else target[key] = '';
+    return;
+  }
+  target[key] = pf.value;
 }
 
 function buildGroupItems(
@@ -1342,10 +1487,7 @@ function buildGroupItems(
 
   const buildFresh = (it: ParsedGroupItem, orderIndex: number): LooseItem => {
     const item: LooseItem = { order: orderIndex };
-    for (const spec of g.fields) {
-      const pf = it.fields[spec.key];
-      if (pf) applyItemField(item, spec, pf);
-    }
+    applyItemFields(item, g.fields, it.fields);
     if (g.idPrefix && (typeof item.id !== 'string' || !item.id)) item.id = newId(g.idPrefix);
     // requiredness of subfields — never silently drop an item
     for (const spec of g.fields) {
@@ -1382,10 +1524,7 @@ function buildGroupItems(
       const base = byId.get(id);
       if (base) {
         const item: LooseItem = { ...base, order: orderIndex };
-        for (const spec of g.fields) {
-          const pf = it.fields[spec.key];
-          if (pf) applyItemField(item, spec, pf);
-        }
+        applyItemFields(item, g.fields, it.fields);
         if (g.rowFields) item.rows = buildRows(g, it, (base.rows as LooseItem[]) ?? [], result);
         merged.push(item);
       } else {
@@ -1587,6 +1726,10 @@ export function toDocBody(
         // The enum allows '' for "no family"; the column holds NULL for that.
         body.template_family = pf.value ? pf.value : null;
         break;
+      case 'usage_official_url':
+        // Nested in usage_guide; the steps beside it are a group (below).
+        body.usage_guide = { ...guideOf(body), official_url: typeof pf.value === 'string' ? pf.value : '' };
+        break;
       default:
         body[spec.key] = pf.value;
     }
@@ -1678,8 +1821,14 @@ export function toDocBody(
   for (const g of orderedGroups) {
     const clear = parsed.groupClears[g.name];
     const templateItems = parsed.groups[g.name] ?? [];
+    // The usage steps live inside usage_guide, not at the top of the body.
+    const nested = g.name === 'usage_steps';
+    const writeItems = (items: LooseItem[]) => {
+      if (nested) body.usage_guide = { ...guideOf(body), steps: items };
+      else body[g.bodyKey] = items;
+    };
     if (clear) {
-      body[g.bodyKey] = [];
+      writeItems([]);
       result.cleared_fields.push(g.name);
       if (templateItems.length > 0) {
         result.warnings.push(`${g.name}: both ${g.name}=${CLEAR_TOKEN} and indexed items were given — the group was cleared, items ignored`);
@@ -1690,7 +1839,7 @@ export function toDocBody(
       if (existing) result.preserved_fields.push(g.name);
       continue;
     }
-    const existingItems = (existing ? (body[g.bodyKey] as LooseItem[]) : []) ?? [];
+    const existingItems = existing ? (nested ? guideOf(body).steps : ((body[g.bodyKey] as LooseItem[]) ?? [])) : [];
     const items = buildGroupItems(g, templateItems, existingItems, result);
     if (g.name === 'options') {
       templateItems.forEach((it, i) => {
@@ -1718,11 +1867,20 @@ export function toDocBody(
         delete target.option_index;
       });
     }
-    body[g.bodyKey] = items;
+    writeItems(items);
     result.applied_fields.push(g.name);
   }
 
   return result;
+}
+
+/** The usage guide carried on a body, in the shape the merge writes back. */
+function guideOf(body: Record<string, unknown>): { official_url: string; steps: LooseItem[] } {
+  const g = body.usage_guide as { official_url?: unknown; steps?: unknown } | undefined;
+  return {
+    official_url: typeof g?.official_url === 'string' ? g.official_url : '',
+    steps: Array.isArray(g?.steps) ? (g.steps as LooseItem[]) : [],
+  };
 }
 
 // ---------------------------------------------------------------- translation bookkeeping

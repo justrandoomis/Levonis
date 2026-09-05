@@ -206,15 +206,21 @@ test('example template is valid end-to-end and creates a draft', () => {
   assert.equal(doc.price_iqd, 100_000);
 });
 
-test('example demonstrates per-field inheritance without inventing prices', () => {
+test('example demonstrates the owner\'s form: the base is the cheapest, options and colours are increases', () => {
   const { doc } = pipeline(buildExampleTemplate());
   const [small, large] = doc.options;
   assert.equal(small.regular_price_iqd, null, '__NULL__ inherits, it is not zero');
-  assert.equal(large.regular_price_iqd, 120_000);
+  assert.equal(large.regular_price_iqd, null, '+20000 is not a price');
+  assert.equal(large.regular_adjust_iqd, 20_000, 'it is the increase over the 100,000 base');
+  assert.equal(small.availability_type, '', 'availability follows the product');
   // option_index is an import-only alias that must resolve to the option id.
   const gold = doc.colors.find((c) => c.name_en === 'Gold');
   assert.equal(gold?.option_id, large.id);
-  assert.equal(gold?.regular_price_iqd, 135_000);
+  assert.equal(gold?.regular_price_iqd, null);
+  assert.equal(gold?.regular_adjust_iqd, 15_000, '+15,000 over the Large option');
+  // …and the last form section is in the file too.
+  assert.equal(doc.usage_guide.steps.length, 1);
+  assert.equal(doc.usage_guide.steps[0].kind, 'setup');
 });
 
 test('example never ships an active image URL (no broken-image product)', () => {

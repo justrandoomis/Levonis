@@ -83,8 +83,9 @@ function view(): ProductRelationsView {
       {
         id: 'pc1', product_id: 'prd_x', name_en: 'Black', hex: '#000000', image: '/files/col-black.jpg',
         sort: 0, active: 1, stock: 9, low_stock_threshold: 3,
-        regular_price_iqd: 5_000, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: 2_000,
-        regular_adjust_iqd: null, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: null,
+        // +5,000 over whichever model is picked — the owner's surcharge form.
+        regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: 2_000,
+        regular_adjust_iqd: 5_000, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: null,
       },
     ],
     // Available for BOTH models — the case `option_id` alone cannot express.
@@ -163,7 +164,11 @@ test('every price, membership price, adjustment and cost survives the trip', () 
   const { body } = roundTrip();
   const groups = body.groups as Array<{ values: Array<Record<string, unknown>> }>;
   const a1 = groups.flatMap((g) => g.values).find((v) => v.id === 'ov1')!;
-  assert.equal(a1.regular_price_iqd, 899_000);
+  // THE OWNER'S FORM. A1 was stored as a FIXED 899,000; the file writes it as
+  // what it is relative to the 500,000 base — +399,000 — and that is what
+  // comes back. Same price at checkout; see tests/cheapestBase.test.ts.
+  assert.equal(a1.regular_price_iqd, null);
+  assert.equal(a1.regular_adjust_iqd, 399_000);
   assert.equal(a1.prime_price_iqd, 885_000);
   assert.equal(a1.pro_price_iqd, 799_000);
   assert.equal(a1.cost_iqd, 700_000);
@@ -177,7 +182,8 @@ test('the colour keeps its own price, its cost, its stock and BOTH its links', (
   const { body } = roundTrip();
   const colors = body.colors as Array<Record<string, unknown>>;
   assert.equal(colors.length, 1);
-  assert.equal(colors[0].regular_price_iqd, 5_000);
+  assert.equal(colors[0].regular_price_iqd, null);
+  assert.equal(colors[0].regular_adjust_iqd, 5_000, 'the +5,000 surcharge over the chosen model');
   assert.equal(colors[0].cost_iqd, 2_000);
   assert.equal(colors[0].stock, 9);
   assert.equal(colors[0].low_stock_threshold, 3);
@@ -433,13 +439,176 @@ test('the annotation is a COMMENT — re-parsing the annotated file is identical
   assert.deepEqual(a, b, 'a comment can never change what a file means');
 });
 
-test('a row that states its own price is not told what its own price is', () => {
-  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+test('a row that must keep a fixed price is written as a number and told WHY, not what it costs', () => {
+  // A colour on two models that price differently has no single increase
+  // that is right for both, so its fixed price stays — and the comment beside
+  // it explains that instead of restating the number above it.
+  const v = view();
+  const cols = v.colors as unknown as Array<Record<string, unknown>>;
+  cols[0].regular_price_iqd = 905_000;
+  cols[0].regular_adjust_iqd = null;
+  const doc = applyRelations(parseProductRow(baseRow()), v, { includeInactive: true });
   const text = exportProduct(doc, { includeCost: true });
   const lines = text.split('\n');
-  const i = lines.findIndex((l) => l === 'options.1.regular_price_iqd=899000');
-  assert.ok(i > 0, 'options.1 states its own regular price');
-  assert.ok(!lines[i + 1].startsWith('#   ↳'), 'a fixed price needs no annotation');
+  const i = lines.findIndex((l) => l === 'colors.1.regular_price_iqd=905000');
+  assert.ok(i > 0, 'the colour states its own regular price');
+  assert.match(lines[i + 1], /أُبقي سعر اللون/, 'the reason it stayed fixed');
+  assert.ok(!lines[i + 1].includes('الفعلي'), 'a fixed price is not told what its own price is');
+});
+
+// ------------------------------------------- the owner's form: one price, then surcharges
+
+test('the export writes the cheapest sellable price as the base and every option as an increase', () => {
+  // Stored: base 500,000; A1 FIXED at 899,000; A1 Combo +300,000; a switched-off
+  // nozzle +25,000. The base is already the cheapest sellable line, so it
+  // stays; the fixed A1 becomes +399,000, and the file says what it did.
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true });
+  assert.match(text, /^price_iqd=500000\n#\s+↳ أرخص صنف قابل للبيع/m);
+  assert.match(text, /^options\.1\.regular_price_iqd=__NULL__\n#\s+↳ السعر الاعتيادي الفعلي للصنف: 899,000 د\.ع — فرق \+399,000 عن 500,000/m);
+  assert.match(text, /^options\.1\.regular_adjust_iqd=399000$/m);
+  assert.match(text, /أسعار ثابتة للخيارات\/الألوان في المخزن تظهر هنا كزيادات/, 'the file says the stored form differed');
+  // Re-importing stores exactly this: once the product is in the owner's
+  // form, export → import → export changes nothing at all. (The first export
+  // also carries the "stored form differed" note and the selling type the
+  // options imply, which is why the comparison starts from the second.)
+  const built1 = validateProductDoc(toDocBody(parseTemplate(text), doc, { needs_review: [] }).body);
+  const text2 = exportProduct(built1, { includeCost: true });
+  const built2 = validateProductDoc(toDocBody(parseTemplate(text2), built1, { needs_review: [] }).body);
+  const text3 = exportProduct(built2, { includeCost: true });
+  assert.equal(text3, text2, 'export → import → export is a fixed point');
+  assert.ok(!text2.includes('في المخزن تظهر هنا كزيادات'), 'nothing left to re-express');
+  assert.equal(built1.price_iqd, 500_000);
+  assert.equal(built1.options.find((o) => o.id === 'ov1')?.regular_adjust_iqd, 399_000);
+});
+
+test('the documented Bambu A1 example is valid and already in the owner\'s form', async () => {
+  const { readFileSync } = await import('node:fs');
+  const text = readFileSync('docs/examples/bambu-a1.txt', 'utf8');
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsed.unknown_keys, []);
+  const merged = toDocBody(parsed, null, { brand_id: null, catalog_ids: [] });
+  assert.deepEqual(merged.needs_review, []);
+  const built = validateProductDoc(merged.body);
+  assert.equal(built.price_iqd, 899_000, 'the cheapest model is the base');
+  assert.deepEqual(built.sale_types.sort(), ['direct_sale', 'pre_order'], 'sold both ways, at product level');
+  assert.equal(built.direct_surcharge_iqd, 51_000);
+  assert.equal(built.preorder_transports.find((t) => t.method === 'air')?.commission_iqd, 25_000);
+  const combo = built.options.find((o) => o.id === 'a1-combo')!;
+  assert.equal(combo.availability_type, '', 'availability follows the product');
+  assert.deepEqual([combo.regular_price_iqd, combo.regular_adjust_iqd], [null, 200_000]);
+  assert.deepEqual([combo.prime_adjust_iqd, combo.pro_adjust_iqd], [200_000, 200_000]);
+  // Nothing for the normalizer to do — the example teaches the stored form.
+  const { normalizeCheapestBase } = await import('../worker/lib/cheapestBase');
+  assert.deepEqual(normalizeCheapestBase(built).changed, []);
+  // And the resolver charges what the header table promises.
+  const { resolveUnitPrice } = await import('../worker/lib/pricing');
+  const comboDirect = resolveUnitPrice({ product: built, optionId: 'a1-combo', tier: 'free', tierActive: false });
+  assert.equal(comboDirect.unit_subtotal_iqd, 1_099_000 + 51_000, 'Combo, direct sale');
+  const a1Air = resolveUnitPrice({ product: built, optionId: 'a1', transportMethod: 'air', tier: 'free', tierActive: false });
+  assert.equal(a1Air.unit_subtotal_iqd, 899_000 + 25_000, 'A1, pre-order by air');
+  const comboPro = resolveUnitPrice({ product: built, optionId: 'a1-combo', transportMethod: 'air', tier: 'pro', tierActive: true });
+  assert.equal(comboPro.applied_iqd, 999_000, 'PRO price of the Combo');
+  assert.equal(comboPro.unit_subtotal_iqd, 999_000, 'and PRO pays no air commission');
+});
+
+test('a product stored with a base above its cheapest option is re-based on the cheapest', () => {
+  const v = view();
+  const vals = v.values as unknown as Array<Record<string, unknown>>;
+  vals[0].regular_price_iqd = 450_000; // A1 below the 500,000 base
+  vals[0].prime_price_iqd = 445_000; // its member prices come down with it
+  vals[0].pro_price_iqd = 430_000;
+  const doc = applyRelations(parseProductRow(baseRow()), v, { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true });
+  assert.match(text, /^price_iqd=450000$/m);
+  assert.match(text, /المخزّن حاليًا 500,000 د\.ع/);
+  // The Combo inherited 500,000 and must still cost 500,000: +50,000 now.
+  assert.match(text, /^options\.2\.regular_adjust_iqd=350000$/m, '300,000 over the old base is 350,000 over the new one');
+  const built = validateProductDoc(toDocBody(parseTemplate(text), doc, { needs_review: [] }).body);
+  assert.equal(built.price_iqd, 450_000);
+});
+
+test('a signed number on an option price is read as the increase, and lands in the adjustment', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true })
+    .replace(/^options\.2\.regular_price_iqd=__NULL__$/m, 'options.2.regular_price_iqd=+120000')
+    .replace(/^options\.2\.regular_adjust_iqd=300000$/m, '# (moved to the price line above)')
+    .replace(/^colors\.1\.pro_price_iqd=__NULL__$/m, 'colors.1.pro_price_iqd=-7000');
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  const built = validateProductDoc(toDocBody(parsed, doc, { needs_review: [] }).body);
+  const combo = built.options.find((o) => o.id === 'ov2')!;
+  assert.equal(combo.regular_price_iqd, null, 'not a price');
+  assert.equal(combo.regular_adjust_iqd, 120_000, 'the increase');
+  const black = built.colors[0];
+  assert.equal(black.pro_price_iqd, null);
+  assert.equal(black.pro_adjust_iqd, -7_000, 'a discount is a negative difference');
+});
+
+test('a signed number on the PRODUCT price is refused — there is nothing beneath it to differ from', () => {
+  const parsed = parseTemplate('template_version=2\nname_ar=x\nprice_iqd=+5000\n');
+  assert.equal(parsed.errors.length, 1);
+  assert.match(parsed.errors[0].message, /signed value/);
+});
+
+test('the transport surcharge may be written with the word the form uses', () => {
+  const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
+  const text = exportProduct(doc, { includeCost: true })
+    .replace(/^transports\.3\.commission_iqd=__NULL__$/m, 'transports.3.surcharge_iqd=15000')
+    .replace(/^transports\.3\.active=false$/m, 'transports.3.active=true');
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  const built = validateProductDoc(toDocBody(parsed, doc, { needs_review: [] }).body);
+  const land = built.preorder_transports.find((t) => t.method === 'land')!;
+  assert.equal(land.commission_iqd, 15_000, 'surcharge_iqd is commission_iqd');
+  assert.equal(land.active, true);
+  assert.ok(!/^transports\.\d+\.surcharge_iqd=/m.test(exportProduct(doc, { includeCost: true })), 'the alias is import-only, never exported');
+});
+
+// ------------------------------------------------------------- the usage guide
+
+test('the setup & usage guide round-trips: official link, steps, photos, video, doc link', () => {
+  const doc = applyRelations(
+    parseProductRow({
+      ...baseRow(),
+      usage_guide: JSON.stringify({
+        official_url: 'https://wiki.bambulab.com/en/a1',
+        steps: [
+          { id: 'ustep_1', kind: 'setup', title: 'Mount the spool holder', body: 'Two screws.\nHand-tight.', images: ['https://img.example/1.jpg', 'https://img.example/2.jpg'], video_url: 'https://www.youtube.com/watch?v=abc', link_url: 'https://wiki.bambulab.com/en/a1/spool', order: 0 },
+          { id: 'ustep_2', kind: 'usage', title: 'First print', body: 'Load PLA.', images: [], video_url: '', link_url: '', order: 1 },
+        ],
+      }),
+    }),
+    view(),
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, { includeCost: true });
+  assert.match(text, /^usage_official_url=https:\/\/wiki\.bambulab\.com\/en\/a1$/m);
+  assert.match(text, /^usage_steps\.1\.kind=setup$/m);
+  assert.match(text, /^usage_steps\.1\.images=https:\/\/img\.example\/1\.jpg,https:\/\/img\.example\/2\.jpg$/m);
+  assert.match(text, /^usage_steps\.2\.title=First print$/m);
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsed.unknown_keys, []);
+  const built = validateProductDoc(toDocBody(parsed, doc, { needs_review: [] }).body);
+  assert.equal(built.usage_guide.official_url, 'https://wiki.bambulab.com/en/a1');
+  assert.equal(built.usage_guide.steps.length, 2);
+  assert.equal(built.usage_guide.steps[0].body, 'Two screws.\nHand-tight.', 'a heredoc body survives');
+  assert.deepEqual(built.usage_guide.steps[0].images, ['https://img.example/1.jpg', 'https://img.example/2.jpg']);
+  assert.equal(built.usage_guide.steps[0].video_url, 'https://www.youtube.com/watch?v=abc');
+  assert.equal(built.usage_guide.steps[1].kind, 'usage');
+
+  // Editing ONE step's title merges by id; a file that omits the guide keeps it.
+  const renamed = text.replace(/^usage_steps\.2\.title=First print$/m, 'usage_steps.2.title=أول طباعة');
+  const edited = validateProductDoc(toDocBody(parseTemplate(renamed), built, { needs_review: [] }).body);
+  assert.deepEqual(edited.usage_guide.steps.map((s) => s.title), ['Mount the spool holder', 'أول طباعة']);
+  const without = text.split('\n').filter((l) => !l.startsWith('usage_')).join('\n');
+  const kept = validateProductDoc(toDocBody(parseTemplate(without), built, { needs_review: [] }).body);
+  assert.equal(kept.usage_guide.steps.length, 2, 'an omitted group preserves');
+  const cleared = validateProductDoc(toDocBody(parseTemplate(`${without}\nusage_steps=__CLEAR__\n`), built, { needs_review: [] }).body);
+  assert.equal(cleared.usage_guide.steps.length, 0, '__CLEAR__ really clears');
+  assert.equal(cleared.usage_guide.official_url, 'https://wiki.bambulab.com/en/a1', 'clearing the steps keeps the link');
 });
 
 test('an assistant admin sees no cost, and no cost annotation either', () => {

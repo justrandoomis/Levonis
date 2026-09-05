@@ -56,6 +56,7 @@ import {
   type ResolvedRefs,
   type ToDocResult,
 } from '../lib/template';
+import { normalizeCheapestBase } from '../lib/cheapestBase';
 import {
   parseProductRow,
   validateProductDoc,
@@ -270,21 +271,26 @@ payment_options=
 # images.1.alt_ar=صورة المنتج
 
 # ------------------------------ الخيارات / options
+# السعر الأساسي (100000) هو الأرخص؛ كل خيار زيادة فوقه. التوفر حسب المنتج:
+# اترك availability_type فارغًا، فالبيع المباشر/الطلب المسبق يُسعَّر بزيادات
+# المنتج (direct_surcharge_iqd وطرق الشحن) لا بخيارات منفصلة.
 options.1.id=opt_example_small
 options.1.name_ar=المقاس الصغير
 options.1.name_en=Small
 options.1.active=true
-# __NULL__ = يرث السعر الأساسي (لا يساوي صفراً)
+# __NULL__ = نفس السعر الأساسي (لا يساوي صفراً)
 options.1.regular_price_iqd=__NULL__
+options.1.availability_type=
 options.2.id=opt_example_large
 options.2.name_ar=المقاس الكبير
 options.2.name_en=Large
 options.2.active=true
-# سعر الخيار يستبدل السعر الأساسي
-options.2.regular_price_iqd=120000
+# +20000 = زيادة عشرين ألفًا فوق السعر الأساسي (تُخزَّن في regular_adjust_iqd)
+options.2.regular_price_iqd=+20000
+options.2.availability_type=
 
 # ------------------------------ الألوان / colors
-# الوراثة لكل حقل: لون ← خيار ← أساسي
+# اللون زيادة فوق سعر الخيار المختار (لون ← خيار ← أساسي)
 colors.1.id=col_example_black
 colors.1.name_ar=أسود
 colors.1.name_en=Black
@@ -298,7 +304,8 @@ colors.2.name_en=Gold
 colors.2.hex=#D4AF37
 # option_index بديل استيراد فقط: يربط اللون بالخيار options.2
 colors.2.option_index=2
-colors.2.regular_price_iqd=135000
+# +15000 فوق سعر الخيار الكبير (120000) = 135000 للزبون
+colors.2.regular_price_iqd=+15000
 colors.2.active=true
 
 # ------------------------------ المواصفات / specifications
@@ -336,6 +343,16 @@ content_blocks.1.body_ar=<<<END
 كتلة محتوى نصية تظهر أسفل صفحة المنتج.
 END
 content_blocks.1.caption_ar=مثال
+
+# ------------------------------ دليل التركيب والاستخدام / setup & usage guide
+usage_official_url=
+usage_steps.1.id=ustep_example_unbox
+usage_steps.1.kind=setup
+usage_steps.1.title=فك التغليف
+usage_steps.1.body=أخرج الجهاز وأزل أشرطة التثبيت قبل التشغيل.
+usage_steps.1.images=
+usage_steps.1.video_url=
+usage_steps.1.link_url=
 `;
 
 export function buildExampleTemplate(): string {
@@ -586,13 +603,22 @@ async function analyzeTemplate(
     }
   }
 
-  a.merge = toDocBody(parsed, a.existing, a.refs);
-  const body = { ...a.merge.body };
+  const merge = toDocBody(parsed, a.existing, a.refs);
+  a.merge = merge;
+  const body = { ...merge.body };
   const bookkeeping = translationBookkeeping(body, a.existing);
   body.content_rev = bookkeeping.content_rev;
   body.translation_meta = bookkeeping.translation_meta;
   try {
-    a.doc = validateProductDoc(body);
+    const validated = validateProductDoc(body);
+    // THE OWNER'S FORM IS WHAT GETS STORED: cheapest sellable price as the
+    // base, every option and colour an increase over it (cheapestBase.ts). A
+    // file that states fixed option prices is re-expressed here — the resolved
+    // price of every option × colour × tier is unchanged — and the preview's
+    // warnings and key-by-key diff show exactly what will be written.
+    const norm = normalizeCheapestBase(validated);
+    a.doc = norm.doc;
+    merge.warnings.push(...norm.warnings);
   } catch (e) {
     if (e instanceof HttpError) a.validation_error = { message: e.message, code: e.code };
     else throw e;

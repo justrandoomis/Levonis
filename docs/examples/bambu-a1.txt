@@ -1,27 +1,28 @@
 # ============================================================
-#  Bambu Lab A1 — نسختان، وطريقتا شراء لكل نسخة
-#  One product. Two models. Two ways to buy each. Four prices.
+#  Bambu Lab A1 — نسختان، وطريقتا شراء لكل نسخة، بسعرٍ واحد وزيادات
+#  One product. Two models. Two ways to buy each. ONE base price, then increases.
 # ============================================================
 #
-#          |  طلب مسبق (pre-order)   |  بيع مباشر (direct sale)
-#  --------+-------------------------+--------------------------
-#   A1     |  899,000                |  950,000
-#   A1 Combo| 1,099,000               | 1,150,000
+#          |  طلب مسبق جوي (pre-order, air) |  بيع مباشر (direct sale)
+#  --------+--------------------------------+--------------------------
+#   A1     |  899,000 + 25,000              |  899,000 + 51,000
+#   A1 Combo| 1,099,000 + 25,000            |  1,099,000 + 51,000
 #
-# كل خلية من الأربع تحمل سعرها وسعر PRIME وسعر PRO وكلفتها ومخزونها
-# ومدة انتظارها — مستقلة تمامًا عن الثلاث الأخرى.
+#  قاعدة المالك: «سعر المنتج يوضع الأرخص ليكون الخيارات والألوان والتوفر
+#  عبارة عن زيادة». فهذا الملف يقول ثلاثة أشياء فقط:
 #
-# ثلاثة أشياء تستحق الانتباه:
+#  1. `price_iqd=899000` هو الأرخص. الـ Combo زيادة فوقه: `+200000`.
+#  2. التوفر حسب المنتج، لا حسب الخيار. `selling_type=mixed` = يُباع بالطريقتين،
+#     و`availability_type` للخيارَين فارغ. لا يوجد خيار «A1 — طلب مسبق» وآخر
+#     «A1 — بيع مباشر»: النسخة واحدة، والطريقة يختارها الزبون في السلة.
+#  3. فرق الطريقة زيادة على المنتج: البيع المباشر `direct_surcharge_iqd=51000`
+#     (لا تُعفى بالعضوية)، والطلب المسبق الجوي `transports.1.commission_iqd=25000`
+#     (تُعفى لأعضاء PRO الفعالين). البري والبحري معطّلان هنا؛ لتفعيل البري اكتب
+#     `transports.3.active=true` وزيادته في `transports.3.commission_iqd`
+#     (أو بكلمة الواجهة `transports.3.surcharge_iqd`).
 #
-#  1. `selling_type=mixed` كلمة إدخال فقط. لا تُخزَّن: تتوسّع إلى
-#     direct_sale + pre_order. والأدق أنك لا تحتاجها أصلًا — أنواع البيع
-#     تُشتق من availability_type لكل خيار، فلو حذفت هذا السطر لخرج المنتج
-#     مختلطًا على أي حال.
-#  2. `variant_key` هو ما يجمع «A1 طلب مسبق» و«A1 بيع مباشر» تحت نسخة
-#     واحدة في صفحة المنتج. لا يعتمد النظام على تحليل الاسم إلا كخطة
-#     أخيرة لمنتجات كُتبت قبل وجود هذا الحقل.
-#  3. الطلب المسبق بلا مخزون (`__NULL__`) والبيع المباشر برقم. هذا ليس
-#     شرطًا: لو كان لدفعة الطلب المسبق حدٌّ فضع رقمًا.
+#  رقم بلا إشارة في regular_price_iqd ما زال مقبولًا كسعر ثابت، ويُعاد
+#  التعبير عنه كزيادة فوق الأساسي عند الاستيراد — ما يدفعه الزبون لا يتغيّر.
 #
 # القالب الفارغ الكامل: زر «تنزيل قالب TXT» في نافذة الاستيراد/التصدير.
 # ============================================================
@@ -36,79 +37,65 @@ description_ar=<<<END
 طابعة A1 من Bambu Lab، متوفرة كنسخة مفردة أو مع وحدة AMS lite.
 END
 
-# السعر الأساسي هنا هو ما يظهر قبل اختيار الزبون لأي خيار.
+# ------------------------------ التسعير: الأرخص أولًا
 price_iqd=899000
+prime_price_iqd=885000
+pro_price_iqd=799000
 product_cost_iqd=__NULL__
 
-# `mixed` تعني: هذا المنتج يُباع بالطريقتين.
+# ------------------------------ البيع والتوفر والمخزون
+# `mixed` تعني: هذا المنتج يُباع بالطريقتين. الخيارات ترث ذلك.
 selling_type=mixed
+# زيادة البيع المباشر فوق سعر الخيار المختار.
+direct_surcharge_iqd=51000
+# مخزون البيع المباشر يُتتبع على الخيار (أدناه)؛ الطلب المسبق بلا مخزون.
+stock=__NULL__
 
-# رحلة الطلب المسبق وعمولتها. الخيارات ذات الطلب المسبق تطلب اختيار واحدة.
+# طرق الطلب المسبق وزيادتها فوق سعر الخيار. __NULL__ = القيمة الافتراضية من الإعدادات.
 transports.1.method=air
 transports.1.commission_iqd=25000
 transports.1.active=true
+transports.2.method=sea
+transports.2.commission_iqd=__NULL__
+transports.2.active=false
+transports.3.method=land
+transports.3.commission_iqd=__NULL__
+transports.3.active=false
 
-# ------------------------------------------------------------
-#  النسخة الأولى: A1
-# ------------------------------------------------------------
-options.1.id=a1-preorder
-options.1.name_ar=A1 — طلب مسبق
-options.1.name_en=A1 - Pre-order
+# ------------------------------ الخيارات: نسخة واحدة لكل صف، التوفر حسب المنتج
+options.1.id=a1
+options.1.group=Model
+options.1.name_ar=A1
+options.1.name_en=A1
 options.1.variant_key=a1
 options.1.variant_label=A1
-options.1.availability_type=pre_order
+# فارغ = حسب المنتج (بيع مباشر وطلب مسبق معًا، حسب ما يختاره الزبون)
+options.1.availability_type=
 options.1.lead_time_text=3-4 weeks
 options.1.lead_time_min_days=21
 options.1.lead_time_max_days=28
-options.1.stock=__NULL__
-options.1.regular_price_iqd=899000
-options.1.prime_price_iqd=885000
-options.1.pro_price_iqd=799000
+options.1.stock=4
+# __NULL__ = نفس السعر الأساسي (هذه هي النسخة الأرخص)
+options.1.regular_price_iqd=__NULL__
 options.1.cost_iqd=700000
 options.1.active=true
 
-options.2.id=a1-direct
-options.2.name_ar=A1 — بيع مباشر
-options.2.name_en=A1 - Direct Sale
-options.2.variant_key=a1
-options.2.variant_label=A1
-options.2.availability_type=direct_sale
-options.2.stock=4
-options.2.regular_price_iqd=950000
-options.2.prime_price_iqd=935000
-# سعر PRO نفسه في الطريقتين — وهذا مقصود ومسموح.
-options.2.pro_price_iqd=799000
-options.2.cost_iqd=720000
+options.2.id=a1-combo
+options.2.group=Model
+options.2.name_ar=A1 Combo
+options.2.name_en=A1 Combo
+options.2.variant_key=a1-combo
+options.2.variant_label=A1 Combo
+options.2.availability_type=
+options.2.lead_time_text=3-4 weeks
+options.2.lead_time_min_days=21
+options.2.lead_time_max_days=28
+options.2.stock=2
+# +200000 = زيادة فوق السعر الأساسي (تُخزَّن في regular_adjust_iqd): 1,099,000 للزبون
+options.2.regular_price_iqd=+200000
+# سعر PRIME للـ Combo: +200000 فوق PRIME الأساسي = 1,085,000
+options.2.prime_price_iqd=+200000
+# سعر PRO للـ Combo: +200000 فوق PRO الأساسي = 999,000
+options.2.pro_price_iqd=+200000
+options.2.cost_iqd=900000
 options.2.active=true
-
-# ------------------------------------------------------------
-#  النسخة الثانية: A1 Combo
-# ------------------------------------------------------------
-options.3.id=a1-combo-preorder
-options.3.name_ar=A1 Combo — طلب مسبق
-options.3.name_en=A1 Combo - Pre-order
-options.3.variant_key=a1-combo
-options.3.variant_label=A1 Combo
-options.3.availability_type=pre_order
-options.3.lead_time_text=3-4 weeks
-options.3.lead_time_min_days=21
-options.3.lead_time_max_days=28
-options.3.stock=__NULL__
-options.3.regular_price_iqd=1099000
-options.3.prime_price_iqd=1085000
-options.3.pro_price_iqd=999000
-options.3.cost_iqd=900000
-options.3.active=true
-
-options.4.id=a1-combo-direct
-options.4.name_ar=A1 Combo — بيع مباشر
-options.4.name_en=A1 Combo - Direct Sale
-options.4.variant_key=a1-combo
-options.4.variant_label=A1 Combo
-options.4.availability_type=direct_sale
-options.4.stock=2
-options.4.regular_price_iqd=1150000
-options.4.prime_price_iqd=1135000
-options.4.pro_price_iqd=999000
-options.4.cost_iqd=920000
-options.4.active=true

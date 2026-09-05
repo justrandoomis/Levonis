@@ -70,9 +70,21 @@ pipeline**, so everything you write is applied literally.
 - المجموعات المتكررة مفهرسة: `options.1.name_ar` ثم `options.2.name_ar`.
   صفوف المواصفات: `spec_groups.1.rows.2.value_ar`.
   Repeatable groups are indexed from 1; spec rows nest as shown.
-- أسعار الخيار/اللون **تستبدل** السعر الأساسي (وراثة لكل حقل:
-  لون ← خيار ← أساسي). Option/color prices **replace** the base price
-  (per-field inheritance color → option → base).
+- **السعر الأساسي هو الأرخص، وكل ما فوقه زيادة.** `price_iqd` = أرخص صنف
+  قابل للبيع؛ الخيار أو اللون زيادة فوقه: `options.2.regular_adjust_iqd=60000`
+  أو مباشرةً `options.2.regular_price_iqd=+60000` (الإشارة تعني «زيادة»).
+  رقم بلا إشارة ما زال مقبولًا كسعر ثابت، ويُعاد التعبير عنه كزيادة عند
+  الاستيراد **دون تغيير ما يدفعه الزبون** (التصدير يكتبه بهذا الشكل أيضًا).
+  The base price is the CHEAPEST sellable item; options and colours are
+  increases over it (`regular_adjust_iqd`, or a signed `+N` on the price
+  key). A plain fixed number is still accepted and re-expressed as an
+  increase on import — the resolved prices never change.
+- **التوفر حسب المنتج.** اترك `options.N.availability_type` فارغًا؛ فرق البيع
+  المباشر زيادة على المنتج (`direct_surcharge_iqd`) وكل طريقة طلب مسبق زيادة
+  (`transports.N.commission_iqd`، وتُقبل بكلمة الواجهة `surcharge_iqd`) —
+  لا حاجة لخيارَين منفصلَين «بيع مباشر» و«طلب مسبق» لنفس النسخة.
+  Availability follows the product: leave the option's type empty; the
+  direct-sale premium and each pre-order route are product-level increases.
 - لربط لون بخيار: أعطِ الخيار `id` ثابتاً واستخدمه في `colors.N.option_id`،
   أو استخدم `colors.N.option_index=2` للإشارة إلى `options.2` في نفس الملف.
   To link a color to an option use ids, or `option_index` within one file.

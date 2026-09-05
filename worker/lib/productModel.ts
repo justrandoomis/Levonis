@@ -828,7 +828,8 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     regular: number | null,
     prime: number | null,
     pro: number | null,
-    cost: number | null
+    cost: number | null,
+    regularAdjust: number | null = null
   ) => {
     if (regular !== null && cost !== null && regular === cost) {
       fail(
@@ -838,8 +839,16 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     }
     // The membership prices are compared against the price actually in force
     // at this level: an option with no regular price of its own sells at the
-    // product's.
-    const effectiveRegular = regular ?? (price as number | null);
+    // product's — PLUS its adjustment, when it carries one. A row written as
+    // "+60,000 over the base" (the owner's surcharge model) sells at base +
+    // 60,000, and a PRO price between the two is valid; comparing it against
+    // the bare base refused every such row.
+    const basePrice = price as number | null;
+    const effectiveRegular =
+      regular ??
+      (basePrice !== null && regularAdjust !== null && Number.isFinite(regularAdjust)
+        ? Math.max(0, Math.round(basePrice + regularAdjust))
+        : basePrice);
     if (prime !== null && effectiveRegular !== null && prime > effectiveRegular) {
       fail(
         label ? `${label}.prime_price_iqd` : 'prime_price_iqd',
@@ -886,10 +895,10 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
   // than a save-blocking error.
 
   for (const o of options) {
-    priceRules(`options.${o.id}`, o.regular_price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd);
+    priceRules(`options.${o.id}`, o.regular_price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd, o.regular_adjust_iqd ?? null);
   }
   for (const col of colors) {
-    priceRules(`colors.${col.id}`, col.regular_price_iqd, col.prime_price_iqd, col.pro_price_iqd, col.cost_iqd);
+    priceRules(`colors.${col.id}`, col.regular_price_iqd, col.prime_price_iqd, col.pro_price_iqd, col.cost_iqd, col.regular_adjust_iqd ?? null);
   }
 
   return {
