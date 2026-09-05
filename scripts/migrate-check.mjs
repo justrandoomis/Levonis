@@ -70,7 +70,7 @@ function applyAll(db, { quiet = false } = {}) {
  *  and the one-shot table rebuild, which D1's bookkeeping guarantees never
  *  runs a second time. */
 const isIdempotent = (s) =>
-  /^CREATE (TABLE|INDEX|UNIQUE INDEX)\s+IF NOT EXISTS/i.test(s) ||
+  /^CREATE (TABLE|INDEX|UNIQUE INDEX|TRIGGER)\s+IF NOT EXISTS/i.test(s) ||
   /^CREATE UNIQUE INDEX IF NOT EXISTS/i.test(s) ||
   /^INSERT OR IGNORE\s+INTO/i.test(s) ||
   (/^INSERT\s+INTO/i.test(s) && /WHERE NOT EXISTS/i.test(s)) ||

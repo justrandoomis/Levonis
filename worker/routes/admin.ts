@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
+import { asDocument } from '../lib/securityPolicy';
+import { approvableWithdrawalSql } from '../lib/walletOps';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { canViewFinancials, normalizeAdminScope } from '../lib/adminScope';
+import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { deductOrderStock, returnOrderStock } from '../lib/orderInventory';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
@@ -233,18 +235,30 @@ adminRoutes.patch('/users/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
   const target = await c.env.DB
-    .prepare('SELECT id, role, email FROM users WHERE id = ?')
+    .prepare('SELECT id, role, email, is_investor FROM users WHERE id = ?')
     .bind(id)
-    .first<{ id: string; role: string; email: string }>();
+    .first<{ id: string; role: string; email: string; is_investor: number }>();
   if (!target) throw notFound('User not found');
+
+  // Validate first, decide second, write third. Every value below is checked
+  // before the single authorization decision so the refusal reflects what was
+  // actually asked for, not what the parser made of it.
+  const role = body.role === undefined ? undefined : oneOf(body.role, 'role', ['customer', 'merchant', 'admin'] as const);
+  const isInvestor = body.is_investor === undefined ? undefined : Boolean(body.is_investor);
+  const scope = body.admin_scope === undefined ? undefined : normalizeAdminScope(body.admin_scope);
+
+  // Who may change whom — worker/lib/adminScope.ts. Promoting to, or demoting
+  // from, administrator is granting or revoking financial access (a fresh
+  // admin has admin_scope NULL = full), so it follows the same rule as
+  // admin_scope itself; the owner can never be demoted; nobody demotes
+  // themselves; and a value equal to the stored one is not an attempt, because
+  // the panel echoes the whole row on every save.
+  const refusal = userPatchRefusal(c.env, admin, target, { role, is_investor: isInvestor, admin_scope: scope });
+  if (refusal) throw forbidden(refusal);
 
   const updates: string[] = [];
   const params: unknown[] = [];
-  if (body.role !== undefined) {
-    const role = oneOf(body.role, 'role', ['customer', 'merchant', 'admin'] as const);
-    if (id === admin.id && role !== 'admin') {
-      throw forbidden('You cannot remove your own administrator role');
-    }
+  if (role !== undefined) {
     updates.push('role = ?');
     params.push(role);
   }
@@ -264,24 +278,13 @@ adminRoutes.patch('/users/:id', async (c) => {
     updates.push('subscription_plan = ?');
     params.push(tier === 'prime' ? 'free' : tier);
   }
-  // §11: only a financial admin may hand out (or take away) financial access,
-  // and the site owner can never be demoted — otherwise a compromised
-  // assistant could lock the owner out of their own numbers.
-  if (body.admin_scope !== undefined) {
-    if (!canViewFinancials(c.env, admin)) {
-      throw forbidden('Only a financial administrator can change financial access');
-    }
-    const scope = normalizeAdminScope(body.admin_scope);
-    const ownerEmail = (c.env.INITIAL_ADMIN_EMAIL ?? '').trim().toLowerCase();
-    if (scope === 'assistant' && ownerEmail && target.email.trim().toLowerCase() === ownerEmail) {
-      throw forbidden('The owner account cannot be restricted');
-    }
+  if (scope !== undefined) {
     updates.push('admin_scope = ?');
     params.push(scope);
   }
-  if (body.is_investor !== undefined) {
+  if (isInvestor !== undefined) {
     updates.push('is_investor = ?');
-    params.push(body.is_investor ? 1 : 0);
+    params.push(isInvestor ? 1 : 0);
   }
   if (updates.length === 0) throw badRequest('Nothing to update');
   params.push(id);
@@ -414,16 +417,15 @@ adminRoutes.post('/wallet-requests/:id/decide', async (c) => {
 
   if (decision === 'approved' && tx.type === 'withdrawal') {
     // Approving a withdrawal must not overdraw: conditional update guarded by
-    // the live approved balance.
+    // the SPENDABLE balance — settled minus the user's other active holds —
+    // with this request's own hold counted as covering it (walletOps).
     const res = await c.env.DB.prepare(
       `UPDATE wallet_transactions
           SET status = 'approved', admin_note = ?1, decided_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), decided_by = ?2
         WHERE id = ?3 AND status = 'pending'
-          AND (SELECT COALESCE(SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END),0)
-                 FROM wallet_transactions
-                WHERE user_id = ?4 AND currency = ?5 AND status='approved') >= amount`
+          AND ${approvableWithdrawalSql('?4', '?3')} >= amount`
     )
-      .bind(adminNote, adminUser.id, id, tx.user_id, tx.currency)
+      .bind(adminNote, adminUser.id, id, tx.user_id)
       .run();
     if (res.meta.changes === 0) {
       throw badRequest("The user's balance no longer covers this withdrawal", 'INSUFFICIENT_BALANCE');
@@ -910,6 +912,7 @@ adminRoutes.get('/orders/:id/receipt', async (c) => {
     return c.body(escposReceipt(data, int(c.req.query('cols') ?? 48, 'cols', { min: 24, max: 96 })));
   }
   c.header('Cache-Control', 'no-store');
+  asDocument(c);
   return c.html(renderPurchaseReceipt(data, printLang(c), wantsPrint(c),
     int(c.req.query('width') ?? 80, 'width', { min: 50, max: 110 })));
 });
@@ -956,6 +959,7 @@ adminRoutes.get('/orders/:id/warranty-receipt', async (c) => {
     ).first<{ body: string }>().catch(() => null));
 
   c.header('Cache-Control', 'no-store');
+  asDocument(c);
   return c.html(renderWarrantyReceipt(
     {
       order_id: data.order_id,
@@ -1007,6 +1011,7 @@ adminRoutes.get('/orders/:id/label', async (c) => {
   const { data, order } = await receiptDataFor(c, id);
   const count = data.lines.reduce((n, l) => n + l.qty, 0);
   c.header('Cache-Control', 'no-store');
+  asDocument(c);
   return c.html(renderDeliveryLabel(labelFrom(data, order, count), printLang(c), wantsPrint(c)));
 });
 
@@ -1093,6 +1098,7 @@ adminRoutes.get('/labels', async (c) => {
       };
 
   c.header('Cache-Control', 'no-store');
+  asDocument(c);
   return c.html(renderLabelSheet(labels, printLang(c), wantsPrint(c), batch));
 });
 

@@ -116,6 +116,7 @@ if (!canImportTs) {
   const { handleAuthRoute } = await import("../worker/auth/callback.ts");
   const {
     isStudioSessionStillAuthorized,
+    loadLiveStudioSession,
     loadStudioSession,
     resetLivenessCacheForTests,
     sanitizeRequestHeaders,
@@ -512,6 +513,28 @@ if (!canImportTs) {
     resetLivenessCacheForTests();
   });
 
+  test("a page reload after a main-site logout renders a guest — the document path applies the same rule", async () => {
+    resetLivenessCacheForTests();
+    const { callback } = await signInThroughHandoff("/");
+    const cookie = getCookiePair(callback, "levo_studio_session");
+    const documentRequest = () =>
+      new Request(`${STUDIO_ORIGIN}/`, { headers: { Cookie: cookie, "Sec-Fetch-Dest": "document", Accept: "text/html" } });
+
+    // Signed in on both sides: the document loader hands back the session.
+    assert.ok(await loadLiveStudioSession(documentRequest(), studioEnv));
+
+    // Main-site logout. The stored Studio session still exists — that is the
+    // bug's precondition — but the live loader must now answer "nobody".
+    mainSqlite.prepare("DELETE FROM sessions WHERE user_id = ?").run(USER_ID);
+    resetLivenessCacheForTests();
+    assert.ok(await loadStudioSession(documentRequest(), studioEnv), "the stale Studio cookie is still a stored session");
+    assert.equal(await loadLiveStudioSession(documentRequest(), studioEnv), null,
+      "the SSR document path must not render a signed-in shell for a revoked account");
+
+    mainSession.cookie = `levonis_session=${await mintMainSession()}`;
+    resetLivenessCacheForTests();
+  });
+
   test("the liveness answer is cached, so editing does not call the main site on every request", async () => {
     resetLivenessCacheForTests();
     const { callback } = await signInThroughHandoff("/");
@@ -568,15 +591,25 @@ if (!canImportTs) {
     resetLivenessCacheForTests();
   });
 
-  test("the /api path is what enforces liveness — the wiring, not just the helper", async () => {
+  test("BOTH request paths enforce liveness through one loader — the wiring, not just the helper", async () => {
     // A helper nothing calls is what this whole block exists to prevent, so
-    // assert the call site itself is present in the worker entry point.
+    // assert the call sites themselves are present in the worker entry point:
+    // the /api/* branch AND the SSR document branch, which used to call
+    // loadStudioSession alone and rendered a signed-in shell after a
+    // main-site logout.
     const entry = readFileSync(fileURLToPath(new URL("../worker/index.ts", import.meta.url)), "utf8");
     const apiBlock = entry.slice(entry.indexOf('url.pathname.startsWith("/api/")'));
-    assert.match(apiBlock.slice(0, 800), /isStudioSessionStillAuthorized\(env, session\)/,
-      "the /api/* branch must run the liveness check");
-    assert.match(apiBlock.slice(0, 800), /session = null/,
-      "a revoked session must become a guest, not an error");
+    assert.match(apiBlock.slice(0, 900), /loadLiveStudioSession\(request, env\)/,
+      "the /api/* branch must load the session through the liveness rule");
+    const docBlock = entry.slice(entry.indexOf("isDocumentRequest(request)) {"));
+    assert.match(docBlock.slice(0, 400), /loadLiveStudioSession\(request, env\)/,
+      "the SSR document branch must load the session through the same rule");
+    assert.doesNotMatch(entry, /await loadStudioSession\(/,
+      "no path in the entry point may bypass the liveness rule with the raw loader");
+    // …and the loader itself is what revokes: a definite "inactive" yields null.
+    const sessionModule = readFileSync(fileURLToPath(new URL("../worker/auth/session.ts", import.meta.url)), "utf8");
+    const helper = sessionModule.slice(sessionModule.indexOf("export async function loadLiveStudioSession"));
+    assert.match(helper.slice(0, 600), /isStudioSessionStillAuthorized\(env, session\)\) \? session : null/);
   });
 
   test("logout destroys the server-side studio session", async () => {

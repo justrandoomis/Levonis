@@ -51,14 +51,14 @@ const settledUsdSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='dep
  * approved has been paid out of `settled` — counting it again would subtract
  * the same money twice.
  */
-const effectiveHoldsUsdSql = (u: string) => `(SELECT COALESCE(SUM(h.amount_cents),0)
+export const effectiveHoldsUsdSql = (u: string) => `(SELECT COALESCE(SUM(h.amount_cents),0)
        FROM wallet_holds h
        LEFT JOIN wallet_transactions ht ON ht.id = h.tx_id
       WHERE h.user_id = ${u} AND h.state = 'active'
         AND (h.tx_id IS NULL OR ht.status <> 'approved'))`;
 
 /** Spendable USD cents = settled − effective active holds. */
-const availableUsdSql = (u: string) => `(${settledUsdSql(u)} - ${effectiveHoldsUsdSql(u)})`;
+export const availableUsdSql = (u: string) => `(${settledUsdSql(u)} - ${effectiveHoldsUsdSql(u)})`;
 
 const settledPointsSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='deposit' THEN t.amount ELSE -t.amount END),0)
        FROM wallet_transactions t
@@ -73,6 +73,54 @@ export const MAX_AMOUNT_CENTS = 100_000_000;
 export function isValidAmountCents(v: unknown): v is number {
   return typeof v === 'number' && Number.isSafeInteger(v) && v > 0 && v <= MAX_AMOUNT_CENTS;
 }
+
+/**
+ * THE ONE CONDITIONAL SPEND. Debits `amountCents` from a user's USD wallet as
+ * an approved ledger row — but only if the SPENDABLE balance covers it, where
+ * spendable is settled MINUS active holds, exactly what getAvailableBalances
+ * reports and exactly what a hold's own INSERT checks.
+ *
+ * WHY THIS EXISTS. Checkout and the membership purchase each carried their own
+ * copy of this statement, and both guarded on the SETTLED sum alone. The read
+ * side subtracted holds; the write side did not. So a customer with 100,000
+ * settled could file a withdrawal for all of it (hold created, available 0)
+ * and, in the same instant, pay for an order with the same 100,000: the
+ * checkout's guard saw settled ≥ amount and posted the debit. When the
+ * withdrawal was later paid out, the ledger went negative — the same money
+ * spent twice. Two concurrent requests from one browser were enough.
+ *
+ * The guard follows the file's atomicity rule: it lives inside the writing
+ * statement. When the balance does not cover the amount, the row's amount
+ * becomes -1, which violates CHECK (amount > 0) and aborts the whole batch,
+ * so nothing dependent on the payment can persist either.
+ */
+export function usdSpendStatement(
+  db: D1Database,
+  p: { txId: string; userId: string; amountCents: number; note: string; ref: string; nowIso: string }
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+       SELECT ?1, ?2, 'withdrawal', 'USD',
+         CASE WHEN ${availableUsdSql('?2')} >= ?3 THEN ?3 ELSE -1 END,
+         'approved', ?4, ?5, 'system', ?6`
+    )
+    .bind(p.txId, p.userId, p.amountCents, p.note, p.ref, p.nowIso);
+}
+
+/**
+ * The overdraft predicate for approving a PENDING withdrawal row `txId` by the
+ * legacy admin decision: spendable balance, but with this withdrawal's OWN hold
+ * added back — that hold is the reservation for this very payout, so counting
+ * it against itself would refuse every hold-backed withdrawal. Other users'
+ * holds are irrelevant (per-user sums); this user's OTHER holds still count.
+ *
+ * `u` and `tx` are placeholders for the user id and the transaction id.
+ */
+export const approvableWithdrawalSql = (u: string, tx: string) =>
+  `(${availableUsdSql(u)} + COALESCE((SELECT h.amount_cents FROM wallet_holds h
+        WHERE h.state = 'active'
+          AND h.id = (SELECT w.hold_id FROM wallet_withdrawals w WHERE w.tx_id = ${tx})), 0))`;
 
 // ---------------------------------------------------------------- balances
 

@@ -14,12 +14,13 @@ import {
   email,
   username,
   oneOf,
+  requireMainHost,
 } from '../lib/http';
 import { newId, hashPassword, verifyPassword, isLegacyHash, randomToken, sha256Hex } from '../lib/crypto';
 import { trustedOrigin } from '../lib/appOrigin';
-import { createSession, destroySession, destroyAllSessions, loadSessionUser } from '../lib/session';
+import { createSession, destroySession, destroyAllSessions, loadSessionUser , FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
 import { verifyGoogleIdToken } from '../lib/google';
-import { rateLimit } from '../lib/ratelimit';
+import { identifierKey, rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { normalizePhone, maskPhone, DEFAULT_COUNTRY, allCountries } from '../lib/phone';
 import { canonicalUsername, usernameRejection, suggestUsername } from '../lib/usernames';
@@ -421,6 +422,11 @@ authRoutes.post('/login', async (c) => {
   // `identifier` is the preferred name; `email` stays accepted so every
   // existing client keeps working unchanged.
   const raw = str(body.identifier ?? body.email, 'email, username or phone', { min: 3, max: 320 });
+  // A second limit on the ACCOUNT being tried, so a guess spread across many
+  // addresses is still a guess against one account. Keyed on a hash of the
+  // identifier, applied before any lookup and to every identifier alike, so it
+  // reveals nothing about which accounts exist.
+  await rateLimit(c, 'login-id', 10, 900, await identifierKey(raw));
   const { identifier, phone } = classifyLoginIdentifier(raw);
   const password = String(body.password ?? '');
   if (!password) throw badRequest('Password is required');
@@ -650,7 +656,7 @@ authRoutes.post('/google', async (c) => {
  * conditional so concurrent calls cannot overwrite an existing link. The
  * email is stamped verified only when it is the SAME address Google proved.
  */
-authRoutes.post('/google/link', requireAuth, async (c) => {
+authRoutes.post('/google/link', requireMainHost, requireAuth, async (c) => {
   await rateLimit(c, 'google-link', 10, 900);
   const me = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -744,7 +750,7 @@ authRoutes.post('/logout', async (c) => {
   return c.json({ success: true });
 });
 
-authRoutes.post('/change-password', requireAuth, async (c) => {
+authRoutes.post('/change-password', requireMainHost, requireAuth, async (c) => {
   await rateLimit(c, 'change-password', 10, 900);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -758,6 +764,16 @@ authRoutes.post('/change-password', requireAuth, async (c) => {
   if (row?.password_hash) {
     const ok = await verifyPassword(current, row.password_hash);
     if (!ok) throw unauthorized('Current password is incorrect');
+  } else if (sessionAgeSeconds(c) > FRESH_SESSION_SECONDS) {
+    // A Google/Telegram account has no password to prove, and a session cookie
+    // alone is not proof of presence — a stolen one would let its holder set a
+    // password and keep the account. Setting the FIRST password needs a
+    // sign-in within the last few minutes.
+    throw new HttpError(
+      401,
+      'سجّل الدخول مجددًا ثم عيّن كلمة المرور / Sign in again, then set your password',
+      'REAUTH_REQUIRED'
+    );
   }
   const hash = await hashPassword(next);
   await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.id).run();
@@ -779,6 +795,8 @@ authRoutes.post('/forgot-password', async (c) => {
   await rateLimit(c, 'forgot', 5, 3600);
   const body = await c.req.json().catch(() => ({}));
   const mail = email(body.email);
+  // Per address as well as per IP: one inbox must not be floodable from many IPs.
+  await rateLimit(c, 'forgot-id', 3, 3600, await identifierKey(mail));
   const lang = emailLang(body.lang);
 
   if (!c.env.EMAIL_API_KEY || !c.env.EMAIL_FROM) {
@@ -1499,7 +1517,7 @@ authRoutes.post('/verify-email/confirm', async (c) => {
  * address already belongs to another account (in that case no token is
  * issued and no mail is sent).
  */
-authRoutes.post('/change-email', requireAuth, async (c) => {
+authRoutes.post('/change-email', requireMainHost, requireAuth, async (c) => {
   await rateLimit(c, 'change-email', 5, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -1524,6 +1542,14 @@ authRoutes.post('/change-email', requireAuth, async (c) => {
     throw badRequest(
       'This account signs in with Google, so its email is managed by Google and cannot be changed here.',
       'GOOGLE_MANAGED_EMAIL'
+    );
+  } else if (sessionAgeSeconds(c) > FRESH_SESSION_SECONDS) {
+    // Telegram-only account: no password and no Google. The address is the
+    // recovery channel, so moving it needs a fresh sign-in, not just a cookie.
+    throw new HttpError(
+      401,
+      'سجّل الدخول مجددًا ثم غيّر البريد / Sign in again, then change your email',
+      'REAUTH_REQUIRED'
     );
   }
 

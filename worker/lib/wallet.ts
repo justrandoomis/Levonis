@@ -1,4 +1,5 @@
 import { newId } from './crypto';
+import { effectiveHoldsUsdSql } from './walletOps';
 
 /**
  * Wallet helpers. Balances are always derived server-side from approved
@@ -22,8 +23,9 @@ export async function getBalances(db: D1Database, userId: string): Promise<{ usd
 
 /**
  * Atomically spend from a balance: inserts an approved withdrawal only if the
- * current approved balance covers it. Returns the transaction id, or null if
- * the balance was insufficient.
+ * SPENDABLE balance covers it — for USD that is the approved sum minus active
+ * withdrawal holds (walletOps), the same number the wallet page shows. Points
+ * have no holds. Returns the transaction id, or null if insufficient.
  */
 export async function spend(
   db: D1Database,
@@ -43,7 +45,7 @@ export async function spend(
          SELECT COALESCE(SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END), 0)
            FROM wallet_transactions
           WHERE user_id = ?2 AND currency = ?3 AND status = 'approved'
-       ) >= ?4`
+       ) - (CASE WHEN ?3 = 'USD' THEN ${effectiveHoldsUsdSql('?2')} ELSE 0 END) >= ?4`
     )
     .bind(id, userId, currency, amount, note, ref)
     .run();

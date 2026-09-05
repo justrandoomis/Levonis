@@ -35,8 +35,9 @@ export function canViewFinancials(env: Env, user: SessionUser | null | undefined
   return normalizeAdminScope(user.admin_scope) !== 'assistant';
 }
 
-/** The bootstrap owner account named by INITIAL_ADMIN_EMAIL. */
-export function isOwner(env: Env, user: SessionUser | null | undefined): boolean {
+/** The bootstrap owner account named by INITIAL_ADMIN_EMAIL. Only the address
+ *  is needed, so a stored user row qualifies as well as a session. */
+export function isOwner(env: Env, user: Pick<SessionUser, 'email'> | null | undefined): boolean {
   const owner = (env.INITIAL_ADMIN_EMAIL ?? '').trim().toLowerCase();
   if (!owner || !user) return false;
   return user.email.trim().toLowerCase() === owner;
@@ -80,6 +81,67 @@ export function stripFinancials<T>(value: T): T {
 /** Applies the rule in one call at a route boundary. */
 export function projectForAdmin<T>(env: Env, user: SessionUser | null | undefined, payload: T): T {
   return canViewFinancials(env, user) ? payload : stripFinancials(payload);
+}
+
+// ------------------------------------------------- who may change whom
+
+/** The stored row an administrator is editing. */
+export interface UserPatchTarget {
+  id: string;
+  role: string;
+  email: string;
+  is_investor: number | boolean | null;
+}
+
+/** What the request asks to set. Absent means "not sent". */
+export interface UserPatchChanges {
+  role?: 'customer' | 'merchant' | 'admin';
+  is_investor?: boolean;
+  admin_scope?: AdminScope | null;
+}
+
+/**
+ * Why an administrator's PATCH of an account must be refused, or null when
+ * it may proceed. The route throws forbidden(reason).
+ *
+ * THE HOLE THIS CLOSES. `admin_scope` was gated — only a financial admin may
+ * hand out financial access — but `role` was not, and a freshly promoted
+ * admin has admin_scope NULL, which canViewFinancials reads as FULL. So an
+ * assistant, who must never see a cost, could promote any account (a second
+ * account of their own included) and sign in to unrestricted financials. The
+ * same assistant could demote every other admin, the owner included, and
+ * hand out investor status. Minting or revoking an administrator IS granting
+ * or revoking financial access, so it follows the admin_scope rule; investor
+ * status is financial standing, so it does too. Customer ↔ merchant stays an
+ * operations task an assistant may do.
+ *
+ * ONLY A CHANGE IS AN ATTEMPT. The admin panel echoes the whole row on every
+ * save, so an assistant editing a membership tier sends role: 'admin' for an
+ * admin it never touched. A value equal to what is stored is not a request to
+ * change it — the same distinction attemptedFinancialWrites draws for cost.
+ */
+export function userPatchRefusal(
+  env: Env,
+  actor: SessionUser,
+  target: UserPatchTarget,
+  changes: UserPatchChanges
+): string | null {
+  const financial = canViewFinancials(env, actor);
+  if (changes.role !== undefined && changes.role !== target.role) {
+    if (target.id === actor.id && changes.role !== 'admin') return 'You cannot remove your own administrator role';
+    if (isOwner(env, target) && changes.role !== 'admin') return 'The owner account cannot be demoted';
+    if ((changes.role === 'admin' || target.role === 'admin') && !financial) {
+      return 'Only a financial administrator can grant or revoke administrator access';
+    }
+  }
+  if (changes.is_investor !== undefined && changes.is_investor !== Boolean(target.is_investor) && !financial) {
+    return 'Only a financial administrator can change investor status';
+  }
+  if (changes.admin_scope !== undefined) {
+    if (!financial) return 'Only a financial administrator can change financial access';
+    if (changes.admin_scope === 'assistant' && isOwner(env, target)) return 'The owner account cannot be restricted';
+  }
+  return null;
 }
 
 // ------------------------------------------------- the write side of §11

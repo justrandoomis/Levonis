@@ -56,11 +56,12 @@ export async function createSession(c: Context<AppContext>, userId: string): Pro
 export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
   c.set('user', null);
   c.set('sessionId', null);
+  c.set('sessionCreatedAt', null);
   const token = getCookie(c, COOKIE_NAME);
   if (!token) return;
   const id = await sha256Hex(token);
   const row = await c.env.DB.prepare(
-    `SELECT u.*, s.id AS session_id, s.expires_at AS session_expires
+    `SELECT u.*, s.id AS session_id, s.expires_at AS session_expires, s.created_at AS session_created
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ?`
   )
@@ -71,9 +72,30 @@ export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
     await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(id).run();
     return;
   }
-  const { session_id, session_expires, password_hash, google_sub, ...user } = row;
+  const { session_id, session_expires, session_created, password_hash, google_sub, ...user } = row;
   c.set('user', user as unknown as SessionUser);
   c.set('sessionId', String(session_id));
+  c.set('sessionCreatedAt', session_created ? String(session_created) : null);
+}
+
+/** The window in which "you just signed in" still counts as proof of presence. */
+export const FRESH_SESSION_SECONDS = 10 * 60;
+
+/**
+ * How old the current session is, in seconds; Infinity when unknown.
+ *
+ * A live session cookie proves the browser holds a session, not that the
+ * person is present: a stolen cookie is exactly as live. Where an account has
+ * no password to prove (Google/Telegram sign-ups), setting its FIRST password
+ * or changing its email asks for a sign-in within the last few minutes
+ * instead — a re-authentication the cookie's holder cannot perform.
+ */
+export function sessionAgeSeconds(c: Context<AppContext>): number {
+  const created = c.get('sessionCreatedAt');
+  if (!created) return Number.POSITIVE_INFINITY;
+  const ms = Date.parse(created);
+  if (!Number.isFinite(ms)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (Date.now() - ms) / 1000);
 }
 
 /**

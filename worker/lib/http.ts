@@ -1,4 +1,6 @@
 import type { Context, Next } from 'hono';
+import { adminAllowedOn } from './hosts';
+import { STATIC_SECURITY_HEADERS, STRICT_TRANSPORT_SECURITY, spaCsp } from './securityPolicy';
 import type { AppContext } from './types';
 import { canonicalUsername, usernameRejection, type UsernameRejection } from './usernames';
 
@@ -75,11 +77,42 @@ export function originCheck() {
 export function securityHeaders() {
   return async (c: Context<AppContext>, next: Next) => {
     await next();
-    c.header('X-Content-Type-Options', 'nosniff');
-    c.header('X-Frame-Options', 'DENY');
-    c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    for (const [name, value] of Object.entries(STATIC_SECURITY_HEADERS)) c.header(name, value);
+    c.header('Strict-Transport-Security', STRICT_TRANSPORT_SECURITY);
+    // The SPA policy, unless the route already chose one: the print documents
+    // (asDocument) and the R2 file sandbox set their own. See securityPolicy.ts
+    // — and note the asset layer serves the page itself from dist/_headers.
+    if (!c.res.headers.has('Content-Security-Policy')) {
+      c.header('Content-Security-Policy', spaCsp());
+    }
   };
+}
+
+/**
+ * Refuses a route on every host but the platform's own — the guard that makes
+ * wildcard merchant subdomains survivable (hosts.ts §53). Used for global
+ * administration and for changing a signed-in account's credentials: the
+ * session cookie is scoped to the parent domain, so a page on a merchant host
+ * carries the visitor's session, and nothing those pages do needs either.
+ *
+ * 404, not 403: a wrong-host caller learns the route does not exist here
+ * rather than that it exists elsewhere.
+ */
+export async function requireMainHost(c: Context<AppContext>, next: Next) {
+  if (!adminAllowedOn(c.get('host'))) return c.json({ success: false, error: 'Not found' }, 404);
+  await next();
+}
+
+/**
+ * Own-property lookup for an allowlist map keyed by user input.
+ *
+ * A plain object literal answers 'constructor', 'toString' or 'hasOwnProperty'
+ * with a builtin function — and when the map's values are SQL fragments, that
+ * builtin's source text ends up inside the query text. Only keys the map
+ * itself declares count; anything else is the fallback.
+ */
+export function pickFrom<T>(map: Record<string, T>, key: unknown, fallback: T): T {
+  return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : fallback;
 }
 
 // Validation helpers ---------------------------------------------------------

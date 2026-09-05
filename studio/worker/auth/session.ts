@@ -352,6 +352,22 @@ export async function isStudioSessionStillAuthorized(
   return true;
 }
 
+/**
+ * The session a request may ACT as: the stored Studio session, unless the
+ * main site says that account is no longer signed in.
+ *
+ * Both request paths must use this. The API path always did; the SSR document
+ * path called loadStudioSession alone, so after a main-site logout a page
+ * reload still rendered "signed in as <name>" for up to a fortnight — the
+ * Studio session's own lifetime — until the next API call happened to revoke
+ * it. One loader, one rule, no path that forgets.
+ */
+export async function loadLiveStudioSession(request: Request, env: StudioAuthEnv): Promise<StudioSession | null> {
+  const session = await loadStudioSession(request, env);
+  if (!session) return null;
+  return (await isStudioSessionStillAuthorized(env, session)) ? session : null;
+}
+
 export async function verifyMainSessionLiveness(
   env: StudioAuthEnv,
   userId: string

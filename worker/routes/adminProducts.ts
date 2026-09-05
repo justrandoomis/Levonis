@@ -17,7 +17,7 @@
 
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, int, str, forbidden } from '../lib/http';
+import { requireAdmin, badRequest, notFound, int, str, forbidden , pickFrom } from '../lib/http';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import { registerHashtags } from '../lib/hashtags';
@@ -574,7 +574,7 @@ adminProductsRoutes.get('/', async (c) => {
   // Own-property lookup only: a plain object literal would otherwise answer
   // ?sort=constructor with a stringified builtin inside the SQL text.
   const sortKey = q.sort ?? 'updated';
-  const orderBy = Object.prototype.hasOwnProperty.call(ORDERS, sortKey) ? ORDERS[sortKey] : ORDERS.updated;
+  const orderBy = pickFrom(ORDERS, sortKey, ORDERS.updated);
 
   const [list, count] = await Promise.all([
     c.env.DB.prepare(

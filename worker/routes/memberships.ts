@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { usdSpendStatement } from '../lib/walletOps';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, requireAdmin, badRequest, notFound, oneOf, str, int, HttpError } from '../lib/http';
 import { sha256Hex } from '../lib/crypto';
@@ -223,25 +224,22 @@ export async function subscribeUser(
 
   const stmts: D1PreparedStatement[] = [];
   if (chargedUsdCents > 0) {
-    // Conditional spend: amount becomes -1 (violating CHECK amount > 0) when
-    // the approved balance no longer covers it, aborting the whole batch.
+    // Conditional spend on the SPENDABLE balance — settled minus active holds.
+    // This used to test the settled sum alone, so a withdrawal waiting for
+    // payout could be spent again on a membership (see usdSpendStatement).
+    // An uncovered amount becomes -1, violating CHECK (amount > 0) and
+    // aborting the whole batch.
     stmts.push(
-      db.prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-         SELECT ?1, ?2, 'withdrawal', 'USD',
-           CASE WHEN (SELECT COALESCE(SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END),0)
-                        FROM wallet_transactions WHERE user_id = ?2 AND currency='USD' AND status='approved') >= ?3
-                THEN ?3 ELSE -1 END,
-           'approved', ?4, ?5, 'system', ?6`
-      ).bind(
-        wtxId,
-        user.id,
-        chargedUsdCents,
-        `Membership ${plan.tier.toUpperCase()} ${plan.duration_months}mo (${plan.id})` +
+      usdSpendStatement(db, {
+        txId: wtxId,
+        userId: user.id,
+        amountCents: chargedUsdCents,
+        note:
+          `Membership ${plan.tier.toUpperCase()} ${plan.duration_months}mo (${plan.id})` +
           (credit > 0 ? ` — credited ${credit} IQD for remaining PLUS days` : ''),
-        membershipId,
-        nowIso
-      )
+        ref: membershipId,
+        nowIso: nowIso,
+      })
     );
   }
   stmts.push(

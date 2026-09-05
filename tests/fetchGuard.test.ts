@@ -87,3 +87,32 @@ test('the deprecated IPv4-compatible IPv6 form is unwrapped too', () => {
   // A v4-compatible PUBLIC address is still allowed: unwrap and judge.
   assert.equal(validateOutboundUrl('http://[::8.8.8.8]/').protocol, 'http:');
 });
+
+// ------------------------------------------------ redirects in resolveModelLink
+
+test('resolveModelLink follows redirects by hand and refuses a hop to a blocked address', async () => {
+  const { resolveModelLink } = await import('../worker/lib/externalModels');
+  const providers = [
+    { id: 'makerworld', enabled: true, hosts: ['makerworld.com'], api_url: 'https://api.example.com/models/{id}', headers: {} },
+  ] as never;
+  const calls: string[] = [];
+  const redirectTo = (loc: string) => new Response(null, { status: 302, headers: { Location: loc } });
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+
+  // A redirect at a private address is refused before it is dialled.
+  let fake = (async (url: string) => { calls.push(url); return redirectTo('http://127.0.0.1/admin'); }) as unknown as typeof fetch;
+  let info = await resolveModelLink('https://makerworld.com/models/123', providers, fake);
+  assert.equal(info.resolved, false);
+  assert.equal(info.reason, 'BAD_REDIRECT');
+  assert.equal(calls.length, 1, 'the blocked hop was never fetched');
+
+  // A redirect to a public address is followed, and the JSON read there.
+  calls.length = 0;
+  fake = (async (url: string) => {
+    calls.push(url);
+    return calls.length === 1 ? redirectTo('https://cdn.example.com/models/123.json') : json({ name: 'Benchy', images: [] });
+  }) as unknown as typeof fetch;
+  info = await resolveModelLink('https://makerworld.com/models/123', providers, fake);
+  assert.equal(info.resolved, true);
+  assert.deepEqual(calls, ['https://api.example.com/models/123', 'https://cdn.example.com/models/123.json']);
+});

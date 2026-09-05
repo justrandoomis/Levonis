@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext, Env } from './lib/types';
-import { HttpError, originCheck, securityHeaders } from './lib/http';
+import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser } from './lib/session';
 import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
@@ -40,7 +40,7 @@ import { kycRoutes } from './routes/kyc';
 import { supportRoutes } from './routes/support';
 import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
-import { classifyHost, rootDomainFrom, adminAllowedOn } from './lib/hosts';
+import { classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storefrontRoutes } from './routes/storefront';
 import { marketplaceRoutes } from './routes/marketplace';
@@ -93,16 +93,11 @@ app.use('*', async (c, next) => {
  * 404, not 403: a wrong-host caller learns the route does not exist here
  * rather than that it exists elsewhere.
  */
-app.use('/api/admin/*', async (c, next) => {
-  // `adminAllowedOn`, not `kind === 'main'`: see the note on that function.
-  // The short version is that a mistyped APP_ORIGIN classified the apex
-  // itself as `foreign` and took the entire admin API down with a 404, while
-  // protecting nobody.
-  if (!adminAllowedOn(c.get('host'))) {
-    return c.json({ success: false, error: 'Not found' }, 404);
-  }
-  await next();
-});
+// `adminAllowedOn`, not `kind === 'main'`: see the note on that function.
+// The short version is that a mistyped APP_ORIGIN classified the apex itself
+// as `foreign` and took the entire admin API down with a 404, while protecting
+// nobody. The same middleware guards credential changes in routes/auth.ts.
+app.use('/api/admin/*', requireMainHost);
 
 app.route('/api/auth', authRoutes);
 app.route('/api/products', productRoutes);

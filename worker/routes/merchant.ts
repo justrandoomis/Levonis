@@ -18,7 +18,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf , pickFrom } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -561,7 +561,7 @@ merchantRoutes.get('/products', async (c) => {
     stock: 'stock ASC, created_at DESC',
     updated: "COALESCE(NULLIF(updated_at, ''), created_at) DESC",
   };
-  const orderBy = ORDERS[sort] ?? ORDERS.newest;
+  const orderBy = pickFrom(ORDERS, sort, ORDERS.newest);
 
   const whereSql = where.join(' AND ');
   const [{ results }, count] = await Promise.all([

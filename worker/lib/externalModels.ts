@@ -172,13 +172,31 @@ export async function resolveModelLink(
 
   let payload: unknown;
   try {
-    const res = await fetchImpl(target.toString(), {
-      method: 'GET',
-      headers: { Accept: 'application/json', ...(provider.headers ?? {}) },
-      // A slow third party must not hold a customer's wizard open.
-      signal: AbortSignal.timeout(6000),
-      redirect: 'follow',
-    });
+    // Redirects are followed BY HAND so every hop passes validateOutboundUrl,
+    // exactly as media.ts does: `redirect: 'follow'` would let a provider
+    // endpoint 302 the Worker at an address the first-hop check refused.
+    let res: Response | null = null;
+    for (let hop = 0; hop < 4; hop++) {
+      res = await fetchImpl(target.toString(), {
+        method: 'GET',
+        headers: { Accept: 'application/json', ...(provider.headers ?? {}) },
+        // A slow third party must not hold a customer's wizard open.
+        signal: AbortSignal.timeout(6000),
+        redirect: 'manual',
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('Location');
+        if (!loc) break;
+        try {
+          target = validateOutboundUrl(new URL(loc, target).toString());
+        } catch {
+          return { ...base, reason: 'BAD_REDIRECT' };
+        }
+        continue;
+      }
+      break;
+    }
+    if (!res) return { ...base, reason: 'FETCH_FAILED' };
     if (!res.ok) return { ...base, reason: `HTTP_${res.status}` };
     const type = res.headers.get('content-type') ?? '';
     // JSON or nothing. An HTML body here means we were handed a page, and

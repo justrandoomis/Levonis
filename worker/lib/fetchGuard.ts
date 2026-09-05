@@ -71,9 +71,19 @@ function ipIsPrivate(host: string): boolean {
   return false;
 }
 
-/** Validates an outbound URL: http(s) only, no credentials, no loopback,
- *  private, link-local or multicast address. Must be re-run on EVERY redirect
- *  hop — a first-hop check alone is not a guard. */
+/**
+ * Validates an outbound URL: http(s) only, no credentials, and no LITERAL
+ * loopback, private, link-local or multicast address (in any spelling the URL
+ * parser normalises — decimal, octal, IPv4-mapped IPv6). Must be re-run on
+ * EVERY redirect hop — a first-hop check alone is not a guard.
+ *
+ * WHAT IT DOES NOT DO: resolve hostnames. A Worker has no DNS API, so a name
+ * that resolves to a private address cannot be caught here; it is caught by
+ * the platform instead — Workers egress does not route RFC 1918, loopback or
+ * link-local ranges, and exposes no metadata endpoint. If this code ever runs
+ * somewhere that does route them, resolve-and-check must be added before the
+ * connect, and the connection pinned to the checked address.
+ */
 export function validateOutboundUrl(raw: string): URL {
   let url: URL;
   try {

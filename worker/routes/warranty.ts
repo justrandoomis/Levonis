@@ -16,6 +16,7 @@
  */
 
 import { Hono } from 'hono';
+import { asDocument } from '../lib/securityPolicy';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { trustedOrigin } from '../lib/appOrigin';
@@ -869,5 +870,6 @@ warrantyAdminRoutes.get('/:id/document', async (c) => {
       .first<{ receipt_no: string }>();
     data.chain.replaced_by = next?.receipt_no ?? null;
   }
+  asDocument(c);
   return c.html(renderWarrantyDoc(data, lang, autoPrint));
 });

@@ -32,19 +32,35 @@ test('platform admin is refused on every host a merchant could control', () => {
   // and carries a visiting admin's own session.
   //
   // The DECISION lives in hosts.ts (`adminAllowedOn`) and is tested against
-  // real hostnames in tests/hosts.test.ts. This asserts only that the
-  // middleware still asks it, and still answers 404 — a later refactor that
-  // inlined a different condition here is exactly what this catches.
+  // real hostnames in tests/hosts.test.ts. The MIDDLEWARE that asks it is
+  // `requireMainHost` in lib/http.ts, shared with the credential routes below.
+  // This asserts that /api/admin/* is mounted behind it, and that it still
+  // consults adminAllowedOn and still answers 404 — a later refactor that
+  // inlined a different condition is exactly what this catches.
   const index = code(read('worker/index.ts'));
   assert.match(
     index,
-    /app\.use\(\s*['"]\/api\/admin\/\*['"]/,
+    /app\.use\(\s*['"]\/api\/admin\/\*['"]\s*,\s*requireMainHost\s*\)/,
     'no host guard is mounted on /api/admin/*'
   );
-  const guard = /app\.use\(\s*['"]\/api\/admin\/\*['"][\s\S]{0,400}?\}\);/.exec(index)?.[0] ?? '';
+  const http = code(read('worker/lib/http.ts'));
+  const guard = /export async function requireMainHost[\s\S]{0,400}?\n\}/.exec(http)?.[0] ?? '';
   assert.match(guard, /adminAllowedOn\(\s*c\.get\(\s*['"]host['"]\s*\)\s*\)/,
     'the guard does not consult adminAllowedOn');
   assert.match(guard, /404/, 'a wrong-host caller should get 404, not a 403 that confirms the route exists');
+});
+
+test('changing a signed-in account\'s credentials is apex-only, behind the same guard', () => {
+  // The session cookie is scoped to the parent domain, so a merchant host
+  // carries the visitor's session; nothing a storefront does needs to change
+  // a password, an email or a linked Google account. Same guard as admin.
+  const auth = code(read('worker/routes/auth.ts'));
+  for (const route of ['/change-password', '/change-email', '/google/link']) {
+    const re = new RegExp("authRoutes\\.post\\(\\s*'" + route.replace('/', '\\/') + "'\\s*,\\s*requireMainHost\\s*,");
+    assert.match(auth, re, route + ' is not behind requireMainHost');
+  }
+  // Sign-in itself must keep working on a storefront (/auth is a storefront route).
+  assert.doesNotMatch(auth, /authRoutes\.post\(\s*'\/login'\s*,\s*requireMainHost/, '/login must stay reachable on every host');
 });
 
 test('the community admin API is mounted under /api/admin so the guard covers it', () => {

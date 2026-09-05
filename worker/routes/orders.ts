@@ -18,7 +18,7 @@ import {
   validateCoupon,
   grantPrinterGiftIfEligible,
 } from '../lib/membershipOps';
-import { getAvailableBalances } from '../lib/walletOps';
+import { getAvailableBalances, usdSpendStatement } from '../lib/walletOps';
 import { buildSupportSnapshot } from '../lib/supportCode';
 import {
   eligibleMerchandiseIqd,
@@ -958,6 +958,10 @@ orderRoutes.post('/', async (c) => {
 
   const shippingTotal = comp.shipping.total_iqd;
   const deliveryWaived = comp.shipping.total_iqd < comp.shipping.total_before_waiver_iqd ? 1 : 0;
+  // WHICH waiver produced the free delivery is recorded apart from the fact of
+  // it: the referral waiver is one-per-friend, and the check that enforces
+  // "one" reads this column at the next checkout (referralFreeDeliveryApplies).
+  const referralWaived = comp.shipping.waiver_source === 'promotion' ? 1 : 0;
   // PRO priority preparation is a CONTEXTUAL purchase benefit: only in the
   // eligible PRO checkout context (approved default address), and pausable
   // by an active priorityService restriction case (§10).
@@ -990,8 +994,8 @@ orderRoutes.post('/', async (c) => {
          payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
-         support_snapshot, shipping_type, membership_gift, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         support_snapshot, shipping_type, membership_gift, referral_delivery_waived, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.pointsDiscount, comp.walletApplied,
@@ -1006,12 +1010,16 @@ orderRoutes.post('/', async (c) => {
       // state machine must not have to re-derive the path from lines that can
       // change afterwards. The cart guarantees one type, so the first line
       // speaks for all of them.
-      orderShippingType, membershipGift, now, now
+      orderShippingType, membershipGift, referralWaived, now, now
     ),
   ];
 
   if (comp.couponId) {
     // UNIQUE(order_id) makes the redemption idempotent with the order itself.
+    // The coupon's per-user and global limits are enforced by a BEFORE INSERT
+    // trigger on this table (migration 0049), inside this same transaction —
+    // validateCoupon's counts above are advice, this is the decision. A
+    // refused redemption aborts the batch and the order with it.
     stmts.push(
       c.env.DB.prepare(
         `INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd, created_at)
@@ -1071,15 +1079,18 @@ orderRoutes.post('/', async (c) => {
     );
   }
   if (comp.walletUsdCents > 0) {
+    // Guarded on the SPENDABLE balance (settled minus active holds) — the same
+    // number getAvailableBalances showed a moment ago — so money reserved for
+    // a withdrawal cannot also pay for this order (see usdSpendStatement).
     stmts.push(
-      c.env.DB.prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-         SELECT ?1, ?2, 'withdrawal', 'USD',
-           CASE WHEN (SELECT COALESCE(SUM(CASE WHEN type='deposit' THEN amount ELSE -amount END),0)
-                        FROM wallet_transactions WHERE user_id = ?2 AND currency='USD' AND status='approved') >= ?3
-                THEN ?3 ELSE -1 END,
-           'approved', ?4, ?5, 'system', ?6`
-      ).bind(`wtx_ord_${orderId}_usd`, user.id, comp.walletUsdCents, `Wallet payment on order ${orderId}`, orderId, now)
+      usdSpendStatement(c.env.DB, {
+        txId: `wtx_ord_${orderId}_usd`,
+        userId: user.id,
+        amountCents: comp.walletUsdCents,
+        note: `Wallet payment on order ${orderId}`,
+        ref: orderId,
+        nowIso: now,
+      })
     );
   }
 
@@ -1164,6 +1175,12 @@ orderRoutes.post('/', async (c) => {
         const snaps = await getOrderPointsSnapshots(c.env, [replay.id]);
         return c.json({ success: true, order: orderPublic(d.order, d.items, snaps.get(replay.id)), replay: true });
       }
+    }
+    if (msg.includes('COUPON_PER_USER_LIMIT')) {
+      throw badRequest('Coupon could not be applied (PER_USER_LIMIT_REACHED)', 'PER_USER_LIMIT_REACHED');
+    }
+    if (msg.includes('COUPON_GLOBAL_LIMIT')) {
+      throw badRequest('Coupon could not be applied (GLOBAL_LIMIT_REACHED)', 'GLOBAL_LIMIT_REACHED');
     }
     if (msg.includes('CHECK')) {
       throw badRequest('Order could not be placed: a balance or stock level changed. Please review your cart and try again.', 'CONFLICT_RETRY');

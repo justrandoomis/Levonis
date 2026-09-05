@@ -100,6 +100,8 @@ export type AppContext = {
   Variables: {
     user: SessionUser | null;
     sessionId: string | null;
+    /** When the current session was created (ISO 8601), or null when signed out. */
+    sessionCreatedAt: string | null;
     /** Set once per request by the host middleware in worker/index.ts.
      *  Every merchant-scoped route reads it instead of re-parsing the Host,
      *  so there is exactly one place where a hostname becomes a decision. */

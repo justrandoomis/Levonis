@@ -215,6 +215,19 @@ export async function referralFreeDeliveryApplies(env: Env, userId: string, prod
     .first();
   if (alreadyUsed) return false;
 
+  // The reward row above is written on DELIVERY. Between the first qualifying
+  // order and its delivery — weeks, for a printer shipped from abroad — every
+  // further printer order the friend placed also went out with free delivery,
+  // because nothing at checkout remembered that the waiver had been used. An
+  // order that already carries the referral waiver and is not cancelled has
+  // spent the one qualifying purchase (migration 0049 records it on the order).
+  const pendingUse = await env.DB.prepare(
+    "SELECT 1 AS x FROM orders WHERE user_id = ? AND referral_delivery_waived = 1 AND status <> 'cancelled' LIMIT 1"
+  )
+    .bind(userId)
+    .first();
+  if (pendingUse) return false;
+
   const placeholders = ids.map(() => '?').join(',');
   const hit = await env.DB.prepare(
     `SELECT 1 AS x

@@ -25,9 +25,9 @@ import { isMemoryConstrainedApple } from "./platform";
 import {
   type StudioAuthEnv,
   isStudioSessionStillAuthorized,
-  loadStudioSession,
   sanitizeRequestHeaders,
   withUserHeader,
+  loadLiveStudioSession,
 } from "./auth/session";
 
 interface Env extends StudioAuthEnv {
@@ -145,14 +145,14 @@ const worker = {
     // every handler can enforce ownership; guests get null (editing without
     // an account keeps working — only account features need sign-in).
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
-      let session = await loadStudioSession(request, env);
-      // Studio's own session lasts 14 days, so without this a main-site
-      // logout would leave the account signed in here for a fortnight. The
-      // answer is cached for a minute and only a definite "inactive" revokes;
-      // an unconfigured or unreachable main site keeps the session (see
-      // isStudioSessionStillAuthorized). A revoked session becomes a GUEST,
-      // not an error: editing keeps working, account features stop.
-      if (session && !(await isStudioSessionStillAuthorized(env, session))) session = null;
+      // Studio's own session lasts 14 days, so without the liveness rule a
+      // main-site logout would leave the account signed in here for a
+      // fortnight. The answer is cached for a minute and only a definite
+      // "inactive" revokes; an unconfigured or unreachable main site keeps the
+      // session (see isStudioSessionStillAuthorized). A revoked session
+      // becomes a GUEST, not an error: editing keeps working, account
+      // features stop.
+      const session = await loadLiveStudioSession(request, env);
       return withSecurityHeaders(await apiRouter(request, env, ctx, session), request);
     }
 
@@ -172,7 +172,9 @@ const worker = {
     // app reads the identity via studio-auth.ts from the x-levo-user header.
     let forwarded = request;
     if (isDocumentRequest(request)) {
-      const session = await loadStudioSession(request, env);
+      // The SAME liveness rule as the API path: a page reload after a
+      // main-site logout must render a guest, not a name from a stale cookie.
+      const session = await loadLiveStudioSession(request, env);
       if (session) forwarded = withUserHeader(request, session.user);
     }
     return withSecurityHeaders(await handler.fetch(forwarded, env, ctx), request);

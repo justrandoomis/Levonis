@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { asDocument } from '../lib/securityPolicy';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { localeToApi, safeParse } from '../lib/types';
@@ -98,6 +99,7 @@ invoiceRoutes.get('/:id/html', async (c) => {
   const lang = emailLang(c.req.query('lang') || localeToApi(user.locale));
   const doc = renderInvoiceHtmlDocument(lang, invoiceEmailData(snapshot, row.invoice_no, row.revision, row.issued_at));
   c.header('Cache-Control', 'no-store');
+  asDocument(c);
   return c.html(doc);
 });
 
