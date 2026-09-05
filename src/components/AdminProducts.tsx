@@ -1043,6 +1043,7 @@ export default function AdminProducts() {
                       {p.pro_price_iqd !== null && (
                         <p className="text-[11px] text-[var(--ap-text-3)] whitespace-nowrap mt-0.5">
                           PRO <span dir="ltr">{formatIqd(p.pro_price_iqd)}</span>
+                          <span className="opacity-70"> · أساسي</span>
                         </p>
                       )}
                     </td>

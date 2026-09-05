@@ -22,6 +22,7 @@ import { badRequest } from './http';
 import { newId } from './crypto';
 import { dedupeHashtags, normalizeHashtag } from './hashtags';
 import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields } from './pricing';
+import { derivedRung } from './pricing';
 import {
   deriveSaleTypes,
   expandSellingType,
@@ -888,6 +889,41 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
     optionalPrice(body.product_cost_iqd, 'product_cost_iqd')
   );
+  /**
+   * THE MEMBER LADDER FOLLOWS THE REGULAR ONE (pricing.ts memberAtRung): a
+   * row that says nothing about PRIME/PRO inherits the base member price PLUS
+   * its own regular surcharge. Two things that rule makes refusable here,
+   * measured against the DERIVED numbers rather than the stored ones:
+   *  - a reduction at least as large as the member price it would inherit
+   *    (base PRO 90,000, option −100,000) — the member would be charged the
+   *    reduced regular price with no discount, silently; the row must state
+   *    its own member price or reduce less;
+   *  - a member adjustment that lifts the derived member price above the
+   *    row's own regular price.
+   * Colours are measured against the base, as every other rule here is; the
+   * resolver anchors them on the chosen option, which the validator cannot
+   * know.
+   */
+  const baseLadder = {
+    regular: price as number,
+    prime: optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
+    pro: optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
+  };
+  const memberRules = (label: string, row: PriceFields) => {
+    const d = derivedRung(row, baseLadder);
+    for (const f of d.consumed) {
+      fail(
+        `${label}.regular_price_iqd`,
+        `the reduction on this row is larger than the ${f.toUpperCase()} price it inherits (${baseLadder[f]}) — state a ${f.toUpperCase()} price for this row, or reduce less`
+      );
+    }
+    if (d.prime !== null && d.prime > d.regular) {
+      fail(`${label}.prime_adjust_iqd`, `the PRIME price this row resolves to (${d.prime}) is above its regular price (${d.regular})`);
+    }
+    if (d.pro !== null && d.pro > d.regular) {
+      fail(`${label}.pro_adjust_iqd`, `the PRO price this row resolves to (${d.pro}) is above its regular price (${d.regular})`);
+    }
+  };
   // The compare-at price is only VALIDATED here (non-negative integer, via
   // optionalPrice below); it is deliberately not fed into priceRules, whose
   // ladder is about what a buyer pays. The storefront already shows it only
@@ -896,9 +932,11 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
 
   for (const o of options) {
     priceRules(`options.${o.id}`, o.regular_price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd, o.regular_adjust_iqd ?? null);
+    memberRules(`options.${o.id}`, o);
   }
   for (const col of colors) {
     priceRules(`colors.${col.id}`, col.regular_price_iqd, col.prime_price_iqd, col.pro_price_iqd, col.cost_iqd, col.regular_adjust_iqd ?? null);
+    memberRules(`colors.${col.id}`, col);
   }
 
   return {

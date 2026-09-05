@@ -136,6 +136,10 @@ spec_groups.1.rows.1.unit=mm
 - `pro_price_iqd=__NULL__` لأن المالك لم يحدد سعر PRO — النظام يطبق سياسة
   المتجر (الافتراضي: لا خصم مختلق). No PRO price was provided, so the store
   policy applies (default: no fabricated discount).
+- حين يُحدَّد سعر PRIME/PRO للمنتج فإن **زيادة الخيار أو اللون تنتقل إليهما
+  تلقائيًا** (أساسي 150,000 / 125,000 / 100,000 وخيار +25,000 → 175,000 /
+  150,000 / 125,000). لا تكتب للخيار زيادة عضوية ثانية. Member prices carry the
+  option/colour surcharge on their own — do not add a second one.
 - `product_cost_iqd=__NULL__` الكلفة غير معروفة للجهة الخارجية — وهي على
   كل حال داخلية ولا تُعرض أبداً. Cost unknown to the external party; it is
   internal-only anyway.

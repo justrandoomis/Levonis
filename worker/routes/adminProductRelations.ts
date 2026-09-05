@@ -298,10 +298,18 @@ export async function planRelationsWrite(
   const money = opts.money;
 
   const product = await db
-    .prepare('SELECT id, inventory_mode FROM products WHERE id = ?')
+    .prepare('SELECT id, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd FROM products WHERE id = ?')
     .bind(productId)
-    .first<{ id: string; inventory_mode: string }>();
+    .first<{ id: string; inventory_mode: string; price_iqd: number; prime_price_iqd: number | null; pro_price_iqd: number | null }>();
   if (!product) throw notFound('Product not found');
+  // The product's base ladder, so each row's DERIVED member price can be
+  // validated (pricing.ts derivedRung): a row inherits the base member price
+  // plus its own regular surcharge.
+  const baseLadder = {
+    regular: Number(product.price_iqd),
+    prime: product.prime_price_iqd === null ? null : Number(product.prime_price_iqd),
+    pro: product.pro_price_iqd === null ? null : Number(product.pro_price_iqd),
+  };
 
   const existing = await loadProductRelations(db, productId);
   const existingVariants = await db
@@ -366,7 +374,7 @@ export async function planRelationsWrite(
     g.values.forEach((v, i) => {
       const where = `${g.name_en}[${i}]`;
       const prices = readPrices(v, where);
-      errors.push(...validatePriceLadder(prices, where));
+      errors.push(...validatePriceLadder(prices, where, baseLadder));
       const name = str(v.name_en, `${where}.name_en`, { max: 80 });
       // 0043. Unknown words become '' (inherit) rather than an error: this
       // endpoint is also how an old client saves an old product, and refusing
@@ -420,7 +428,7 @@ export async function planRelationsWrite(
       errors.push(`${where}.hex: must be #RGB or #RRGGBB`);
     }
     const prices = readPrices(col, where);
-    errors.push(...validatePriceLadder(prices, where));
+    errors.push(...validatePriceLadder(prices, where, baseLadder));
     const linkedRaw = Array.isArray(col.option_value_ids) ? col.option_value_ids : [];
     const linked = linkedRaw.filter((x): x is string => typeof x === 'string');
     for (const l of linked) {

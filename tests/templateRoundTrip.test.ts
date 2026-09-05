@@ -397,9 +397,11 @@ test('an inheriting price is annotated with the number the ladder resolves', () 
 });
 
 test('a member price is never annotated above the regular price of its own row', () => {
-  // pricing.ts caps PRO and PRIME at the regular price resolved AT THAT ROW;
-  // buildGrid does not. A clearance option — regular adjusted down below the
-  // inherited PRO price — was annotated with a PRO price the cart refuses.
+  // A clearance option — regular adjusted down below the inherited PRO price.
+  // The member ladder follows the regular one, so the reduction swallows the
+  // PRO price (400,000 − 450,000 < 0): the member pays the reduced regular
+  // and the file must not annotate a PRO number at all, let alone one above
+  // the row's own 50,000.
   const v = view();
   const vals = v.values as unknown as Array<Record<string, unknown>>;
   vals[1].regular_adjust_iqd = -450_000; // 500,000 - 450,000 = 50,000
@@ -409,8 +411,15 @@ test('a member price is never annotated above the regular price of its own row',
     { includeInactive: true }
   );
   const text = exportProduct(doc, { includeCost: true });
-  const line = text.split('\n').find((l) => l.includes('سعر PRO الفعلي للصنف') && l.includes('50,000'));
-  assert.ok(line, `PRO must be clamped to 50,000; got:\n${text.split('\n').filter((l) => l.includes('PRO')).join('\n')}`);
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => l === 'options.2.id=ov2');
+  const end = lines.findIndex((l, i) => i > start && /^options\.3\.id=/.test(l));
+  const block = lines.slice(start, end);
+  assert.ok(block.some((l) => l.includes('السعر الاعتيادي الفعلي للصنف: 50,000')), 'the reduced regular is annotated');
+  for (const l of block.filter((l) => /سعر (PRO|PRIME) الفعلي/.test(l))) {
+    const n = Number((l.match(/: ([\d,]+) د/) ?? [])[1]?.replace(/,/g, '') ?? '0');
+    assert.ok(n <= 50_000, `a member note above the row's regular: ${l}`);
+  }
 });
 
 test('an inheriting colour on a product whose options differ says so instead of naming a price', () => {
@@ -498,7 +507,9 @@ test('the documented Bambu A1 example is valid and already in the owner\'s form'
   const combo = built.options.find((o) => o.id === 'a1-combo')!;
   assert.equal(combo.availability_type, '', 'availability follows the product');
   assert.deepEqual([combo.regular_price_iqd, combo.regular_adjust_iqd], [null, 200_000]);
-  assert.deepEqual([combo.prime_adjust_iqd, combo.pro_adjust_iqd], [200_000, 200_000]);
+  // The member prices follow the surcharge on their own (pricing.ts
+  // memberAtRung) — the example states no member adjustment.
+  assert.deepEqual([combo.prime_adjust_iqd ?? null, combo.pro_adjust_iqd ?? null], [null, null]);
   // Nothing for the normalizer to do — the example teaches the stored form.
   const { normalizeCheapestBase } = await import('../worker/lib/cheapestBase');
   assert.deepEqual(normalizeCheapestBase(built).changed, []);

@@ -598,11 +598,14 @@ adminPriceGridRoutes.patch('/:id/price-grid', async (c) => {
       after = value;
       writeValue = value;
     } else if (p.mode === 'adjust') {
+      // cell.inherited carries the rung's regular surcharge for a member
+      // cell (priceGrid cellOf); with nothing beneath, a member adjustment
+      // anchors on the rung's own regular price, as the resolver does.
       const anchor =
         cell.inherited !== null
           ? cell.inherited
           : p.field === 'prime' || p.field === 'pro'
-            ? row.cells.regular.inherited
+            ? row.cells.regular.effective
             : null;
       if (anchor === null) {
         throw badRequest(`${row.label_ar || row.id}: there is no inherited ${p.field} price to adjust`, 'NOTHING_TO_ADJUST');

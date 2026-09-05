@@ -8,7 +8,13 @@
  *    level: regular, PRIME, PRO, cost. NULL means "inherit" down the chain
  *    variant → color → option → product base, PER FIELD independently. Zero
  *    is an explicit value, never treated as blank (no truthiness checks).
- *  - Option/color prices REPLACE the applicable base price (not surcharges).
+ *  - An option/colour REGULAR price is a rung on the ladder: a fixed number
+ *    replaces what is beneath it, an adjustment moves it. Either way the
+ *    difference it makes to the regular price is a SURCHARGE (or reduction)
+ *    that EVERY tier pays — see "the member ladder follows the regular one"
+ *    below. Base 150,000 / PRIME 125,000 / PRO 100,000 with an option
+ *    +25,000 sells at 175,000 / 150,000 / 125,000; add a direct-sale
+ *    premium of 100,000 and the line is 275,000 / 250,000 / 225,000.
  *  - PRO members pay the resolved PRO price when one exists; otherwise the
  *    configured store-wide PRO policy applies; if no policy is configured,
  *    the regular price applies (no fabricated discount).
@@ -247,6 +253,112 @@ interface LadderTrace {
  * inventing a cost from a selling price would make the profit figures of §12
  * confidently wrong.
  */
+/**
+ * THE MEMBER LADDER FOLLOWS THE REGULAR ONE — the owner's rule:
+ *
+ *   «الخيارات والألوان والشحن تبقى تكاليف إضافية»: a member price is an
+ *   OFFSET from the base, and everything a customer adds on top of the base
+ *   costs every tier the same.
+ *
+ * So at each rung (option, then colour) a PRIME/PRO field that says nothing
+ * of its own does not merely inherit the value beneath it — it inherits that
+ * value PLUS the change this rung made to the regular price. A rung that
+ * states its own member price replaces it (as ever); a rung with a member
+ * ADJUSTMENT applies it on top of that carried value ("PRO gets 5,000 more
+ * off on this option"), or on the rung's regular price when no member price
+ * exists beneath — "PRO pays 15,000 less" can only mean less than everyone
+ * else pays.
+ *
+ * A REDUCTION that swallows the member price (base PRO 90,000, option
+ * −100,000) leaves nothing to carry: the member simply pays the reduced
+ * regular price. The write-time validator refuses such a row unless it states
+ * its own member price, so this is a safety net for legacy rows, not a path.
+ */
+export function memberAtRung(input: {
+  /** the member price resolved beneath this rung (null = no member price anywhere below) */
+  inherited: number | null;
+  /** regular at this rung − regular beneath it: what this rung adds for everyone */
+  regularDelta: number;
+  /** the regular price resolved AT this rung — the anchor for an adjustment with nothing beneath */
+  regularHere: number | null;
+  row: PriceFields | null;
+  field: 'prime_price_iqd' | 'pro_price_iqd';
+}): number | null {
+  const { inherited, regularDelta, regularHere, row, field } = input;
+  const carried =
+    inherited === null ? null : inherited + regularDelta > 0 ? Math.round(inherited + regularDelta) : null;
+  if (!row) return carried;
+  const fixed = row[field];
+  if (fixed !== null && fixed !== undefined) return fixed;
+  const adj = row[ADJUST_OF[field]];
+  if (adj !== null && adj !== undefined && Number.isFinite(adj)) {
+    const anchor = carried !== null ? carried : regularHere;
+    if (anchor === null) return carried;
+    return Math.max(0, Math.round(anchor + adj));
+  }
+  return carried;
+}
+
+/**
+ * What ONE row resolves to on top of the level beneath it — the write-time
+ * validators' view of the ladder (productModel, productRelations, importCsv).
+ * `consumed` names the member fields the row would inherit but cannot: the
+ * row's reduction is at least as large as the member price beneath it, so the
+ * resolver would charge the member the reduced regular price. Validators
+ * refuse that unless the row states its own member price.
+ */
+export function derivedRung(
+  row: PriceFields,
+  beneath: { regular: number; prime: number | null; pro: number | null }
+): { regular: number; prime: number | null; pro: number | null; consumed: Array<'prime' | 'pro'> } {
+  const regAdj = row.regular_adjust_iqd;
+  const regular =
+    row.regular_price_iqd !== null && row.regular_price_iqd !== undefined
+      ? row.regular_price_iqd
+      : regAdj !== null && regAdj !== undefined && Number.isFinite(regAdj)
+        ? Math.max(0, Math.round(beneath.regular + regAdj))
+        : beneath.regular;
+  const regularDelta = regular - beneath.regular;
+  const consumed: Array<'prime' | 'pro'> = [];
+  const member = (field: 'prime_price_iqd' | 'pro_price_iqd', inherited: number | null) => {
+    const own = row[field];
+    const adj = row[ADJUST_OF[field]];
+    const statesOwn = (own !== null && own !== undefined) || (adj !== null && adj !== undefined);
+    if (inherited !== null && !statesOwn && regular > 0 && inherited + regularDelta <= 0) {
+      consumed.push(field === 'prime_price_iqd' ? 'prime' : 'pro');
+    }
+    return memberAtRung({ inherited, regularDelta, regularHere: regular, row, field });
+  };
+  return { regular, prime: member('prime_price_iqd', beneath.prime), pro: member('pro_price_iqd', beneath.pro), consumed };
+}
+
+/** Walks base → option → colour for PRIME or PRO with the rule above. */
+function pickMember(
+  field: 'prime_price_iqd' | 'pro_price_iqd',
+  color: ColorV2 | null,
+  option: OptionV2 | null,
+  base: number | null,
+  regularAt: Record<PriceSource, number | null>
+): LadderTrace {
+  const at: Record<PriceSource, number | null> = { base, option: base, color: base };
+  let value = base;
+  let source: PriceSource = 'base';
+  const regularBase = regularAt.base ?? 0;
+  const regularOption = regularAt.option ?? regularBase;
+  const regularColor = regularAt.color ?? regularOption;
+  const rungs: Array<[Exclude<PriceSource, 'base'>, PriceFields | null, number, number | null]> = [
+    ['option', option, regularOption - regularBase, regularAt.option],
+    ['color', color, regularColor - regularOption, regularAt.color],
+  ];
+  for (const [rung, row, regularDelta, regularHere] of rungs) {
+    const next = memberAtRung({ inherited: value, regularDelta, regularHere, row, field });
+    if (row && (next !== value || regularDelta !== 0)) source = rung;
+    value = next;
+    at[rung] = value;
+  }
+  return { value: value ?? null, source, at };
+}
+
 function pick(
   field: PriceKey,
   color: ColorV2 | null,
@@ -317,8 +429,11 @@ export function resolveUnitPrice(input: {
   // Per-field independent inheritance. Regular is resolved first because the
   // member fields may need to anchor an adjustment on it.
   const regular = pick('regular_price_iqd', color, option, product.price_iqd);
-  const proExplicit = pick('pro_price_iqd', color, option, product.pro_price_iqd, regular.at);
-  const primeExplicit = pick('prime_price_iqd', color, option, product.prime_price_iqd, regular.at);
+  // PRIME and PRO carry every surcharge the regular ladder added (see
+  // memberAtRung); cost does not — a surcharge says nothing about what the
+  // extra costs the store, and inventing a cost would make §12 profit wrong.
+  const proExplicit = pickMember('pro_price_iqd', color, option, product.pro_price_iqd, regular.at);
+  const primeExplicit = pickMember('prime_price_iqd', color, option, product.prime_price_iqd, regular.at);
   const cost = pick('cost_iqd', color, option, product.product_cost_iqd);
 
   const regularIqd = regular.value ?? product.price_iqd;

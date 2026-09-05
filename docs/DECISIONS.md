@@ -264,3 +264,18 @@ tab-versus-backslash-t typo that let a duplicate variable reach wrangler in the
 very workflow they have to run. The last finding changed the migration answer
 itself: the Studio worker creates its own tables at runtime, so saving and
 opening projects never depended on a migration at all.
+
+## 2026-09-05 — the member ladder follows the regular one
+
+The owner's rule, verbatim: member prices are offsets of the base (Regular
+150,000 / PRIME 125,000 / PRO 100,000), and options, colours and availability
+are additional costs for every tier (option +25,000 → 175,000 / 150,000 /
+125,000; direct sale +100,000 → 275,000 / 250,000 / 225,000). This reverses
+the earlier "an option price REPLACES the base and member prices inherit
+unchanged" reading (rows 70 and 88). Implemented once in `pricing.ts`
+`memberAtRung` and mirrored by the Quick Edit grid and the four write-time
+validators through `derivedRung`; the cheapest-base normaliser moves PRIME/PRO
+with the base so member offsets survive a rewrite. A reduction that swallows a
+member price is refused at write time unless the row states its own member
+price. PRO's pre-order commission waiver and the never-waived direct premium
+are unchanged.

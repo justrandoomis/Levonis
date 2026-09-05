@@ -33,8 +33,40 @@ independently **per field**. `0` is an explicit value (truthiness is never
 used). At product level the four map to columns `price_iqd` (required),
 `pro_price_iqd`, `original_price_iqd`, `product_cost_iqd`.
 
-Option/color prices **replace** the applicable base price; they are never
-surcharges.
+An option/colour regular price is a rung on the ladder: a **fixed** number
+replaces what is beneath it, an **adjustment** moves it. Either way the
+difference it makes to the regular price is a **surcharge every tier pays** —
+see "The member ladder follows the regular one" below.
+
+## The member ladder follows the regular one (the owner's rule)
+
+> Base Regular 150,000 / PRIME 125,000 / PRO 100,000. Option 2 adds 25,000 →
+> 175,000 / 150,000 / 125,000. Direct sale adds 100,000 on top → 275,000 /
+> 250,000 / 225,000. Options, colours, availability and shipping are
+> **additional costs for every tier**.
+
+Implemented in `worker/lib/pricing.ts` `memberAtRung`, mirrored by the Quick
+Edit grid (`priceGrid.ts step/cellOf`) and the write-time validators
+(`derivedRung`). At each rung (option, then colour) a PRIME/PRO field that
+states nothing of its own inherits the value beneath **plus the change this
+rung made to the regular price**. A rung that states its own member price
+replaces it; a rung with a member *adjustment* applies it on top of that
+carried value ("PRO gets 5,000 more off on this option"), or on the rung's
+regular price when no member price exists beneath. Cost never follows: a
+surcharge says nothing about what the extra costs the store.
+
+A reduction at least as large as the member price it would inherit (base PRO
+90,000, option −100,000) leaves nothing to carry: the resolver charges the
+member the reduced regular price, and every validator refuses such a row
+unless it states its own member price.
+
+Consequences: the same option written as `regular_price_iqd=175000` or as
+`regular_adjust_iqd=+25000` prices every tier identically; the cheapest-base
+normaliser (`cheapestBase.ts`) moves the product's PRIME/PRO by the same
+amount it moves the base, so member prices are offsets that survive the
+rewrite; and a product-level `pro_price_iqd` is the PRO price of the *base
+selection only* — every surface shows the resolver's `pro_iqd` for the
+selection in hand.
 
 ## Inherit, adjust, fixed — the three modes (0044)
 
@@ -62,10 +94,11 @@ is 60,000 above the base" once, and keeps saying it after every future base
 change.
 
 **Anchoring.** An adjustment applies to the value the row would otherwise have
-inherited *for the same field*. When a member field (PRIME/PRO) has nothing to
-inherit — no member price is set anywhere below it — the adjustment anchors on
-the **regular price resolved at that same rung**, because "PRO pays 15,000 less"
-can only mean less than what everyone else pays. **Cost has no such fallback**: a
+inherited *for the same field* — which, for PRIME/PRO, already carries the
+row's regular surcharge (see the owner's rule above). When a member field has
+nothing to inherit — no member price is set anywhere below it — the adjustment
+anchors on the **regular price resolved at that same rung**, because "PRO pays
+15,000 less" can only mean less than what everyone else pays. **Cost has no such fallback**: a
 cost adjustment with no cost beneath it stays `inherit`, because inventing a cost
 from a selling price would make the profit figures confidently wrong. The result
 is clamped at zero and rounded to whole dinars.
@@ -120,7 +153,9 @@ but the server is what parses the value that is written.
 
 ## PRO resolution
 
-1. Resolved explicit PRO price (color→option→base) when present.
+1. Resolved explicit PRO price (color→option→base) when present — the base
+   PRO price plus every regular surcharge on the way up, unless a rung states
+   its own PRO price (`memberAtRung`).
 2. Otherwise the store-wide policy `proPricingPolicy`:
    - `explicit_only` (default): **no discount** — no fabricated percentages.
    - `global_percent` (owner-approved only): `regular − floor(regular×p/100)`.
@@ -156,9 +191,12 @@ selection server-side; the UI mirrors them but is never the enforcement.
 ## Worked examples (from the unit tests)
 
 1. Base 100,000; option regular 120,000 selected → applied 120,000.
-2. Option regular 120,000 + compare-at 150,000; color regular 130,000
-   (compare-at null) → applied 130,000, compare-at 150,000 (inherited
-   per-field from the option).
+2. Option regular 120,000 with PRIME 115,000; colour regular 130,000 (PRIME
+   null) → applied 130,000, PRIME 125,000: the colour's +10,000 is paid by
+   every tier, inherited per-field from the option.
+2b. Base 150,000 / 125,000 / 100,000, option +25,000, direct-sale premium
+   100,000 → 175,000 / 150,000 / 125,000 for the item and 275,000 / 250,000 /
+   225,000 per unit.
 3. Preorder, sea commission 15,000, free tier → unit subtotal 115,000.
 4. PRO + air commission 25,000 + 2-year warranty 20,000, no PRO price →
    100,000 + 0 (waived) + 20,000 = 120,000.

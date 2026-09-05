@@ -219,7 +219,27 @@ test('every effective cell in the grid equals what the resolver charges', () => 
     });
     assert.equal(row.cells.regular.effective, r.applied_iqd, `regular for ${row.id}`);
     assert.equal(row.cells.cost.effective, r.cost_iqd, `cost for ${row.id}`);
+    // The member cells too — including the surcharge the owner's rule carries
+    // onto them (+50,000 direct option → PRIME 530,000, PRO 510,000). The
+    // resolver clamps PRO ≤ PRIME ≤ regular; the grid does not, so compare
+    // the unclamped explicit values with the same clamp applied here.
+    const clampPro = r.pro_iqd;
+    const clampPrime = r.prime_iqd;
+    assert.equal(row.cells.pro.effective, clampPro, `pro for ${row.id}`);
+    assert.equal(row.cells.prime.effective, clampPrime, `prime for ${row.id}`);
   }
+});
+
+test('OWNER: an inheriting member cell lands on the value beneath PLUS this row\'s surcharge', () => {
+  const rows = buildGrid(
+    gridInput(product({ price_iqd: 150_000, prime_price_iqd: 125_000, pro_price_iqd: 100_000, options: [option({ id: 'o1', regular_adjust_iqd: 25_000 })] }))
+  );
+  const row = rows.find((r) => r.id === 'o1')!;
+  assert.equal(row.cells.regular.effective, 175_000);
+  assert.equal(row.cells.prime.effective, 150_000);
+  assert.equal(row.cells.pro.effective, 125_000);
+  assert.equal(row.cells.pro.inherited, 125_000, 'the placeholder says what inheriting lands on');
+  assert.equal(row.cells.pro.mode, 'inherit');
 });
 
 test('the grid names each option model and fulfilment route without parsing names', () => {

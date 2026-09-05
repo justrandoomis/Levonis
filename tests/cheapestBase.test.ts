@@ -131,6 +131,32 @@ test('normalizing twice is normalizing once', () => {
 
 // ------------------------------------------------------------ member prices
 
+test('OWNER RULE: when the base moves, PRIME and PRO move with it — member prices are offsets', () => {
+  // base 60,000 / PRIME 55,000 / PRO 50,000; option a FIXED 50,000 (cheapest),
+  // option b inherits. Under the member-follows-regular rule b's PRO is
+  // 50,000 today (no surcharge) and a's is 40,000 (a is 10,000 below base).
+  // After: base 50,000 / PRIME 45,000 / PRO 40,000; a inherits (PRO 40,000),
+  // b is +10,000 (PRO 40,000 + 10,000 = 50,000). Same numbers, every tier.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 }), opt('b')], [], { prime_price_iqd: 55_000, pro_price_iqd: 50_000 });
+  const { doc, base_after } = normalizeCheapestBase(before);
+  assert.equal(base_after, 50_000);
+  assert.equal(doc.prime_price_iqd, 45_000);
+  assert.equal(doc.pro_price_iqd, 40_000);
+  assertSamePrices(before, doc);
+});
+
+test('the base does not move where a member offset would reach zero', () => {
+  // PRO 5,000 (55,000 below the base); an option 10,000 below the base.
+  // Moving the base down 10,000 would put PRO at −5,000 → the base stays,
+  // with a warning naming the offset.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 }), opt('b')], [], { pro_price_iqd: 5_000 });
+  const { doc, base_after, warnings } = normalizeCheapestBase(before);
+  assert.equal(base_after, 60_000);
+  assert.equal(doc.pro_price_iqd, 5_000);
+  assert.ok(warnings.some((w) => w.startsWith('price_iqd:') && w.includes('PRO')), warnings.join('\n'));
+  assertSamePrices(before, doc);
+});
+
 test('PRIME, PRO and cost keep their own mode — only the regular ladder is rewritten', () => {
   const before = product(60_000, [
     opt('a', { regular_price_iqd: 50_000, pro_price_iqd: 45_000, prime_price_iqd: 48_000, cost_iqd: 30_000 }),
@@ -143,14 +169,15 @@ test('PRIME, PRO and cost keep their own mode — only the regular ladder is rew
   assertSamePrices(before, doc);
 });
 
-test('the base is not lowered under the product\'s own PRIME/PRO price — the ladder would refuse it', () => {
-  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 }), opt('b')], [], { pro_price_iqd: 55_000 });
-  const { doc, base_after, warnings } = normalizeCheapestBase(before);
-  assert.equal(base_after, 60_000, 'kept');
-  assert.equal(doc.options[0].regular_adjust_iqd, -10_000, 'the cheap option is still written as a difference');
-  assert.ok(warnings.some((w) => w.startsWith('price_iqd:') && w.includes('PRO') && w.includes('55,000')), warnings.join('\n'));
+test('a product PRO price above the cheapest option no longer blocks the move — the offset travels', () => {
+  // PRO 45,000 (offset 15,000). Base 60,000 → 50,000 takes PRO to 35,000:
+  // the same 15,000 below the base, on every option.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 }), opt('b')], [], { pro_price_iqd: 45_000 });
+  const { doc, base_after } = normalizeCheapestBase(before);
+  assert.equal(base_after, 50_000);
+  assert.equal(doc.pro_price_iqd, 35_000);
+  assert.deepEqual([doc.options[0].regular_adjust_iqd ?? null, doc.options[1].regular_adjust_iqd], [null, 10_000]);
   assertSamePrices(before, doc);
-  // …and what it produced is a document the validator accepts.
   validateProductDoc(asBody(doc));
 });
 
@@ -230,9 +257,10 @@ test('REVIEW: with every option switched off, the base and the colours are left 
 });
 
 test('REVIEW: the "kept fixed" note names the right direction', () => {
-  // Product PRO 55,000 keeps the base at 60,000 although option a sells at
-  // 50,000; the colour on a is below the base, and the note must say so.
-  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [col('k', { regular_price_iqd: 52_000 })], { pro_price_iqd: 55_000 });
+  // A product PRO of 5,000 (55,000 below the base) keeps the base at 60,000
+  // although option a sells at 50,000; the colour on a is below the base,
+  // and the note must say so.
+  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [col('k', { regular_price_iqd: 52_000 })], { pro_price_iqd: 5_000 });
   const { doc, warnings } = normalizeCheapestBase(before);
   assert.equal(doc.colors[0].regular_price_iqd, 52_000);
   assert.ok(warnings.some((w) => w.startsWith('colors.1.') && w.includes('تحت الأساسي')), warnings.join('\n'));

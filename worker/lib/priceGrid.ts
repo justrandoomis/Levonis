@@ -20,7 +20,8 @@
  * same computation rather than two implementations of one intention.
  */
 
-import { ADJUST_OF, priceMode, type PriceKey, type PriceMode, type PriceFields } from './pricing';
+import {
+  memberAtRung, ADJUST_OF, priceMode, type PriceKey, type PriceMode, type PriceFields } from './pricing';
 import { effectiveAvailability, type AvailabilityType } from './availability';
 
 // --------------------------------------------------------------- vocabulary
@@ -274,8 +275,24 @@ export interface GridProductInput {
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
-/** One rung of the ladder, applied exactly as worker/lib/pricing.ts does. */
-function step(inherited: number | null, row: PriceFields | null, field: Field, regularHere: number | null): number | null {
+/**
+ * One rung of the ladder, applied exactly as worker/lib/pricing.ts does.
+ *
+ * `regularDelta` is what this rung added to the REGULAR price (regular here −
+ * regular beneath). PRIME and PRO carry it (pricing.ts memberAtRung — the
+ * owner's rule that options, colours and shipping are additional costs for
+ * every tier); regular and cost do not.
+ */
+function step(
+  inherited: number | null,
+  row: PriceFields | null,
+  field: Field,
+  regularHere: number | null,
+  regularDelta = 0
+): number | null {
+  if (field === 'prime' || field === 'pro') {
+    return memberAtRung({ inherited, regularDelta, regularHere, row, field: COLUMN_OF[field] as 'prime_price_iqd' | 'pro_price_iqd' });
+  }
   if (!row) return inherited;
   const col = COLUMN_OF[field];
   const mode = priceMode(row, col);
@@ -283,22 +300,28 @@ function step(inherited: number | null, row: PriceFields | null, field: Field, r
   if (mode === 'adjust') {
     const adj = num(row[ADJUST_OF[col]]);
     if (adj === null) return inherited;
-    const anchor = inherited !== null ? inherited : field === 'prime' || field === 'pro' ? regularHere : null;
-    if (anchor === null) return inherited;
-    return Math.max(0, Math.round(anchor + adj));
+    if (inherited === null) return inherited;
+    return Math.max(0, Math.round(inherited + adj));
   }
   return inherited;
 }
 
-function cellOf(row: PriceFields | null, field: Field, inherited: number | null, regularHere: number | null): Cell {
+function cellOf(row: PriceFields | null, field: Field, inherited: number | null, regularHere: number | null, regularDelta = 0): Cell {
   const col = COLUMN_OF[field];
   const mode = row ? priceMode(row, col) : 'inherit';
+  // For a member cell, "what inheriting would land on" is the value beneath
+  // PLUS this rung's regular surcharge — that is the number the resolver
+  // charges an inheriting row, and the anchor an adjustment applies to.
+  const landing =
+    (field === 'prime' || field === 'pro') && inherited !== null
+      ? memberAtRung({ inherited, regularDelta, regularHere, row: null, field: col as 'prime_price_iqd' | 'pro_price_iqd' })
+      : inherited;
   return {
     mode,
     value: row ? num(row[col]) : null,
     adjust: row ? num(row[ADJUST_OF[col]]) : null,
-    effective: step(inherited, row, field, regularHere),
-    inherited,
+    effective: step(inherited, row, field, regularHere, regularDelta),
+    inherited: landing,
   };
 }
 
@@ -350,10 +373,11 @@ export function buildGrid(p: GridProductInput): GridRow[] {
   for (const o of p.options) {
     optionById.set(o.id, o);
     const regular = step(baseOf('regular'), o, 'regular', null);
+    const regularDelta = (regular ?? p.price_iqd) - p.price_iqd;
     const eff = {} as Record<Field, number | null>;
     const cells = {} as Record<Field, Cell>;
     for (const f of FIELDS) {
-      const c = cellOf(o, f, baseOf(f), regular);
+      const c = cellOf(o, f, baseOf(f), regular, regularDelta);
       cells[f] = c;
       eff[f] = c.effective;
     }
@@ -383,8 +407,10 @@ export function buildGrid(p: GridProductInput): GridRow[] {
     const parentEff = c.option_id ? optionEffective.get(c.option_id) ?? null : null;
     const inheritedOf = (f: Field): number | null => (parentEff ? parentEff[f] : baseOf(f));
     const regular = step(inheritedOf('regular'), c, 'regular', null);
+    const regularBeneath = inheritedOf('regular') ?? p.price_iqd;
+    const regularDelta = (regular ?? regularBeneath) - regularBeneath;
     const cells = {} as Record<Field, Cell>;
-    for (const f of FIELDS) cells[f] = cellOf(c, f, inheritedOf(f), regular);
+    for (const f of FIELDS) cells[f] = cellOf(c, f, inheritedOf(f), regular, regularDelta);
     rows.push({
       level: 'color',
       id: c.id,
@@ -542,7 +568,10 @@ export function previewBulk(
           skipped.push({ level: row.level, id: row.id, field, reason: 'BASE_HAS_NOTHING_TO_ADJUST' });
           continue;
         }
-        const anchor = cell.inherited !== null ? cell.inherited : field === 'prime' || field === 'pro' ? row.cells.regular.inherited : null;
+        // cell.inherited already carries this rung's regular surcharge for a
+        // member cell; with no member price beneath, the anchor is the rung's
+        // own regular price — exactly what pricing.ts uses.
+        const anchor = cell.inherited !== null ? cell.inherited : field === 'prime' || field === 'pro' ? row.cells.regular.effective : null;
         if (anchor === null) {
           skipped.push({ level: row.level, id: row.id, field, reason: 'NOTHING_TO_ADJUST' });
           continue;
@@ -686,7 +715,7 @@ export function previewCopy(
         from.mode === 'fixed'
           ? from.value
           : from.mode === 'adjust'
-            ? Math.max(0, (to.inherited ?? dst.cells.regular.inherited ?? 0) + (from.adjust ?? 0))
+            ? Math.max(0, (to.inherited ?? dst.cells.regular.effective ?? 0) + (from.adjust ?? 0))
             : to.inherited;
       changes.push({
         level: dst.level,

@@ -54,6 +54,7 @@
  * bytes (worker/routes/media.ts). A product-page URL is rejected, not read.
  */
 
+import { derivedRung } from './pricing';
 import {
   PRODUCT_TYPES,
   flatFields,
@@ -1053,8 +1054,38 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       }
     };
     ladder('المنتج', p.line, p.price_iqd, p.prime_price_iqd, p.pro_price_iqd, p.cost_iqd);
-    for (const o of p.options) ladder(`الخيار ${o.value}`, o.line, o.price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd);
-    for (const c of p.colors) ladder(`اللون ${c.name}`, c.line, c.price_iqd, c.prime_price_iqd, c.pro_price_iqd, c.cost_iqd);
+    // The member ladder follows the regular one (worker/lib/pricing.ts
+    // memberAtRung): a row that states no PRIME/PRO inherits the base member
+    // price PLUS its own surcharge. A reduction at least as large as that
+    // member price would leave the member no discount at all — refused
+    // unless the row states its own member price.
+    const memberCarried = (where: string, line: number, row: {
+      price_iqd: number | null; regular_adjust_iqd: number | null;
+      prime_price_iqd: number | null; prime_adjust_iqd: number | null;
+      pro_price_iqd: number | null; pro_adjust_iqd: number | null;
+    }) => {
+      if (p.price_iqd === null) return;
+      const d = derivedRung(
+        {
+          regular_price_iqd: row.price_iqd, prime_price_iqd: row.prime_price_iqd, pro_price_iqd: row.pro_price_iqd, cost_iqd: null,
+          regular_adjust_iqd: row.regular_adjust_iqd, prime_adjust_iqd: row.prime_adjust_iqd, pro_adjust_iqd: row.pro_adjust_iqd, cost_adjust_iqd: null,
+        },
+        { regular: p.price_iqd, prime: p.prime_price_iqd, pro: p.pro_price_iqd }
+      );
+      for (const f of d.consumed) {
+        issues.push({ line, severity: 'error', message: `${where}: التخفيض أكبر من سعر ${f.toUpperCase()} الموروث — حدّد سعر ${f.toUpperCase()} لهذا الصف أو قلّل التخفيض` });
+      }
+      if (d.prime !== null && d.prime > d.regular) issues.push({ line, severity: 'error', message: `${where}: سعر PRIME الناتج أعلى من الاعتيادي` });
+      if (d.pro !== null && d.pro > d.regular) issues.push({ line, severity: 'error', message: `${where}: سعر PRO الناتج أعلى من الاعتيادي` });
+    };
+    for (const o of p.options) {
+      ladder(`الخيار ${o.value}`, o.line, o.price_iqd, o.prime_price_iqd, o.pro_price_iqd, o.cost_iqd);
+      memberCarried(`الخيار ${o.value}`, o.line, o);
+    }
+    for (const c of p.colors) {
+      ladder(`اللون ${c.name}`, c.line, c.price_iqd, c.prime_price_iqd, c.pro_price_iqd, c.cost_iqd);
+      memberCarried(`اللون ${c.name}`, c.line, c);
+    }
 
     for (const v of p.variants) {
       ladder('التوليفة', v.line, v.price_iqd, v.prime_price_iqd, v.pro_price_iqd, v.cost_iqd);

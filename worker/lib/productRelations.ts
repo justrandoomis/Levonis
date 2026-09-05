@@ -23,6 +23,8 @@
  * with `group_id` denormalized so the grouping is one indexed read.
  */
 
+import { derivedRung } from './pricing';
+
 export interface OptionGroupRow {
   id: string;
   product_id: string;
@@ -281,6 +283,10 @@ export interface PriceLadderInput {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null;
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
 }
 
 /**
@@ -291,7 +297,12 @@ export interface PriceLadderInput {
  *     التكلفة. امنع الحفظ مع رسالة واضحة إذا تساويا");
  *   - integers only, never negative.
  */
-export function validatePriceLadder(p: PriceLadderInput, where: string): string[] {
+export function validatePriceLadder(
+  p: PriceLadderInput,
+  where: string,
+  /** The product's base ladder — lets the derived member prices be checked too (pricing.ts derivedRung). */
+  beneath?: { regular: number; prime: number | null; pro: number | null }
+): string[] {
   const errors: string[] = [];
   const bad = (v: number | null) => v !== null && (!Number.isInteger(v) || v < 0);
   if (bad(p.regular_price_iqd)) errors.push(`${where}: regular price must be a whole number of IQD`);
@@ -320,6 +331,25 @@ export function validatePriceLadder(p: PriceLadderInput, where: string): string[
         errors.push(`${where}: the ${label} price is identical to the cost — set a real selling price`);
       }
     }
+  }
+  // The member ladder follows the regular one: a row that states no member
+  // price inherits the base member price PLUS its own surcharge. A reduction
+  // that swallows that member price is refused, and so is a member adjustment
+  // that lifts the derived price above the row's regular price.
+  if (beneath) {
+    const d = derivedRung(
+      {
+        regular_price_iqd: reg, prime_price_iqd: prime, pro_price_iqd: pro, cost_iqd: cost,
+        regular_adjust_iqd: p.regular_adjust_iqd ?? null, prime_adjust_iqd: p.prime_adjust_iqd ?? null,
+        pro_adjust_iqd: p.pro_adjust_iqd ?? null, cost_adjust_iqd: p.cost_adjust_iqd ?? null,
+      },
+      beneath
+    );
+    for (const f of d.consumed) {
+      errors.push(`${where}: the reduction is larger than the ${f.toUpperCase()} price this row inherits (${beneath[f]}) — state a ${f.toUpperCase()} price for it, or reduce less`);
+    }
+    if (d.prime !== null && d.prime > d.regular) errors.push(`${where}: the PRIME price this row resolves to (${d.prime}) is above its regular price (${d.regular})`);
+    if (d.pro !== null && d.pro > d.regular) errors.push(`${where}: the PRO price this row resolves to (${d.pro}) is above its regular price (${d.regular})`);
   }
   return errors;
 }

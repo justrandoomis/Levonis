@@ -203,6 +203,7 @@ export function publicBreakdown(r: ResolvedPrice) {
     // the retired original_price_iqd column anywhere.
     regular_iqd: r.regular_iqd,
     prime_iqd: r.prime_iqd,
+    pro_iqd: r.pro_iqd,
     transport: r.transport,
     warranty: r.warranty,
     unit_subtotal_iqd: r.unit_subtotal_iqd,

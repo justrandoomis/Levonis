@@ -52,15 +52,80 @@ test('option regular price REPLACES base', () => {
   assert.equal(r.price_source, 'option');
 });
 
-test('color overrides option overrides base — per field', () => {
+test('color overrides option overrides base — per field, and a colour surcharge reaches the member price', () => {
   const p = product({
     options: [baseOption({ regular_price_iqd: 120_000, prime_price_iqd: 115_000 })],
-    colors: [baseColor({ regular_price_iqd: 130_000 })], // prime null → inherits the option's 115k
+    colors: [baseColor({ regular_price_iqd: 130_000 })], // prime null → the option's 115k PLUS this colour's +10k
   });
   const r = resolveUnitPrice({ product: p, optionId: 'opt1', colorId: 'col1', ...free });
   assert.equal(r.applied_iqd, 130_000);
   assert.equal(r.price_source, 'color');
-  assert.equal(r.prime_iqd, 115_000); // per-field inheritance, not whole-object replacement
+  // Per-field inheritance, not whole-object replacement — and the colour is an
+  // additional cost for every tier: 115,000 + (130,000 − 120,000).
+  assert.equal(r.prime_iqd, 125_000);
+});
+
+// ------------------------- the owner's rule: surcharges are paid by every tier
+
+test("OWNER: options, colours and availability are additional costs for every tier", () => {
+  // Regular 150,000 / PRIME 125,000 / PRO 100,000. Option 2 adds 25,000 →
+  // 175,000 / 150,000 / 125,000. Direct sale adds 100,000 on top →
+  // 275,000 / 250,000 / 225,000.
+  const p = product({
+    price_iqd: 150_000,
+    prime_price_iqd: 125_000,
+    pro_price_iqd: 100_000,
+    direct_surcharge_iqd: 100_000,
+    options: [baseOption({ id: 'opt2', regular_adjust_iqd: 25_000 })],
+  });
+  const at = (tier: 'free' | 'prime' | 'pro') =>
+    resolveUnitPrice({ product: p, optionId: 'opt2', tier, tierActive: tier !== 'free' });
+  assert.equal(at('free').regular_iqd, 175_000);
+  assert.equal(at('prime').prime_iqd, 150_000);
+  assert.equal(at('pro').pro_iqd, 125_000);
+  assert.deepEqual([at('free').applied_iqd, at('prime').applied_iqd, at('pro').applied_iqd], [175_000, 150_000, 125_000]);
+  // The direct-sale premium is added after the tier price, for every tier.
+  assert.deepEqual(
+    [at('free').unit_subtotal_iqd, at('prime').unit_subtotal_iqd, at('pro').unit_subtotal_iqd],
+    [275_000, 250_000, 225_000]
+  );
+});
+
+test('OWNER: a FIXED option price is the same surcharge as an adjustment of the same size', () => {
+  const adj = product({ price_iqd: 150_000, prime_price_iqd: 125_000, pro_price_iqd: 100_000, options: [baseOption({ regular_adjust_iqd: 25_000 })] });
+  const fixed = product({ price_iqd: 150_000, prime_price_iqd: 125_000, pro_price_iqd: 100_000, options: [baseOption({ regular_price_iqd: 175_000 })] });
+  for (const tier of ['free', 'prime', 'pro'] as const) {
+    const a = resolveUnitPrice({ product: adj, optionId: 'opt1', tier, tierActive: tier !== 'free' });
+    const f = resolveUnitPrice({ product: fixed, optionId: 'opt1', tier, tierActive: tier !== 'free' });
+    assert.equal(a.applied_iqd, f.applied_iqd, tier);
+  }
+});
+
+test('OWNER: a rung that states its own member price replaces the carried one; an adjustment applies on top of it', () => {
+  const own = product({ price_iqd: 150_000, pro_price_iqd: 100_000, options: [baseOption({ regular_adjust_iqd: 25_000, pro_price_iqd: 110_000 })] });
+  assert.equal(resolveUnitPrice({ product: own, optionId: 'opt1', ...pro }).pro_iqd, 110_000, 'stated: 110,000, not 125,000');
+  const more = product({ price_iqd: 150_000, pro_price_iqd: 100_000, options: [baseOption({ regular_adjust_iqd: 25_000, pro_adjust_iqd: -5_000 })] });
+  assert.equal(resolveUnitPrice({ product: more, optionId: 'opt1', ...pro }).pro_iqd, 120_000, '100,000 + 25,000 − 5,000');
+});
+
+test('OWNER: a colour surcharge stacks on the option surcharge for every tier', () => {
+  const p = product({
+    price_iqd: 150_000, prime_price_iqd: 125_000, pro_price_iqd: 100_000,
+    options: [baseOption({ regular_adjust_iqd: 25_000 })],
+    colors: [baseColor({ regular_adjust_iqd: 10_000 })],
+  });
+  const r = (tier: 'free' | 'prime' | 'pro') => resolveUnitPrice({ product: p, optionId: 'opt1', colorId: 'col1', tier, tierActive: tier !== 'free' }).applied_iqd;
+  assert.deepEqual([r('free'), r('prime'), r('pro')], [185_000, 160_000, 135_000]);
+});
+
+test('a reduction that swallows the member price leaves the member paying the reduced regular price', () => {
+  // Base PRO 90,000; an option 100,000 cheaper than the base. There is no
+  // PRO price left to carry — the member pays the (already reduced) regular.
+  const p = product({ price_iqd: 100_000, pro_price_iqd: 90_000, options: [baseOption({ regular_price_iqd: 0 })] });
+  const r = resolveUnitPrice({ product: p, optionId: 'opt1', ...pro });
+  assert.equal(r.pro_iqd, null);
+  assert.equal(r.applied_iqd, 0);
+  assert.equal(r.applied_tier, 'regular');
 });
 
 test('zero is an explicit price, not inherit', () => {
@@ -346,4 +411,25 @@ test('the rule survives the resolver: a saved doc always prices above its cost',
     assert.notEqual(r.applied_iqd, r.cost_iqd, `${tier} sells at exactly the cost`);
     assert.ok((r.cost_iqd ?? 0) < r.applied_iqd, `${tier}: ${r.cost_iqd} !< ${r.applied_iqd}`);
   }
+});
+
+// ------------------------------------------- the validators know the rule too
+
+test('OWNER: the validator refuses a reduction that swallows an inherited member price', async () => {
+  const { validateProductDoc } = await import('../worker/lib/productModel');
+  const body = (option: Record<string, unknown>) => ({
+    name_ar: 'منتج', name_en: 'P', price_iqd: 100_000, pro_price_iqd: 90_000, selling_type: 'direct_sale',
+    options: [{ id: 'o1', name_ar: 'خيار', name_en: 'O', ...option }],
+  });
+  // −95,000 on a 90,000 PRO price: the row still sells at 5,000 but there is
+  // no PRO price left to carry → refused…
+  assert.throws(() => validateProductDoc(body({ regular_adjust_iqd: -95_000 })), /reduction on this row is larger than the PRO price/);
+  // …unless the row states its own PRO price…
+  assert.doesNotThrow(() => validateProductDoc(body({ regular_adjust_iqd: -95_000, pro_price_iqd: 4_000 })));
+  // (a row reduced to a FREE item has nothing to discount — not a refusal)
+  assert.doesNotThrow(() => validateProductDoc(body({ regular_adjust_iqd: -100_000 })));
+  // …and a plain surcharge is always fine.
+  assert.doesNotThrow(() => validateProductDoc(body({ regular_adjust_iqd: 25_000 })));
+  // A member adjustment that lifts PRO above the row's regular price is refused.
+  assert.throws(() => validateProductDoc(body({ regular_adjust_iqd: 25_000, pro_adjust_iqd: 50_000 })), /PRO price this row resolves to/);
 });

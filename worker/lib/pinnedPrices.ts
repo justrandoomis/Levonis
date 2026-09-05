@@ -3,10 +3,11 @@
  *
  * THE PROBLEM THIS EXISTS FOR. An option, a colour or a variant may carry its
  * own regular_price_iqd, and worker/lib/pricing.ts treats that as a REPLACEMENT
- * for the product's base price, not a surcharge (see the header there: the
- * per-field ladder is variant -> colour -> option -> product). That is a
- * deliberate model, and it is the right one for a shop where "Large" is not
- * always "base plus a fixed amount".
+ * for the product's base price at that rung (the per-field ladder is variant
+ * -> colour -> option -> product; the difference the rung makes is a surcharge
+ * every tier pays, see memberAtRung there). A fixed number is a pin: it does
+ * not follow the base — which is right for a shop where "Large" is not always
+ * "base plus a fixed amount", and the reason this module exists.
  *
  * What it is NOT is obvious to the owner. They open the product, change السعر
  * from 200,000 to 350,000, save, and the storefront headline changes while a

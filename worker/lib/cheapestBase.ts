@@ -20,8 +20,12 @@
  * resolveUnitPrice). It is a change of representation, not of what anyone
  * pays.
  *
- * Only the REGULAR ladder is touched. PRIME, PRO and cost keep whatever mode
- * they have: a member price is a discount, not a surcharge.
+ * MEMBER PRICES ARE OFFSETS FROM THE BASE (pricing.ts memberAtRung: every
+ * rung's regular surcharge is carried onto PRIME and PRO). So when the base
+ * moves by Δ, the product's PRIME and PRO move by the same Δ — that is what
+ * keeps every member price where it was once the options are rewritten
+ * relative to the new base. Rows that state their own member price or
+ * adjustment keep it; cost keeps its mode.
  *
  * WHERE EACH ROW'S ANCHOR IS — the fact the whole rewrite turns on:
  *  - An OPTION anchors on the base. When the base moves by Δ, every option
@@ -168,9 +172,18 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
 
   // ---- never onto a number the ladder refuses ------------------------------
   if (newBase < base) {
-    // The product's own member prices…
-    let floor = Math.max(input.pro_price_iqd ?? 0, input.prime_price_iqd ?? 0);
-    let floorName = (input.prime_price_iqd ?? 0) >= (input.pro_price_iqd ?? 0) ? 'PRIME للمنتج' : 'PRO للمنتج';
+    // The product's own member prices move WITH the base (they are offsets),
+    // so the only thing that can stop the move is one of them reaching zero…
+    const drop = base - newBase;
+    let floor = 0;
+    let floorName = '';
+    for (const [name, v] of [['PRIME للمنتج', input.prime_price_iqd], ['PRO للمنتج', input.pro_price_iqd]] as const) {
+      if (v !== null && v - drop <= 0 && base - v + 1 > floor) {
+        // base − v is the offset; the base may not go below offset + 1
+        floor = base - v + 1;
+        floorName = name;
+      }
+    }
     // …and a fixed member price on a colour that keeps following the base
     // through an option: the validator measures it against base + its own
     // adjustment, so lowering the base under it refuses the document.
@@ -188,8 +201,8 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
     }
     if (newBase < floor) {
       warnings.push(
-        `price_iqd: أرخص صنف هو ${iqd(newBase)} د.ع، لكن سعر ${floorName} (${iqd(floor)}) أعلى منه — ` +
-          `بقي السعر الأساسي ${iqd(base)}؛ اخفض سعر العضوية ذاك أولًا ليصبح الأساسي هو الأرخص.`
+        `price_iqd: أرخص صنف هو ${iqd(newBase)} د.ع، لكن خفض الأساسي إليه يُنزل سعر ${floorName} إلى الصفر أو أقل ` +
+          `(فرقه عن الأساسي ${iqd(floor - 1)}) — بقي السعر الأساسي ${iqd(base)}؛ عدّل سعر العضوية أولًا.`
       );
       newBase = base;
     } else if (input.product_cost_iqd !== null && newBase === input.product_cost_iqd) {
@@ -258,9 +271,24 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
   });
 
   if (newBase !== base) changed.unshift('price_iqd');
-  const doc: T = { ...input, price_iqd: newBase, options: nextOptions, colors: nextColors };
+  // The member offsets travel with the base (see the header): PRIME and PRO
+  // drop by exactly what the base dropped, so an inheriting option's carried
+  // member price (base member + its new surcharge) is the number it was.
+  const shift = newBase - base;
+  const shifted = (v: number | null) => (v === null || shift === 0 ? v : Math.max(0, v + shift));
+  const doc: T = {
+    ...input,
+    price_iqd: newBase,
+    prime_price_iqd: shifted(input.prime_price_iqd),
+    pro_price_iqd: shifted(input.pro_price_iqd),
+    options: nextOptions,
+    colors: nextColors,
+  };
+  if (shift !== 0 && (input.prime_price_iqd !== null || input.pro_price_iqd !== null)) {
+    changed.push('member_prices');
+  }
   if (changed.length > 0) {
-    const rows = changed.filter((k) => k !== 'price_iqd').length;
+    const rows = changed.filter((k) => k !== 'price_iqd' && k !== 'member_prices').length;
     warnings.push(
       newBase !== base
         ? `الأسعار أُعيد التعبير عنها: السعر الأساسي = أرخص صنف (${iqd(newBase)} بدل ${iqd(base)} د.ع)، و${rows} من الخيارات/الألوان صار زيادة فوقه — ما يدفعه الزبون لم يتغير.`

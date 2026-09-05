@@ -888,7 +888,10 @@ export default function Product() {
   const unitPrice = priceIsAuthoritative ? quote!.unit_subtotal_iqd : null;
   const lineTotal = priceIsAuthoritative ? quote!.line_total_iqd : null;
   const isPro = viewerTier?.tier === 'pro' && viewerTier.active;
-  const proPrice = product.pro_price_iqd ?? null;
+  // The PRO price FOR THIS SELECTION, from the server quote: an option or
+  // colour surcharge is paid by every tier, so the product-level number is
+  // only right for the base selection.
+  const proPrice = quote && quoteErrors.length === 0 ? (quote.pro_iqd ?? null) : (product.pro_price_iqd ?? null);
 
   const blockingCodes: string[] = [
     ...(availability?.selection.errors ?? []),

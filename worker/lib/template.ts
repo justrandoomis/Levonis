@@ -247,8 +247,8 @@ const GROUP_SPECS: GroupSpec[] = [
       // above the base" keeps following the base; a row that pins a number
       // does not, which is the whole reason pinnedPrices.ts exists.
       f('regular_adjust_iqd', 'int', 'options', 'الزيادة فوق السعر الأساسي بالدينار — الطريقة المعتمدة لتسعير الخيار: يتبع السعر الأساسي ويبقى الفرق ثابتًا (موجب عادةً؛ سالب مسموح). يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر الأساسي.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
-      f('prime_adjust_iqd', 'int', 'options', 'فرق سعر PRIME عن المستوى الأعلى — يُستخدم فقط عندما يكون prime_price_iqd فارغًا. بدون سعر PRIME موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
-      f('pro_adjust_iqd', 'int', 'options', 'فرق سعر PRO عن المستوى الأعلى — يُستخدم فقط عندما يكون pro_price_iqd فارغًا. بدون سعر PRO موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('prime_adjust_iqd', 'int', 'options', 'فرق إضافي لسعر PRIME فوق ما ينتقل تلقائيًا — سعر PRIME يتبع زيادة الخيار من تلقاء نفسه (أساسي 125,000 وخيار +25,000 = 150,000)، فلا تكرّر الزيادة هنا. يُستخدم فقط عندما يكون prime_price_iqd فارغًا؛ بدون سعر PRIME موروث يُحسب من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('pro_adjust_iqd', 'int', 'options', 'فرق إضافي لسعر PRO فوق ما ينتقل تلقائيًا — سعر PRO يتبع زيادة الخيار من تلقاء نفسه، فلا تكرّر الزيادة هنا. يُستخدم فقط عندما يكون pro_price_iqd فارغًا؛ بدون سعر PRO موروث يُحسب من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('cost_adjust_iqd', 'int', 'options', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       // ---- 0043: this option's own availability, stock and lead time ------
       f('availability_type', 'enum', 'options', 'نوع التوفر لهذا الخيار — فارغ = حسب المنتج (الموصى به): يُباع كما يُباع المنتج، وفرق البيع المباشر/الطلب المسبق يأتي من direct_surcharge_iqd وزيادات النقل لا من خيارات منفصلة. direct_sale | pre_order فقط عندما يختلف هذا الخيار فعلًا عن المنتج.', { enumValues: ['', 'direct_sale', 'pre_order'] as const }),
@@ -290,8 +290,8 @@ const GROUP_SPECS: GroupSpec[] = [
       f('cost_iqd', 'iqd', 'colors', 'كلفة اللون (داخلي) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
       // ---- 0044: see the options group above.
       f('regular_adjust_iqd', 'int', 'colors', 'الزيادة فوق سعر الخيار المختار (أو الأساسي) بالدينار — الطريقة المعتمدة لتسعير اللون: يتبع ما تحته ويبقى الفرق ثابتًا. يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
-      f('prime_adjust_iqd', 'int', 'colors', 'فرق سعر PRIME عن المستوى الأعلى — يُستخدم فقط عندما يكون prime_price_iqd فارغًا. بدون سعر PRIME موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
-      f('pro_adjust_iqd', 'int', 'colors', 'فرق سعر PRO عن المستوى الأعلى — يُستخدم فقط عندما يكون pro_price_iqd فارغًا. بدون سعر PRO موروث يُحسب الفرق من السعر الاعتيادي لنفس الصف.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('prime_adjust_iqd', 'int', 'colors', 'فرق إضافي لسعر PRIME فوق ما ينتقل تلقائيًا — زيادة اللون تصل إلى سعر PRIME من تلقاء نفسها، فلا تكرّرها هنا. يُستخدم فقط عندما يكون prime_price_iqd فارغًا.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      f('pro_adjust_iqd', 'int', 'colors', 'فرق إضافي لسعر PRO فوق ما ينتقل تلقائيًا — زيادة اللون تصل إلى سعر PRO من تلقاء نفسها، فلا تكرّرها هنا. يُستخدم فقط عندما يكون pro_price_iqd فارغًا.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('cost_adjust_iqd', 'int', 'colors', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
     ],
   },

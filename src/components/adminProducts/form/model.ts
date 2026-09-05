@@ -413,8 +413,34 @@ export interface FormErrors {
   [key: string]: string;
 }
 
-const ladder = (p: FormPrices, where: string, out: FormErrors, key: string) => {
+/**
+ * The member ladder follows the regular one (worker/lib/pricing.ts
+ * memberAtRung): a row that states no PRIME/PRO inherits the base member
+ * price PLUS its own regular surcharge. When `base` is given, a reduction at
+ * least as large as the member price it would inherit is flagged, exactly as
+ * the server refuses it.
+ */
+const ladder = (
+  p: FormPrices,
+  where: string,
+  out: FormErrors,
+  key: string,
+  base?: { regular: number | null; prime: number | null; pro: number | null }
+) => {
   const { regular_price_iqd: reg, prime_price_iqd: prime, pro_price_iqd: pro, cost_iqd: cost } = p;
+  if (base && base.regular !== null) {
+    const regular = reg ?? (p.regular_adjust_iqd != null ? Math.max(0, base.regular + p.regular_adjust_iqd) : base.regular);
+    const delta = regular - base.regular;
+    for (const [name, inherited, own, adj] of [
+      ['PRIME', base.prime, prime, p.prime_adjust_iqd ?? null],
+      ['PRO', base.pro, pro, p.pro_adjust_iqd ?? null],
+    ] as const) {
+      if (inherited !== null && own === null && adj === null && regular > 0 && inherited + delta <= 0) {
+        out[key] = `${where}: التخفيض أكبر من سعر ${name} الموروث (${inherited.toLocaleString('en-US')}) — حدّد سعر ${name} لهذا الصف أو قلّل التخفيض`;
+        return;
+      }
+    }
+  }
   if (reg !== null && prime !== null && prime > reg) {
     out[key] = `${where}: سعر PRIME أعلى من السعر الاعتيادي`;
   } else if (reg !== null && pro !== null && pro > reg) {
@@ -461,18 +487,19 @@ export function validateForm(input: {
     e,
     'prices'
   );
+  const base = { regular: input.price_iqd, prime: input.prime_price_iqd, pro: input.pro_price_iqd };
 
   for (const g of input.rel.groups) {
     if (!g.name_en.trim()) e[`group:${g.id}`] = 'اسم المجموعة مطلوب';
     for (const v of g.values) {
       if (!v.name_en.trim()) e[`value:${v.id}`] = 'اسم الخيار مطلوب';
-      ladder(v, v.name_en || 'خيار', e, `value_price:${v.id}`);
+      ladder(v, v.name_en || 'خيار', e, `value_price:${v.id}`, base);
     }
   }
   for (const c of input.rel.colors) {
     if (!c.name_en.trim()) e[`color:${c.id}`] = 'اسم اللون مطلوب';
     if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c.hex)) e[`color_hex:${c.id}`] = 'كود لون غير صالح';
-    ladder(c, c.name_en || 'لون', e, `color_price:${c.id}`);
+    ladder(c, c.name_en || 'لون', e, `color_price:${c.id}`, base);
   }
   for (const v of input.rel.variants) {
     if (v.option_value_ids.length === 0 && !v.color_id) {
