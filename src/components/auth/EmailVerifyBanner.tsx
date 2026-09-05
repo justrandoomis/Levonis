@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 
 /**
@@ -103,7 +104,8 @@ function clearTokenFromUrl(): void {
 }
 
 export default function EmailVerifyBanner() {
-  const { isAuthenticated, isLoaded } = useAuth();
+  const { isAuthenticated, isLoaded, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const { lang } = useLanguage();
   const t = STRINGS[lang] ?? STRINGS.ar;
 
@@ -173,10 +175,17 @@ export default function EmailVerifyBanner() {
     if (confirmState === 'confirming' || confirmState === 'done') return;
     setConfirmState('confirming');
     try {
-      await api.post('/api/auth/verify-email/confirm', { token });
+      const data = await api.post<{ signed_in?: boolean }>('/api/auth/verify-email/confirm', { token });
       setConfirmState('done');
       clearTokenFromUrl();
-      if (isAuthenticated) loadStatus();
+      if (data.signed_in) {
+        // An email-first sign-up: the link opened the account. Load it and
+        // take the new member through setup, exactly as a form sign-up does.
+        await refreshUser();
+        navigate('/welcome', { replace: true });
+      } else if (isAuthenticated) {
+        loadStatus();
+      }
     } catch {
       setConfirmState('failed');
     }

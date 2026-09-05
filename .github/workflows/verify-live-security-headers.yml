@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+#   levonis-iq.com -> Worker levonis-staging
+# ---------------------------------------------------------------------------
+# Read-only proof that the deployed site carries its security headers and that
+# the Content-Security-Policy is enforced without breaking a page.
+#
+# The document, every SPA route and /assets/* are served by the asset layer
+# (dist/_headers, generated at build from worker/lib/securityPolicy.ts) and
+# /api/* by the Worker (lib/http.ts). The audit's first live probe found the
+# API fully covered and the page carrying nothing — this job is where that can
+# never quietly happen again.
+#
+# WHAT IT WRITES: nothing. Anonymous GETs with no cookie, then a headless
+# browser reading the public pages.
+name: 28 - Verify Live Security Headers + CSP (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apex:
+        description: 'Main site origin'
+        required: false
+        default: 'https://levonis-iq.com'
+
+concurrency: verify-live-security-headers
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APEX: ${{ github.event.inputs.apex || 'https://levonis-iq.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The suite needs only a browser driver; the site under test is remote.
+      - name: Install a browser
+        run: |
+          npm i --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Headers on every kind of response, and a browser that sees no violation
+        id: suite
+        run: BASE_URL="$APEX" node scripts/e2e-security-headers.mjs
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo '### Live security headers + CSP'
+            echo ''
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| document, SPA route, asset and API all carry CSP / HSTS / XFO / nosniff / Referrer / Permissions | ${{ steps.suite.outcome }} |"
+            echo "| script-src is 'self' + Google sign-in only — no inline, no eval | ${{ steps.suite.outcome }} |"
+            echo "| Chromium opens the public pages with zero policy violations | ${{ steps.suite.outcome }} |"
+            echo ''
+            echo 'Read-only: anonymous GETs and a headless browser; nothing written.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -100,21 +100,41 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
     fetchOverviewData();
   }, [fetchOverviewData]);
 
-  const decideWallet = async (id: string, status: 'approved' | 'rejected') => {
+  const decideWallet = async (req: PendingWalletRequest, status: 'approved' | 'rejected') => {
     if (loadingActionId) return;
+    // A hold-backed withdrawal is decided by its own workflow: the quick
+    // button here APPROVES FOR PROCESSING (no money moves); paying it out,
+    // with the payout reference, happens in Wallet Requests. The legacy
+    // decision stays for deposits and pre-holds rows.
+    const wd = req.type === 'withdrawal' ? req.withdrawal : null;
     let adminNote: string | undefined;
     if (status === 'rejected') {
-      const note = window.prompt(dir === 'rtl' ? 'سبب الرفض (اختياري):' : 'Rejection reason (optional):');
+      const required = !!wd;
+      const note = window.prompt(
+        required
+          ? (dir === 'rtl' ? 'سبب الرفض (مطلوب):' : 'Rejection reason (required):')
+          : (dir === 'rtl' ? 'سبب الرفض (اختياري):' : 'Rejection reason (optional):')
+      );
       if (note === null) return; // cancelled
+      if (required && note.trim().length < 3) {
+        setActionError({ id: req.id, message: dir === 'rtl' ? 'اكتب سبب الرفض (3 أحرف على الأقل)' : 'Write the rejection reason (at least 3 characters)' });
+        return;
+      }
       adminNote = note || undefined;
     }
-    setLoadingActionId(`${status}-${id}`);
+    setLoadingActionId(`${status}-${req.id}`);
     setActionError(null);
     try {
-      await api.post(`/api/admin/wallet-requests/${id}/decide`, { status, adminNote });
+      if (wd) {
+        const base = `/api/wallet/admin/withdrawals/${wd.id}`;
+        if (status === 'approved') await api.post(`${base}/approve`, {});
+        else await api.post(`${base}/reject`, { reason: (adminNote ?? '').trim() });
+      } else {
+        await api.post(`/api/admin/wallet-requests/${req.id}/decide`, { status, adminNote });
+      }
       await fetchOverviewData();
     } catch (e) {
-      setActionError({ id, message: e instanceof ApiError ? e.message : 'Action failed' });
+      setActionError({ id: req.id, message: e instanceof ApiError ? e.message : 'Action failed' });
     } finally {
       setLoadingActionId(null);
     }
@@ -293,16 +313,30 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {req.type === 'withdrawal' && req.withdrawal && req.withdrawal.state !== 'requested' ? (
+                        // Already in the workflow (approved / processing): the
+                        // next step needs a payout reference — Wallet Requests.
+                        <button
+                          onClick={() => onNavigateTab?.('wallet_requests')}
+                          className="text-[11px] font-bold text-[#c5a059] hover:text-[#e6c27a] transition-colors capitalize"
+                          title={req.withdrawal.state}
+                        >
+                          {req.withdrawal.state} →
+                        </button>
+                      ) : (
                       <button
-                        onClick={() => decideWallet(req.id, 'approved')}
+                        onClick={() => decideWallet(req, 'approved')}
                         disabled={!!loadingActionId}
                         className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8a9a49] to-[#708238] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(112,130,56,0.4)] hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
-                        title={dir === 'rtl' ? 'موافقة' : 'Approve'}
+                        title={req.type === 'withdrawal' && req.withdrawal
+                          ? (dir === 'rtl' ? 'موافقة للمعالجة (لا يُدفع هنا)' : 'Approve for processing (no payout here)')
+                          : (dir === 'rtl' ? 'موافقة' : 'Approve')}
                       >
                         <Check className="w-4 h-4 stroke-[3]" />
                       </button>
+                      )}
                       <button
-                        onClick={() => decideWallet(req.id, 'rejected')}
+                        onClick={() => decideWallet(req, 'rejected')}
                         disabled={!!loadingActionId}
                         className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-red-400 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
                         title={dir === 'rtl' ? 'رفض' : 'Reject'}

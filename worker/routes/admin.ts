@@ -143,8 +143,13 @@ adminRoutes.get('/overview', async (c) => {
        FROM wallet_transactions`
     ).first<Record<string, number>>(),
     db.prepare(
-      `SELECT wt.*, u.email, u.username FROM wallet_transactions wt
+      `SELECT wt.*, u.email, u.username,
+              w.id AS withdrawal_id, w.state AS withdrawal_state,
+              w.needs_reconciliation AS withdrawal_needs_reconciliation,
+              w.payout_reference AS withdrawal_payout_reference
+         FROM wallet_transactions wt
          LEFT JOIN users u ON u.id = wt.user_id
+         LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id
         WHERE wt.status = 'pending' ORDER BY wt.created_at DESC LIMIT 10`
     ).all<Record<string, unknown>>(),
     db.prepare("SELECT COUNT(*) AS n FROM community_requests WHERE status = 'open'").first<{ n: number }>(),
@@ -176,7 +181,7 @@ adminRoutes.get('/overview', async (c) => {
       open_community_requests: pendingCommunity?.n ?? 0,
     },
     pending_wallet_requests: money
-      ? pendingWallet.results.map((t) => ({ ...walletTxPublic(t), email: t.email, username: t.username }))
+      ? pendingWallet.results.map((t) => ({ ...walletTxPublic(t), ...withdrawalRef(t), email: t.email, username: t.username }))
       : [],
     recent_orders: recentOrders.results.map((o) => ({
       id: o.id,
@@ -386,10 +391,34 @@ adminRoutes.delete('/products/:id', async (c) => {
 
 // ---------------------------------------------------------------- wallet review
 
+/** The workflow row behind a ledger withdrawal, for the panel — or null for a
+ *  deposit / a pre-0015 withdrawal, which the legacy decision still handles. */
+function withdrawalRef(t: Record<string, unknown>) {
+  if (!t.withdrawal_id) return { withdrawal: null };
+  return {
+    withdrawal: {
+      id: String(t.withdrawal_id),
+      state: String(t.withdrawal_state),
+      needs_reconciliation: Number(t.withdrawal_needs_reconciliation) === 1,
+      payout_reference: t.withdrawal_payout_reference ? String(t.withdrawal_payout_reference) : null,
+    },
+  };
+}
+
 adminRoutes.get('/wallet-requests', async (c) => {
   const status = str(c.req.query('status'), 'status', { max: 20, required: false });
-  let sql = `SELECT wt.*, u.email, u.username FROM wallet_transactions wt
-               LEFT JOIN users u ON u.id = wt.user_id WHERE wt.currency = 'USD'`;
+  // A withdrawal filed since the holds engine (migration 0015) has a
+  // wallet_withdrawals row: its state machine, not the ledger row's status,
+  // is what an admin acts on. The join lets the panel show that state and
+  // drive the workflow routes; the legacy decide below refuses such rows.
+  let sql = `SELECT wt.*, u.email, u.username,
+                    w.id AS withdrawal_id, w.state AS withdrawal_state,
+                    w.needs_reconciliation AS withdrawal_needs_reconciliation,
+                    w.payout_reference AS withdrawal_payout_reference
+               FROM wallet_transactions wt
+               LEFT JOIN users u ON u.id = wt.user_id
+               LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id
+              WHERE wt.currency = 'USD'`;
   const params: unknown[] = [];
   if (status && ['pending', 'approved', 'rejected'].includes(status)) {
     sql += ' AND wt.status = ?';
@@ -399,7 +428,7 @@ adminRoutes.get('/wallet-requests', async (c) => {
   const { results } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
   return c.json({
     success: true,
-    requests: results.map((t) => ({ ...walletTxPublic(t), email: t.email, username: t.username, userId: t.user_id })),
+    requests: results.map((t) => ({ ...walletTxPublic(t), ...withdrawalRef(t), email: t.email, username: t.username, userId: t.user_id })),
   });
 });
 
@@ -414,6 +443,26 @@ adminRoutes.post('/wallet-requests/:id/decide', async (c) => {
     .bind(id)
     .first<Record<string, unknown>>();
   if (!tx) throw notFound('Pending request not found (it may already be decided)');
+
+  // A hold-backed withdrawal is decided by its own state machine
+  // (/api/wallet/admin/withdrawals/:id/…), which commits or releases the hold
+  // in the same transaction as the ledger row. Deciding it HERE would flip the
+  // ledger and leave the hold active for ever — the customer's money reserved
+  // for a payout that already happened, or never will. Refused, not silently
+  // redirected: the panel must call the right thing.
+  if (tx.type === 'withdrawal') {
+    const wd = await c.env.DB.prepare('SELECT id, state FROM wallet_withdrawals WHERE tx_id = ?')
+      .bind(id)
+      .first<{ id: string; state: string }>();
+    if (wd) {
+      throw new HttpError(
+        409,
+        `This withdrawal is handled by the withdrawal workflow (currently ${wd.state}) — approve it for processing, mark it paid with the payout reference, or reject it there.`,
+        'USE_WITHDRAWAL_WORKFLOW',
+        { withdrawal_id: wd.id, state: wd.state }
+      );
+    }
+  }
 
   if (decision === 'approved' && tx.type === 'withdrawal') {
     // Approving a withdrawal must not overdraw: conditional update guarded by

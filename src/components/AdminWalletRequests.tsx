@@ -10,8 +10,21 @@ export default function AdminWalletRequests() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  // Inline decision panel: which request is being decided, in which direction, with what note.
-  const [decision, setDecision] = useState<{ id: string; action: 'approved' | 'rejected'; note: string } | null>(null);
+  /**
+   * The step being confirmed for one row, with the note that step needs.
+   *
+   * Deposits — and withdrawals filed before the holds engine — are decided the
+   * old way (approve / reject with an optional note). A hold-backed withdrawal
+   * walks its own state machine: requested → approved (for processing, no
+   * money moves) → processing → paid, with the payout reference of a transfer
+   * that already happened; or reject / fail with a reason. Each step is ONE
+   * call to /api/wallet/admin/withdrawals/:id/…, which commits or releases the
+   * hold in the same transaction as the ledger row.
+   */
+  type Step =
+    | { kind: 'legacy'; status: 'approved' | 'rejected' }
+    | { kind: 'wd'; action: 'approve' | 'processing' | 'paid' | 'reject' | 'fail'; wdId: string };
+  const [decision, setDecision] = useState<{ id: string; step: Step; note: string } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
 
   const fetchTransactions = useCallback(async () => {
@@ -31,23 +44,85 @@ export default function AdminWalletRequests() {
     fetchTransactions();
   }, [fetchTransactions]);
 
+  /** Steps that need a written reason or reference before they can be confirmed. */
+  const noteRequired = (step: Step) => step.kind === 'wd' && (step.action === 'paid' || step.action === 'reject' || step.action === 'fail');
+  const noteLabel = (step: Step) => {
+    if (step.kind === 'legacy') return step.status === 'approved' ? 'Admin note (optional)' : 'Rejection reason (optional)';
+    switch (step.action) {
+      case 'paid': return 'Payout reference of the transfer that already happened (required)';
+      case 'reject': return 'Rejection reason (required)';
+      case 'fail': return 'Why the transfer failed (required)';
+      case 'approve': return 'Approve for processing — this is NOT a payout; the money stays held';
+      case 'processing': return 'A person is now working the transfer — the money stays held';
+    }
+  };
+  const confirmLabel = (step: Step) => {
+    if (step.kind === 'legacy') return step.status === 'approved' ? 'Confirm Approve' : 'Confirm Reject';
+    return { approve: 'Approve for processing', processing: 'Start processing', paid: 'Confirm paid', reject: 'Confirm Reject', fail: 'Confirm failure' }[step.action];
+  };
+
   const confirmDecision = async () => {
     if (!decision || loadingAction) return;
-    setLoadingAction(`${decision.action}-${decision.id}`);
+    const { id, step, note } = decision;
+    if (noteRequired(step) && note.trim().length < 3) {
+      setActionError({ id, message: 'Write at least 3 characters — this is recorded on the request.' });
+      return;
+    }
+    setLoadingAction(`${step.kind === 'legacy' ? step.status : step.action}-${id}`);
     setActionError(null);
     try {
-      await api.post(`/api/admin/wallet-requests/${decision.id}/decide`, {
-        status: decision.action,
-        adminNote: decision.note || undefined,
-      });
+      if (step.kind === 'legacy') {
+        await api.post(`/api/admin/wallet-requests/${id}/decide`, { status: step.status, adminNote: note || undefined });
+      } else {
+        const base = `/api/wallet/admin/withdrawals/${step.wdId}`;
+        if (step.action === 'approve') await api.post(`${base}/approve`, {});
+        else if (step.action === 'processing') await api.post(`${base}/processing`, {});
+        else if (step.action === 'paid') await api.post(`${base}/paid`, { payoutReference: note.trim() });
+        else if (step.action === 'reject') await api.post(`${base}/reject`, { reason: note.trim() });
+        else await api.post(`${base}/fail`, { reason: note.trim() });
+      }
       setDecision(null);
       await fetchTransactions();
     } catch (err) {
-      // Surfaces e.g. INSUFFICIENT_BALANCE on withdrawal approvals honestly.
-      setActionError({ id: decision.id, message: err instanceof ApiError ? err.message : 'Action failed' });
+      // Surfaces e.g. INSUFFICIENT_BALANCE, STATE_CONFLICT or
+      // USE_WITHDRAWAL_WORKFLOW honestly instead of a green button.
+      setActionError({ id, message: err instanceof ApiError ? err.message : 'Action failed' });
     } finally {
       setLoadingAction(null);
     }
+  };
+
+  /** The buttons one row offers, from where it stands. */
+  const stepsFor = (t: AdminWalletTx): Array<{ label: string; step: Step; primary: boolean; icon: 'check' | 'x' }> => {
+    const wd = t.type === 'withdrawal' ? t.withdrawal : null;
+    if (wd) {
+      const w = (action: Extract<Step, { kind: 'wd' }>['action'], label: string, primary: boolean, icon: 'check' | 'x') =>
+        ({ label, step: { kind: 'wd', action, wdId: wd.id } as Step, primary, icon });
+      switch (wd.state) {
+        case 'requested': return [w('approve', 'Approve for processing', true, 'check'), w('reject', 'Reject', false, 'x')];
+        case 'approved': return [w('processing', 'Start processing', true, 'check'), w('reject', 'Reject', false, 'x')];
+        case 'processing': return [w('paid', 'Mark paid', true, 'check'), w('fail', 'Transfer failed', false, 'x')];
+        default: return [];
+      }
+    }
+    if (t.status !== 'pending') return [];
+    return [
+      { label: 'Approve', step: { kind: 'legacy', status: 'approved' }, primary: true, icon: 'check' },
+      { label: 'Reject', step: { kind: 'legacy', status: 'rejected' }, primary: false, icon: 'x' },
+    ];
+  };
+
+  /** What the badge says: the workflow state for a hold-backed withdrawal, the ledger status otherwise. */
+  const badgeFor = (t: AdminWalletTx): { text: string; cls: string } => {
+    const wd = t.type === 'withdrawal' ? t.withdrawal : null;
+    const state = wd ? wd.state : t.status;
+    const cls =
+      state === 'pending' || state === 'requested' ? 'bg-[#FFD166]/20 text-[#FFB703]' :
+      state === 'approved' && wd ? 'bg-[#6B46FF]/20 text-[#8B6BFF]' :
+      state === 'processing' ? 'bg-[#6B46FF]/20 text-[#8B6BFF]' :
+      state === 'approved' || state === 'paid' ? 'bg-[#2CE59B]/20 text-[#06D6A0]' :
+      'bg-[#FF6B6B]/20 text-[#EF476F]';
+    return { text: wd?.needs_reconciliation ? `${state} · needs reconciliation` : state, cls };
   };
 
   const filtered = transactions.filter(t => filter === 'all' ? true : t.status === filter);
@@ -102,11 +177,8 @@ export default function AdminWalletRequests() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-bold text-white capitalize text-lg">{t.type}</h3>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
-                      t.status === 'pending' ? 'bg-[#FFD166]/20 text-[#FFB703]' :
-                      t.status === 'approved' ? 'bg-[#2CE59B]/20 text-[#06D6A0]' : 'bg-[#FF6B6B]/20 text-[#EF476F]'
-                    }`}>
-                      {t.status}
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${badgeFor(t).cls}`}>
+                      {badgeFor(t).text}
                     </span>
                   </div>
                   <div className="text-sm text-zinc-400 font-medium flex flex-wrap items-center gap-2">
@@ -146,22 +218,25 @@ export default function AdminWalletRequests() {
                 <div className="text-xl font-black text-white">
                   {formatUsdCents(t.amount)}
                 </div>
-                {t.status === 'pending' && decision?.id !== t.id && (
+                {stepsFor(t).length > 0 && decision?.id !== t.id && (
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => { setActionError(null); setDecision({ id: t.id, action: 'approved', note: '' }); }}
-                      disabled={!!loadingAction}
-                      className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-[0_4px_10px_rgba(44,229,155,0.4)] hover:scale-105 disabled:opacity-50"
-                    >
-                      <Check className="w-3 h-3" /> Approve
-                    </button>
-                    <button
-                      onClick={() => { setActionError(null); setDecision({ id: t.id, action: 'rejected', note: '' }); }}
-                      disabled={!!loadingAction}
-                      className="flex items-center gap-1 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800/50 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:scale-105 disabled:opacity-50"
-                    >
-                      <X className="w-3 h-3" /> Reject
-                    </button>
+                    {stepsFor(t).map((b) => (
+                      <button
+                        key={b.label}
+                        onClick={() => { setActionError(null); setDecision({ id: t.id, step: b.step, note: '' }); }}
+                        disabled={!!loadingAction}
+                        className={b.primary
+                          ? 'flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-[0_4px_10px_rgba(44,229,155,0.4)] hover:scale-105 disabled:opacity-50'
+                          : 'flex items-center gap-1 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800/50 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:scale-105 disabled:opacity-50'}
+                      >
+                        {b.icon === 'check' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} {b.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {t.type === 'withdrawal' && t.withdrawal?.payout_reference && (
+                  <div className="text-xs text-zinc-500 max-w-[220px] text-right truncate" title={t.withdrawal.payout_reference}>
+                    Payout ref: {t.withdrawal.payout_reference}
                   </div>
                 )}
                 {t.adminNote && (
@@ -178,13 +253,21 @@ export default function AdminWalletRequests() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                   <div className="flex-1">
                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
-                      {decision.action === 'approved' ? 'Admin note (optional)' : 'Rejection reason (optional)'}
+                      {noteLabel(decision.step)}
                     </label>
                     <input
                       type="text"
                       value={decision.note}
                       onChange={e => setDecision({ ...decision, note: e.target.value })}
-                      placeholder={decision.action === 'approved' ? 'e.g. Verified against the receipt' : 'e.g. Receipt does not match the amount'}
+                      disabled={decision.step.kind === 'wd' && (decision.step.action === 'approve' || decision.step.action === 'processing')}
+                      placeholder={
+                        decision.step.kind === 'legacy'
+                          ? (decision.step.status === 'approved' ? 'e.g. Verified against the receipt' : 'e.g. Receipt does not match the amount')
+                          : decision.step.action === 'paid' ? 'e.g. ZainCash TX 8841-2201'
+                          : decision.step.action === 'reject' ? 'e.g. Account holder name does not match'
+                          : decision.step.action === 'fail' ? 'e.g. Channel refused the transfer'
+                          : 'No note needed for this step'
+                      }
                       className="w-full bg-zinc-800 border border-zinc-700 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
                       autoFocus
                     />
@@ -194,12 +277,12 @@ export default function AdminWalletRequests() {
                       onClick={confirmDecision}
                       disabled={!!loadingAction}
                       className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
-                        decision.action === 'approved'
+                        (decision.step.kind === 'legacy' ? decision.step.status === 'approved' : decision.step.action !== 'reject' && decision.step.action !== 'fail')
                           ? 'bg-[#2CE59B] hover:bg-[#06D6A0] text-black'
                           : 'bg-red-500/90 hover:bg-red-500 text-white'
                       }`}
                     >
-                      {loadingAction ? 'Working...' : decision.action === 'approved' ? 'Confirm Approve' : 'Confirm Reject'}
+                      {loadingAction ? 'Working...' : confirmLabel(decision.step)}
                     </button>
                     <button
                       onClick={() => setDecision(null)}

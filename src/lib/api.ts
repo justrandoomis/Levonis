@@ -345,6 +345,16 @@ export interface AdminOrderTracking {
   }>;
 }
 
+/** The workflow row behind a hold-backed withdrawal (migration 0015); null
+ *  for deposits and for withdrawals filed before holds existed. Its state —
+ *  not the ledger row's status — is what an administrator acts on. */
+export interface WalletWithdrawalRef {
+  id: string;
+  state: 'requested' | 'approved' | 'processing' | 'paid' | 'rejected' | 'cancelled' | 'failed';
+  needs_reconciliation: boolean;
+  payout_reference: string | null;
+}
+
 export interface WalletTx {
   id: string;
   type: 'deposit' | 'withdrawal';
@@ -359,6 +369,7 @@ export interface WalletTx {
   hasReceipt: boolean;
   receiptUrl: string | null;
   ref: string;
+  withdrawal?: WalletWithdrawalRef | null;
   email?: string;
   username?: string;
   userId?: string;

@@ -48,6 +48,7 @@ import {
   renderPasswordChangedEmail,
   renderGoogleAccountNoticeEmail,
   type EmailLang,
+  renderAccountExistsEmail,
 } from '../lib/emailTemplates';
 
 export const authRoutes = new Hono<AppContext>();
@@ -354,49 +355,93 @@ authRoutes.post('/register', async (c) => {
   const referralCode = referralCodeFrom(body);
   checkPassword(password);
 
-  // Checked here so the message names the ONE thing that is wrong; the
-  // UNIQUE indexes below are what actually decide, and produce the same
-  // codes when two signups race.
-  const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
-  if (existing) throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
+  // EMAIL-FIRST SIGN-UP. When the deployment can send mail, creating an
+  // account with an address never answers "taken" and never opens a session:
+  // the only way to learn whether an address has an account is to read that
+  // inbox. Both branches below — new account, existing account — return the
+  // same body, set no cookie and do the same password work, so neither the
+  // response nor its timing is an oracle. Sign-in stays refused for such an
+  // account until the emailed link (or a password reset) proves the address
+  // — see /login — or "register, then sign in" would be the oracle instead.
+  // Without a mail service there is no private channel, so the old behaviour
+  // (409 EMAIL_TAKEN and an immediate session) is kept, and known for what it
+  // is.
+  const emailFirst = !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM);
+  const mailLang = emailLang(body.lang ?? locale);
+  const pending = () =>
+    c.json({
+      success: true,
+      pending_email: true,
+      message:
+        'أرسلنا رسالة إلى بريدك — افتحها لتأكيد الحساب ثم سجّل الدخول. / ' +
+        'We sent a message to your email — open it to confirm the account, then sign in.',
+    });
+  // One address must not be floodable from many IPs: a limit on the address
+  // itself, applied before any lookup and to every address alike.
+  if (emailFirst) await rateLimit(c, 'register-id', 5, 3600, await identifierKey(mail));
+
+  // Usernames are public handles (/username-available tells anyone), so a
+  // taken one is still named — and it is checked BEFORE the address so the
+  // answer never depends on whether the address has an account.
   if (uname) {
     const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
     if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
+  }
+
+  const existing = await c.env.DB.prepare(
+    'SELECT id, email_verified_at, signup_verification_required FROM users WHERE email = ?'
+  )
+    .bind(mail)
+    .first<{ id: string; email_verified_at: string | null; signup_verification_required: number }>();
+  if (existing) {
+    if (!emailFirst) throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
+    await hashPassword(password); // the same work a real sign-up does
+    if (existing.signup_verification_required && !existing.email_verified_at) {
+      // An unfinished sign-up for this address — theirs, or someone else's;
+      // only the inbox owner can use the link. Send it again.
+      await issueEmailVerification(c, existing.id, mail, mailLang);
+    } else {
+      // A real account: its owner, and nobody else, learns that someone tried.
+      // One notice per address per day, however many attempts.
+      const notice = renderAccountExistsEmail(mailLang, `${trustedOrigin(c)}/auth`);
+      const day = new Date().toISOString().slice(0, 10);
+      await enqueue(c.env, `email_exists:${await sha256Hex(mail)}:${day}`, {
+        kind: 'email', to: mail, subject: notice.subject, html: notice.html, text: notice.text,
+      });
+      c.executionCtx.waitUntil(processOutbox(c.env, 3));
+    }
+    return pending();
   }
 
   const id = newId('usr');
   const hash = await hashPassword(password);
   try {
     await c.env.DB.prepare(
-      'INSERT INTO users (id, email, username, name, password_hash, country, locale) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (id, email, username, name, password_hash, country, locale, signup_verification_required) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )
-      .bind(id, mail, uname, name, hash, country, locale)
+      .bind(id, mail, uname, name, hash, country, locale, emailFirst ? 1 : 0)
       .run();
   } catch (e) {
-    // THE RACE THE CHECKS ABOVE CANNOT CLOSE. Two signups a millisecond
-    // apart both read "free" and both insert; the database is what actually
-    // decides, so its refusal is translated into the same 409 the check
-    // would have produced rather than surfacing as a 500 that reads like the
-    // site is broken.
+    // THE RACE THE CHECKS ABOVE CANNOT CLOSE. Two sign-ups a millisecond
+    // apart both read "free" and both insert; the database decides. The
+    // winner's mail is on its way; the loser gets the same answer as
+    // everyone else — or, without a mail service, the same 409 the check
+    // would have produced rather than a 500 that reads like the site broke.
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes('UNIQUE')) throw e;
     if (msg.includes('username')) throw conflict('This username is taken', 'USERNAME_TAKEN');
+    if (emailFirst) return pending();
     throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
   }
 
   await tryAttributeReferral(c.env, id, referralCode);
 
-  // Best-effort verification email right after signup (final-phase §3A).
-  // Skipped silently when no email service is configured — the banner offers
-  // an honest resend; a failure here never fails the registration itself.
-  if (c.env.EMAIL_API_KEY && c.env.EMAIL_FROM) {
-    try {
-      await issueEmailVerification(c, id, mail, emailLang(body.lang));
-    } catch (e) {
-      console.error('signup verification email failed for user', id, e instanceof Error ? e.message : String(e));
-    }
+  if (emailFirst) {
+    await issueEmailVerification(c, id, mail, mailLang);
+    return pending();
   }
-
+  // No mail service: the address cannot be confirmed, so the account opens
+  // straight away, as it always did.
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
   return c.json({ success: true, user: publicUser(user!) });
@@ -459,6 +504,12 @@ authRoutes.post('/login', async (c) => {
       .bind(identifier, identifier)
       .first<SessionUser & { password_hash: string | null }>();
   }
+  // An email-first sign-up that has not confirmed its address is not an
+  // account yet, and must fail exactly like a wrong password — a distinct
+  // answer here would turn "register, then sign in" into the oracle that
+  // /register no longer is.
+  const pendingSignup = row as unknown as { signup_verification_required?: number; email_verified_at?: string | null } | null;
+  if (pendingSignup && pendingSignup.signup_verification_required && !pendingSignup.email_verified_at) row = null;
 
   // ONE uniform failure for every identifier kind and every cause — unknown
   // identifier, wrong password, and provider-only account (no password at
@@ -873,7 +924,10 @@ authRoutes.post('/reset-password', async (c) => {
 
   const hash = await hashPassword(next);
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, row.user_id),
+    // The reset link proved the inbox exactly as a verification link would, so
+    // an email-first sign-up that reset its password is confirmed by it too.
+    c.env.DB.prepare('UPDATE users SET password_hash = ?, email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?')
+      .bind(hash, new Date().toISOString(), row.user_id),
     c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(row.user_id),
   ]);
   await audit(c.env.DB, row.user_id, 'auth.password_reset', row.user_id);
@@ -1496,8 +1550,17 @@ authRoutes.post('/verify-email/confirm', async (c) => {
       .bind(now, row.user_id)
       .run();
   }
+  // An email-first sign-up opens its account HERE: the link proved the inbox,
+  // which is the whole test (the same trust a password-reset link carries).
+  // Only when nobody is signed in — a member confirming their own address in
+  // their own session keeps that session.
+  let signedIn = false;
+  if (!row.new_email && !c.get('user')) {
+    await createSession(c, row.user_id);
+    signedIn = true;
+  }
   await audit(c.env.DB, row.user_id, 'auth.email_verified', row.user_id, row.new_email ? { email_changed: true } : {});
-  return c.json({ success: true, verified: true });
+  return c.json({ success: true, verified: true, signed_in: signedIn });
 });
 
 /**

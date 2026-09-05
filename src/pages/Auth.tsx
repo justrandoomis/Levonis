@@ -130,7 +130,7 @@ const STRINGS = {
     resetDeadBody: 'روابط إعادة التعيين تصلح لمرة واحدة ولمدة 30 دقيقة فقط. اطلب رابطًا جديدًا للمتابعة.',
     requestNewLink: 'طلب رابط جديد',
     genericError: 'حدث خطأ ما. حاول مرة أخرى.',
-    errLoginFailed: 'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره.',
+    errLoginFailed: 'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره، وإن أنشأته للتو فأكّد بريدك أولًا من الرسالة التي وصلتك.',
     errEmailTaken: 'يوجد حساب بهذا البريد بالفعل. سجّل الدخول بدلًا من ذلك.',
     errUsernameTaken: 'اسم المستخدم هذا محجوز بالفعل. جرّب اسمًا آخر.',
     errUsernameReserved: 'اسم المستخدم هذا محجوز للمنصّة.',
@@ -153,7 +153,12 @@ const STRINGS = {
     optional: 'اختياري',
     edit: 'تعديل',
     referralLabel: 'كود الإحالة',
-    verifyNote: 'سنرسل رابط تفعيل إلى بريدك بعد إنشاء الحساب.',
+    verifyNote: 'سنرسل رسالة تأكيد إلى بريدك — يُفتح حسابك من الرابط داخلها.',
+    pendingTitle: 'تحقق من بريدك',
+    pendingHint: 'خطوة أخيرة قبل الدخول.',
+    pendingBody: (e: string) => `أرسلنا رسالة إلى ${e}. افتحها واضغط زر التأكيد داخل الصفحة ليُفتح حسابك.`,
+    pendingSpam: 'لم تصلك؟ تحقق من مجلد الرسائل غير المرغوبة، أو أعد إنشاء الحساب بنفس البريد لتصلك رسالة جديدة.',
+    pendingSignIn: 'لديك حساب مؤكد؟ سجّل الدخول',
     hintUsernameTaken: 'اختر اسم مستخدم آخر',
   },
   en: {
@@ -220,7 +225,7 @@ const STRINGS = {
     resetDeadBody: 'Reset links work once and expire after 30 minutes. Request a new link to continue.',
     requestNewLink: 'Request a new link',
     genericError: 'Something went wrong. Please try again.',
-    errLoginFailed: 'Incorrect email, username, phone or password. If you created your account with Google or Telegram, use that button.',
+    errLoginFailed: 'Incorrect email, username, phone or password. If you created your account with Google or Telegram, use that button; if you just signed up, confirm your email from the message we sent first.',
     errEmailTaken: 'An account with this email already exists. Sign in instead.',
     errUsernameTaken: 'That username is already taken. Try another one.',
     errUsernameReserved: 'That username is reserved for the platform.',
@@ -242,7 +247,12 @@ const STRINGS = {
     optional: 'Optional',
     edit: 'Edit',
     referralLabel: 'Referral code',
-    verifyNote: "We'll email you a verification link after the account is created.",
+    verifyNote: "We'll email you a confirmation — your account opens from the link inside it.",
+    pendingTitle: 'Check your email',
+    pendingHint: 'One last step before you sign in.',
+    pendingBody: (e: string) => `We sent a message to ${e}. Open it and press the confirm button on the page to open your account.`,
+    pendingSpam: 'Nothing there? Check your spam folder, or sign up again with the same address to get a fresh message.',
+    pendingSignIn: 'Already confirmed? Sign in',
     hintUsernameTaken: 'Choose a different username',
   },
   ckb: {
@@ -309,7 +319,7 @@ const STRINGS = {
     resetDeadBody: 'بەستەرەکانی ڕێکخستنەوە تەنها جارێک و بۆ ٣٠ خولەک کاردەکەن. بەستەرێکی نوێ داوا بکە.',
     requestNewLink: 'داواکردنی بەستەری نوێ',
     genericError: 'هەڵەیەک ڕوویدا. دووبارە هەوڵ بدە.',
-    errLoginFailed: 'ئیمەیل، ناوی بەکارهێنەر، ژمارە یان وشەی نهێنی هەڵەیە. ئەگەر هەژمارەکەت بە Google یان تەلەگرام دروستکردووە، ئەو دوگمەیە بەکاربهێنە.',
+    errLoginFailed: 'ئیمەیل، ناوی بەکارهێنەر، ژمارە یان وشەی نهێنی هەڵەیە. ئەگەر هەژمارەکەت بە Google یان تەلەگرام دروستکردووە، ئەو دوگمەیە بەکاربهێنە؛ ئەگەر تازە هەژمارت دروستکردووە، سەرەتا ئیمەیلەکەت لە پەیامەکە پشتڕاست بکەرەوە.',
     errEmailTaken: 'هەژمارێک بەم ئیمەیلە هەیە. لەبری ئەوە بچۆرەژوورەوە.',
     errUsernameTaken: 'ئەم ناوە پێشتر وەرگیراوە. یەکێکی تر تاقی بکەرەوە.',
     errUsernameReserved: 'ئەم ناوە بۆ پلاتفۆرمەکە پاراستراوە.',
@@ -331,7 +341,12 @@ const STRINGS = {
     optional: 'ئارەزوومەندانە',
     edit: 'دەستکاری',
     referralLabel: 'کۆدی بانگهێشت',
-    verifyNote: 'دوای دروستکردنی هەژمار بەستەری پشتڕاستکردنەوە بۆ ئیمەیلەکەت دەنێرین.',
+    verifyNote: 'پەیامی پشتڕاستکردنەوە بۆ ئیمەیلەکەت دەنێرین — هەژمارەکەت لە بەستەری ناو ئەو پەیامە دەکرێتەوە.',
+    pendingTitle: 'ئیمەیلەکەت بپشکنە',
+    pendingHint: 'دوا هەنگاو پێش چوونەژوورەوە.',
+    pendingBody: (e: string) => `پەیامێکمان نارد بۆ ${e}. بیکەرەوە و دوگمەی پشتڕاستکردنەوە لە پەڕەکە دابگرە بۆ کردنەوەی هەژمارەکەت.`,
+    pendingSpam: 'نەگەیشت؟ فۆڵدەری سپام بپشکنە، یان دووبارە بە هەمان ئیمەیل هەژمار دروست بکە بۆ وەرگرتنی پەیامی نوێ.',
+    pendingSignIn: 'هەژمارت پشتڕاستکراوە؟ بچۆرەژوورەوە',
     hintUsernameTaken: 'ناوی بەکارهێنەرێکی تر هەڵبژێرە',
   },
 };
@@ -419,6 +434,9 @@ export default function Auth() {
   // A REAL success (the server answered 2xx), never assumed: it is set only
   // after a resolved request and drives the FillButton's success state.
   const [succeeded, setSucceeded] = useState(false);
+  // Email-first sign-up: the server created the account but opened no session;
+  // the page shows "check your inbox" instead of moving on.
+  const [pendingEmail, setPendingEmail] = useState(false);
   const [serverError, setServerError] = useState('');
   // Set only when the SERVER says phone sign-up needs ownership proof — the
   // page then offers the Telegram verification path instead of pretending.
@@ -535,6 +553,7 @@ export default function Auth() {
 
   const switchView = (next: AuthView) => {
     clearMessages();
+    setPendingEmail(false);
     setPanel('form');
     setStep(1);
     setView(next);
@@ -735,7 +754,7 @@ export default function Auth() {
     setVia('form');
     setSubmitting(true);
     try {
-      await api.post('/api/auth/register', {
+      const created = await api.post<{ pending_email?: boolean }>('/api/auth/register', {
         username: trimmedUsername,
         name: trimmedName,
         email: trimmedEmail,
@@ -744,8 +763,15 @@ export default function Auth() {
         ...(country ? { country } : {}),
         ...(referral ? { referralCode: referral } : {}),
       });
-      await refreshUser();
       setSucceeded(true);
+      // With a mail service configured the account opens from the link in
+      // the inbox, not from here — and the answer is the same whether or not
+      // the address already had an account (see worker/routes/auth.ts).
+      if (created.pending_email) {
+        setPendingEmail(true);
+        return;
+      }
+      await refreshUser();
       finishAuth(true);
     } catch (err) {
       setServerError(errMsg(err));
@@ -1159,8 +1185,22 @@ export default function Auth() {
       </form>
     );
   } else if (view === 'signup') {
-    screenKey = `signup:${panel}:${panel === 'form' ? step : 0}`;
-    if (panel === 'telegram') {
+    screenKey = pendingEmail ? 'signup:pending' : `signup:${panel}:${panel === 'form' ? step : 0}`;
+    if (pendingEmail) {
+      screen = (
+        <div>
+          {heading(SHEET.signup, s.pendingTitle, s.pendingHint)}
+          <div className="lv-notice lv-notice--info" role="status">
+            <MailCheck aria-hidden />
+            <p>{s.pendingBody(trimmedEmail)}</p>
+          </div>
+          <p className="lv-sub">{s.pendingSpam}</p>
+          <button type="button" onClick={() => switchView('signin')} className="lv-link">
+            {s.pendingSignIn}
+          </button>
+        </div>
+      );
+    } else if (panel === 'telegram') {
       screen = (
         <div>
           {backLink(() => setPanel('form'))}

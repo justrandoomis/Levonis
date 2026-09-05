@@ -229,21 +229,31 @@ headers (see "Evidence").
 - Rate limits: present on every sensitive mutating endpoint, keyed on values a
   caller cannot forge.
 
-## Deferred, for the owner to decide
+## Completed after the owner's approval
 
-- **Account enumeration at `/register`** (Low). A taken email answers 409
-  `EMAIL_TAKEN`. Closing it means *not* telling a new user their email is
-  taken (send a "you already have an account" email instead). That changes the
-  sign-up experience; it is a product decision, not made here.
-- **Admin withdrawal approval path.** The admin UI still approves withdrawals
-  through the legacy `/wallet-requests/:id/decide`, which approves the ledger
-  row without committing the hold (reconciliation flags it). Its overdraft
-  guard is now hold-aware; moving the UI to the `/api/wallet/admin/withdrawals`
-  workflow is recommended.
-- **CSP in production.** The policy was verified in a browser against the dev
-  server. Before production, a short staging smoke (sign in with Google, open a
-  product with vendor images, print a receipt) is advised; every allowed origin
-  is listed in `worker/lib/securityPolicy.ts`.
+- **Account enumeration at `/register`** (Low) — closed. With a mail service
+  configured, sign-up is *email-first*: a free address and a taken one answer
+  the same body, open no session and do the same password work; the address's
+  owner alone learns what happened (a fresh verification link for an
+  unfinished sign-up, an "account exists" notice — one per address per day —
+  for a real one). Because "register, then sign in with my own password" would
+  otherwise be the oracle, an unconfirmed email-first account is refused at
+  sign-in exactly like a wrong password until the emailed link, or a password
+  reset, proves the inbox; the link itself opens the account (migration 0050,
+  `signup_verification_required`). Every account that existed before is
+  untouched, and a deployment without a mail service keeps the old behaviour.
+  Usernames stay public handles. Test: `tests/registerEmailFirst.test.ts`.
+- **Admin withdrawal path.** The legacy `/wallet-requests/:id/decide` now
+  refuses a hold-backed withdrawal (`USE_WITHDRAWAL_WORKFLOW`), so a ledger row
+  can no longer be flipped with its hold left active; the wallet-request lists
+  carry the workflow row, and the admin panels drive
+  `/api/wallet/admin/withdrawals/:id/{approve,processing,paid,reject,fail}`
+  — payout only with the transfer's reference. Deposits and pre-holds rows are
+  decided as before. Test: `tests/adminWalletDecide.test.ts`.
+- **CSP on the live site.** Workflow `28 - Verify Live Security Headers + CSP`
+  (`scripts/e2e-security-headers.mjs`) proves, read-only, that the document,
+  an SPA route, an asset and the API all carry the headers with one policy
+  text, and that a real browser opens the public pages with zero violations.
 
 ## Evidence
 
