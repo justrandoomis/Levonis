@@ -11,6 +11,7 @@ import {
   normalizeHex,
   loadProductRelations,
   validatePriceLadder,
+  optionLaddersFor,
 } from '../lib/productRelations';
 import {
   applyInventory,
@@ -428,9 +429,23 @@ export async function planRelationsWrite(
       errors.push(`${where}.hex: must be #RGB or #RRGGBB`);
     }
     const prices = readPrices(col, where);
-    errors.push(...validatePriceLadder(prices, where, baseLadder));
     const linkedRaw = Array.isArray(col.option_value_ids) ? col.option_value_ids : [];
     const linked = linkedRaw.filter((x): x is string => typeof x === 'string');
+    // A colour is sold under an option, so its member ladder is judged under
+    // each option it can be sold with (its links, else every active option) —
+    // the same rule the product form, the import and the Quick Edit apply.
+    errors.push(
+      ...validatePriceLadder(
+        prices,
+        where,
+        baseLadder,
+        optionLaddersFor(
+          baseLadder,
+          valueInputs.map((v) => ({ id: v.id, where: `"${v.name_en}"`, active: v.active, prices: v.prices })),
+          linked
+        )
+      )
+    );
     for (const l of linked) {
       if (!valueIds.has(l)) errors.push(`${where}: linked option value ${l} does not exist in this product`);
     }

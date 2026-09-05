@@ -221,12 +221,11 @@ test('every effective cell in the grid equals what the resolver charges', () => 
     assert.equal(row.cells.cost.effective, r.cost_iqd, `cost for ${row.id}`);
     // The member cells too — including the surcharge the owner's rule carries
     // onto them (+50,000 direct option → PRIME 530,000, PRO 510,000). The
-    // resolver clamps PRO ≤ PRIME ≤ regular; the grid does not, so compare
-    // the unclamped explicit values with the same clamp applied here.
-    const clampPro = r.pro_iqd;
-    const clampPrime = r.prime_iqd;
-    assert.equal(row.cells.pro.effective, clampPro, `pro for ${row.id}`);
-    assert.equal(row.cells.prime.effective, clampPrime, `prime for ${row.id}`);
+    // grid applies the resolver's final clamps (pricing.ts clampMemberLadder)
+    // to its member cells, so the two are compared as they are; the whole
+    // fixture set is covered in tests/priceGridAgreement.test.ts.
+    assert.equal(row.cells.pro.effective, r.pro_iqd, `pro for ${row.id}`);
+    assert.equal(row.cells.prime.effective, r.prime_iqd, `prime for ${row.id}`);
   }
 });
 

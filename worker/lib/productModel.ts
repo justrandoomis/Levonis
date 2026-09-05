@@ -21,7 +21,7 @@ import { safeLink } from './homeContent';
 import { badRequest } from './http';
 import { newId } from './crypto';
 import { dedupeHashtags, normalizeHashtag } from './hashtags';
-import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields } from './pricing';
+import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields, LadderRungs } from './pricing';
 import { derivedRung } from './pricing';
 import {
   deriveSaleTypes,
@@ -899,17 +899,23 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
    *    reduced regular price with no discount, silently; the row must state
    *    its own member price or reduce less;
    *  - a member adjustment that lifts the derived member price above the
-   *    row's own regular price.
-   * Colours are measured against the base, as every other rule here is; the
-   * resolver anchors them on the chosen option, which the validator cannot
-   * know.
+   *    row's own regular price;
+   *  - a row whose derived PRIME lands below its derived PRO (an option with
+   *    its own PRIME of 120,000 while it carries a PRO of 125,000) — the
+   *    resolver would clamp PRIME up to PRO and charge a PRIME member a
+   *    number the row never shows.
+   * A COLOUR is measured against the base like every other row here, AND
+   * under each option it can be sold with (its links, else every active
+   * option), because the resolver anchors it on the option the customer
+   * picked: a colour that is fine against the base can still swallow the PRO
+   * price an option states, or invert PRIME and PRO under it.
    */
-  const baseLadder = {
+  const baseLadder: LadderRungs = {
     regular: price as number,
     prime: optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
     pro: optionalPrice(body.pro_price_iqd, 'pro_price_iqd'),
   };
-  const memberRules = (label: string, row: PriceFields) => {
+  const memberRules = (label: string, row: PriceFields, under: Array<{ name: string; ladder: LadderRungs }> = []) => {
     const d = derivedRung(row, baseLadder);
     for (const f of d.consumed) {
       fail(
@@ -923,6 +929,38 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     if (d.pro !== null && d.pro > d.regular) {
       fail(`${label}.pro_adjust_iqd`, `the PRO price this row resolves to (${d.pro}) is above its regular price (${d.regular})`);
     }
+    if (d.inverted) {
+      fail(
+        `${label}.prime_price_iqd`,
+        `the PRIME price this row resolves to (${d.prime}) is below the PRO price it resolves to (${d.pro}) — the ladder is PRO <= PRIME <= Regular`
+      );
+    }
+    for (const u of under) {
+      const c = derivedRung(row, u.ladder);
+      for (const f of c.consumed) {
+        fail(
+          `${label}.regular_price_iqd`,
+          `with option "${u.name}", the reduction on this colour is larger than the ${f.toUpperCase()} price it inherits (${u.ladder[f]}) — state a ${f.toUpperCase()} price for this colour, or reduce less`
+        );
+      }
+      if (c.inverted) {
+        fail(
+          `${label}.prime_price_iqd`,
+          `with option "${u.name}", the PRIME price this colour resolves to (${c.prime}) is below its PRO price (${c.pro}) — the ladder is PRO <= PRIME <= Regular`
+        );
+      }
+    }
+  };
+  const optionLadders = new Map(
+    options
+      .filter((o) => o.active !== false)
+      .map((o) => [o.id, { name: o.name_en || o.name_ar || o.id, ladder: derivedRung(o, baseLadder) }] as const)
+  );
+  /** The options a colour can be sold with: its link set, else every active option. */
+  const optionsUnder = (col: ColorV2) => {
+    const linked = col.option_ids && col.option_ids.length ? col.option_ids : col.option_id ? [col.option_id] : [];
+    if (!linked.length) return [...optionLadders.values()];
+    return linked.map((id) => optionLadders.get(id)).filter((x): x is NonNullable<typeof x> => !!x);
   };
   // The compare-at price is only VALIDATED here (non-negative integer, via
   // optionalPrice below); it is deliberately not fed into priceRules, whose
@@ -936,7 +974,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
   }
   for (const col of colors) {
     priceRules(`colors.${col.id}`, col.regular_price_iqd, col.prime_price_iqd, col.pro_price_iqd, col.cost_iqd, col.regular_adjust_iqd ?? null);
-    memberRules(`colors.${col.id}`, col);
+    memberRules(`colors.${col.id}`, col, optionsUnder(col));
   }
 
   return {

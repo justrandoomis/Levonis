@@ -12,8 +12,10 @@
  * read from, and written back to, the columns worker/lib/pricing.ts already
  * resolves from — the same four nullable price fields at product, option and
  * colour level, plus the adjustments added in 0044. `effective` below is
- * computed by the SAME ladder rules the resolver uses, so the admin preview and
- * the customer's cart cannot disagree (§30). Nothing derived is ever stored.
+ * computed by the SAME ladder rules the resolver uses — including the final
+ * clamps it applies to a line's member prices (pricing.ts clampMemberLadder) —
+ * so the admin preview and the customer's cart cannot disagree (§30). Nothing
+ * derived is ever stored.
  *
  * Everything in this file is pure: no database, no request, no clock. That is
  * what lets the preview the admin approves and the write that follows be the
@@ -21,7 +23,7 @@
  */
 
 import {
-  memberAtRung, ADJUST_OF, priceMode, type PriceKey, type PriceMode, type PriceFields } from './pricing';
+  memberAtRung, clampMemberLadder, ADJUST_OF, priceMode, type PriceKey, type PriceMode, type PriceFields } from './pricing';
 import { effectiveAvailability, type AvailabilityType } from './availability';
 
 // --------------------------------------------------------------- vocabulary
@@ -216,11 +218,16 @@ export interface Cell {
   value: number | null;
   /** The signed move, when mode is 'adjust'. */
   adjust: number | null;
-  /** What this row would charge if the customer picked exactly it. */
+  /** What this row would charge if the customer picked exactly it — for a
+   *  member cell, AFTER the resolver's final clamps (never above the row's
+   *  regular price, PRIME never below PRO, PRO falling back to PRIME). */
   effective: number | null;
   /** What it would have charged with this cell left on inherit — the number an
    *  'inherit' click lands on, shown as the placeholder so the admin can see
-   *  what they are overriding before they override it. */
+   *  what they are overriding before they override it. For a member cell this
+   *  is the RAW carried value (the value beneath plus this rung's regular
+   *  surcharge), unclamped, because it is also the anchor a member adjustment
+   *  applies to — exactly as pricing.ts memberAtRung anchors one. */
   inherited: number | null;
 }
 
@@ -269,6 +276,10 @@ export interface GridProductInput {
     stock?: number | null;
     hex?: string;
     option_id?: string | null;
+    /** EVERY option this colour is sold with (its link set); `option_id` alone
+     *  can only hold one. Not read by the ladder — carried so the write-time
+     *  validation in the routes can check the colour under each option. */
+    option_ids?: string[];
   }>;
 }
 
@@ -326,6 +337,21 @@ function cellOf(row: PriceFields | null, field: Field, inherited: number | null,
 }
 
 /**
+ * The resolver's final clamps on ONE row's member cells (pricing.ts
+ * clampMemberLadder), applied to what is DISPLAYED and charged. The raw values
+ * are captured before this runs and are what the next rung inherits, because
+ * that is how pricing.ts pickMember carries them: the walk is unclamped and the
+ * clamp is the last word on the line the customer actually picked.
+ */
+function clampCells(cells: Record<Field, Cell>): void {
+  const regular = cells.regular.effective;
+  if (regular === null) return;
+  const c = clampMemberLadder(regular, cells.prime.effective, cells.pro.effective);
+  cells.prime.effective = c.prime;
+  cells.pro.effective = c.pro;
+}
+
+/**
  * The whole product as one flat table: the base row, then one row per option
  * (which is one model × one fulfilment route), then one per colour.
  *
@@ -351,6 +377,7 @@ export function buildGrid(p: GridProductInput): GridRow[] {
       inherited: null,
     };
   }
+  clampCells(baseCells);
   rows.push({
     level: 'product',
     id: '',
@@ -379,9 +406,11 @@ export function buildGrid(p: GridProductInput): GridRow[] {
     for (const f of FIELDS) {
       const c = cellOf(o, f, baseOf(f), regular, regularDelta);
       cells[f] = c;
+      // The RAW ladder value is what a colour on this option inherits.
       eff[f] = c.effective;
     }
     optionEffective.set(o.id, eff);
+    clampCells(cells);
     rows.push({
       level: 'option',
       id: o.id,
@@ -411,6 +440,7 @@ export function buildGrid(p: GridProductInput): GridRow[] {
     const regularDelta = (regular ?? regularBeneath) - regularBeneath;
     const cells = {} as Record<Field, Cell>;
     for (const f of FIELDS) cells[f] = cellOf(c, f, inheritedOf(f), regular, regularDelta);
+    clampCells(cells);
     rows.push({
       level: 'color',
       id: c.id,
@@ -541,6 +571,11 @@ export function previewBulk(
     for (const field of fields) {
       const cell = row.cells[field];
       const before = cell.effective;
+      // What the row itself HAS for this field. A PRO cell that inherits
+      // nothing (no PRO price beneath, none of its own) shows the PRIME price
+      // PRO members fall back to; moving "the PRO price" of such a row by an
+      // amount would pin a PRO number onto a row that never had one.
+      const own = field === 'pro' && cell.mode === 'inherit' && cell.inherited === null ? null : before;
 
       let toMode: PriceMode = 'fixed';
       let writeValue: number | null = null;
@@ -587,7 +622,7 @@ export function previewBulk(
         if (req.op === 'set') {
           after = Math.max(0, Math.round(req.value));
         } else {
-          if (before === null) {
+          if (own === null) {
             // Moving "nothing" by a percentage or an amount has no answer that
             // is not invented. §11's cost update hits this on products that
             // never recorded a cost, and inventing one would poison §12.
@@ -597,9 +632,9 @@ export function previewBulk(
           const delta =
             req.op === 'add' ? req.value
             : req.op === 'subtract' ? -req.value
-            : req.op === 'add_percent' ? (before * req.value) / 100
-            : -(before * req.value) / 100;
-          after = Math.max(0, Math.round(before + delta));
+            : req.op === 'add_percent' ? (own * req.value) / 100
+            : -(own * req.value) / 100;
+          after = Math.max(0, Math.round(own + delta));
         }
         writeValue = after;
       }

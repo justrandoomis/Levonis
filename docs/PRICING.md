@@ -57,8 +57,46 @@ surcharge says nothing about what the extra costs the store.
 
 A reduction at least as large as the member price it would inherit (base PRO
 90,000, option −100,000) leaves nothing to carry: the resolver charges the
-member the reduced regular price, and every validator refuses such a row
-unless it states its own member price.
+member the reduced regular price — or, for a PRO member whose line still has
+a PRIME price, that PRIME price (see *PRO resolution* below: **a PRO member
+never pays more than a PRIME member**) — and every validator refuses such a
+row unless it states its own member price.
+
+**What the validators refuse, on the DERIVED numbers.** `derivedRung` is run
+by `productModel.validateProductDoc`, `productRelations.validatePriceLadder`,
+`importCsv.parseImport`, the Quick Edit routes, and the product form's client
+mirror (`src/components/adminProducts/form/model.ts`, which replicates
+`memberAtRung`/`derivedRung` line for line). One fixture list,
+`tests/pricingLadderFixtures.ts`, is run through the three server validators
+and the client mirror in `tests/productModelLadder.test.ts` and through the
+Quick Edit route in `tests/adminPriceGridRoute.test.ts`, and all five must
+refuse exactly the same inputs:
+
+- a reduction that swallows an inherited member price (above);
+- a derived PRIME or PRO above the row's own regular price — base 150,000
+  with no member prices, option +25,000 with `pro_adjust +10,000` puts PRO at
+  185,000 on a 175,000 row;
+- a derived PRIME below the derived PRO — option +25,000 with its own PRIME
+  120,000 while it carries PRO 125,000: the resolver would clamp PRIME up to
+  125,000 and charge a PRIME member a number the row never shows;
+- for a **colour**, the swallowed-member-price and PRIME-below-PRO checks
+  again under **each option it can be sold with** (its link set, else every
+  active option), via `derivedRung(colour, derivedRung(option, base))` —
+  because the resolver anchors a colour on the option the customer picked.
+  Base 150/125/100k, option +100,000 with its own PRO 40,000, colour fixed
+  130,000: under that option the colour's −120,000 swallows the 40,000 PRO,
+  and the refusal names both the option and the colour. A colour is still
+  measured against the base as every other row is.
+
+**Legacy rows.** A product stored before these rules (base 100,000 / PRO
+90,000, option fixed 5,000) exports as `options.N.regular_adjust_iqd=-95000`
+with a note beside `price_iqd` saying the base stayed because lowering it
+would take the product PRO to zero. Re-applying that file — exactly like
+saving the product itself — is refused with `options.<id>.regular_price_iqd:
+the reduction on this row is larger than the PRO price it inherits (90000) —
+state a PRO price for this row, or reduce less`. That is the intended path:
+the owner gives that row its own `options.N.pro_price_iqd` and the file
+applies (`tests/templateRoundTrip.test.ts`).
 
 Consequences: the same option written as `regular_price_iqd=175000` or as
 `regular_adjust_iqd=+25000` prices every tier identically; the cheapest-base
@@ -114,8 +152,33 @@ from.
 then one row per option, then one per colour) with a cell per field carrying its
 mode, its stored value, its **effective** price and the price it would fall back
 to on `inherit`. `effective` is computed by the same ladder `resolveUnitPrice`
-walks, so the admin preview and the customer's cart cannot disagree — that
-agreement is asserted row by row in `scripts/e2e-quick-price.mjs`.
+walks **and then clamped exactly as the resolver clamps the line**
+(`clampMemberLadder`: neither member price above the row's regular price,
+PRIME never below PRO, PRO falling back to PRIME), so the admin preview and
+the customer's cart cannot disagree — `tests/priceGridAgreement.test.ts`
+asserts cell-for-cell equality with the resolver over the whole fixture set,
+and `scripts/e2e-quick-price.mjs` row by row against a running worker. Two
+details keep that true: the value a rung passes UP to the next one is the raw
+ladder value (that is how `pickMember` carries it; the clamp is the last word
+on the line the customer actually picked), and a member cell's `inherited` is
+that raw carried value too, because it is the anchor a member *adjustment*
+applies to, exactly as `memberAtRung` anchors one. A PRO cell that inherits
+nothing (no PRO price beneath, none of its own) shows the PRIME price PRO
+members fall back to; a bulk `add`/`subtract`/percent on such a cell is
+skipped as `NO_CURRENT_VALUE` rather than pinning a PRO number onto a row that
+never had one.
+
+**Write-time ladder.** `PATCH /price-grid`, and `bulk`/`copy` with
+`apply: true`, rebuild the product as it would read after the change and run
+`validatePriceLadder` — the validator the relations PUT runs — over every row
+whose derived ladder can have moved: every row when the base row changed (it
+is beneath all of them), an option and the colours sold with it when that
+option changed, a colour alone (under each option it is sold with) when only
+it changed. A violation answers `400 {code: 'VALIDATION', errors: […]}` with
+the same messages the product form's save would show, before anything is
+written; the preview responses carry the same list as `errors`. A legacy row
+that is already wrong elsewhere in the product does not block an unrelated
+edit, and undo is exempt — restoring a previous state is always allowed.
 
 The endpoints live in `worker/routes/adminPriceGrid.ts`, all under
 `/api/admin/products/:id`:
@@ -159,8 +222,21 @@ but the server is what parses the value that is written.
 2. Otherwise the store-wide policy `proPricingPolicy`:
    - `explicit_only` (default): **no discount** — no fabricated percentages.
    - `global_percent` (owner-approved only): `regular − floor(regular×p/100)`.
-3. A PRO member never pays more than the regular price (misconfigured PRO
-   prices clamp to regular).
+3. Otherwise the PRIME price resolved for the same line, when one exists:
+   **a PRO member never pays more than a PRIME member** (`clampMemberLadder`).
+   This covers a PRIME-only product and a line whose base PRO was swallowed by
+   a reduction (base 150/125/100k, option +100,000 with its own PRO 40,000,
+   colour fixed 130,000 → PRIME 105,000, and PRO members pay 105,000 too).
+   `pro_iqd` reports the number actually charged, so the product page, the
+   cart, the admin preview and the Quick Edit grid all agree. No discount is
+   invented: with no member price on the line at all, the regular price
+   applies.
+4. A PRO member never pays more than the regular price (misconfigured PRO
+   prices clamp to regular), and PRIME is never below PRO (a legacy inverted
+   row clamps PRIME up to PRO). Every resolved line therefore satisfies
+   PRO ≤ PRIME ≤ Regular wherever the values exist —
+   `tests/pricingLadder.test.ts` asserts it over the fixture set, and that
+   `product_cost_iqd` never influences any of the three.
 
 `compare_at` is shown only when it exceeds the applicable selling price —
 no misleading strikethroughs.

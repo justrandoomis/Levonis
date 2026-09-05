@@ -7,7 +7,8 @@ import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
 import { normalizeAvailability, deriveSaleTypes, type AvailabilityType } from '../lib/availability';
 import { normalizeSaleTypes } from '../lib/productModel';
-import { ADJUST_OF } from '../lib/pricing';
+import { optionLaddersFor, validatePriceLadder, type PriceLadderInput } from '../lib/productRelations';
+import { ADJUST_OF, type LadderRungs, type PriceFields, type PriceMode } from '../lib/pricing';
 import {
   buildGrid,
   previewBulk,
@@ -28,7 +29,6 @@ import {
   type GridRow,
   type Level,
 } from '../lib/priceGrid';
-import type { PriceMode } from '../lib/pricing';
 
 /**
  * QUICK EDIT — one product's whole price table, read and written in a single
@@ -198,19 +198,25 @@ async function loadProduct(db: D1Database, productId: string): Promise<LoadedPro
           stock: numOrNull(x.stock),
           hex: String(x.hex ?? ''),
           option_id: linked.length === 1 ? linked[0] : null,
+          option_ids: linked,
           ...priceBits(x),
         };
       })
-    : jsonColors.map((x) => ({
-        id: String(x.id ?? ''),
-        name_ar: String(x.name_ar ?? x.name_en ?? ''),
-        name_en: String(x.name_en ?? x.name_ar ?? ''),
-        active: x.active !== false,
-        stock: numOrNull(x.stock),
-        hex: String(x.hex ?? ''),
-        option_id: (x.option_id as string | null) ?? null,
-        ...priceBits(x),
-      }));
+    : jsonColors.map((x) => {
+        const optionId = (x.option_id as string | null) ?? null;
+        const optionIds = readStrArr(x.option_ids);
+        return {
+          id: String(x.id ?? ''),
+          name_ar: String(x.name_ar ?? x.name_en ?? ''),
+          name_en: String(x.name_en ?? x.name_ar ?? ''),
+          active: x.active !== false,
+          stock: numOrNull(x.stock),
+          hex: String(x.hex ?? ''),
+          option_id: optionId,
+          option_ids: optionIds.length ? optionIds : optionId ? [optionId] : [],
+          ...priceBits(x),
+        };
+      });
 
   return {
     input: {
@@ -397,6 +403,97 @@ function applyWrites(
 
   return stmts;
 }
+
+// ------------------------------------------------- the write-time ladder
+
+/** The product as it will read AFTER these cell changes — what the validators judge. */
+function afterChanges(input: GridProductInput, changes: CellChange[]): GridProductInput {
+  const next: GridProductInput = {
+    ...input,
+    options: input.options.map((o) => ({ ...o })),
+    colors: input.colors.map((x) => ({ ...x })),
+  };
+  for (const ch of changes) {
+    if (ch.level === 'product') {
+      if (ch.field === 'regular') next.price_iqd = ch.write_value ?? next.price_iqd;
+      else if (ch.field === 'prime') next.prime_price_iqd = ch.write_value;
+      else if (ch.field === 'pro') next.pro_price_iqd = ch.write_value;
+      else next.product_cost_iqd = ch.write_value;
+      continue;
+    }
+    const row = (ch.level === 'option' ? next.options : next.colors).find((r) => r.id === ch.id);
+    if (!row) continue;
+    const col = COLUMN_OF[ch.field];
+    row[col] = ch.write_value;
+    row[ADJUST_OF[col]] = ch.write_adjust;
+  }
+  return next;
+}
+
+const ladderPrices = (r: PriceFields): PriceLadderInput => ({
+  regular_price_iqd: r.regular_price_iqd ?? null,
+  prime_price_iqd: r.prime_price_iqd ?? null,
+  pro_price_iqd: r.pro_price_iqd ?? null,
+  cost_iqd: r.cost_iqd ?? null,
+  regular_adjust_iqd: r.regular_adjust_iqd ?? null,
+  prime_adjust_iqd: r.prime_adjust_iqd ?? null,
+  pro_adjust_iqd: r.pro_adjust_iqd ?? null,
+  cost_adjust_iqd: r.cost_adjust_iqd ?? null,
+});
+
+/**
+ * WHAT THE PRODUCT FORM WOULD REFUSE, THE GRID REFUSES TOO.
+ *
+ * The grid used to check only that a number parsed, was not negative and did
+ * not fall under its cost. So it happily stored a PRO adjustment that lifted
+ * the row's PRO price above its regular price — the grid then showed a PRO
+ * number the resolver capped, and the next save from the product form was
+ * refused on a field the form does not even display. The rows are judged here
+ * by the SAME validator the relations PUT runs (validatePriceLadder over the
+ * derived ladder), so the two surfaces accept exactly the same catalogue.
+ *
+ * Only the rows whose DERIVED ladder can have moved are re-checked: every row
+ * when the base row changed (it is beneath all of them), an option and the
+ * colours sold with it when that option changed, a colour alone when only it
+ * changed. A legacy row that is already wrong elsewhere in the product does
+ * not block an unrelated edit — the admin can still reach it and fix it.
+ */
+function ladderErrorsAfter(next: GridProductInput, changes: CellChange[]): string[] {
+  const touched = new Set(changes.map((ch) => `${ch.level}:${ch.id}`));
+  const baseTouched = touched.has('product:');
+  const label = (r: { id: string; name_ar?: string; name_en?: string }) =>
+    (r.name_ar ?? '').trim() || (r.name_en ?? '').trim() || r.id;
+  const base: LadderRungs = { regular: next.price_iqd, prime: next.prime_price_iqd, pro: next.pro_price_iqd };
+  const errors: string[] = [];
+
+  if (baseTouched) {
+    errors.push(
+      ...validatePriceLadder(
+        { regular_price_iqd: next.price_iqd, prime_price_iqd: next.prime_price_iqd, pro_price_iqd: next.pro_price_iqd, cost_iqd: next.product_cost_iqd },
+        (next.name_ar ?? '').trim() || (next.name_en ?? '').trim() || 'base price'
+      )
+    );
+  }
+  for (const o of next.options) {
+    if (!baseTouched && !touched.has(`option:${o.id}`)) continue;
+    errors.push(...validatePriceLadder(ladderPrices(o), label(o), base));
+  }
+  const optionsForLadders = next.options.map((o) => ({ id: o.id, where: `"${label(o)}"`, active: o.active !== false, prices: ladderPrices(o) }));
+  for (const x of next.colors) {
+    const linked = x.option_ids && x.option_ids.length ? x.option_ids : x.option_id ? [x.option_id] : [];
+    const affected =
+      baseTouched ||
+      touched.has(`color:${x.id}`) ||
+      next.options.some((o) => touched.has(`option:${o.id}`) && (linked.length === 0 || linked.includes(o.id)));
+    if (!affected) continue;
+    errors.push(...validatePriceLadder(ladderPrices(x), label(x), base, optionLaddersFor(base, optionsForLadders, linked)));
+  }
+  return [...new Set(errors)];
+}
+
+/** The refusal envelope the relations PUT uses, so the drawer and the form read one shape. */
+const ladderRefusal = (errors: string[]) =>
+  ({ success: false, error: errors.join('\n'), code: 'VALIDATION', errors }) as const;
 
 function historyStatements(
   db: D1Database,
@@ -640,6 +737,11 @@ adminPriceGridRoutes.patch('/:id/price-grid', async (c) => {
   if (changes.length === 0) {
     return c.json({ success: true, changed: 0, rows: projectGrid(c.env, admin, rows), guards: [], batch_id: '' });
   }
+
+  // The ladder is judged on the RESULT by the validator the product form's
+  // save runs — a refusal here is the refusal the form would have given.
+  const ladderErrors = ladderErrorsAfter(afterChanges(loaded.input, changes), changes);
+  if (ladderErrors.length) return c.json(ladderRefusal(ladderErrors), 400);
 
   // The guard is computed on the RESULT, pairing each row's new prices against
   // its new cost, and only a financial admin can be shown it at all.
@@ -927,13 +1029,17 @@ adminPriceGridRoutes.post('/:id/price-grid/bulk', async (c) => {
   const financial = canViewFinancials(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
   const preview = previewBulk(rows, req, financial ? minMargin : null);
+  // What the write-time ladder would say about the result — shown with the
+  // preview, and a refusal at apply time.
+  const ladderErrors = preview.changes.length ? ladderErrorsAfter(afterChanges(loaded.input, preview.changes), preview.changes) : [];
 
   if (body.apply !== true) {
-    return c.json({ success: true, preview: projectForAdmin(c.env, admin, preview) });
+    return c.json({ success: true, preview: projectForAdmin(c.env, admin, preview), errors: ladderErrors });
   }
   if (preview.changes.length === 0) {
     return c.json({ success: true, changed: 0, batch_id: '', preview: projectForAdmin(c.env, admin, preview) });
   }
+  if (ladderErrors.length) return c.json(ladderRefusal(ladderErrors), 400);
   if (preview.guards.length && body.confirm !== true) {
     return c.json(
       {
@@ -1000,13 +1106,15 @@ adminPriceGridRoutes.post('/:id/price-grid/copy', async (c) => {
   const financial = canViewFinancials(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
   const preview = previewCopy(rows, req, financial ? minMargin : null);
+  const ladderErrors = preview.changes.length ? ladderErrorsAfter(afterChanges(loaded.input, preview.changes), preview.changes) : [];
 
   if (body.apply !== true) {
-    return c.json({ success: true, preview: projectForAdmin(c.env, admin, preview) });
+    return c.json({ success: true, preview: projectForAdmin(c.env, admin, preview), errors: ladderErrors });
   }
   if (preview.changes.length === 0) {
     return c.json({ success: true, changed: 0, batch_id: '', preview: projectForAdmin(c.env, admin, preview) });
   }
+  if (ladderErrors.length) return c.json(ladderRefusal(ladderErrors), 400);
   if (preview.guards.length && body.confirm !== true) {
     return c.json(
       {

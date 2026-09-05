@@ -16,14 +16,18 @@
  *    +25,000 sells at 175,000 / 150,000 / 125,000; add a direct-sale
  *    premium of 100,000 and the line is 275,000 / 250,000 / 225,000.
  *  - PRO members pay the resolved PRO price when one exists; otherwise the
- *    configured store-wide PRO policy applies; if no policy is configured,
- *    the regular price applies (no fabricated discount).
+ *    configured store-wide PRO policy applies; otherwise the PRIME price when
+ *    one exists on the line (a PRO member never pays more than a PRIME
+ *    member); if none of those exist, the regular price applies (no
+ *    fabricated discount).
  *  - PRIME members pay the resolved PRIME price when one exists; PRIME has no
  *    store-wide policy fallback, so an unpriced product simply costs the
  *    regular price — a PRIME discount is never invented (product-form
  *    mandate §5).
  *  - Precedence is fixed: active PRO, then active PRIME, then regular. A
- *    member never pays more than the regular price.
+ *    member never pays more than the regular price, and the ladder the
+ *    resolver hands out is always PRO <= PRIME <= Regular
+ *    (`clampMemberLadder`).
  *  - Compare-at is GONE from the resolver (mandate §4: "احذف ... خانة
  *    Compare-at price من الواجهة ومن منطق العرض"). products.original_price_iqd
  *    still exists in the schema but nothing reads it any more; a later
@@ -271,8 +275,10 @@ interface LadderTrace {
  *
  * A REDUCTION that swallows the member price (base PRO 90,000, option
  * −100,000) leaves nothing to carry: the member simply pays the reduced
- * regular price. The write-time validator refuses such a row unless it states
- * its own member price, so this is a safety net for legacy rows, not a path.
+ * regular price — or, for a PRO member whose line still has a PRIME price,
+ * that PRIME price (`clampMemberLadder`). The write-time validators refuse
+ * such a row unless it states its own member price, so this is a safety net
+ * for legacy rows, not a path.
  */
 export function memberAtRung(input: {
   /** the member price resolved beneath this rung (null = no member price anywhere below) */
@@ -299,18 +305,50 @@ export function memberAtRung(input: {
   return carried;
 }
 
+/** The three selling prices one level of the ladder resolves to. */
+export interface LadderRungs {
+  regular: number;
+  prime: number | null;
+  pro: number | null;
+}
+
+/**
+ * THE RESOLVER'S FINAL WORD on a line's member prices — applied after the
+ * ladder has been walked, and mirrored by the Quick Edit grid so that what the
+ * admin sees is what the customer is charged:
+ *   - neither member price is ever above the regular price;
+ *   - PRIME is never below PRO (a PRIME row cheaper than PRO would be refused
+ *     at write time; a legacy row is clamped up rather than inverting the
+ *     ladder at checkout);
+ *   - a PRO member never pays more than a PRIME member: a line with a PRIME
+ *     price but no PRO price of its own — none configured, or the base PRO
+ *     swallowed by a reduction — charges PRO members the PRIME price.
+ * Nothing here invents a discount: with no member price on the line at all,
+ * both stay null and the regular price applies.
+ */
+export function clampMemberLadder(regular: number, prime: number | null, pro: number | null): { prime: number | null; pro: number | null } {
+  let proOut = pro === null ? null : Math.min(pro, regular);
+  let primeOut = prime === null ? null : Math.min(prime, regular);
+  if (primeOut !== null && proOut !== null) primeOut = Math.max(primeOut, proOut);
+  if (proOut === null && primeOut !== null) proOut = primeOut;
+  return { prime: primeOut, pro: proOut };
+}
+
 /**
  * What ONE row resolves to on top of the level beneath it — the write-time
- * validators' view of the ladder (productModel, productRelations, importCsv).
+ * validators' view of the ladder (productModel, productRelations, importCsv,
+ * and the client mirror in src/components/adminProducts/form/model.ts).
  * `consumed` names the member fields the row would inherit but cannot: the
  * row's reduction is at least as large as the member price beneath it, so the
- * resolver would charge the member the reduced regular price. Validators
- * refuse that unless the row states its own member price.
+ * resolver would charge the member the reduced regular price. `inverted` says
+ * the row's derived PRO is above its derived PRIME — the resolver would clamp
+ * PRIME up to PRO, charging a PRIME member a number the row never shows.
+ * Validators refuse both unless the row states its own member price.
  */
 export function derivedRung(
   row: PriceFields,
-  beneath: { regular: number; prime: number | null; pro: number | null }
-): { regular: number; prime: number | null; pro: number | null; consumed: Array<'prime' | 'pro'> } {
+  beneath: LadderRungs
+): LadderRungs & { consumed: Array<'prime' | 'pro'>; inverted: boolean } {
   const regAdj = row.regular_adjust_iqd;
   const regular =
     row.regular_price_iqd !== null && row.regular_price_iqd !== undefined
@@ -329,7 +367,9 @@ export function derivedRung(
     }
     return memberAtRung({ inherited, regularDelta, regularHere: regular, row, field });
   };
-  return { regular, prime: member('prime_price_iqd', beneath.prime), pro: member('pro_price_iqd', beneath.pro), consumed };
+  const prime = member('prime_price_iqd', beneath.prime);
+  const pro = member('pro_price_iqd', beneath.pro);
+  return { regular, prime, pro, consumed, inverted: prime !== null && pro !== null && pro > prime };
 }
 
 /** Walks base → option → colour for PRIME or PRO with the rule above. */
@@ -439,25 +479,25 @@ export function resolveUnitPrice(input: {
   const regularIqd = regular.value ?? product.price_iqd;
   if (!Number.isInteger(regularIqd) || regularIqd < 0) errors.push('REGULAR_PRICE_INVALID');
 
-  // PRO resolution: explicit price, else policy, else none. Never above regular.
+  // PRO resolution: explicit price, else policy, else (below) the line's PRIME
+  // price, else none.
   let proIqd: number | null = null;
   if (proExplicit.value !== null && proExplicit.value !== undefined) {
-    proIqd = Math.min(proExplicit.value, regularIqd);
+    proIqd = proExplicit.value;
   } else if (proPolicy.mode === 'global_percent' && proPolicy.percent !== null && proPolicy.percent > 0) {
     proIqd = Math.max(0, regularIqd - Math.floor((regularIqd * proPolicy.percent) / 100));
   }
 
   // PRIME resolution: explicit price only — no store-wide percentage policy,
   // because §5 defines the PRIME discount as a per-product/per-variant price.
-  // Never above regular, and never below the PRO price (PRO <= PRIME <=
-  // Regular): a PRIME row cheaper than PRO would be rejected at write time,
-  // and clamping here keeps a legacy row from inverting the ladder at
-  // checkout.
-  let primeIqd: number | null = null;
-  if (primeExplicit.value !== null && primeExplicit.value !== undefined) {
-    primeIqd = Math.min(primeExplicit.value, regularIqd);
-    if (proIqd !== null) primeIqd = Math.max(primeIqd, proIqd);
-  }
+  let primeIqd: number | null =
+    primeExplicit.value !== null && primeExplicit.value !== undefined ? primeExplicit.value : null;
+
+  // The ladder the customer is charged from is PRO <= PRIME <= Regular, and a
+  // PRO member never pays more than a PRIME member (clampMemberLadder). The
+  // Quick Edit grid applies the same function to its cells, which is what
+  // keeps the admin's numbers and the cart's identical.
+  ({ prime: primeIqd, pro: proIqd } = clampMemberLadder(regularIqd, primeIqd, proIqd));
 
   // §5 precedence: active PRO first, then active PRIME, then regular.
   const isPro = input.tier === 'pro' && input.tierActive;

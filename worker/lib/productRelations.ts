@@ -23,7 +23,7 @@
  * with `group_id` denormalized so the grouping is one indexed read.
  */
 
-import { derivedRung } from './pricing';
+import { derivedRung, type LadderRungs, type PriceFields } from './pricing';
 
 export interface OptionGroupRow {
   id: string;
@@ -289,6 +289,42 @@ export interface PriceLadderInput {
   cost_adjust_iqd?: number | null;
 }
 
+const asFields = (p: PriceLadderInput): PriceFields => ({
+  regular_price_iqd: p.regular_price_iqd, prime_price_iqd: p.prime_price_iqd, pro_price_iqd: p.pro_price_iqd, cost_iqd: p.cost_iqd,
+  regular_adjust_iqd: p.regular_adjust_iqd ?? null, prime_adjust_iqd: p.prime_adjust_iqd ?? null,
+  pro_adjust_iqd: p.pro_adjust_iqd ?? null, cost_adjust_iqd: p.cost_adjust_iqd ?? null,
+});
+
+/** One option a colour can be sold with, and the ladder it resolves to on top of the base. */
+export interface OptionLadder {
+  /** How the option is named in a refusal. */
+  where: string;
+  ladder: LadderRungs;
+}
+
+/**
+ * The ladders a COLOUR must be checked under — one per option it can be sold
+ * with, each the option's own rung on top of the base (pricing.ts
+ * derivedRung): its linked options when it has links, else every active
+ * option. The resolver walks base → option → colour, so a colour that is fine
+ * against the base can still swallow the PRO price an option states, or invert
+ * PRIME and PRO under it — and only a check under that option can see it. A
+ * product with no active option yields an empty list: the colour is then
+ * measured against the base alone.
+ *
+ * The colour PUT in worker/routes/adminProductRelations.ts is the caller: it
+ * has the option values in hand when it validates the colours.
+ */
+export function optionLaddersFor(
+  base: LadderRungs,
+  options: Array<{ id: string; where: string; active: boolean | number; prices: PriceLadderInput }>,
+  linked: string[]
+): OptionLadder[] {
+  const active = options.filter((o) => o.active !== 0 && o.active !== false);
+  const chosen = linked.length ? active.filter((o) => linked.includes(o.id)) : active;
+  return chosen.map((o) => ({ where: o.where, ladder: derivedRung(asFields(o.prices), base) }));
+}
+
 /**
  * §5 price rules, enforced server-side at every level (product, option value,
  * colour, variant):
@@ -301,7 +337,9 @@ export function validatePriceLadder(
   p: PriceLadderInput,
   where: string,
   /** The product's base ladder — lets the derived member prices be checked too (pricing.ts derivedRung). */
-  beneath?: { regular: number; prime: number | null; pro: number | null }
+  beneath?: LadderRungs,
+  /** For a colour: the ladder of each option it can be sold with (`optionLaddersFor`). */
+  under?: OptionLadder[]
 ): string[] {
   const errors: string[] = [];
   const bad = (v: number | null) => v !== null && (!Number.isInteger(v) || v < 0);
@@ -334,22 +372,32 @@ export function validatePriceLadder(
   }
   // The member ladder follows the regular one: a row that states no member
   // price inherits the base member price PLUS its own surcharge. A reduction
-  // that swallows that member price is refused, and so is a member adjustment
-  // that lifts the derived price above the row's regular price.
+  // that swallows that member price is refused, so is a member adjustment
+  // that lifts the derived price above the row's regular price, and so is a
+  // row whose derived PRIME lands below its derived PRO — the resolver would
+  // charge PRIME members the PRO number, one the row never shows.
   if (beneath) {
-    const d = derivedRung(
-      {
-        regular_price_iqd: reg, prime_price_iqd: prime, pro_price_iqd: pro, cost_iqd: cost,
-        regular_adjust_iqd: p.regular_adjust_iqd ?? null, prime_adjust_iqd: p.prime_adjust_iqd ?? null,
-        pro_adjust_iqd: p.pro_adjust_iqd ?? null, cost_adjust_iqd: p.cost_adjust_iqd ?? null,
-      },
-      beneath
-    );
+    const fields = asFields(p);
+    const d = derivedRung(fields, beneath);
     for (const f of d.consumed) {
       errors.push(`${where}: the reduction is larger than the ${f.toUpperCase()} price this row inherits (${beneath[f]}) — state a ${f.toUpperCase()} price for it, or reduce less`);
     }
     if (d.prime !== null && d.prime > d.regular) errors.push(`${where}: the PRIME price this row resolves to (${d.prime}) is above its regular price (${d.regular})`);
     if (d.pro !== null && d.pro > d.regular) errors.push(`${where}: the PRO price this row resolves to (${d.pro}) is above its regular price (${d.regular})`);
+    if (d.inverted) {
+      errors.push(`${where}: the PRIME price this row resolves to (${d.prime}) is below the PRO price it resolves to (${d.pro}) — PRO ≤ PRIME ≤ Regular`);
+    }
+    // A colour anchors on the option the customer picked, not on the base:
+    // the same two checks, once under each option it can be sold with.
+    for (const u of under ?? []) {
+      const c = derivedRung(fields, u.ladder);
+      for (const f of c.consumed) {
+        errors.push(`${where}: with option ${u.where}, the reduction is larger than the ${f.toUpperCase()} price this colour inherits (${u.ladder[f]}) — state a ${f.toUpperCase()} price for it, or reduce less`);
+      }
+      if (c.inverted) {
+        errors.push(`${where}: with option ${u.where}, the PRIME price this colour resolves to (${c.prime}) is below its PRO price (${c.pro}) — PRO ≤ PRIME ≤ Regular`);
+      }
+    }
   }
   return errors;
 }

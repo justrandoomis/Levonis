@@ -789,3 +789,54 @@ test("an image's recorded type and size are carried, not cleared", () => {
   assert.equal(im1.content_type, 'image/jpeg');
   assert.equal(im1.bytes, 204_800);
 });
+
+// ------------------------------------------- a legacy row the ladder now refuses
+
+test('U2: a legacy product whose option swallows the base PRO exports with a warning, and the apply refusal names the row to give its own PRO price', () => {
+  // Stored before the rule: base 100,000 / PRO 90,000, option FIXED 5,000.
+  // The PRO carried onto the option would be 90,000 − 95,000 ≤ 0 — nothing.
+  const legacy = {
+    has_relations: true,
+    inventory_mode: 'BASE',
+    groups: [{ id: 'og1', product_id: 'prd_x', name_en: 'Model', sort: 0, active: 1 }],
+    values: [
+      {
+        id: 'ov1', product_id: 'prd_x', group_id: 'og1', name_en: 'Clearance', sku_part: '', image: '', sort: 0, active: 1,
+        stock: null, low_stock_threshold: null,
+        regular_price_iqd: 5_000, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
+        regular_adjust_iqd: null, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: null,
+        availability_type: '', lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null, variant_key: '', variant_label: '',
+      },
+    ],
+    colors: [], links: [], variants: [], images: [],
+  } as unknown as ProductRelationsView;
+  const doc = applyRelations(
+    parseProductRow({ ...baseRow(), price_iqd: 100_000, pro_price_iqd: 90_000, original_price_iqd: null, product_cost_iqd: null }),
+    legacy,
+    { includeInactive: true }
+  );
+  const text = exportProduct(doc, { includeCost: true, brand: null, catalogs: [] });
+
+  // The normaliser keeps the base (lowering it to 5,000 would take PRO to
+  // zero), says so beside price_iqd, and writes the option as −95,000.
+  assert.match(text, /^price_iqd=100000$/m);
+  assert.match(text, /أرخص صنف هو 5,000 د\.ع، لكن خفض الأساسي إليه يُنزل سعر PRO للمنتج إلى الصفر أو أقل/);
+  assert.match(text, /^options\.1\.regular_adjust_iqd=-95000$/m);
+
+  // Applying that file is refused exactly as saving the product itself is —
+  // and the message says which row, and what to do: give it its own PRO.
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  const refusal = {
+    message: /^options\.ov1\.regular_price_iqd: the reduction on this row is larger than the PRO price it inherits \(90000\) — state a PRO price for this row, or reduce less$/,
+  };
+  assert.throws(() => validateProductDoc(toDocBody(parsed, doc, { needs_review: [] }).body), refusal, 'the file as exported');
+  assert.throws(() => validateProductDoc({ ...doc, options: doc.options, colors: doc.colors } as unknown as Record<string, unknown>), refusal, 'the stored product itself');
+
+  // Following the advice — one line in the file — makes it apply, and the
+  // row charges PRO members the number the owner wrote.
+  const fixed = text.replace(/^options\.1\.pro_price_iqd=__NULL__$/m, 'options.1.pro_price_iqd=4000');
+  assert.notEqual(fixed, text, 'the export carries the pro_price_iqd line to fill in');
+  const built = validateProductDoc(toDocBody(parseTemplate(fixed), doc, { needs_review: [] }).body);
+  assert.deepEqual([built.options[0].regular_adjust_iqd, built.options[0].pro_price_iqd], [-95_000, 4_000]);
+});

@@ -121,7 +121,10 @@ test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»
   assert.equal(out.display_from, true); // 80k..120k genuinely differ
   // The cheapest explicit PRIME anywhere feeds the faint teaser line.
   assert.equal(out.display_prime_iqd, 90_000);
-  assert.equal(out.display_pro_iqd, null); // no PRO price exists → no teaser
+  // No PRO price is stated anywhere, but a PRO member never pays more than a
+  // PRIME member (pricing.ts clampMemberLadder) — so the PRO teaser truthfully
+  // shows the PRIME figure they would actually pay.
+  assert.equal(out.display_pro_iqd, 90_000);
 });
 
 test('card price: a PRIME viewer\'s minimum uses their tier level by level', () => {

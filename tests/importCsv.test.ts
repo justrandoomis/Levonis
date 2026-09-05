@@ -1385,3 +1385,17 @@ test('bundle survives an options-derived sale type', () => {
   const r = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
   assert.equal((r.doc.sale_types as string[]).includes('bundle'), true);
 });
+
+test('a negative adjustment the export itself wrote is read back — the formula-injection quote is the export\'s, not the number\'s', () => {
+  // toCsv prefixes a cell starting with - or + with a single quote so a
+  // spreadsheet does not execute it. A file uploaded straight back keeps that
+  // quote, and the reader must take it off again — or a −5,000 PRIME
+  // adjustment round-trips as `'-5000` and is refused as "not a number".
+  const res = parseOne([
+    row({ row_type: 'product', key: 'K1', name: 'X', price_iqd: '150000', prime_price_iqd: '125000', pro_price_iqd: '100000' }),
+    row({ row_type: 'option', key: 'K1', group: 'Model', value: 'A', regular_adjust_iqd: '+25000', prime_adjust_iqd: '-5000', pro_adjust_iqd: '-5000' }),
+  ]);
+  assert.deepEqual(res.issues.filter((i) => i.severity === 'error'), []);
+  const option = res.products[0].options[0];
+  assert.deepEqual([option.regular_adjust_iqd, option.prime_adjust_iqd, option.pro_adjust_iqd], [25_000, -5_000, -5_000]);
+});
