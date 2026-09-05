@@ -11,6 +11,8 @@ import {
   renderVerifyEmail,
   renderResetPasswordEmail,
   renderPasswordChangedEmail,
+  renderFinishSignupEmail,
+  renderAccountExistsEmail,
   renderOrderInvoiceEmail,
   renderInvoiceHtmlDocument,
   escapeHtml,
@@ -82,6 +84,8 @@ test('templates contain no tracking pixels, images or scripts', () => {
     renderVerifyEmail('ar', LINK),
     renderResetPasswordEmail('en', LINK),
     renderPasswordChangedEmail('ckb'),
+    renderFinishSignupEmail('ar', LINK),
+    renderAccountExistsEmail('en', LINK),
     renderOrderInvoiceEmail('ar', invoice(), 'https://levonis-iq.com/orders'),
   ];
   for (const m of all) {

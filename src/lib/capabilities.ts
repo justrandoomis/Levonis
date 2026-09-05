@@ -23,6 +23,8 @@ export interface AuthCapabilities {
   emailPassword: boolean;
   passwordReset: boolean;
   emailVerification: boolean;
+  /** Sign-up collects no password: the emailed link's finish screen does. */
+  emailFirstSignup: boolean;
   google: boolean;
   googleClientId: string;
   telegram: boolean;
@@ -46,6 +48,7 @@ export const OFFLINE_CAPABILITIES: AuthCapabilities = {
   emailPassword: true,
   passwordReset: false,
   emailVerification: false,
+  emailFirstSignup: false,
   google: false,
   googleClientId: '',
   telegram: false,
@@ -70,6 +73,7 @@ export function loadCapabilities(): Promise<AuthCapabilities> {
         emailPassword: r.emailPassword !== false,
         passwordReset: !!r.passwordReset,
         emailVerification: !!r.emailVerification,
+        emailFirstSignup: !!r.emailFirstSignup,
         google: !!r.google && !!r.googleClientId,
         googleClientId: r.googleClientId || '',
         telegram: !!r.telegram,

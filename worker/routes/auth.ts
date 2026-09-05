@@ -47,6 +47,8 @@ import {
   renderResetPasswordEmail,
   renderPasswordChangedEmail,
   renderGoogleAccountNoticeEmail,
+  renderFinishSignupEmail,
+  renderAccountExistsEmail,
   type EmailLang,
 } from '../lib/emailTemplates';
 
@@ -284,6 +286,13 @@ authRoutes.get('/capabilities', async (c) => {
     // Both of these need an outbound mail provider, and they fail together.
     passwordReset: mail,
     emailVerification: mail,
+    /**
+     * With a mail provider, an email sign-up collects NO password: /register
+     * only mails a link, and the password is chosen on the finish page
+     * (migration 0051). The sign-up form hides its password fields when this
+     * is true; a server in this mode ignores a password it is sent anyway.
+     */
+    emailFirstSignup: mail,
     google: clientId.length > 0,
     googleClientId: clientId,
     telegram: !!botUsername,
@@ -350,19 +359,71 @@ authRoutes.post('/register', async (c) => {
   // must not fail over a country dropdown.
   const country = countryCodeOrNull(body.country);
   const locale = localeOrDefault(body.locale ?? body.lang);
-  const password = String(body.password ?? '');
   const referralCode = referralCodeFrom(body);
-  checkPassword(password);
 
-  // Checked here so the message names the ONE thing that is wrong; the
-  // UNIQUE indexes below are what actually decide, and produce the same
-  // codes when two signups race.
-  const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
-  if (existing) throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
+  // Usernames are public handles (/username-available tells anyone), so a
+  // taken one is still named — and it is checked against CONFIRMED accounts
+  // only (a pending sign-up holds no row in `users`), so the answer depends on
+  // the handle alone and never on whether the address has an account.
   if (uname) {
     const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
     if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
   }
+
+  // EMAIL-FIRST SIGN-UP (migration 0051). When the deployment can send mail,
+  // registering with an address creates NOTHING in `users` and stores NO
+  // password: the attempt waits in pending_signups until the person holding
+  // the emailed link chooses a password on the finish page, and only THAT
+  // request (POST /signup/complete) creates the account and its username. A
+  // free address and a taken one get the identical body, set no cookie and do
+  // the same database work (one lookup, two writes, one queued mail), and
+  // neither claims a username, so nothing anywhere — this response,
+  // /username-available, /login, the referral count, the admin list —
+  // reveals whether the address has an account. Only its owner learns, by
+  // reading the inbox. Because no password is collected here, a stranger who
+  // plants a sign-up for someone else's address gains nothing: the owner
+  // ignores the mail or sets their own password.
+  const emailFirst = !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM);
+  if (emailFirst) {
+    // One address must not be floodable from many IPs.
+    await rateLimit(c, 'register-id', 5, 3600, await identifierKey(mail));
+    const mailLang = emailLang(body.lang ?? localeToApi(locale));
+    const account = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
+    if (account) {
+      // A real account already exists. Its owner alone learns someone tried —
+      // one notice per address per day, however many attempts. The pending
+      // row for this address (if any) is dropped: an account now exists, so
+      // nothing may finish a sign-up for it — and this write, with the
+      // expiry sweep below, keeps the two branches the same shape.
+      await c.env.DB.prepare('DELETE FROM pending_signups WHERE email = ?').bind(mail).run();
+      await c.env.DB.prepare('DELETE FROM pending_signups WHERE expires_at < ?').bind(new Date().toISOString()).run();
+      const notice = renderAccountExistsEmail(mailLang, `${trustedOrigin(c)}/auth`);
+      const day = new Date().toISOString().slice(0, 10);
+      await enqueue(c.env, `email_exists:${await sha256Hex(mail)}:${day}`, {
+        kind: 'email', to: mail, subject: notice.subject, html: notice.html, text: notice.text,
+      });
+      c.executionCtx.waitUntil(processOutbox(c.env, 3));
+    } else {
+      // No account yet: hold the profile (never a password) and mail the link.
+      await issuePendingSignup(c, { email: mail, username: uname, name, country, locale, referral: referralCode, lang: mailLang });
+    }
+    return c.json({
+      success: true,
+      pending_email: true,
+      message:
+        'أرسلنا رسالة إلى بريدك — افتح الرابط داخلها لاختيار كلمة المرور وفتح حسابك. / ' +
+        'We sent a message to your email — open the link inside it to choose a password and open your account.',
+    });
+  }
+
+  // NO MAIL SERVICE: there is no private channel to prove an address, so the
+  // account opens straight away with the password typed here, and a taken
+  // address is named — as it always was. Development and test deployments
+  // only; every real deployment has a mail provider.
+  const password = String(body.password ?? '');
+  checkPassword(password);
+  const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
+  if (existing) throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
 
   const id = newId('usr');
   const hash = await hashPassword(password);
@@ -385,21 +446,162 @@ authRoutes.post('/register', async (c) => {
   }
 
   await tryAttributeReferral(c.env, id, referralCode);
-
-  // Best-effort verification email right after signup (final-phase §3A).
-  // Skipped silently when no email service is configured — the banner offers
-  // an honest resend; a failure here never fails the registration itself.
-  if (c.env.EMAIL_API_KEY && c.env.EMAIL_FROM) {
-    try {
-      await issueEmailVerification(c, id, mail, emailLang(body.lang));
-    } catch (e) {
-      console.error('signup verification email failed for user', id, e instanceof Error ? e.message : String(e));
-    }
-  }
-
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
   return c.json({ success: true, user: publicUser(user!) });
+});
+
+// ------------------------------------------------ email-first sign-up: finish
+
+const PENDING_SIGNUP_TTL_HOURS = 24;
+const PENDING_LINK_MSG = 'This sign-up link is invalid or has expired — sign up again to get a new one';
+
+interface PendingSignupRow {
+  email: string;
+  username: string | null;
+  name: string;
+  country: string | null;
+  locale: string;
+  referral_code: string;
+  expires_at: string;
+}
+
+/**
+ * Holds an email sign-up until the inbox is proven, WITHOUT creating anything
+ * in `users` and WITHOUT a password (migration 0051). Keyed by address, so a
+ * re-signup overwrites the previous attempt and re-issues the link — the
+ * latest attempt is the only one that can be finished, and nothing an earlier
+ * (possibly hostile) attempt chose survives. The account, its username and
+ * its password are born together in POST /signup/complete.
+ */
+async function issuePendingSignup(
+  c: Context<AppContext>,
+  p: { email: string; username: string | null; name: string; country: string | null; locale: string; referral: string; lang: EmailLang }
+): Promise<void> {
+  const token = randomToken(32);
+  const tokenHash = await sha256Hex(token);
+  const expires = new Date(Date.now() + PENDING_SIGNUP_TTL_HOURS * 3_600_000).toISOString();
+  await c.env.DB.prepare(
+    `INSERT INTO pending_signups (email, token_hash, username, name, country, locale, referral_code, expires_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+     ON CONFLICT(email) DO UPDATE SET
+       token_hash = ?2, username = ?3, name = ?4, country = ?5,
+       locale = ?6, referral_code = ?7, expires_at = ?8,
+       created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+  )
+    .bind(p.email, tokenHash, p.username, p.name, p.country, p.locale, p.referral, expires)
+    .run();
+  // Opportunistic cleanup of expired attempts so the table stays small.
+  await c.env.DB.prepare('DELETE FROM pending_signups WHERE expires_at < ?').bind(new Date().toISOString()).run();
+  // The link OPENS the finish page on the main origin; nothing is consumed by
+  // opening it (a mail scanner's GET spends nothing) — the token is used only
+  // by the explicit POST that carries the chosen password.
+  const link = `${trustedOrigin(c)}/auth?finish=${token}`;
+  const msg = renderFinishSignupEmail(p.lang, link);
+  await enqueue(c.env, `signup_link:${tokenHash}`, { kind: 'email', to: p.email, subject: msg.subject, html: msg.html, text: msg.text });
+  c.executionCtx.waitUntil(processOutbox(c.env, 3));
+}
+
+/** The live pending sign-up behind a link token, or the one generic refusal. */
+async function loadPendingSignup(db: D1Database, tokenHash: string): Promise<PendingSignupRow> {
+  const p = await db
+    .prepare('SELECT email, username, name, country, locale, referral_code, expires_at FROM pending_signups WHERE token_hash = ?')
+    .bind(tokenHash)
+    .first<PendingSignupRow>();
+  if (!p) throw badRequest(PENDING_LINK_MSG, 'BAD_TOKEN');
+  if (new Date(p.expires_at).getTime() < Date.now()) throw badRequest(PENDING_LINK_MSG, 'TOKEN_EXPIRED');
+  return p;
+}
+
+/**
+ * What the finish page shows before the password is typed: the address the
+ * account will belong to and the profile the person asked for. Read-only —
+ * opening the link never spends it. The holder of the token got it from that
+ * inbox, so the address is theirs to see.
+ */
+authRoutes.get('/signup/pending', async (c) => {
+  await rateLimit(c, 'signup-pending', 30, 600);
+  const token = str(c.req.query('token'), 'token', { min: 20, max: 128 });
+  const p = await loadPendingSignup(c.env.DB, await sha256Hex(token));
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, email: p.email, name: p.name, username: p.username, country: p.country, expires_at: p.expires_at });
+});
+
+/**
+ * Finishes an email-first sign-up (migration 0051). The token proved the
+ * inbox and the PASSWORD ARRIVES HERE, chosen by the person holding the link,
+ * so the account is created NOW — its username claimed only if still free
+ * (otherwise left null for onboarding to ask), the referral bound, a session
+ * opened. This is the ONLY place an email-first account is born.
+ *
+ * Order matters: the password is validated and hashed BEFORE the row is
+ * claimed, so a weak password never burns the link; the claim is one DELETE,
+ * so of two concurrent completions exactly one creates the account.
+ */
+authRoutes.post('/signup/complete', async (c) => {
+  await rateLimit(c, 'signup-complete', 20, 3600);
+  const body = await c.req.json().catch(() => ({}));
+  const token = str(body.token, 'token', { min: 20, max: 128 });
+  const password = String(body.password ?? '');
+  checkPassword(password);
+  const tokenHash = await sha256Hex(token);
+  const p = await loadPendingSignup(c.env.DB, tokenHash);
+
+  // The finish page may correct the profile typed at sign-up — same
+  // validators as /register. A handle typed HERE that is taken is named
+  // before anything is spent, so the person picks another without losing
+  // the link; the handle carried from /register falls back silently below.
+  const overrideUname = typeof body.username === 'string' && body.username.trim() !== '' ? username(body.username) : null;
+  if (overrideUname && overrideUname !== p.username) {
+    const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(overrideUname).first();
+    if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
+  }
+  const uname = overrideUname ?? p.username;
+  const name = typeof body.name === 'string' ? str(body.name, 'name', { min: 0, max: 100, required: false }) : p.name;
+  const country = body.country !== undefined ? countryCodeOrNull(body.country) : p.country;
+
+  const hash = await hashPassword(password);
+  // Claim the row atomically: exactly one of two concurrent completions wins.
+  const claimed = await c.env.DB.prepare('DELETE FROM pending_signups WHERE token_hash = ?').bind(tokenHash).run();
+  if (claimed.meta.changes === 0) throw badRequest(PENDING_LINK_MSG, 'TOKEN_USED');
+
+  const id = newId('usr');
+  const now = new Date().toISOString();
+  const insert = (u: string | null) =>
+    c.env.DB.prepare(
+      'INSERT INTO users (id, email, username, name, password_hash, country, locale, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+      .bind(id, p.email, u, name, hash, country, p.locale, now)
+      .run();
+  let usernameDropped = false;
+  try {
+    await insert(uname);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE') && msg.includes('username') && uname) {
+      // The handle was taken while the link waited in the inbox — keep the
+      // account, drop the handle; onboarding asks for a new one (username null).
+      try {
+        await insert(null);
+        usernameDropped = true;
+      } catch (e2) {
+        const m2 = e2 instanceof Error ? e2.message : String(e2);
+        if (m2.includes('UNIQUE')) throw conflict('Your account is already set up — please sign in', 'ALREADY_REGISTERED');
+        throw e2;
+      }
+    } else if (msg.includes('UNIQUE')) {
+      // The address already has an account (e.g. its owner signed in with
+      // Google before opening this link). Nothing to create.
+      throw conflict('Your account is already set up — please sign in', 'ALREADY_REGISTERED');
+    } else {
+      throw e;
+    }
+  }
+  await tryAttributeReferral(c.env, id, p.referral_code);
+  await createSession(c, id);
+  await audit(c.env.DB, id, 'auth.signup_completed', id, usernameDropped ? { username_dropped: true } : {});
+  const user = await getFullUser(c.env.DB, id);
+  return c.json({ success: true, user: publicUser(user!), username_dropped: usernameDropped });
 });
 
 /**

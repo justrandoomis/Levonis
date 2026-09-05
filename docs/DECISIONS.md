@@ -279,3 +279,23 @@ with the base so member offsets survive a rewrite. A reduction that swallows a
 member price is refused at write time unless the row states its own member
 price. PRO's pre-order commission waiver and the never-waived direct premium
 are unchanged.
+
+## 2026-09-05 — sign-up: the password is chosen at the link, not at the form
+
+The owner asked us to decide the two pre-launch notices ourselves ("the website
+doesn't publish yet"). The first is the `/register` account-existence oracle
+the audit left open after two reverted attempts. Decision: email-first sign-up
+in the form the audit recommended. `/register` stores only the profile in a
+`pending_signups` table that has no password column, mails a link to
+`/auth?finish=TOKEN`, and answers the same body for a free and a taken address
+(the latter gets an "account exists" notice once a day). The finish screen —
+the same shape as the reset-password screen — is where the password is typed,
+and `POST /api/auth/signup/complete` creates the account, its handle (if still
+free), its session and its verified stamp in one request. A planted sign-up
+therefore gives the planter nothing: it never carried a password, and the
+owner's own sign-up replaces its link. A deployment without a mail provider
+keeps the old immediate-account behaviour. The second notice (a legacy
+JSON-column cart line for a product with options could reach checkout with no
+option chosen) was closed the same day in `cart.ts`/`orders.ts` with
+`refuseIncompleteSelection`, for every product regardless of how its options
+are stored.

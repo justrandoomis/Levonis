@@ -260,33 +260,49 @@ regression.
   one policy text and that a real browser opens the public pages with zero
   violations.
 
-- **Account enumeration at `/register` (Low) — NOT shipped; reverted.** Closing
-  it requires deferring account creation until the inbox is proven (email-first
-  sign-up). Two implementations were built and each was caught by an
-  adversarial re-review as introducing a HIGH that the original LOW did not
-  have:
-    1. keeping the unconfirmed account in `users` behind a flag re-leaked the
-       answer through the username (claimed only on the free path) and let a
-       stranger fix a password the owner would confirm; and
-    2. moving the attempt to a `pending_signups` table closed the username
-       oracle but STILL let the password be chosen at sign-up by whoever
-       submitted it, so an attacker who plants (or last-writes) a sign-up for
-       an address, then relies on the inbox owner clicking the "confirm your
-       account" link, ends up with an account the victim activates under the
-       attacker's password.
-  The root cause of (2) is inherent to collecting the password before the inbox
-  is proven: the fix is a sign-up where the password is set by the CONFIRMING
-  request (a dedicated "finish creating your account" page reached from the
-  email link), not by the `/register` request. That is a self-contained feature
-  with real frontend surface, and shipping a third hurried variant on a
-  security branch is the wrong risk. Both attempts were reverted; `/register`
-  is back to its original, well-tested behaviour (immediate account, 409
-  `EMAIL_TAKEN`). The residual is the ORIGINAL Low: a signed-out visitor can
-  learn whether an address has an account. RECOMMENDATION: implement email-first
-  sign-up as its own change — `/register` stores only the profile in a
-  `pending_signups` table and mails a link; a confirmation page collects the
-  password and creates the account; a real account instead receives an
-  "account exists" notice — then re-run the adversarial review before shipping.
+- **Account enumeration at `/register` (Low) — SHIPPED, pre-launch, in the
+  form the audit recommended.** Two earlier implementations were built and each
+  was caught by an adversarial re-review as introducing a HIGH the original LOW
+  did not have (an unconfirmed account kept in `users` behind a flag re-leaked
+  the answer through the username and let a stranger fix a password the owner
+  would confirm; a `pending_signups` row that CARRIED a password still let
+  whoever submitted the sign-up choose the password the inbox owner would
+  "confirm"). Both were reverted. The shipped design removes the root cause of
+  both: the password is set by the CONFIRMING request, never by `/register`.
+
+  With a mail provider configured (`emailFirstSignup` in `/api/auth/capabilities`):
+    - `POST /api/auth/register` stores only the profile (address, requested
+      handle, name, country, language, referral) in `pending_signups`
+      (migration 0051 — the table has NO password column), mails a
+      "finish creating your account" link to `/auth?finish=TOKEN`, opens no
+      session and answers the identical `{pending_email: true}` body whether
+      the address is free or taken; a taken address instead receives an
+      "account exists" notice, once per address per day. Both branches do one
+      lookup, two writes and one queued mail. A pending sign-up never claims a
+      username, so `/username-available`, `/login`, the referral count and the
+      admin list see nothing. Per-address limit 5/h on top of the IP limit.
+    - `GET /api/auth/signup/pending?token=` shows the finish page the pending
+      profile without spending the link (a mail scanner's GET burns nothing).
+    - `POST /api/auth/signup/complete {token, password}` validates and hashes
+      the password FIRST (a weak password never burns the link), claims the
+      row with one DELETE (of two concurrent completions exactly one wins),
+      creates the account born verified, claims the handle only if still free
+      (else null → onboarding asks), binds the referral, opens the session.
+      An address that gained an account another way meanwhile → 409
+      `ALREADY_REGISTERED`, no session. Every dead link (unknown, expired,
+      superseded, used) is one generic 400 wording.
+    - The latest attempt per address wins: a planted sign-up's link dies the
+      moment the owner signs up, and it never carried a password anyway.
+  Without a mail provider the pre-existing behaviour stays (immediate account,
+  password required, 409 `EMAIL_TAKEN`) — development and tests only. The
+  sign-up page hides its password fields in email-first mode and shows a
+  "check your email" step; the finish screen is a sibling of the
+  `/auth?reset=TOKEN` screen. Tests: `tests/registerEmailFirst.test.ts`
+  (15 cases: nothing in `users`, no password column, identical taken/free
+  bodies, no handle claimed, one notice a day, no takeover, read-without-spend,
+  weak password keeps the link, single use, handle fallback, handle override,
+  address raced, expiry, member link opens no session, Kurdish mail on the
+  trusted origin, capabilities flag, no-mail fallback).
 
 - **`/telegram/complete` email oracle (Medium) — SHIPPED (independent of the
   above).** The email-taken check ran before the OTP was consumed, so one

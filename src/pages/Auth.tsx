@@ -39,10 +39,15 @@ import { onboardingStrings, usernameReasonLabel } from '../components/onboarding
  * under an "أو" seam; tapping Telegram swaps the panel to the
  * Telegram-verified phone flow (the only route that can prove number
  * ownership), with a way back. Creating an account is a light three-step
- * flow inside the same panel — email and password, then name, handle and
- * country, then a review — and ONE request: the steps only validate locally, the
- * single POST /api/auth/register happens on the last one. Non-sensitive
- * values survive every step/panel switch; passwords never touch
+ * flow inside the same panel — email (and, only when the deployment has no
+ * mail service, the password), then name, handle and country, then a review —
+ * and ONE request: the steps only validate locally, the single
+ * POST /api/auth/register happens on the last one. With a mail service the
+ * server answers `pending_email` and creates nothing yet: the person opens
+ * the emailed link, which lands back here as /auth?finish=TOKEN, chooses the
+ * password on that screen, and POST /api/auth/signup/complete creates the
+ * account and signs them in (the same shape as the /auth?reset=TOKEN screen).
+ * Non-sensitive values survive every step/panel switch; passwords never touch
  * localStorage/analytics/logs.
  *
  * FillButton (§2.2): every step's button fills with REAL validation
@@ -52,9 +57,12 @@ import { onboardingStrings, usernameReasonLabel } from '../components/onboarding
  * Server contracts (unchanged by the redesign):
  * - POST /api/auth/login    { identifier (email|username|phone), password }
  *   (the legacy `email` field carries the same value for the current server)
- * - POST /api/auth/register { username, name, email, password, locale,
+ * - POST /api/auth/register { username, name, email, password?, locale,
  *   country?, referralCode? } — country is an ISO-2 the server already
- *   accepts (unknown → null, never an error)
+ *   accepts (unknown → null, never an error); the password is sent only
+ *   when capabilities.emailFirstSignup is false
+ * - GET  /api/auth/signup/pending?token=… · POST /api/auth/signup/complete
+ *   { token, password } — the finish screen (email-first sign-up)
  * - POST /api/auth/google   { credential, referralCode? }  (GIS credential)
  * - GET  /api/auth/username-available?u=…  (live handle check, informational)
  * - GET  /api/auth/referrer-info?ref=…  (ReferralBar — 404 = honest
@@ -130,7 +138,8 @@ const STRINGS = {
     resetDeadBody: 'روابط إعادة التعيين تصلح لمرة واحدة ولمدة 30 دقيقة فقط. اطلب رابطًا جديدًا للمتابعة.',
     requestNewLink: 'طلب رابط جديد',
     genericError: 'حدث خطأ ما. حاول مرة أخرى.',
-    errLoginFailed: 'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره.',
+    errLoginFailed: 'البريد أو اسم المستخدم أو الهاتف أو كلمة المرور غير صحيحة. إن أنشأت حسابك عبر Google أو تيليغرام فاستخدم زره، وإن سجّلت للتو فافتح الرابط الذي وصل بريدك أولًا.',
+    errAlreadyRegistered: 'هذا الحساب مُعدّ بالفعل — سجّل الدخول بدلًا من ذلك.',
     errEmailTaken: 'يوجد حساب بهذا البريد بالفعل. سجّل الدخول بدلًا من ذلك.',
     errUsernameTaken: 'اسم المستخدم هذا محجوز بالفعل. جرّب اسمًا آخر.',
     errUsernameReserved: 'اسم المستخدم هذا محجوز للمنصّة.',
@@ -153,8 +162,27 @@ const STRINGS = {
     optional: 'اختياري',
     edit: 'تعديل',
     referralLabel: 'كود الإحالة',
-    verifyNote: 'سنرسل رابط تفعيل إلى بريدك بعد إنشاء الحساب.',
+    verifyNote: 'سنرسل رابطًا إلى بريدك — تختار كلمة المرور من داخله، وعندها فقط يُفتح حسابك.',
     hintUsernameTaken: 'اختر اسم مستخدم آخر',
+    step1NameEmail: 'البريد الإلكتروني',
+    step1HintEmail: 'ابدأ ببريدك — كلمة المرور تختارها من الرابط الذي سنرسله إليه.',
+    sendLinkCta: 'إرسال رابط التأكيد',
+    sendingLink: 'جارٍ الإرسال…',
+    linkSent: 'تم الإرسال',
+    pendingTitle: 'تحقق من بريدك',
+    pendingHint: 'خطوة أخيرة: اختيار كلمة المرور.',
+    pendingBody: (e: string) => `أرسلنا رسالة إلى ${e}. افتح الرابط داخلها لاختيار كلمة المرور — عندها يُفتح حسابك.`,
+    pendingSpam: 'لم تصلك؟ تحقق من مجلد الرسائل غير المرغوبة، أو أعد الخطوات بنفس البريد لتصلك رسالة جديدة.',
+    pendingSignIn: 'لديك حساب بالفعل؟ سجّل الدخول',
+    finishTitle: 'اختر كلمة المرور',
+    finishHint: (e: string) => (e ? `آخر خطوة لفتح حساب ${e}. الرابط يصلح لمرة واحدة.` : 'آخر خطوة لفتح حسابك. الرابط يصلح لمرة واحدة.'),
+    finishCta: 'فتح الحساب',
+    finishing: 'جارٍ فتح الحساب…',
+    finished: 'تم فتح الحساب',
+    finishLoading: 'جارٍ التحقق من الرابط…',
+    finishDeadTitle: 'هذا الرابط لم يعد صالحًا',
+    finishDeadBody: 'روابط إكمال التسجيل تصلح لمرة واحدة ولمدة 24 ساعة، ويلغيها طلب تسجيل أحدث بنفس البريد. أعد إنشاء الحساب لتصلك رسالة جديدة.',
+    signUpAgain: 'إنشاء الحساب من جديد',
   },
   en: {
     signInTitle: 'Welcome back',
@@ -220,7 +248,8 @@ const STRINGS = {
     resetDeadBody: 'Reset links work once and expire after 30 minutes. Request a new link to continue.',
     requestNewLink: 'Request a new link',
     genericError: 'Something went wrong. Please try again.',
-    errLoginFailed: 'Incorrect email, username, phone or password. If you created your account with Google or Telegram, use that button.',
+    errLoginFailed: 'Incorrect email, username, phone or password. If you created your account with Google or Telegram, use that button; if you just signed up, open the link we emailed you first.',
+    errAlreadyRegistered: 'This account is already set up — sign in instead.',
     errEmailTaken: 'An account with this email already exists. Sign in instead.',
     errUsernameTaken: 'That username is already taken. Try another one.',
     errUsernameReserved: 'That username is reserved for the platform.',
@@ -242,8 +271,27 @@ const STRINGS = {
     optional: 'Optional',
     edit: 'Edit',
     referralLabel: 'Referral code',
-    verifyNote: "We'll email you a verification link after the account is created.",
+    verifyNote: "We'll email you a link — you choose your password from it, and only then does your account open.",
     hintUsernameTaken: 'Choose a different username',
+    step1NameEmail: 'Your email',
+    step1HintEmail: 'Start with your email — you choose the password from the link we send there.',
+    sendLinkCta: 'Send confirmation link',
+    sendingLink: 'Sending…',
+    linkSent: 'Sent',
+    pendingTitle: 'Check your email',
+    pendingHint: 'One last step: choose your password.',
+    pendingBody: (e: string) => `We sent a message to ${e}. Open the link inside it to choose your password — that is when your account opens.`,
+    pendingSpam: 'Nothing there? Check your spam folder, or repeat the steps with the same address to get a fresh message.',
+    pendingSignIn: 'Already have an account? Sign in',
+    finishTitle: 'Choose your password',
+    finishHint: (e: string) => (e ? `The last step to open the account for ${e}. The link works once.` : 'The last step to open your account. The link works once.'),
+    finishCta: 'Open my account',
+    finishing: 'Opening your account…',
+    finished: 'Account opened',
+    finishLoading: 'Checking your link…',
+    finishDeadTitle: 'This link no longer works',
+    finishDeadBody: 'Sign-up links work once, expire after 24 hours, and are replaced by a newer sign-up with the same address. Sign up again to get a fresh message.',
+    signUpAgain: 'Sign up again',
   },
   ckb: {
     signInTitle: 'بەخێربێیتەوە',
@@ -309,7 +357,8 @@ const STRINGS = {
     resetDeadBody: 'بەستەرەکانی ڕێکخستنەوە تەنها جارێک و بۆ ٣٠ خولەک کاردەکەن. بەستەرێکی نوێ داوا بکە.',
     requestNewLink: 'داواکردنی بەستەری نوێ',
     genericError: 'هەڵەیەک ڕوویدا. دووبارە هەوڵ بدە.',
-    errLoginFailed: 'ئیمەیل، ناوی بەکارهێنەر، ژمارە یان وشەی نهێنی هەڵەیە. ئەگەر هەژمارەکەت بە Google یان تەلەگرام دروستکردووە، ئەو دوگمەیە بەکاربهێنە.',
+    errLoginFailed: 'ئیمەیل، ناوی بەکارهێنەر، ژمارە یان وشەی نهێنی هەڵەیە. ئەگەر هەژمارەکەت بە Google یان تەلەگرام دروستکردووە، ئەو دوگمەیە بەکاربهێنە؛ ئەگەر تازە خۆت تۆمار کردووە، سەرەتا بەستەرەکە بکەرەوە کە بۆ ئیمەیلەکەت ناردمان.',
+    errAlreadyRegistered: 'ئەم هەژمارە پێشتر ڕێکخراوە — لەبری ئەوە بچۆرەژوورەوە.',
     errEmailTaken: 'هەژمارێک بەم ئیمەیلە هەیە. لەبری ئەوە بچۆرەژوورەوە.',
     errUsernameTaken: 'ئەم ناوە پێشتر وەرگیراوە. یەکێکی تر تاقی بکەرەوە.',
     errUsernameReserved: 'ئەم ناوە بۆ پلاتفۆرمەکە پاراستراوە.',
@@ -331,8 +380,27 @@ const STRINGS = {
     optional: 'ئارەزوومەندانە',
     edit: 'دەستکاری',
     referralLabel: 'کۆدی بانگهێشت',
-    verifyNote: 'دوای دروستکردنی هەژمار بەستەری پشتڕاستکردنەوە بۆ ئیمەیلەکەت دەنێرین.',
+    verifyNote: 'بەستەرێک بۆ ئیمەیلەکەت دەنێرین — وشەی نهێنی لە ناوەوەی هەڵدەبژێریت، و تەنها ئەو کاتە هەژمارەکەت دەکرێتەوە.',
     hintUsernameTaken: 'ناوی بەکارهێنەرێکی تر هەڵبژێرە',
+    step1NameEmail: 'ئیمەیلەکەت',
+    step1HintEmail: 'بە ئیمەیلەکەت دەست پێ بکە — وشەی نهێنی لە بەستەرەکە هەڵدەبژێریت کە بۆی دەنێرین.',
+    sendLinkCta: 'ناردنی بەستەری پشتڕاستکردنەوە',
+    sendingLink: 'دەنێردرێت…',
+    linkSent: 'نێردرا',
+    pendingTitle: 'ئیمەیلەکەت بپشکنە',
+    pendingHint: 'دوا هەنگاو: هەڵبژاردنی وشەی نهێنی.',
+    pendingBody: (e: string) => `پەیامێکمان نارد بۆ ${e}. بەستەرەکەی ناوەوە بکەرەوە بۆ هەڵبژاردنی وشەی نهێنی — ئەو کاتە هەژمارەکەت دەکرێتەوە.`,
+    pendingSpam: 'نەگەیشت؟ فۆڵدەری سپام بپشکنە، یان هەنگاوەکان بە هەمان ئیمەیل دووبارە بکەرەوە بۆ وەرگرتنی پەیامی نوێ.',
+    pendingSignIn: 'پێشتر هەژمارت هەیە؟ بچۆرەژوورەوە',
+    finishTitle: 'وشەی نهێنیەکەت هەڵبژێرە',
+    finishHint: (e: string) => (e ? `دوا هەنگاو بۆ کردنەوەی هەژماری ${e}. بەستەرەکە تەنها جارێک کاردەکات.` : 'دوا هەنگاو بۆ کردنەوەی هەژمارەکەت. بەستەرەکە تەنها جارێک کاردەکات.'),
+    finishCta: 'کردنەوەی هەژمار',
+    finishing: 'هەژمار دەکرێتەوە…',
+    finished: 'هەژمار کرایەوە',
+    finishLoading: 'بەستەرەکە دەپشکنرێت…',
+    finishDeadTitle: 'ئەم بەستەرە چیتر کار ناکات',
+    finishDeadBody: 'بەستەرەکانی تەواوکردنی خۆتۆمارکردن تەنها جارێک و بۆ ٢٤ کاتژمێر کاردەکەن، و تۆمارکردنێکی نوێتر بە هەمان ئیمەیل جێیان دەگرێتەوە. دووبارە هەژمار دروست بکە بۆ وەرگرتنی پەیامی نوێ.',
+    signUpAgain: 'دووبارە هەژمار دروست بکە',
   },
 };
 
@@ -351,6 +419,7 @@ const SHEET = {
   signup: 'CREATE ACCOUNT',
   forgot: 'PASSWORD RESET',
   reset: 'NEW PASSWORD',
+  finish: 'CHOOSE PASSWORD',
   telegram: 'TELEGRAM',
 } as const;
 
@@ -394,6 +463,9 @@ export default function Auth() {
   const shortViewport = useShortViewport();
 
   const resetToken = searchParams.get('reset') || '';
+  // Email-first sign-up: the emailed link lands here. Opening it spends
+  // nothing — the token is used only by the explicit POST with the password.
+  const finishToken = searchParams.get('finish') || '';
   // Friend-invite referral code from ?ref=CODE — user-editable in the
   // ReferralBar (§2.6), page-level so it survives view/panel/step switches
   // and later URL cleanups. The user's explicitly chosen code wins.
@@ -419,6 +491,14 @@ export default function Auth() {
   // A REAL success (the server answered 2xx), never assumed: it is set only
   // after a resolved request and drives the FillButton's success state.
   const [succeeded, setSucceeded] = useState(false);
+  // Email-first sign-up: the server queued a link and created nothing yet;
+  // the page shows "check your inbox" instead of moving on.
+  const [pendingEmail, setPendingEmail] = useState(false);
+  // The finish screen (/auth?finish=TOKEN): the pending profile behind the
+  // link, read once so the person sees which address they are opening.
+  const [finishInfo, setFinishInfo] = useState<{ email: string; name: string; username: string | null } | null>(null);
+  const [finishState, setFinishState] = useState<'loading' | 'ready' | 'dead'>('loading');
+  const [finishLoadFailed, setFinishLoadFailed] = useState(false);
   const [serverError, setServerError] = useState('');
   // Set only when the SERVER says phone sign-up needs ownership proof — the
   // page then offers the Telegram verification path instead of pretending.
@@ -455,6 +535,37 @@ export default function Auth() {
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
   const emailVerificationConfigured = caps?.emailVerification ?? false;
+  // With a mail service the sign-up collects NO password — it is chosen on
+  // the finish screen. Until the answer arrives the password fields are
+  // shown (the server in email-first mode ignores a password it is sent).
+  const emailFirst = caps?.emailFirstSignup ?? false;
+
+  useEffect(() => {
+    if (!finishToken) return;
+    let alive = true;
+    setFinishState('loading');
+    setFinishLoadFailed(false);
+    api
+      .get<{ email: string; name: string; username: string | null }>(`/api/auth/signup/pending?token=${encodeURIComponent(finishToken)}`)
+      .then((p) => {
+        if (!alive) return;
+        setFinishInfo({ email: p.email, name: p.name, username: p.username });
+        setFinishState('ready');
+      })
+      .catch((err) => {
+        if (!alive) return;
+        // A 400 is the server's one generic "this link is dead"; anything
+        // else (network) still lets the person try — the POST is the judge.
+        if (err instanceof ApiError && err.status === 400) setFinishState('dead');
+        else {
+          setFinishLoadFailed(true);
+          setFinishState('ready');
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [finishToken]);
 
   /**
    * If the open Telegram panel stops being offered — the capabilities answer
@@ -491,6 +602,7 @@ export default function Auth() {
     BAD_TOKEN: s.errResetLink,
     TOKEN_USED: s.errResetLink,
     TOKEN_EXPIRED: s.errResetLink,
+    ALREADY_REGISTERED: s.errAlreadyRegistered,
     RATE_LIMITED: s.errTooMany,
   };
 
@@ -535,6 +647,7 @@ export default function Auth() {
 
   const switchView = (next: AuthView) => {
     clearMessages();
+    setPendingEmail(false);
     setPanel('form');
     setStep(1);
     setView(next);
@@ -632,9 +745,13 @@ export default function Auth() {
   const emailPart = { progress: emailProgress, valid: emailValid };
 
   // Each step's button answers for ITS fields; the last one for all of them.
-  const step1Fill = combineFillProgress([emailPart, newPwPart, confirmPart]);
+  // Email-first: the password is not a field of this form at all — it is
+  // chosen on the finish screen — so the meters answer for the email alone.
+  const step1Fill = combineFillProgress(emailFirst ? [emailPart] : [emailPart, newPwPart, confirmPart]);
   const step2Fill = combineFillProgress([namePart, usernamePart]);
-  const signupEmailFill = combineFillProgress([emailPart, usernamePart, namePart, newPwPart, confirmPart]);
+  const signupEmailFill = combineFillProgress(
+    emailFirst ? [emailPart, usernamePart, namePart] : [emailPart, usernamePart, namePart, newPwPart, confirmPart]
+  );
 
   const forgotFill = combineFillProgress([emailPart]);
   const resetFill = combineFillProgress([newPwPart, confirmPart]);
@@ -649,11 +766,13 @@ export default function Auth() {
         : '';
   const step1Hint = !emailValid
     ? s.hintEmail
-    : !newPwValid
-      ? s.hintPassword
-      : !confirmValid
-        ? s.hintConfirm
-        : '';
+    : emailFirst
+      ? ''
+      : !newPwValid
+        ? s.hintPassword
+        : !confirmValid
+          ? s.hintConfirm
+          : '';
   const step2Hint = !trimmedName
     ? s.hintName
     : !usernameShapeValid
@@ -735,17 +854,26 @@ export default function Auth() {
     setVia('form');
     setSubmitting(true);
     try {
-      await api.post('/api/auth/register', {
+      const created = await api.post<{ pending_email?: boolean }>('/api/auth/register', {
         username: trimmedUsername,
         name: trimmedName,
         email: trimmedEmail,
-        password,
+        // Email-first: no password leaves this page — it is chosen on the
+        // finish screen by whoever holds the emailed link.
+        ...(emailFirst ? {} : { password }),
         locale: lang,
         ...(country ? { country } : {}),
         ...(referral ? { referralCode: referral } : {}),
       });
-      await refreshUser();
       setSucceeded(true);
+      // With a mail service the server created nothing yet: the account opens
+      // from the link in the inbox, and the answer is the same whether or not
+      // the address already had an account (see worker/routes/auth.ts).
+      if (created.pending_email) {
+        setPendingEmail(true);
+        return;
+      }
+      await refreshUser();
       finishAuth(true);
     } catch (err) {
       setServerError(errMsg(err));
@@ -837,6 +965,47 @@ export default function Auth() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /**
+   * The finish screen's one request: the token proved the inbox, the password
+   * typed here is the account's, and the server creates the account and signs
+   * the person in — then setup, like any brand-new account.
+   */
+  const handleFinish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    if (!resetFill.ready) return;
+    clearMessages();
+    setVia('form');
+    setSubmitting(true);
+    try {
+      await api.post('/api/auth/signup/complete', { token: finishToken, password });
+      setPassword('');
+      setConfirmPassword('');
+      await refreshUser();
+      setSucceeded(true);
+      finishAuth(true);
+    } catch (err) {
+      if (err instanceof ApiError && (err.code === 'BAD_TOKEN' || err.code === 'TOKEN_EXPIRED' || err.code === 'TOKEN_USED')) {
+        setFinishState('dead');
+      } else {
+        setServerError(errMsg(err));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** Leave the (dead or finished) link behind so a refresh does not resurrect it. */
+  const leaveFinish = (next: AuthView) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('finish');
+    setSearchParams(params, { replace: true });
+    setFinishInfo(null);
+    setFinishState('loading');
+    setFinishLoadFailed(false);
+    switchView(next);
   };
 
   const switchToForgotForm = () => {
@@ -1021,7 +1190,7 @@ export default function Auth() {
       </div>
       <div className="lv-stepper__meta">
         <span ref={stepHeadingRef} tabIndex={-1} className="lv-stepper__name" aria-live="polite" style={{ outline: 'none' }}>
-          {step === 1 ? s.step1Name : step === 2 ? s.step2Name : s.step3Name}
+          {step === 1 ? (emailFirst ? s.step1NameEmail : s.step1Name) : step === 2 ? s.step2Name : s.step3Name}
         </span>
         <span className="lv-stepper__count lv-mono">
           <b>0{step}</b> / 03
@@ -1047,7 +1216,77 @@ export default function Auth() {
   let screenKey: string;
   let screen: React.ReactNode;
 
-  if (resetToken) {
+  if (finishToken) {
+    if (finishState === 'loading') {
+      screenKey = 'finish-loading';
+      screen = (
+        <div>
+          {heading(SHEET.finish, s.finishTitle)}
+          <p className="lv-sub" role="status" aria-live="polite">
+            <span className="lv-dots" aria-hidden /> {s.finishLoading}
+          </p>
+        </div>
+      );
+    } else if (finishState === 'dead') {
+      screenKey = 'finish-dead';
+      screen = (
+        <div className="lv-center">
+          <span className="lv-center__icon" aria-hidden>
+            <Mail />
+          </span>
+          <h1 className="lv-title">{s.finishDeadTitle}</h1>
+          <p className="lv-sub">{s.finishDeadBody}</p>
+          <button type="button" onClick={() => leaveFinish('signup')} className="lv-btn-gold">
+            {s.signUpAgain}
+          </button>
+          <button type="button" onClick={() => leaveFinish('signin')} className="lv-link" style={{ marginTop: 8 }}>
+            {s.backToSignIn}
+          </button>
+        </div>
+      );
+    } else {
+      screenKey = 'finish';
+      screen = (
+        <form onSubmit={handleFinish} noValidate aria-busy={submitting && via === 'form'}>
+          {heading(SHEET.finish, s.finishTitle, s.finishHint(finishInfo?.email ?? ''))}
+          {finishLoadFailed && !serverError && (
+            <div className="lv-notice lv-notice--warn" role="status">
+              <Info aria-hidden />
+              <p>{s.errNetwork}</p>
+            </div>
+          )}
+          {errorSummary}
+          <div className="lv-fields">
+            {passwordField('new-password')}
+            {confirmField}
+          </div>
+          <div className="lv-cta">
+            <FillButton
+              id="finish-submit"
+              label={s.finishCta}
+              workingLabel={s.finishing}
+              successLabel={s.finished}
+              progress={resetFill.progress}
+              ready={resetFill.ready}
+              status={buttonStatus}
+              hint={!newPwValid ? s.hintPassword : !confirmValid ? s.hintConfirm : ''}
+            />
+          </div>
+          <p className="lv-terms">
+            {s.termsPrefix}{' '}
+            <Link to="/policies" className="lv-link">
+              {s.termsLink}
+            </Link>
+          </p>
+          <p className="lv-foot">
+            <button type="button" onClick={() => leaveFinish('signin')} className="lv-link">
+              {s.backToSignIn}
+            </button>
+          </p>
+        </form>
+      );
+    }
+  } else if (resetToken) {
     if (resetDone) {
       screenKey = 'reset-done';
       screen = (
@@ -1159,8 +1398,22 @@ export default function Auth() {
       </form>
     );
   } else if (view === 'signup') {
-    screenKey = `signup:${panel}:${panel === 'form' ? step : 0}`;
-    if (panel === 'telegram') {
+    screenKey = pendingEmail ? 'signup:pending' : `signup:${panel}:${panel === 'form' ? step : 0}`;
+    if (pendingEmail) {
+      screen = (
+        <div>
+          {heading(SHEET.signup, s.pendingTitle, s.pendingHint)}
+          <div className="lv-notice lv-notice--info" role="status">
+            <MailCheck aria-hidden />
+            <p>{s.pendingBody(trimmedEmail)}</p>
+          </div>
+          <p className="lv-sub">{s.pendingSpam}</p>
+          <button type="button" onClick={() => switchView('signin')} className="lv-link">
+            {s.pendingSignIn}
+          </button>
+        </div>
+      );
+    } else if (panel === 'telegram') {
       screen = (
         <div>
           {backLink(() => setPanel('form'))}
@@ -1174,7 +1427,7 @@ export default function Auth() {
       screen = (
         <div>
           {backLink(() => switchView('signin'))}
-          {heading(SHEET.signup, s.signUpTitle, s.step1Hint)}
+          {heading(SHEET.signup, s.signUpTitle, emailFirst ? s.step1HintEmail : s.step1Hint)}
           {stepper}
           {/* The referral bar sits OUTSIDE the form: it is not a field of the
               account and must never gate the button. */}
@@ -1198,8 +1451,8 @@ export default function Auth() {
                 spellCheck={false}
                 icon={<Mail />}
               />
-              {passwordField('new-password')}
-              {confirmField}
+              {!emailFirst && passwordField('new-password')}
+              {!emailFirst && confirmField}
             </div>
             <div className="lv-cta">
               <FillButton
@@ -1328,9 +1581,9 @@ export default function Auth() {
             <div className="lv-cta">
               <FillButton
                 id="signup-submit"
-                label={s.signUpCta}
-                workingLabel={s.signingUp}
-                successLabel={s.signedUp}
+                label={emailFirst ? s.sendLinkCta : s.signUpCta}
+                workingLabel={emailFirst ? s.sendingLink : s.signingUp}
+                successLabel={emailFirst ? s.linkSent : s.signedUp}
                 progress={signupEmailFill.progress}
                 ready={signupEmailFill.ready}
                 status={buttonStatus}
