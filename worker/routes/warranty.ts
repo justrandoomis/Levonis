@@ -21,7 +21,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { trustedOrigin } from '../lib/appOrigin';
 import { safeParse } from '../lib/types';
-import { requireAdmin, badRequest, notFound, conflict, str, int, oneOf } from '../lib/http';
+import { requireAdmin, requireAuth, badRequest, notFound, conflict, str, int, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -86,7 +86,12 @@ function verifyUrl(c: Context<AppContext>, receiptNo: string): string {
 }
 
 function docData(row: WarrantyReceiptRow, c: Context<AppContext>, now: string, lang: 'ar' | 'en' = 'ar'): WarrantyDocData {
-  const retailer = safeParse<WarrantyConfig['retailer']>(row.retailer_json, DEFAULT_WARRANTY_CONFIG.retailer);
+  // A receipt whose snapshot is an empty object (the column default) still
+  // renders every retailer line rather than escaping `undefined`.
+  const retailer = {
+    ...DEFAULT_WARRANTY_CONFIG.retailer,
+    ...safeParse<Partial<WarrantyConfig['retailer']>>(row.retailer_json, {}),
+  } as WarrantyConfig['retailer'];
   return {
     receipt_no: row.receipt_no,
     issued_date: row.issued_at ?? row.created_at,
@@ -848,14 +853,10 @@ warrantyAdminRoutes.post('/:id/printed', async (c) => {
 });
 
 /** The A4 document itself. Opened in a tab; `print=1` opens the dialog. */
-warrantyAdminRoutes.get('/:id/document', async (c) => {
-  const id = c.req.param('id');
+/** The printable A4 document for one receipt row — shared by the admin route and the holder's own copy. */
+async function receiptDocument(c: Context<AppContext>, row: WarrantyReceiptRow) {
   const lang = c.req.query('lang') === 'en' ? 'en' : 'ar';
   const autoPrint = c.req.query('print') === '1';
-  const row = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE id = ? OR receipt_no = ?`)
-    .bind(id, id)
-    .first<WarrantyReceiptRow>();
-  if (!row) throw notFound('Warranty receipt not found');
   const now = nowIso();
   const data = docData(row, c, now, lang);
   if (row.replaces_receipt_id) {
@@ -872,4 +873,40 @@ warrantyAdminRoutes.get('/:id/document', async (c) => {
   }
   asDocument(c);
   return c.html(renderWarrantyDoc(data, lang, autoPrint));
+}
+
+warrantyAdminRoutes.get('/:id/document', async (c) => {
+  const id = c.req.param('id');
+  const row = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE id = ? OR receipt_no = ?`)
+    .bind(id, id)
+    .first<WarrantyReceiptRow>();
+  if (!row) throw notFound('Warranty receipt not found');
+  return receiptDocument(c, row);
+});
+
+/**
+ * THE HOLDER'S OWN COPY. A customer could until now only see their warranty
+ * paper if someone handed them the printout. The buyer named on the receipt,
+ * or the account that currently holds the device, may open and print it
+ * from /warranty. Everyone else gets the same 404 as a receipt that does
+ * not exist. Drafts are not documents yet and are refused the same way.
+ */
+warrantyPublicRoutes.get('/receipts/:receiptNo/document', requireAuth, async (c) => {
+  await rateLimit(c, 'warranty-receipt-doc', 30, 600);
+  const user = c.get('user')!;
+  const receiptNo = str(c.req.param('receiptNo'), 'receiptNo', { min: 3, max: 40 }).toUpperCase();
+  const row = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE receipt_no = ?`)
+    .bind(receiptNo)
+    .first<WarrantyReceiptRow>();
+  const miss = () => notFound('Warranty receipt not found');
+  if (!row || row.status === 'draft') throw miss();
+  let allowed = row.user_id === user.id;
+  if (!allowed && row.unit_id) {
+    const reg = await c.env.DB.prepare('SELECT user_id FROM device_registrations WHERE unit_id = ? AND revoked_at IS NULL')
+      .bind(row.unit_id)
+      .first<{ user_id: string }>();
+    allowed = reg?.user_id === user.id;
+  }
+  if (!allowed) throw miss();
+  return receiptDocument(c, row);
 });

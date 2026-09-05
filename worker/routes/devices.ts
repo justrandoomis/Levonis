@@ -3,7 +3,11 @@
  *
  * Customer surface (/api/devices/...):
  *   GET  /mine                       registered devices with honest coverage
- *   POST /register { serial }        non-enumerating serial registration
+ *   POST /register { serial }        non-enumerating registration by serial,
+ *                                    receipt number or the receipt's QR link
+ *   GET  /eligible                   the caller's delivered units not yet linked
+ *   POST /units/:unitId/register     link one of those without typing a serial
+ *   DELETE /units/:unitId/registration  unlink (the step before a transfer)
  *   GET  /claims                     the user's warranty claims (legacy incl.)
  *   GET  /claims/:id                 one claim + message thread
  *   POST /units/:unitId/claims       open a claim from an owned device
@@ -13,7 +17,8 @@
  *
  * Admin surface (/api/devices/admin/..., admin role, all mutations audited):
  *   GET   /admin/orders/:orderId/units      order units + serialized items
- *   GET   /admin/units?email=|user_id=      units by customer
+ *   GET   /admin/units?email=|user_id=|serial=|receipt=   units by customer or identifier
+ *   POST  /admin/units/:unitId/unregister    unlink from whichever account holds it
  *   POST  /admin/orders/:orderId/units/backfill   (re)create units, idempotent
  *   POST  /admin/units/:unitId/serial       assign serial (reassign = explicit)
  *   PATCH /admin/units/:unitId/delivery     correct ONE unit's delivered_at
@@ -21,9 +26,17 @@
  *   GET   /admin/claims  · PATCH /admin/claims/:id   claim workflow decisions
  *   POST  /admin/products/:id/ops-policy    explicit serialization config
  *
- * A serial is an identifier, not an authentication secret: registration only
- * matches units on the SIGNED-IN user's delivered orders and never changes
- * ownership or any warranty clock.
+ * A serial is an identifier, not an authentication secret. ONE ACCOUNT PER
+ * DEVICE: device_registrations.unit_id is the primary key, so a unit can be
+ * linked to one account at a time. A device travels between accounts only
+ * by being unlinked first — by the account that holds it, or by an admin
+ * when that account is lost. Registration never changes who bought the unit
+ * (owner_user_id) or any warranty clock.
+ *
+ * THE ONE ANSWER for a serial that is unknown, not yet delivered, replaced,
+ * or already linked to another account: «غير موجود أو مستخدم مسبقًا / Not
+ * found or already in use.» Whether the serial exists, and whose it is, are
+ * exactly the facts a stranger typing serials must not learn.
  */
 
 import { Hono } from 'hono';
@@ -43,7 +56,9 @@ import {
 } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { rateLimit } from '../lib/ratelimit';
+import { rateLimit, rateLimitKey } from '../lib/ratelimit';
+import { getTierStatus, benefits } from '../lib/entitlements';
+import { RECEIPT_NO_RE } from '../lib/warranty';
 import { sniff } from './uploads';
 import {
   parseOpsPolicy,
@@ -66,12 +81,33 @@ export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
 deviceRoutes.use('/admin/*', requireAdmin);
 
-// The one non-enumerating answer for unknown / foreign / undelivered /
-// unassigned serials — never reveals whether the serial exists or whose it is.
-const SERIAL_NO_MATCH = () =>
-  notFound(
-    'This serial could not be matched to a delivered device on your account. Check the number on the device label, or contact LEVONIS support.'
-  );
+// The one non-enumerating answer — unknown, undelivered, replaced, or linked
+// to another account all read the same. Never reveals whether the serial
+// exists or whose it is. The client shows its own localized copy off the code.
+export const SERIAL_NOT_FOUND_OR_IN_USE = 'غير موجود أو مستخدم مسبقًا. / Not found or already in use.';
+const SERIAL_NO_MATCH = () => new HttpError(404, SERIAL_NOT_FOUND_OR_IN_USE, 'SERIAL_NOT_FOUND_OR_IN_USE');
+
+/**
+ * What the customer typed or scanned: a serial, a receipt number
+ * (WR-YYYY-MMDD-NNN), or the receipt's QR link (https://…/warranty/WR-…).
+ * Returns the receipt number when the input is one, else null.
+ */
+export function receiptNoFrom(input: string): string | null {
+  let s = input.trim();
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      s = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() ?? '');
+    } catch {
+      return null;
+    }
+  }
+  s = s.toUpperCase();
+  return RECEIPT_NO_RE.test(s) ? s : null;
+}
+
+/** A claim at one of these stages is closed and no longer binds the device to its holder. */
+const CLOSED_CLAIM_SQL = `stage IN ('rejected','replaced','resolved') OR (stage IS NULL AND status IN ('rejected','approved'))`;
 
 const UNIT_COLS = `id, order_id, order_item_id, product_id, owner_user_id, unit_index,
   delivered_at, warranty_base_months, warranty_ext_months, warranty_start_at, warranty_end_at,
@@ -98,6 +134,10 @@ function firstImage(imagesJson: unknown, imageSnapshot: unknown): string {
 interface DeviceRow extends UnitRow {
   registered_at?: string | null;
   revoked_at?: string | null;
+  reg_user_id?: string | null;
+  receipt_no?: string | null;
+  receipt_status?: string | null;
+  open_claims?: number | null;
   serial_raw?: string | null;
   name_snapshot?: string | null;
   image_snapshot?: string | null;
@@ -136,7 +176,52 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean } = {}) {
     },
     replaced_by_unit_id: row.replaced_by_unit_id ?? null,
     replacement_of_unit_id: row.replacement_of_unit_id ?? null,
+    // The live warranty receipt for this unit, when one was issued: the
+    // customer may open its public verification page and print it.
+    receipt: row.receipt_no ? { receipt_no: row.receipt_no, status: row.receipt_status ?? 'active' } : null,
+    open_claims: Number(row.open_claims ?? 0),
   };
+}
+
+const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
+            u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
+            u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
+            r.registered_at, r.revoked_at, r.user_id AS reg_user_id, s.serial_raw,
+            wr.receipt_no, wr.status AS receipt_status,
+            (SELECT COUNT(*) FROM warranty_claims wc WHERE wc.unit_id = u.id AND NOT (${CLOSED_CLAIM_SQL})) AS open_claims,
+            oi.name_snapshot, oi.image_snapshot,
+            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku, p.images
+       FROM order_item_units u
+       LEFT JOIN device_registrations r ON r.unit_id = u.id
+       LEFT JOIN device_serials s ON s.unit_id = u.id
+       LEFT JOIN warranty_receipts wr ON wr.unit_id = u.id AND wr.status = 'active'
+       LEFT JOIN order_items oi ON oi.id = u.order_item_id
+       LEFT JOIN products p ON p.id = u.product_id`;
+
+/** Loads one unit with everything devicePublic needs, by unit id. */
+async function loadDevice(db: D1Database, unitId: string): Promise<DeviceRow | null> {
+  return db.prepare(`${DEVICE_SELECT} WHERE u.id = ?`).bind(unitId).first<DeviceRow>();
+}
+
+/**
+ * Binds a unit to the caller. The PRIMARY KEY on unit_id is the one-account
+ * rule; the conditional UPDATE re-activates only the caller's own revoked
+ * link, so a unit held by someone else is left exactly as it was — and the
+ * re-read decides what the caller is told.
+ */
+async function bindUnit(db: D1Database, unitId: string, userId: string) {
+  await db
+    .prepare(
+      `INSERT INTO device_registrations (unit_id, user_id) VALUES (?, ?)
+       ON CONFLICT(unit_id) DO UPDATE SET user_id = excluded.user_id, registered_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), revoked_at = NULL
+         WHERE device_registrations.revoked_at IS NOT NULL OR device_registrations.user_id = excluded.user_id`
+    )
+    .bind(unitId, userId)
+    .run();
+  return db
+    .prepare('SELECT user_id, registered_at, revoked_at FROM device_registrations WHERE unit_id = ?')
+    .bind(unitId)
+    .first<{ user_id: string; registered_at: string; revoked_at: string | null }>();
 }
 
 interface ClaimRow extends Record<string, unknown> {
@@ -154,6 +239,7 @@ interface ClaimRow extends Record<string, unknown> {
   admin_note: string;
   evidence: string | null;
   created_at: string;
+  priority?: number | null;
   serial_raw?: string | null;
   email?: string | null;
   username?: string | null;
@@ -175,6 +261,7 @@ function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
     admin_note: row.admin_note ?? '',
     evidence: evidenceKeys.map((key) => ({ key, url: `/api/devices/claim-files/${key}` })),
     created_at: row.created_at,
+    priority: Number(row.priority ?? 0) === 1,
     serial: row.serial_raw ? (opts.admin ? row.serial_raw : maskSerial(row.serial_raw)) : null,
     ...(opts.admin ? { user_id: row.user_id, email: row.email ?? null, username: row.username ?? null } : {}),
   };
@@ -185,84 +272,151 @@ function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
 deviceRoutes.get('/mine', async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
-    `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
-            u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
-            u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
-            r.registered_at, s.serial_raw,
-            oi.name_snapshot, oi.image_snapshot,
-            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku, p.images
-       FROM device_registrations r
-       JOIN order_item_units u ON u.id = r.unit_id
-       LEFT JOIN device_serials s ON s.unit_id = u.id
-       LEFT JOIN order_items oi ON oi.id = u.order_item_id
-       LEFT JOIN products p ON p.id = u.product_id
+    `${DEVICE_SELECT}
       WHERE r.user_id = ? AND r.revoked_at IS NULL
       ORDER BY r.registered_at DESC
       LIMIT 100`
   )
     .bind(user.id)
     .all<DeviceRow>();
-  return c.json({ success: true, devices: results.map((r) => devicePublic(r)) });
+  const tier = await getTierStatus(c.env.DB, user.id);
+  return c.json({
+    success: true,
+    devices: results.map((r) => ({ ...devicePublic(r), transferred: r.owner_user_id !== user.id })),
+    // The PRO membership's warranty perk: priority service on claims. Read
+    // here so the page can say it without a second request.
+    priority_service: benefits.priorityService(tier),
+    tier: { tier: tier.tier, active: tier.active },
+  });
+});
+
+/**
+ * The caller's own delivered units that are not linked to any account — the
+ * "add from my previous orders" list. A unit another account holds is shown
+ * as such (the buyer knows they gave it away; nothing about the holder is
+ * revealed) so the list does not silently omit a device they paid for.
+ */
+deviceRoutes.get('/eligible', async (c) => {
+  const user = c.get('user')!;
+  const { results } = await c.env.DB.prepare(
+    `${DEVICE_SELECT}
+      WHERE u.owner_user_id = ? AND u.delivered_at IS NOT NULL AND u.replaced_by_unit_id IS NULL
+        -- "not actively linked by me" — spelled out, because NOT (NULL = ?)
+        -- is NULL in SQL and would drop every never-linked unit.
+        AND (r.unit_id IS NULL OR r.revoked_at IS NOT NULL OR r.user_id <> ?)
+      ORDER BY u.delivered_at DESC, u.unit_index ASC
+      LIMIT 100`
+  )
+    .bind(user.id, user.id)
+    .all<DeviceRow>();
+  return c.json({
+    success: true,
+    units: results.map((r) => ({
+      ...devicePublic(r),
+      linked_elsewhere: !!(r.reg_user_id && r.reg_user_id !== user.id && !r.revoked_at),
+    })),
+  });
 });
 
 deviceRoutes.post('/register', async (c) => {
-  // Rate-limited serial search (non-enumerating either way).
+  // Two limits: per account (the signed-in customer) and per address, so a
+  // stranger cannot rotate accounts to walk serials. Both answers are the
+  // same 429; both are generous for a person typing their own devices.
   await rateLimit(c, 'serial-register', 10, 600);
+  await rateLimit(c, 'serial-register-ip', 40, 600, rateLimitKey('serial-register-ip', null, c.req.header('CF-Connecting-IP') || 'unknown'));
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
-  const serialInput = str(body.serial, 'serial', { min: 4, max: 80 });
-  const norm = normalizeSerial(serialInput);
-  if (norm.length < 4) throw SERIAL_NO_MATCH();
+  const input = str(body.serial, 'serial', { min: 4, max: 300 });
 
-  const row = await c.env.DB.prepare(
-    `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
-            u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
-            u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
-            s.serial_raw,
-            oi.name_snapshot, oi.image_snapshot,
-            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku, p.images
-       FROM device_serials s
-       JOIN order_item_units u ON u.id = s.unit_id
-       LEFT JOIN order_items oi ON oi.id = u.order_item_id
-       LEFT JOIN products p ON p.id = u.product_id
-      WHERE s.serial_norm = ?`
-  )
-    .bind(norm)
-    .first<DeviceRow>();
+  // A receipt number (typed, or scanned off the receipt's QR link) names the
+  // unit through its LIVE receipt; anything else is read as a serial.
+  const receiptNo = receiptNoFrom(input);
+  let unitId: string | null = null;
+  if (receiptNo) {
+    const rec = await c.env.DB.prepare("SELECT unit_id FROM warranty_receipts WHERE receipt_no = ? AND status = 'active'")
+      .bind(receiptNo)
+      .first<{ unit_id: string | null }>();
+    unitId = rec?.unit_id ?? null;
+  } else {
+    const norm = normalizeSerial(input);
+    if (norm.length < 4) throw SERIAL_NO_MATCH();
+    const ser = await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(norm).first<{ unit_id: string }>();
+    unitId = ser?.unit_id ?? null;
+  }
+  if (!unitId) throw SERIAL_NO_MATCH();
+  const row = await loadDevice(c.env.DB, unitId);
 
-  // Unknown, foreign, or undelivered → the SAME generic answer. The other
-  // owner or order is never revealed.
-  if (!row || row.owner_user_id !== user.id || !row.delivered_at) throw SERIAL_NO_MATCH();
-  if (row.replaced_by_unit_id) {
-    // Ownership is verified at this point, so being specific reveals nothing
-    // about anyone else.
-    throw badRequest('This device was replaced — the replacement unit carries the coverage. Contact support if this looks wrong.', 'UNIT_REPLACED');
+  // Unknown, undelivered, replaced, or held by another account → the SAME
+  // answer. The holder, the buyer and the order are never revealed.
+  if (!row || !row.delivered_at || row.replaced_by_unit_id) throw SERIAL_NO_MATCH();
+  if (row.reg_user_id && row.reg_user_id !== user.id && !row.revoked_at) throw SERIAL_NO_MATCH();
+
+  // Idempotent. Registration NEVER touches warranty dates: an expired device
+  // registers with an honest expired state, a duplicate registration returns
+  // the existing one, and a device whose previous holder unlinked it is
+  // linked to its new holder — the transfer the owner asked for.
+  const alreadyMine = row.reg_user_id === user.id && !row.revoked_at;
+  const reg = await bindUnit(c.env.DB, row.id, user.id);
+  if (!reg || reg.user_id !== user.id || reg.revoked_at) throw SERIAL_NO_MATCH();
+  if (!alreadyMine) {
+    await audit(c.env.DB, user.id, 'device.register', row.id, {
+      by: receiptNo ? 'receipt' : 'serial',
+      transferred: row.owner_user_id !== user.id,
+    });
   }
 
-  // Idempotent activation. Registration NEVER touches warranty dates: an
-  // expired device registers with an honest expired state, and a duplicate
-  // registration returns the existing one.
-  const priorReg = await c.env.DB.prepare('SELECT user_id, registered_at, revoked_at FROM device_registrations WHERE unit_id = ?')
-    .bind(row.id)
-    .first<{ user_id: string; registered_at: string; revoked_at: string | null }>();
-  await c.env.DB.prepare(
-    `INSERT INTO device_registrations (unit_id, user_id) VALUES (?, ?)
-     ON CONFLICT(unit_id) DO UPDATE SET revoked_at = NULL
-       WHERE device_registrations.user_id = excluded.user_id`
+  const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
+  return c.json({
+    success: true,
+    device: { ...devicePublic(fresh), transferred: fresh.owner_user_id !== user.id },
+    already_registered: alreadyMine,
+  });
+});
+
+/** Link one of the caller's OWN delivered units without typing its serial. */
+deviceRoutes.post('/units/:unitId/register', async (c) => {
+  await rateLimit(c, 'unit-register', 30, 600);
+  const user = c.get('user')!;
+  const row = await loadDevice(c.env.DB, c.req.param('unitId'));
+  // Only the buyer may use this path: the unit id came from their own list.
+  if (!row || row.owner_user_id !== user.id) throw notFound('Device not found on your account');
+  if (!row.delivered_at) throw badRequest('This device is not delivered yet — it can be linked after delivery', 'NOT_DELIVERED');
+  if (row.replaced_by_unit_id) throw badRequest('This device was replaced — the replacement carries the coverage', 'UNIT_REPLACED');
+  if (row.reg_user_id && row.reg_user_id !== user.id && !row.revoked_at) {
+    // The buyer already knows this device exists; saying WHY it cannot be
+    // linked is honest, and still names nobody.
+    throw conflict('This device is linked to another account. That account must unlink it first, or support can.', 'LINKED_ELSEWHERE');
+  }
+  const alreadyMine = row.reg_user_id === user.id && !row.revoked_at;
+  const reg = await bindUnit(c.env.DB, row.id, user.id);
+  if (!reg || reg.user_id !== user.id || reg.revoked_at) throw conflict('This device is linked to another account.', 'LINKED_ELSEWHERE');
+  if (!alreadyMine) await audit(c.env.DB, user.id, 'device.register', row.id, { by: 'order' });
+  const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
+  return c.json({ success: true, device: { ...devicePublic(fresh), transferred: false }, already_registered: alreadyMine });
+});
+
+/**
+ * Unlink — the step before a transfer. Only the account that holds the
+ * device may do it, and not while a claim on it is still open: a claim is a
+ * conversation about THIS holder's device, and handing the device on
+ * mid-claim would leave it about nobody's.
+ */
+deviceRoutes.delete('/units/:unitId/registration', async (c) => {
+  const user = c.get('user')!;
+  const row = await loadDevice(c.env.DB, c.req.param('unitId'));
+  if (!row || row.reg_user_id !== user.id || row.revoked_at) throw notFound('Device not found on your account');
+  if (Number(row.open_claims ?? 0) > 0) {
+    throw conflict('This device has an open warranty claim — it can be unlinked once the claim is closed', 'CLAIM_OPEN');
+  }
+  const res = await c.env.DB.prepare(
+    `UPDATE device_registrations SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE unit_id = ? AND user_id = ? AND revoked_at IS NULL`
   )
     .bind(row.id, user.id)
     .run();
-  const reg = await c.env.DB.prepare('SELECT user_id, registered_at, revoked_at FROM device_registrations WHERE unit_id = ?')
-    .bind(row.id)
-    .first<{ user_id: string; registered_at: string; revoked_at: string | null }>();
-  if (!reg || reg.user_id !== user.id) throw SERIAL_NO_MATCH();
-
-  const device = devicePublic({ ...row, registered_at: reg.registered_at });
-  return c.json({
-    success: true,
-    device,
-    already_registered: !!(priorReg && priorReg.user_id === user.id && !priorReg.revoked_at),
-  });
+  if (res.meta.changes === 0) throw notFound('Device not found on your account');
+  await audit(c.env.DB, user.id, 'device.unregister', row.id, { by: 'holder' });
+  return c.json({ success: true });
 });
 
 // ----------------------------------------------------------------- claims
@@ -357,11 +511,17 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   )
     .bind(unitId)
     .first<UnitRow & { reg_revoked: string | null; reg_user: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
-  // Owner-only; foreign units are indistinguishable from missing ones.
-  if (!unit || unit.owner_user_id !== user.id) throw notFound('Device not found on your account');
-  if (unit.reg_user !== user.id || unit.reg_revoked) {
+  // The account that HOLDS the device (its active registration) may claim on
+  // it; the buyer who has not linked it yet is told to link it first; anyone
+  // else sees nothing.
+  const holds = !!unit && unit.reg_user === user.id && !unit.reg_revoked;
+  if (!unit || (!holds && unit.owner_user_id !== user.id)) throw notFound('Device not found on your account');
+  if (!holds) {
     throw badRequest('Register this device first (Warranty → Add device), then open the claim from it.', 'NOT_REGISTERED');
   }
+  // PRO priority service, snapshotted at creation exactly as support tickets
+  // do — the one warranty perk the membership carries.
+  const priority = benefits.priorityService(await getTierStatus(c.env.DB, user.id)) ? 1 : 0;
 
   // Private attachment keys uploaded through POST /claims/upload only.
   const rawAttachments = Array.isArray(body.attachments) ? body.attachments : [];
@@ -377,10 +537,10 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   const id = newId('wc');
   const productName = String(unit.name_snapshot || unit.p_name_ar || unit.p_name || 'Device');
   await c.env.DB.prepare(
-    `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', 'submitted')`
+    `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', 'submitted', ?)`
   )
-    .bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments))
+    .bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority)
     .run();
 
   const cov = coverageState(unit.delivered_at, unit.warranty_end_at);
@@ -388,6 +548,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     success: true,
     id,
     stage: 'received',
+    priority: priority === 1,
     warranty_facts: {
       order_id: unit.order_id,
       delivered_at: unit.delivered_at,
@@ -547,7 +708,36 @@ deviceRoutes.get('/admin/units', async (c) => {
   const q = c.req.query();
   const email = str(q.email, 'email', { max: 320, required: false });
   const userId = str(q.user_id, 'user_id', { max: 60, required: false });
-  if (!email && !userId) throw badRequest('Provide email or user_id');
+  const serial = str(q.serial, 'serial', { max: 300, required: false });
+  if (!email && !userId && !serial) throw badRequest('Provide email, user_id or serial');
+  if (serial) {
+    // One identifier — a serial, a receipt number or the receipt's QR link —
+    // resolves to the unit it names, with who bought it and who holds it.
+    const receiptNo = receiptNoFrom(serial);
+    const unitRow = receiptNo
+      ? await c.env.DB.prepare('SELECT unit_id FROM warranty_receipts WHERE receipt_no = ?').bind(receiptNo).first<{ unit_id: string | null }>()
+      : await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(normalizeSerial(serial)).first<{ unit_id: string }>();
+    const row = unitRow?.unit_id ? await loadDevice(c.env.DB, unitRow.unit_id) : null;
+    if (!row) return c.json({ success: true, units: [] });
+    const people = await c.env.DB.prepare('SELECT id, email, username, name FROM users WHERE id IN (?, ?)')
+      .bind(row.owner_user_id, row.reg_user_id ?? '')
+      .all<{ id: string; email: string; username: string | null; name: string | null }>();
+    const person = (id: string | null) => {
+      const p = id ? people.results.find((x) => x.id === id) : null;
+      return p ? { id: p.id, email: p.email, username: p.username, name: p.name } : null;
+    };
+    return c.json({
+      success: true,
+      units: [
+        {
+          ...devicePublic(row, { admin: true }),
+          registration: row.registered_at ? { registered_at: row.registered_at, revoked_at: row.revoked_at ?? null } : null,
+          buyer: person(row.owner_user_id),
+          holder: row.reg_user_id && !row.revoked_at ? person(row.reg_user_id) : null,
+        },
+      ],
+    });
+  }
   let ownerId = userId;
   if (!ownerId) {
     const u = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email.toLowerCase()).first<{ id: string }>();
@@ -575,6 +765,27 @@ deviceRoutes.get('/admin/units', async (c) => {
       registration: u.registered_at ? { registered_at: u.registered_at, revoked_at: u.revoked_at ?? null } : null,
     })),
   });
+});
+
+/**
+ * Admin unlink — for a customer who lost access to the account that holds
+ * the device, or a dispute. Reason required and audited; the device is then
+ * free to be linked by whoever holds it.
+ */
+deviceRoutes.post('/admin/units/:unitId/unregister', async (c) => {
+  const admin = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const reason = str(body.reason, 'reason', { min: 5, max: 500 });
+  const row = await loadDevice(c.env.DB, c.req.param('unitId'));
+  if (!row) throw notFound('Unit not found');
+  if (!row.reg_user_id || row.revoked_at) throw conflict('This device is not linked to any account', 'NOT_LINKED');
+  await c.env.DB.prepare(
+    `UPDATE device_registrations SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE unit_id = ? AND revoked_at IS NULL`
+  )
+    .bind(row.id)
+    .run();
+  await audit(c.env.DB, admin.id, 'device.unregister', row.id, { by: 'admin', from_user_id: row.reg_user_id, reason });
+  return c.json({ success: true, unlinked_from_user_id: row.reg_user_id });
 });
 
 deviceRoutes.post('/admin/orders/:orderId/units/backfill', async (c) => {
@@ -846,7 +1057,7 @@ deviceRoutes.get('/admin/claims', async (c) => {
        FROM warranty_claims wc
        LEFT JOIN device_serials s ON s.unit_id = wc.unit_id
        LEFT JOIN users u ON u.id = wc.user_id
-      ORDER BY wc.created_at DESC LIMIT 300`
+      ORDER BY wc.priority DESC, wc.created_at DESC LIMIT 300`
   ).all<ClaimRow>();
   let claims = results.map((r) => claimPublic(r, { admin: true }));
   if (stageFilter) claims = claims.filter((cl) => cl.stage === stageFilter);
