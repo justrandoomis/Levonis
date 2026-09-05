@@ -5,6 +5,9 @@
  * on the account screen; adding fourteen history rows to every order in it,
  * so that one expanded card can show a tracker, would make every OTHER card
  * slower. This asks for one order's path, once, when the customer opens it.
+ * A screen that has ALREADY fetched the path (the order detail, which also
+ * needs the tracking number for its header) hands it in as `tracking` and no
+ * second request is made.
  *
  * WHY THE LABELS COME FROM THE SERVER. Stage five of a pre-order names the
  * freight mode — "جارٍ التجهيز للشحن البحري" — so building it in the browser
@@ -20,25 +23,9 @@
 import { useEffect, useState } from 'react';
 import { Check, Circle, Loader2, Truck } from 'lucide-react';
 import { api } from '../lib/api';
+import type { OrderTrackingPublic } from '../lib/api';
 
-interface Step {
-  stage: string;
-  label: string;
-  reached: boolean;
-  current: boolean;
-  at: string | null;
-}
-
-interface Tracking {
-  order_id: string;
-  shipping_type: string;
-  shipping_type_label: string;
-  stage: string;
-  stage_changed_at: string;
-  next_stage_at: string | null;
-  tracking_no: string | null;
-  steps: Step[];
-}
+export type Tracking = OrderTrackingPublic;
 
 const STRINGS = {
   ar: { loading: 'جارٍ تحميل التتبع…', failed: 'تعذّر تحميل حالة الشحن.', tracking: 'رقم التتبع', expected: 'المتوقع', title: 'تتبع الشحنة' },
@@ -55,13 +42,31 @@ function when(iso: string | null, lang: string): string {
   });
 }
 
-export default function OrderTracker({ orderId, lang }: { orderId: string; lang: string }) {
+export default function OrderTracker({
+  orderId,
+  lang,
+  tracking,
+  showTrackingNo = true,
+}: {
+  orderId: string;
+  lang: string;
+  /** Already-fetched path from GET /api/orders/:id/tracking — skips the fetch. */
+  tracking?: Tracking | null;
+  /** The detail screen shows the number with a copy control of its own. */
+  showTrackingNo?: boolean;
+}) {
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
-  const [data, setData] = useState<Tracking | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<Tracking | null>(tracking ?? null);
+  const [loading, setLoading] = useState(!tracking);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (tracking) {
+      setData(tracking);
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
     let alive = true;
     setLoading(true);
     setFailed(false);
@@ -73,12 +78,12 @@ export default function OrderTracker({ orderId, lang }: { orderId: string; lang:
     return () => {
       alive = false;
     };
-  }, [orderId, lang]);
+  }, [orderId, lang, tracking]);
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-zinc-400 text-xs py-4">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> {s.loading}
+      <div className="flex items-center gap-2 text-zinc-400 text-xs py-4" role="status">
+        <Loader2 className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> {s.loading}
       </div>
     );
   }
@@ -86,7 +91,7 @@ export default function OrderTracker({ orderId, lang }: { orderId: string; lang:
   // legacy status as if it were the tracker: half a truth about where a
   // parcel is is worse than saying we could not check.
   if (failed || !data) {
-    return <p className="text-zinc-500 text-xs py-3">{s.failed}</p>;
+    return <p className="text-zinc-500 text-xs py-3" role="status">{s.failed}</p>;
   }
 
   return (
@@ -130,7 +135,7 @@ export default function OrderTracker({ orderId, lang }: { orderId: string; lang:
         })}
       </ol>
 
-      {data.tracking_no && (
+      {showTrackingNo && data.tracking_no && (
         <p className="text-zinc-400 text-[11px] mt-2 pt-2 border-t border-zinc-800">
           {s.tracking}: <span dir="ltr" className="text-zinc-200 font-mono">{data.tracking_no}</span>
         </p>

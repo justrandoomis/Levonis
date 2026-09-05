@@ -213,9 +213,83 @@ export interface ApiAddress {
   created_at: string;
 }
 
+export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+
+/** The four journeys an order can be on (worker/lib/shippingType.ts). */
+export type OrderShippingType = 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land';
+
+/** Per-line price breakdown frozen at checkout (cost fields stripped). */
+export interface OrderItemPricing {
+  applied_iqd?: number;
+  applied_tier?: 'regular' | 'pro' | 'prime' | string;
+  regular_iqd?: number;
+  prime_iqd?: number | null;
+  pro_iqd?: number | null;
+  unit_subtotal_iqd?: number;
+  price_source?: string;
+}
+
+/** The exact selection bought, in the shape POST /api/cart/items accepts. */
+export interface OrderItemSelection {
+  option_id: string;
+  option_value_ids: string[];
+  color_id: string;
+  transport_method: '' | 'air' | 'sea' | 'land';
+  warranty_plan_id: string;
+}
+
+export interface ApiOrderItem {
+  id: string;
+  product_id: string | null;
+  /** The product's CURRENT slug (null when the product is gone). */
+  product_slug?: string | null;
+  name: string;
+  image: string;
+  variant: string;
+  qty: number;
+  unit_price_iqd: number;
+  line_total_iqd: number;
+  pricing?: OrderItemPricing | null;
+  warranty?: {
+    plan_id?: string;
+    title_ar?: string;
+    fee_iqd?: number;
+    duration_months?: number;
+    duration_kind?: string;
+  } | null;
+  transport?: { method?: string; commission_iqd?: number; waived?: boolean } | null;
+  selection?: OrderItemSelection;
+}
+
+/** Stages reached out of the path's length — the card's progress hairline. */
+export interface OrderStageProgress {
+  index: number;
+  total: number;
+}
+
+export interface OrderInvoiceRef {
+  id: string;
+  invoice_no: string;
+  revision?: number;
+  payment_status?: string;
+}
+
+/** Points EARNED by an order: pending under the 7-day hold, or released. */
+export interface OrderPointsEarned {
+  state: 'none' | 'pending' | 'released' | 'cancelled' | 'reversed' | string;
+  pending: number;
+  released: number;
+  available_at: string | null;
+  eligible_iqd?: number;
+  iqd_per_point?: number | null;
+  rule_version?: string | null;
+  redeemed?: number;
+  redemption_state?: string;
+}
+
 export interface ApiOrder {
   id: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: OrderStatus;
   address: Partial<ApiAddress>;
   delivery_method: { id?: string; titleAr?: string; titleEn?: string; price_iqd?: number };
   payment_method_id: string;
@@ -227,19 +301,33 @@ export interface ApiOrder {
   due_on_delivery_iqd: number;
   created_at: string;
   updated_at: string;
-  items: Array<{
-    id: string;
-    product_id: string | null;
-    name: string;
-    image: string;
-    variant: string;
-    qty: number;
-    unit_price_iqd: number;
-    line_total_iqd: number;
-  }>;
+  items: ApiOrderItem[];
   email?: string;
   username?: string;
   user_id?: string;
+  // ---- the customer's tracking view (orders.ts orderPublic) ----
+  shipping_type?: OrderShippingType;
+  /** Where the order stands on its path; the tracking endpoint labels it. */
+  stage?: string;
+  stage_changed_at?: string;
+  next_stage?: string | null;
+  /** Non-null ONLY when the clock owns the next move — never a guess. */
+  next_stage_at?: string | null;
+  tracking_no?: string | null;
+  delivered_at?: string | null;
+  delivery_waived?: boolean;
+  membership_tier_snapshot?: string;
+  coupon?: { coupon_id?: string; code?: string; discount_iqd?: number } | null;
+  coupon_discount_iqd?: number;
+  progress?: OrderStageProgress;
+  /** §5: the single money view — every screen reads this, none recomputes. */
+  financial?: OrderFinancial;
+  /** Sum of quantities — "8 items" on the card. */
+  item_count?: number;
+  // ---- GET /api/orders/:id only ----
+  invoice?: OrderInvoiceRef | null;
+  can_cancel?: boolean;
+  can_review?: boolean;
   /** A membership gift that ships WITH the order and is worth 0 IQD on every
    *  total — today only «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». */
   membership_gift?: {
@@ -280,7 +368,54 @@ export interface OrderFinancial {
   due_on_delivery_iqd: number;
   collected_iqd: number | null;
   outstanding_iqd: number;
-  payment_state: string;
+  payment_state: 'paid' | 'partial' | 'cod_due' | string;
+  wallet_tx_id?: string | null;
+  points_tx_id?: string | null;
+  settlement?: { collected_iqd: number; settled_at: string | null; fully_settled: boolean } | null;
+  /** Null when the accrual snapshot was not loaded — never a fabricated zero. */
+  points?: OrderPointsEarned | null;
+  support?: { referrer_username: string; ref: string; discount_iqd: 0 } | null;
+}
+
+/** One serialized device inside an order, as GET /api/orders/:id/units shows it. */
+export interface OrderUnitPublic {
+  unit_id: string;
+  order_item_id: string;
+  unit_index: number;
+  product: { id: string | null; slug: string | null; name: string; name_ar: string; image: string };
+  /** MASKED — last four characters only; null when no serial was assigned. */
+  serial: string | null;
+  delivered_at: string | null;
+  warranty: {
+    start_at: string | null;
+    end_at: string | null;
+    state: 'active' | 'expired' | 'needs_config' | 'not_delivered';
+    remaining_days: number | null;
+  };
+  /** Whether the buyer holds it, another account does, or nobody yet. */
+  linked: 'mine' | 'other' | 'none';
+  receipt_no: string | null;
+  replaced: boolean;
+}
+
+export interface OrderTrackingStep {
+  stage: string;
+  label: string;
+  reached: boolean;
+  current: boolean;
+  at: string | null;
+}
+
+/** GET /api/orders/:id/tracking — labels resolved server-side. */
+export interface OrderTrackingPublic {
+  order_id: string;
+  shipping_type: OrderShippingType | string;
+  shipping_type_label: string;
+  stage: string;
+  stage_changed_at: string;
+  next_stage_at: string | null;
+  tracking_no: string | null;
+  steps: OrderTrackingStep[];
 }
 
 /** Everything the fulfilment screen needs for ONE order. */

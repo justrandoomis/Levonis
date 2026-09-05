@@ -1,33 +1,42 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Info, Search, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { ArrowLeft, ArrowRight, Package, RefreshCw, Info, Truck } from 'lucide-react';
-import { api, ApiOrder, formatIqd } from '../lib/api';
-import ReturnsSection from '../components/returns/ReturnsSection';
-import OrderTracker from '../components/OrderTracker';
+import { api } from '../lib/api';
+import type { ApiOrder } from '../lib/api';
+import { TabStrip } from '../components/ui/Tabs';
+import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
+import Spinner from '../components/ui/Spinner';
+import OrderCard from '../components/orders/OrderCard';
+import OrderCardSkeleton from '../components/orders/OrderCardSkeleton';
+import CancelOrderSheet from '../components/orders/CancelOrderSheet';
+import ReviewSheet from '../components/orders/ReviewSheet';
+import GiftsEntry from '../components/orders/GiftsEntry';
+import { asLang } from '../components/orders/format';
 
 /**
- * Orders list with a WORKING status filter. The filter is driven by the
- * ?status= query param so profile deep-links land on the right view:
+ * The customer's orders, one page at a time.
  *
- *  - pending / shipped / cancelled … single REAL order statuses, passed to
- *    GET /api/orders?status=… (server-side WHERE status = ?).
- *  - to_ship … merges the two real "waiting to ship" statuses
- *    (confirmed + processing) client-side; the server filter is
- *    single-status, so the full list is fetched and filtered here.
- *  - review / returns … both open the DELIVERED orders list, because
- *    reviewing and the 7-day return window (ReturnsSection below each
- *    order) are actions on delivered orders. The returns view says so
- *    explicitly instead of pretending a separate "returns orders" status
- *    exists.
+ * The status filter is the ?status= query param so profile deep-links land on
+ * the right view:
+ *
+ *  - pending / shipped / cancelled … single REAL order statuses.
+ *  - to_ship … the two "waiting to ship" statuses (confirmed + processing),
+ *    sent to the server as a comma list — the server filters, so a page is a
+ *    page and never an empty remainder after client-side filtering.
+ *  - review / returns … both open the DELIVERED list, because reviewing and
+ *    the 7-day return window are actions on delivered orders. The returns
+ *    view says so instead of pretending a "returns" status exists.
  *
  * Unknown ?status= values fall back to "All" — never an accidental empty
  * list from a bogus server filter.
+ *
+ * The list is cursor-paginated (limit + before). Search is client-side over
+ * what is loaded and says so when more pages exist.
  */
 
 type Filter = 'All' | 'pending' | 'to_ship' | 'shipped' | 'review' | 'returns' | 'cancelled';
 
-/** Map an incoming ?status= value (including legacy links) to a view. */
 function parseFilter(raw: string | null): Filter {
   switch (raw) {
     case 'pending':
@@ -48,20 +57,23 @@ function parseFilter(raw: string | null): Filter {
   }
 }
 
-/** Server query for a view; null = fetch all and filter client-side. */
-const SERVER_STATUS: Record<Filter, string | null> = {
+/** Server query for a view — every view is server-filtered now. */
+const SERVER_STATUS: Record<Filter, string> = {
   All: '',
   pending: 'pending',
+  to_ship: 'confirmed,processing',
   shipped: 'shipped',
-  cancelled: 'cancelled',
   review: 'delivered',
   returns: 'delivered',
-  to_ship: null,
+  cancelled: 'cancelled',
 };
+
+const FILTER_ORDER: Filter[] = ['All', 'pending', 'to_ship', 'shipped', 'review', 'returns', 'cancelled'];
+const PAGE_SIZE = 20;
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 
 const STRINGS = {
   ar: {
-    track: 'تتبع الشحنة',
     title: 'طلباتي',
     back: 'رجوع',
     filters: {
@@ -69,32 +81,26 @@ const STRINGS = {
       pending: 'انتظار الدفع',
       to_ship: 'انتظار الشحن',
       shipped: 'المشحونة',
-      review: 'المراجعة',
+      review: 'المستلمة',
       returns: 'الاسترجاع',
       cancelled: 'الملغية',
     } as Record<Filter, string>,
-    statuses: {
-      pending: 'بانتظار الدفع',
-      confirmed: 'بانتظار الشحن',
-      processing: 'قيد التجهيز',
-      shipped: 'مشحونة',
-      delivered: 'تم التوصيل',
-      cancelled: 'ملغية',
-    } as Record<ApiOrder['status'], string>,
-    returnsNote: 'الإرجاع يُطلب من الطلبات المستلمة (خلال 7 أيام من الاستلام). هذه قائمة طلباتك المستلمة — استخدم قسم «الإرجاع والاستبدال» أسفل كل طلب.',
+    returnsNote: 'الإرجاع يُطلب من الطلبات المستلمة (خلال 7 أيام من الاستلام). افتح تفاصيل الطلب ← «الدفع والنقاط» ← «الإرجاع والاستبدال».',
     empty: 'لا توجد طلبات بعد.',
     emptyFiltered: 'لا توجد طلبات بهذه الحالة.',
-    loadError: 'تعذر تحميل الطلبات.',
-    retry: 'إعادة المحاولة',
-    total: 'المجموع',
-    cancel: 'إلغاء الطلب',
-    cancelling: 'جارٍ الإلغاء...',
-    cancelConfirm: (id: string) => `هل أنت متأكد من إلغاء الطلب ${id}؟ سيُعاد أي رصيد أو نقاط مدفوعة.`,
-    cancelFailed: 'تعذر إلغاء الطلب',
     filterLabel: 'تصفية الطلبات',
+    search: 'بحث في الطلبات',
+    searchPlaceholder: 'ابحث برقم الطلب أو اسم المنتج',
+    clearSearch: 'مسح البحث',
+    noMatches: 'لا نتائج مطابقة',
+    searchHint: 'يبحث ضمن الطلبات المحمّلة فقط — حمّل المزيد لتوسيع البحث.',
+    loadMore: 'تحميل المزيد',
+    loadingMore: 'جارٍ التحميل…',
+    loadMoreFailed: 'تعذر تحميل المزيد.',
+    cancelledNotice: (id: string) => `أُلغي الطلب ${id}.`,
+    reviewThanks: 'شكرًا — مراجعتك بانتظار الاعتماد.',
   },
   en: {
-    track: 'Track shipment',
     title: 'My Orders',
     back: 'Back',
     filters: {
@@ -102,32 +108,26 @@ const STRINGS = {
       pending: 'Pending payment',
       to_ship: 'To ship',
       shipped: 'Shipped',
-      review: 'To review',
+      review: 'Delivered',
       returns: 'Returns',
       cancelled: 'Cancelled',
     } as Record<Filter, string>,
-    statuses: {
-      pending: 'Pending payment',
-      confirmed: 'To ship',
-      processing: 'Processing',
-      shipped: 'Shipped',
-      delivered: 'Delivered',
-      cancelled: 'Cancelled',
-    } as Record<ApiOrder['status'], string>,
-    returnsNote: 'Returns are requested from DELIVERED orders (within 7 days of receipt). This is your delivered-orders list — use the "Returns & exchange" section under each order.',
+    returnsNote: 'Returns are requested from DELIVERED orders (within 7 days of receipt). Open an order → "Payment & points" → "Returns & Replacement".',
     empty: 'No orders yet.',
     emptyFiltered: 'No orders with this status.',
-    loadError: 'Could not load orders.',
-    retry: 'Retry',
-    total: 'Total',
-    cancel: 'Cancel',
-    cancelling: 'Cancelling...',
-    cancelConfirm: (id: string) => `Cancel order ${id}? Any paid balance or points will be refunded.`,
-    cancelFailed: 'Failed to cancel order',
     filterLabel: 'Filter orders',
+    search: 'Search orders',
+    searchPlaceholder: 'Search by order number or product',
+    clearSearch: 'Clear search',
+    noMatches: 'No matching orders',
+    searchHint: 'Searching loaded orders only — load more to widen the search.',
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
+    loadMoreFailed: 'Could not load more.',
+    cancelledNotice: (id: string) => `Order ${id} was cancelled.`,
+    reviewThanks: 'Thank you — your review is awaiting approval.',
   },
   ckb: {
-    track: 'بەدواداچوونی بار',
     title: 'داواکارییەکانم',
     back: 'گەڕانەوە',
     filters: {
@@ -135,107 +135,153 @@ const STRINGS = {
       pending: 'چاوەڕێی پارەدان',
       to_ship: 'چاوەڕێی ناردن',
       shipped: 'نێردراوەکان',
-      review: 'پێداچوونەوە',
+      review: 'گەیەنراوەکان',
       returns: 'گەڕاندنەوە',
       cancelled: 'هەڵوەشێنراوەکان',
     } as Record<Filter, string>,
-    statuses: {
-      pending: 'چاوەڕێی پارەدان',
-      confirmed: 'چاوەڕێی ناردن',
-      processing: 'لە جێبەجێکردندایە',
-      shipped: 'نێردراوە',
-      delivered: 'گەیەنراوە',
-      cancelled: 'هەڵوەشێنراوەتەوە',
-    } as Record<ApiOrder['status'], string>,
-    returnsNote: 'گەڕاندنەوە لە داواکارییە گەیەنراوەکانەوە داوا دەکرێت (لە ماوەی ٧ ڕۆژ لە وەرگرتن). ئەمە لیستی داواکارییە گەیەنراوەکانتە — بەشی «گەڕاندنەوە و گۆڕینەوە» لەژێر هەر داواکارییەک بەکاربهێنە.',
+    returnsNote: 'گەڕاندنەوە لە داواکارییە گەیەنراوەکانەوە داوا دەکرێت (لە ماوەی ٧ ڕۆژ لە وەرگرتن). داواکارییەک بکەرەوە ← «پارەدان و خاڵ» ← «گەڕاندنەوە و گۆڕینەوە».',
     empty: 'هێشتا هیچ داواکارییەک نییە.',
     emptyFiltered: 'هیچ داواکارییەک بەم دۆخە نییە.',
-    loadError: 'داواکارییەکان بار نەبوون.',
-    retry: 'هەوڵدانەوە',
-    total: 'کۆی گشتی',
-    cancel: 'هەڵوەشاندنەوە',
-    cancelling: 'هەڵوەشاندنەوە بەردەوامە...',
-    cancelConfirm: (id: string) => `دڵنیایت لە هەڵوەشاندنەوەی داواکاری ${id}؟ هەر باڵانس یان خاڵێکی دراو دەگەڕێتەوە.`,
-    cancelFailed: 'داواکارییەکە هەڵنەوەشایەوە',
     filterLabel: 'فلتەرکردنی داواکارییەکان',
+    search: 'گەڕان لە داواکارییەکان',
+    searchPlaceholder: 'بە ژمارەی داواکاری یان ناوی کاڵا بگەڕێ',
+    clearSearch: 'سڕینەوەی گەڕان',
+    noMatches: 'هیچ داواکارییەکی هاوتا نییە',
+    searchHint: 'تەنها لە داواکارییە بارکراوەکان دەگەڕێت — زیاتر بار بکە بۆ فراوانکردنی گەڕان.',
+    loadMore: 'زیاتر بار بکە',
+    loadingMore: 'بارکردن…',
+    loadMoreFailed: 'زیاتر بار نەکرا.',
+    cancelledNotice: (id: string) => `داواکاری ${id} هەڵوەشێنرایەوە.`,
+    reviewThanks: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
   },
 };
 
-const FILTER_ORDER: Filter[] = ['All', 'pending', 'to_ship', 'shipped', 'review', 'returns', 'cancelled'];
-
-const STATUS_STYLES: Record<ApiOrder['status'], string> = {
-  pending: 'bg-amber-500/10 text-amber-400',
-  confirmed: 'bg-blue-500/10 text-blue-400',
-  processing: 'bg-sky-500/10 text-sky-400',
-  shipped: 'bg-indigo-500/10 text-indigo-400',
-  delivered: 'bg-emerald-500/10 text-emerald-400',
-  cancelled: 'bg-red-500/10 text-red-400',
-};
+function listUrl(filter: Filter, before?: string | null): string {
+  const p = new URLSearchParams();
+  const st = SERVER_STATUS[filter];
+  if (st) p.set('status', st);
+  p.set('limit', String(PAGE_SIZE));
+  if (before) p.set('before', before);
+  return `/api/orders?${p.toString()}`;
+}
 
 export default function Orders() {
   const navigate = useNavigate();
   const { dir, lang } = useLanguage();
   const location = useLocation();
-  const s = STRINGS[lang] ?? STRINGS.ar;
+  const s = STRINGS[asLang(lang)];
 
-  const filter = useMemo(
-    () => parseFilter(new URLSearchParams(location.search).get('status')),
-    [location.search]
-  );
+  const filter = useMemo(() => parseFilter(new URLSearchParams(location.search).get('status')), [location.search]);
 
   const [orders, setOrders] = useState<ApiOrder[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [nextBefore, setNextBefore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState('');
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [reviewed, setReviewed] = useState<ReadonlySet<string> | null>(null);
   const [trackingFor, setTrackingFor] = useState<string | null>(null);
+  const [cancelFor, setCancelFor] = useState<ApiOrder | null>(null);
+  const [reviewFor, setReviewFor] = useState<ApiOrder | null>(null);
+  const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState('');
+  // A filter changed mid-flight must not let the older response land last.
+  const requestSeq = useRef(0);
 
-  const loadOrders = useCallback(async () => {
-    try {
-      const serverStatus = SERVER_STATUS[filter];
-      const query = serverStatus ? `?status=${encodeURIComponent(serverStatus)}` : '';
-      const data = await api.get<{ orders: ApiOrder[] }>(`/api/orders${query}`);
-      let list = data.orders || [];
-      if (filter === 'to_ship') {
-        list = list.filter((o) => o.status === 'confirmed' || o.status === 'processing');
-      }
-      setOrders(list);
-      setError('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : s.loadError);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, s.loadError]);
-
-  useEffect(() => {
+  const loadFirst = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
-    loadOrders();
-  }, [loadOrders]);
+    setError(null);
+    setMoreError('');
+    try {
+      const data = await api.get<{ orders: ApiOrder[]; next_before?: string | null }>(listUrl(filter));
+      if (seq !== requestSeq.current) return;
+      setOrders(data.orders || []);
+      setNextBefore(data.next_before ?? null);
+    } catch (e) {
+      if (seq !== requestSeq.current) return;
+      setError(e);
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
+    }
+  }, [filter]);
 
-  // Real per-status counts for the filter chips (same endpoint the profile
-  // page uses) — never invented numbers; chips render without a badge until
-  // (or unless) counts load.
-  useEffect(() => {
+  const loadMore = async () => {
+    if (!nextBefore || loadingMore) return;
+    const seq = requestSeq.current;
+    setLoadingMore(true);
+    setMoreError('');
+    try {
+      const data = await api.get<{ orders: ApiOrder[]; next_before?: string | null }>(listUrl(filter, nextBefore));
+      if (seq !== requestSeq.current) return;
+      setOrders((prev) => {
+        const seen = new Set(prev.map((o) => o.id));
+        return [...prev, ...(data.orders || []).filter((o) => !seen.has(o.id))];
+      });
+      setNextBefore(data.next_before ?? null);
+    } catch (e) {
+      if (seq !== requestSeq.current) return;
+      setMoreError(e instanceof Error && e.message ? e.message : s.loadMoreFailed);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const loadCounts = useCallback(() => {
+    // Real per-status counts for the tabs — never invented numbers; a tab
+    // renders without a badge until (or unless) counts load.
     api
       .get<{ counts: Record<string, number> }>('/api/orders/counts')
       .then((res) => setCounts(res.counts || {}))
       .catch(() => setCounts({}));
   }, []);
 
+  useEffect(() => {
+    loadFirst();
+  }, [loadFirst]);
+
+  useEffect(() => {
+    loadCounts();
+  }, [loadCounts]);
+
+  // Which products this customer already reviewed, so a delivered order
+  // whose every item is reviewed does not keep offering the verb. Unknown
+  // (request failed) means the verb is offered and the sheet asks the server.
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ reviews: Array<{ product_id: string | null }> }>('/api/reviews/mine')
+      .then((r) => {
+        if (!alive) return;
+        setReviewed(new Set((r.reviews || []).map((x) => x.product_id).filter((x): x is string => !!x)));
+      })
+      .catch(() => alive && setReviewed(null));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const chipCount = (f: Filter): number | null => {
     switch (f) {
-      case 'pending': return counts.pending ?? null;
-      case 'to_ship': return (counts.confirmed || 0) + (counts.processing || 0) || null;
-      case 'shipped': return counts.shipped ?? null;
+      case 'pending':
+        return counts.pending ?? null;
+      case 'to_ship':
+        return (counts.confirmed || 0) + (counts.processing || 0) || null;
+      case 'shipped':
+        return counts.shipped ?? null;
       case 'review':
-      case 'returns': return counts.delivered ?? null;
-      case 'cancelled': return counts.cancelled ?? null;
-      default: return null;
+      case 'returns':
+        return counts.delivered ?? null;
+      case 'cancelled':
+        return counts.cancelled ?? null;
+      default:
+        return null;
     }
   };
 
   const setFilter = (f: Filter) => {
+    setTrackingFor(null);
     navigate(f === 'All' ? '/orders' : `/orders?status=${f}`, { replace: true });
   };
 
@@ -247,31 +293,41 @@ export default function Orders() {
     else navigate('/');
   };
 
-  const cancelOrder = async (order: ApiOrder) => {
-    const confirmed = window.confirm(s.cancelConfirm(order.id));
-    if (!confirmed) return;
-    setCancellingId(order.id);
-    try {
-      await api.post(`/api/orders/${order.id}/cancel`);
-      await loadOrders();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : s.cancelFailed);
-    } finally {
-      setCancellingId(null);
-    }
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter(
+      (o) => o.id.toLowerCase().includes(q) || o.items.some((it) => (it.name || '').toLowerCase().includes(q))
+    );
+  }, [orders, search]);
+
+  const onCancelled = (order: ApiOrder) => {
+    setCancelFor(null);
+    setNotice(s.cancelledNotice(order.id));
+    setOrders((prev) =>
+      filter === 'pending' ? prev.filter((o) => o.id !== order.id) : prev.map((o) => (o.id === order.id ? { ...o, ...order } : o))
+    );
+    loadCounts();
   };
 
-  const formatDate = (iso: string) => {
-    try {
-      return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-IQ', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
-      return iso;
-    }
+  const onReviewSubmitted = (productId: string) => {
+    setReviewed((prev) => new Set([...(prev ?? []), productId]));
+    setNotice(s.reviewThanks);
   };
+
+  const tabs = FILTER_ORDER.map((f) => {
+    const n = chipCount(f);
+    return {
+      id: f,
+      label: s.filters[f],
+      badge:
+        n != null && n > 0 ? (
+          <span className="text-[10px] font-bold tabular-nums text-zinc-500" data-count={n}>
+            {n}
+          </span>
+        ) : undefined,
+    };
+  });
 
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen">
@@ -281,164 +337,132 @@ export default function Orders() {
             type="button"
             onClick={goBack}
             aria-label={s.back}
-            className="w-11 h-11 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-all"
+            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
           </button>
-          <h1 className="text-white font-bold text-lg">
-            {s.title}{filter !== 'All' ? ` — ${s.filters[filter]}` : ''}
-          </h1>
+          <h1 className="text-white font-bold text-lg min-w-0 truncate flex-1">{s.title}</h1>
         </div>
 
-        {/* Status filter chips — each one changes ?status= and the list
-            actually refetches/refilters. Active chip is bold + gold border,
-            not color-only. */}
-        <div role="group" aria-label={s.filterLabel} className="flex gap-2 px-4 pb-3 overflow-x-auto hide-scrollbar">
-          {FILTER_ORDER.map((f) => {
-            const active = filter === f;
-            const n = chipCount(f);
-            return (
+        <div className="px-4 pb-2">
+          <label className="relative block">
+            <span className="sr-only">{s.search}</span>
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={s.searchPlaceholder}
+              autoComplete="off"
+              data-orders-search
+              className="w-full min-h-[40px] bg-zinc-900 border border-zinc-800 rounded-xl ps-9 pe-10 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#BAA369]/60 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            />
+            {search && (
               <button
-                key={f}
                 type="button"
-                onClick={() => setFilter(f)}
-                aria-pressed={active}
-                className={`shrink-0 min-h-[36px] px-3.5 rounded-full text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-                  active
-                    ? 'bg-olive/30 border border-gold text-gold font-bold'
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-400 font-medium hover:text-zinc-200 hover:border-zinc-600'
-                }`}
+                onClick={() => setSearch('')}
+                aria-label={s.clearSearch}
+                className="absolute end-1 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
               >
-                {s.filters[f]}
-                {n != null && n > 0 && (
-                  <span className={`ms-1.5 text-[10px] font-bold ${active ? 'text-gold' : 'text-zinc-500'}`}>{n}</span>
-                )}
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
-            );
-          })}
+            )}
+          </label>
+        </div>
+
+        {/* Status tabs — the indicator travels; the URL carries the choice. */}
+        <div className="overflow-x-auto hide-scrollbar px-2">
+          <TabStrip
+            items={tabs}
+            value={filter}
+            onChange={(id) => setFilter(id as Filter)}
+            group="orders-status"
+            fill={false}
+            indicatorClassName="bg-[#BAA369]"
+            activeClassName="text-[#BAA369] font-bold"
+            idleClassName="text-zinc-400 hover:text-zinc-200"
+            label={s.filterLabel}
+            className="min-w-max"
+          />
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 max-w-2xl mx-auto">
+        <p
+          role="status"
+          aria-live="polite"
+          className={notice ? 'mb-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[12.5px] text-emerald-200' : 'sr-only'}
+        >
+          {notice}
+        </p>
+
         {/* Honest explanation of the returns view: it IS the delivered list. */}
         {filter === 'returns' && !loading && !error && (
           <div className="flex items-start gap-2 bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-3 mb-4 text-xs text-zinc-400 leading-relaxed">
-            <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden="true" />
+            <Info className="w-4 h-4 text-[#BAA369] shrink-0 mt-0.5" aria-hidden="true" />
             <p>{s.returnsNote}</p>
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-12" role="status" aria-busy="true">
-            <div className="w-6 h-6 mx-auto border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
-          </div>
+          <OrderCardSkeleton />
         ) : error ? (
-          <div className="text-center py-12 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-            <p className="text-red-400 mb-3">{error}</p>
-            <button
-              type="button"
-              onClick={() => { setLoading(true); loadOrders(); }}
-              className="min-h-[44px] px-6 inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 text-sm font-bold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-            >
-              <RefreshCw className="w-4 h-4" aria-hidden="true" />
-              {s.retry}
-            </button>
-          </div>
+          <ErrorState error={error} onRetry={loadFirst} />
         ) : orders.length === 0 ? (
-          <div className="text-center py-12 text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-            {filter === 'All' ? s.empty : s.emptyFiltered}
-          </div>
+          <EmptyState title={filter === 'All' ? s.empty : s.emptyFiltered} />
+        ) : visible.length === 0 ? (
+          <EmptyState title={s.noMatches} description={nextBefore ? s.searchHint : undefined} compact />
         ) : (
-          <div className="flex flex-col gap-4">
-            {orders.map(order => (
-              <div key={order.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 flex flex-col">
-                <div className="flex justify-between items-center mb-3 pb-3 border-b border-zinc-800/50">
-                  <span className="text-white font-bold">{order.id}</span>
-                  <span className="text-xs text-zinc-500">{formatDate(order.created_at)}</span>
-                </div>
-
-                <div className="flex flex-col gap-3 mb-4">
-                  {order.items.map(item => (
-                    <div key={item.id} className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center border border-zinc-800 overflow-hidden shrink-0">
-                        {item.image ? (
-                          <img referrerPolicy="no-referrer" src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Package className="w-6 h-6 text-olive" aria-hidden="true" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm text-zinc-300 line-clamp-1">{item.name}</div>
-                        <div className="text-xs text-zinc-500">
-                          {item.variant ? `${item.variant} · ` : ''}x{item.qty}
-                        </div>
-                      </div>
-                      <div className="text-sm text-zinc-400 shrink-0">{formatIqd(item.line_total_iqd)}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-zinc-800/50">
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">{s.total}</div>
-                    <div className="text-gold font-bold">{formatIqd(order.total_iqd)}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {order.status === 'pending' && (
-                      <button
-                        type="button"
-                        onClick={() => cancelOrder(order)}
-                        disabled={cancellingId === order.id}
-                        className="min-h-[36px] px-3 py-1 rounded text-xs font-bold tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-colors disabled:opacity-50"
-                      >
-                        {cancellingId === order.id ? s.cancelling : s.cancel}
-                      </button>
-                    )}
-                    <span className={`px-3 py-1 rounded text-xs font-bold tracking-wider ${STATUS_STYLES[order.status] ?? 'bg-zinc-800 text-zinc-300'}`}>
-                      {s.statuses[order.status] ?? order.status}
-                    </span>
-                  </div>
-                </div>
-                {/* A membership gift earned on this order. It is worth 0 IQD
-                    on every total — the customer paid the same price and a
-                    spool comes in the box — so it is announced beside the
-                    order rather than folded into its arithmetic. */}
-                {order.membership_gift && (
-                  <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
-                    <p className="text-[12.5px] font-bold text-emerald-300">
-                      {lang === 'en' ? 'A gift ships with this order' : 'هدية مرفقة مع هذا الطلب'}
-                    </p>
-                    <p className="text-[12px] text-emerald-200/85 mt-0.5">
-                      {order.membership_gift.label_ar ||
-                        (lang === 'en' ? 'Filament spool' : 'بكرة فلمنت')}
-                      {order.membership_gift.qty > 1 && ` × ${order.membership_gift.qty}`}
-                    </p>
-                  </div>
-                )}
-                {/* Where the parcel actually is, on the path this order
-                    walks — five stages direct, fourteen for a pre-order.
-                    Opened on demand: the list is already the slowest query on
-                    this screen, and fourteen history rows per order would
-                    make every other card slower for one that is expanded. */}
-                {trackingFor === order.id ? (
-                  <OrderTracker orderId={order.id} lang={lang} />
-                ) : (
-                  <button
-                    type="button"
-                    data-track-order={order.id}
-                    onClick={() => setTrackingFor(order.id)}
-                    className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-zinc-300 hover:text-white border border-zinc-700 rounded-lg px-3 py-2 hover:bg-zinc-800 transition-colors"
-                  >
-                    <Truck className="w-3.5 h-3.5" aria-hidden />
-                    {s.track}
-                  </button>
-                )}
-                <ReturnsSection order={order} />
-              </div>
+          <div className="flex flex-col gap-4" data-orders-list>
+            {visible.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                reviewedProductIds={reviewed}
+                trackingOpen={trackingFor === order.id}
+                onToggleTracking={() => setTrackingFor((cur) => (cur === order.id ? null : order.id))}
+                onCancel={(o) => setCancelFor(o)}
+                onReview={(o) => setReviewFor(o)}
+              />
             ))}
+            {search && nextBefore && <p className="text-[11.5px] text-zinc-500 text-center">{s.searchHint}</p>}
+            {nextBefore && (
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                data-load-more
+                className="min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              >
+                {loadingMore && <Spinner size="sm" delayMs={0} decorative />}
+                {loadingMore ? s.loadingMore : s.loadMore}
+              </button>
+            )}
+            {moreError && (
+              <p role="alert" className="text-red-400 text-[12.5px] text-center">
+                {moreError}
+              </p>
+            )}
           </div>
         )}
+
+        <GiftsEntry className="mt-6" />
       </div>
+
+      <CancelOrderSheet
+        open={cancelFor !== null}
+        orderId={cancelFor?.id ?? null}
+        onClose={() => setCancelFor(null)}
+        onCancelled={onCancelled}
+      />
+      <ReviewSheet
+        open={reviewFor !== null}
+        onClose={() => setReviewFor(null)}
+        orderId={reviewFor?.id ?? ''}
+        items={reviewFor?.items ?? []}
+        reviewedProductIds={reviewed ?? EMPTY_SET}
+        onSubmitted={onReviewSubmitted}
+      />
     </div>
   );
 }

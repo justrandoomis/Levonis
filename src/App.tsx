@@ -30,6 +30,7 @@ import InvestAdmin from './pages/InvestAdmin';
 
 import Profile from './pages/Profile';
 import Orders from './pages/Orders';
+import OrderDetail from './pages/OrderDetail';
 import Warranty from './pages/Warranty';
 import WarrantyVerify from './pages/WarrantyVerify';
 import Cart from './pages/Cart';
@@ -107,6 +108,7 @@ function StorefrontApp() {
         <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
         <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+        <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
         <Route path="*" element={<Storefront store={store} />} />
@@ -276,6 +278,7 @@ function AppContent() {
           <Route path="/products" element={<Products />} />
           <Route path="/bundles" element={<Bundles />} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+          <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
           <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
           {/* PUBLIC on purpose: whoever holds the printed receipt (or the
               device) must be able to check its coverage without an account.

@@ -44,7 +44,9 @@ import type { ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shippin
 import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
 import { typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
-import { stageLabel } from '../lib/orderStages';
+import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
+import type { OrderStage } from '../lib/orderStages';
+import { coverageState, maskSerial } from '../lib/deviceOps';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
@@ -153,23 +155,46 @@ function financialSnapshot(
   };
 }
 
+/**
+ * How far along its path an order is, as a fraction the customer's card can
+ * draw without holding a copy of the path itself: `index` stages reached out
+ * of `total`. A cancelled order (or a stage the path does not know) reports
+ * 0 — the card draws nothing rather than a guessed position.
+ */
+function stageProgress(o: Record<string, unknown>, shippingType: ShippingType): { index: number; total: number } {
+  const path = stagesFor(shippingType);
+  const status = String(o.status ?? '');
+  if (status === 'cancelled') return { index: 0, total: path.length };
+  const raw = String(o.stage || '');
+  // An order written before 0028 may carry no stage; its legacy status still
+  // places it on the path honestly instead of at the start.
+  const stage: OrderStage = (path as string[]).includes(raw)
+    ? (raw as OrderStage)
+    : stageForLegacyStatus(status, shippingType);
+  const idx = path.indexOf(stage);
+  return { index: idx < 0 ? 0 : idx + 1, total: path.length };
+}
+
 export function orderPublic(
   o: Record<string, unknown>,
   items: Record<string, unknown>[],
   snap?: OrderPointsSnapshot
 ) {
   const coupon = safeParse<Record<string, unknown> | null>(o.coupon_snapshot, null);
+  const shippingType = typeForTransport(
+    String(o.shipping_type ?? '').startsWith('preorder_')
+      ? String(o.shipping_type).slice('preorder_'.length)
+      : ''
+  );
   return {
     id: o.id,
     status: o.status,
     /** §1: which of the four journeys this order is on. */
-    shipping_type: typeForTransport(
-      String(o.shipping_type ?? '').startsWith('preorder_')
-        ? String(o.shipping_type).slice('preorder_'.length)
-        : ''
-    ),
+    shipping_type: shippingType,
     /** §2/§3: where the order stands on that journey, and when it moved. */
     stage: String(o.stage || 'received'),
+    /** Stages reached out of the path's length — the card's progress hairline. */
+    progress: stageProgress(o, shippingType),
     stage_changed_at: o.stage_changed_at || o.updated_at || o.created_at,
     /**
      * The next stage and when it is expected — but ONLY when the clock owns
@@ -208,29 +233,63 @@ export function orderPublic(
     updated_at: o.updated_at,
     /** §5: the single money view — every screen reads this, none recomputes. */
     financial: financialSnapshot(o, items, snap),
-    items: items.map((it) => ({
-      id: it.id,
-      product_id: it.product_id,
-      name: it.name_snapshot,
-      image: it.image_snapshot,
-      variant: it.option_snapshot,
-      qty: it.qty,
-      unit_price_iqd: it.unit_price_iqd,
-      line_total_iqd: it.line_total_iqd,
-      // Resolver snapshots persisted at checkout time (cost fields stripped
-      // before persistence — safe for the buyer to see).
-      pricing: safeParse(it.pricing_snapshot, null),
-      warranty: safeParse(it.warranty_snapshot, null),
-      transport: safeParse(it.transport_snapshot, null),
-    })),
+    items: items.map((it) => {
+      const transport = safeParse<{ method?: unknown } | null>(it.transport_snapshot, null);
+      const warranty = safeParse<{ plan_id?: unknown } | null>(it.warranty_snapshot, null);
+      return {
+        id: it.id,
+        product_id: it.product_id,
+        /** Present when the items were loaded with the products join (the
+         *  customer routes); the storefront links to /product/:slug with it. */
+        product_slug: (it.product_slug as string | null | undefined) ?? null,
+        name: it.name_snapshot,
+        image: it.image_snapshot,
+        variant: it.option_snapshot,
+        qty: it.qty,
+        unit_price_iqd: it.unit_price_iqd,
+        line_total_iqd: it.line_total_iqd,
+        // Resolver snapshots persisted at checkout time (cost fields stripped
+        // before persistence — safe for the buyer to see).
+        pricing: safeParse(it.pricing_snapshot, null),
+        warranty: safeParse(it.warranty_snapshot, null),
+        transport: safeParse(it.transport_snapshot, null),
+        /**
+         * The exact selection that was bought, in the shape POST /api/cart/items
+         * accepts — so "buy again" repeats THIS line instead of the product's
+         * default. Legacy items (pre-0008) carry empty ids and only the
+         * display label; the cart then asks for a choice as it always has.
+         */
+        selection: {
+          option_id: String(it.option_id ?? ''),
+          option_value_ids: safeParse<unknown[]>(String(it.option_value_ids ?? '[]'), []).filter(
+            (x): x is string => typeof x === 'string' && x.length > 0
+          ),
+          color_id: String(it.color_id ?? ''),
+          transport_method:
+            transport && (transport.method === 'air' || transport.method === 'sea' || transport.method === 'land')
+              ? transport.method
+              : '',
+          warranty_plan_id: warranty && typeof warranty.plan_id === 'string' ? warranty.plan_id : '',
+        },
+      };
+    }),
   };
 }
+
+/** Items with the product's current slug beside the frozen snapshot. */
+const ORDER_ITEMS_SELECT = `SELECT oi.*, p.slug AS product_slug
+       FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id`;
 
 async function loadOrder(db: D1Database, orderId: string) {
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
   if (!order) return null;
-  const { results: items } = await db.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(orderId).all();
+  const { results: items } = await db.prepare(`${ORDER_ITEMS_SELECT} WHERE oi.order_id = ?`).bind(orderId).all();
   return { order, items };
+}
+
+/** Units the customer sees: sum of quantities, "8 items" on the card. */
+function itemCount(items: Record<string, unknown>[]): number {
+  return items.reduce((n, it) => n + (Number(it.qty) || 0), 0);
 }
 
 // -------------------------------------------------- shipping configuration
@@ -787,28 +846,81 @@ function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolea
 
 // ------------------------------------------------------------------ routes
 
+const ORDER_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+/**
+ * The customer's own orders, newest first, one page at a time.
+ *
+ *   ?status=   one legacy status, or several comma-separated
+ *              (`confirmed,processing` is the "to ship" view) — an unknown
+ *              value yields an empty page, as the single-status filter always
+ *              did, never the whole list.
+ *   ?limit=    page size, default 20, at most 50.
+ *   ?before=   cursor: the `created_at` of the last order already shown.
+ *
+ * `next_before` is the cursor for the following page and null on the last
+ * one. Items for the whole page come from ONE query instead of one per
+ * order — the list was the slowest thing on the account screen.
+ */
 orderRoutes.get('/', async (c) => {
   const user = c.get('user')!;
-  const status = str(c.req.query('status'), 'status', { max: 20, required: false });
+  const statusRaw = str(c.req.query('status'), 'status', { max: 80, required: false });
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
+  const before = str(c.req.query('before'), 'before', { max: 40, required: false });
+  if (before && !Number.isFinite(Date.parse(before))) throw badRequest('before must be an ISO timestamp');
+
   let sql = 'SELECT * FROM orders WHERE user_id = ?';
   const params: unknown[] = [user.id];
-  if (status && status !== 'All' && status !== 'null') {
-    sql += ' AND status = ?';
-    params.push(status.toLowerCase());
+  if (statusRaw && statusRaw !== 'All' && statusRaw !== 'null') {
+    const wanted = statusRaw
+      .toLowerCase()
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => ORDER_STATUSES.includes(x));
+    // A filter that names no real status matches nothing — the same answer
+    // the old `WHERE status = 'bogus'` gave, made explicit.
+    if (wanted.length === 0) return c.json({ success: true, orders: [], next_before: null });
+    sql += ` AND status IN (${wanted.map(() => '?').join(',')})`;
+    params.push(...wanted);
   }
-  sql += ' ORDER BY created_at DESC LIMIT 100';
-  const { results: orders } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
+  if (before) {
+    sql += ' AND created_at < ?';
+    params.push(before);
+  }
+  // One row past the page says whether a next page exists, without a COUNT.
+  sql += ' ORDER BY created_at DESC LIMIT ?';
+  params.push(limit + 1);
+  const { results: rows } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
+  const hasMore = rows.length > limit;
+  const orders = hasMore ? rows.slice(0, limit) : rows;
+  const ids = orders.map((o) => String(o.id));
+
   // One snapshot query for the whole page — the §5 money view is never
   // recomputed per row, and never in the browser.
-  const snaps = await getOrderPointsSnapshots(c.env, orders.map((o) => String(o.id)));
-  const out = [];
-  for (const o of orders) {
-    const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?')
-      .bind(o.id)
-      .all();
-    out.push(orderPublic(o, items, snaps.get(String(o.id))));
+  const snaps = await getOrderPointsSnapshots(c.env, ids);
+  const itemsByOrder = new Map<string, Record<string, unknown>[]>();
+  if (ids.length > 0) {
+    const { results: items } = await c.env.DB.prepare(
+      `${ORDER_ITEMS_SELECT} WHERE oi.order_id IN (${ids.map(() => '?').join(',')}) ORDER BY oi.rowid`
+    )
+      .bind(...ids)
+      .all<Record<string, unknown>>();
+    for (const it of items) {
+      const key = String(it.order_id);
+      const list = itemsByOrder.get(key);
+      if (list) list.push(it);
+      else itemsByOrder.set(key, [it]);
+    }
   }
-  return c.json({ success: true, orders: out });
+  const out = orders.map((o) => {
+    const items = itemsByOrder.get(String(o.id)) ?? [];
+    return { ...orderPublic(o, items, snaps.get(String(o.id))), item_count: itemCount(items) };
+  });
+  return c.json({
+    success: true,
+    orders: out,
+    next_before: hasMore ? String(orders[orders.length - 1].created_at) : null,
+  });
 });
 
 orderRoutes.get('/counts', async (c) => {
@@ -1264,7 +1376,119 @@ orderRoutes.get('/:id', async (c) => {
   const data = await loadOrder(c.env.DB, id);
   if (!data || (data.order.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
   const snaps = await getOrderPointsSnapshots(c.env, [id]);
-  return c.json({ success: true, order: orderPublic(data.order, data.items, snaps.get(id)) });
+  // The LATEST revision: a corrected invoice supersedes the one before it,
+  // and the customer prints the document that is currently true.
+  const invoice = await c.env.DB.prepare(
+    'SELECT id, invoice_no, revision, payment_status FROM invoices WHERE order_id = ? ORDER BY revision DESC LIMIT 1'
+  )
+    .bind(id)
+    .first<{ id: string; invoice_no: string; revision: number; payment_status: string }>();
+  const status = String(data.order.status);
+  return c.json({
+    success: true,
+    order: {
+      ...orderPublic(data.order, data.items, snaps.get(id)),
+      item_count: itemCount(data.items),
+      invoice: invoice ?? null,
+      // The two verbs the detail screen offers, decided here so the page
+      // never has to know which statuses permit which.
+      can_cancel: status === 'pending',
+      can_review: status === 'delivered',
+    },
+  });
+});
+
+interface OrderUnitRow extends Record<string, unknown> {
+  id: string;
+  order_item_id: string;
+  unit_index: number;
+  product_id: string | null;
+  delivered_at: string | null;
+  warranty_start_at: string | null;
+  warranty_end_at: string | null;
+  replaced_by_unit_id: string | null;
+  serial_raw: string | null;
+  reg_user_id: string | null;
+  receipt_no: string | null;
+  name_snapshot: string | null;
+  image_snapshot: string | null;
+  slug: string | null;
+  p_name: string | null;
+  p_name_ar: string | null;
+  images: string | null;
+}
+
+/**
+ * The serialized devices inside ONE order, as the customer may see them.
+ *
+ * Owner or admin, 404 otherwise — the same answer as GET /:id, so nobody
+ * learns an order exists by asking for its units. The serial is MASKED to
+ * its last four characters; the full value is on the paper receipt and in
+ * the admin's screen, not in a customer payload that ends up in a screenshot.
+ *
+ * `linked` says whether the buyer's own account holds the device, another
+ * account does, or nobody does yet — and says nothing else. Which other
+ * account is never revealed (deviceOps §4).
+ */
+orderRoutes.get('/:id/units', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  const order = await c.env.DB.prepare('SELECT id, user_id FROM orders WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; user_id: string }>();
+  if (!order || (order.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.order_item_id, u.unit_index, u.product_id, u.delivered_at, u.warranty_start_at,
+            u.warranty_end_at, u.replaced_by_unit_id,
+            s.serial_raw, r.user_id AS reg_user_id, wr.receipt_no,
+            oi.name_snapshot, oi.image_snapshot,
+            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.images
+       FROM order_item_units u
+       LEFT JOIN device_serials s ON s.unit_id = u.id
+       LEFT JOIN device_registrations r ON r.unit_id = u.id AND r.revoked_at IS NULL
+       LEFT JOIN warranty_receipts wr ON wr.unit_id = u.id AND wr.status = 'active'
+       LEFT JOIN order_items oi ON oi.id = u.order_item_id
+       LEFT JOIN products p ON p.id = u.product_id
+      WHERE u.order_id = ?
+      ORDER BY u.order_item_id, u.unit_index`
+  )
+    .bind(id)
+    .all<OrderUnitRow>();
+
+  const units = results.map((r) => {
+    const cov = coverageState(r.delivered_at, r.warranty_end_at);
+    const images = safeParse<unknown[]>(r.images, []);
+    const firstImage = Array.isArray(images) ? images.find((x) => typeof x === 'string' && x) : undefined;
+    return {
+      unit_id: r.id,
+      order_item_id: r.order_item_id,
+      unit_index: Number(r.unit_index) || 0,
+      product: {
+        id: r.product_id,
+        slug: r.slug ?? null,
+        name: String(r.p_name ?? r.name_snapshot ?? ''),
+        name_ar: String(r.p_name_ar ?? ''),
+        image: typeof firstImage === 'string' ? firstImage : String(r.image_snapshot ?? ''),
+      },
+      serial: r.serial_raw ? maskSerial(r.serial_raw) : null,
+      delivered_at: r.delivered_at,
+      warranty: {
+        start_at: r.warranty_start_at,
+        end_at: r.warranty_end_at,
+        state: cov.state,
+        remaining_days: cov.remaining_days,
+      },
+      // Relative to the order's OWNER: for the customer that is themselves;
+      // for an admin it says whether the buyer linked their own device.
+      linked: r.reg_user_id ? (r.reg_user_id === order.user_id ? 'mine' : 'other') : 'none',
+      receipt_no: r.receipt_no ?? null,
+      // A replaced device's coverage lives on its replacement; the screen
+      // offers no "register" for a unit that is no longer the customer's.
+      replaced: !!r.replaced_by_unit_id,
+    };
+  });
+  return c.json({ success: true, order_id: id, units });
 });
 
 /**

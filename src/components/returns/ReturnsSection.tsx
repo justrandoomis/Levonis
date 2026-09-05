@@ -40,12 +40,20 @@ interface ReturnCaseDto {
 
 type OrderLike = ApiOrder & { delivered_at?: string | null };
 
+/** Per-unit delivery, when the order's devices were loaded (GET /:id/units). */
+export interface ReturnsUnitLike {
+  order_item_id: string;
+  delivered_at: string | null;
+}
+
 const STRINGS = {
   ar: {
     title: 'الإرجاع والاستبدال',
     intro: 'يمكن طلب الإرجاع خلال 7 أيام من الاستلام الفعلي للمنتج المتأثر.',
     windowClosed: 'انتهت نافذة الإرجاع (7 أيام من الاستلام) لهذا الطلب.',
-    daysLeft: (n: number) => (n === 1 ? 'يوم واحد متبقٍ لطلب الإرجاع' : `${n.toLocaleString('ar')} أيام متبقية لطلب الإرجاع`),
+    windowUnknown: 'لم نتمكن من تحديد تاريخ الاستلام الفعلي لهذا الطلب، لذا لا نستطيع حساب الأيام المتبقية هنا. يمكنك إرسال الطلب وسيحكم النظام على المدة عند الاستلام.',
+    itemClosed: 'انتهت نافذة الإرجاع لهذا المنتج.',
+    daysLeft: (n: number) => (n === 1 ? 'يوم واحد متبقٍ لطلب الإرجاع' : `${n} أيام متبقية لطلب الإرجاع`),
     request: 'طلب إرجاع',
     loading: 'جارٍ التحميل...',
     loadError: 'تعذّر تحميل حالات الإرجاع.',
@@ -94,6 +102,8 @@ const STRINGS = {
     title: 'Returns & Replacement',
     intro: 'A return can be requested within 7 days of the actual delivery of the affected item.',
     windowClosed: 'The 7-day return window (from delivery) for this order has closed.',
+    windowUnknown: 'We could not determine the actual delivery date of this order, so the days left cannot be shown here. You can still submit a request — the server judges the window when it is filed.',
+    itemClosed: 'The return window for this item has closed.',
     daysLeft: (n: number) => (n === 1 ? '1 day left to request a return' : `${n} days left to request a return`),
     request: 'Request return',
     loading: 'Loading...',
@@ -143,6 +153,8 @@ const STRINGS = {
     title: 'گەڕاندنەوە و گۆڕینەوە',
     intro: 'داوای گەڕاندنەوە لە ماوەی 7 ڕۆژ لە وەرگرتنی ڕاستەقینەی کاڵاکە دەکرێت.',
     windowClosed: 'ماوەی گەڕاندنەوە (7 ڕۆژ لە وەرگرتن) بۆ ئەم داواکارییە تەواو بووە.',
+    windowUnknown: 'نەمانتوانی بەرواری ڕاستەقینەی وەرگرتنی ئەم داواکارییە دیاری بکەین، بۆیە ڕۆژە ماوەکان لێرە نیشان نادرێن. هێشتا دەتوانیت داواکە بنێریت — ڕاژەکار ماوەکە لە کاتی ناردن هەڵدەسەنگێنێت.',
+    itemClosed: 'ماوەی گەڕاندنەوە بۆ ئەم کاڵایە تەواو بووە.',
     daysLeft: (n: number) => `${n} ڕۆژ ماوە بۆ داوای گەڕاندنەوە`,
     request: 'داوای گەڕاندنەوە',
     loading: 'بارکردن...',
@@ -200,7 +212,15 @@ interface FormState {
   evidence: string[]; // private receipt keys
 }
 
-export default function ReturnsSection({ order }: { order: OrderLike }) {
+/** Days left in the 7-day window from a delivery time; null when unknown. */
+function daysLeftFrom(deliveredIso: string | null | undefined): number | null {
+  if (!deliveredIso) return null;
+  const ms = Date.parse(deliveredIso);
+  if (!Number.isFinite(ms)) return null;
+  return Math.max(0, Math.ceil((ms + WINDOW_MS - Date.now()) / 86_400_000));
+}
+
+export default function ReturnsSection({ order, units }: { order: OrderLike; units?: ReturnsUnitLike[] }) {
   const { lang, dir } = useLanguage();
   const S = STRINGS[lang as keyof typeof STRINGS] ?? STRINGS.ar;
 
@@ -235,11 +255,27 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
 
   if (order.status !== 'delivered') return null;
 
-  const deliveredMs = order.delivered_at ? Date.parse(order.delivered_at) : NaN;
-  const daysLeft = Number.isFinite(deliveredMs)
-    ? Math.max(0, Math.ceil((deliveredMs + WINDOW_MS - Date.now()) / 86_400_000))
-    : null;
-  const windowOpen = daysLeft !== null && daysLeft > 0;
+  // The window runs from the ACTUAL delivery of the affected item. Devices
+  // carry their own per-unit delivered_at (partial shipments); a plain item
+  // falls back to the order's delivery time. The latest unit delivery is
+  // used — the customer's most generous honest date; the server still judges.
+  const itemDeliveredAt = (itemId: string): string | null => {
+    const own = (units ?? []).filter((u) => u.order_item_id === itemId && u.delivered_at);
+    if (own.length > 0) {
+      return own.reduce<string | null>((best, u) => (!best || Date.parse(u.delivered_at!) > Date.parse(best) ? u.delivered_at : best), null);
+    }
+    return order.delivered_at ?? null;
+  };
+  const orderDaysLeft = daysLeftFrom(order.delivered_at);
+  // Three honest states for the order as a whole: open, closed, or unknown.
+  // Unknown is NOT closed — the buttons stay, and the server decides.
+  const orderWindow: 'open' | 'closed' | 'unknown' =
+    orderDaysLeft === null ? 'unknown' : orderDaysLeft > 0 ? 'open' : 'closed';
+  const itemWindow = (itemId: string): { state: 'open' | 'closed' | 'unknown'; days: number | null } => {
+    const d = daysLeftFrom(itemDeliveredAt(itemId));
+    return { state: d === null ? 'unknown' : d > 0 ? 'open' : 'closed', days: d };
+  };
+  const anyRequestable = order.items.some((it) => itemWindow(it.id).state !== 'closed');
 
   const startForm = (itemId: string) => {
     setForm({ itemId, qty: 1, reason: 'defective', description: '', evidence: [] });
@@ -288,8 +324,10 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
   return (
     <div dir={dir} className="mt-3 rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
       <button
+        type="button"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-white/5 transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
       >
         <span className="flex items-center gap-2 text-sm text-white font-normal">
           <RotateCcw className="w-4 h-4 text-zinc-400" strokeWidth={1.5} />
@@ -303,16 +341,22 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
 
       {open && (
         <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
-          {/* Window state — display only; the server judges by request time. */}
-          {windowOpen ? (
-            <p className="text-xs text-emerald-400/90 font-light flex items-center gap-2">
+          {/* Window state — display only; the server judges by request time.
+              Unknown is said as unknown, never dressed up as closed. */}
+          {orderWindow === 'open' ? (
+            <p className="text-xs text-emerald-400/90 font-light flex items-center gap-2" data-return-window="open">
               <Clock className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-              {S.daysLeft(daysLeft as number)}
+              {S.daysLeft(orderDaysLeft as number)}
             </p>
-          ) : (
-            <p className="text-xs text-zinc-500 font-light flex items-center gap-2">
+          ) : orderWindow === 'closed' ? (
+            <p className="text-xs text-zinc-500 font-light flex items-center gap-2" data-return-window="closed">
               <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
               {S.windowClosed}
+            </p>
+          ) : (
+            <p className="text-xs text-amber-300/90 font-light flex items-start gap-2" data-return-window="unknown">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
+              {S.windowUnknown}
             </p>
           )}
           <p className="text-xs text-zinc-500 font-light">{S.intro}</p>
@@ -323,7 +367,7 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
           ) : loadError ? (
             <div className="flex items-center gap-3">
               <p className="text-xs text-red-400 font-light">{S.loadError}</p>
-              <button onClick={load} className="text-xs text-white underline">{S.retry}</button>
+              <button type="button" onClick={load} className="text-xs text-white underline">{S.retry}</button>
             </div>
           ) : cases.length === 0 ? (
             <p className="text-xs text-zinc-600 font-light">{S.noCases}</p>
@@ -391,35 +435,46 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
             </div>
           )}
 
-          {/* Request buttons per item (window open only) */}
-          {windowOpen && !form && (
+          {/* Request buttons per item — each item judged by ITS delivery. A
+              closed item says so; an unknown one keeps its button. */}
+          {anyRequestable && !form && (
             <div className="space-y-2">
-              {order.items.map((it) => (
-                <div key={it.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#050505] border border-white/5 p-3">
-                  <div className="min-w-0 flex items-center gap-3">
-                    {it.image ? (
-                      <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-white/5 shrink-0" />
-                    ) : (
-                      <div className="w-9 h-9 rounded bg-zinc-900 shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs text-white truncate">{it.name}</p>
-                      <p className="text-[10px] text-zinc-500">× {it.qty} · {formatIqd(it.line_total_iqd)}</p>
+              {order.items.map((it) => {
+                const w = itemWindow(it.id);
+                return (
+                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="flex items-center justify-between gap-3 rounded-lg bg-[#050505] border border-white/5 p-3">
+                    <div className="min-w-0 flex items-center gap-3">
+                      {it.image ? (
+                        <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-white/5 shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded bg-zinc-900 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs text-white truncate">{it.name}</p>
+                        <p className="text-[10px] text-zinc-500">× {it.qty} · {formatIqd(it.line_total_iqd)}</p>
+                        {w.state === 'open' && orderWindow !== 'open' && (
+                          <p className="text-[10px] text-emerald-400/90">{S.daysLeft(w.days as number)}</p>
+                        )}
+                        {w.state === 'closed' && <p className="text-[10px] text-zinc-500">{S.itemClosed}</p>}
+                      </div>
                     </div>
+                    {w.state !== 'closed' && (
+                      <button
+                        type="button"
+                        onClick={() => startForm(it.id)}
+                        className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                      >
+                        {S.request}
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={() => startForm(it.id)}
-                    className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors"
-                  >
-                    {S.request}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
           {/* Request form */}
-          {windowOpen && form && (
+          {form && (
             <div className="rounded-lg bg-[#050505] border border-white/10 p-3 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
@@ -469,9 +524,10 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
                       <Camera className="w-3 h-3" strokeWidth={1.5} />
                       {k.split('/').pop()}
                       <button
+                        type="button"
                         onClick={() => setForm({ ...form, evidence: form.evidence.filter((x) => x !== k) })}
                         className="text-zinc-500 hover:text-white"
-                        aria-label="remove"
+                        aria-label={S.cancel}
                       >
                         <X className="w-3 h-3" strokeWidth={1.5} />
                       </button>
@@ -479,6 +535,7 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
                   ))}
                   {form.evidence.length < 6 && (
                     <button
+                      type="button"
                       onClick={() => fileRef.current?.click()}
                       disabled={uploadBusy}
                       className="text-[11px] bg-white/5 hover:bg-white/10 border border-dashed border-white/15 text-zinc-300 px-3 py-1.5 rounded-lg disabled:opacity-50"
@@ -507,6 +564,7 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
               )}
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={submit}
                   disabled={submitBusy || uploadBusy}
                   className="flex-1 bg-white text-black text-xs font-normal py-2.5 rounded-lg disabled:opacity-50 hover:bg-zinc-200 transition-colors"
@@ -514,6 +572,7 @@ export default function ReturnsSection({ order }: { order: OrderLike }) {
                   {submitBusy ? S.submitting : S.submit}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setForm(null)}
                   disabled={submitBusy}
                   className="text-xs text-zinc-400 hover:text-white px-3 py-2.5"
