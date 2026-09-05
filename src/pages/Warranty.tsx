@@ -1,1029 +1,359 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, ClipboardList, Crown, Printer } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import {
-  ArrowLeft, ArrowRight, ShieldCheck, X, Clock, CheckCircle, XCircle, Search,
-  Barcode, Paperclip, Send, Wrench, Repeat, AlertTriangle, MessageSquare,
-} from 'lucide-react';
 import { api, ApiError } from '../lib/api';
-import { Overlay } from '../components/ui/Overlay';
+import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
+import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
+import { WARRANTY_STRINGS } from '../components/warranty/strings';
+import type { Claim, Device, MineResponse } from '../components/warranty/types';
+import { fmtInt } from '../components/warranty/types';
+import { AddDevicePanel } from '../components/warranty/AddDevicePanel';
+import { DeviceCard } from '../components/warranty/DeviceCard';
+import { ClaimCard } from '../components/warranty/ClaimCard';
+import { DeviceClaimOverlay, LegacyClaimOverlay } from '../components/warranty/ClaimForms';
+import { ClaimThreadOverlay } from '../components/warranty/ClaimThreadOverlay';
+import { UnlinkSheet } from '../components/warranty/UnlinkSheet';
+import { CARD, FOCUS, OK_BOX } from '../components/warranty/ui';
 
 /**
- * Warranty center rebuilt around registered PHYSICAL devices (mandate §4):
- * my-devices list with honest per-unit coverage, add-device-by-serial,
- * per-device claim submission with private photo/video evidence, and the
- * claim message thread. Legacy claims (pre-device rows) stay visible through
- * the same claims list, and the old free-form claim path is preserved for
- * products without a device record.
+ * Warranty center, built around the PHYSICAL printers linked to an account:
+ *
+ *   1. a header with the one-line promise and the membership strip (PRO
+ *      priority service — never a claim about longer coverage, because
+ *      membership does not change coverage);
+ *   2. "Add a printer" — by serial/receipt number, from the account's own
+ *      delivered orders, or by scanning the receipt QR / label barcode;
+ *   3. "My printers" — one card per unit with the coverage timeline and the
+ *      actions that belong to a unit (claim, support, receipt, order, and
+ *      "remove from my account" behind a confirmation sheet);
+ *   4. "My claims" — the claims list, the thread, the per-device claim form
+ *      and the legacy free-form claim for products never linked as a device.
+ *
+ * Every window is the house Overlay/Sheet: it arrives from the control that
+ * raised it and leaves the same way. Data flows one way — the server says what
+ * the coverage is, and this page draws exactly that.
  */
-
-const STRINGS = {
-  ar: {
-    title: 'مركز الضمان',
-    myDevices: 'أجهزتي المسجّلة',
-    devicesEmpty: 'لا توجد أجهزة مسجّلة بعد. أضف جهازك برقمه التسلسلي.',
-    addDevice: 'إضافة جهاز',
-    serialLabel: 'الرقم التسلسلي',
-    serialPlaceholder: 'أدخل الرقم كما هو على ملصق الجهاز',
-    register: 'تسجيل الجهاز',
-    registering: 'جارٍ التحقق…',
-    registeredOk: 'تم تسجيل الجهاز على حسابك.',
-    alreadyRegistered: 'هذا الجهاز مسجّل مسبقًا على حسابك.',
-    registerHint: 'يطابق الرقم أجهزة طلباتك المُسلَّمة فقط. التسجيل لا يغيّر تواريخ الضمان إطلاقًا.',
-    supportHint: 'إذا استمرت المشكلة تواصل مع الدعم من صفحة الحساب.',
-    orderRef: 'الطلب',
-    deliveredAt: 'تاريخ التسليم',
-    warrantyEnd: 'نهاية الضمان',
-    stActive: 'الضمان ساري',
-    stExpired: 'الضمان منتهٍ',
-    stNeedsConfig: 'مدة الضمان بحاجة إعداد من الإدارة',
-    stNotDelivered: 'لم يُسلَّم بعد',
-    daysLeft: (n: number) => `${n} يوم متبقٍ`,
-    openClaim: 'فتح مطالبة',
-    claims: 'مطالباتي',
-    claimsEmpty: 'ليس لديك أي مطالبات ضمان.',
-    newClaimTitle: 'مطالبة ضمان جديدة',
-    subject: 'الموضوع',
-    subjectPh: 'مثال: توقّف السخان عن العمل',
-    description: 'وصف المشكلة',
-    descriptionPh: 'صف المشكلة بالتفصيل (10 أحرف على الأقل)…',
-    attachments: 'صور / فيديو (اختياري، حتى 6)',
-    uploading: 'جارٍ الرفع…',
-    submit: 'إرسال المطالبة',
-    submitting: 'جارٍ الإرسال…',
-    thread: 'المحادثة',
-    reply: 'اكتب رسالة…',
-    send: 'إرسال',
-    attach: 'إرفاق ملف',
-    close: 'إغلاق',
-    loading: 'جارٍ التحميل…',
-    error: 'حدث خطأ، حاول مجددًا.',
-    decisionReason: 'سبب القرار',
-    legacyClaimLink: 'منتج غير مسجّل كجهاز؟ قدّم مطالبة عامة',
-    productName: 'اسم المنتج',
-    replacedBadge: 'مُستبدَل',
-    stageLabels: {
-      received: 'مُستلَمة', diagnosing: 'قيد الفحص', approved: 'مقبولة', rejected: 'مرفوضة',
-      repairing: 'قيد الإصلاح', replaced: 'استبدال', resolved: 'منتهية',
-    } as Record<string, string>,
-    submittedAt: 'تاريخ التقديم',
-  },
-  en: {
-    title: 'Warranty Center',
-    myDevices: 'My registered devices',
-    devicesEmpty: 'No registered devices yet. Add your device by its serial number.',
-    addDevice: 'Add device',
-    serialLabel: 'Serial number',
-    serialPlaceholder: 'Enter it exactly as printed on the device label',
-    register: 'Register device',
-    registering: 'Checking…',
-    registeredOk: 'Device registered to your account.',
-    alreadyRegistered: 'This device is already registered to your account.',
-    registerHint: 'The serial matches only devices on YOUR delivered orders. Registration never changes any warranty date.',
-    supportHint: 'If the problem persists, contact support from your account page.',
-    orderRef: 'Order',
-    deliveredAt: 'Delivered',
-    warrantyEnd: 'Warranty ends',
-    stActive: 'Warranty active',
-    stExpired: 'Warranty expired',
-    stNeedsConfig: 'Warranty duration needs configuration by the store',
-    stNotDelivered: 'Not delivered yet',
-    daysLeft: (n: number) => `${n} days left`,
-    openClaim: 'Open claim',
-    claims: 'My claims',
-    claimsEmpty: 'You do not have any warranty claims.',
-    newClaimTitle: 'New warranty claim',
-    subject: 'Subject',
-    subjectPh: 'e.g. Heater stopped working',
-    description: 'Problem description',
-    descriptionPh: 'Describe the issue in detail (at least 10 characters)…',
-    attachments: 'Photos / video (optional, up to 6)',
-    uploading: 'Uploading…',
-    submit: 'Submit claim',
-    submitting: 'Submitting…',
-    thread: 'Conversation',
-    reply: 'Write a message…',
-    send: 'Send',
-    attach: 'Attach file',
-    close: 'Close',
-    loading: 'Loading…',
-    error: 'Something went wrong, please try again.',
-    decisionReason: 'Decision reason',
-    legacyClaimLink: 'Product not registered as a device? Submit a general claim',
-    productName: 'Product name',
-    replacedBadge: 'Replaced',
-    stageLabels: {
-      received: 'Received', diagnosing: 'Diagnosing', approved: 'Approved', rejected: 'Rejected',
-      repairing: 'Repairing', replaced: 'Replaced', resolved: 'Resolved',
-    } as Record<string, string>,
-    submittedAt: 'Submitted',
-  },
-  ckb: {
-    title: 'ناوەندی گەرەنتی',
-    myDevices: 'ئامێرە تۆمارکراوەکانم',
-    devicesEmpty: 'هێشتا هیچ ئامێرێک تۆمار نەکراوە. ئامێرەکەت بە ژمارە زنجیرەییەکەی زیاد بکە.',
-    addDevice: 'زیادکردنی ئامێر',
-    serialLabel: 'ژمارە زنجیرەیی',
-    serialPlaceholder: 'وەک لەسەر لەیبڵی ئامێرەکە نووسراوە بینووسە',
-    register: 'تۆمارکردنی ئامێر',
-    registering: 'پشکنین…',
-    registeredOk: 'ئامێرەکە لەسەر هەژمارەکەت تۆمارکرا.',
-    alreadyRegistered: 'ئەم ئامێرە پێشتر لەسەر هەژمارەکەت تۆمارکراوە.',
-    registerHint: 'ژمارەکە تەنها لەگەڵ ئامێرەکانی داواکارییە گەیەنراوەکانی خۆت دەگونجێت. تۆمارکردن هەرگیز بەرواری گەرەنتی ناگۆڕێت.',
-    supportHint: 'ئەگەر کێشەکە بەردەوام بوو، لە پەڕەی هەژمارەوە پەیوەندی بە پشتگیری بکە.',
-    orderRef: 'داواکاری',
-    deliveredAt: 'گەیاندن',
-    warrantyEnd: 'کۆتایی گەرەنتی',
-    stActive: 'گەرەنتی کارایە',
-    stExpired: 'گەرەنتی بەسەرچووە',
-    stNeedsConfig: 'ماوەی گەرەنتی پێویستی بە ڕێکخستنە لەلایەن فرۆشگاوە',
-    stNotDelivered: 'هێشتا نەگەیەنراوە',
-    daysLeft: (n: number) => `${n} ڕۆژ ماوە`,
-    openClaim: 'کردنەوەی داواکاری',
-    claims: 'داواکارییەکانم',
-    claimsEmpty: 'هیچ داواکارییەکی گەرەنتیت نییە.',
-    newClaimTitle: 'داواکاری گەرەنتی نوێ',
-    subject: 'بابەت',
-    subjectPh: 'نموونە: گەرمکەرەوەکە لە کارکەوت',
-    description: 'وەسفی کێشەکە',
-    descriptionPh: 'کێشەکە بە وردی باس بکە (لانیکەم ١٠ پیت)…',
-    attachments: 'وێنە / ڤیدیۆ (ئارەزوومەندانە، تا ٦)',
-    uploading: 'بارکردن…',
-    submit: 'ناردنی داواکاری',
-    submitting: 'ناردن…',
-    thread: 'گفتوگۆ',
-    reply: 'نامەیەک بنووسە…',
-    send: 'ناردن',
-    attach: 'هاوپێچکردنی فایل',
-    close: 'داخستن',
-    loading: 'باردەکرێت…',
-    error: 'هەڵەیەک ڕوویدا، دووبارە هەوڵبدەوە.',
-    decisionReason: 'هۆکاری بڕیار',
-    legacyClaimLink: 'بەرهەمەکە وەک ئامێر تۆمار نەکراوە؟ داواکاری گشتی پێشکەش بکە',
-    productName: 'ناوی بەرهەم',
-    replacedBadge: 'گۆڕدراوەتەوە',
-    stageLabels: {
-      received: 'وەرگیراوە', diagnosing: 'لە پشکنیندایە', approved: 'پەسەندکراوە', rejected: 'ڕەتکراوەتەوە',
-      repairing: 'لە چاککردنەوەدایە', replaced: 'گۆڕدراوەتەوە', resolved: 'تەواوبووە',
-    } as Record<string, string>,
-    submittedAt: 'بەرواری پێشکەشکردن',
-  },
-} as const;
-
-interface MyDevice {
-  unit_id: string;
-  order_id: string;
-  unit_index: number;
-  product: { id: string | null; slug: string | null; name: string; name_ar: string; name_ckb: string; image: string };
-  serial: string | null;
-  delivered_at: string | null;
-  registered_at: string | null;
-  warranty: {
-    start_at: string | null;
-    end_at: string | null;
-    base_months: number | null;
-    ext_months: number;
-    state: 'active' | 'expired' | 'needs_config' | 'not_delivered';
-    remaining_days: number | null;
-  };
-  replaced_by_unit_id: string | null;
-}
-
-interface MyClaim {
-  id: string;
-  unit_id: string | null;
-  subject: string;
-  product_name: string;
-  description: string;
-  stage: string;
-  decision_reason: string;
-  admin_note: string;
-  created_at: string;
-  serial: string | null;
-  evidence: Array<{ key: string; url: string }>;
-}
-
-interface ClaimMessage {
-  id: string;
-  is_staff: boolean;
-  mine: boolean;
-  body: string;
-  file_url: string | null;
-  created_at: string;
-}
-
-interface ClaimDetail {
-  claim: MyClaim;
-  warranty_facts: { order_id: string; delivered_at: string | null; warranty_end_at: string | null; state: string; remaining_days: number | null } | null;
-  messages: ClaimMessage[];
-}
-
-const STAGE_CLS: Record<string, { cls: string; icon: React.ElementType }> = {
-  received: { cls: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/30', icon: Clock },
-  diagnosing: { cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30', icon: Search },
-  approved: { cls: 'bg-green-500/10 text-green-400 border-green-500/30', icon: CheckCircle },
-  rejected: { cls: 'bg-red-500/10 text-red-400 border-red-500/30', icon: XCircle },
-  repairing: { cls: 'bg-blue-500/10 text-blue-300 border-blue-500/30', icon: Wrench },
-  replaced: { cls: 'bg-purple-500/10 text-purple-300 border-purple-500/30', icon: Repeat },
-  resolved: { cls: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30', icon: CheckCircle },
-};
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
-}
 
 export default function Warranty() {
   const navigate = useNavigate();
-  const { lang, dir, loc } = useLanguage();
-  const s = STRINGS[lang];
+  const { lang, dir } = useLanguage();
+  const s = WARRANTY_STRINGS[lang];
 
-  // Devices
-  const [devices, setDevices] = useState<MyDevice[]>([]);
+  // ------------------------------------------------------------- devices
+  const [mine, setMine] = useState<MineResponse | null>(null);
   const [devicesLoading, setDevicesLoading] = useState(true);
-  const [devicesError, setDevicesError] = useState('');
+  const [devicesError, setDevicesError] = useState<unknown>(null);
+  const [devicesNotice, setDevicesNotice] = useState('');
+  // Bumped whenever the set of linked devices changes, so the "from my
+  // orders" list inside the add panel knows to reload.
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Add-by-serial
-  const [serialInput, setSerialInput] = useState('');
-  const [serialBusy, setSerialBusy] = useState(false);
-  const [serialError, setSerialError] = useState('');
-  const [serialOk, setSerialOk] = useState('');
-
-  // Claims
-  const [claims, setClaims] = useState<MyClaim[]>([]);
+  // -------------------------------------------------------------- claims
+  const [claims, setClaims] = useState<Claim[]>([]);
   const [claimsLoading, setClaimsLoading] = useState(true);
-  const [claimsError, setClaimsError] = useState('');
+  const [claimsError, setClaimsError] = useState<unknown>(null);
+  const [claimsNotice, setClaimsNotice] = useState('');
 
-  // New device claim modal
-  const [claimForDevice, setClaimForDevice] = useState<MyDevice | null>(null);
-  // The control each window grows out of. All three windows in this page are
-  // raised from a LIST of near-identical rows — devices that differ only by a
-  // serial, claims that differ only by a subject — so the origin of the
-  // arrival is doing real work: it is the only thing on screen that says which
-  // row is being acted on while the window is on its way in.
+  // ------------------------------------------------------------- windows
+  // The control each window grows out of. Devices and claims are stacks of
+  // near-identical rows, so the origin of the arrival is what says which row
+  // is being acted on while the window is on its way in.
   const claimAnchor = useRef<HTMLElement | null>(null);
   const legacyAnchor = useRef<HTMLElement | null>(null);
   const threadAnchor = useRef<HTMLElement | null>(null);
-  // The claim form must keep its content while it animates OUT. `claimForDevice`
-  // is the open flag AND the data, so the moment it is cleared the panel would
-  // have nothing to render mid-flight (and would throw on the product name).
-  // Holding the last device means the window that leaves is the window that
-  // was there — the exit is the arrival in reverse, including its contents.
-  const lastClaimDevice = useRef<MyDevice | null>(null);
-  const [subject, setSubject] = useState('');
-  const [description, setDescription] = useState('');
-  const [attachments, setAttachments] = useState<Array<{ key: string; url: string; name: string }>>([]);
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [claimBusy, setClaimBusy] = useState(false);
-  const [claimError, setClaimError] = useState('');
-
-  // Legacy free-form claim modal (kept from the previous page)
-  const [showLegacyForm, setShowLegacyForm] = useState(false);
-  const [legacyName, setLegacyName] = useState('');
-  const [legacyDesc, setLegacyDesc] = useState('');
-  const [legacyBusy, setLegacyBusy] = useState(false);
-  const [legacyError, setLegacyError] = useState('');
-
-  // Thread modal
+  const [claimForDevice, setClaimForDevice] = useState<Device | null>(null);
+  const [showLegacy, setShowLegacy] = useState(false);
   const [openClaimId, setOpenClaimId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ClaimDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState('');
-  const [replyText, setReplyText] = useState('');
-  const [replyBusy, setReplyBusy] = useState(false);
 
-  if (claimForDevice) lastClaimDevice.current = claimForDevice;
-  const claimDevice = claimForDevice ?? lastClaimDevice.current;
+  const [unlinkDevice, setUnlinkDevice] = useState<Device | null>(null);
+  const [unlinkOpen, setUnlinkOpen] = useState(false);
+  const [unlinkBusy, setUnlinkBusy] = useState(false);
+  const [unlinkError, setUnlinkError] = useState('');
+  const [unlinkBlocked, setUnlinkBlocked] = useState(false);
 
   const loadDevices = useCallback(async () => {
     try {
-      const res = await api.get<{ devices: MyDevice[] }>('/api/devices/mine');
-      setDevices(res.devices);
-      setDevicesError('');
+      const res = await api.get<MineResponse>('/api/devices/mine');
+      setMine(res);
+      setDevicesError(null);
     } catch (e) {
-      setDevicesError(e instanceof ApiError ? e.message : s.error);
+      setDevicesError(e);
     } finally {
       setDevicesLoading(false);
     }
-  }, [s.error]);
+  }, []);
 
   const loadClaims = useCallback(async () => {
     try {
-      const res = await api.get<{ claims: MyClaim[] }>('/api/devices/claims');
+      const res = await api.get<{ claims: Claim[] }>('/api/devices/claims');
       setClaims(res.claims);
-      setClaimsError('');
+      setClaimsError(null);
     } catch (e) {
-      setClaimsError(e instanceof ApiError ? e.message : s.error);
+      setClaimsError(e);
     } finally {
       setClaimsLoading(false);
     }
-  }, [s.error]);
+  }, []);
 
   useEffect(() => {
     loadDevices();
     loadClaims();
   }, [loadDevices, loadClaims]);
 
-  const registerSerial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (serialBusy || !serialInput.trim()) return;
-    setSerialBusy(true);
-    setSerialError('');
-    setSerialOk('');
-    try {
-      const res = await api.post<{ device: MyDevice; already_registered: boolean }>('/api/devices/register', {
-        serial: serialInput.trim(),
-      });
-      setSerialOk(res.already_registered ? s.alreadyRegistered : s.registeredOk);
-      setSerialInput('');
-      await loadDevices();
-    } catch (e2) {
-      setSerialError(e2 instanceof ApiError ? e2.message : s.error);
-    } finally {
-      setSerialBusy(false);
-    }
+  // Success notices are transient: they confirm, then get out of the way.
+  useEffect(() => {
+    if (!devicesNotice) return;
+    const t = window.setTimeout(() => setDevicesNotice(''), 6000);
+    return () => window.clearTimeout(t);
+  }, [devicesNotice]);
+  useEffect(() => {
+    if (!claimsNotice) return;
+    const t = window.setTimeout(() => setClaimsNotice(''), 6000);
+    return () => window.clearTimeout(t);
+  }, [claimsNotice]);
+
+  // --------------------------------------------------------------- actions
+  const onLinked = (device: Device) => {
+    // Show it at once, then let the server's list be the truth.
+    setMine((prev) => {
+      if (!prev) return prev;
+      if (prev.devices.some((d) => d.unit_id === device.unit_id)) return prev;
+      return { ...prev, devices: [device, ...prev.devices] };
+    });
+    setRefreshKey((k) => k + 1);
+    loadDevices();
   };
 
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setClaimError('');
-    setUploadBusy(true);
+  const openClaimFor = (device: Device, trigger: HTMLElement) => {
+    claimAnchor.current = trigger;
+    setClaimForDevice(device);
+  };
+
+  const askUnlink = (device: Device) => {
+    setUnlinkDevice(device);
+    setUnlinkBusy(false);
+    // A unit with an open claim cannot be unlinked; say so before the tap
+    // rather than after a failed request.
+    const blocked = device.open_claims > 0;
+    setUnlinkBlocked(blocked);
+    setUnlinkError(blocked ? s.claimOpenBlock : '');
+    setUnlinkOpen(true);
+  };
+
+  const confirmUnlink = async () => {
+    if (!unlinkDevice || unlinkBusy) return;
+    setUnlinkBusy(true);
+    setUnlinkError('');
     try {
-      for (const file of Array.from(files)) {
-        if (attachments.length >= 6) break;
-        const form = new FormData();
-        form.append('file', file);
-        const res = await api.post<{ key: string; url: string }>('/api/devices/claims/upload', form);
-        setAttachments((a) => (a.length >= 6 ? a : [...a, { key: res.key, url: res.url, name: file.name }]));
+      await api.delete(`/api/devices/units/${encodeURIComponent(unlinkDevice.unit_id)}/registration`);
+      setUnlinkOpen(false);
+      setMine((prev) => (prev ? { ...prev, devices: prev.devices.filter((d) => d.unit_id !== unlinkDevice.unit_id) } : prev));
+      setDevicesNotice(s.unlinkedOk);
+      setRefreshKey((k) => k + 1);
+      loadDevices();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'CLAIM_OPEN') {
+        setUnlinkBlocked(true);
+        setUnlinkError(s.claimOpenBlock);
+      } else {
+        setUnlinkError(e instanceof ApiError ? e.message : s.error);
       }
-    } catch (e) {
-      setClaimError(e instanceof ApiError ? e.message : s.error);
     } finally {
-      setUploadBusy(false);
+      setUnlinkBusy(false);
     }
   };
 
-  const submitDeviceClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!claimForDevice || claimBusy) return;
-    setClaimBusy(true);
-    setClaimError('');
-    try {
-      await api.post(`/api/devices/units/${claimForDevice.unit_id}/claims`, {
-        subject,
-        description,
-        attachments: attachments.map((a) => a.key),
-      });
-      setClaimForDevice(null);
-      setSubject('');
-      setDescription('');
-      setAttachments([]);
-      await loadClaims();
-    } catch (e2) {
-      setClaimError(e2 instanceof ApiError ? e2.message : s.error);
-    } finally {
-      setClaimBusy(false);
-    }
+  const onClaimSubmitted = () => {
+    setClaimsNotice(s.claimSubmitted);
+    loadClaims();
+    // open_claims on the card changes too.
+    loadDevices();
   };
 
-  const submitLegacyClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (legacyBusy) return;
-    setLegacyBusy(true);
-    setLegacyError('');
-    try {
-      await api.post('/api/profile/warranty-claims', { productName: legacyName, description: legacyDesc });
-      setShowLegacyForm(false);
-      setLegacyName('');
-      setLegacyDesc('');
-      await loadClaims();
-    } catch (e2) {
-      setLegacyError(e2 instanceof ApiError ? e2.message : s.error);
-    } finally {
-      setLegacyBusy(false);
-    }
-  };
-
-  const openThread = async (claimId: string) => {
-    setOpenClaimId(claimId);
-    setDetail(null);
-    setDetailError('');
-    setDetailLoading(true);
-    try {
-      const res = await api.get<ClaimDetail>(`/api/devices/claims/${claimId}`);
-      setDetail(res);
-    } catch (e) {
-      setDetailError(e instanceof ApiError ? e.message : s.error);
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
-  const sendReply = async (fileKey?: string) => {
-    if (!openClaimId || replyBusy) return;
-    if (!replyText.trim() && !fileKey) return;
-    setReplyBusy(true);
-    setDetailError('');
-    try {
-      await api.post(`/api/devices/claims/${openClaimId}/messages`, {
-        body: replyText.trim(),
-        file_key: fileKey,
-      });
-      setReplyText('');
-      const res = await api.get<ClaimDetail>(`/api/devices/claims/${openClaimId}`);
-      setDetail(res);
-    } catch (e) {
-      setDetailError(e instanceof ApiError ? e.message : s.error);
-    } finally {
-      setReplyBusy(false);
-    }
-  };
-
-  const attachToThread = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !openClaimId) return;
-    setReplyBusy(true);
-    setDetailError('');
-    try {
-      const form = new FormData();
-      form.append('file', files[0]);
-      const res = await api.post<{ key: string }>('/api/devices/claims/upload', form);
-      await api.post(`/api/devices/claims/${openClaimId}/messages`, { body: replyText.trim(), file_key: res.key });
-      setReplyText('');
-      const refreshed = await api.get<ClaimDetail>(`/api/devices/claims/${openClaimId}`);
-      setDetail(refreshed);
-    } catch (e) {
-      setDetailError(e instanceof ApiError ? e.message : s.error);
-    } finally {
-      setReplyBusy(false);
-    }
-  };
-
-  const coverageBadge = (d: MyDevice) => {
-    const st = d.warranty.state;
-    if (st === 'active') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold bg-green-500/10 text-green-400 border-green-500/30">
-          <ShieldCheck className="w-3 h-3" />
-          {s.stActive}
-          {d.warranty.remaining_days !== null && ` · ${s.daysLeft(d.warranty.remaining_days)}`}
-        </span>
-      );
-    }
-    if (st === 'expired') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold bg-red-500/10 text-red-400 border-red-500/30">
-          <XCircle className="w-3 h-3" />{s.stExpired}
-        </span>
-      );
-    }
-    if (st === 'needs_config') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold bg-orange-500/10 text-orange-400 border-orange-500/30">
-          <AlertTriangle className="w-3 h-3" />{s.stNeedsConfig}
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold bg-zinc-500/10 text-zinc-400 border-zinc-500/30">
-        <Clock className="w-3 h-3" />{s.stNotDelivered}
-      </span>
-    );
-  };
+  const devices = mine?.devices ?? [];
+  const priority = mine?.priority_service === true;
 
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+      {/* Translucent chrome over content: the page passes under it. */}
+      <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label={s.back}
+          className={`p-2 bg-zinc-900/80 rounded-full hover:bg-zinc-800 transition-colors ${FOCUS}`}
+        >
+          {dir === 'rtl' ? <ArrowRight aria-hidden="true" className="w-5 h-5" /> : <ArrowLeft aria-hidden="true" className="w-5 h-5" />}
         </button>
         <h1 className="text-white font-bold text-lg">{s.title}</h1>
-      </div>
+      </header>
 
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
-        {/* ------------------------------------------------ add by serial */}
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Barcode className="w-5 h-5 text-olive-light" />
-            <h2 className="text-white font-bold text-sm">{s.addDevice}</h2>
-          </div>
-          <form onSubmit={registerSerial} className="flex gap-2">
-            <input
-              value={serialInput}
-              onChange={(e) => setSerialInput(e.target.value)}
-              placeholder={s.serialPlaceholder}
-              aria-label={s.serialLabel}
-              maxLength={80}
-              className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive-light/50 transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={serialBusy || !serialInput.trim()}
-              className="shrink-0 bg-olive-light/20 text-olive-light px-4 py-2.5 rounded-xl font-bold text-sm border border-olive-light/30 hover:bg-olive-light/30 disabled:opacity-50 transition-colors"
-            >
-              {serialBusy ? s.registering : s.register}
-            </button>
-          </form>
-          <p className="text-zinc-500 text-[11px] mt-2">{s.registerHint}</p>
-          {serialError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3 mt-2">
-              {serialError}
-              <div className="text-red-400/70 text-[11px] mt-1">{s.supportHint}</div>
+        {/* ------------------------------------------------ intro + membership */}
+        <section className="space-y-3">
+          <p className="text-zinc-400 text-[13px] leading-relaxed">{s.intro}</p>
+          {priority ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-[#BAA369]/30 bg-[#BAA369]/10 px-4 py-3" data-testid="warranty-pro-strip">
+              <Crown aria-hidden="true" className="w-5 h-5 text-[#BAA369] shrink-0" />
+              <p className="text-[13px] text-zinc-100 flex-1 min-w-0 leading-snug">{s.proStrip}</p>
+              <Link to="/subscription" className={`text-[12px] font-bold text-[#BAA369] whitespace-nowrap hover:underline underline-offset-2 rounded ${FOCUS}`}>
+                {s.proStripLink}
+              </Link>
             </div>
-          )}
-          {serialOk && (
-            <div className="bg-green-500/10 border border-green-500/30 text-green-400 text-[13px] font-medium rounded-xl p-3 mt-2">
-              {serialOk}
-            </div>
-          )}
-        </div>
+          ) : mine ? (
+            <p className="text-[12px] text-zinc-500">
+              <Link to="/subscription" className={`hover:text-zinc-300 underline underline-offset-2 rounded ${FOCUS}`}>
+                {s.proTeaser}
+              </Link>
+            </p>
+          ) : null}
+          <p className="text-[11px] text-zinc-600">{s.coverageNote}</p>
+        </section>
 
-        {/* ------------------------------------------------- my devices */}
-        <div>
-          <h2 className="text-white font-bold text-base mb-3">{s.myDevices}</h2>
-          {devicesError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3 mb-3">{devicesError}</div>
+        {/* ------------------------------------------------------ add a printer */}
+        <AddDevicePanel lang={lang} s={s} refreshKey={refreshKey} onLinked={onLinked} />
+
+        {/* --------------------------------------------------------- my printers */}
+        <section aria-labelledby="warranty-devices-title" className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="warranty-devices-title" className="text-white font-bold text-base">
+              {s.myPrinters}
+            </h2>
+            {devices.length > 0 && <span className="text-zinc-500 text-[12px] tabular-nums">{fmtInt(devices.length, lang)}</span>}
+          </div>
+          {devicesNotice && (
+            <div role="status" className={OK_BOX}>
+              {devicesNotice}
+            </div>
           )}
           {devicesLoading ? (
-            <div className="flex justify-center py-10">
-              <div className="w-8 h-8 border-2 border-olive-light/30 border-t-olive-light rounded-full animate-spin" />
-            </div>
-          ) : devices.length === 0 && !devicesError ? (
-            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 text-center">
-              <ShieldCheck className="w-10 h-10 text-olive-light mx-auto mb-3" />
-              <p className="text-zinc-400 text-sm">{s.devicesEmpty}</p>
-            </div>
+            <SkeletonGroup className="space-y-3">
+              {[0, 1].map((i) => (
+                <div key={i} className={`${CARD} p-4`} aria-hidden="true">
+                  <div className="flex gap-3">
+                    <Skeleton className="w-16 h-16 rounded-xl shrink-0" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-3 w-28 mt-5" />
+                  <Skeleton className="h-px w-full mt-4" />
+                  <div className="flex justify-between mt-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <Skeleton className="h-11 rounded-xl" />
+                    <Skeleton className="h-11 rounded-xl" />
+                  </div>
+                </div>
+              ))}
+            </SkeletonGroup>
+          ) : devicesError != null ? (
+            <ErrorState error={devicesError} onRetry={loadDevices} />
+          ) : devices.length === 0 ? (
+            <EmptyState icon={<Printer aria-hidden="true" className="w-6 h-6" />} title={s.devicesEmpty} description={s.devicesEmptyDesc} />
           ) : (
             <div className="space-y-3">
               {devices.map((d) => (
-                <div key={d.unit_id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4">
-                  <div className="flex gap-3">
-                    <div className="w-16 h-16 rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden shrink-0">
-                      {d.product.image ? (
-                        <img src={d.product.image} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-700">
-                          <ShieldCheck className="w-6 h-6" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-white font-bold text-sm truncate">
-                          {loc(d.product.name_ar || d.product.name, d.product.name, d.product.name_ckb)}
-                        </h3>
-                        {d.replaced_by_unit_id && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-300 shrink-0">
-                            <Repeat className="w-3 h-3" />{s.replacedBadge}
-                          </span>
-                        )}
-                      </div>
-                      {d.serial && <div className="text-zinc-500 text-[12px] font-mono mt-0.5">{d.serial}</div>}
-                      <div className="mt-1.5">{coverageBadge(d)}</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mt-3 text-[11px]">
-                    <div className="bg-zinc-950/60 rounded-lg p-2">
-                      <div className="text-zinc-500">{s.orderRef}</div>
-                      <button onClick={() => navigate('/orders')} className="text-zinc-300 font-mono truncate block max-w-full hover:text-white transition-colors">
-                        {d.order_id}
-                      </button>
-                    </div>
-                    <div className="bg-zinc-950/60 rounded-lg p-2">
-                      <div className="text-zinc-500">{s.deliveredAt}</div>
-                      <div className="text-zinc-300">{fmtDate(d.delivered_at)}</div>
-                    </div>
-                    <div className="bg-zinc-950/60 rounded-lg p-2">
-                      <div className="text-zinc-500">{s.warrantyEnd}</div>
-                      <div className="text-zinc-300">{fmtDate(d.warranty.end_at)}</div>
-                    </div>
-                  </div>
-                  {!d.replaced_by_unit_id && (
-                    <button
-                      onClick={(e) => { claimAnchor.current = e.currentTarget; setClaimForDevice(d); setSubject(''); setDescription(''); setAttachments([]); setClaimError(''); }}
-                      className="w-full mt-3 bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 py-2 rounded-xl text-[13px] font-bold border border-zinc-700/60 transition-colors inline-flex items-center justify-center gap-1.5"
-                    >
-                      <Wrench className="w-3.5 h-3.5" />{s.openClaim}
-                    </button>
-                  )}
-                </div>
+                <DeviceCard key={d.unit_id} device={d} lang={lang} s={s} onOpenClaim={openClaimFor} onRemove={askUnlink} />
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* --------------------------------------------------- my claims */}
-        <div>
-          <h2 className="text-white font-bold text-base mb-3">{s.claims}</h2>
-          {claimsError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3 mb-3">{claimsError}</div>
+        {/* ----------------------------------------------------------- my claims */}
+        <section aria-labelledby="warranty-claims-title" className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="warranty-claims-title" className="text-white font-bold text-base">
+              {s.claims}
+            </h2>
+            {claims.length > 0 && <span className="text-zinc-500 text-[12px] tabular-nums">{fmtInt(claims.length, lang)}</span>}
+          </div>
+          {claimsNotice && (
+            <div role="status" className={OK_BOX}>
+              {claimsNotice}
+            </div>
           )}
           {claimsLoading ? (
-            <div className="flex justify-center py-10">
-              <div className="w-8 h-8 border-2 border-olive-light/30 border-t-olive-light rounded-full animate-spin" />
-            </div>
-          ) : claims.length === 0 && !claimsError ? (
-            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 text-center">
-              <p className="text-zinc-400 text-sm">{s.claimsEmpty}</p>
-            </div>
+            <SkeletonGroup className="space-y-3">
+              {[0, 1].map((i) => (
+                <div key={i} className={`${CARD} p-4`} aria-hidden="true">
+                  <div className="flex justify-between gap-3">
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-3 w-1/3 mt-2" />
+                  <div className="grid grid-cols-5 gap-1 mt-4">
+                    {[0, 1, 2, 3, 4].map((j) => (
+                      <div key={j} className="flex flex-col items-center gap-1.5">
+                        <Skeleton className="w-[11px] h-[11px] rounded-full" />
+                        <Skeleton className="h-2.5 w-10" />
+                      </div>
+                    ))}
+                  </div>
+                  <Skeleton className="h-3 w-full mt-3" />
+                  <Skeleton className="h-3 w-3/4 mt-1.5" />
+                </div>
+              ))}
+            </SkeletonGroup>
+          ) : claimsError != null ? (
+            <ErrorState error={claimsError} onRetry={loadClaims} />
+          ) : claims.length === 0 ? (
+            <EmptyState icon={<ClipboardList aria-hidden="true" className="w-6 h-6" />} title={s.claimsEmpty} description={s.claimsEmptyDesc} />
           ) : (
             <div className="space-y-3">
-              {claims.map((cl) => {
-                const st = STAGE_CLS[cl.stage] ?? STAGE_CLS.received;
-                const StIcon = st.icon;
-                return (
-                  <button
-                    key={cl.id}
-                    onClick={(e) => { threadAnchor.current = e.currentTarget; openThread(cl.id); }}
-                    className="w-full text-start bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 hover:border-zinc-700 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-1">
-                      <h3 className="text-white font-bold text-sm truncate">{cl.subject}</h3>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold shrink-0 ${st.cls}`}>
-                        <StIcon className="w-3 h-3" />
-                        {s.stageLabels[cl.stage] ?? cl.stage}
-                      </span>
-                    </div>
-                    <p className="text-zinc-500 text-[12px] truncate">{cl.product_name}{cl.serial ? ` · ${cl.serial}` : ''}</p>
-                    <p className="text-zinc-400 text-[13px] mt-1 line-clamp-2 whitespace-pre-wrap">{cl.description}</p>
-                    {cl.decision_reason && (
-                      <p className="text-zinc-500 text-[11px] mt-1">{s.decisionReason}: {cl.decision_reason}</p>
-                    )}
-                    <p className="text-zinc-600 text-[11px] mt-1.5 inline-flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />{s.submittedAt}: {fmtDate(cl.created_at)}
-                    </p>
-                  </button>
-                );
-              })}
+              {claims.map((cl) => (
+                <ClaimCard
+                  key={cl.id}
+                  claim={cl}
+                  lang={lang}
+                  s={s}
+                  onOpen={(claim, trigger) => {
+                    threadAnchor.current = trigger;
+                    setOpenClaimId(claim.id);
+                  }}
+                />
+              ))}
             </div>
           )}
           <button
-            onClick={(e) => { legacyAnchor.current = e.currentTarget; setShowLegacyForm(true); setLegacyError(''); }}
-            className="mt-3 text-[12px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+            type="button"
+            onClick={(e) => {
+              legacyAnchor.current = e.currentTarget;
+              setShowLegacy(true);
+            }}
+            className={`text-[12px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors rounded min-h-[32px] ${FOCUS}`}
           >
             {s.legacyClaimLink}
           </button>
-        </div>
+        </section>
       </div>
 
-      {/* NEW DEVICE CLAIM — a centred form that takes the page over while it
-          is up, and hands it back when it leaves.
-
-          It used to be a `fixed inset-0` div that existed only while
-          `claimForDevice` was set: it appeared fully formed, and on submit or
-          dismiss it stopped existing between one frame and the next. Nothing
-          told the person where the window had gone, which is exactly the
-          spatial contract Apple describes — a thing that leaves should leave
-          the way it came. The primitive gives it a spring arrival and the SAME
-          path back out, and because a spring animates from the panel's live
-          value, someone who opens this and immediately taps the X gets a
-          window that turns around from wherever it actually got to.
-
-          `Overlay`, not `Sheet`. This is a scrolling form with a required
-          subject, a 5000-character description and a file picker. A downward
-          drag inside it is how a person reads the rest of the form; giving that
-          same gesture a second meaning ("throw the claim away") would put a
-          half-written fault report and freshly uploaded evidence one clumsy
-          swipe from oblivion.
-
-          `anchor` is the device's own "Open claim" button, captured on press.
-          The devices list is a stack of near-identical cards and the dialog
-          names the unit only in small grey type under the title, so growing
-          the window out of the row that raised it is the clearest statement of
-          WHICH device this claim is about.
-
-          dismissOnScrim={false}: the old backdrop had no click handler, so
-          tapping beside the panel never closed it, and that is the right
-          behaviour to keep for a form — a stray tap on a wide screen must not
-          discard typed text and uploaded evidence. Escape now closes it, which
-          the primitive owns; there was no key listener here to delete.
-
-          Glass, not `solid`. Everything this form draws on top of the panel —
-          the zinc-900 fields, the evidence thumbnails, the tinted error bar —
-          is opaque enough to read against the blurred page behind, so the
-          window takes the house material instead of the old flat `#0a0a0a`.
-
-          z={60} is the old `z-[60]`, unchanged. */}
-      <Overlay
-        open={!!claimForDevice}
-        onClose={() => setClaimForDevice(null)}
-        labelledBy="warranty-device-claim-title"
+      {/* ------------------------------------------------------------ windows */}
+      <DeviceClaimOverlay
+        device={claimForDevice}
         anchor={claimAnchor}
-        dismissOnScrim={false}
-        z={60}
-        testId="warranty-device-claim"
-        panelClassName="w-full max-w-md max-h-[90vh] overflow-y-auto"
-      >
-        {/* The old panel's own `p-6`, moved inside: the primitive owns the
-            material, the border and the rounding; the caller owns the inset. */}
-        <div className="p-6">
-          <button onClick={() => setClaimForDevice(null)} className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors" aria-label={s.close}>
-            <X className="w-4 h-4" />
-          </button>
-          <h2 id="warranty-device-claim-title" className="text-white text-lg font-bold mb-1">{s.newClaimTitle}</h2>
-          <p className="text-zinc-500 text-sm mb-4">
-            {claimDevice && loc(claimDevice.product.name_ar || claimDevice.product.name, claimDevice.product.name, claimDevice.product.name_ckb)}
-            {claimDevice?.serial ? ` · ${claimDevice.serial}` : ''}
-          </p>
-          <form onSubmit={submitDeviceClaim} className="space-y-4">
-            {claimError && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{claimError}</div>
-            )}
-            <div>
-              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.subject}<span className="text-red-500">*</span></label>
-              <input
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                minLength={3}
-                maxLength={200}
-                required
-                placeholder={s.subjectPh}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.description}<span className="text-red-500">*</span></label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                minLength={10}
-                maxLength={5000}
-                required
-                rows={4}
-                placeholder={s.descriptionPh}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors resize-none"
-              />
-            </div>
-            <div>
-              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.attachments}</label>
-              <label className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-300 text-sm cursor-pointer hover:border-zinc-700 transition-colors">
-                <Paperclip className="w-4 h-4" />
-                {uploadBusy ? s.uploading : s.attach}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
-                  multiple
-                  className="hidden"
-                  disabled={uploadBusy || attachments.length >= 6}
-                  onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
-                />
-              </label>
-              {attachments.length > 0 && (
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  {attachments.map((a) => (
-                    <div key={a.key} className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
-                      {a.key.endsWith('.mp4') ? (
-                        <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400 px-1 text-center break-all">{a.name}</div>
-                      ) : (
-                        <img src={a.url} alt="" className="w-full h-full object-cover" />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setAttachments((arr) => arr.filter((x) => x.key !== a.key))}
-                        className="absolute top-0.5 end-0.5 bg-black/70 rounded-full p-0.5 text-zinc-300 hover:text-white"
-                        aria-label={s.close}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={claimBusy || uploadBusy}
-              className="w-full bg-olive hover:bg-olive-light text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-            >
-              {claimBusy ? s.submitting : s.submit}
-            </button>
-          </form>
-        </div>
-      </Overlay>
-
-      {/* GENERAL (LEGACY) CLAIM — the same centred task for a product that was
-          never registered as a device.
-
-          Identical treatment to the device claim above, and deliberately so:
-          these two windows ask for the same thing and a person can arrive at
-          either from the same screen, so they must arrive and leave the same
-          way. The old markup was the third copy of the same `fixed inset-0`
-          div in this file — mounted on a boolean, unmounted on a boolean, with
-          no exit at all.
-
-          `Overlay`, not `Sheet`: a required product name and a 3000-character
-          description are a form, and drag-to-dismiss over a form is a way to
-          lose typing, not a way to close a window.
-
-          `anchor` is the small "not registered as a device?" link at the foot
-          of the claims list. That link is easy to lose track of once a window
-          covers the page, and scaling the dialog out of it is what says the
-          window is the link's own answer rather than something that happened
-          to appear.
-
-          dismissOnScrim={false} preserves the old behaviour exactly — the
-          backdrop was inert — and protects the form. Escape closes, from the
-          primitive.
-
-          z={60} is the old `z-[60]`, unchanged. */}
-      <Overlay
-        open={showLegacyForm}
-        onClose={() => setShowLegacyForm(false)}
-        labelledBy="warranty-legacy-claim-title"
-        anchor={legacyAnchor}
-        dismissOnScrim={false}
-        z={60}
-        testId="warranty-legacy-claim"
-        panelClassName="w-full max-w-md max-h-[90vh] overflow-y-auto"
-      >
-        {/* The old `p-6` inset, moved inside the panel the primitive owns. */}
-        <div className="p-6">
-          <button onClick={() => setShowLegacyForm(false)} className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors" aria-label={s.close}>
-            <X className="w-4 h-4" />
-          </button>
-          <h2 id="warranty-legacy-claim-title" className="text-white text-lg font-bold mb-4">{s.newClaimTitle}</h2>
-          <form onSubmit={submitLegacyClaim} className="space-y-4">
-            {legacyError && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{legacyError}</div>
-            )}
-            <div>
-              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.productName}<span className="text-red-500">*</span></label>
-              <input
-                value={legacyName}
-                onChange={(e) => setLegacyName(e.target.value)}
-                minLength={2}
-                maxLength={200}
-                required
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.description}<span className="text-red-500">*</span></label>
-              <textarea
-                value={legacyDesc}
-                onChange={(e) => setLegacyDesc(e.target.value)}
-                minLength={10}
-                maxLength={3000}
-                required
-                rows={4}
-                placeholder={s.descriptionPh}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors resize-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={legacyBusy}
-              className="w-full bg-olive hover:bg-olive-light text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-            >
-              {legacyBusy ? s.submitting : s.submit}
-            </button>
-          </form>
-        </div>
-      </Overlay>
-
-      {/* CLAIM THREAD — the conversation about one claim, opened from its row
-          in the claims list.
-
-          Like the two forms above it was a `fixed inset-0` div tied to
-          `openClaimId`: it blinked into place and, when the X was tapped, was
-          gone before the finger lifted. This is the window in the page a
-          person opens most often (a claim is checked again and again while it
-          is being diagnosed), so it is the one where the missing return trip
-          costs the most: the window should visibly go back to the claim row it
-          belongs to, and now it does.
-
-          `Overlay`, not `Sheet`. It looks like a chat sheet, but everything a
-          vertical drag could mean here is already taken: the middle section is
-          a scrolling message list, and the bottom is a text field that raises
-          the on-screen keyboard. Drag-to-dismiss would fight the scroll and
-          could throw the window away mid-reply. The X in the header is the
-          way out, and Escape now works too — the primitive owns it, and there
-          was no key listener in this file to remove.
-
-          `anchor` is the claim card that was tapped. Claims differ only by a
-          subject line and a stage chip, so the window growing out of the right
-          card is what makes it obvious the thread belongs to that claim and
-          not the one above it.
-
-          dismissOnScrim={false}: the old backdrop did nothing when tapped, and
-          keeping that matters more here than in the forms — a half-typed reply
-          lives in this window too.
-
-          `onClose` deliberately no longer clears `detail`. `openThread` already
-          resets `detail` and `detailError` on every open, so nothing stale can
-          ever be shown; clearing it on the way OUT only emptied the panel while
-          it was still on screen animating away. Keeping it means the window
-          that leaves is the window that was there.
-
-          The panel keeps its own three-row column geometry (header, scrolling
-          transcript, composer) in `panelClassName`; the material, border and
-          rounding now come from the primitive, and `overflow-hidden` keeps the
-          header and composer edges inside that rounding.
-
-          z={60} is the old `z-[60]`, unchanged. */}
-      <Overlay
-        open={!!openClaimId}
-        onClose={() => setOpenClaimId(null)}
-        labelledBy="warranty-thread-title"
-        anchor={threadAnchor}
-        dismissOnScrim={false}
-        z={60}
-        testId="warranty-claim-thread"
-        panelClassName="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
-      >
-        <div className="p-5 border-b border-zinc-800/70 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 id="warranty-thread-title" className="text-white text-base font-bold truncate">{detail?.claim.subject ?? s.thread}</h2>
-            {detail?.warranty_facts && (
-              <p className="text-zinc-500 text-[11px] mt-1">
-                {s.orderRef}: <span className="font-mono">{detail.warranty_facts.order_id}</span>
-                {' · '}{s.deliveredAt}: {fmtDate(detail.warranty_facts.delivered_at)}
-                {' · '}{s.warrantyEnd}: {fmtDate(detail.warranty_facts.warranty_end_at)}
-              </p>
-            )}
-          </div>
-          {/* The header X closes exactly the way the scrim/Escape do — one
-              close path, so the window can never be dismissed two different
-              ways. `setDetail(null)` moved off it for the reason given
-              above: `openThread` already clears the transcript on every
-              open, and clearing it here only emptied the panel while it was
-              still on screen leaving. */}
-          <button onClick={() => setOpenClaimId(null)} className="p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors shrink-0" aria-label={s.close}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="p-5 overflow-y-auto flex-1 space-y-3 min-h-[160px]">
-          {detailLoading && (
-            <div className="flex justify-center py-8">
-              <div className="w-7 h-7 border-2 border-olive-light/30 border-t-olive-light rounded-full animate-spin" />
-            </div>
-          )}
-          {detailError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-xl p-3">{detailError}</div>
-          )}
-          {detail && (
-            <>
-              <div className="bg-zinc-900/70 rounded-xl px-3 py-2 text-sm text-zinc-300 whitespace-pre-wrap">{detail.claim.description}</div>
-              {detail.claim.evidence.length > 0 && (
-                <div className="flex gap-2 flex-wrap">
-                  {detail.claim.evidence.map((ev) => (
-                    <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
-                      {ev.key.endsWith('.mp4') ? (
-                        <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400">MP4</div>
-                      ) : (
-                        <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      )}
-                    </a>
-                  ))}
-                </div>
-              )}
-              {detail.messages.map((m) => (
-                <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.mine ? 'bg-olive/25 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'}`}>
-                  {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
-                  {m.file_url && (
-                    <a href={m.file_url} target="_blank" rel="noreferrer" className="block mt-1">
-                      {m.file_url.endsWith('.mp4') ? (
-                        <video src={m.file_url} controls preload="none" className="max-h-40 rounded-lg" />
-                      ) : (
-                        <img src={m.file_url} alt="" className="max-h-40 rounded-lg" loading="lazy" />
-                      )}
-                    </a>
-                  )}
-                  <div className="text-[10px] text-zinc-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-        <div className="p-4 border-t border-zinc-800/70 flex items-center gap-2">
-          <label className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white cursor-pointer transition-colors shrink-0" title={s.attach}>
-            <Paperclip className="w-4 h-4" />
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
-              className="hidden"
-              disabled={replyBusy}
-              onChange={(e) => { attachToThread(e.target.files); e.target.value = ''; }}
-            />
-          </label>
-          <input
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder={s.reply}
-            maxLength={3000}
-            className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive-light/50 transition-colors"
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
-          />
-          <button
-            onClick={() => sendReply()}
-            disabled={replyBusy || !replyText.trim()}
-            className="p-2.5 bg-olive-light/20 text-olive-light border border-olive-light/30 rounded-xl hover:bg-olive-light/30 disabled:opacity-40 transition-colors shrink-0"
-            aria-label={s.send}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-      </Overlay>
+        lang={lang}
+        s={s}
+        onClose={() => setClaimForDevice(null)}
+        onSubmitted={onClaimSubmitted}
+      />
+      <LegacyClaimOverlay open={showLegacy} anchor={legacyAnchor} s={s} onClose={() => setShowLegacy(false)} onSubmitted={onClaimSubmitted} />
+      <ClaimThreadOverlay claimId={openClaimId} anchor={threadAnchor} lang={lang} s={s} onClose={() => setOpenClaimId(null)} />
+      <UnlinkSheet
+        device={unlinkDevice}
+        open={unlinkOpen}
+        busy={unlinkBusy}
+        error={unlinkError}
+        blocked={unlinkBlocked}
+        lang={lang}
+        s={s}
+        onConfirm={confirmUnlink}
+        onClose={() => setUnlinkOpen(false)}
+      />
     </div>
   );
 }

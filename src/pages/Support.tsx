@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
@@ -332,23 +332,33 @@ function ReplyCard({ card, onNavigate }: { card: AsstCard; onNavigate: (to: stri
 
 // ------------------------------------------------------------- ticket form
 
+/** Values another page may hand over through router state (e.g. the warranty
+ *  center's "Contact support" on a printer card). */
+export interface TicketPrefill {
+  unitId?: string;
+  orderId?: string;
+  subject?: string;
+}
+
 function TicketForm({
   s,
   lang,
   loc,
+  initial,
   onClose,
   onCreated,
 }: {
   s: SupportStrings;
   lang: string;
   loc: (ar: string, en: string, ckb?: string) => string;
+  initial?: TicketPrefill;
   onClose: () => void;
   onCreated: (t: Ticket) => void;
 }) {
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(initial?.subject ?? '');
   const [body, setBody] = useState('');
-  const [orderId, setOrderId] = useState('');
-  const [unitId, setUnitId] = useState('');
+  const [orderId, setOrderId] = useState(initial?.orderId ?? '');
+  const [unitId, setUnitId] = useState(initial?.unitId ?? '');
   const [orders, setOrders] = useState<OrderOption[]>([]);
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [step, setStep] = useState<'form' | 'confirm'>('form');
@@ -698,10 +708,23 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
 
 export default function Support() {
   const navigate = useNavigate();
+  const { state } = useLocation();
   const { lang, dir, loc } = useLanguage();
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const s: SupportStrings = STRINGS[lang] ?? STRINGS.ar;
+
+  // Router state from another page (the warranty center's "Contact support")
+  // preselects the ticket form: unit, order and subject.
+  const routeState = (state ?? null) as TicketPrefill | null;
+  const prefill: TicketPrefill | undefined =
+    routeState && (routeState.unitId || routeState.orderId || routeState.subject)
+      ? {
+          unitId: typeof routeState.unitId === 'string' ? routeState.unitId : undefined,
+          orderId: typeof routeState.orderId === 'string' ? routeState.orderId : undefined,
+          subject: typeof routeState.subject === 'string' ? routeState.subject : undefined,
+        }
+      : undefined;
 
   const [tab, setTab] = useState<'assistant' | 'tickets'>('assistant');
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -710,6 +733,13 @@ export default function Support() {
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [ticketsRefresh, setTicketsRefresh] = useState(0);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // A preselected ticket is only useful if the form is on screen: open it as
+  // soon as the visitor is known to be signed in.
+  const hasPrefill = !!prefill;
+  useEffect(() => {
+    if (hasPrefill && isAuthenticated) setShowTicketForm(true);
+  }, [hasPrefill, isAuthenticated]);
 
   // Greeting + main menu are client-side (button-first); every answer after
   // that comes from the server.
@@ -881,7 +911,7 @@ export default function Support() {
             {busy && <div className="text-xs text-zinc-500 px-1">{s.thinking}</div>}
 
             {showTicketForm && (
-              <TicketForm s={s} lang={lang} loc={loc} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
+              <TicketForm s={s} lang={lang} loc={loc} initial={prefill} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
             )}
             <div ref={bottomRef} />
           </div>

@@ -387,7 +387,7 @@ export default function Profile() {
           </div>
 
           {/* Middle row: Stats — REAL wallet/points values; the protection
-              cell opens the buyer-protection policies page. */}
+              cell opens the warranty center (linked printers, coverage, claims). */}
           <div className="grid grid-cols-3 mb-3 text-black dark:text-white">
             <button type="button" className="flex flex-col items-center justify-center min-h-[48px] border-e border-zinc-200 dark:border-zinc-700 hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-s-lg" onClick={() => navigate('/points')}>
               <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('النقاط', 'Points', 'خاڵەکان')}</span>
@@ -397,7 +397,7 @@ export default function Profile() {
               <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('الرصيد', 'Balance', 'باڵانس')}</span>
               <span className="text-[12px] font-bold font-mono">{dir === 'rtl' ? 'د.ع' : 'IQD'} {balanceIqd.toLocaleString()}</span>
             </button>
-            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-e-lg" onClick={() => navigate('/policies')}>
+            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-e-lg" onClick={() => navigate('/warranty')}>
                <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('الحماية', 'Protection', 'پاراستن')}</span>
                <span className="text-[10px] font-bold whitespace-nowrap flex items-center gap-0.5 text-zinc-500"><Shield className="w-3 h-3" aria-hidden="true" /> {loc('حماية المشتري', 'Buyer protection', 'پاراستنی کڕیار')}</span>
             </button>

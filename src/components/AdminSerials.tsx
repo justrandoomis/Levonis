@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import {
   Barcode, RefreshCw, Search, ShieldCheck, AlertTriangle, Repeat, CalendarClock,
-  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck,
+  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
+import { Overlay } from './ui/Overlay';
 
 /**
  * Admin — serialized devices: order-units view with serial entry, per-unit
@@ -50,6 +51,8 @@ const STRINGS = {
     stNotDelivered: 'غير مُسلَّم',
     daysLeft: (n: number) => `${n} يوم متبقٍ`,
     claimsEmpty: 'لا توجد مطالبات.',
+    priorityBadge: 'أولوية PRO',
+    priorityHint: 'عضو PRO: تُعالج المطالبة قبل غيرها في الطابور.',
     stage: 'المرحلة',
     moveTo: 'نقل إلى…',
     decisionReason: 'سبب القرار (سيُبلَّغ للزبون ويُسجَّل):',
@@ -63,6 +66,21 @@ const STRINGS = {
     error: 'حدث خطأ',
     customer: 'الزبون',
     subject: 'الموضوع',
+    serialSearchPlaceholder: 'الرقم التسلسلي / رقم الإيصال (WR-…)',
+    account: 'الحساب',
+    buyer: 'المشتري',
+    holder: 'الحامل',
+    noHolder: 'غير مرتبط بأي حساب',
+    registeredAt: 'تاريخ الربط',
+    unlink: 'فكّ الربط من الحساب',
+    unlinkTitle: 'فكّ ربط الجهاز من حساب الحامل؟',
+    unlinkBody: 'سيُفكّ الجهاز من حساب الحامل الحالي ويمكن لأي حساب مؤهل ربطه من جديد. تواريخ الضمان لا تتغيّر. الإجراء مُدقَّق ويتطلب سببًا.',
+    reasonLabel: 'السبب (5 أحرف على الأقل، يُسجَّل في سجل التدقيق)',
+    confirmUnlink: 'فكّ الربط',
+    unlinking: 'جارٍ فكّ الربط…',
+    unlinkedOk: 'تم فكّ ربط الجهاز.',
+    cancel: 'إلغاء',
+    close: 'إغلاق',
   },
   en: {
     title: 'Serials & Devices',
@@ -99,6 +117,8 @@ const STRINGS = {
     stNotDelivered: 'Not delivered',
     daysLeft: (n: number) => `${n} days left`,
     claimsEmpty: 'No claims.',
+    priorityBadge: 'PRO priority',
+    priorityHint: 'PRO member: this claim is served ahead of the queue.',
     stage: 'Stage',
     moveTo: 'Move to…',
     decisionReason: 'Decision reason (shown to the customer, audited):',
@@ -112,6 +132,21 @@ const STRINGS = {
     error: 'Something went wrong',
     customer: 'Customer',
     subject: 'Subject',
+    serialSearchPlaceholder: 'Serial / receipt no. (WR-…)',
+    account: 'Account',
+    buyer: 'Buyer',
+    holder: 'Holder',
+    noHolder: 'Not linked to any account',
+    registeredAt: 'Linked',
+    unlink: 'Unlink from account',
+    unlinkTitle: 'Unlink this device from the holder’s account?',
+    unlinkBody: 'The device will be unlinked from its current holder and any eligible account will be able to link it again. Warranty dates do not change. This action is audited and requires a reason.',
+    reasonLabel: 'Reason (min 5 characters, recorded in the audit trail)',
+    confirmUnlink: 'Unlink',
+    unlinking: 'Unlinking…',
+    unlinkedOk: 'Device unlinked.',
+    cancel: 'Cancel',
+    close: 'Close',
   },
   ckb: {
     title: 'ئامێرەکان و ژمارە زنجیرەییەکان',
@@ -148,6 +183,8 @@ const STRINGS = {
     stNotDelivered: 'نەگەیەنراوە',
     daysLeft: (n: number) => `${n} ڕۆژ ماوە`,
     claimsEmpty: 'هیچ داواکارییەک نییە.',
+    priorityBadge: 'پێشینەیی PRO',
+    priorityHint: 'ئەندامی PRO: ئەم داواکارییە پێش ئەوانی تر لە ڕیزەکە دەکرێت.',
     stage: 'قۆناغ',
     moveTo: 'گواستنەوە بۆ…',
     decisionReason: 'هۆکاری بڕیار (بۆ کڕیار پیشاندەدرێت و تۆماردەکرێت):',
@@ -161,6 +198,21 @@ const STRINGS = {
     error: 'هەڵەیەک ڕوویدا',
     customer: 'کڕیار',
     subject: 'بابەت',
+    serialSearchPlaceholder: 'ژمارە زنجیرەیی / ژمارەی پسووڵە (WR-…)',
+    account: 'هەژمار',
+    buyer: 'کڕیار',
+    holder: 'هەڵگر',
+    noHolder: 'بە هیچ هەژمارێک نەبەستراوە',
+    registeredAt: 'بەستراوە',
+    unlink: 'لابردنی بەستن لە هەژمار',
+    unlinkTitle: 'بەستنی ئەم ئامێرە لە هەژماری هەڵگر لابردرێت؟',
+    unlinkBody: 'ئامێرەکە لە هەژماری هەڵگری ئێستا دەکرێتەوە و هەر هەژمارێکی شیاو دەتوانێت دووبارە بیبەستێت. بەروارەکانی گەرەنتی ناگۆڕێن. ئەم کردارە وردبینیکراوە و هۆکاری دەوێت.',
+    reasonLabel: 'هۆکار (لانیکەم ٥ پیت، لە تۆماری وردبینیدا تۆماردەکرێت)',
+    confirmUnlink: 'لابردنی بەستن',
+    unlinking: 'لابردنی بەستن…',
+    unlinkedOk: 'بەستنی ئامێرەکە لابرا.',
+    cancel: 'هەڵوەشاندنەوە',
+    close: 'داخستن',
   },
 } as const;
 
@@ -185,6 +237,21 @@ interface AdminDevice {
   replaced_by_unit_id: string | null;
   replacement_of_unit_id: string | null;
   registration: { registered_at: string; revoked_at: string | null } | null;
+  /** Present on `/admin/units` lookups (serial / email / user_id). */
+  buyer?: AdminAccount | null;
+  holder?: AdminAccount | null;
+}
+
+interface AdminAccount {
+  id: string;
+  email: string | null;
+  username: string | null;
+  name: string | null;
+}
+
+function accountLabel(a: AdminAccount | null | undefined): string {
+  if (!a) return '—';
+  return a.email || (a.username ? `@${a.username}` : '') || a.name || a.id;
 }
 
 interface AdminOrderUnits {
@@ -206,6 +273,8 @@ interface AdminClaim {
   serial: string | null;
   email: string | null;
   evidence: Array<{ key: string; url: string }>;
+  /** PRO membership's priority service, snapshotted when the claim was filed; the queue is sorted by it. */
+  priority: boolean;
 }
 
 interface ClaimMessage {
@@ -273,13 +342,39 @@ export default function AdminSerials() {
   // ------------------------------------------------------------- units tab
   const [orderQuery, setOrderQuery] = useState('');
   const [emailQuery, setEmailQuery] = useState('');
+  const [serialQuery, setSerialQuery] = useState('');
   const [orderData, setOrderData] = useState<AdminOrderUnits | null>(null);
   const [customerUnits, setCustomerUnits] = useState<AdminDevice[] | null>(null);
+  const [serialUnits, setSerialUnits] = useState<AdminDevice[] | null>(null);
   const [unitsLoading, setUnitsLoading] = useState(false);
   const [unitsError, setUnitsError] = useState('');
   const [unitsNotice, setUnitsNotice] = useState('');
   const [serialDrafts, setSerialDrafts] = useState<Record<string, string>>({});
   const [busyUnit, setBusyUnit] = useState<string | null>(null);
+
+  // Unlink-from-account confirmation (an in-app window, never window.confirm).
+  const [unlinkTarget, setUnlinkTarget] = useState<AdminDevice | null>(null);
+  const [unlinkReason, setUnlinkReason] = useState('');
+  const [unlinkBusy, setUnlinkBusy] = useState(false);
+  const [unlinkError, setUnlinkError] = useState('');
+
+  const loadBySerial = useCallback(async (q: string) => {
+    if (!q.trim()) return;
+    setUnitsLoading(true);
+    setUnitsError('');
+    setUnitsNotice('');
+    setOrderData(null);
+    setCustomerUnits(null);
+    try {
+      const data = await api.get<{ units: AdminDevice[] }>(`/api/devices/admin/units?serial=${encodeURIComponent(q.trim())}`);
+      setSerialUnits(data.units);
+    } catch (e) {
+      setSerialUnits(null);
+      setUnitsError(e instanceof ApiError ? e.message : s.error);
+    } finally {
+      setUnitsLoading(false);
+    }
+  }, [s.error]);
 
   const loadOrder = useCallback(async (orderId: string) => {
     if (!orderId.trim()) return;
@@ -287,6 +382,7 @@ export default function AdminSerials() {
     setUnitsError('');
     setUnitsNotice('');
     setCustomerUnits(null);
+    setSerialUnits(null);
     try {
       const data = await api.get<AdminOrderUnits>(`/api/devices/admin/orders/${encodeURIComponent(orderId.trim())}/units`);
       setOrderData(data);
@@ -304,6 +400,7 @@ export default function AdminSerials() {
     setUnitsError('');
     setUnitsNotice('');
     setOrderData(null);
+    setSerialUnits(null);
     try {
       const data = await api.get<{ units: AdminDevice[] }>(`/api/devices/admin/units?email=${encodeURIComponent(email.trim())}`);
       setCustomerUnits(data.units);
@@ -318,7 +415,35 @@ export default function AdminSerials() {
   const refreshCurrent = useCallback(() => {
     if (orderData) loadOrder(orderData.order.id);
     else if (customerUnits && emailQuery) loadCustomer(emailQuery);
-  }, [orderData, customerUnits, emailQuery, loadOrder, loadCustomer]);
+    else if (serialUnits && serialQuery) loadBySerial(serialQuery);
+  }, [orderData, customerUnits, emailQuery, serialUnits, serialQuery, loadOrder, loadCustomer, loadBySerial]);
+
+  const openUnlink = (device: AdminDevice) => {
+    setUnlinkTarget(device);
+    setUnlinkReason('');
+    setUnlinkError('');
+  };
+
+  const confirmUnlink = async () => {
+    if (!unlinkTarget || unlinkBusy) return;
+    const reason = unlinkReason.trim();
+    if (reason.length < 5) {
+      setUnlinkError(s.reasonRequired);
+      return;
+    }
+    setUnlinkBusy(true);
+    setUnlinkError('');
+    try {
+      await api.post(`/api/devices/admin/units/${encodeURIComponent(unlinkTarget.unit_id)}/unregister`, { reason });
+      setUnlinkTarget(null);
+      setUnitsNotice(s.unlinkedOk);
+      refreshCurrent();
+    } catch (e) {
+      setUnlinkError(e instanceof ApiError ? e.message : s.error);
+    } finally {
+      setUnlinkBusy(false);
+    }
+  };
 
   const backfill = async () => {
     if (!orderData) return;
@@ -506,6 +631,7 @@ export default function AdminSerials() {
               <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.delivered}</th>
               <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.warrantyEnd}</th>
               <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.stage}</th>
+              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.account}</th>
               <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase" />
             </tr>
           </thead>
@@ -569,21 +695,57 @@ export default function AdminSerials() {
                   </div>
                 </td>
                 <td className="py-3 px-4"><CoverageBadge device={u} s={s} /></td>
-                <td className="py-3 px-4">
-                  {!u.replaced_by_unit_id && (
-                    <button
-                      onClick={() => replaceUnit(u)}
-                      disabled={busyUnit === u.unit_id}
-                      className="inline-flex items-center gap-1 text-xs font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-lg px-2.5 py-1.5 hover:bg-purple-500/20 disabled:opacity-40 transition-colors"
-                    >
-                      <Repeat className="w-3 h-3" />{s.replace}
-                    </button>
+                <td className="py-3 px-4 text-[11px] leading-relaxed">
+                  {u.buyer !== undefined || u.holder !== undefined ? (
+                    <>
+                      <div className="text-zinc-500 whitespace-nowrap">
+                        {s.buyer}: <span className="text-zinc-300 break-all whitespace-normal">{accountLabel(u.buyer)}</span>
+                      </div>
+                      <div className="text-zinc-500 whitespace-nowrap">
+                        {s.holder}:{' '}
+                        {u.holder ? (
+                          <span className="text-green-400 break-all whitespace-normal">{accountLabel(u.holder)}</span>
+                        ) : (
+                          <span className="text-zinc-400">{s.noHolder}</span>
+                        )}
+                      </div>
+                      {u.holder && u.registration && !u.registration.revoked_at && (
+                        <div className="text-zinc-500 whitespace-nowrap">
+                          {s.registeredAt}: <span className="text-zinc-300">{fmtDate(u.registration.registered_at)}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-zinc-600">—</span>
                   )}
+                </td>
+                <td className="py-3 px-4">
+                  <div className="flex flex-col items-start gap-1.5">
+                    {!u.replaced_by_unit_id && (
+                      <button
+                        onClick={() => replaceUnit(u)}
+                        disabled={busyUnit === u.unit_id}
+                        className="inline-flex items-center gap-1 text-xs font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-lg px-2.5 py-1.5 hover:bg-purple-500/20 disabled:opacity-40 transition-colors"
+                      >
+                        <Repeat className="w-3 h-3" />{s.replace}
+                      </button>
+                    )}
+                    {u.holder && (
+                      <button
+                        type="button"
+                        onClick={() => openUnlink(u)}
+                        disabled={busyUnit === u.unit_id}
+                        className="inline-flex items-center gap-1 text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/30 rounded-lg px-2.5 py-1.5 hover:bg-red-500/20 disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                      >
+                        <Unlink className="w-3 h-3" aria-hidden="true" />{s.unlink}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
             {units.length === 0 && (
-              <tr><td colSpan={6} className="py-10 text-center text-zinc-500 font-medium">{s.noUnits}</td></tr>
+              <tr><td colSpan={7} className="py-10 text-center text-zinc-500 font-medium">{s.noUnits}</td></tr>
             )}
           </tbody>
         </table>
@@ -634,6 +796,21 @@ export default function AdminSerials() {
                 <Search className="w-4 h-4" />{s.load}
               </button>
             </form>
+            <form className="flex gap-2 flex-1" onSubmit={(e) => { e.preventDefault(); loadBySerial(serialQuery); }}>
+              <input
+                value={serialQuery}
+                onChange={(e) => setSerialQuery(e.target.value)}
+                placeholder={s.serialSearchPlaceholder}
+                aria-label={s.serialSearchPlaceholder}
+                autoComplete="off"
+                spellCheck={false}
+                dir="ltr"
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              />
+              <button type="submit" className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-4 text-sm font-bold hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+                <Barcode className="w-4 h-4" aria-hidden="true" />{s.load}
+              </button>
+            </form>
           </div>
 
           {unitsError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm font-medium">{unitsError}</div>}
@@ -674,8 +851,81 @@ export default function AdminSerials() {
           )}
 
           {customerUnits && !unitsLoading && renderUnitsTable(customerUnits)}
+          {serialUnits && !unitsLoading && renderUnitsTable(serialUnits)}
         </div>
       )}
+
+      {/* UNLINK FROM ACCOUNT — an audited action with a required reason, asked
+          for in an in-app window rather than a browser prompt. The scrim and
+          Escape are inert while the request is in flight. */}
+      <Overlay
+        open={!!unlinkTarget}
+        onClose={() => { if (!unlinkBusy) setUnlinkTarget(null); }}
+        labelledBy="admin-unlink-title"
+        dismissOnScrim={!unlinkBusy}
+        dismissOnEscape={!unlinkBusy}
+        z={60}
+        testId="admin-unlink-device"
+        panelClassName="w-full max-w-md"
+      >
+        <div className="p-6 space-y-4">
+          <button
+            type="button"
+            onClick={() => setUnlinkTarget(null)}
+            disabled={unlinkBusy}
+            aria-label={s.close}
+            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+          <div className="pe-10">
+            <h3 id="admin-unlink-title" className="text-white text-base font-bold">{s.unlinkTitle}</h3>
+            {unlinkTarget && (
+              <p className="text-zinc-400 text-[12px] mt-1">
+                {unlinkTarget.product.name_ar || unlinkTarget.product.name}
+                {unlinkTarget.serial ? <> · <span className="font-mono" dir="ltr">{unlinkTarget.serial}</span></> : null}
+                {' · '}{s.holder}: <span className="text-zinc-200">{accountLabel(unlinkTarget.holder)}</span>
+              </p>
+            )}
+          </div>
+          <p className="text-zinc-400 text-sm leading-relaxed">{s.unlinkBody}</p>
+          <div>
+            <label htmlFor="admin-unlink-reason" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.reasonLabel}</label>
+            <textarea
+              id="admin-unlink-reason"
+              value={unlinkReason}
+              onChange={(e) => setUnlinkReason(e.target.value)}
+              minLength={5}
+              maxLength={500}
+              rows={3}
+              required
+              disabled={unlinkBusy}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369] resize-none"
+            />
+          </div>
+          {unlinkError && (
+            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[13px] font-medium">{unlinkError}</div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setUnlinkTarget(null)}
+              disabled={unlinkBusy}
+              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              {s.cancel}
+            </button>
+            <button
+              type="button"
+              onClick={confirmUnlink}
+              disabled={unlinkBusy || unlinkReason.trim().length < 5}
+              className="min-h-[44px] rounded-xl bg-[#ef233c] text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              {unlinkBusy ? s.unlinking : s.confirmUnlink}
+            </button>
+          </div>
+        </div>
+      </Overlay>
 
       {tab === 'claims' && (
         <div className="space-y-4">
@@ -717,6 +967,15 @@ export default function AdminSerials() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {cl.priority && (
+                      <span
+                        title={s.priorityHint}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#BAA369]/40 bg-[#BAA369]/10 text-[#BAA369] text-[11px] font-bold whitespace-nowrap"
+                      >
+                        <Crown aria-hidden="true" className="w-3 h-3" />
+                        {s.priorityBadge}
+                      </span>
+                    )}
                     <span className={`inline-flex px-2.5 py-1 rounded-full border text-[11px] font-bold capitalize ${STAGE_CLS[cl.stage] ?? STAGE_CLS.received}`}>{cl.stage}</span>
                     {(CLAIM_NEXT[cl.stage] ?? []).length > 0 && (
                       <select
