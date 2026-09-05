@@ -55,7 +55,7 @@ jobs:
             echo "| check | result |"
             echo "| --- | --- |"
             echo "| document, SPA route, asset and API all carry CSP / HSTS / XFO / nosniff / Referrer / Permissions | ${{ steps.suite.outcome }} |"
-            echo "| script-src is 'self' + Google sign-in only — no inline, no eval | ${{ steps.suite.outcome }} |"
+            echo "| script-src is 'self' + Google sign-in + Cloudflare's edge-injected analytics beacon only — no inline, no eval | ${{ steps.suite.outcome }} |"
             echo "| Chromium opens the public pages with zero policy violations | ${{ steps.suite.outcome }} |"
             echo ''
             echo 'Read-only: anonymous GETs and a headless browser; nothing written.'

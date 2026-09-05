@@ -27,6 +27,19 @@
  *                         the owner adds; https: still refuses mixed content.
  *   media-src https:      the same, for product video and the home ad video
  *   blob: / data:         image previews before upload, generated QR codes
+ *   static.cloudflareinsights.com / cloudflareinsights.com
+ *                         Cloudflare Web Analytics. The zone has it switched
+ *                         on, so the EDGE injects `beacon.min.js` into every
+ *                         HTML response after the Worker and the asset layer
+ *                         are done — nothing in this repository loads it. The
+ *                         first live run of workflow 28 found the policy
+ *                         refusing that script on every public page: the
+ *                         owner's analytics had gone dark the moment the CSP
+ *                         shipped. The script origin may load and the beacon
+ *                         origin may be posted to; both are Cloudflare's own,
+ *                         serve fixed first-party code, and add no inline or
+ *                         eval allowance. Switching the injection off instead
+ *                         is a dashboard setting, i.e. the owner's call.
  *
  * The built index.html carries ONE external module script and ONE external
  * stylesheet and no inline code, which is what makes the strict script-src
@@ -48,6 +61,10 @@
 export const GOOGLE_SIGNIN_ORIGIN = 'https://accounts.google.com';
 export const GOOGLE_FONTS_CSS = 'https://fonts.googleapis.com';
 export const GOOGLE_FONTS_FILES = 'https://fonts.gstatic.com';
+/** Cloudflare Web Analytics: where the edge-injected beacon script comes from … */
+export const CLOUDFLARE_INSIGHTS_SCRIPT = 'https://static.cloudflareinsights.com';
+/** … and where it reports to. */
+export const CLOUDFLARE_INSIGHTS_BEACON = 'https://cloudflareinsights.com';
 
 /**
  * The one inline script the Worker ever emits: opens the browser's print
@@ -93,12 +110,12 @@ export const STATIC_SECURITY_HEADERS: Readonly<Record<string, string>> = {
 export function spaCsp(): string {
   return policy([
     ['default-src', ["'self'"]],
-    ['script-src', ["'self'", GOOGLE_SIGNIN_ORIGIN]],
+    ['script-src', ["'self'", GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]],
     ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_FONTS_CSS, GOOGLE_SIGNIN_ORIGIN]],
     ['font-src', ["'self'", 'data:', GOOGLE_FONTS_FILES]],
     ['img-src', ["'self'", 'data:', 'blob:', 'https:']],
     ['media-src', ["'self'", 'blob:', 'https:']],
-    ['connect-src', ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, GOOGLE_FONTS_CSS]],
+    ['connect-src', ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, GOOGLE_FONTS_CSS, CLOUDFLARE_INSIGHTS_BEACON]],
     ['frame-src', [GOOGLE_SIGNIN_ORIGIN]],
     ['worker-src', ["'self'", 'blob:']],
     ['manifest-src', ["'self'"]],

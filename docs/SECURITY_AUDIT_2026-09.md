@@ -191,7 +191,8 @@ headers (see "Evidence").
 ## Hardening delivered alongside (not exploitable as found)
 
 - **Content-Security-Policy and HSTS** on every response. `script-src 'self'
-  https://accounts.google.com` — no inline, no eval — so an injected script
+  https://accounts.google.com https://static.cloudflareinsights.com` — no
+  inline, no eval — so an injected script
   does not run even if React's escaping ever fails on merchant-controlled text
   (the storefront serves the platform's own bundle on merchant subdomains; the
   injection attacker found no XSS sink, which is why the verifier refuted the
@@ -200,6 +201,15 @@ headers (see "Evidence").
   sign-in, the fonts, vendor-CDN product media and blob previews are allowed
   explicitly. Browser smoke on seven pages: zero CSP violations, every page
   rendered.
+  *Live finding after the first deploy (workflow 28, run 1):* the zone's
+  Cloudflare Web Analytics setting makes the EDGE inject `beacon.min.js` into
+  every HTML response — nothing in the repository loads it — and the policy
+  refused it on all six public pages, blinding the owner's analytics. The
+  script origin (`static.cloudflareinsights.com`) and the beacon origin
+  (`cloudflareinsights.com`) are now allowed explicitly; both are
+  Cloudflare's own fixed first-party code and add no inline/eval allowance.
+  Switching the injection off is a dashboard setting — the owner's call, not a
+  code change.
 - **Credential changes are apex-only.** `change-password`, `change-email` and
   `google/link` sit behind the same `requireMainHost` guard as `/api/admin/*`
   (a merchant host carries the visitor's cookie and needs none of them);

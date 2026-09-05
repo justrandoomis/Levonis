@@ -76,7 +76,11 @@ async function main() {
       const src = scriptSrc(c) || [];
       check(`${t} script-src refuses inline script`, !src.includes("'unsafe-inline'"));
       check(`${t} script-src refuses eval`, !src.includes("'unsafe-eval'"));
-      check(`${t} script-src allows the app and Google sign-in only`, src.length === 2 && src.includes("'self'") && src.includes('https://accounts.google.com'), src.join(' '));
+      // 'self', Google sign-in, and Cloudflare's Web Analytics script — which
+      // the EDGE injects into every HTML response (first live run: refused on
+      // every page). Exactly these three; anything else is a regression.
+      const allowed = ["'self'", 'https://accounts.google.com', 'https://static.cloudflareinsights.com'];
+      check(`${t} script-src allows the app, Google sign-in and the CF analytics beacon only`, src.length === allowed.length && allowed.every((a) => src.includes(a)), src.join(' '));
       check(`${t} cannot be framed (frame-ancestors 'none')`, /frame-ancestors 'none'/.test(c));
     }
   }

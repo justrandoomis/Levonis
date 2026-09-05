@@ -19,6 +19,8 @@ import { securityHeaders } from '../worker/lib/http';
 import {
   AUTO_PRINT_SCRIPT,
   AUTO_PRINT_SCRIPT_HASH,
+  CLOUDFLARE_INSIGHTS_BEACON,
+  CLOUDFLARE_INSIGHTS_SCRIPT,
   GOOGLE_SIGNIN_ORIGIN,
   STATIC_SECURITY_HEADERS,
   STRICT_TRANSPORT_SECURITY,
@@ -51,7 +53,20 @@ test('an injected inline or eval script is refused — the lock that holds when 
   assert.ok(!script.includes("'unsafe-inline'"), 'no inline script');
   assert.ok(!script.includes("'unsafe-eval'"), 'no eval');
   assert.ok(!script.includes('*') && !script.includes('https:'), 'no wildcard script origin');
-  assert.deepEqual(script, ["'self'", GOOGLE_SIGNIN_ORIGIN]);
+  assert.deepEqual(script, ["'self'", GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]);
+});
+
+test("Cloudflare's edge-injected analytics beacon may load and report — found refused by the first live run", () => {
+  // Nothing in the repository loads beacon.min.js: the zone's Web Analytics
+  // setting makes the edge inject it into every HTML response. Refusing it
+  // (as the first policy did) silently blinded the owner's analytics.
+  const csp = spaCsp();
+  assert.ok(directive(csp, 'script-src')?.includes(CLOUDFLARE_INSIGHTS_SCRIPT), 'the script may load');
+  assert.ok(directive(csp, 'connect-src')?.includes(CLOUDFLARE_INSIGHTS_BEACON), 'the beacon may report');
+  // …and the allowance is exactly those two origins — never a Cloudflare wildcard.
+  assert.equal(CLOUDFLARE_INSIGHTS_SCRIPT, 'https://static.cloudflareinsights.com');
+  assert.equal(CLOUDFLARE_INSIGHTS_BEACON, 'https://cloudflareinsights.com');
+  assert.ok(!csp.includes('*.cloudflare'), 'no wildcard');
 });
 
 test('Google sign-in keeps working: its origin may load, frame and connect', () => {
@@ -77,8 +92,10 @@ test('the page cannot be framed, re-based, made to submit elsewhere or host plug
   assert.deepEqual(directive(csp, 'object-src'), ["'none'"]);
 });
 
-test('the app talks only to itself (plus Google sign-in and the fonts stylesheet)', () => {
-  assert.deepEqual(directive(spaCsp(), 'connect-src'), ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, 'https://fonts.googleapis.com']);
+test('the app talks only to itself (plus Google sign-in, the fonts stylesheet and the analytics beacon)', () => {
+  assert.deepEqual(directive(spaCsp(), 'connect-src'), [
+    "'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, 'https://fonts.googleapis.com', CLOUDFLARE_INSIGHTS_BEACON,
+  ]);
 });
 
 // ------------------------------------------------------ the document policy
