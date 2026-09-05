@@ -60,10 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (username: string, name: string, email: string, password: string) => {
-    // Email-first sign-up (mail configured) answers pending_email with no
-    // account object: the account opens from the link in the inbox.
-    const data = await api.post<{ user?: ApiUser; pending_email?: boolean }>('/api/auth/register', { username, name, email, password });
-    if (data.user) setUser(data.user);
+    const data = await api.post<{ user: ApiUser }>('/api/auth/register', { username, name, email, password });
+    setUser(data.user);
   }, []);
 
   const logout = useCallback(async () => {

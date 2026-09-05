@@ -48,7 +48,6 @@ import {
   renderPasswordChangedEmail,
   renderGoogleAccountNoticeEmail,
   type EmailLang,
-  renderAccountExistsEmail,
 } from '../lib/emailTemplates';
 
 export const authRoutes = new Hono<AppContext>();
@@ -355,61 +354,16 @@ authRoutes.post('/register', async (c) => {
   const referralCode = referralCodeFrom(body);
   checkPassword(password);
 
-  // EMAIL-FIRST SIGN-UP (migration 0050). When the deployment can send mail,
-  // registering with an address creates NOTHING in `users`: the attempt waits
-  // in pending_signups until the emailed link proves the inbox, and only then
-  // is the account — and its username — created. A free address and a taken
-  // one return the identical body, set no cookie and do the same password
-  // work, and neither claims a username, so nothing anywhere (this response,
-  // /username-available, /login, the referral count) reveals whether the
-  // address has an account. Only its owner learns, by reading the inbox. An
-  // adversarial review of a first attempt that kept the pending account in
-  // `users` behind a flag found it leaked the answer through the username and
-  // let a stranger's first attempt fix a password the owner would confirm;
-  // holding the attempt outside `users` removes both.
-  const emailFirst = !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM);
-  const mailLang = emailLang(body.lang ?? localeToApi(locale));
-
-  // Usernames are public handles (/username-available tells anyone), so a
-  // taken one is still named — and it is checked against CONFIRMED accounts
-  // only (a pending sign-up holds no row in `users`), so the answer depends on
-  // the handle alone and never on whether the address has an account.
+  // Checked here so the message names the ONE thing that is wrong; the
+  // UNIQUE indexes below are what actually decide, and produce the same
+  // codes when two signups race.
+  const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
+  if (existing) throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
   if (uname) {
     const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
     if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
   }
 
-  if (emailFirst) {
-    // One address must not be floodable from many IPs.
-    await rateLimit(c, 'register-id', 5, 3600, await identifierKey(mail));
-    const hash = await hashPassword(password); // the same work on either branch below
-    const account = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
-    if (account) {
-      // A real account already exists. Its owner alone learns someone tried —
-      // one notice per address per day, however many attempts.
-      const notice = renderAccountExistsEmail(mailLang, `${trustedOrigin(c)}/auth`);
-      const day = new Date().toISOString().slice(0, 10);
-      await enqueue(c.env, `email_exists:${await sha256Hex(mail)}:${day}`, {
-        kind: 'email', to: mail, subject: notice.subject, html: notice.html, text: notice.text,
-      });
-      c.executionCtx.waitUntil(processOutbox(c.env, 3));
-    } else {
-      // No account yet: hold the attempt and mail the confirmation link.
-      await issuePendingSignup(c, {
-        email: mail, username: uname, name, passwordHash: hash, country, locale, referral: referralCode, lang: mailLang,
-      });
-    }
-    return c.json({
-      success: true,
-      pending_email: true,
-      message:
-        'أرسلنا رسالة إلى بريدك — افتحها لتأكيد الحساب وتسجيل الدخول. / ' +
-        'We sent a message to your email — open it to confirm the account and sign in.',
-    });
-  }
-
-  // NO MAIL SERVICE: there is no private channel to confirm an address, so the
-  // account opens straight away and a taken address is named — as it always was.
   const id = newId('usr');
   const hash = await hashPassword(password);
   try {
@@ -419,8 +373,11 @@ authRoutes.post('/register', async (c) => {
       .bind(id, mail, uname, name, hash, country, locale)
       .run();
   } catch (e) {
-    // THE RACE THE CHECK ABOVE CANNOT CLOSE — the database decides. A UNIQUE
-    // violation becomes the same 409 the check would have produced, not a 500.
+    // THE RACE THE CHECKS ABOVE CANNOT CLOSE. Two signups a millisecond
+    // apart both read "free" and both insert; the database is what actually
+    // decides, so its refusal is translated into the same 409 the check
+    // would have produced rather than surfacing as a 500 that reads like the
+    // site is broken.
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes('UNIQUE')) throw e;
     if (msg.includes('username')) throw conflict('This username is taken', 'USERNAME_TAKEN');
@@ -428,6 +385,18 @@ authRoutes.post('/register', async (c) => {
   }
 
   await tryAttributeReferral(c.env, id, referralCode);
+
+  // Best-effort verification email right after signup (final-phase §3A).
+  // Skipped silently when no email service is configured — the banner offers
+  // an honest resend; a failure here never fails the registration itself.
+  if (c.env.EMAIL_API_KEY && c.env.EMAIL_FROM) {
+    try {
+      await issueEmailVerification(c, id, mail, emailLang(body.lang));
+    } catch (e) {
+      console.error('signup verification email failed for user', id, e instanceof Error ? e.message : String(e));
+    }
+  }
+
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
   return c.json({ success: true, user: publicUser(user!) });
@@ -490,6 +459,7 @@ authRoutes.post('/login', async (c) => {
       .bind(identifier, identifier)
       .first<SessionUser & { password_hash: string | null }>();
   }
+
   // ONE uniform failure for every identifier kind and every cause — unknown
   // identifier, wrong password, and provider-only account (no password at
   // all) are indistinguishable from outside, so this endpoint cannot be used
@@ -1202,8 +1172,8 @@ authRoutes.post('/telegram/complete', async (c) => {
         // real address, so a placeholder can never be claimed by hand.
         throw badRequest('Invalid email address');
       }
-      // The address is checked for collision at the INSERT below (after the
-      // OTP is consumed), never here: a pre-OTP check let one verified phone
+      // The address is checked for collision at the INSERT below (after the OTP
+      // is consumed), never here: a pre-OTP check let one verified phone
       // challenge probe many addresses without spending its code — a working
       // email-existence oracle. The UNIQUE(users.email) handler on the insert
       // names the same 409, but only after a fresh OTP has been burned.
@@ -1415,42 +1385,6 @@ const VERIFY_TOKEN_TTL_HOURS = 24;
  * to the NEW address, and confirming it atomically applies the new address
  * plus its verified stamp (see /verify-email/confirm).
  */
-const PENDING_SIGNUP_TTL_HOURS = 24;
-
-/**
- * Holds an email sign-up until the inbox is proven, WITHOUT creating anything
- * in `users` (migration 0050). Keyed by address, so a re-signup overwrites the
- * previous attempt and re-issues the link — the latest attempt is the only one
- * that can be confirmed, and nothing an earlier (possibly hostile) attempt
- * chose survives. The account and its username are born in /verify-email/confirm.
- */
-async function issuePendingSignup(
-  c: Context<AppContext>,
-  p: { email: string; username: string | null; name: string; passwordHash: string; country: string | null; locale: string; referral: string; lang: EmailLang }
-): Promise<void> {
-  const token = randomToken(32);
-  const tokenHash = await sha256Hex(token);
-  const expires = new Date(Date.now() + PENDING_SIGNUP_TTL_HOURS * 3_600_000).toISOString();
-  await c.env.DB.prepare(
-    `INSERT INTO pending_signups (email, token_hash, username, name, password_hash, country, locale, referral_code, expires_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-     ON CONFLICT(email) DO UPDATE SET
-       token_hash = ?2, username = ?3, name = ?4, password_hash = ?5, country = ?6,
-       locale = ?7, referral_code = ?8, expires_at = ?9,
-       created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`
-  )
-    .bind(p.email, tokenHash, p.username, p.name, p.passwordHash, p.country, p.locale, p.referral, expires)
-    .run();
-  // Opportunistic cleanup of expired attempts so the table stays small.
-  await c.env.DB.prepare('DELETE FROM pending_signups WHERE expires_at < ?').bind(new Date().toISOString()).run();
-  // Same URL shape as a verification link, so the SPA's confirm banner handles
-  // it identically; a scanner's GET only renders a button (§ confirm route).
-  const link = `${trustedOrigin(c)}/?verify_email=${token}`;
-  const msg = renderVerifyEmail(p.lang, link);
-  await enqueue(c.env, `signup_verify:${tokenHash}`, { kind: 'email', to: p.email, subject: msg.subject, html: msg.html, text: msg.text });
-  c.executionCtx.waitUntil(processOutbox(c.env, 3));
-}
-
 async function issueEmailVerification(
   c: Context<AppContext>,
   userId: string,
@@ -1518,60 +1452,6 @@ authRoutes.post('/verify-email/send', requireAuth, async (c) => {
   return c.json({ success: true, message: 'A verification message has been sent if your email still needs verification.' });
 });
 
-/**
- * Completes an email-first sign-up (migration 0050): the token proved the
- * inbox, so the account is created NOW — its username claimed only if still
- * free, otherwise left null for onboarding to ask — the referral bound, and a
- * session opened. This is the ONLY place an email-first account is born.
- */
-async function confirmPendingSignup(c: Context<AppContext>, tokenHash: string, genericMsg: string): Promise<Response> {
-  const p = await c.env.DB.prepare(
-    'SELECT email, username, name, password_hash, country, locale, referral_code, expires_at FROM pending_signups WHERE token_hash = ?'
-  )
-    .bind(tokenHash)
-    .first<{ email: string; username: string | null; name: string; password_hash: string; country: string | null; locale: string; referral_code: string; expires_at: string }>();
-  if (!p) throw badRequest(genericMsg, 'BAD_TOKEN');
-  if (new Date(p.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
-  // Claim the row atomically: exactly one of two concurrent confirms wins.
-  const claimed = await c.env.DB.prepare('DELETE FROM pending_signups WHERE token_hash = ?').bind(tokenHash).run();
-  if (claimed.meta.changes === 0) throw badRequest(genericMsg, 'TOKEN_USED');
-
-  const id = newId('usr');
-  const now = new Date().toISOString();
-  const insert = (uname: string | null) =>
-    c.env.DB.prepare(
-      'INSERT INTO users (id, email, username, name, password_hash, country, locale, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    )
-      .bind(id, p.email, uname, p.name, p.password_hash, p.country, p.locale, now)
-      .run();
-  try {
-    await insert(p.username);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('UNIQUE') && msg.includes('username') && p.username) {
-      // The handle was taken while the link waited in the inbox — keep the
-      // account, drop the handle; onboarding asks for a new one (username null).
-      try {
-        await insert(null);
-      } catch (e2) {
-        const m2 = e2 instanceof Error ? e2.message : String(e2);
-        if (m2.includes('UNIQUE')) throw conflict('Your account is already set up — please sign in', 'ALREADY_REGISTERED');
-        throw e2;
-      }
-    } else if (msg.includes('UNIQUE')) {
-      // The address already has an account (e.g. its owner signed in with
-      // Google before clicking this link). Nothing to create.
-      throw conflict('Your account is already set up — please sign in', 'ALREADY_REGISTERED');
-    } else {
-      throw e;
-    }
-  }
-  await tryAttributeReferral(c.env, id, p.referral_code);
-  await createSession(c, id);
-  await audit(c.env.DB, id, 'auth.signup_confirmed', id, {});
-  return c.json({ success: true, verified: true, signed_in: true });
-}
-
 authRoutes.post('/verify-email/confirm', async (c) => {
   await rateLimit(c, 'verify-email-confirm', 20, 3600);
   const body = await c.req.json().catch(() => ({}));
@@ -1585,7 +1465,7 @@ authRoutes.post('/verify-email/confirm', async (c) => {
     .bind(tokenHash)
     .first<{ token_hash: string; user_id: string; new_email: string | null; expires_at: string; used: number }>();
   const genericMsg = 'This verification link is invalid or has expired';
-  if (!row) return confirmPendingSignup(c, tokenHash, genericMsg);
+  if (!row) throw badRequest(genericMsg, 'BAD_TOKEN');
   if (row.used) throw badRequest(genericMsg, 'TOKEN_USED');
   if (new Date(row.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
 
@@ -1620,10 +1500,7 @@ authRoutes.post('/verify-email/confirm', async (c) => {
       .run();
   }
   await audit(c.env.DB, row.user_id, 'auth.email_verified', row.user_id, row.new_email ? { email_changed: true } : {});
-  // A verification token belongs to an account that ALREADY EXISTS — a member
-  // proving their address, or an email change. It never opens a session (that
-  // would sign a visitor into any account whose token they hold).
-  return c.json({ success: true, verified: true, signed_in: false });
+  return c.json({ success: true, verified: true });
 });
 
 /**

@@ -229,42 +229,60 @@ headers (see "Evidence").
 - Rate limits: present on every sensitive mutating endpoint, keyed on values a
   caller cannot forge.
 
-## Completed after the owner's approval
+## Completed after the owner's approval, and what was reverted
 
-- **Account enumeration at `/register`** (Low) — closed, at the root. An
-  email sign-up now creates NOTHING in `users` until the emailed link proves
-  the inbox; the attempt waits in `pending_signups` (migration 0050, keyed by
-  address so the latest attempt wins). A free address and a taken one return
-  the identical body, open no session and do the same password work, and
-  neither claims a username — so nothing anywhere (the response,
-  `/username-available`, `/login`, the referral count) reveals whether the
-  address has an account; only its owner learns, by reading the inbox (a
-  confirmation link, or an "account exists" notice — one per address per day).
-  `/verify-email/confirm` is the only place the account and its username are
-  created, and the only sign-up path that opens a session; a member's own
-  verification link never does. A first attempt that kept the unconfirmed
-  account in `users` behind a `signup_verification_required` flag was caught by
-  an adversarial re-review (below) as WORSE than the original — it leaked the
-  answer through the username and let a stranger's first attempt fix a password
-  the owner would confirm — and was replaced by this `pending_signups` design.
-  Legacy accounts are untouched; a deployment without a mail service keeps the
-  old immediate-session behaviour. Test: `tests/registerEmailFirst.test.ts`.
-  The same reusable email oracle in `/telegram/complete` (one verified phone
-  challenge could probe many addresses because the check ran before the OTP was
-  consumed) is closed by moving the collision to the post-OTP insert, so each
-  probe burns a fresh code.
+The owner approved the two deferred items. One shipped; the other was attempted,
+failed adversarial re-review twice, and was reverted rather than shipped with a
+regression.
 
-- **Admin withdrawal path.**- **Admin withdrawal path.** The legacy `/wallet-requests/:id/decide` now
-  refuses a hold-backed withdrawal (`USE_WITHDRAWAL_WORKFLOW`), so a ledger row
-  can no longer be flipped with its hold left active; the wallet-request lists
-  carry the workflow row, and the admin panels drive
-  `/api/wallet/admin/withdrawals/:id/{approve,processing,paid,reject,fail}`
-  — payout only with the transfer's reference. Deposits and pre-holds rows are
-  decided as before. Test: `tests/adminWalletDecide.test.ts`.
-- **CSP on the live site.** Workflow `28 - Verify Live Security Headers + CSP`
-  (`scripts/e2e-security-headers.mjs`) proves, read-only, that the document,
-  an SPA route, an asset and the API all carry the headers with one policy
-  text, and that a real browser opens the public pages with zero violations.
+- **Admin withdrawal path — SHIPPED.** The legacy `/wallet-requests/:id/decide`
+  now refuses a hold-backed withdrawal (`USE_WITHDRAWAL_WORKFLOW`), so a ledger
+  row can no longer be flipped with its hold left active; the wallet-request
+  lists carry the workflow row, and both admin panels drive
+  `/api/wallet/admin/withdrawals/:id/{approve,processing,paid,reject,fail}` —
+  a payout only with the transfer's reference, and a reconciliation finding
+  recorded before a parked transfer can be marked paid or failed. Deposits and
+  pre-holds rows are decided as before. Tests: `tests/adminWalletDecide.test.ts`.
+
+- **CSP on the live site — SHIPPED.** Workflow `28 - Verify Live Security
+  Headers + CSP` (`scripts/e2e-security-headers.mjs`) proves, read-only, that
+  the document, an SPA route, an asset and the API all carry the headers with
+  one policy text and that a real browser opens the public pages with zero
+  violations.
+
+- **Account enumeration at `/register` (Low) — NOT shipped; reverted.** Closing
+  it requires deferring account creation until the inbox is proven (email-first
+  sign-up). Two implementations were built and each was caught by an
+  adversarial re-review as introducing a HIGH that the original LOW did not
+  have:
+    1. keeping the unconfirmed account in `users` behind a flag re-leaked the
+       answer through the username (claimed only on the free path) and let a
+       stranger fix a password the owner would confirm; and
+    2. moving the attempt to a `pending_signups` table closed the username
+       oracle but STILL let the password be chosen at sign-up by whoever
+       submitted it, so an attacker who plants (or last-writes) a sign-up for
+       an address, then relies on the inbox owner clicking the "confirm your
+       account" link, ends up with an account the victim activates under the
+       attacker's password.
+  The root cause of (2) is inherent to collecting the password before the inbox
+  is proven: the fix is a sign-up where the password is set by the CONFIRMING
+  request (a dedicated "finish creating your account" page reached from the
+  email link), not by the `/register` request. That is a self-contained feature
+  with real frontend surface, and shipping a third hurried variant on a
+  security branch is the wrong risk. Both attempts were reverted; `/register`
+  is back to its original, well-tested behaviour (immediate account, 409
+  `EMAIL_TAKEN`). The residual is the ORIGINAL Low: a signed-out visitor can
+  learn whether an address has an account. RECOMMENDATION: implement email-first
+  sign-up as its own change — `/register` stores only the profile in a
+  `pending_signups` table and mails a link; a confirmation page collects the
+  password and creates the account; a real account instead receives an
+  "account exists" notice — then re-run the adversarial review before shipping.
+
+- **`/telegram/complete` email oracle (Medium) — SHIPPED (independent of the
+  above).** The email-taken check ran before the OTP was consumed, so one
+  verified phone challenge could probe many addresses. It is moved to the
+  post-OTP insert (via the existing `UNIQUE(users.email)` handler), so each
+  probe now burns a fresh code.
 
 ## Evidence
 

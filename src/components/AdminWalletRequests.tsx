@@ -23,7 +23,7 @@ export default function AdminWalletRequests() {
    */
   type Step =
     | { kind: 'legacy'; status: 'approved' | 'rejected' }
-    | { kind: 'wd'; action: 'approve' | 'processing' | 'paid' | 'reject' | 'fail'; wdId: string };
+    | { kind: 'wd'; action: 'approve' | 'processing' | 'paid' | 'reject' | 'fail' | 'reconcile_clear'; wdId: string };
   const [decision, setDecision] = useState<{ id: string; step: Step; note: string } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
 
@@ -45,7 +45,7 @@ export default function AdminWalletRequests() {
   }, [fetchTransactions]);
 
   /** Steps that need a written reason or reference before they can be confirmed. */
-  const noteRequired = (step: Step) => step.kind === 'wd' && (step.action === 'paid' || step.action === 'reject' || step.action === 'fail');
+  const noteRequired = (step: Step) => step.kind === 'wd' && (step.action === 'paid' || step.action === 'reject' || step.action === 'fail' || step.action === 'reconcile_clear');
   const noteLabel = (step: Step) => {
     if (step.kind === 'legacy') return step.status === 'approved' ? 'Admin note (optional)' : 'Rejection reason (optional)';
     switch (step.action) {
@@ -54,11 +54,12 @@ export default function AdminWalletRequests() {
       case 'fail': return 'Why the transfer failed (required)';
       case 'approve': return 'Approve for processing — this is NOT a payout; the money stays held';
       case 'processing': return 'A person is now working the transfer — the money stays held';
+      case 'reconcile_clear': return 'What the transfer channel actually did — the recorded finding (required)';
     }
   };
   const confirmLabel = (step: Step) => {
     if (step.kind === 'legacy') return step.status === 'approved' ? 'Confirm Approve' : 'Confirm Reject';
-    return { approve: 'Approve for processing', processing: 'Start processing', paid: 'Confirm paid', reject: 'Confirm Reject', fail: 'Confirm failure' }[step.action];
+    return { approve: 'Approve for processing', processing: 'Start processing', paid: 'Confirm paid', reject: 'Confirm Reject', fail: 'Confirm failure', reconcile_clear: 'Record finding' }[step.action];
   };
 
   const confirmDecision = async () => {
@@ -79,7 +80,8 @@ export default function AdminWalletRequests() {
         else if (step.action === 'processing') await api.post(`${base}/processing`, {});
         else if (step.action === 'paid') await api.post(`${base}/paid`, { payoutReference: note.trim() });
         else if (step.action === 'reject') await api.post(`${base}/reject`, { reason: note.trim() });
-        else await api.post(`${base}/fail`, { reason: note.trim() });
+        else if (step.action === 'fail') await api.post(`${base}/fail`, { reason: note.trim() });
+        else await api.post(`${base}/reconcile/clear`, { finding: note.trim() });
       }
       setDecision(null);
       await fetchTransactions();
@@ -98,6 +100,10 @@ export default function AdminWalletRequests() {
     if (wd) {
       const w = (action: Extract<Step, { kind: 'wd' }>['action'], label: string, primary: boolean, icon: 'check' | 'x') =>
         ({ label, step: { kind: 'wd', action, wdId: wd.id } as Step, primary, icon });
+      // A transfer with an unknown outcome is parked for reconciliation; until
+      // the real finding is recorded, /paid and /fail are both refused by the
+      // server, so the only step is to record what the channel actually did.
+      if (wd.needs_reconciliation) return [w('reconcile_clear', 'Record reconciliation finding', true, 'check')];
       switch (wd.state) {
         case 'requested': return [w('approve', 'Approve for processing', true, 'check'), w('reject', 'Reject', false, 'x')];
         case 'approved': return [w('processing', 'Start processing', true, 'check'), w('reject', 'Reject', false, 'x')];

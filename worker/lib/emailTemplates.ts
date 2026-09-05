@@ -67,10 +67,6 @@ interface Copy {
   googleSubject: string;
   googleBody: string;
   googleIgnore: string;
-  existsSubject: string;
-  existsBody: string;
-  existsCta: string;
-  existsIgnore: string;
   invoiceSubject: (invoiceNo: string) => string;
   invoiceTitle: string;
   invoiceGreeting: (name: string) => string;
@@ -120,11 +116,6 @@ const COPY_AR: Copy = {
   googleBody:
     'وصلنا طلب لإعادة تعيين كلمة المرور لهذا البريد، لكن هذا الحساب يسجّل الدخول عبر Google ولا يملك كلمة مرور. للدخول استخدم زر «المتابعة عبر Google» في صفحة تسجيل الدخول.',
   googleIgnore: 'إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة بأمان.',
-  existsSubject: 'محاولة إنشاء حساب ببريدك — LEVONIS',
-  existsBody:
-    'حاول شخص إنشاء حساب في LEVONIS بهذا البريد، لكن لديك حسابًا بالفعل. إن كان ذلك أنت فسجّل الدخول بحسابك الحالي، أو أعد تعيين كلمة المرور إن نسيتها.',
-  existsCta: 'الذهاب إلى تسجيل الدخول',
-  existsIgnore: 'إذا لم يكن ذلك أنت فلا يلزمك أي إجراء — لم يتغيّر شيء في حسابك.',
   invoiceSubject: (invoiceNo) => `فاتورة طلبك ${invoiceNo} — LEVONIS`,
   invoiceTitle: 'فاتورة',
   invoiceGreeting: (name) => (name ? `مرحبًا ${name}،` : 'مرحبًا،'),
@@ -182,11 +173,6 @@ const COPY_EN: Copy = {
   googleBody:
     'We received a password reset request for this email, but this account signs in with Google and has no password. Use the "Continue with Google" button on the sign-in page instead.',
   googleIgnore: 'If you did not request this, you can safely ignore this email.',
-  existsSubject: 'Someone tried to sign up with your email — LEVONIS',
-  existsBody:
-    'Someone tried to create a LEVONIS account with this address, but you already have one. If that was you, sign in to your existing account, or reset your password if you have forgotten it.',
-  existsCta: 'Go to sign-in',
-  existsIgnore: 'If that was not you, nothing needs doing — nothing about your account has changed.',
   invoiceSubject: (invoiceNo) => `Your LEVONIS invoice ${invoiceNo}`,
   invoiceTitle: 'Invoice',
   invoiceGreeting: (name) => (name ? `Hello ${name},` : 'Hello,'),
@@ -246,11 +232,6 @@ const COPY_CKB: Copy = {
   googleBody:
     'داواکاری دانانەوەی وشەی نهێنی بۆ ئەم ئیمەیڵە گەیشت، بەڵام ئەم هەژمارە بە Google دەچێتە ژوورەوە و وشەی نهێنی نییە. لە پەڕەی چوونەژوورەوە دوگمەی «بەردەوامبوون بە Google» بەکاربهێنە.',
   googleIgnore: 'ئەگەر ئەمەت داوا نەکردووە، ئەم پەیامە پشتگوێ بخە.',
-  existsSubject: 'هەوڵی دروستکردنی هەژمار بە ئیمەیلەکەت — LEVONIS',
-  existsBody:
-    'کەسێک هەوڵی دا هەژمارێکی LEVONIS بەم ئیمەیلە دروست بکات، بەڵام تۆ پێشتر هەژمارت هەیە. ئەگەر ئەوە تۆ بوویت، بە هەژمارەکەت بچۆرەژوورەوە، یان ئەگەر وشەی نهێنیت لەبیرچووە دایبنێرەوە.',
-  existsCta: 'بڕۆ بۆ چوونەژوورەوە',
-  existsIgnore: 'ئەگەر ئەوە تۆ نەبوویت، هیچ پێویست ناکات — هیچ شتێک لە هەژمارەکەت نەگۆڕاوە.',
   invoiceSubject: (invoiceNo) => `پسوولەی داواکارییەکەت ${invoiceNo} — LEVONIS`,
   invoiceTitle: 'پسوولە',
   invoiceGreeting: (name) => (name ? `سڵاو ${name}،` : 'سڵاو،'),
@@ -371,20 +352,6 @@ export function renderGoogleAccountNoticeEmail(lang: EmailLang): RenderedEmail {
   const t = COPY[lang];
   const html = shell(lang, para(t.googleBody) + para(t.googleIgnore, { small: true }));
   return { subject: t.googleSubject, html, text: `${t.googleBody}\n\n${t.googleIgnore}` };
-}
-
-/**
- * Sent to an address that already has an account when someone tries to sign
- * up with it. The person who typed the address gets the same "check your
- * inbox" answer as a real sign-up; only the inbox owner learns what happened.
- */
-export function renderAccountExistsEmail(lang: EmailLang, signInUrl: string): RenderedEmail {
-  const t = COPY[lang];
-  const html = shell(
-    lang,
-    para(t.existsBody) + ctaButton(t.existsCta, signInUrl) + para(t.existsIgnore, { small: true }) + rawLink(signInUrl, t.linkFallback)
-  );
-  return { subject: t.existsSubject, html, text: [t.existsBody, '', `${t.existsCta}: ${signInUrl}`, '', t.existsIgnore].join('\n') };
 }
 
 // ------------------------------------------------------ invoice template
