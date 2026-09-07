@@ -104,12 +104,16 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
     if (loadingActionId) return;
     // A hold-backed withdrawal is decided by its own workflow: the quick
     // button here APPROVES FOR PROCESSING (no money moves); paying it out,
-    // with the payout reference, happens in Wallet Requests. The legacy
-    // decision stays for deposits and pre-holds rows.
+    // with the payout reference, happens in Wallet Requests. A deposit goes
+    // through the guarded deposit decision (amount-mismatch refusal, dedup
+    // release, Telegram close), whose rejection needs a written reason. The
+    // legacy decision stays only for withdrawals filed before the holds
+    // engine, which have no workflow row.
     const wd = req.type === 'withdrawal' ? req.withdrawal : null;
+    const isDeposit = req.type === 'deposit';
     let adminNote: string | undefined;
     if (status === 'rejected') {
-      const required = !!wd;
+      const required = !!wd || isDeposit;
       const note = window.prompt(
         required
           ? (dir === 'rtl' ? 'سبب الرفض (مطلوب):' : 'Rejection reason (required):')
@@ -127,6 +131,10 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
     try {
       if (wd) {
         const base = `/api/wallet/admin/withdrawals/${wd.id}`;
+        if (status === 'approved') await api.post(`${base}/approve`, {});
+        else await api.post(`${base}/reject`, { reason: (adminNote ?? '').trim() });
+      } else if (isDeposit) {
+        const base = `/api/wallet/admin/deposits/${req.id}`;
         if (status === 'approved') await api.post(`${base}/approve`, {});
         else await api.post(`${base}/reject`, { reason: (adminNote ?? '').trim() });
       } else {

@@ -111,25 +111,41 @@ export async function deductOrderStock(
 }
 
 /**
- * Puts an order's units back. Chooses release or restore from what the ledger
- * actually records, so a cancellation before confirmation frees the hold while
- * one after it adds the units back to stock — never both, never the wrong one.
+ * Plans the return of an order's units, for a caller that wants it inside its
+ * own transaction (both cancel routes run it in the batch that flips the
+ * status and refunds the money, so a cancellation that fails half-way cannot
+ * hand units back on an order that is still open). Chooses release or restore
+ * from what the ledger actually records, so a cancellation before confirmation
+ * frees the hold while one after it adds the units back to stock — never both,
+ * never the wrong one. `plan` is null when the order reserved nothing.
  */
-export async function returnOrderStock(
+export async function planOrderReturn(
   db: D1Database,
   orderId: string,
   actorUserId: string | null
-): Promise<{ kind: 'release' | 'restore' | 'none'; applied: number }> {
+): Promise<{ kind: 'release' | 'restore' | 'none'; plan: InventoryPlan | null }> {
   const deducted = await hasLedgerKind(db, orderId, 'deduct');
   const moves = await movesFor(db, orderId, 'reserve');
-  if (moves.length === 0) return { kind: 'none', applied: 0 };
+  if (moves.length === 0) return { kind: 'none', plan: null };
   const kind = deducted ? ('restore' as const) : ('release' as const);
-  const res = await applyInventory(db, moves, {
+  const plan = await planInventory(db, moves, {
     kind,
     operationId: orderId,
     orderId,
     actorUserId,
     reason: 'order cancelled',
   });
-  return { kind, applied: res.applied };
+  return { kind, plan };
+}
+
+/** Puts an order's units back in a batch of its own. Idempotent (see planOrderReturn). */
+export async function returnOrderStock(
+  db: D1Database,
+  orderId: string,
+  actorUserId: string | null
+): Promise<{ kind: 'release' | 'restore' | 'none'; applied: number }> {
+  const { kind, plan } = await planOrderReturn(db, orderId, actorUserId);
+  if (!plan) return { kind: 'none', applied: 0 };
+  if (plan.statements.length) await db.batch(plan.statements);
+  return { kind, applied: plan.applied };
 }

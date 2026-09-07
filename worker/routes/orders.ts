@@ -21,7 +21,8 @@ import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { saleAvailability } from './products';
 import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
 import { planInventory, resolveStock } from '../lib/inventory';
-import { returnOrderStock } from '../lib/orderInventory';
+import { planOrderReturn } from '../lib/orderInventory';
+import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import type { StockMove, StockTarget } from '../lib/inventory';
 import { pricingTierContext, preorderGiftFor } from '../lib/entitlements';
 import type { PreorderGiftConfig, TierStatus } from '../lib/entitlements';
@@ -41,7 +42,6 @@ import {
   getPointsRuleConfig,
   buildPurchaseAccrualStatements,
   buildSettlementStatements,
-  cancelPendingAccrualStatement,
   recordOrderSettlement,
   releaseAccrualForOrder,
   getOrderPointsSnapshots,
@@ -1753,64 +1753,44 @@ orderRoutes.post('/:id/cancel', async (c) => {
     throw badRequest('Only pending orders can be cancelled — please contact support');
   }
 
-  // Flip the status first with a conditional UPDATE so concurrent cancel
-  // requests cannot both proceed to the refund step.
-  const flip = await c.env.DB.prepare(
-    `UPDATE orders SET status = 'cancelled', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-      WHERE id = ? AND status = 'pending'`
-  )
-    .bind(id)
-    .run();
-  if (flip.meta.changes === 0) throw badRequest('This order was already cancelled or has progressed');
-
   const now = new Date().toISOString();
-  const stmts = [];
-  // §7: the units this order was holding go back through the ledger — a
-  // release when it was never confirmed, a restore when it had been. The raw
-  // "stock = stock + qty" it replaces could not tell those apart and would
-  // have handed back units that were never taken.
-  const returned = await returnOrderStock(c.env.DB, id, user.id);
-  // Refund wallet and points that were applied. Deterministic transaction ids
-  // make the refund idempotent if this step ever has to be re-run.
   const walletCents = Number(data.order.wallet_applied_usd_cents) || 0;
-  if (walletCents > 0) {
-    stmts.push(
-      c.env.DB.prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-         VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, 'system', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
-      ).bind(`wtx_refund_${id}_usd`, user.id, walletCents, `Refund for cancelled order ${id}`, id)
-    );
-  }
-  // §4.4: a refund returns POINTS AS POINTS (never as cash) and cash by its
-  // own channel. The deterministic id makes a re-run idempotent; the
-  // reservation flip records that the redemption was given back.
   const points = Number(data.order.points_discount_iqd) || 0;
-  if (points > 0) {
-    stmts.push(
-      c.env.DB.prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-         VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'system', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
-      ).bind(`wtx_refund_${id}_pts`, user.id, points, `Points refund for cancelled order ${id}`, id)
-    );
-    stmts.push(
-      c.env.DB.prepare(
-        `UPDATE points_reservations
-            SET state = 'refunded', refunded_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-          WHERE order_id = ? AND state = 'committed'`
-      ).bind(id)
-    );
-  }
-  // §4.3: the pending accrual of a cancelled order is cancelled, never
-  // released. Conditional on state='pending', so an accrual that somehow
-  // already released is left to the reversal path instead of vanishing.
-  stmts.push(cancelPendingAccrualStatement(c.env, id, 'order_cancelled', now));
+  // §7: the units this order was holding go back through the ledger — a
+  // release when it was never confirmed, a restore when it had been. Planned
+  // here (reads only) and executed in the batch below.
+  const stock = await planOrderReturn(c.env.DB, id, user.id);
 
-  if (stmts.length > 0) await c.env.DB.batch(stmts);
+  // ONE transaction: the conditional status flip, the stock return, the
+  // refund of wallet money and points, the reservation flip and the accrual
+  // cancellation (see orderCancelOps). The flip used to be a `.run()` of its
+  // own with the refund in a later batch — a failure between the two left a
+  // cancelled, unrefunded order that the `status === 'pending'` guard above
+  // then refused to retry for ever. Now a lost flip aborts the whole batch
+  // (nothing is written), and a transient failure leaves the order pending so
+  // the same request can simply be sent again.
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE orders SET status = 'cancelled', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE id = ? AND status = 'pending'`
+      ).bind(id),
+      ...(stock.plan?.statements ?? []),
+      ...cancelledOrderRefundStatements(c.env, data.order, 'system', now),
+    ]);
+  } catch (e) {
+    // The fence aborts the batch when the flip matched no row — a concurrent
+    // cancel or an admin transition won. Anything else is a genuine failure,
+    // and the order is untouched: surface it and let the retry work.
+    const again = await c.env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(id).first<{ status: string }>();
+    if (again && again.status !== 'pending') throw badRequest('This order was already cancelled or has progressed');
+    throw e;
+  }
   await audit(c.env.DB, user.id, 'order.cancel', id, {
     refund_usd_cents: walletCents,
     refund_points: points,
-    stock_returned: returned.kind,
-    stock_rows: returned.applied,
+    stock_returned: stock.kind,
+    stock_rows: stock.plan?.applied ?? 0,
   });
   const after = (await loadOrder(c.env.DB, id))!;
   const snaps = await getOrderPointsSnapshots(c.env, [id]);

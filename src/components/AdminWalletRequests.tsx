@@ -13,16 +13,21 @@ export default function AdminWalletRequests() {
   /**
    * The step being confirmed for one row, with the note that step needs.
    *
-   * Deposits — and withdrawals filed before the holds engine — are decided the
-   * old way (approve / reject with an optional note). A hold-backed withdrawal
-   * walks its own state machine: requested → approved (for processing, no
-   * money moves) → processing → paid, with the payout reference of a transfer
-   * that already happened; or reject / fail with a reason. Each step is ONE
-   * call to /api/wallet/admin/withdrawals/:id/…, which commits or releases the
-   * hold in the same transaction as the ledger row.
+   * A deposit is decided through /api/wallet/admin/deposits/:id/approve|reject
+   * — the guarded service the Telegram buttons also call: it refuses a request
+   * whose observed amount does not match, frees the transfer reference on a
+   * rejection and closes the group message. Rejecting needs a written reason.
+   * Only a withdrawal filed before the holds engine (no workflow row) is still
+   * decided the old way. A hold-backed withdrawal walks its own state machine:
+   * requested → approved (for processing, no money moves) → processing → paid,
+   * with the payout reference of a transfer that already happened; or reject /
+   * fail with a reason. Each step is ONE call to
+   * /api/wallet/admin/withdrawals/:id/…, which commits or releases the hold in
+   * the same transaction as the ledger row.
    */
   type Step =
     | { kind: 'legacy'; status: 'approved' | 'rejected' }
+    | { kind: 'deposit'; action: 'approve' | 'reject' }
     | { kind: 'wd'; action: 'approve' | 'processing' | 'paid' | 'reject' | 'fail' | 'reconcile_clear'; wdId: string };
   const [decision, setDecision] = useState<{ id: string; step: Step; note: string } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
@@ -45,9 +50,12 @@ export default function AdminWalletRequests() {
   }, [fetchTransactions]);
 
   /** Steps that need a written reason or reference before they can be confirmed. */
-  const noteRequired = (step: Step) => step.kind === 'wd' && (step.action === 'paid' || step.action === 'reject' || step.action === 'fail' || step.action === 'reconcile_clear');
+  const noteRequired = (step: Step) =>
+    (step.kind === 'deposit' && step.action === 'reject') ||
+    (step.kind === 'wd' && (step.action === 'paid' || step.action === 'reject' || step.action === 'fail' || step.action === 'reconcile_clear'));
   const noteLabel = (step: Step) => {
     if (step.kind === 'legacy') return step.status === 'approved' ? 'Admin note (optional)' : 'Rejection reason (optional)';
+    if (step.kind === 'deposit') return step.action === 'approve' ? 'Admin note (optional)' : 'Rejection reason (required — frees the transfer reference for a corrected request)';
     switch (step.action) {
       case 'paid': return 'Payout reference of the transfer that already happened (required)';
       case 'reject': return 'Rejection reason (required)';
@@ -59,8 +67,14 @@ export default function AdminWalletRequests() {
   };
   const confirmLabel = (step: Step) => {
     if (step.kind === 'legacy') return step.status === 'approved' ? 'Confirm Approve' : 'Confirm Reject';
+    if (step.kind === 'deposit') return step.action === 'approve' ? 'Confirm Approve' : 'Confirm Reject';
     return { approve: 'Approve for processing', processing: 'Start processing', paid: 'Confirm paid', reject: 'Confirm Reject', fail: 'Confirm failure', reconcile_clear: 'Record finding' }[step.action];
   };
+  /** Which button colour: green for a step that moves things forward, red for a refusal. */
+  const isPositive = (step: Step) =>
+    step.kind === 'legacy' ? step.status === 'approved'
+    : step.kind === 'deposit' ? step.action === 'approve'
+    : step.action !== 'reject' && step.action !== 'fail';
 
   const confirmDecision = async () => {
     if (!decision || loadingAction) return;
@@ -74,6 +88,11 @@ export default function AdminWalletRequests() {
     try {
       if (step.kind === 'legacy') {
         await api.post(`/api/admin/wallet-requests/${id}/decide`, { status: step.status, adminNote: note || undefined });
+      } else if (step.kind === 'deposit') {
+        // The guarded deposit decision (amount-mismatch refusal, dedup-slot
+        // release, Telegram message close) — never the generic legacy decide.
+        if (step.action === 'approve') await api.post(`/api/wallet/admin/deposits/${id}/approve`, { adminNote: note || undefined });
+        else await api.post(`/api/wallet/admin/deposits/${id}/reject`, { reason: note.trim() });
       } else {
         const base = `/api/wallet/admin/withdrawals/${step.wdId}`;
         if (step.action === 'approve') await api.post(`${base}/approve`, {});
@@ -112,6 +131,14 @@ export default function AdminWalletRequests() {
       }
     }
     if (t.status !== 'pending') return [];
+    if (t.type === 'deposit') {
+      return [
+        { label: 'Approve', step: { kind: 'deposit', action: 'approve' }, primary: true, icon: 'check' },
+        { label: 'Reject', step: { kind: 'deposit', action: 'reject' }, primary: false, icon: 'x' },
+      ];
+    }
+    // A withdrawal from before the holds engine: no workflow row, nothing
+    // else can decide it.
     return [
       { label: 'Approve', step: { kind: 'legacy', status: 'approved' }, primary: true, icon: 'check' },
       { label: 'Reject', step: { kind: 'legacy', status: 'rejected' }, primary: false, icon: 'x' },
@@ -269,6 +296,8 @@ export default function AdminWalletRequests() {
                       placeholder={
                         decision.step.kind === 'legacy'
                           ? (decision.step.status === 'approved' ? 'e.g. Verified against the receipt' : 'e.g. Receipt does not match the amount')
+                          : decision.step.kind === 'deposit'
+                          ? (decision.step.action === 'approve' ? 'e.g. Verified against the receipt' : 'e.g. Receipt does not match the amount')
                           : decision.step.action === 'paid' ? 'e.g. ZainCash TX 8841-2201'
                           : decision.step.action === 'reject' ? 'e.g. Account holder name does not match'
                           : decision.step.action === 'fail' ? 'e.g. Channel refused the transfer'
@@ -283,7 +312,7 @@ export default function AdminWalletRequests() {
                       onClick={confirmDecision}
                       disabled={!!loadingAction}
                       className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
-                        (decision.step.kind === 'legacy' ? decision.step.status === 'approved' : decision.step.action !== 'reject' && decision.step.action !== 'fail')
+                        isPositive(decision.step)
                           ? 'bg-[#2CE59B] hover:bg-[#06D6A0] text-black'
                           : 'bg-red-500/90 hover:bg-red-500 text-white'
                       }`}

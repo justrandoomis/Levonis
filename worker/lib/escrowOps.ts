@@ -28,8 +28,15 @@
  */
 
 import { newId } from './crypto';
-import { createPurchaseHold, commitHold, releaseHold } from './walletOps';
-import { credit } from './wallet';
+import {
+  assertHoldStateStatement,
+  commitHoldStatements,
+  createPurchaseHold,
+  holdDebitTxId,
+  isConstraintAbort,
+  releaseHoldStatement,
+  type HoldState,
+} from './walletOps';
 
 export type EscrowState =
   | 'pending'
@@ -199,17 +206,56 @@ export interface SettleInput {
 }
 
 /**
+ * "The customer's debit is posted and linked to this hold" — the predicate
+ * every merchant credit below is conditional on. Money enters the merchant's
+ * ledger ONLY in a batch where the customer's money left theirs.
+ */
+const FUNDED_BY_HOLD = `EXISTS (SELECT 1 FROM wallet_holds fh
+   JOIN wallet_transactions ft ON ft.id = fh.tx_id
+  WHERE fh.id = ?1 AND fh.state = 'committed' AND fh.tx_id = ?2
+    AND ft.type = 'withdrawal' AND ft.status = 'approved')`;
+
+/**
+ * Why did a settlement batch write nothing? Read-only: the escrow that was
+ * read before the batch, re-read now, and its hold.
+ */
+async function classifySettleFailure(
+  db: D1Database,
+  esc: EscrowRow,
+  intended: EscrowState
+): Promise<EscrowResult> {
+  const again = await getEscrow(db, esc.id);
+  if (!again) return { ok: false, reason: 'NOT_FOUND' };
+  if (again.state === intended) return { ok: true, replayed: true, escrowId: esc.id };
+  if (again.state !== esc.state) return { ok: false, reason: 'STATE_CONFLICT', detail: again.state };
+  // The escrow did not move, so the hold refused: it is no longer active, or
+  // the reservation is no longer covered by the customer's settled money.
+  const hold = esc.hold_id
+    ? await db.prepare('SELECT state FROM wallet_holds WHERE id = ?').bind(esc.hold_id).first<{ state: HoldState }>()
+    : null;
+  if (!hold) return { ok: false, reason: 'WALLET_ERROR', detail: 'escrow has no wallet hold' };
+  if (hold.state !== 'active') return { ok: false, reason: 'WALLET_ERROR', detail: `hold is ${hold.state}` };
+  return { ok: false, reason: 'INSUFFICIENT_FUNDS', detail: 'the reserved money is no longer covered' };
+}
+
+/**
  * Pay the merchant.
  *
  * Three things happen together, or none of them do: the customer's held money
- * is committed (it leaves their balance), the merchant is credited in the
- * payout ledger, and the escrow is marked released. Splitting these across
- * requests is how a merchant ends up credited for money the customer still
- * has.
+ * is committed AND its ledger debit posts (it leaves their balance — see
+ * `commitHoldStatements`), the merchant is credited in the payout ledger, and
+ * the escrow is marked released. Splitting these across requests is how a
+ * merchant ends up credited for money the customer still has — which is what
+ * the first version of this function did: it committed the hold in a call of
+ * its own, posted no debit, and credited the merchant from a batch that ran
+ * afterwards.
  *
- * A released escrow can NEVER return to held (§29). The state guard is part
- * of the UPDATE, so two concurrent releases cannot both win: the second finds
- * zero rows changed.
+ * Everything is ONE `db.batch`. The escrow flip is conditional on the state
+ * that was read; the debit aborts the batch unless the hold is still active;
+ * and every merchant credit repeats "the debit is posted and linked", so a
+ * lost race writes nothing on either side.
+ *
+ * A released escrow can NEVER return to held (§29).
  */
 export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<EscrowResult> {
   const replay = await findEvent(db, p.idempotencyKey);
@@ -221,33 +267,33 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
   if (esc.state !== 'held' && esc.state !== 'disputed') {
     return { ok: false, reason: 'STATE_CONFLICT', detail: esc.state };
   }
+  // No hold means no customer money to settle, so nothing may be paid out.
+  if (!esc.hold_id) return { ok: false, reason: 'WALLET_ERROR', detail: 'escrow has no wallet hold' };
 
   const ts = NOW();
-  // Conditional on the state we read. If anything moved underneath us, this
-  // writes nothing and we report the conflict rather than paying twice.
-  const guard = await db
-    .prepare(
-      `UPDATE community_escrows
-          SET state = 'released', released_iqd = gross_iqd, released_at = ?
-        WHERE id = ? AND state IN ('held','disputed')`
-    )
-    .bind(ts, esc.id)
-    .run();
-  if (!guard.meta.changes) return { ok: false, reason: 'STATE_CONFLICT' };
-
-  if (esc.hold_id) {
-    // Commit takes the reserved money out of the customer's balance for good.
-    await commitHold(db, { holdId: esc.hold_id, note: 'Community order released' });
-  }
-
-  await db.batch([
+  const debitTx = holdDebitTxId(esc.hold_id);
+  const statements = [
+    db
+      .prepare(
+        `UPDATE community_escrows
+            SET state = 'released', released_iqd = gross_iqd, released_at = ?
+          WHERE id = ? AND state IN ('held','disputed')`
+      )
+      .bind(ts, esc.id),
+    ...commitHoldStatements(db, {
+      holdId: esc.hold_id,
+      note: 'Community order payment',
+      ref: esc.community_order_id,
+    }),
     db
       .prepare(
         `INSERT INTO merchant_payout_ledger
            (id, merchant_id, kind, amount_iqd, state, community_order_id, escrow_id, note, idempotency_key)
-         VALUES (?,?,'community_order_credit',?,'available',?,?,?,?)`
+         SELECT ?3, ?4, 'community_order_credit', ?5, 'available', ?6, ?7, ?8, ?9
+          WHERE ${FUNDED_BY_HOLD}`
       )
       .bind(
+        esc.hold_id, debitTx,
         newId('pay'), esc.merchant_id, esc.merchant_receivable_iqd,
         esc.community_order_id, esc.id, p.reason ?? '', `credit:${p.idempotencyKey}`
       ),
@@ -255,9 +301,11 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
       .prepare(
         `INSERT INTO merchant_payout_ledger
            (id, merchant_id, kind, amount_iqd, state, community_order_id, escrow_id, note, idempotency_key)
-         VALUES (?,?,'commission',?,'paid',?,?,'platform commission',?)`
+         SELECT ?3, ?4, 'commission', ?5, 'paid', ?6, ?7, 'platform commission', ?8
+          WHERE ${FUNDED_BY_HOLD}`
       )
       .bind(
+        esc.hold_id, debitTx,
         newId('pay'), esc.merchant_id, -esc.platform_fee_iqd,
         esc.community_order_id, esc.id, `fee:${p.idempotencyKey}`
       ),
@@ -265,15 +313,25 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
       .prepare(
         `INSERT INTO community_escrow_events
            (id, escrow_id, kind, amount_iqd, actor_id, actor_role, reason, idempotency_key, created_at)
-         VALUES (?,?,'release',?,?,?,?,?,?)`
+         SELECT ?3, ?4, 'release', ?5, ?6, ?7, ?8, ?9, ?10
+          WHERE ${FUNDED_BY_HOLD}`
       )
       .bind(
+        esc.hold_id, debitTx,
         newId('ese'), esc.id, esc.merchant_receivable_iqd, p.actorId, p.actorRole,
         p.reason ?? '', p.idempotencyKey, ts
       ),
-  ]);
+  ];
 
-  return { ok: true, replayed: false, escrowId: esc.id };
+  try {
+    const res = await db.batch(statements);
+    if (res[0]?.meta.changes) return { ok: true, replayed: false, escrowId: esc.id };
+  } catch (e) {
+    // The debit's CHECK guard fired — the batch rolled back whole and the
+    // re-read below says why. A failure that is not a guard propagates.
+    if (!isConstraintAbort(e)) throw e;
+  }
+  return classifySettleFailure(db, esc, 'released');
 }
 
 // ----------------------------------------------------------------- refund
@@ -290,10 +348,17 @@ export interface RefundInput extends SettleInput {
  * so it becomes available again and no ledger entry is needed on either side.
  *
  * A PARTIAL refund cannot work that way — part is kept and part returned — so
- * the hold is committed in full and the refunded part is credited back to the
- * customer's wallet as a real transaction. That leaves a visible pair of
- * movements rather than a quietly reduced hold, which is what an auditor
- * needs to see.
+ * the hold is committed in full (its debit posts, see `commitHoldStatements`)
+ * and the refunded part is credited back to the customer's wallet as a real
+ * transaction. That leaves a visible pair of movements rather than a quietly
+ * reduced hold, which is what an auditor needs to see, and the NET equals
+ * exactly what the merchant is credited for. Before the settlement rule the
+ * "commit" posted no debit, so the pair was a credit for money never taken.
+ *
+ * Either way it is ONE `db.batch`: the state flip, the hold's release or
+ * settlement, the customer's credit and the merchant's credit commit
+ * together or not at all, and a hold statement that matched zero rows aborts
+ * the batch instead of leaving a refunded escrow over a still-active hold.
  */
 export async function refundEscrow(db: D1Database, p: RefundInput): Promise<EscrowResult> {
   const replay = await findEvent(db, p.idempotencyKey);
@@ -305,6 +370,7 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
   if (esc.state !== 'held' && esc.state !== 'disputed') {
     return { ok: false, reason: 'STATE_CONFLICT', detail: esc.state };
   }
+  if (!esc.hold_id) return { ok: false, reason: 'WALLET_ERROR', detail: 'escrow has no wallet hold' };
 
   const amount = p.amountIqd === undefined ? esc.gross_iqd : Math.floor(p.amountIqd);
   if (amount <= 0) return { ok: false, reason: 'INVALID_AMOUNT' };
@@ -314,69 +380,94 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
 
   const full = amount === esc.gross_iqd;
   const ts = NOW();
-  const nextState = full ? 'refunded' : 'partially_refunded';
+  const nextState: EscrowState = full ? 'refunded' : 'partially_refunded';
 
-  const guard = await db
-    .prepare(
-      `UPDATE community_escrows
-          SET state = ?, refunded_iqd = refunded_iqd + ?, refunded_at = ?
-        WHERE id = ? AND state IN ('held','disputed')
-          AND released_iqd + refunded_iqd + ? <= gross_iqd`
-    )
-    .bind(nextState, amount, ts, esc.id, amount)
-    .run();
-  if (!guard.meta.changes) return { ok: false, reason: 'STATE_CONFLICT' };
-
-  if (esc.hold_id) {
-    if (full) {
-      // Nothing was ever spent: releasing the hold returns it to available.
-      await releaseHold(db, { holdId: esc.hold_id, reason: 'Community order refunded' });
-    } else {
-      const rate = await exchangeRate(db);
-      await commitHold(db, { holdId: esc.hold_id, note: 'Community order partially settled' });
-      // The returned part comes back as its own approved credit, so both
-      // movements are visible in the customer's wallet history.
-      await credit(
-        db,
-        esc.customer_id,
-        'USD',
-        iqdToUsdCents(amount, rate),
-        'Community order partial refund',
-        esc.community_order_id
-      );
-    }
-  }
-
-  const stmts = [
+  const statements: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO community_escrow_events
-           (id, escrow_id, kind, amount_iqd, actor_id, actor_role, reason, idempotency_key, created_at)
-         VALUES (?,?,'refund',?,?,?,?,?,?)`
+        `UPDATE community_escrows
+            SET state = ?, refunded_iqd = refunded_iqd + ?, refunded_at = ?
+          WHERE id = ? AND state IN ('held','disputed')
+            AND released_iqd + refunded_iqd + ? <= gross_iqd`
       )
-      .bind(newId('ese'), esc.id, amount, p.actorId, p.actorRole, p.reason ?? '', p.idempotencyKey, ts),
+      .bind(nextState, amount, ts, esc.id, amount),
   ];
 
-  // On a partial refund the merchant still earns on the part that was kept.
-  if (!full) {
+  if (full) {
+    // Nothing was ever spent: releasing the hold returns it to available.
+    // The fence aborts the batch if the release matched no row (the hold was
+    // no longer active), so a refunded escrow never sits over kept money.
+    statements.push(
+      releaseHoldStatement(db, { holdId: esc.hold_id, reason: 'Community order refunded' }),
+      assertHoldStateStatement(db, esc.hold_id, 'released'),
+      db
+        .prepare(
+          `INSERT INTO community_escrow_events
+             (id, escrow_id, kind, amount_iqd, actor_id, actor_role, reason, idempotency_key, created_at)
+           VALUES (?,?,'refund',?,?,?,?,?,?)`
+        )
+        .bind(newId('ese'), esc.id, amount, p.actorId, p.actorRole, p.reason ?? '', p.idempotencyKey, ts)
+    );
+  } else {
+    const rate = await exchangeRate(db);
+    const debitTx = holdDebitTxId(esc.hold_id);
     const keptGross = esc.gross_iqd - amount;
     const keptReceivable = Math.max(0, Math.min(esc.merchant_receivable_iqd, keptGross));
-    stmts.push(
+    statements.push(
+      ...commitHoldStatements(db, {
+        holdId: esc.hold_id,
+        note: 'Community order payment',
+        ref: esc.community_order_id,
+      }),
+      // The returned part comes back as its own approved credit — only once
+      // the full debit is posted, so the two movements always appear together.
+      db
+        .prepare(
+          `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+           SELECT ?3, ?4, 'deposit', 'USD', ?5, 'approved', 'Community order partial refund', ?6, 'system', ?7
+            WHERE ${FUNDED_BY_HOLD}`
+        )
+        .bind(
+          esc.hold_id, debitTx,
+          `wtx_escrow_refund_${esc.id}`, esc.customer_id, iqdToUsdCents(amount, rate), esc.community_order_id, ts
+        ),
+      db
+        .prepare(
+          `INSERT INTO community_escrow_events
+             (id, escrow_id, kind, amount_iqd, actor_id, actor_role, reason, idempotency_key, created_at)
+           SELECT ?3, ?4, 'refund', ?5, ?6, ?7, ?8, ?9, ?10
+            WHERE ${FUNDED_BY_HOLD}`
+        )
+        .bind(
+          esc.hold_id, debitTx,
+          newId('ese'), esc.id, amount, p.actorId, p.actorRole, p.reason ?? '', p.idempotencyKey, ts
+        ),
+      // The merchant still earns on the part that was kept — funded by the
+      // same debit, in the same batch.
       db
         .prepare(
           `INSERT INTO merchant_payout_ledger
              (id, merchant_id, kind, amount_iqd, state, community_order_id, escrow_id, note, idempotency_key)
-           VALUES (?,?,'community_order_credit',?,'available',?,?,'partial settlement',?)`
+           SELECT ?3, ?4, 'community_order_credit', ?5, 'available', ?6, ?7, 'partial settlement', ?8
+            WHERE ${FUNDED_BY_HOLD}`
         )
         .bind(
+          esc.hold_id, debitTx,
           newId('pay'), esc.merchant_id, keptReceivable, esc.community_order_id, esc.id,
           `partial:${p.idempotencyKey}`
         )
     );
   }
-  await db.batch(stmts);
 
-  return { ok: true, replayed: false, escrowId: esc.id };
+  try {
+    const res = await db.batch(statements);
+    if (res[0]?.meta.changes) return { ok: true, replayed: false, escrowId: esc.id };
+  } catch (e) {
+    // A hold statement refused (fence or debit guard) — the whole batch
+    // rolled back and the re-read below says why. Anything else propagates.
+    if (!isConstraintAbort(e)) throw e;
+  }
+  return classifySettleFailure(db, esc, nextState);
 }
 
 // ---------------------------------------------------------------- dispute

@@ -66,6 +66,17 @@ const settledPointsSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='
 
 const NOW_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 
+/**
+ * Did a batch abort because one of ITS OWN guards fired — a CHECK, NOT NULL,
+ * UNIQUE or PRIMARY KEY constraint — as opposed to failing for an unrelated
+ * reason (a D1 outage, a network error)? A guard abort is an answer and is
+ * classified by re-reading; anything else must propagate so the caller (and
+ * the person behind it) sees a failure to retry, not a made-up refusal.
+ */
+export function isConstraintAbort(e: unknown): boolean {
+  return /constraint/i.test(e instanceof Error ? e.message : String(e));
+}
+
 /** Largest amount any single wallet operation may carry (integer cents). */
 export const MAX_AMOUNT_CENTS = 100_000_000;
 
@@ -212,7 +223,8 @@ export type HoldFailure =
   | 'NOT_FOUND';
 
 export type HoldResult =
-  | { ok: true; holdId: string; replayed: boolean }
+  /** `txId` is set by `commitHold`: the approved ledger debit the hold settled into. */
+  | { ok: true; holdId: string; replayed: boolean; txId?: string }
   | { ok: false; reason: HoldFailure; holdId?: string };
 
 export interface CreateHoldInput {
@@ -302,40 +314,130 @@ export function createPurchaseHold(db: D1Database, p: CreateHoldInput): Promise<
   return createHold(db, 'purchase', p);
 }
 
+/** The ledger row that carries a purchase hold's debit — one per hold, by construction. */
+export const holdDebitTxId = (holdId: string) => `wtx_hold_${holdId}`;
+
 /**
- * Settle a hold against a ledger debit: the reserved money leaves the
- * balance exactly once. `txId` links the approved ledger row that carries
- * the debit; the caller must post that row in the SAME batch (see
- * `markWithdrawalPaid`) or beforehand.
+ * THE SETTLEMENT RULE: a committed purchase hold posts its ledger debit in
+ * the same transaction, or it does not commit at all.
+ *
+ * WHY. A hold only RESERVES money: `effectiveHoldsUsdSql` subtracts active
+ * holds from the spendable balance, and stops counting a hold the moment it
+ * leaves `active`. Committing a hold without posting the debit therefore
+ * hands the reserved money straight back to the buyer — the balance is
+ * restored to what it was before the purchase while the merchant is credited
+ * for it. That is exactly what the store checkout and the escrow release did
+ * before this function existed: `commitHold` flipped the state and nothing
+ * ever wrote the withdrawal row.
+ *
+ * The two statements are returned rather than executed so a caller with a
+ * transaction of its own (the store order batch, the escrow settlement) can
+ * append them and get order + payout + debit as one all-or-nothing write.
+ *
+ *  1. The debit. Its amount is the hold's own amount when the hold is still
+ *     an ACTIVE, UNLINKED purchase hold and the reservation is still funded —
+ *     settled minus the user's OTHER active holds covers it (this hold is
+ *     added back because it is the very reservation being settled). In every
+ *     other case the amount becomes -1, which violates CHECK (amount > 0)
+ *     and aborts the whole batch: a released hold, an already-committed hold,
+ *     a withdrawal hold (those settle through `markWithdrawalPaid`) and a
+ *     hold whose money has somehow gone can none of them produce a debit.
+ *  2. The flip, dependent on that debit existing, and linking the hold to it
+ *     through `tx_id` so reconciliation can prove every committed hold paid.
+ */
+export function commitHoldStatements(
+  db: D1Database,
+  p: { holdId: string; note: string; ref: string }
+): D1PreparedStatement[] {
+  const txId = holdDebitTxId(p.holdId);
+  return [
+    // `hh` — never `h`: the balance fragments alias wallet_holds as `h`
+    // internally, and a same-named outer alias would make their correlation
+    // bind to the inner table and sum every user's holds.
+    db
+      .prepare(
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+         SELECT ?1, hh.user_id, 'withdrawal', 'USD',
+                CASE WHEN hh.state = 'active' AND hh.tx_id IS NULL AND hh.kind = 'purchase'
+                          AND ${availableUsdSql('hh.user_id')} + hh.amount_cents >= hh.amount_cents
+                     THEN hh.amount_cents ELSE -1 END,
+                'approved', ?3, ?4, 'system', ${NOW_SQL}
+           FROM wallet_holds hh
+          WHERE hh.id = ?2`
+      )
+      .bind(txId, p.holdId, p.note.slice(0, 500), p.ref.slice(0, 120)),
+    db
+      .prepare(
+        `UPDATE wallet_holds
+            SET state='committed', committed_at=${NOW_SQL}, updated_at=${NOW_SQL}, tx_id=?2
+          WHERE id = ?1 AND state = 'active' AND tx_id IS NULL
+            AND EXISTS (SELECT 1 FROM wallet_transactions t
+                         WHERE t.id = ?2 AND t.type = 'withdrawal' AND t.status = 'approved')`
+      )
+      .bind(p.holdId, txId),
+  ];
+}
+
+/**
+ * A batch fence on a hold's state: a no-op write when the hold is in
+ * `state`, a NOT NULL violation (which aborts the enclosing batch) when it is
+ * not. Lets a caller that released or committed a hold a statement earlier
+ * refuse to continue when that statement quietly matched zero rows.
+ */
+export function assertHoldStateStatement(db: D1Database, holdId: string, state: HoldState): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE wallet_holds
+          SET updated_at = CASE WHEN state = ?2 THEN updated_at ELSE NULL END
+        WHERE id = ?1`
+    )
+    .bind(holdId, state);
+}
+
+/**
+ * Settle a purchase hold: the reserved money leaves the balance exactly once,
+ * as an approved `withdrawal` ledger row posted in the SAME transaction as
+ * the state flip (see `commitHoldStatements`). Callers that already run a
+ * batch append the statements instead of calling this.
  */
 export async function commitHold(
   db: D1Database,
-  p: { holdId: string; txId?: string; note?: string }
+  p: { holdId: string; note?: string; ref?: string }
 ): Promise<HoldResult> {
-  const stmt = p.txId
-    ? db
-        .prepare(
-          `UPDATE wallet_holds
-              SET state='committed', committed_at=${NOW_SQL}, updated_at=${NOW_SQL}, tx_id=?2
-            WHERE id = ?1 AND state = 'active' AND (tx_id IS NULL OR tx_id = ?2)`
-        )
-        .bind(p.holdId, p.txId)
-    : db
-        .prepare(
-          `UPDATE wallet_holds
-              SET state='committed', committed_at=${NOW_SQL}, updated_at=${NOW_SQL}
-            WHERE id = ?1 AND state = 'active'`
-        )
-        .bind(p.holdId);
-  const res = await stmt.run();
-  if ((res.meta.changes ?? 0) > 0) return { ok: true, holdId: p.holdId, replayed: false };
+  const txId = holdDebitTxId(p.holdId);
+  try {
+    const res = await db.batch(
+      commitHoldStatements(db, { holdId: p.holdId, note: p.note ?? 'Purchase settled', ref: p.ref ?? '' })
+    );
+    if ((res[1]?.meta.changes ?? 0) > 0) return { ok: true, holdId: p.holdId, replayed: false, txId };
+  } catch (e) {
+    // CHECK abort (not an active purchase hold) or a PRIMARY KEY replay of
+    // the debit row: the batch rolled back, nothing partial was written.
+    // Anything else is a real failure and is not a refusal.
+    if (!isConstraintAbort(e)) throw e;
+  }
   const row = await db
-    .prepare('SELECT state FROM wallet_holds WHERE id = ?')
+    .prepare('SELECT state, tx_id FROM wallet_holds WHERE id = ?')
     .bind(p.holdId)
-    .first<{ state: HoldState }>();
+    .first<{ state: HoldState; tx_id: string | null }>();
   if (!row) return { ok: false, reason: 'NOT_FOUND' };
-  if (row.state === 'committed') return { ok: true, holdId: p.holdId, replayed: true };
+  if (row.state === 'committed') {
+    return row.tx_id
+      ? { ok: true, holdId: p.holdId, replayed: true, txId: row.tx_id }
+      : { ok: true, holdId: p.holdId, replayed: true };
+  }
   return { ok: false, reason: 'STATE_CONFLICT', holdId: p.holdId };
+}
+
+/** The conditional release, for a caller that runs it inside its own batch. */
+export function releaseHoldStatement(db: D1Database, p: { holdId: string; reason: string }): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE wallet_holds
+          SET state='released', released_at=${NOW_SQL}, updated_at=${NOW_SQL}, release_reason=?2
+        WHERE id = ?1 AND state = 'active'`
+    )
+    .bind(p.holdId, p.reason.slice(0, 300));
 }
 
 /**
@@ -348,14 +450,7 @@ export async function releaseHold(
   db: D1Database,
   p: { holdId: string; reason: string }
 ): Promise<HoldResult> {
-  const res = await db
-    .prepare(
-      `UPDATE wallet_holds
-          SET state='released', released_at=${NOW_SQL}, updated_at=${NOW_SQL}, release_reason=?2
-        WHERE id = ?1 AND state = 'active'`
-    )
-    .bind(p.holdId, p.reason.slice(0, 300))
-    .run();
+  const res = await releaseHoldStatement(db, p).run();
   if ((res.meta.changes ?? 0) > 0) return { ok: true, holdId: p.holdId, replayed: false };
   const row = await db
     .prepare('SELECT state FROM wallet_holds WHERE id = ?')
@@ -1082,7 +1177,16 @@ export type ReconciliationAnomalyKind =
   | 'open_without_active_hold'
   | 'open_with_posted_debit'
   | 'unknown_outcome_pending_reconciliation'
-  | 'ledger_debit_without_paid_withdrawal';
+  | 'ledger_debit_without_paid_withdrawal'
+  /**
+   * A hold that left `active` as committed but never posted (or never
+   * linked) its approved debit: the reserved money went back to the buyer's
+   * spendable balance while the other side of the sale was still paid. Rows
+   * like this were written by the pre-settlement-rule store checkout and
+   * escrow release; they are REPORTED here for the owner to decide on, never
+   * rewritten.
+   */
+  | 'committed_hold_without_debit';
 
 export interface ReconciliationAnomaly {
   kind: ReconciliationAnomalyKind;
@@ -1101,9 +1205,13 @@ export interface ReconciliationReport {
     withdrawal_holds_usd_cents: number;
     open_withdrawals_usd_cents: number;
     pending_deposits_usd_cents: number;
+    /** Money committed out of holds that never reached the ledger (legacy leak). */
+    committed_without_debit_usd_cents: number;
   };
   /** Reserved money must equal the open withdrawal requests it belongs to. */
   sums_match: boolean;
+  /** How many committed holds carry no approved debit (the `committed_hold_without_debit` rows). */
+  committed_holds_without_debit: number;
   anomalies: ReconciliationAnomaly[];
 }
 
@@ -1167,7 +1275,7 @@ export function classifyWithdrawalRow(row: WithdrawalReconRow): ReconciliationAn
 export async function walletReconciliationReport(db: D1Database): Promise<ReconciliationReport> {
   const ranAt = new Date().toISOString();
 
-  const [totalsRow, negatives, withdrawals, orphanDebits, userCount] = await Promise.all([
+  const [totalsRow, negatives, withdrawals, orphanDebits, unpaidCommits, userCount] = await Promise.all([
     db
       .prepare(
         `SELECT
@@ -1184,7 +1292,11 @@ export async function walletReconciliationReport(db: D1Database): Promise<Reconc
            (SELECT COALESCE(SUM(amount_cents),0) FROM wallet_withdrawals
              WHERE state IN ('requested','approved','processing')) AS open_withdrawals_usd_cents,
            (SELECT COALESCE(SUM(amount),0) FROM wallet_transactions
-             WHERE currency='USD' AND type='deposit' AND status='pending') AS pending_deposits_usd_cents`
+             WHERE currency='USD' AND type='deposit' AND status='pending') AS pending_deposits_usd_cents,
+           (SELECT COALESCE(SUM(h.amount_cents),0) FROM wallet_holds h
+             LEFT JOIN wallet_transactions ht ON ht.id = h.tx_id
+            WHERE h.state='committed' AND (h.tx_id IS NULL OR ht.status IS NULL OR ht.status <> 'approved'))
+             AS committed_without_debit_usd_cents`
       )
       .first<ReconciliationReport['totals']>(),
     db
@@ -1226,6 +1338,28 @@ export async function walletReconciliationReport(db: D1Database): Promise<Reconc
           LIMIT 200`
       )
       .all<{ id: string; user_id: string; amount: number }>(),
+    // The settlement rule's own invariant: a committed hold carries an
+    // approved debit. Rows that do not are the legacy leak (store orders and
+    // escrow releases committed before the rule) — reported, never repaired.
+    db
+      .prepare(
+        `SELECT h.id, h.user_id, h.kind, h.amount_cents, h.ref_type, h.ref_id, h.tx_id, t.status AS tx_status
+           FROM wallet_holds h
+           LEFT JOIN wallet_transactions t ON t.id = h.tx_id
+          WHERE h.state = 'committed' AND (h.tx_id IS NULL OR t.status IS NULL OR t.status <> 'approved')
+          ORDER BY h.committed_at DESC
+          LIMIT 200`
+      )
+      .all<{
+        id: string;
+        user_id: string;
+        kind: HoldKind;
+        amount_cents: number;
+        ref_type: string;
+        ref_id: string;
+        tx_id: string | null;
+        tx_status: string | null;
+      }>(),
     db
       .prepare('SELECT COUNT(DISTINCT user_id) AS n FROM wallet_transactions').first<{ n: number }>(),
   ]);
@@ -1248,6 +1382,16 @@ export async function walletReconciliationReport(db: D1Database): Promise<Reconc
       detail: `approved user withdrawal debit ${t.amount} with no paid request (legacy or out-of-band approval)`,
     });
   }
+  for (const h of unpaidCommits.results ?? []) {
+    anomalies.push({
+      kind: 'committed_hold_without_debit',
+      user_id: h.user_id,
+      ref: h.id,
+      detail: `${h.kind} hold of ${h.amount_cents} (${h.ref_type || 'no ref'} ${h.ref_id}) committed with ${
+        h.tx_id ? `ledger row ${h.tx_id} in status ${h.tx_status ?? 'missing'}` : 'no ledger debit'
+      } — the reserved money returned to the buyer's spendable balance`,
+    });
+  }
 
   const totals = totalsRow ?? {
     settled_usd_cents: 0,
@@ -1255,6 +1399,7 @@ export async function walletReconciliationReport(db: D1Database): Promise<Reconc
     withdrawal_holds_usd_cents: 0,
     open_withdrawals_usd_cents: 0,
     pending_deposits_usd_cents: 0,
+    committed_without_debit_usd_cents: 0,
   };
 
   return {
@@ -1263,6 +1408,7 @@ export async function walletReconciliationReport(db: D1Database): Promise<Reconc
     checked_users: userCount?.n ?? 0,
     totals,
     sums_match: totals.withdrawal_holds_usd_cents === totals.open_withdrawals_usd_cents,
+    committed_holds_without_debit: unpaidCommits.results?.length ?? 0,
     anomalies,
   };
 }

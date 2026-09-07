@@ -40,7 +40,11 @@ risks. Verification evidence is in `docs/TEST_RESULTS.md`.
   enforced by DB constraints.
 - **Roles**: `customer | merchant | admin` in `users.role`; `is_investor`
   flag for the invest portal. UI hiding is never the control — every
-  endpoint re-checks.
+  endpoint re-checks. Platform administration is apex-only wherever it is
+  mounted: `requireAdmin` itself refuses (404) any host on which
+  `adminAllowedOn` says a merchant could control the page, so a visiting
+  admin's parent-domain cookie on a storefront reaches no admin route
+  (`tests/adminHostGuard.test.ts` walks every discovered admin route).
 - **Initial admin**: while **no admin exists**, the account whose *verified
   Google identity* matches `INITIAL_ADMIN_EMAIL` is promoted on sign-in
   (audited). Password-registration never auto-promotes (an attacker who
@@ -51,7 +55,11 @@ risks. Verification evidence is in `docs/TEST_RESULTS.md`.
   admin setting recorded on each order. IQD→cents conversions round **up**
   so the wallet never undercharges. Products store canonical IQD (the old
   divide-by-rate storage silently repriced the whole catalog whenever the
-  rate changed — fixed).
+  rate changed — fixed). Settlement rule: a purchase hold that commits posts
+  its approved `withdrawal` row (`wtx_hold_<holdId>`) in the same batch or
+  does not commit (`walletOps.commitHoldStatements`); a merchant is credited
+  only in a batch where the buyer's debit posted; committed holds without a
+  debit are reported by reconciliation, never repaired.
 - **Audit**: `audit_log` records admin/financial mutations (actor, action,
   target, bounded detail; never passwords or tokens).
 - **Headers**: `X-Content-Type-Options`, `X-Frame-Options: DENY`,

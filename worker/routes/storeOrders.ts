@@ -35,7 +35,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { feeFor } from '../lib/merchantOps';
 import { exchangeRate, iqdToUsdCents } from '../lib/escrowOps';
-import { createPurchaseHold, commitHold } from '../lib/walletOps';
+import { createPurchaseHold, commitHoldStatements } from '../lib/walletOps';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -339,9 +339,24 @@ storeOrderRoutes.post('/', async (c) => {
   );
   stmts.push(c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id));
 
-  await c.env.DB.batch(stmts);
+  // §11.1 settlement rule: the hold commits AND its ledger debit posts inside
+  // THIS batch, with the order and the merchant's pending share. Committing
+  // the hold in a call of its own — the way this route first did — flipped
+  // the state and posted nothing, which handed the reserved money back to the
+  // buyer's spendable balance while the merchant was credited for the sale.
+  // The debit's guard aborts the whole batch if the hold is not an active,
+  // still-funded reservation, so no order can exist unpaid.
+  if (holdId) {
+    stmts.push(
+      ...commitHoldStatements(c.env.DB, {
+        holdId,
+        note: `Wallet payment on order ${orderId}`,
+        ref: orderId,
+      })
+    );
+  }
 
-  if (holdId) await commitHold(c.env.DB, { holdId, note: `Order ${orderId}` });
+  await c.env.DB.batch(stmts);
 
   await audit(c.env.DB, user.id, 'community.store_order_created', orderId, {
     store: cart.store_id,

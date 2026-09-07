@@ -360,3 +360,186 @@ regression.
 
 Not deployed. Production deployment needs the owner's explicit approval
 (`deploy-staging-code.yml`, which applies migration 0049 before the code).
+
+## Phase 0 follow-up — 2026-09-07 (architecture-assessment findings)
+
+Five defects surfaced by the architecture assessment were first CONFIRMED with
+executable repros against the real routes and the real migrations, then fixed
+at the root on this branch. Each fix carries a permanent regression test that
+fails on the old code. Nothing was deployed and no live row was rewritten.
+
+### P0-1. P0 (money) — a committed purchase hold never posted its ledger debit
+
+**Where.** `worker/lib/walletOps.ts` (`commitHold`), `worker/routes/storeOrders.ts`
+(wallet-paid store orders), `worker/lib/escrowOps.ts` (`releaseEscrow`,
+`refundEscrow`).
+
+**Cause.** `wallet_holds` is the reservation book and `wallet_transactions` the
+ledger; `effectiveHoldsUsdSql` subtracts only ACTIVE holds from the spendable
+balance. `commitHold` without a `txId` flipped `state` to `committed` and wrote
+no `withdrawal` row, so the moment a store order or an escrow release
+"committed" the hold, the buyer's whole balance was spendable again while the
+merchant's payout ledger was credited. A customer cancel then posted
+`wtx_refund_<order>_usd` for money that had never left — the buyer ended ABOVE
+the original deposit. A partial escrow refund did the same and additionally
+credited the refunded part (net minting). The platform checkout
+(`usdSpendStatement`) was already correct.
+
+**Fix.** The settlement rule: a committed purchase hold posts its debit in the
+same transaction or does not commit. `commitHoldStatements()` returns two
+statements — an approved `withdrawal` row with the deterministic id
+`wtx_hold_<holdId>` whose amount becomes -1 (CHECK abort of the whole batch)
+unless the hold is an active, unlinked, still-funded purchase hold, and the
+flip that links the hold to that row through `tx_id`. `commitHold` wraps them
+in one batch (guard aborts are classified; any other failure propagates).
+`storeOrders` appends them to the order batch, so order, merchant share and
+debit commit together. `releaseEscrow` and `refundEscrow` are each ONE batch;
+every merchant credit is conditional on `FUNDED_BY_HOLD` ("the customer's debit
+is posted and linked to this hold"), and a full refund's hold release is fenced
+(`assertHoldStateStatement`) so a refunded escrow can never sit over kept money.
+A partial refund is the full debit plus a credit of the refunded part, so the
+net equals what the merchant receives. Reconciliation
+(`walletReconciliationReport`, `GET /api/wallet/admin/reconciliation`, the cron
+report in `lib/jobs.ts`) now reports `committed_hold_without_debit` anomalies
+and a `committed_holds_without_debit` count.
+
+**Legacy rows.** Holds committed before this rule (`state='committed'`,
+`tx_id IS NULL`) are only REPORTED by reconciliation; nothing rewrites them and
+no migration touches existing rows. Whether and how to reconcile the live data
+is the owner's decision (DECISIONS row 98).
+
+**Test.** `tests/walletHoldSettlement.test.ts` (10): debited exactly once at
+placement; place → cancel returns exactly the deposit; a failed order batch
+leaves the hold active and the retry settles once; `commitHold` replays without
+a second debit and refuses withdrawal/unfunded holds; escrow release debits
+once and pays in the same batch; partial refund nets correctly; full refund
+releases; a sabotaged hold refuses the whole settlement (merchant never
+credited); a transient failure writes nothing on either side; the legacy leak
+row is reported and untouched.
+
+### P0-2. HIGH (authz) — platform-admin surfaces answered on merchant subdomains
+
+**Where.** `worker/lib/http.ts` (`requireAdmin`), every router using it outside
+`/api/admin/*`: `/api/kyc/admin/*`, `/api/telegram/admin/*`,
+`/api/support/admin/*`, `/api/policies/admin/*`, `/api/wallet/admin/*`,
+`/api/referrals/admin/*`, `/api/reviews/admin/*`, plus the inline-guarded
+routes in `returns.ts`, `invoices.ts` and `misc.ts` (`/translate`).
+
+**Cause.** The apex-only host guard was a prefix middleware
+(`app.use('/api/admin/*', requireMainHost)`); `requireAdmin` checked the role
+and never the host. The session cookie is scoped to the parent domain, so a
+page on `somestore.levonis-iq.com` is same-origin with its API and carries a
+visiting admin's own session.
+
+**Fix.** The host rule is part of admin authorisation itself: `requireAdmin`
+first checks `adminAllowedOn(host)` — using the classification
+`worker/index.ts` sets, or classifying the Host header against the configured
+root domain when a router is mounted without that middleware — and answers the
+same `404 Not found` as `requireMainHost`. Apex, `www`, localhost, preview and
+unconfigured-root hosts still pass (`adminAllowedOn` unchanged);
+`requireMainHost` is unchanged and stays on `/api/admin/*` and the credential
+routes; merchant dashboard routes (`merchantAuth`) are unaffected.
+
+**Test.** `tests/adminHostGuard.test.ts` (4): discovers every admin route from
+`worker/index.ts` and `worker/routes/*.ts` (225 routes: `/api/admin` mounts,
+router-wide / sub-path / inline `requireAdmin`, any `/admin` segment), drives
+the REAL Worker entry point with a real session row and cookie, and asserts
+404 on the merchant host for all of them and reachability on the apex for all
+of them (plus 200 on the seven that leaked); a customer session gets 403 on the
+apex and 404 on the merchant host.
+
+### P0-3. HIGH (money) — `POST /api/admin/wallet/credit` had no scope, no idempotency, no rate limit
+
+**Where.** `worker/routes/admin.ts`.
+
+**Cause.** Any admin — an `assistant` included — could mint up to the maximum;
+a double submit credited twice; 25 rapid calls all succeeded.
+
+**Fix.** `canViewFinancials` is required (403 `FINANCIAL_SCOPE_REQUIRED`, the
+farm's wording); `rateLimit(c, 'admin-credit', 20, 3600)` per admin; a required
+`idempotencyKey` (8–80 chars) with the ledger id derived from
+`sha256(adminId:key)` and a conditional INSERT — the second identical submit
+returns the same id with `replayed: true` and credits nothing; the same key with
+a different payload is 409 `IDEMPOTENCY_KEY_REUSED`; the key is on the audit
+row. There is no caller of this route in `src/` (verified by grep), so no UI
+change was needed; any script using it must now send `idempotencyKey`.
+
+**Test.** `tests/adminWalletCredit.test.ts` (7).
+
+### P0-4. MEDIUM (money) — order cancellation was two transactions
+
+**Where.** `worker/routes/orders.ts` (`POST /:id/cancel`), `worker/routes/admin.ts`
+(`PATCH /orders/:id` → `cancelled`), new `worker/lib/orderCancelOps.ts`,
+`worker/lib/orderInventory.ts` (`planOrderReturn`).
+
+**Cause.** The customer route flipped the status with a standalone `.run()` and
+posted the refund from a later batch; a failure in between left a cancelled,
+unrefunded order that the `status === 'pending'` guard then refused to retry.
+The admin cancel had the same shape and — verified — never flipped
+`points_reservations` nor cancelled the pending accrual.
+
+**Fix.** `cancelledOrderRefundStatements()` builds the wallet and points
+refunds (idempotent on `wtx_refund_<order>_usd|_pts`, amount -1 → CHECK abort
+when the order is not cancelled), the reservation flip, the accrual
+cancellation and a NOT-NULL fence on `orders.status` that aborts the batch
+whenever the flip matched zero rows. Both routes run the conditional flip, the
+planned stock return and these statements in ONE `db.batch`; a lost flip is a
+400, a transient failure leaves the order untouched and retryable.
+
+**Test.** `tests/orderCancelAtomic.test.ts` (4): injected batch failure leaves
+the order pending and unrefunded and the retry refunds exactly once; a flip
+that loses to a concurrent transition writes nothing; admin cancel refunds,
+returns the reservation and cancels the accrual, and a re-open → cancel does
+not double-refund; admin cancel under failure / stale edit writes nothing.
+
+### P0-5. MEDIUM (money) — the legacy deposit decision bypassed the deposit service
+
+**Where.** `worker/routes/admin.ts` (`POST /wallet-requests/:id/decide`),
+`src/components/AdminWalletRequests.tsx`, `src/components/AdminOverview.tsx`.
+
+**Cause.** The legacy route approved deposits with a plain UPDATE, skipping
+`decideDeposit`'s `amount_mismatch` refusal, the dedup-slot release on
+rejection and the Telegram message close — and both admin screens still called
+it for deposits.
+
+**Fix.** USD deposit decisions on the legacy route delegate to `decideDeposit`
+(same refusals: 409 `AMOUNT_MISMATCH`, 400 `REASON_REQUIRED`; same side
+effects, message close and customer notice in the background); the response
+shape stays `{ success: true }`. Withdrawals filed before the holds engine (no
+`wallet_withdrawals` row — the only other kind the legacy list carries) keep
+the legacy path. Both screens now call
+`/api/wallet/admin/deposits/:id/approve|reject` for deposit rows (a rejection
+requires a written reason) and the legacy decide only for pre-holds
+withdrawals.
+
+**Test.** `tests/depositDecideGuard.test.ts` (5).
+
+### Behaviour changes the owner should know about
+
+- Wallet-paid store orders now really charge the buyer at placement (one
+  approved `withdrawal` row, `wtx_hold_<holdId>`), and an escrow release or
+  partial refund really debits the customer. Balances shown after these events
+  drop by the purchase amount, as they should have.
+- Merchant credits in `merchant_payout_ledger` are only ever written in a batch
+  where the customer's debit posted. An escrow whose hold cannot settle (a hold
+  released out of band) refuses the release with `WALLET_ERROR` instead of
+  paying the merchant.
+- Rejecting a deposit — on either screen or through the legacy route — now
+  requires a reason of at least 3 characters.
+- An `assistant`-scope admin can no longer credit wallets; every manual credit
+  needs an `idempotencyKey`.
+- Admin surfaces outside `/api/admin/*` answer 404 on merchant subdomains for
+  everyone (previously 200 for an admin session, 401/403 for others).
+- Committed holds without a debit from before this change are listed by
+  `GET /api/wallet/admin/reconciliation` (`committed_hold_without_debit`) and
+  counted by the hourly job; they are not repaired.
+
+### Evidence (this section)
+
+- `npm run test:unit`: 1734 tests, 0 failures (baseline 1704; 30 added across
+  the five new suites).
+- `npm run check`: 0 errors (typecheck ×3, eslint — 120 pre-existing warnings,
+  Studio typecheck clean).
+- `npm run build`: succeeds; `dist/_headers` written.
+- `node scripts/migrate-check.mjs --twice`: all 54 migrations apply, second
+  pass a no-op, 0 foreign-key violations. No migration was added.

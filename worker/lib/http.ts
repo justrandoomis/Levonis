@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import { adminAllowedOn } from './hosts';
+import { adminAllowedOn, classifyHost, rootDomainFrom, type HostInfo } from './hosts';
 import { STATIC_SECURITY_HEADERS, STRICT_TRANSPORT_SECURITY, spaCsp } from './securityPolicy';
 import type { AppContext } from './types';
 import { canonicalUsername, usernameRejection, type UsernameRejection } from './usernames';
@@ -33,8 +33,34 @@ export async function requireAuth(c: Context<AppContext>, next: Next) {
   await next();
 }
 
-/** Requires an admin (server-side role, never a client flag). */
+/**
+ * The request's host classification. worker/index.ts sets it once per request;
+ * a router mounted without that middleware (a test harness, a future second
+ * entry point) gets the same classification computed from the Host header and
+ * the configured root domain, so the admin host rule below never depends on
+ * a middleware someone remembered to install.
+ */
+function requestHost(c: Context<AppContext>): HostInfo {
+  return c.get('host') ?? classifyHost(c.req.header('Host'), rootDomainFrom(c.env ?? {}));
+}
+
+/**
+ * Requires a PLATFORM admin (server-side role, never a client flag) — and
+ * requires it on a host where platform administration may be served at all.
+ *
+ * WHY THE HOST CHECK LIVES HERE. The apex-only guard used to be a prefix
+ * middleware on `/api/admin/*` alone, while seven admin surfaces mounted under
+ * other prefixes (`/api/kyc/admin`, `/api/wallet/admin`, `/api/support/admin`,
+ * …) used only this function. The session cookie is scoped to the parent
+ * domain, so a page on a merchant storefront carries a visiting admin's own
+ * session and is same-origin with its API: every one of those surfaces
+ * answered on `somestore.levonis-iq.com`. Making the host rule part of admin
+ * authorisation itself means a mount cannot forget it. Same 404 as
+ * `requireMainHost`, for the same reason: a wrong-host caller learns the
+ * route does not exist here, not that it exists elsewhere.
+ */
 export async function requireAdmin(c: Context<AppContext>, next: Next) {
+  if (!adminAllowedOn(requestHost(c))) return c.json({ success: false, error: 'Not found' }, 404);
   const user = c.get('user');
   if (!user) throw unauthorized();
   if (user.role !== 'admin') throw forbidden('Administrator access required');

@@ -1,20 +1,23 @@
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
-import { approvableWithdrawalSql } from '../lib/walletOps';
+import { approvableWithdrawalSql, decideDeposit } from '../lib/walletOps';
+import { closeDepositNotification, enqueueUserDepositStatusNotification } from '../lib/walletNotify';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAdmin, badRequest, notFound, forbidden, str, int, oneOf, jsonArray, HttpError } from '../lib/http';
-import { newId } from '../lib/crypto';
+import { requireAdmin, badRequest, notFound, forbidden, conflict, str, int, oneOf, jsonArray, HttpError } from '../lib/http';
+import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { rateLimit } from '../lib/ratelimit';
 import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
-import { deductOrderStock, returnOrderStock } from '../lib/orderInventory';
+import { deductOrderStock, planOrderReturn } from '../lib/orderInventory';
+import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
 import { awardOrderPoints } from '../lib/pointsOps';
-import { walletTxPublic, credit } from '../lib/wallet';
+import { walletTxPublic } from '../lib/wallet';
 import { productPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
@@ -481,6 +484,44 @@ adminRoutes.post('/wallet-requests/:id/decide', async (c) => {
     }
   }
 
+  // A DEPOSIT is decided by the one deposit service (§12.2) — the same
+  // function the guarded /api/wallet/admin/deposits/:id routes and the
+  // Telegram buttons call — so this legacy button carries the same refusals
+  // (an amount finance observed as different from what was declared is never
+  // approved) and the same side effects (a rejection frees the transfer
+  // reference; the group message is closed). Before this it flipped the row
+  // with a bare UPDATE and bypassed all three. Only the response shape is the
+  // legacy one, for the panel.
+  if (tx.type === 'deposit' && tx.currency === 'USD') {
+    const res = await decideDeposit(c.env, {
+      requestId: id,
+      action: decision === 'approved' ? 'approve' : 'reject',
+      actorUserId: adminUser.id,
+      reason: adminNote,
+      source: 'site',
+    });
+    if (!res.ok) {
+      if (res.reason === 'AMOUNT_MISMATCH') {
+        throw conflict(
+          'The observed amount does not match the requested amount — reject this request and file a linked adjustment for the amount that actually arrived',
+          'AMOUNT_MISMATCH'
+        );
+      }
+      if (res.reason === 'REASON_REQUIRED') {
+        throw badRequest('A rejection reason is required (at least 3 characters)', 'REASON_REQUIRED');
+      }
+      throw badRequest('This request was already decided');
+    }
+    backgroundWork(
+      c,
+      Promise.allSettled([closeDepositNotification(c.env, id), enqueueUserDepositStatusNotification(c.env, id)])
+    );
+    await audit(c.env.DB, adminUser.id, `wallet.${decision}`, id, {
+      user_id: tx.user_id, type: tx.type, amount: tx.amount, currency: tx.currency, via: 'deposit_service',
+    });
+    return c.json({ success: true });
+  }
+
   if (decision === 'approved' && tx.type === 'withdrawal') {
     // Approving a withdrawal must not overdraw: conditional update guarded by
     // the SPENDABLE balance — settled minus the user's other active holds —
@@ -512,18 +553,73 @@ adminRoutes.post('/wallet-requests/:id/decide', async (c) => {
   return c.json({ success: true });
 });
 
+/**
+ * Run a background promise without letting its absence break the request:
+ * `c.executionCtx` throws when there is no ExecutionContext (unit tests, some
+ * local runners), and an after-the-fact notice must never turn a completed
+ * decision into a reported failure.
+ */
+function backgroundWork(c: Context<AppContext>, work: Promise<unknown>): void {
+  const swallow = () => work.catch(() => undefined);
+  try {
+    c.executionCtx.waitUntil(swallow());
+  } catch {
+    void swallow();
+  }
+}
+
+/**
+ * A manual wallet credit MINTS money. Three guards that the first version of
+ * this route did not have:
+ *  - financial scope (§11): an `assistant` admin may run the catalogue but may
+ *    never move money — the same 403 the farm's money sections answer;
+ *  - a per-admin rate limit, so a stolen session or a stuck button cannot
+ *    fire hundreds of credits in a minute;
+ *  - a required idempotency key, with the ledger id DERIVED from
+ *    (admin, key): a double submit — the browser retrying, the admin clicking
+ *    twice — finds its own row and credits nothing. The same key with a
+ *    different payload is refused, never silently reused.
+ */
 adminRoutes.post('/wallet/credit', async (c) => {
   const adminUser = c.get('user')!;
+  if (!canViewFinancials(c.env, adminUser)) {
+    throw new HttpError(
+      403,
+      'هذا الإجراء للمالك أو الدور المالي فقط / This action needs the owner or a financial admin',
+      'FINANCIAL_SCOPE_REQUIRED'
+    );
+  }
+  await rateLimit(c, 'admin-credit', 20, 3600);
   const body = await c.req.json().catch(() => ({}));
+  const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
   const userId = str(body.userId, 'userId', { min: 1, max: 60 });
   const currency = oneOf(body.currency, 'currency', ['USD', 'POINT'] as const);
   const amount = int(body.amount, 'amount', { min: 1, max: 100_000_000 });
   const note = str(body.note, 'note', { min: 3, max: 300 });
   const target = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
   if (!target) throw notFound('User not found');
-  const id = await credit(c.env.DB, userId, currency, amount, note, `admin:${adminUser.id}`, 'admin');
-  await audit(c.env.DB, adminUser.id, 'wallet.manual_credit', id, { userId, currency, amount, note });
-  return c.json({ success: true, id });
+
+  const id = `wtx_credit_${(await sha256Hex(`${adminUser.id}:${idempotencyKey}`)).slice(0, 32)}`;
+  const res = await c.env.DB.prepare(
+    `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+     SELECT ?1, ?2, 'deposit', ?3, ?4, 'approved', ?5, ?6, 'admin', strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE NOT EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?1)`
+  )
+    .bind(id, userId, currency, amount, note, `admin:${adminUser.id}`)
+    .run();
+  if (res.meta.changes === 0) {
+    const existing = await c.env.DB.prepare('SELECT user_id, currency, amount FROM wallet_transactions WHERE id = ?')
+      .bind(id)
+      .first<{ user_id: string; currency: string; amount: number }>();
+    if (!existing || existing.user_id !== userId || existing.currency !== currency || existing.amount !== amount) {
+      throw conflict('This idempotency key was already used for a different credit', 'IDEMPOTENCY_KEY_REUSED');
+    }
+    return c.json({ success: true, id, replayed: true });
+  }
+  await audit(c.env.DB, adminUser.id, 'wallet.manual_credit', id, {
+    userId, currency, amount, note, idempotency_key: idempotencyKey,
+  });
+  return c.json({ success: true, id, replayed: false });
 });
 
 // ---------------------------------------------------------------- orders
@@ -1421,31 +1517,54 @@ adminRoutes.patch('/orders/:id', async (c) => {
 
   // delivered_at is stamped in the SAME conditional update as the status flip
   // so a concurrent transition can never produce a delivered order without it.
-  const flip = await c.env.DB.prepare(
+  const flipStmt = c.env.DB.prepare(
     next === 'delivered'
       ? `UPDATE orders SET status = ?, admin_note = ?, delivered_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
           WHERE id = ? AND status = ?`
       : `UPDATE orders SET status = ?, admin_note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
           WHERE id = ? AND status = ?`
-  )
-    .bind(next, adminNote, id, from)
-    .run();
-  if (flip.meta.changes === 0) throw badRequest('The order changed while you were editing — reload and retry');
+  ).bind(next, adminNote, id, from);
+
+  let stockNote: string | null = null;
+  let flipped: number;
+  if (next === 'cancelled') {
+    // A cancellation is ONE transaction: the status flip, the stock return
+    // (§7 — a release when the order was never confirmed, a restore when it
+    // was), the refund of wallet money and points, the points-reservation
+    // flip and the pending-accrual cancellation (orderCancelOps — the same
+    // statements the customer's cancel runs). This route used to flip first,
+    // post only the two refund rows from a later batch, and never touch the
+    // reservation or the accrual. A lost flip aborts the whole batch.
+    const stock = await planOrderReturn(c.env.DB, id, adminUser.id);
+    try {
+      const res = await c.env.DB.batch([
+        flipStmt,
+        ...(stock.plan?.statements ?? []),
+        ...cancelledOrderRefundStatements(c.env, order, 'admin', new Date().toISOString()),
+      ]);
+      flipped = res[0]?.meta.changes ?? 0;
+    } catch (e) {
+      const again = await c.env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(id).first<{ status: string }>();
+      if (again && again.status !== from) throw badRequest('The order changed while you were editing — reload and retry');
+      throw e;
+    }
+    if (stock.kind !== 'none') stockNote = `Stock ${stock.kind}d for ${stock.plan?.applied ?? 0} row(s).`;
+  } else {
+    flipped = (await flipStmt.run()).meta.changes;
+  }
+  if (flipped === 0) throw badRequest('The order changed while you were editing — reload and retry');
 
   // §7 stock lifecycle. Confirmation turns the hold taken at checkout into a
-  // real decrement; cancellation gives the units back — a release when the
-  // order was never confirmed, a restore when it was. Both are idempotent
-  // through the inventory ledger, so a double-clicked transition (or a replay
-  // after the status flip already landed) moves nothing twice.
+  // real decrement (cancellation's return ran inside the batch above). Both
+  // are idempotent through the inventory ledger, so a double-clicked
+  // transition (or a replay after the status flip already landed) moves
+  // nothing twice.
   //
   // The trigger is CROSSING THE BOUNDARY, not landing on one particular
   // status. Now that an order may go pending -> shipped directly, or come back
   // from cancelled to processing, keying the deduction off `next ===
-  // 'confirmed'` would have silently skipped it. Both operations are
-  // idempotent through the inventory ledger, so a correction that re-crosses
-  // the boundary moves nothing twice.
-  let stockNote: string | null = null;
+  // 'confirmed'` would have silently skipped it.
   const wasDeducted = STOCK_DEDUCTED_STATES.has(from);
   const nowDeducted = STOCK_DEDUCTED_STATES.has(next);
   if (!wasDeducted && nowDeducted) {
@@ -1455,9 +1574,6 @@ adminRoutes.patch('/orders/:id', async (c) => {
       // IS confirmed, and the stock needs a human.
       stockNote = `Stock could not be deducted for ${res.rejected} line(s) — check the product's stock before shipping.`;
     }
-  } else if (next === 'cancelled') {
-    const res = await returnOrderStock(c.env.DB, id, adminUser.id);
-    if (res.kind !== 'none') stockNote = `Stock ${res.kind}d for ${res.applied} row(s).`;
   }
 
   // Reversing a delivery does not un-grant what delivery granted. Say so
@@ -1477,31 +1593,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
   }
 
   if (next === 'cancelled') {
-    // Stock was already handled above through the inventory ledger, which
-    // knows whether the units were ever deducted. The raw "stock + qty" that
-    // used to live here could not, and handed back units on an order that was
-    // cancelled before confirmation — units it had never taken.
-    const stmts = [];
-    const walletCents = Number(order.wallet_applied_usd_cents) || 0;
-    if (walletCents > 0) {
-      stmts.push(
-        c.env.DB.prepare(
-          `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-           VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, 'admin', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
-        ).bind(`wtx_refund_${id}_usd`, order.user_id, walletCents, `Refund for cancelled order ${id}`, id)
-      );
-    }
-    const points = Number(order.points_discount_iqd) || 0;
-    if (points > 0) {
-      stmts.push(
-        c.env.DB.prepare(
-          `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-           VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'admin', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
-        ).bind(`wtx_refund_${id}_pts`, order.user_id, points, `Points refund for cancelled order ${id}`, id)
-      );
-    }
-    if (stmts.length > 0) await c.env.DB.batch(stmts);
-
+    // Money, points and stock were returned inside the cancellation batch
+    // above (orderCancelOps). What remains is not money:
     // A cancelled order can no longer qualify referral rewards keyed on it —
     // cancel any still-undecided ones (never touches available/reserved/
     // fulfilled rewards, which an admin decided explicitly).

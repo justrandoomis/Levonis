@@ -33,8 +33,9 @@ export interface DurableJobsReport {
   points_accruals: ReleaseSweepReport;
   /** Admin-group wallet notifications delivered/retried (§12.1). */
   wallet_notifications: ProcessReport;
-  /** Wallet invariant check (§11.4) — reports, never repairs. */
-  wallet_reconciliation: { anomalies: number; sums_match: boolean };
+  /** Wallet invariant check (§11.4) — reports, never repairs. `committed_holds_without_debit`
+   *  counts holds committed without their ledger debit (the pre-settlement-rule leak). */
+  wallet_reconciliation: { anomalies: number; sums_match: boolean; committed_holds_without_debit: number };
   /** Support-gift entitlement re-evaluation (§3.4). */
   support_gifts: SupportGiftReconciliation;
   /**
@@ -71,7 +72,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     pruned_sessions: 0,
     points_accruals: { scanned: 0, released: 0, points: 0, skipped: 0 },
     wallet_notifications: { sent: 0, failed: 0, dead: 0 },
-    wallet_reconciliation: { anomalies: 0, sums_match: true },
+    wallet_reconciliation: { anomalies: 0, sums_match: true, committed_holds_without_debit: 0 },
     support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
@@ -172,7 +173,11 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   //    by a cron job.
   await step('wallet_reconciliation', async () => {
     const rec = await reconcileWallets(env);
-    report.wallet_reconciliation = { anomalies: rec.anomalies.length, sums_match: rec.sums_match };
+    report.wallet_reconciliation = {
+      anomalies: rec.anomalies.length,
+      sums_match: rec.sums_match,
+      committed_holds_without_debit: rec.committed_holds_without_debit,
+    };
   });
 
   // 10. Support-gift entitlements (§3.4): re-evaluate the claims still waiting
