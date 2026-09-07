@@ -1,6 +1,6 @@
 # LEVONIS — Event Catalogue (canonical)
 
-Date: 2026-09-07. Base tree: `89e663e`. Companion to `01-TARGET.md` §5 and `02-MIGRATION-PLAN.md`. Schemas live in `packages/contracts/src/events/v1/<EventType>.ts` (new) with fixtures under `packages/contracts/src/events/fixtures/` (new); `tests/eventSchemas.test.ts` (new) round-trips every fixture and refuses a consumer in `packages/contracts/src/subscriptions.ts` (new) for an event without a schema.
+Date: 2026-09-07. Base tree: `69ee814`. Revision 2 (critiques applied: authenticated envelopes, `delivery` class, per-consumer queues, pump budgets, PII reclassification, `PurchaseCompleted` after payment). Companion to `01-TARGET.md` §5 and `02-MIGRATION-PLAN.md`. Schemas live in `packages/contracts/src/events/v1/<EventType>.ts` (new) with fixtures under `packages/contracts/src/events/fixtures/` (new); `tests/eventSchemas.test.ts` (new) round-trips every fixture, refuses a consumer in `packages/contracts/src/subscriptions.ts` (new) for an event without a schema, and refuses an event type without a `producers` entry.
 
 Nothing here is applied. Names marked **(new)** do not exist yet; every table, file and route name otherwise cited exists in the tree.
 
@@ -22,11 +22,15 @@ interface EventEnvelope<T = unknown> {
   aggregate_id: string;
   aggregate_seq: number;       // monotonically increasing per (aggregate_type, aggregate_id) — ordering within one aggregate
   pii_class: 'none' | 'pseudonymous' | 'personal';   // decides who may consume: Ads/Analytics accept only 'none' | 'pseudonymous'
+  delivery: 'transactional' | 'best_effort';         // transactional: outbox row in the business batch; best_effort: fire-and-forget RPC in waitUntil, never touches the producer's D1
   payload: T;                  // validated against the schema for (event_type, version); an allowlist, never a whole row
+  sig: string;                 // Ed25519 by the producer's <SVC>_SIGNING_KEY over the canonical envelope minus `sig` (kid in the JWS-style header)
 }
 ```
 
-Schema files export the TypeScript type, a hand-written `validate(payload): asserts payload is T` (no new runtime dependency), and a `pii: string[]` list naming payload fields that Analytics drops and Ads may only hash under consent. Field rules for every payload: amounts are integers as today (IQD dinars, USD cents, points); ids are opaque strings; never a password hash, token, secret, full phone, cost, margin, commission, admin note or free-text customer message.
+Schema files export the TypeScript type, a hand-written `validate(payload): asserts payload is T` (no new runtime dependency), a `pii: string[]` list naming payload fields that Analytics drops and Ads may only hash under consent, and a `delivery` default. Field rules for every payload: amounts are integers as today (IQD dinars, USD cents, points); ids are opaque strings; never a password hash, token, secret, full phone, cost, margin, commission, admin note or free-text customer message. **Rule for identifiers**: any `user_id`/`buyer_id`/`merchant_id`/`referee_id` field is `pii` unless the event is `pii_class:'none'` **and** its consumer set excludes Analytics and Ads; an event whose payload names a person and whose fact is sensitive (KYC outcome, risk flag, role, money movement, withdrawal) is `personal`.
+
+**Authentication.** `subscriptions.ts` carries, per event type, `producers: string[]` (e.g. `'SubscriptionChanged.v1': ['subscriptions', 'core']`). `defineConsumer` verifies `sig` against the producer's registered public key (`service_keys`, cached 5 min) and refuses an envelope whose `source_service` is not in `producers[event_type]`; in RPC mode it additionally requires the hop `iss` to be in that list. This holds regardless of transport — in queue mode there is no hop, and any Worker holding a producer binding could otherwise enqueue `SubscriptionChanged{to_tier:'gold', active:true}`, `RoleChanged`, `KycDecided{approved}` or `ReviewPosted` with fresh `event_id`s that `processed_events` would not catch. A refused envelope is recorded `result='forged'`, never retried, and emits `RiskFlagRaised` + `AuditRecorded`.
 
 ## 2. Producer, dispatcher, consumer rules
 
@@ -61,23 +65,26 @@ CREATE TABLE IF NOT EXISTS commerce_outbox_deliveries (   -- rpc mode only
 );
 ```
 
-Rules: the outbox INSERT is **inside the same `db.batch()` as the business write** (the pattern `notifyStatement` already uses, `worker/lib/notifications.ts:66-72`); `bus.publishStatement(env, envelope)` returns a `D1PreparedStatement` to append; the platform kit's `Uow` refuses to commit a command declared `publishes` without it. `ctx.waitUntil(bus.pump())` after the batch; the producer's cron is the safety net (the core: step 0 of `lib/jobs.ts`; new Workers: their own `* * * * *`). A `pump_lock` row (`UPDATE … WHERE locked_until < now`) keeps two isolates from double-dispatching the same batch. Envelope bodies are retained; pruning older than 180 days is an owner decision; delivery rows are kept.
+Rules: for `transactional` events the outbox INSERT is **inside the same `db.batch()` as the business write** (the pattern `notifyStatement` already uses, `worker/lib/notifications.ts:66-72`); `bus.publishStatement(env, envelope)` returns a `D1PreparedStatement` to append — **or nothing** when `EVENT_BUS_ENABLED` is `off` or the isolate's boot probe found no outbox table (so code can ship before its migration without breaking the batch it rides in); the platform kit's `Uow` refuses to commit a command declared `publishes` without it (when enabled). `best_effort` events never enter the outbox: `bus.emitBestEffort(envelope)` calls the subscribers' `deliver()` fire-and-forget in `waitUntil` (Analytics Engine sink later) and drops on failure — page-view-rate telemetry (`ProductViewed`, `AddToCart`, `CartCleared`, `FarmEvent` from a 20-s game poll, `RateLimitHit`, `SearchQueried`, `TurnstileFailed`) would otherwise cost 5–8 D1 writes per page view in the customer database for no transactional benefit.
+
+After the batch, `ctx.waitUntil(bus.pumpIds(eventIds))` delivers **only the events this request just committed** — no `pump_lock`, no `SELECT … WHERE dispatched_at IS NULL` on the shared single-writer database per request. The producer's cron (the core: step 0 of `lib/jobs.ts`, per minute from G2; new Workers: their own `* * * * *`) is the **only** `pump_lock` holder (`UPDATE … WHERE locked_until < now`) and sweeps whatever the post-request pumps missed. Envelope bodies are retained 180 days for `none`/`pseudonymous` events (pruning beyond that is an owner decision; delivery rows are kept); **acked `personal` envelopes (`AuditRecorded`) are pruned within 24 h** — while services share one D1, every Worker bound to it could otherwise read 180 days of audit detail in the producers' outboxes (D24).
 
 ### 2.2 Dispatcher
 
-- `RpcFanoutBus` (today): `pump` selects `dispatched_at IS NULL` in `seq` order (≤200), computes subscribers from `subscriptions.ts`, calls `env.<CONSUMER>.deliver(batch, hop)` per consumer (≤50 events per call), records per-consumer state; backoff `min(15 min, 5 s·2^attempts)` with jitter; after 8 attempts `state='dead'` (the DLQ is the deliveries table filtered by state); admin RPC `redeliver(event_id, consumer)` replays; `pump` caps at 200 events / 20 consumers per run.
-- `QueueBus` (when Queues exist): `pump` does `env.EVENTS_QUEUE.sendBatch(envelopes)` and marks `dispatched_at`; one queue `levonis-events` per environment; each consumer Worker declares `queues.consumers: [{ queue: 'levonis-events', max_batch_size: 50, max_batch_timeout: 5, max_retries: 8, dead_letter_queue: 'levonis-events-dlq' }]` and its `queue(batch)` handler calls the same `deliver()`. Type filtering happens in the consumer. A per-domain queue split (`levonis-events-money`) is a later config change.
-- Switch: `EVENT_BUS_MODE = 'rpc' | 'queue'` (var) + presence of the `EVENTS_QUEUE` binding. Producers and consumers do not change.
+- `RpcFanoutBus` (today): the cron `pump` selects `dispatched_at IS NULL` in `seq` order, computes subscribers from `subscriptions.ts`, calls `env.<CONSUMER>.deliver(batch, hop)` per consumer — **≤50 events and ≤500 KB serialised per call** (RPC arguments have a size ceiling; `OrderCreated` with items and `AuditRecorded` with a 4,000-char detail are the large ones) — and records delivery state with **one statement per `deliver()` call** (`UPDATE <svc>_outbox_deliveries SET state='acked', acked_at=? WHERE consumer=? AND event_id IN (…≤50 ids…)`, under D1's 100-bound-parameter cap), never one statement per event. **Budget per pump run: ≤600 D1 statements and ≤60 RPC calls** (D1 allows 1,000 queries per invocation on Paid; `waitUntil` work is cut ~30 s after the response); the run stops at the budget and the next minute continues. Backoff `min(15 min, 5 s·2^attempts)` with jitter; after 8 attempts `state='dead'` (the DLQ is the deliveries table filtered by state); admin RPC `redeliver(event_id, consumer)` replays. The post-request `pumpIds` uses the same `deliver()` and the same one-statement bookkeeping for the handful of ids it carries.
+- `QueueBus` (when Queues exist): **a Cloudflare Queue has exactly one consumer Worker**, so the topology is one queue per consumer service — `levonis-events-<consumer>` + `levonis-events-<consumer>-dlq` — fixed now so the switch is configuration later. Every producer declares `queues.producers: [{ binding: 'Q_<CONSUMER>', queue: 'levonis-events-<consumer>' }]` for each of its subscribers in `subscriptions.ts` (the eventSchemas test asserts it); `pump` calls `env.Q_<CONSUMER>.sendBatch(envelopes)` per subscriber in chunks of **≤100 messages / ≤256 KB** (the `sendBatch` cap), with a per-envelope check: a single message is capped at 128 KB, so an envelope above 100 KB stays in the outbox and a pointer `{event_id, producer}` is sent instead (the consumer fetches it via `PRODUCER.fetchEvent(event_id)`); each consumer Worker declares `queues.consumers: [{ queue: 'levonis-events-<consumer>', max_batch_size: 50, max_batch_timeout: 5, max_retries: 8, dead_letter_queue: 'levonis-events-<consumer>-dlq' }]` and its `queue(batch)` handler calls the same `deliver()`. Type filtering happens in the consumer. Cost: (write + read + delete) × subscribers per event, i.e. ~40 billable operations per `OrderCreated`; payload allowlists stay small (`items[]` carries `warranty_plan_id` and `ops_policy_id` references, §3.7).
+- Switch: `EVENT_BUS_MODE = 'rpc' | 'queue'` (var) + presence of the `Q_*` bindings. Producers' and consumers' code does not change; their wrangler files gain the queue declarations.
 
 ### 2.3 Consumer
 
 - `<svc>_processed_events (event_id TEXT PRIMARY KEY, consumer TEXT NOT NULL, processed_at TEXT NOT NULL, result TEXT)` (new, per consumer). `deliver()` inserts the row **in the same batch** as the side effect; a PK violation rejects the batch and the event is acked as `replayed`.
 - When the effect is a remote command (Referrals → `LEDGER.credit`), the command's `eventKey` is derived deterministically from the event (`ref_<event_id>`) or from the domain key (`wtx_review_<id>`), so a redelivery hits the callee's idempotency and returns `replayed`.
 - Money consumers (Ledger, Commerce, Inventory in Catalog, Payments) additionally keep **domain** idempotency (`ledger_idempotency`, `inventory_ledger.idempotency_key` (`0020_inventory_adjust_direction.sql:31`), `orders.idempotency_key` (`0001_init.sql:156`)) so correctness never depends on the event layer.
-- Retry only on transient failure (`deliver` throws or returns `{retry:true}`). A schema-invalid event is recorded `result='invalid'`, emits `EventRejected` to Audit and is never retried — a poison message cannot block the stream.
+- `deliver()` first verifies `sig` and `source_service ∈ producers[event_type]` (and hop `iss` in RPC mode) before touching any state.
+- Retry only on transient failure (`deliver` throws or returns `{retry:true}`). A schema-invalid event is recorded `result='invalid'`, a badly signed or wrong-producer one `result='forged'` (+ `RiskFlagRaised`); both emit `EventRejected` to Audit and are never retried — a poison message cannot block the stream.
 - Ordering: guaranteed per aggregate by `aggregate_seq` from one producer; consumers that keep projections apply "last `aggregate_seq` wins" and ignore stale sequences; no cross-aggregate ordering.
 - Replay: `bus.replay(env, {from_seq, to_seq, consumer})` re-delivers from the producer's outbox; safe by construction; Audit and Analytics can be rebuilt from every producer's outbox.
-- Observability: `PumpReport {selected, delivered, retried, dead}` logged with `cid`; deep health reports oldest pending event age per producer (alert at 5 minutes).
+- Observability: `PumpReport {selected, delivered, retried, dead, budget_hit}` logged with `cid` (unsampled); deep health reports oldest pending event age per producer (alert at 5 minutes for producers with a per-minute cron; 15 minutes for `source_service:'core'` until G2 adds the core's per-minute trigger).
 
 ### 2.4 Versioning
 
@@ -100,7 +107,7 @@ Producer names are the end-state services; until a service is extracted, the leg
 
 ### 3.1 `UserCreated` v1
 - **Producer**: Identity (`routes/auth.ts` signup paths incl. `:1505-1527` Telegram signup; email-first completion).
-- **Consumers**: Referrals (attribution — replaces the direct write at `auth.ts:206-221`), Notifications (verification mail), Analytics, Ads (`CompleteRegistration`, only under consent), Risk, Farm (display cache), Audit.
+- **Consumers**: Referrals (attribution — replaces the direct write at `auth.ts:206-221`), Notifications (verification mail), Analytics, Risk, Farm (display cache), Audit. Not Ads: `CompleteRegistration` is mapped from the first `UserUpdated{marketing_consent:'ads'}` (§4), because no consent exists at signup.
 - **Aggregate**: `user` / `user_id` / seq 1. **pii_class**: `pseudonymous`.
 
 | Field | Type | pii | Notes |
@@ -110,13 +117,13 @@ Producer names are the end-state services; until a service is extracted, the leg
 | `locale` | `'ar'\|'en'\|'ckb'` | | |
 | `referrer_code` | `string \| null` | | the code entered at signup; Referrals resolves it |
 | `email_verified` | `boolean` | | |
-| `email_hash` | `string \| null` | pii | SHA-256 of the normalised email, for Ads matching under consent only |
 | `created_at` | `string` | | |
 
+No contact hash here: at signup `marketing_consent` is necessarily `none`, so a hash would reach Ads before any consent exists. Hashes travel only in `UserUpdated` on a consent change (§4), produced by Identity.
 - **Idempotency**: consumers key on `event_id`; Referrals' attribution insert is UNIQUE on `(referee_id)` in `referral_attributions`.
 
-### 3.2 `ProductViewed` v1
-- **Producer**: Catalog (`routes/products.ts` public product read), sampled 1:1 for signed-in users, 1:5 anonymous.
+### 3.2 `ProductViewed` v1 (`delivery: best_effort`)
+- **Producer**: Catalog (`routes/products.ts` public product read), sampled 1:1 for signed-in users, 1:5 anonymous; never written to an outbox.
 - **Consumers**: Analytics, Ads (`ViewContent`, aggregated per product per hour for anonymous viewers), Loyalty (browse mission — replaces the app-wide ping only when the mission rule allows), Search (popularity).
 - **Aggregate**: `product` / `product_id`. **pii_class**: `pseudonymous`.
 
@@ -173,8 +180,8 @@ Never: `product_cost_iqd`, `cost_iqd`, `cost_adjust_iqd`, margins (DECISIONS row
 
 - **Idempotency**: `op_id` (UNIQUE in `inventory_ledger`).
 
-### 3.5 `AddToCart` v1
-- **Producer**: Cart (`routes/cart.ts` add / quantity increase).
+### 3.5 `AddToCart` v1 (`delivery: best_effort`)
+- **Producer**: Cart (`routes/cart.ts` add / quantity increase); never written to an outbox.
 - **Consumers**: Analytics, Ads (`AddToCart`, under consent).
 - **Aggregate**: `cart` / `user_id`. **pii_class**: `pseudonymous`.
 
@@ -206,17 +213,19 @@ Never: `product_cost_iqd`, `cost_iqd`, `cost_adjust_iqd`, margins (DECISIONS row
 - **Idempotency**: `event_id`; at most one per `session_id` (the producer checks).
 
 ### 3.7 `OrderCreated` v1
-- **Producer**: Orders — inside the order batch (today `routes/orders.ts:1318-1493`; step 6 of the saga later); store orders via `ORDERS.createMerchantOrder`.
-- **Consumers**: Fulfilment (init stage — replaces inline `initOrderStage`), Invoices (replaces the synchronous `createInvoiceForOrder` call at `orders.ts:1556`), Notifications (customer + admin Telegram), Payments (settlement row), Loyalty (accrual planning), Referrals, Merchants (projection for `seller_type='merchant'`), Coupons (commit), Analytics, Ads (as `PurchaseCompleted` when prepaid — see 3.14), Risk, Chat (order-room eligibility), Audit.
+- **Producer**: Orders — inside the fenced order batch (today `routes/orders.ts:1318-1493`; step 6 of the saga later, i.e. **before** the debit commits); store orders via `ORDERS.createMerchantOrder`.
+- **Consumers**: Notifications (customer + admin Telegram "order received"), Loyalty (accrual planning), Referrals, Merchants (projection for `seller_type='merchant'`), Coupons (commit), Analytics, Risk, Chat (order-room eligibility), Audit. **Not** a consumer of anything that presumes payment: Fulfilment beyond `init` (`initOrderStage` and `createInvoiceForOrder` stay synchronous RPCs in saga step 8 — the SPA reads `invoice_no` and the stage right after placing), Invoices' mail, Merchants' payout credit and Ads' `PurchaseCompleted` subscribe to `PaymentCompleted`/`OrderPaid` (prepaid) or `OrderDelivered` (COD) — otherwise a saga that ends `compensated` or `stuck` after step 6 would have started fulfilment and reported a sale (`01-TARGET.md` §6.6).
 - **Aggregate**: `order` / `order_id` / seq 1. **pii_class**: `pseudonymous` (address by reference).
 
 | Field | Type | pii | Notes |
 |---|---|---|---|
 | `order_id` | `string` | | |
-| `user_id` | `string` | | |
+| `user_id` | `string` | pii | dropped by Analytics; Analytics keys on `user_hash` |
+| `user_hash` | `string` | | daily-salted |
 | `seller_type` | `'platform'\|'merchant'` | | |
 | `merchant_id`, `store_id` | `string \| null` | | |
-| `items` | `{ order_item_id: string; product_id: string; qty: number; unit_price_iqd: number; is_printer: boolean; warranty_snapshot: object \| null; ops_policy: object \| null }[]` | | what Devices needs on delivery |
+| `payment_state` | `'authorized'\|'cod'` | | `authorized` = hold placed, debit not yet committed; `paid` arrives as `OrderPaid` |
+| `items` | `{ order_item_id: string; product_id: string; qty: number; unit_price_iqd: number; is_printer: boolean; warranty_plan_id: string \| null; ops_policy_id: string \| null }[]` | | references, not snapshots — a large order with whole `warranty_snapshot`/`ops_policy` objects per line approaches the 128 KB queue-message cap; Devices reads the snapshot from `OrderDelivered` (3.13), which carries it by reference + `ORDERS.itemSnapshots(orderId)` |
 | `totals` | `{ merchandise_iqd: number; delivery_iqd: number; discount_iqd: number; total_iqd: number }` | | |
 | `payment` | `{ method: 'wallet'\|'cash'; wallet_usd_cents: number; points: number; cod_iqd: number; exchange_rate: number }` | | |
 | `shipping_type` | `string` | | |
@@ -229,6 +238,11 @@ Never: `product_cost_iqd`, `cost_iqd`, `cost_adjust_iqd`, margins (DECISIONS row
 
 Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`, `admin_note` (assessment HIGH: internal commission must not leak).
 - **Idempotency**: `order_id`; Invoices' `createInvoiceForOrder` is replay-safe; Fulfilment's `initOrderStage` is conditional on no existing stage row.
+
+### 3.7b `OrderPaid` v1
+- **Producer**: Orders — its `PaymentCompleted` consumer flips `orders.payment_state='paid'` (conditional on `authorized`) in the same batch as this outbox row.
+- **Consumers**: Fulfilment (proceed past `init`), Invoices (mail), Merchants (payout credit on store orders), Ads/Analytics (as `PurchaseCompleted`, 3.14), Notifications.
+- **Aggregate**: `order` / `order_id`. **pii_class**: `none`. Payload `{ order_id, ledger_tx_ids, paid_at }`. **Idempotency**: `order_id`.
 
 ### 3.8 `PaymentAuthorized` v1
 - **Producer**: Ledger (a purchase/escrow hold placed — `createPurchaseHold`, `walletOps.ts:301`) or Payments (a PSP authorisation later).
@@ -249,7 +263,7 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 
 ### 3.9 `PaymentCompleted` v1
 - **Producer**: Ledger (`commitHoldAndDebit`, direct debit, deposit approved via `decideDeposit`) or Payments (COD settlement recorded, escrow released, PSP capture later).
-- **Consumers**: Orders (settlement flag), Ads (`Purchase` when `order_id` is set and the order is prepaid — see 3.14), Analytics, Notifications, Risk, Merchants (payout credit on store orders), Subscriptions (launch activation on deposit), Audit.
+- **Consumers**: Orders (flips `payment_state='paid'` and emits `OrderPaid`, 3.7b — the fact everything payment-dependent hangs on), Analytics, Notifications, Risk, Subscriptions (launch activation on deposit), Audit. Ads and Merchants do **not** consume it directly: they follow `OrderPaid`/`PurchaseCompleted`, so the order aggregate stays the single place that decides "paid".
 - **Aggregate**: `wallet` / `user_id`. **pii_class**: `none`.
 
 | Field | Type | Notes |
@@ -325,7 +339,7 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 | `seller_type` | `'platform'\|'merchant'` | |
 | `merchant_id` | `string \| null` | |
 | `delivered_at` | `string` | |
-| `items` | as `OrderCreated.items` | carried so Devices never reads `orders`/`order_items` |
+| `items` | as `OrderCreated.items` (references: `warranty_plan_id`, `ops_policy_id`) | Devices never reads `orders`/`order_items`; it fetches the frozen `warranty_snapshot`/`ops_policy` objects for the printer lines through `ORDERS.itemSnapshots(orderId)` (read-only RPC, idempotent), keeping the envelope well under the 128 KB queue cap |
 | `payment_method` | `'wallet'\|'cash'` | |
 | `cod_amount_iqd` | `number \| null` | |
 | `by` | `'admin'\|'merchant'\|'courier'\|'customer_confirm'` | |
@@ -333,21 +347,20 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 - **Idempotency**: `order_id` (one delivery per order); Devices' units are UNIQUE on `(order_item_id, unit_index)`.
 
 ### 3.14 `PurchaseCompleted` v1 (conversion fact for Ads/Analytics; PII-free)
-- **Producer**: Orders — on `OrderCreated` for prepaid orders (wallet-settled), on `OrderDelivered` for COD (owner decision D20). Never emitted from Checkout code; Ads is purely a bus consumer.
+- **Producer**: Orders — on **`OrderPaid`** for prepaid orders (the debit has committed), on `OrderDelivered` for COD (owner decision D20). Never on `OrderCreated`, never emitted from Checkout code; Ads is purely a bus consumer.
 - **Consumers**: Ads (`Purchase`), Analytics.
 - **Aggregate**: `order` / `order_id`. **pii_class**: `pseudonymous`.
 
 | Field | Type | pii | Notes |
 |---|---|---|---|
 | `order_id` | `string` | | doubles as the provider `event_id` for dedup |
+| `user_hash` | `string` | | stable (not daily-salted) hash Ads joins against `ads_consent_snapshots` to find the contact hashes Identity supplied under consent |
 | `value_iqd` | `number` | | |
 | `currency` | `'IQD'` | | |
 | `content_ids` | `string[]` | | product ids |
 | `num_items` | `number` | | |
-| `email_hash` | `string \| null` | pii | SHA-256 of normalised email, produced by Orders via `IDENTITY.lookupContacts` in memory, only when consent is `ads` |
-| `phone_hash` | `string \| null` | pii | SHA-256 of E.164 phone, same rule |
-| `consent` | `'none'\|'analytics'\|'ads'` | | |
 
+No `email_hash`/`phone_hash` here: Commerce never holds a contacts permission. Identity hashes on consent change (`UserUpdated`, §4) and Ads joins locally; without an `ads` snapshot the delivery is recorded `no_consent` and no identifier leaves the platform.
 - **Idempotency**: `order_id`; Ads records `ads_deliveries(order_id, provider)` UNIQUE.
 
 ### 3.15 `ReferralUsed` v1
@@ -367,7 +380,7 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 
 ### 3.16 `SubscriptionChanged` v1 (alias `MembershipChanged`)
 - **Producer**: Subscriptions (purchase, expiry via cron — replaces the write-on-read in `lib/entitlements.ts:70-75,125-131`, cancellation, gift, admin override, launch activation).
-- **Consumers**: Identity (updates its `users.membership_tier`/`subscription_plan`/`subscription_expiry` columns — the only writer of `users`), Catalog (tier cache), Referrals, Ads (`Subscribe` when `to_tier` is active), Analytics, Notifications, Audit.
+- **Consumers**: Identity (updates its `users.membership_tier`/`subscription_plan`/`subscription_expiry` columns — the only writer of `users`; the consumer lives in the core's `IdentityEntrypoint` from Phase 6b, the slice that removes the write-on-read, and moves with Identity in Phase 9), Catalog (tier cache), Referrals, Ads (`Subscribe` when `to_tier` is active), Analytics, Notifications, Audit. `producers: ['subscriptions', 'core']` — verified by signature on every delivery.
 - **Aggregate**: `membership` / `user_id`. **pii_class**: `none`.
 
 | Field | Type | Notes |
@@ -388,11 +401,11 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 
 | Event | Producer | Payload (v1, allowlist) | Consumers | pii_class | Idempotency key |
 |---|---|---|---|---|---|
-| `UserUpdated` | Identity | `{ user_id, username, name, avatar_key, locale, marketing_consent }` | Farm, Marketplace, Chat, Ads (consent snapshot), Analytics | pseudonymous | `(user_id, aggregate_seq)` |
-| `SessionRevoked` | Identity | `{ user_id, sid_hash, reason }` | Gateway (cache eviction), Studio (later; replaces the 60-s liveness poll) | none | `sid_hash` |
-| `RoleChanged` | Identity | `{ user_id, role, admin_scope, is_investor, actor_id }` | Audit, Gateway cache | none | `(user_id, aggregate_seq)` |
+| `UserUpdated` | Identity | `{ user_id, user_hash, username, name, avatar_key, locale, marketing_consent, email_hash (pii), phone_hash (pii) }` — the hashes are present **only** when `marketing_consent` changed to `ads`, computed by Identity in memory | Farm, Marketplace, Chat, Ads (consent snapshot keyed by `user_hash`; drops the hashes at ingest unless consent is `ads`), Analytics (drops `user_id` and hashes) | pseudonymous | `(user_id, aggregate_seq)` |
+| `SessionRevoked` | Identity | `{ user_id, sid_hash, reason }` | Gateway (cache eviction, from Phase 3), Studio (later; replaces the 60-s liveness poll) | none | `sid_hash` |
+| `RoleChanged` | Identity | `{ user_id, role, admin_scope, is_investor, actor_id }` | Audit, Gateway cache — **never Analytics** | personal | `(user_id, aggregate_seq)` |
 | `AddressChanged` | Identity | `{ user_id, address_id, is_default }` | KYC (approved-address check), Subscriptions | none | `(address_id, seq)` |
-| `KycDecided` | KYC | `{ user_id, case_id, decision, decided_by }` | Notifications, Subscriptions, Risk, Audit | none | `case_id` |
+| `KycDecided` | KYC | `{ user_id, case_id, decision, decided_by }` | Notifications, Subscriptions, Risk, Audit — never Analytics/Ads | personal | `case_id` |
 | `ApprovedAddressChanged` | KYC | `{ user_id, address_id }` | Subscriptions | none | `(user_id, seq)` |
 | `ProductArchived` | Products | `{ product_id, slug }` | Catalog, Search, Cart, Files (orphan sweep) | none | `product_id` |
 | `PriceChanged` | Pricing | `{ product_id, scope, field, old, new, mode, effective_at }` | Catalog cache, Cart (re-quote flag), Refunds (price-protection eligibility), Search, Analytics | none | `(product_id, scope, effective_at)` — never cost fields |
@@ -400,16 +413,16 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 | `ImportApplied` | Products | `{ import_id, rows, created, updated, failed }` | Analytics, Audit | none | `import_id` |
 | `SettingChanged` | Config | `{ key, version, public: boolean }` | every service memo, Gateway cache version, Ads flags, Audit | none | `(key, version)` |
 | `FlagChanged` | Config | `{ name, version }` | Gateway, Ads | none | `(name, version)` |
-| `CartCleared` | Cart | `{ user_hash, reason: 'checkout'\|'manual' }` | Analytics | pseudonymous | `event_id` |
+| `CartCleared` (best_effort) | Cart | `{ user_hash, reason: 'checkout'\|'manual' }` | Analytics | pseudonymous | `event_id` |
 | `OrderCancelled` | Orders | `{ order_id, by: 'customer'\|'admin'\|'merchant'\|'system', reason, refund: { usd_cents, points } }` | Ledger (reconciliation only — the refund is a synchronous command), Inventory, Coupons, Referrals, Merchants, Fulfilment, Notifications, Analytics, Risk | none | `order_id` |
 | `StageChanged` | Fulfilment | `{ order_id, from_stage, to_stage, next_stage_at, actor_kind }` | Orders (status mirror + `OrderDelivered` relay), Notifications, Realtime | none | `(order_id, seq)` |
 | `ShipmentCreated` / `CourierStatusChanged` | Fulfilment (Shipping) | `{ order_id, courier, courier_order_id, status_raw, status_mapped }` | Fulfilment stage machine, Analytics | none | `(courier_order_id, status_raw)` |
 | `LabelPrinted` | Fulfilment | `{ order_id, actor_id }` | Audit | none | `event_id` |
 | `ReturnApproved` | Refunds | `{ case_id, order_id, order_item_id, qty, reason_class }` | Inventory (restore), Referrals, Loyalty (reverse), Notifications | none | `case_id` |
 | `CouponRedeemed` / `CouponReleased` | Coupons | `{ coupon_id, code, order_id, user_id }` | Analytics, Audit | none | `(coupon_id, order_id)` |
-| `DepositRequested` | Payments | `{ request_id, user_id, usd_cents, method, receipt_key_present }` | Notifications (admin group), Risk, Files (receipt visibility) | none | `request_id` |
-| `DepositDecided` | Payments | `{ request_id, user_id, decision, decided_by, usd_cents }` | Notifications (customer + Telegram edit), Risk, Audit | none | `request_id` |
-| `WithdrawalStateChanged` | Payments | `{ withdrawal_id, user_id, from, to, usd_cents }` | Notifications, Risk, Audit | none | `(withdrawal_id, to)` |
+| `DepositRequested` | Payments | `{ request_id, user_id, usd_cents, method, receipt_key_present, approval_nonce }` — the nonce's hash is stored by Ledger in `wallet_deposit_meta.approval_nonce_hash`; Notifications renders it into the Telegram buttons and returns it in `LEDGER.decideDeposit` (`01-TARGET.md` §6.5) | Notifications (admin group), Risk, Files (receipt visibility) — never Analytics | personal | `request_id` |
+| `DepositDecided` | Payments | `{ request_id, user_id, decision, decided_by, usd_cents }` | Notifications (customer + Telegram edit), Risk, Audit — never Analytics | personal | `request_id` |
+| `WithdrawalStateChanged` | Payments | `{ withdrawal_id, user_id, from, to, usd_cents }` | Notifications, Risk, Audit — never Analytics | personal | `(withdrawal_id, to)` |
 | `WalletHoldPlaced` / `WalletHoldReleased` | Ledger | `{ hold_id, user_id, kind, currency, amount, event_key }` | Analytics, Risk | none | `event_key` |
 | `LedgerEntryPosted` | Ledger | `{ tx_id, user_id, currency, type, amount, event_key, source_service }` | Audit (hash chain), Analytics | none | `tx_id` |
 | `BalanceAnomaly` | Ledger (`reconcile`) | `{ user_id, currency, sum, cached, held_active, kind }` | Risk, Audit, Notifications (admin) | none | `(user_id, currency, run_id)` |
@@ -434,58 +447,85 @@ Never: `commission_percent_x100`, `platform_fee_iqd`, `merchant_receivable_iqd`,
 | `InvoiceIssued` | Invoices | `{ invoice_id, order_id, user_id, total_iqd }` | Notifications (email), Analytics | none | `invoice_id` |
 | `PolicyPublished` / `PolicyAccepted` | Policies | `{ document_id, version, hash }` / `{ user_id, document_id, version }` | Gateway cache, Checkout, Audit | none | `(document_id, version)` / `(user_id, document_id, version)` |
 | `TicketOpened` / `TicketStateChanged` | Support | `{ ticket_id, user_id, from, to }` | Notifications, Analytics | none | `(ticket_id, seq)` |
-| `RestrictionChanged` / `RiskFlagRaised` | Risk | `{ user_id, case_id, flags[], level, reasons[] }` | Subscriptions (pricing context), Ledger (deposit review), Support, Gateway (`RISK_FLAGS`), Audit | none | `(user_id, seq)` |
+| `RestrictionChanged` / `RiskFlagRaised` | Risk | `{ user_id, case_id, flags[], level, reasons[] }` | Subscriptions (pricing context), Ledger (deposit review), Support, Gateway (`RISK_FLAGS`), Audit — never Analytics | personal | `(user_id, seq)` |
 | `ChatMessageSent` | Chat | `{ chat_id, message_id, sender_hash, recipient_ids[] }` — no content | Notifications, Realtime | pseudonymous | `message_id` |
 | `NotificationSent` / `NotificationFailed` | Notifications | `{ event_key, channel, provider_status }` | Analytics, Audit | none | `event_key` |
 | `TelegramCallbackReceived` | Notifications (webhook ingress) | `{ update_id, kind: 'identity'\|'wallet_approval', token_hash }` | Identity (link/OTP), Ledger (`decideDeposit`) — as commands, the event is for audit | none | `update_id` (`telegram_updates`) |
 | `FileUploaded` / `FileDeleted` | Files | `{ key, owner_service, owner_id, purpose, bytes }` | Audit, Analytics | none | `key` |
 | `ImportJobQueued` / `IngestCompleted` | Catalog / Files | `{ job_id, urls: number, stored: number }` | Audit | none | `job_id` |
-| `FarmEvent` | Farm | `{ user_hash, kind, coins_delta }` | Analytics | pseudonymous | `event_id` (the farm's own ledger ids remain the game's replay memory) |
-| `SearchQueried` | Search | `{ query_hash, scope, lang, results }` | Analytics | none | `event_id` |
-| `RateLimitHit` / `TurnstileFailed` | Gateway (sampled) | `{ class, key_hash, route_class, host_kind }` | Risk, Analytics | none | `event_id` |
+| `FarmEvent` (best_effort) | Farm | `{ user_hash, kind, coins_delta }` | Analytics | pseudonymous | `event_id` (the farm's own ledger ids remain the game's replay memory) |
+| `SearchQueried` (best_effort) | Search | `{ query_hash, scope, lang, results }` | Analytics | none | `event_id` |
+| `RateLimitHit` / `TurnstileFailed` (best_effort) | Gateway (sampled) | `{ class, key_hash, route_class, host_kind }` | Risk, Analytics | none | `event_id` |
 | `AdConversionSent` / `AdConversionFailed` | Ads | `{ provider, event_type, source_event_id, status }` | Audit, Analytics | none | `(provider, source_event_id)` |
-| `AuditRecorded` | every service via the `audit()` facade | `{ actor_id, action, target, detail (≤4000 chars, no secrets/tokens), source_service }` | Audit only | personal | `event_id` |
+| `AuditRecorded` | every service via the `audit()` facade | `{ actor_id, action, target, detail_hash, detail_ref, source_service }` — the `detail` body (≤4000 chars, no secrets/tokens) is **not** in the outbox envelope: the facade writes it to the producer's `<svc>_audit_details` row (pruned once acked, ≤24 h) and the pump hands it to Audit in the same `deliver()` call; Audit stores it under the hash-chained row | Audit only | personal | `event_id` |
 | `EventRejected` | any consumer | `{ event_id, consumer, reason }` | Audit | none | `(event_id, consumer)` |
 
 ---
 
 ## 5. PII rules
 
-1. `pii_class` on the envelope gates delivery: the bus never delivers `personal` to a consumer whose `defineConsumer({piiMax})` is `pseudonymous` (Ads, Analytics, Search, Farm).
-2. Per-field `pii` annotations in the schema are dropped mechanically by Analytics at ingest and used by Ads only under consent (`ads_consent_snapshots`).
-3. Hashing is done by the producer in memory (SHA-256 of normalised lowercase email / E.164 phone; daily-salted user hash for uniqueness counts); raw contacts never enter an event.
+1. `pii_class` on the envelope gates delivery: the bus never delivers `personal` to a consumer whose `defineConsumer({piiMax})` is `pseudonymous` (Ads, Analytics, Search, Farm). **Any `user_id`-shaped payload field is `pii` unless the event is `pii_class:'none'` and its consumer set excludes Analytics and Ads**; `tests/eventSchemas.test.ts` enforces the rule over the catalogue.
+2. Per-field `pii` annotations in the schema are dropped mechanically by Analytics at ingest and used by Ads only under consent (`ads_consent_snapshots`); Ads drops them **before persistence** when the snapshot is not `ads`.
+3. Hashing of contacts is done by **Identity** (the owner of the contacts) in memory on a consent change (SHA-256 of normalised lowercase email / E.164 phone); the daily-salted user hash for uniqueness counts is computed by each producer; raw contacts never enter an event, and no producer other than Identity ever reads them.
 4. Never in any payload: password hashes, tokens, secrets, full phone numbers, full addresses (address by reference), cost/margin/commission, admin notes, free-text customer messages (chat content, ticket bodies, complaint text).
-5. `AuditRecorded` is the one `personal` event; only Audit consumes it; Audit reads are scope-gated (`admin:full`).
-6. Retention: envelope bodies in outboxes are kept ≥180 days (pruning is an owner decision); Analytics raw events roll 30 days, rollups indefinitely; Audit is append-only.
+5. `personal` events — `AuditRecorded`, `KycDecided`, `RoleChanged`, `RiskFlagRaised`/`RestrictionChanged`, `DepositRequested`/`DepositDecided`, `WithdrawalStateChanged` — go to Audit, Risk, Notifications, Ledger, Subscriptions, Support and the gateway only, never to Analytics or Ads; Audit reads are scope-gated (`admin:full`). Analytics consumes an explicit allowlist (§6), not a wildcard.
+6. Retention: envelope bodies of `none`/`pseudonymous` events in outboxes are kept ≥180 days (pruning beyond that is an owner decision); acked `personal` envelopes and `<svc>_audit_details` rows are pruned within 24 h (D24); Analytics raw events roll 30 days, rollups indefinitely; Audit is append-only.
+7. Every envelope is signed by its producer and every consumer checks the producer allowlist (§1); a consumer never applies a privilege-granting event on transport trust alone.
 
 ---
 
 ## 6. Subscriptions seed (`packages/contracts/src/subscriptions.ts`, Phases 1–3)
 
 ```ts
+// consumers per event type — no wildcard: Analytics is listed explicitly where it may read
 export const SUBSCRIPTIONS: Record<string, string[]> = {
-  '*':                        ['analytics'],                       // wildcard; pii gate applies
-  'UserCreated.v1':           ['notifications', 'ads', 'risk', 'audit'],
-  'ProductViewed.v1':         ['ads', 'search'],
-  'ProductAdded.v1':          ['search'],
-  'InventoryChanged.v1':      ['search'],
-  'AddToCart.v1':             ['ads'],
-  'CheckoutStarted.v1':       ['ads', 'risk'],
-  'OrderCreated.v1':          ['notifications', 'ads', 'risk', 'audit'],
-  'PaymentAuthorized.v1':     ['risk'],
-  'PaymentCompleted.v1':      ['ads', 'notifications', 'risk', 'audit'],
-  'PaymentFailed.v1':         ['risk', 'notifications'],
-  'RefundCompleted.v1':       ['notifications', 'risk', 'audit'],
-  'OrderStatusChanged.v1':    ['notifications'],
-  'OrderDelivered.v1':        ['notifications'],
-  'PurchaseCompleted.v1':     ['ads'],
-  'ReferralUsed.v1':          ['notifications', 'risk'],
-  'SubscriptionChanged.v1':   ['ads', 'notifications'],
-  'RequestPublished.v1':      ['notifications'],
+  'UserCreated.v1':           ['notifications', 'risk', 'audit', 'analytics'],          // no ads: no consent can exist at signup
+  'UserUpdated.v1':           ['ads', 'analytics'],                                     // consent snapshot; Farm/Marketplace/Chat later
+  'ProductViewed.v1':         ['ads', 'search', 'analytics'],                           // best_effort
+  'ProductAdded.v1':          ['search', 'analytics'],
+  'InventoryChanged.v1':      ['search', 'analytics'],
+  'AddToCart.v1':             ['ads', 'analytics'],                                     // best_effort
+  'CheckoutStarted.v1':       ['ads', 'risk', 'analytics'],
+  'OrderCreated.v1':          ['notifications', 'risk', 'audit', 'analytics'],          // never ads
+  'OrderPaid.v1':             ['notifications', 'analytics'],
+  'PaymentAuthorized.v1':     ['risk', 'analytics'],
+  'PaymentCompleted.v1':      ['notifications', 'risk', 'audit', 'analytics'],
+  'PaymentFailed.v1':         ['risk', 'notifications', 'analytics'],
+  'RefundCompleted.v1':       ['notifications', 'risk', 'audit', 'analytics'],
+  'OrderStatusChanged.v1':    ['notifications', 'analytics'],
+  'OrderDelivered.v1':        ['notifications', 'analytics'],
+  'PurchaseCompleted.v1':     ['ads', 'analytics'],                                     // produced on OrderPaid / OrderDelivered
+  'ReferralUsed.v1':          ['notifications', 'risk', 'analytics'],
+  'SubscriptionChanged.v1':   ['ads', 'notifications', 'analytics'],                    // + 'identity' from Phase 6b
+  'RequestPublished.v1':      ['notifications', 'analytics'],
+  'SessionRevoked.v1':        ['gateway'],
+  'RoleChanged.v1':           ['audit', 'gateway'],                                     // personal — never analytics
+  'DepositRequested.v1':      ['notifications', 'risk'],                                // personal
+  'DepositDecided.v1':        ['notifications', 'risk', 'audit'],                       // personal
+  'WithdrawalStateChanged.v1':['notifications', 'risk', 'audit'],                       // personal
   'AuditRecorded.v1':         ['audit'],
-  'RateLimitHit.v1':          ['risk'],
-  'TurnstileFailed.v1':       ['risk'],
+  'RateLimitHit.v1':          ['risk', 'analytics'],                                    // best_effort
+  'TurnstileFailed.v1':       ['risk', 'analytics'],                                    // best_effort
+  'EventRejected.v1':         ['audit'],
+};
+
+// producers per event type — verified by signature on every delivery, in rpc and queue mode alike
+export const PRODUCERS: Record<string, string[]> = {
+  'UserCreated.v1': ['identity', 'core'], 'UserUpdated.v1': ['identity', 'core'], 'SessionRevoked.v1': ['identity', 'core'],
+  'RoleChanged.v1': ['identity', 'core'],
+  'ProductViewed.v1': ['catalog', 'core'], 'ProductAdded.v1': ['catalog', 'core'], 'InventoryChanged.v1': ['catalog', 'core'],
+  'AddToCart.v1': ['commerce', 'core'], 'CheckoutStarted.v1': ['commerce', 'marketplace', 'core'],
+  'OrderCreated.v1': ['commerce', 'core'], 'OrderPaid.v1': ['commerce', 'core'], 'OrderStatusChanged.v1': ['commerce', 'core'],
+  'OrderDelivered.v1': ['commerce', 'core'], 'PurchaseCompleted.v1': ['commerce', 'core'],
+  'PaymentAuthorized.v1': ['ledger', 'core'], 'PaymentCompleted.v1': ['ledger', 'core'], 'PaymentFailed.v1': ['ledger', 'commerce', 'core'],
+  'RefundCompleted.v1': ['ledger', 'core'], 'DepositRequested.v1': ['ledger', 'core'], 'DepositDecided.v1': ['ledger', 'core'],
+  'WithdrawalStateChanged.v1': ['ledger', 'core'],
+  'ReferralUsed.v1': ['referrals', 'core'], 'SubscriptionChanged.v1': ['subscriptions', 'core'],
+  'RequestPublished.v1': ['marketplace', 'core'],
+  'RateLimitHit.v1': ['gateway'], 'TurnstileFailed.v1': ['gateway'],
+  'AuditRecorded.v1': ['*'],            // every service, through the audit() facade; still signed by the emitting service
+  'EventRejected.v1': ['*'],
 };
 ```
 
-Each later phase appends consumers (Phase 4: `invoices` on `OrderCreated`; Phase 6: `referrals`, `subscriptions`, `reviews`; Phase 7: `fulfilment`, `devices`, `commerce` consumers; Phase 9: `identity` on `SubscriptionChanged`). `tests/eventSchemas.test.ts` asserts every consumer named here is a `services` binding of the producer (rpc mode) or a declared queue consumer (queue mode).
+Each later phase appends consumers (Phase 4: `invoices` on `OrderPaid`, `risk` on the remaining money events; **Phase 6b: `identity` on `SubscriptionChanged`** (the core's `IdentityEntrypoint.deliver`, moving to `levonis-identity` in Phase 9); Phase 6: `referrals`, `subscriptions`, `reviews`; Phase 7: `fulfilment`, `devices`, `commerce` consumers) and removes `'core'` from a type's `producers` once its emitter has left the core. `tests/eventSchemas.test.ts` asserts every consumer named here is a `services` binding of the producer (rpc mode) or has a declared `Q_<CONSUMER>` producer binding and its own queue (queue mode), that every event type has a `producers` entry, that no `personal` event lists `analytics`/`ads`/`search`/`farm`, and that every `best_effort` event is `none`/`pseudonymous`.
