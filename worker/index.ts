@@ -49,6 +49,8 @@ import { communityReviewRoutes } from './routes/merchantReviews';
 import { communityFavoriteRoutes } from './routes/communityFavorites';
 import { adminCommunityRoutes } from './routes/adminCommunity';
 import { bundlesRoutes, adminBundlesRoutes } from './routes/bundles';
+import { farmRoutes } from './routes/farm';
+import { farmAdminRoutes } from './routes/farmAdmin';
 
 const app = new Hono<AppContext>();
 
@@ -117,8 +119,16 @@ app.route('/api/community', communityRoutes);
 app.route('/api/chats', chatRoutes);
 app.route('/api/profile', profileRoutes);
 app.route('/api/uploads', uploadRoutes);
+// LEVO Printer Farm — the player API. Mounted before the '/api' misc catch-all
+// so nothing there can shadow it; its one public route (the leaderboard) is
+// registered inside the module ahead of its own requireAuth.
+app.route('/api/farm', farmRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
+// The farm's balancing console. Under /api/admin/* on purpose: the apex-only
+// host guard above covers it, and the generic settings PUT refuses its key so
+// this normalising, versioned, audited route is the only way to change it.
+app.route('/api/admin/farm', farmAdminRoutes);
 app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);

@@ -3,6 +3,7 @@ import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
 import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type PrintMaterial } from './printPricing';
 import { DEFAULT_MATCH_WEIGHTS, type MatchWeights } from './printMatching';
 import { DEFAULT_LINK_PROVIDERS, type LinkProviderConfig } from './externalModels';
+import { FARM_CONFIG_DEFAULTS, type FarmConfig } from './farm/config';
 
 /** Typed access to the admin_settings key/value store, with safe defaults. */
 
@@ -250,6 +251,21 @@ export const SETTING_DEFAULTS = {
    * and where to ask MakerWorld about it. Nothing is scraped, ever.
    */
   printLinkProviders: DEFAULT_LINK_PROVIDERS as LinkProviderConfig[],
+
+  /**
+   * LEVO PRINTER FARM — every number the game runs on (docs/PRINTER_FARM.md
+   * §5): prices, rates, probabilities, rewards, deadlines, thresholds, limits.
+   * One versioned document; defaults live in worker/lib/farm/config.ts (a leaf
+   * module) and are normalised on every read.
+   *
+   * NOT PUBLIC: `limits` and `rewards` are anti-abuse and Points budgets, and
+   * the game serves players `publicFarmConfig(cfg)` from its own route.
+   * NOT WRITABLE through the generic PUT /api/admin/settings/:key either — the
+   * farm admin route (/api/admin/farm/config) is the only write path, because
+   * it is the one that normalises, checks `farmConfigProblems`, bumps `version`
+   * and audits before/after per section.
+   */
+  printerFarmConfig: FARM_CONFIG_DEFAULTS as FarmConfig,
 };
 
 /**

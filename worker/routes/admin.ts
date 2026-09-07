@@ -1696,6 +1696,15 @@ adminRoutes.put('/settings/:key', async (c) => {
   const adminUser = c.get('user')!;
   const key = c.req.param('key') as SettingKey;
   if (!SETTING_KEYS.includes(key)) throw badRequest('Unknown setting');
+  // The farm's balancing document has exactly one write path — the route that
+  // normalises it, refuses an unusable one, bumps its version and audits the
+  // change per section. Storing it raw here would bypass all four.
+  if (key === 'printerFarmConfig') {
+    throw badRequest(
+      'إعدادات مزرعة الطابعات تُحرَّر من مسارها الخاص / Use PUT /api/admin/farm/config/:section for the printer farm configuration',
+      'FARM_CONFIG_ROUTE'
+    );
+  }
   const body = await c.req.json().catch(() => ({}));
   let value = body.value as unknown;
 
