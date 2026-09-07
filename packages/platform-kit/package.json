@@ -1,0 +1,20 @@
+{
+  "name": "@levonis/platform-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The platform kit every LEVONIS Worker is built on: structured logging with correlation ids, UUIDv7 correlation, Ed25519 principals and hop envelopes (WebCrypto), the RPC client (budget, retry-on-idempotent, circuit breaker), fetchWithBudget, the owned-tables D1 guard, inList chunking, the transactional outbox and the RpcFanoutBus/QueueBus dispatchers, defineConsumer with processed_events idempotency, the idempotency store, config/feature-flag readers, rate-limiter adapters, the audit() facade, health, sagas, admin scope, realtime and process adapters, and byte-identical copies of the core's edge libraries (hosts, securityPolicy, middleware) plus gatewayOnly().",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./edge/*": "./src/edge/*.ts"
+  },
+  "dependencies": {
+    "@levonis/contracts": "*",
+    "hono": "^4.9.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  }
+}

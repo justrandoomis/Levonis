@@ -28,6 +28,8 @@
     "node_modules",
     "worker",
     "tests",
-    "studio"
+    "studio",
+    "packages",
+    "services"
   ]
 }

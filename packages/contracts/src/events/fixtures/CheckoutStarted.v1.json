@@ -1,0 +1,34 @@
+{
+  "event_id": "01a07b4f-9440-760c-bafb-9b59be184dea",
+  "event_type": "CheckoutStarted",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:08.000Z",
+  "source_service": "commerce",
+  "correlation_id": "01a07b4e-8aa0-7fb9-b61a-6dfaa4faf26f",
+  "causation_id": null,
+  "actor_id": "usr_01",
+  "aggregate_type": "checkout",
+  "aggregate_id": "idem_9f2",
+  "aggregate_seq": 1,
+  "pii_class": "pseudonymous",
+  "delivery": "transactional",
+  "payload": {
+    "session_id": "idem_9f2",
+    "user_hash": "e0e441f2d1f5666802a0d8a140bb0b6c458ac21dafd2d4e1ab8e274171d6d428",
+    "lines": [
+      {
+        "product_id": "prd_bambu_a1",
+        "qty": 1
+      }
+    ],
+    "totals": {
+      "items_iqd": 899000,
+      "delivery_iqd": 5000,
+      "discount_iqd": 0,
+      "grand_iqd": 904000
+    },
+    "payment_method": "wallet",
+    "seller_type": "platform"
+  },
+  "sig": "fixture"
+}

@@ -1,0 +1,24 @@
+{
+  "event_id": "01a07b4f-d2c0-7a45-af6a-b6f80105d5bc",
+  "event_type": "AuditRecorded",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:24.000Z",
+  "source_service": "ledger",
+  "correlation_id": "01a07b4e-8aa0-7137-aa27-6f9f69831231",
+  "causation_id": null,
+  "actor_id": "usr_admin",
+  "aggregate_type": "audit",
+  "aggregate_id": "aud_01",
+  "aggregate_seq": 1,
+  "pii_class": "personal",
+  "delivery": "transactional",
+  "payload": {
+    "actor_id": "usr_admin",
+    "action": "wallet.credit",
+    "target": "usr_01",
+    "detail_hash": "5f3b3137d88f498b65704f4554465403a34def4af349b91addd8614825f90226",
+    "detail_ref": "aud_01",
+    "source_service": "ledger"
+  },
+  "sig": "fixture"
+}

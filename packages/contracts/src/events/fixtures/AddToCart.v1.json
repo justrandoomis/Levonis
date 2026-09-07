@@ -1,0 +1,24 @@
+{
+  "event_id": "01a07b4f-9058-77ff-a7b6-0ca5d2117a70",
+  "event_type": "AddToCart",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:07.000Z",
+  "source_service": "commerce",
+  "correlation_id": "01a07b4e-8aa0-7d35-8c5b-2cb1db6ae57b",
+  "causation_id": null,
+  "actor_id": "usr_01",
+  "aggregate_type": "cart",
+  "aggregate_id": "usr_01",
+  "aggregate_seq": 1,
+  "pii_class": "pseudonymous",
+  "delivery": "best_effort",
+  "payload": {
+    "user_hash": "e0e441f2d1f5666802a0d8a140bb0b6c458ac21dafd2d4e1ab8e274171d6d428",
+    "product_id": "prd_bambu_a1",
+    "line_key": "prd_bambu_a1::",
+    "qty": 1,
+    "seller_type": "platform",
+    "price_iqd_snapshot": 899000
+  },
+  "sig": "fixture"
+}

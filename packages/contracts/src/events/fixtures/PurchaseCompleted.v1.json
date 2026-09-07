@@ -1,0 +1,26 @@
+{
+  "event_id": "01a07b4f-a7c8-79ad-afce-146e70106b34",
+  "event_type": "PurchaseCompleted",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:13.000Z",
+  "source_service": "commerce",
+  "correlation_id": "01a07b4e-8aa0-7ce4-ab61-c977c327b74d",
+  "causation_id": null,
+  "actor_id": null,
+  "aggregate_type": "order",
+  "aggregate_id": "ord_01",
+  "aggregate_seq": 1,
+  "pii_class": "pseudonymous",
+  "delivery": "transactional",
+  "payload": {
+    "order_id": "ord_01",
+    "user_hash": "fd7f00b62d225a902278575fd1addcd2633ee9def3b5b1593ef19982d355c1fa",
+    "value_iqd": 904000,
+    "currency": "IQD",
+    "content_ids": [
+      "prd_bambu_a1"
+    ],
+    "num_items": 1
+  },
+  "sig": "fixture"
+}

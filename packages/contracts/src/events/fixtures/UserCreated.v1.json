@@ -1,0 +1,24 @@
+{
+  "event_id": "01a07b4f-7500-764b-bb76-1966ea90879f",
+  "event_type": "UserCreated",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:00.000Z",
+  "source_service": "identity",
+  "correlation_id": "01a07b4e-8aa0-7adc-9e65-8572acd93734",
+  "causation_id": null,
+  "actor_id": "usr_01",
+  "aggregate_type": "user",
+  "aggregate_id": "usr_01",
+  "aggregate_seq": 1,
+  "pii_class": "pseudonymous",
+  "delivery": "transactional",
+  "payload": {
+    "user_id": "usr_01",
+    "method": "email_first",
+    "locale": "ar",
+    "referrer_code": "ALI-7F2K",
+    "email_verified": false,
+    "created_at": "2026-09-07T10:00:00.000Z"
+  },
+  "sig": "fixture"
+}

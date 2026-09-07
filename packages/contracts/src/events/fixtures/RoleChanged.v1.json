@@ -1,0 +1,23 @@
+{
+  "event_id": "01a07b4f-80b8-7c64-8c36-5d7e8ed83316",
+  "event_type": "RoleChanged",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:03.000Z",
+  "source_service": "identity",
+  "correlation_id": "01a07b4e-8aa0-7642-bcac-74b48648651e",
+  "causation_id": null,
+  "actor_id": "usr_admin",
+  "aggregate_type": "user",
+  "aggregate_id": "usr_02",
+  "aggregate_seq": 1,
+  "pii_class": "personal",
+  "delivery": "transactional",
+  "payload": {
+    "user_id": "usr_02",
+    "role": "admin",
+    "admin_scope": "assistant",
+    "is_investor": false,
+    "actor_id": "usr_admin"
+  },
+  "sig": "fixture"
+}

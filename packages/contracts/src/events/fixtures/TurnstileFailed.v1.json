@@ -1,0 +1,22 @@
+{
+  "event_id": "01a07b4f-da90-79ff-87af-54e270d34e40",
+  "event_type": "TurnstileFailed",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:26.000Z",
+  "source_service": "gateway",
+  "correlation_id": "01a07b4e-8aa0-7dab-a65f-2e742205fa80",
+  "causation_id": null,
+  "actor_id": null,
+  "aggregate_type": "gateway",
+  "aggregate_id": "gw",
+  "aggregate_seq": 1,
+  "pii_class": "none",
+  "delivery": "best_effort",
+  "payload": {
+    "class": "auth",
+    "key_hash": "072a319ead46b94a7998a742b7a60321a7e8dcc4b23d28757702bdfa4aeac178",
+    "route_class": "auth",
+    "host_kind": "main"
+  },
+  "sig": "fixture"
+}

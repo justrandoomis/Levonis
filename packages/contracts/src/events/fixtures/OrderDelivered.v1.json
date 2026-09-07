@@ -1,0 +1,37 @@
+{
+  "event_id": "01a07b4f-a3e0-7829-ab08-5964c859e4e5",
+  "event_type": "OrderDelivered",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:12.000Z",
+  "source_service": "commerce",
+  "correlation_id": "01a07b4e-8aa0-7b5f-ac44-7bd17a31df08",
+  "causation_id": null,
+  "actor_id": "usr_admin",
+  "aggregate_type": "order",
+  "aggregate_id": "ord_01",
+  "aggregate_seq": 1,
+  "pii_class": "pseudonymous",
+  "delivery": "transactional",
+  "payload": {
+    "order_id": "ord_01",
+    "user_id": "usr_01",
+    "seller_type": "platform",
+    "merchant_id": null,
+    "delivered_at": "2026-09-07T10:00:00.000Z",
+    "items": [
+      {
+        "order_item_id": "oi_01",
+        "product_id": "prd_bambu_a1",
+        "qty": 1,
+        "unit_price_iqd": 899000,
+        "is_printer": true,
+        "warranty_plan_id": "wp_12",
+        "ops_policy_id": null
+      }
+    ],
+    "payment_method": "wallet",
+    "cod_amount_iqd": null,
+    "by": "admin"
+  },
+  "sig": "fixture"
+}

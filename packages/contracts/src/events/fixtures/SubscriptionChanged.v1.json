@@ -1,0 +1,26 @@
+{
+  "event_id": "01a07b4f-caf0-745f-bf6c-ec66a0c944b8",
+  "event_type": "SubscriptionChanged",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:22.000Z",
+  "source_service": "subscriptions",
+  "correlation_id": "01a07b4e-8aa0-7ab2-85bc-bfef7476ef36",
+  "causation_id": null,
+  "actor_id": "usr_01",
+  "aggregate_type": "membership",
+  "aggregate_id": "usr_01",
+  "aggregate_seq": 1,
+  "pii_class": "none",
+  "delivery": "transactional",
+  "payload": {
+    "user_id": "usr_01",
+    "from_tier": "free",
+    "to_tier": "plus",
+    "plan_id": "plan_plus_m",
+    "membership_id": "mem_01",
+    "active": true,
+    "expires_at": "2026-10-07T10:00:00.000Z",
+    "reason": "purchased"
+  },
+  "sig": "fixture"
+}

@@ -1,0 +1,26 @@
+{
+  "$comment": "The reviewed snapshot of worker/OWNERSHIP.tolerance.json (table + writer only). It is only ever SHRUNK by a reviewed commit: a new foreign write in the core must be a deliberate change here, never a silent addition there.",
+  "entries": [
+    { "table": "wallet_transactions", "writer": "worker/routes/orders.ts#POST /" },
+    { "table": "points_reservations", "writer": "worker/routes/orders.ts#POST /" },
+    { "table": "products", "writer": "worker/lib/inventory.ts#applyInventory" },
+    { "table": "product_option_values", "writer": "worker/lib/inventory.ts#applyInventory" },
+    { "table": "product_colors", "writer": "worker/lib/inventory.ts#applyInventory" },
+    { "table": "product_variants", "writer": "worker/lib/inventory.ts#applyInventory" },
+    { "table": "wallet_transactions", "writer": "worker/lib/orderCancelOps.ts#cancelledOrderRefundStatements" },
+    { "table": "points_reservations", "writer": "worker/lib/orderCancelOps.ts#cancelledOrderRefundStatements" },
+    { "table": "points_accruals", "writer": "worker/lib/orderCancelOps.ts#cancelledOrderRefundStatements" },
+    { "table": "wallet_transactions", "writer": "worker/routes/returns.ts#POST /admin/:id/transition" },
+    { "table": "wallet_transactions", "writer": "worker/routes/returns.ts#POST /admin/claims/:id/decide" },
+    { "table": "wallet_transactions", "writer": "worker/routes/admin.ts#PATCH /orders/:id" },
+    { "table": "wallet_transactions", "writer": "worker/routes/admin.ts#POST /wallet/credit" },
+    { "table": "orders", "writer": "worker/routes/storeOrders.ts#POST /" },
+    { "table": "orders", "writer": "worker/routes/merchant.ts#POST /orders/:id/status" },
+    { "table": "orders", "writer": "worker/lib/orderStageOps.ts#moveOrderStage" },
+    { "table": "orders", "writer": "worker/lib/orderStageOps.ts#initOrderStage" },
+    { "table": "orders", "writer": "worker/lib/delivery/sync.ts#syncOrderDelivery" },
+    { "table": "users", "writer": "worker/lib/entitlements.ts#getTierStatus" },
+    { "table": "users", "writer": "worker/routes/rewards.ts#POST /checkin" },
+    { "table": "users", "writer": "worker/routes/admin.ts#PATCH /users/:id" }
+  ]
+}

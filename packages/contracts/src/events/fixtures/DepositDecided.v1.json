@@ -1,0 +1,23 @@
+{
+  "event_id": "01a07b4f-bf38-7838-82ab-38a5d60cbe64",
+  "event_type": "DepositDecided",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:19.000Z",
+  "source_service": "ledger",
+  "correlation_id": "01a07b4e-8aa0-7e73-be7c-805b665d6f91",
+  "causation_id": null,
+  "actor_id": "usr_admin",
+  "aggregate_type": "wallet",
+  "aggregate_id": "usr_01",
+  "aggregate_seq": 1,
+  "pii_class": "personal",
+  "delivery": "transactional",
+  "payload": {
+    "request_id": "dep_01",
+    "user_id": "usr_01",
+    "decision": "approved",
+    "decided_by": "usr_admin",
+    "usd_cents": 10000
+  },
+  "sig": "fixture"
+}

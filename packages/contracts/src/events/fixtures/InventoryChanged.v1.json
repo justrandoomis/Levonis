@@ -1,0 +1,29 @@
+{
+  "event_id": "01a07b4f-8c70-7efd-8d16-3463004b2080",
+  "event_type": "InventoryChanged",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:06.000Z",
+  "source_service": "catalog",
+  "correlation_id": "01a07b4e-8aa0-78e7-ac0c-89ea93da485a",
+  "causation_id": null,
+  "actor_id": null,
+  "aggregate_type": "product",
+  "aggregate_id": "prd_bambu_a1",
+  "aggregate_seq": 1,
+  "pii_class": "none",
+  "delivery": "transactional",
+  "payload": {
+    "product_id": "prd_bambu_a1",
+    "scope": {
+      "table": "products",
+      "id": "prd_bambu_a1"
+    },
+    "delta": -1,
+    "stock_after": 4,
+    "reserved_after": 1,
+    "reason": "reserve",
+    "op_id": "inv_ord_01",
+    "order_id": "ord_01"
+  },
+  "sig": "fixture"
+}

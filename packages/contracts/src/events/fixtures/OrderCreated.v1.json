@@ -1,0 +1,56 @@
+{
+  "event_id": "01a07b4f-9828-7a89-bc46-ff21490718e3",
+  "event_type": "OrderCreated",
+  "version": 1,
+  "created_at": "2026-09-07T10:00:09.000Z",
+  "source_service": "commerce",
+  "correlation_id": "01a07b4e-8aa0-7dc4-8f88-dbd7135dd1d3",
+  "causation_id": null,
+  "actor_id": "usr_01",
+  "aggregate_type": "order",
+  "aggregate_id": "ord_01",
+  "aggregate_seq": 1,
+  "pii_class": "pseudonymous",
+  "delivery": "transactional",
+  "payload": {
+    "order_id": "ord_01",
+    "user_id": "usr_01",
+    "user_hash": "e0e441f2d1f5666802a0d8a140bb0b6c458ac21dafd2d4e1ab8e274171d6d428",
+    "seller_type": "platform",
+    "merchant_id": null,
+    "store_id": null,
+    "payment_state": "authorized",
+    "items": [
+      {
+        "order_item_id": "oi_01",
+        "product_id": "prd_bambu_a1",
+        "qty": 1,
+        "unit_price_iqd": 899000,
+        "is_printer": true,
+        "warranty_plan_id": "wp_12",
+        "ops_policy_id": null
+      }
+    ],
+    "totals": {
+      "merchandise_iqd": 899000,
+      "delivery_iqd": 5000,
+      "discount_iqd": 0,
+      "total_iqd": 904000
+    },
+    "payment": {
+      "method": "wallet",
+      "wallet_usd_cents": 61500,
+      "points": 0,
+      "cod_iqd": 0,
+      "exchange_rate": 1470
+    },
+    "shipping_type": "direct",
+    "address_snapshot_ref": "adr_01",
+    "coupon_code": null,
+    "membership_gift": false,
+    "referral_delivery_waived": false,
+    "idempotency_key": "idem_9f2",
+    "created_at": "2026-09-07T10:00:00.000Z"
+  },
+  "sig": "fixture"
+}
