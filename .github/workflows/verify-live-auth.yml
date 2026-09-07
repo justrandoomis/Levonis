@@ -303,7 +303,10 @@ jobs:
             --file /tmp/identity.sql > /tmp/insert.json 2>/tmp/insert.err \
             || { echo "::error::the INSERT failed"; sed -n '1,10p' /tmp/insert.err >&2; rm -f /tmp/identity.sql; exit 1; }
           rm -f /tmp/identity.sql
-          jq -e '.[0].success == true' /tmp/insert.json > /dev/null \
+          # `--file` mode prints wrangler's progress line on stdout BEFORE the JSON
+          # (run 10: "jq: parse error: Invalid numeric literal" while the row was
+          # in fact inserted), so the JSON is read from its first bracket onward.
+          sed -n '/^[[{]/,$p' /tmp/insert.json | jq -e '.[0].success == true' > /dev/null \
             || { echo "::error::D1 did not report success for the INSERT"; exit 1; }
 
           # Exactly one row for this run's tag, unverified, with a pbkdf2 hash —
