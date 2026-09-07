@@ -36,7 +36,7 @@ jobs:
           # of its own paths, so a 200 here means the route exists and the app
           # is reachable; which component renders is asserted by the browser
           # suite (scripts/e2e-guest.mjs) at build time.
-          for p in / /products /bundles /community /requests /chats /subscription /points /tools /games /leaderboards /policies /support; do
+          for p in / /products /bundles /community /requests /chats /subscription /points /tools /games /leaderboards /games/printer-farm /policies /support; do
             code=$(curl -s -o /tmp/page.html -w '%{http_code}' --max-time 25 "$APEX$p" || echo 000)
             if [ "$code" = "200" ]; then
               echo "  ok   $p answers 200 to a guest"
@@ -65,6 +65,13 @@ jobs:
           probe /api/community/products      'the community products'
           probe /api/community/requests      'the community requests'
           probe /api/memberships/plans       'the membership plans'
+          # The Printer Farm's one public read: the leaderboard, public fields only.
+          probe '/api/farm/leaderboard?board=reputation' 'the farm leaderboard'
+          if grep -q '"success":true' /tmp/body.json && ! grep -qE '"(email|user_id|coins|phone)"' /tmp/body.json; then
+            echo '  ok   the farm leaderboard is a success body with public fields only'
+          else
+            echo "  FAIL the farm leaderboard body is not the public shape: $(head -c 200 /tmp/body.json)"; fail=1
+          fi
           # And the personal ones must still refuse.
           refuse() {
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$APEX$1" || echo 000)
@@ -78,6 +85,8 @@ jobs:
           refuse /api/wallet            'someone’s wallet'
           refuse /api/addresses         'someone’s addresses'
           refuse /api/community/followed 'someone’s followed stores'
+          refuse /api/farm/state        'someone’s printer farm'
+          refuse /api/admin/farm/config 'the farm balancing console'
           exit $fail
 
       - name: The shipped bundle carries the guest sign-in helper
