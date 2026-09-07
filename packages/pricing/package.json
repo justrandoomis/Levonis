@@ -1,0 +1,14 @@
+{
+  "name": "@levonis/pricing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure pricing engine shared by the core and, from Phase 5, the Catalog deployable: price resolution, the member ladder, price grid, pinned prices, cheapest base, shipping types, payment policy, availability and warranty-plan arithmetic. No I/O, no Cloudflare bindings, no imports from worker/ or services/.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  }
+}
