@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import AdminCoupons from '../components/adminCoupons/AdminCoupons';
 import AdminDelivery from '../components/adminDelivery/AdminDelivery';
@@ -22,6 +22,7 @@ import AdminSerials from '../components/AdminSerials';
 import AdminReviews from '../components/AdminReviews';
 import AdminKyc from '../components/AdminKyc';
 import AdminMemberships from '../components/AdminMemberships';
+import AdminFarmConfig from '../components/adminFarm/AdminFarmConfig';
 import DashboardLayout from '../components/DashboardLayout';
 
 type AdminTab =
@@ -43,7 +44,8 @@ type AdminTab =
   | 'memberships'
   | 'coupons'
   | 'delivery'
-  | 'community';
+  | 'community'
+  | 'printer_farm';
 
 /**
  * Mirrors ORDER_TRANSITIONS in worker/routes/admin.ts, which is the authority
@@ -445,7 +447,7 @@ function AdminOrders() {
 }
 
 export default function Admin() {
-  const { t, dir } = useLanguage();
+  const { t, dir, loc } = useLanguage();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
 
   const sidebarItems = [
@@ -468,6 +470,7 @@ export default function Admin() {
     { id: 'coupons', icon: Ticket, label: dir === 'rtl' ? 'أكواد الخصم' : 'Promo codes' },
     { id: 'delivery', icon: Truck, label: dir === 'rtl' ? 'التوصيل المحلي' : 'Local delivery' },
     { id: 'community', icon: Store, label: dir === 'rtl' ? 'مجتمع ليفو' : 'Levo Community' },
+    { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر') },
   ];
 
   return (
@@ -540,6 +543,8 @@ export default function Admin() {
         {activeTab === 'delivery' && <AdminDelivery dir={dir} />}
 
         {activeTab === 'community' && <AdminCommunity dir={dir} />}
+
+        {activeTab === 'printer_farm' && <AdminFarmConfig />}
       </div>
     </DashboardLayout>
   );
