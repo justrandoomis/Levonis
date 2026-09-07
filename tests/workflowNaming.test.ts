@@ -304,3 +304,61 @@ test('an unobservable provider response fails the run rather than passing quietl
     'the final gate must require a real zero — "not captured" is not evidence of delivery'
   );
 });
+
+/**
+ * Since the email-first sign-up (migration 0051) POST /register opens no
+ * account, so the live-auth scenario cannot get its user from it: the workflow
+ * inserts the run's identity into the live database with the Worker's own
+ * hash algorithm, the scenario signs in, and /register is checked for what it
+ * now promises — a uniform 200 with no session — while the database proves
+ * the rest by counts. Run 9 of workflow 15 failed for exactly this reason,
+ * with nothing wrong on the site; these pins keep the three parts agreeing.
+ */
+test('the live-auth identity is inserted with the Worker\'s hash algorithm, and the scenario signs in rather than registering', () => {
+  // Shell continuations (`\` + newline) are joined first, so a flag on the
+  // next physical line still belongs to its command.
+  const lines = read('verify-live-auth.yml')
+    .replace(/\\\n\s*/g, ' ')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => !l.startsWith('#'));
+  const hashAt = lines.findIndex((l) => /node scripts\/live-auth-identity\.mjs --sql /.test(l));
+  assert.ok(hashAt >= 0, 'the workflow no longer produces the identity with scripts/live-auth-identity.mjs');
+  const maskAt = lines.findIndex((l) => /::add-mask::\$HASH/.test(l));
+  assert.ok(maskAt > hashAt, 'the hash must be masked right after it is produced');
+  const insertAt = lines.findIndex((l) => /wrangler d1 execute levonis-db-staging --remote --env staging .*--file/.test(l));
+  assert.ok(insertAt > maskAt, 'the INSERT must run from a file, after the mask');
+  assert.ok(!lines.some((l) => /--command .*INSERT INTO/i.test(l)), 'never an inline INSERT — argv would carry the hash');
+  assert.ok(!lines.some((l) => /node scripts\/live-auth-identity\.mjs.*\$(TEST_PASSWORD|\{TEST_PASSWORD)/.test(l)),
+    'the password reaches the script through the environment, never argv');
+
+  const scenario = readFileSync(new URL('../scripts/e2e-live-auth.mjs', import.meta.url), 'utf8');
+  assert.match(scenario, /\/api\/auth\/login/, 'the scenario must sign in');
+  assert.match(scenario, /pending_email === true/, 'the scenario must assert the email-first body');
+  assert.match(scenario, /SIGNUP_EMAIL/, 'the sign-up probe uses its own address');
+  const register = scenario.slice(scenario.indexOf("'/api/auth/register'"));
+  assert.ok(!/userId = body\?\.user\?\.id/.test(register), 'the user id must not come from /register any more');
+  assert.match(read('verify-live-auth.yml'), /SIGNUP_EMAIL: \$\{\{ steps\.identity\.outputs\.signup_addr \}\}/,
+    'the workflow must hand the scenario the second address');
+});
+
+test('the outbox step proves the email-first sign-up from the database, by counts only, and the gate includes the identity step', () => {
+  const yml = read('verify-live-auth.yml');
+  assert.match(yml, /FROM pending_signups WHERE email LIKE '%\+\$\{SIGNUP_TAG\}@%'/, 'the pending row must be counted by the sign-up tag');
+  assert.match(yml, /FROM users WHERE email LIKE '%\+\$\{SIGNUP_TAG\}@%'/, 'the absence of a users row for the sign-up address must be asserted');
+  assert.match(yml, /payload LIKE '%\$\{APEX\}\/auth\?finish=%'/, 'the sign-up link must be proved on APEX, inside a predicate');
+  assert.match(yml, /\[ "\$SIGNUP_USERS" = "0" \]/, 'the step must fail when /register opened an account');
+  assert.match(yml, /\[ "\$SIGNUP_PENDING" = "1" \]/, 'exactly one pending row, not "at least one"');
+
+  // Every d1 query the workflow runs must be a count or a state listing. A
+  // payload, token hash or event key leaving the database would print a live
+  // credential (or its hash) into the log.
+  for (const line of yml.split('\n')) {
+    const list = /SELECT\s+(.*?)(?:\s+FROM\b|$)/.exec(line)?.[1];
+    if (list === undefined) continue;
+    assert.ok(!/^\*/.test(list.trim()), `a SELECT * would print row contents: ${line.trim()}`);
+    assert.ok(!/\b(payload|token_hash|event_key|password_hash|email)\b/.test(list),
+      `a credential- or identity-bearing column is selected: ${line.trim()}`);
+  }
+  assert.match(yml, /\[ "\$\{\{ steps\.account\.outcome \}\}" = "success" \]/, 'the final gate must include the identity step');
+});

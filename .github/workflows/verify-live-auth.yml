@@ -11,18 +11,29 @@
 # ---------------------------------------------------------------------------
 # Verifies, against the REAL origins, that Studio sign-on works, that logging
 # out of the main site takes Studio access with it, that the handoff refuses
-# everything it is supposed to refuse, and that Resend actually accepted a
-# password-reset email and a verification email.
+# everything it is supposed to refuse, that sign-up is email-first (POST
+# /register opens no account and sets no session), and that Resend actually
+# accepted a password-reset email, a verification email and a sign-up link.
 #
-# WHAT IT WRITES. One throwaway account, with a run-scoped plus-tagged address
-# derived from EMAIL_TEST_RECIPIENT so the two real emails land in the owner's
-# inbox and are identifiable. It buys nothing, touches no wallet, no order and
-# no ledger. Everything else it does is a GET or a SELECT.
+# WHAT IT WRITES. One throwaway account, INSERTED into the live database by
+# this workflow — one `users` row, unverified, its password hashed with the
+# Worker's own PBKDF2 parameters by scripts/live-auth-identity.mjs — because
+# since the email-first sign-up (migration 0051) POST /register creates no
+# account, and the link that would is in an inbox nothing here may read. One
+# pending_signups row for a SECOND run-scoped address, left to expire in 24 h
+# the way every unfinished sign-up is. Both addresses are plus-tagged variants
+# of EMAIL_TEST_RECIPIENT, so the THREE real emails — the account's password
+# reset and verification, the second address's sign-up link — land in the
+# owner's inbox and are identifiable by their tags. It buys nothing, touches
+# no wallet, no order and no ledger. Everything else it does is a GET or a
+# SELECT. Nothing is deleted afterwards: the account stays, as every earlier
+# run's did, and the pending row expires on its own.
 #
-# WHAT IT NEVER PRINTS. No secret value, and no token: a password-reset link
-# and a verification link are live credentials, so they are asserted with SQL
-# predicates that return booleans and never with anything that echoes them.
-# The generated account address and password are masked before first use.
+# WHAT IT NEVER PRINTS. No secret value, and no token: a password-reset link,
+# a verification link and a sign-up link are live credentials, so they are
+# asserted with SQL predicates that return counts and never with anything
+# that echoes them. The generated addresses, the password and its hash are
+# masked before first use; the INSERT travels in a file, never in argv.
 name: 15 - Verify Live Auth (SSO, logout liveness, Resend)
 
 on:
@@ -214,19 +225,97 @@ jobs:
           fi
           echo "test inbox taken from the $SOURCE repository secret (value masked)"
           echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          # Lowercased, because that is what the Worker does to every address
+          # it stores or mails (worker/lib/http.ts email()): the row inserted
+          # below must be the row /login and /forgot-password will find.
+          BASE=$(printf '%s' "$BASE" | tr 'A-Z' 'a-z')
           LOCAL="${BASE%@*}"
           DOMAIN="${BASE#*@}"
           TAG="levo-e2e-${GITHUB_RUN_ID}"
           ADDR="${LOCAL}+${TAG}@${DOMAIN}"
+          # A SECOND address for the email-first sign-up probe. Its tag extends
+          # the first, and every query below matches `+<tag>@` on both sides, so
+          # neither address's rows can ever be counted as the other's.
+          SIGNUP_TAG="${TAG}-signup"
+          SIGNUP_ADDR="${LOCAL}+${SIGNUP_TAG}@${DOMAIN}"
           PASS="Lv-$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')-e2e"
-          # Masked before either is used anywhere, so neither can reach the log.
+          # Masked before any of them is used anywhere, so none can reach the log.
           echo "::add-mask::$ADDR"
+          echo "::add-mask::$SIGNUP_ADDR"
           echo "::add-mask::$PASS"
           echo "addr=$ADDR" >> "$GITHUB_OUTPUT"
+          echo "signup_addr=$SIGNUP_ADDR" >> "$GITHUB_OUTPUT"
           echo "pass=$PASS" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "A throwaway address was generated with the plus-tag +$TAG."
-          echo "The address itself is masked; the tag is what the outbox is searched by."
+          echo "signup_tag=$SIGNUP_TAG" >> "$GITHUB_OUTPUT"
+          echo "Two throwaway addresses were generated: plus-tag +$TAG (the account) and +$SIGNUP_TAG (the sign-up probe)."
+          echo "The addresses themselves are masked; the tags are what the database is searched by."
+
+      # THE ACCOUNT, INSERTED. Since the email-first sign-up (migration 0051)
+      # POST /register creates nothing in `users`: it holds a pending row and
+      # mails a link, and the account is born only when the person holding the
+      # link chooses a password. The token is stored hashed, so nothing here
+      # can follow that link — and a workflow that could would be reading the
+      # owner's inbox. So the identity is created the way the database ends up
+      # after a finished sign-up, minus the verified stamp: one row, the
+      # Worker's own PBKDF2 parameters (scripts/live-auth-identity.mjs mirrors
+      # worker/lib/crypto.ts, and tests/liveAuthIdentity.test.ts proves its
+      # hash opens under the Worker's verifyPassword), email_verified_at NULL
+      # so the verification mail below is a real send. The hash is masked the
+      # moment it exists, the INSERT travels in a file (never argv), and the
+      # password reaches the script through the environment only. Run 9 is
+      # why: register answered 200 with no session, and every later check
+      # failed for want of a user, not for anything wrong on the site.
+      - name: Create the throwaway account in the live database
+        id: account
+        continue-on-error: true
+        env:
+          TEST_EMAIL: ${{ steps.identity.outputs.addr }}
+          TEST_PASSWORD: ${{ steps.identity.outputs.pass }}
+          TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          set -e
+          echo "created=unknown" >> "$GITHUB_OUTPUT"
+
+          # wrangler resolves a D1 database through wrangler.jsonc, whose
+          # database_id is a committed *-PLACEHOLDER that the deploy workflows
+          # fill in first (the trap workflow 12 and this file's outbox step both
+          # hit). Filled once here; the outbox step repeats it only if needed.
+          if grep -q 'STAGING-DB-ID-PLACEHOLDER' wrangler.jsonc; then
+            ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+            [ -n "$ID" ] || { echo "::error::levonis-db-staging not found on this account"; exit 1; }
+            echo "::add-mask::$ID"
+            STAGING_DB_ID="$ID" node scripts/set-deploy-ids.mjs --env staging
+          fi
+
+          # The script reads the password from the environment, writes the
+          # INSERT to the file and prints the hash alone — masked before the
+          # next command runs.
+          HASH=$(node scripts/live-auth-identity.mjs --sql /tmp/identity.sql)
+          echo "::add-mask::$HASH"
+          if printf '%s' "$HASH" | grep -Eq '^pbkdf2[$]100000[$]'; then
+            echo "password hash produced with the Worker's parameters (pbkdf2, 100000 iterations); value masked"
+          else
+            echo "::error::the identity script did not produce a pbkdf2 hash"; rm -f /tmp/identity.sql; exit 1
+          fi
+
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --yes --json \
+            --file /tmp/identity.sql > /tmp/insert.json 2>/tmp/insert.err \
+            || { echo "::error::the INSERT failed"; sed -n '1,10p' /tmp/insert.err >&2; rm -f /tmp/identity.sql; exit 1; }
+          rm -f /tmp/identity.sql
+          jq -e '.[0].success == true' /tmp/insert.json > /dev/null \
+            || { echo "::error::D1 did not report success for the INSERT"; exit 1; }
+
+          # Exactly one row for this run's tag, unverified, with a pbkdf2 hash —
+          # counted, never read.
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT COUNT(*) AS n FROM users WHERE email LIKE '%+${TAG}@%' AND email_verified_at IS NULL AND password_hash LIKE 'pbkdf2%'" \
+            > /tmp/account.json 2>/tmp/account.err \
+            || { echo "::error::the account count query failed"; sed -n '1,10p' /tmp/account.err >&2; exit 1; }
+          N=$(jq -r '.[0].results[0].n' /tmp/account.json)
+          echo "unverified pbkdf2 accounts for +${TAG}: $N"
+          echo "created=$N" >> "$GITHUB_OUTPUT"
+          [ "$N" = "1" ] || { echo "::error::expected exactly one account for this run's tag, found '$N'"; exit 1; }
 
       # The two email paths differ, and the difference decides how each can be
       # proved:
@@ -283,12 +372,13 @@ jobs:
             strip /tmp/tail.err /tmp/tail.log 2>/dev/null | sed -n '1,15p' || true
           fi
 
-      - name: Studio SSO, negative cases and logout liveness, live
+      - name: Studio SSO, email-first sign-up, negative cases and logout liveness, live
         id: scenario
         continue-on-error: true
         env:
           TEST_EMAIL: ${{ steps.identity.outputs.addr }}
           TEST_PASSWORD: ${{ steps.identity.outputs.pass }}
+          SIGNUP_EMAIL: ${{ steps.identity.outputs.signup_addr }}
           MERCHANT_ORIGIN: https://levo-e2e-check.levonis-iq.com
         run: |
           # WITHOUT pipefail this step CANNOT FAIL: a pipeline's status is the
@@ -303,7 +393,8 @@ jobs:
       # blueprint /auth at phone and desktop widths, the providers the
       # capabilities advertise (Google's own iframe, the Telegram entry and
       # its phone panel), the forgot link only when mail is configured, the
-      # three-step sign-up opening without posting anything, and a REAL
+      # three-step sign-up opening without posting anything (and, with mail
+      # configured, collecting no password on its first step), and a REAL
       # sign-in with this run's identity through the form. Playwright is
       # installed for this job only (--no-save), so the repository's
       # dependencies do not change; it signs out at the end.
@@ -359,28 +450,35 @@ jobs:
           echo "errors=$N" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------- did Resend take them?
-      # The API reporting success is not evidence a message was sent: both
-      # endpoints answer identically whether or not an account exists, and the
-      # outbox is where the truth is. `state='sent'` is written only after
-      # Resend answered 2xx (worker/lib/outbox.ts).
-      - name: Did Resend accept the two emails
+      # The API reporting success is not evidence a message was sent: every
+      # endpoint here answers identically whether or not an account exists, and
+      # the outbox is where the truth is. `state='sent'` is written only after
+      # Resend answered 2xx (worker/lib/outbox.ts). The same tables hold the
+      # other half of the email-first contract — a pending row and NO account
+      # for the second address — which no HTTP response can show.
+      - name: Did Resend accept the emails, and did the sign-up open nothing
         id: outbox
         continue-on-error: true
         env:
           TAG: ${{ steps.identity.outputs.tag }}
+          SIGNUP_TAG: ${{ steps.identity.outputs.signup_tag }}
         run: |
           set -e
           echo "reset=unknown" >> "$GITHUB_OUTPUT"
           echo "verify=unknown" >> "$GITHUB_OUTPUT"
+          echo "signup=unknown" >> "$GITHUB_OUTPUT"
 
           # wrangler resolves a D1 database through wrangler.jsonc, whose
           # database_id is a committed *-PLACEHOLDER that the deploy workflows
           # fill in first. Skipping that is what made every query here fail —
           # the same trap workflow 12 hit and fixed, repeated in a new file.
-          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
-          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found on this account"; exit 1; }
-          echo "::add-mask::$ID"
-          STAGING_DB_ID="$ID" node scripts/set-deploy-ids.mjs --env staging
+          # The account step normally filled it already; repeat only if not.
+          if grep -q 'STAGING-DB-ID-PLACEHOLDER' wrangler.jsonc; then
+            ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+            [ -n "$ID" ] || { echo "::error::levonis-db-staging not found on this account"; exit 1; }
+            echo "::add-mask::$ID"
+            STAGING_DB_ID="$ID" node scripts/set-deploy-ids.mjs --env staging
+          fi
           grep -c 'PLACEHOLDER' wrangler.jsonc | sed 's/^/remaining placeholders: /' || true
 
           # Give the outbox processor a moment; sends run via ctx.waitUntil.
@@ -399,15 +497,17 @@ jobs:
           }
           n() { q "$1" '.[0].results[0].n'; }
 
-          # Never select the payload: it contains a live reset token and a live
-          # verification token. Only counts and states leave the database.
-          echo "Outbox rows for this run's address (by plus-tag, no payload read):"
+          # Never select the payload: it contains a live reset token, a live
+          # verification token and a live sign-up token. Only counts and states
+          # leave the database.
+          echo "Outbox rows for this run's two addresses (by plus-tag, no payload read):"
           q "SELECT kind, state, substr(last_error,1,120) AS last_error, COUNT(*) AS n
-              FROM outbox WHERE recipient LIKE '%+${TAG}@%' GROUP BY kind, state, last_error" \
+              FROM outbox WHERE recipient LIKE '%+${TAG}@%' OR recipient LIKE '%+${SIGNUP_TAG}@%'
+              GROUP BY kind, state, last_error" \
             '.[0].results[] | "  \(.kind)  state=\(.state)  n=\(.n)  \(.last_error // "")"'
 
-          SENT=$(n "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%' AND state='sent'")
-          TOTAL=$(n "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%'")
+          SENT=$(n "SELECT COUNT(*) AS n FROM outbox WHERE (recipient LIKE '%+${TAG}@%' OR recipient LIKE '%+${SIGNUP_TAG}@%') AND state='sent'")
+          TOTAL=$(n "SELECT COUNT(*) AS n FROM outbox WHERE recipient LIKE '%+${TAG}@%' OR recipient LIKE '%+${SIGNUP_TAG}@%'")
           echo "rows: $TOTAL, accepted by Resend: $SENT"
 
           # THE VERIFICATION EMAIL goes through the outbox, so its row proves
@@ -418,11 +518,26 @@ jobs:
                        WHERE recipient LIKE '%+${TAG}@%' AND state='sent'
                          AND payload LIKE '%${APEX}/%verify_email=%'")
           OFFSITE=$(n "SELECT COUNT(*) AS n FROM outbox
-                        WHERE recipient LIKE '%+${TAG}@%'
+                        WHERE (recipient LIKE '%+${TAG}@%' OR recipient LIKE '%+${SIGNUP_TAG}@%')
                           AND payload LIKE '%https://%'
                           AND payload NOT LIKE '%${APEX}%'")
 
-          # THE PASSWORD RESET DOES NOT. worker/routes/auth.ts:1560 sends it
+          # THE SIGN-UP LINK. The scenario posted ONE email-first sign-up for the
+          # second address and saw a uniform 200 with no cookie. What the API
+          # cannot show is the rest of the contract, and the database can:
+          # exactly one pending_signups row for that address, NO users row (an
+          # account is born only at the link), and one outbox row Resend
+          # accepted whose link opens the finish page on APEX. The token lives
+          # hashed in pending_signups and in clear inside the payload; neither
+          # column is ever selected — each predicate runs in SQLite and returns
+          # a count.
+          SIGNUP_PENDING=$(n "SELECT COUNT(*) AS n FROM pending_signups WHERE email LIKE '%+${SIGNUP_TAG}@%'")
+          SIGNUP_USERS=$(n "SELECT COUNT(*) AS n FROM users WHERE email LIKE '%+${SIGNUP_TAG}@%'")
+          SIGNUP_LINK=$(n "SELECT COUNT(*) AS n FROM outbox
+                            WHERE recipient LIKE '%+${SIGNUP_TAG}@%' AND state='sent'
+                              AND payload LIKE '%${APEX}/auth?finish=%'")
+
+          # THE PASSWORD RESET DOES NOT. worker/routes/auth.ts sends it
           # immediately through sendEmail() rather than the queue, deliberately
           # ("reset links must not sit in a queue"), so NO outbox row is ever
           # written for it — an outbox-only check would call a perfectly
@@ -437,13 +552,15 @@ jobs:
           echo ""
           echo "verification email accepted by Resend, link on ${APEX} : $VERIFY"
           echo "password-reset token minted (send attempted, not 503)   : $RESET"
+          echo "sign-up: pending rows / accounts opened / links sent    : $SIGNUP_PENDING / $SIGNUP_USERS / $SIGNUP_LINK"
           echo "any queued link pointing off ${APEX}                    : $OFFSITE"
           echo "reset=$RESET" >> "$GITHUB_OUTPUT"
           echo "verify=$VERIFY" >> "$GITHUB_OUTPUT"
+          echo "signup=pending=$SIGNUP_PENDING accounts=$SIGNUP_USERS sent=$SIGNUP_LINK" >> "$GITHUB_OUTPUT"
           echo "offsite=$OFFSITE" >> "$GITHUB_OUTPUT"
 
           FAIL=0
-          for v in RESET VERIFY OFFSITE SENT TOTAL; do
+          for v in RESET VERIFY OFFSITE SENT TOTAL SIGNUP_PENDING SIGNUP_USERS SIGNUP_LINK; do
             case "${!v}" in
               ''|*[!0-9]*) echo "::error::the query for $v returned '${!v}', not a number — the state is UNKNOWN, not empty"; FAIL=1 ;;
             esac
@@ -451,6 +568,9 @@ jobs:
           [ "$FAIL" = "0" ] || exit 1
           [ "$RESET" -ge 1 ] || { echo "::error::no password-reset token was minted — the endpoint refused rather than sending"; FAIL=1; }
           [ "$VERIFY" -ge 1 ] || { echo "::error::no verification email was accepted by Resend for this run"; FAIL=1; }
+          [ "$SIGNUP_PENDING" = "1" ] || { echo "::error::expected exactly one pending sign-up for the second address, found $SIGNUP_PENDING"; FAIL=1; }
+          [ "$SIGNUP_USERS" = "0" ] || { echo "::error::the email-first sign-up opened $SIGNUP_USERS account(s) — /register must create nothing"; FAIL=1; }
+          [ "$SIGNUP_LINK" -ge 1 ] || { echo "::error::no sign-up link on ${APEX} was accepted by Resend for the second address"; FAIL=1; }
           [ "$OFFSITE" = "0" ] || { echo "::error::a queued email for this run carries a link outside ${APEX}"; FAIL=1; }
           exit $FAIL
 
@@ -466,10 +586,12 @@ jobs:
             echo "| levonis-staging · STUDIO_ALLOWED_DESTINATIONS | ${{ steps.mainbind.outputs.dest }} |"
             echo "| levonis-studio-staging · STUDIO_HANDOFF_SECRET | ${{ steps.studiobind.outputs.secret }} |"
             echo "| levonis-studio-staging · MAIN_SITE_ORIGIN | ${{ steps.studiobind.outputs.main_origin }} |"
-            echo "| Scenario (SSO, negatives, logout liveness) | ${{ steps.scenario.outcome }} |"
+            echo "| Throwaway account inserted in the live database (unverified, Worker's own hash) | ${{ steps.account.outputs.created }} |"
+            echo "| Scenario (sign-in, email-first sign-up, SSO, negatives, logout liveness) | ${{ steps.scenario.outcome }} |"
             echo "| The /auth screen in a real browser (widths, providers, stepper, real sign-in) | ${{ steps.ui.outcome }} |"
             echo "| Verification email accepted by Resend (outbox state=sent) | ${{ steps.outbox.outputs.verify }} |"
             echo "| Password-reset token minted (immediate send, no outbox row) | ${{ steps.outbox.outputs.reset }} |"
+            echo "| Email-first sign-up: pending rows / accounts opened / links Resend sent | ${{ steps.outbox.outputs.signup }} |"
             echo "| Provider-error lines in the Worker log | ${{ steps.providerlog.outputs.errors }} |"
             echo "| Queued links pointing off ${{ env.APEX }} | ${{ steps.outbox.outputs.offsite }} |"
             echo ""
@@ -492,6 +614,7 @@ jobs:
       - name: Fail the run if anything failed
         if: always()
         run: |
+          [ "${{ steps.account.outcome }}" = "success" ] || { echo "::error::the throwaway account could not be created in the live database"; exit 1; }
           [ "${{ steps.scenario.outcome }}" = "success" ] || { echo "::error::the live scenario failed"; exit 1; }
           [ "${{ steps.ui.outcome }}" = "success" ] || { echo "::error::the live /auth screen check failed"; exit 1; }
           [ "${{ steps.outbox.outcome }}" = "success" ] || { echo "::error::the email delivery check failed"; exit 1; }

@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * Live verification of Studio single sign-on, logout revocation, and the two
- * email flows, against the REAL origins.
+ * Live verification of Studio single sign-on, logout revocation, the
+ * email-first sign-up contract and the two account emails, against the REAL
+ * origins.
  *
- * WHAT IT DOES AND DOES NOT TOUCH. It creates one throwaway account, signs it
- * in, walks the handoff, tries every way the handoff is supposed to refuse,
- * asks for a password-reset email and a verification email, and then logs out
- * to watch the Studio session die. It never buys anything, never touches the
- * wallet or an order, never reads a secret, and never prints a token — the
- * reset and verification links are live credentials for a real inbox, so this
- * script asserts on their SHAPE and never on their contents.
+ * WHAT IT DOES AND DOES NOT TOUCH. It signs in as the run's throwaway
+ * identity — created in the database by the workflow that runs this, because
+ * since the email-first sign-up (migration 0051) POST /register opens no
+ * account, and the link that would is in an inbox this script must never
+ * read — walks the Studio handoff, tries every way the handoff is supposed to
+ * refuse, asks for a password-reset email and a verification email, posts ONE
+ * email-first sign-up for a SECOND run-scoped address and checks that it opens
+ * nothing, and then logs out to watch the Studio session die. It never buys
+ * anything, never touches the wallet or an order, never reads a secret, and
+ * never prints a token — the reset, verification and sign-up links are live
+ * credentials for a real inbox, so this script asserts on their SHAPE and
+ * never on their contents.
  *
  * The email assertions here stop at "the API accepted the request". Whether
- * Resend actually took the message is asserted separately, from the outbox
- * table, by the workflow that runs this — see `15 - Verify Live Auth`.
+ * Resend actually took each message, and whether the sign-up left exactly one
+ * pending row and no account, is asserted separately from the database, by
+ * counts, by the workflow that runs this — see `15 - Verify Live Auth`.
  *
  * Every check prints pass/fail with the evidence that decided it. A failure
  * is a failure; nothing is retried into looking green.
@@ -23,11 +30,14 @@ const STUDIO = (process.env.STUDIO || 'https://studio.levonis-iq.com').replace(/
 const MERCHANT = (process.env.MERCHANT_ORIGIN || 'https://levo-e2e-store.levonis-iq.com').replace(/\/+$/, '');
 const EMAIL = process.env.TEST_EMAIL || '';
 const PASSWORD = process.env.TEST_PASSWORD || '';
+// A SECOND run-scoped address for the email-first sign-up probe. It gets one
+// POST /register and nothing else; the account above never registers.
+const SIGNUP_EMAIL = process.env.SIGNUP_EMAIL || '';
 const HANDOFF_TTL_SECONDS = 60; // worker/routes/studio.ts HANDOFF_TTL_SECONDS
 const LIVENESS_POLL_SECONDS = Number(process.env.LIVENESS_POLL_SECONDS || 180);
 
-if (!EMAIL || !PASSWORD) {
-  console.error('TEST_EMAIL and TEST_PASSWORD are required');
+if (!EMAIL || !PASSWORD || !SIGNUP_EMAIL) {
+  console.error('TEST_EMAIL, TEST_PASSWORD and SIGNUP_EMAIL are required');
   process.exit(2);
 }
 
@@ -105,22 +115,71 @@ let userId = null;
   );
 }
 
-// ====================================================== B. throwaway account
-console.log('\nB. A throwaway account to test with');
+// ============================================ B. sign in as the run's identity
+console.log("\nB. Signing in as the run's throwaway identity");
 {
-  const res = await req(APEX, '/api/auth/register', {
+  // The account was inserted into the database by the workflow (see the
+  // header): since the email-first sign-up, /register cannot produce a
+  // signed-in user, and the link that could is in an inbox this script must
+  // never read. So the session comes from /login, the way a returning person
+  // gets one — which also means the identity step and the Worker's password
+  // hashing agree, or nothing below runs.
+  const res = await req(APEX, '/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD, name: 'LEVO live check', locale: 'en' }),
+    body: JSON.stringify({ identifier: EMAIL, password: PASSWORD }),
   });
   const body = await json(res);
-  check('register succeeds', res.status === 200 && body?.success === true, `http=${res.status} code=${body?.code ?? ''}`);
+  check('login succeeds', res.status === 200 && body?.success === true, `http=${res.status} code=${body?.code ?? ''}`);
   userId = body?.user?.id ?? null;
   check('a session cookie is set', !!jar(APEX).get('levonis_session'), 'levonis_session present');
   check('the response carries a user id', typeof userId === 'string' && userId.length > 0, userId ? 'present' : 'missing');
+  check(
+    "and it is the run's own account",
+    typeof body?.user?.email === 'string' && body.user.email.toLowerCase() === EMAIL.toLowerCase(),
+    'address matches (value never printed)'
+  );
 }
 
-// ============================================== C. the two email flows, real
-console.log('\nC. Password reset and email verification (real sends)');
+// ======================================= C. the email-first sign-up contract
+console.log('\nC. Sign-up is email-first: /register opens nothing');
+{
+  // ONE sign-up for the SECOND run-scoped address, sent from an empty cookie
+  // jar — a person signing up is not signed in, and the session above must
+  // not be able to influence, or be replaced by, this response. The contract
+  // (migration 0051, docs/SECURITY_AUDIT_2026-09.md): a uniform 200 with
+  // `pending_email`, no cookie, no user, no id — the same answer for a free
+  // and a taken address, so nothing here says which this one was. The other
+  // half of the contract lives in the database (exactly one pending row, no
+  // users row, one sent link on APEX) and is proved by the workflow's SQL
+  // step, by counts only.
+  const probeJar = 'probe:signup';
+  const res = await req(APEX, '/api/auth/register', {
+    method: 'POST',
+    cookieOrigin: probeJar,
+    body: JSON.stringify({ email: SIGNUP_EMAIL, name: 'LEVO live check', locale: 'en' }),
+  });
+  const setCookies = res.headers.getSetCookie?.() ?? [];
+  const body = await json(res);
+  check(
+    'register answers 200 with the pending body',
+    res.status === 200 && body?.success === true && body?.pending_email === true,
+    `http=${res.status} pending_email=${body?.pending_email ?? 'absent'} code=${body?.code ?? ''}`
+  );
+  check(
+    'register sets NO cookie',
+    setCookies.length === 0 && jar(probeJar).size === 0,
+    setCookies.length ? `Set-Cookie: ${setCookies.map((c) => c.split('=')[0]).join(', ')}` : 'no Set-Cookie header'
+  );
+  check(
+    'register returns no user, no id and no token',
+    body != null && body.user === undefined && !Object.keys(body).some((k) => /id|token/i.test(k)),
+    `keys=${Object.keys(body ?? {}).join(',')}`
+  );
+  check('the signed-in session above was not touched', !!jar(APEX).get('levonis_session'), 'levonis_session still present');
+}
+
+// ============================================== D. the two email flows, real
+console.log('\nD. Password reset and email verification (real sends)');
 {
   const reset = await req(APEX, '/api/auth/forgot-password', {
     method: 'POST',
@@ -146,8 +205,8 @@ console.log('\nC. Password reset and email verification (real sends)');
   );
 }
 
-// ===================================================== D. the SSO happy path
-console.log('\nD. Studio sign-on, end to end');
+// ===================================================== E. the SSO happy path
+console.log('\nE. Studio sign-on, end to end');
 let studioSessionCookie = null;
 
 const setCookie = (origin, name, value) => jar(origin).set(name, value);
@@ -217,8 +276,8 @@ async function mintCode(startUrl) {
     replay.headers.get('Location') || `http=${replay.status}`);
 }
 
-// ========================================================= E. negative cases
-console.log('\nE. What the handoff must refuse');
+// ========================================================= F. negative cases
+console.log('\nF. What the handoff must refuse');
 {
   const state = 'levoe2e' + 'x'.repeat(20);
 
@@ -289,15 +348,15 @@ console.log('\nE. What the handoff must refuse');
       expired.headers.get('Location') || `http=${expired.status}`);
   }
 
-  // The session established in D must have survived every refusal above.
+  // The session established in E must have survived every refusal above.
   const still = await req(STUDIO, '/auth/me');
   const body = await json(still);
   check('none of those refusals disturbed the real session', body?.user?.id === userId,
     body?.user?.id === userId ? 'still signed in as the same user' : `user=${body?.user?.id ?? 'null'}`);
 }
 
-// ==================================================== F. logout revocation
-console.log('\nF. Logging out of the main site revokes Studio');
+// ==================================================== G. logout revocation
+console.log('\nG. Logging out of the main site revokes Studio');
 {
   // The Studio session must be live first, measured on an /api/* route —
   // that is the only path the liveness check runs on (studio/worker/index.ts).
@@ -336,5 +395,5 @@ console.log('='.repeat(72));
 for (const r of results) console.log(`${r.ok ? ' pass ' : ' FAIL '} ${r.name}`);
 
 const { writeFileSync } = await import('node:fs');
-writeFileSync('/tmp/live-auth-results.json', JSON.stringify({ results, failures, userId }, null, 2));
+writeFileSync(process.env.RESULTS_PATH || '/tmp/live-auth-results.json', JSON.stringify({ results, failures, userId }, null, 2));
 process.exit(failures === 0 ? 0 : 1);

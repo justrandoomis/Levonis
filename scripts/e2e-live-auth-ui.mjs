@@ -7,12 +7,15 @@
  * advertises are the ones on screen (Google's own identity iframe, the
  * Telegram entry that opens the phone panel), the forgot-password link
  * appears only when mail is configured, the three-step sign-up opens with
- * its stepper and posts nothing until the last step, and a REAL sign-in with
- * the run's throwaway identity leaves /auth for the destination.
+ * its stepper, posts nothing until the last step and — with a mail service,
+ * where sign-up is email-first — collects no password on its first step, and
+ * a REAL sign-in with the run's throwaway identity leaves /auth for the
+ * destination.
  *
- * It never creates an account (the API scenario already did), never sends
- * mail, and signs out at the end so the live session table is left as it
- * was. Screenshots go to OUT_DIR for the run artifact.
+ * It never creates an account (the workflow inserted the run's identity into
+ * the database: since the email-first sign-up, /register opens none), never
+ * sends mail, and signs out at the end so the live session table is left as
+ * it was. Screenshots go to OUT_DIR for the run artifact.
  */
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -74,7 +77,7 @@ const check = (name, ok, evidence = '') => {
 
 async function main() {
   const caps = await fetch(`${APEX}/api/auth/capabilities`).then((r) => r.json());
-  console.log(`live capabilities: google=${!!caps.google} telegram=${!!caps.telegram} passwordReset=${!!caps.passwordReset} emailVerification=${!!caps.emailVerification}`);
+  console.log(`live capabilities: google=${!!caps.google} telegram=${!!caps.telegram} passwordReset=${!!caps.passwordReset} emailVerification=${!!caps.emailVerification} emailFirstSignup=${!!caps.emailFirstSignup}`);
 
   const browser = await chromium.launch();
   const open = async (w, h) => {
@@ -175,8 +178,18 @@ async function main() {
     const stepper = await page.textContent('.lv-stepper__count').catch(() => '');
     check('sign-up opens on step 1 of 3 with its own meter and the referral bar', /01/.test(stepper || '') && !!(await page.$('#signup-next-1')) && !!(await page.$('.lv-refbar')));
     await page.fill('#email', 'preview@example.com');
-    await page.fill('#new-password', 'preview-pass-1');
-    await page.fill('#confirm-password', 'preview-pass-1');
+    // With a mail service the sign-up is email-first: the password is chosen
+    // at the emailed link, so step 1 has no password fields — and must not,
+    // since a password typed here would be one the server ignores. Without
+    // one, the account opens at once and the fields are here.
+    const pwFields = await page.locator('#new-password, #confirm-password').count();
+    if (caps.emailFirstSignup) {
+      check('email-first: step 1 collects no password (it is chosen at the emailed link)', pwFields === 0, `password fields=${pwFields}`);
+    } else {
+      check('no mail service: step 1 collects the password here', pwFields === 2, `password fields=${pwFields}`);
+      await page.fill('#new-password', 'preview-pass-1');
+      await page.fill('#confirm-password', 'preview-pass-1');
+    }
     await page.click('#signup-next-1');
     await page.waitForSelector('#name', { timeout: 10000 });
     check('step 2 (name + handle + country) reached with nothing posted', !!(await page.$('#username')) && !!(await page.$('#country')) && posts.length === 0, `posts=${posts.length}`);
