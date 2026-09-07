@@ -89,6 +89,7 @@ Data ownership below: "owner" = the signed-in account (server-enforced),
 | Rewards | push/video/browse missions | all client-attested, self-approving inserts | server-recorded claims; browse mission server-timed via pings; video honestly capped 1/day (client-attested playback — documented limitation) | ⚙️ |
 | Warranty | submit claim | dead button | `POST /api/profile/warranty-claims` + status list | ⚙️ |
 | Games / Leaderboards | game cards, ranks | fake play counters ("2,305,654"), fake profile "Mobbie Des" | ⛔ fakes removed; honest "coming soon"; real user shown | ⚙️ |
+| Games | LEVO Printer Farm (server slice, Phase 1) | no game existed; fake cards only | `/api/farm` — server-authoritative simulator: bootstrap + starter kit, offers, accept/assign/collect, maintenance/repair, filament and printer market, Farm Coin ledger (derived balance, overdraft trigger), events, public leaderboard; `/api/admin/farm` versioned + audited balancing config (docs/PRINTER_FARM.md §9); Farm Coins are in-game only — no Levonis Points minted | ⚙️ (unit: farmEngine/farmRoutes/farmAdmin/farmBalance) |
 | Tools | Tool 1–4 grid | fake cards, no handlers | honest "coming soon" state | 🔶 |
 
 ## Community, chats, invest

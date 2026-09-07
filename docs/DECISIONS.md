@@ -131,6 +131,12 @@
 | 89 | **التصفح كزائر — بلا تسجيل دخول**: طلب المالك أن يعمل التصفح بلا حساب، وسمّى صفحة المجتمع «وغيرها». المفارقة التي كشفها الفحص أن **معظم تلك الصفحات كانت جاهزة للزائر أصلًا** ولا يمنعها إلا `ProtectedRoute`: قراءات المجتمع الثلاث عامة على الخادم وكتابته الوحيدة تدعو للدخول قبل أن تفشل، وصفحة النقاط تتخطّى طلبها بلا مستخدم وتعرض لوحة «سجّل الدخول» لم يكن أحد يصل إليها، وخطط العضوية عامة والصفحة تتخطّى `/mine`، ولوحة الترتيب مكتوبة لزائر بصور وأسماء بديلة، والألعاب والأدوات لا تُجري طلبًا شبكيًا ولا تقرأ المستخدم إطلاقًا. القرارات: (١) **فُتحت ست صفحات عرض**: المجتمع، العضويات، النقاط، الأدوات، الألعاب، الترتيب — كلها إما بلا طلب، أو تُصيب نقطة عامة، أو تتخطّى طلبها الشخصي بلا جلسة. (٢) **بقيت خمس عشرة صفحة شخصية خلف الدخول** (الطلبات، المحفظة، العناوين، الإعدادات، تعديل الملف، الإحالات، الهدايا، مركز الضمان، السلة، الدفع، دفع المتجر، الاستثمار، لوحة التاجر، المحادثة الفردية، الترحيب) — كلٌّ لا تقرأ إلا صفوف صاحبها ويرفضها الخادم للزائر على أي حال؛ الحارس راحة لا حماية. (٣) **دعوة دخول تتذكّر الطريق**: `src/lib/guest.ts` بدالة `useSignInPrompt()` تحمل الصفحة الحالية إلى `/auth` فيعود إليها الزائر بعد الدخول — سبع نداءات `navigate('/auth')` كانت تُسقط الطريق. **ولم يُستحدث نمط جديد**: `UnauthorizedState` موجود ويأخذ الوجهة، فاستُعمل هو بدل ثالثٍ يشبهه. (٤) **صدق ما يراه الزائر**: بطاقة العضوية لم تعد ترتدي اسمًا مُختلقًا («Levo User» و`@username`) لمن لا حساب له؛ وتبويب «طلباتي» لم يعد يقول لزائر «لم تنشئ أي طلب بعد» بل يعرض لوحة دخول، وزر «طلب جديد» صار ظاهرًا يدعوه بدل أن يختفي بصمت؛ ومتابعة متجر لم تعد ترسل طلبًا مضمون الفشل ثم تترك الزائر عالقًا؛ و`StoreCta` توقّف عن إطلاق `/api/merchant/me` عند كل زيارة زائر. (٥) **تصحيحان في الهيكل**: `/chats` كان مُدرجًا في قائمة الشريط السفلي كصفحة محمية وهو غير محمي إطلاقًا، فكان يُرسل الزائر إلى تسجيل الدخول لصفحة يقرأها؛ وزر العضويات في الترويسة كان يمرّ به عبر `/auth` قبل أن يريه السعر. (٦) **عطبٌ دقيق**: مُصنِّف الصفحات الكاملة في `App.tsx` حسّاس لحالة الأحرف بينما موجِّه React ليس كذلك، فكان `/Points` يُخدَّم من كتلة مسارات مختلفة عن `/points`؛ صار الطرفان يقارنان بحروف صغيرة وحُذف المسار المكرر الذي صار غير قابل للوصول. **ما لم يتغيّر**: السلة تبقى تحتاج حسابًا — سلة الزائر تعني جلسة سلة على الخادم، وهي بنية جديدة لا رفع حارس؛ أُبلغ عنها ولم تُنفَّذ. الدليل: `scripts/e2e-guest.mjs` (٣٤ فحصًا في متصفح بلا أي كوكي: كل صفحة مفتوحة تُعرض بمحتوى فعلي، وكل صفحة شخصية ما تزال تسأل من أنت، ولا اسم مُختلق، والإجراء المحجوز يدعو للدخول حاملًا طريق العودة، وروابط الشريط تطابق ما يفتحه الزائر فعلًا) مع `e2e-permissions` (٤٦) و`e2e-integrated` (٤١) و`e2e-ui` (٣٦) واختبارات الوحدة ٩٧٢. |
 | 91 | **الضمان الممدد للطابعات (تكليف المالك، 2026-09-05)**: (١) **للطابعات فقط** — هوية الطابعة علم الكتالوج `is_printer_catalog` عبر `worker/lib/printerIdentity.ts`؛ منتج ليس طابعة يحمل خططًا يُرفض على كل مسار كتابة (حفظ الإدارة، تحليل/تطبيق TXT، معاينة/تأكيد CSV) وعند التشغيل (إضافة السلة وتعديلها والدفع) بـ`WARRANTY_NOT_PRINTER`؛ البيانات القديمة تبقى تُسعَّر عند القراءة. (٢) **الشكل**: `extension` بمدة 12 أو 24 فقط، خطة لكل مدة — «+12 → 24 إجمالًا» و«+24 → 36 إجمالًا» فوق الأساسي 12 (`warranty_base_months` و`serialized` صارا حقلَي منتج في النموذج والقالبَين، يُكتبان في `ops_policy` عبر كاتب واحد). (٣) **الرسم نسبة من السعر الاعتيادي** للاختيار (`fee_percent`، `planFee` = round(basis × pct / 100) بنقاط الأساس) — متساوٍ للزائر وPRIME وPRO لأن رسم الضمان لا يُعفى بالعضوية؛ 7.5–10% تلميح في النموذج لا سقف؛ `fee_iqd` رسم ثابت بديل. (٤) **قبل الطلب فقط**: يُختار في صفحة المنتج أو من «الضمان الممدد» المنطوي في السلة (خطة واحدة للبند تُطبَّق على كل وحداته)؛ الدفع يجمّد `warranty_snapshot` بالنسبة والأساس والأشهر الإجمالية ولا يكتبه أي مسار بعده، وعند التسليم يفضّل `computeCoverage` إجمالي اللقطة فيسجَّل 24/36 على الوحدة. (٥) **سياسة `extended_warranty`** بصياغة LEVONIS في اللغات الثلاث (الأهلية، الخياران، نافذة الشراء، السعر، التغطية، الاستثناءات، المطالبات، الانتقال) — لم تُنسخ من أي مصنّع؛ الوصل يطبع سطر التمديد والمركز يعرض الأساسي + التمديد. **تعديل المراجعة العدائية (2026-09-05 لاحقًا):** (٦) **افتراضات عند القراءة** (`effectiveDevicePolicy`): طابعة `ops_policy`ها بلا المفتاحين (`'{}'` أو أساس فقط — صفوف قبل هذه الجولة) تُقرأ مسلسَلة بأساس 12 في المحلّل و`pricedPlans` والسلة و`createUnitsOnDelivery`، فتحمل اللقطة 12/24 و36 وتُنشأ الوحدات عند التسليم؛ `serialized: false` الصريح كلمة المالك ويبقى؛ لا هجرة تعيد كتابة الصفوف. (٧) إعادة إضافة الطابعة نفسها **لا تعيد كتابة خطة الضمان بصمت**: خطة مختلفة عمّا يحمله البند (أو بند بلا خطة) تُرفض `409 CART_WARRANTY_CONFLICT` باسم الحل («غيّره من السلة»)، وإضافة بلا خطة تُبقي خطة البند. (٨) المسار القديم `POST /api/admin/products` يشغّل حارس الطابعة نفسه (`WARRANTY_NOT_PRINTER` / `WARRANTY_PLAN_INVALID`)، ومسار `ops-policy` يرفض `serialized: false` لطابعة بخطط نشطة | ✅ منفَّذ (`tests/extendedWarranty.test.ts`، `tests/pricing.test.ts`، `tests/cartUpsert.test.ts`، اختبارات القالب وCSV) | worker/lib/warrantyPlans.ts، pricing.ts، deviceOps.ts، routes/cart.ts، orders.ts، products.ts، admin.ts، devices.ts؛ src/pages/Cart.tsx، Product.tsx، form/WarrantySection.tsx |
 | 90 | **طريقة الدفع × تسعير التوفر × نوع الطلب (تكليف المالك، 2026-09-05)**: (١) **عضو PRO الفعّال معفى من زيادة البيع المباشر** كما هو معفى من عمولة النقل، وعلى البوابة نفسها (العنوان الافتراضي المعتمد، بلا قيود دعم) — مثال المالك يصير 275,000 / 250,000 / **125,000**. (٢) **الطلب المسبق يُدفع مقدمًا من المحفظة أو نقدًا عند الاستلام**: المقدّم يُبقي تسعير الطلب المسبق كما هو مُعدّ؛ الدفع عند الاستلام **يُسعَّر كبيع مباشر** (الأساس + زيادة البيع المباشر، بلا عمولة — لا يجتمعان أبدًا) بينما يبقى الطلب طلبًا مسبقًا: `shipping_type` = `preorder_*`، أربع عشرة مرحلة، التتبع والهدية كما هي (الهدية تشترط صفر مستحق عند الاستلام فلا تُمنح لطلب مسبق نقدي). المحلّل يحمل `preorderPricing` ويقرّ `pricing_basis` و`direct.waived` و`transport.waived_by` في اللقطة والفاتورة. (٣) **معرّفات الدفع المعروضة `wallet` و`cash` لكل نوع شحن** (`worker/lib/paymentPolicy.ts`)؛ `full_advance` مقبول كاسم بديل لـ`wallet` لطلبات مخزّنة وسكربتات ولا يُعرض؛ `half_advance` مرفوض بـ`400 PAYMENT_METHOD_NOT_ALLOWED` («أبقِ النظام بسيطًا»). لا يُعاد تسمية أي معرّف. (٤) **ملاحظة توصيل الطابعة 50,000 د.ع ملاحظة فقط** (الصف 16): إعداد عام `printerHomeDeliveryNoteIqd` وهوية الطابعة من علم الكتالوج (`worker/lib/printerIdentity.ts`)، تُعرض في صفحة المنتج والسلة والدفع وتفاصيل الطلب ولا تدخل أي مجموع. (٥) شاشة الدفع تعرض ما يسمح به الخادم فقط وتُظهر أسعار عرض السعر لا أسعار السلة. **تعديل المراجعة العدائية (2026-09-05 لاحقًا):** (٦) «يُسعَّر كبيع مباشر» لا ينطبق إلا حين يحمل المنتج زيادة بيع مباشر فعلًا (`direct_surcharge_iqd > 0`)؛ منتج بلا زيادة (الشكل الطبيعي لطلب مسبق فقط) لا يوجد ما يُسعَّر به «كمباشر»، فتبقى عمولة النقل و`pricing_basis = 'preorder'` بلا إعفاء — وإلا خسر المتجر العمولة وصار الدفع عند الاستلام أرخص من المحفظة، عكس نية المالك (115,000 للطريقتين). (٧) طلب نقدي تغطيه المحفظة **بالكامل** (`due_on_delivery_iqd = 0`) طلبٌ مدفوع مقدمًا أيًّا كان الزر المضغوط: يُعاد تسعيره بقاعدة الطلب المسبق (الرقم الأقل، والمحفظة تغطيه)، `prepaid_by_wallet: true` على عرض السعر مع ملاحظة في شاشة الدفع، و`payment_method_id` يبقى `cash`؛ تغطية جزئية تُبقي تسعير الاستلام. (٨) عرض السعر يحمل `cod_reprices`، وعرض سعر المنتج `pricing_modes` (مباشر، ولكل رحلة مقدّم/استلام)، وبند السلة `cod_reprices` — فيُشرح حكم الاستلام **حيث يتغيّر الرقم فقط**، وصفحة المنتج لا تحسب شيئًا في المتصفح. (٩) سياق PRO واحد على كل السطوح (`pricingTierContext`): صفحة المنتج والسلة يحكمان بالعنوان الافتراضي، والدفع بالعنوان المختار — فـPRO بعنوان افتراضي غير معتمد يدفع الزيادة في الثلاثة معًا | ✅ منفَّذ (`tests/checkoutPayment.test.ts`، `tests/pricing.test.ts`) | worker/lib/pricing.ts، paymentPolicy.ts، printerIdentity.ts، entitlements.ts، routes/orders.ts، cart.ts، products.ts |
+| 92 | **عملات المزرعة (Farm Coins) عملة داخل اللعبة فقط — ليست نقاط ليفونيس**: مزرعة الطابعات (docs/PRINTER_FARM.md) تُحاسِب بعملة `farm_ledger` وحدها؛ نقاط ليفونيس تبقى في `wallet_transactions` ولا يلمسها أي مسار في هذه المرحلة. مفتاح التحويل `rewards.levonis_points.enabled` افتراضيًا `false`، ويرفض المدقّق حفظه بقيمة `true` (`FARM_CONFIG_INVALID`) لأن لا شفرة تنفّذه — لا زر يعِد بما لا يوجد. التحويل نفسه (المرحلة الخامسة) يحتاج ميزانية يومية/أسبوعية يقرّرها المالك | ✅ منفَّذ (المرحلة 1) · 🔴 للتحويل إلى نقاط لاحقًا | `worker/lib/farm/config.ts` قسم `rewards`؛ الإدارة → `/api/admin/farm/config/rewards` |
+| 93 | **رصيد المزرعة مُشتقّ من الدفتر مع حارس في قاعدة البيانات**: لا عمود رصيد في `farm_profiles`؛ الرصيد دائمًا `SUM(farm_ledger.amount)`، وقادح `BEFORE INSERT` يرفض أي خصم يُنزل المجموع تحت الصفر (`FARM_INSUFFICIENT_COINS`) فيُلغى الـbatch كله. كل حركة صفّ واحد بمفتاح تكرار فريد لكل مستخدم، ومعرّفات الأحداث (دفع الطلب، الكهرباء) حتمية فلا يُدفع طلب مرتين حتى بطلبَين متزامنَين | ✅ منفَّذ | `migrations/0053_printer_farm.sql`، `worker/lib/farm/ledger.ts` |
+| 94 | **يوم بغداد للحدود اليومية في المزرعة**: `farm_daily` مفتاحه يوم آسيا/بغداد (UTC+3) كما في نقاط الدخول اليومي، لا يوم UTC كما ورد في مسودة العقد — حدّ النظام كله يوم واحد | ✅ منفَّذ | `worker/lib/farm/time.ts` (`baghdadDayOf`)، `farm_daily.day` |
+| 95 | **جداول التذاكر لا تُمَسّ**: `ticket_ledger` و`game_sessions` (0003) تبقى بلا قارئ ولا كاتب؛ المزرعة لا تبني عليها لأن آليات التذاكر/الحظّ محجوزة بالصف 25 (مشروعية المسابقات) | ✅ (لا إجراء) · ⚪ الصف 25 | — |
+| 96 | **كل رقم افتراضي في مزرعة الطابعات تخمين موازنة أول، لا قرار مالك**: أسعار الطابعات (A1 mini 6,000 … H2C 75,000)، سعر الغرام، رصيد البداية 1,500، احتمالات الفشل، صيغة الأجر، المواعيد، عتبات المستويات، الحدود اليومية — كلها في `printerFarmConfig` وتُعدَّل بلا نشر، وهدف الموازنة الموثَّق (أول طلب 2–4 دقائق حقيقية، طابعة ثانية بعد ~8–10 طلبات، الطابعة الخاملة لا تكلّف) مُثبَّت باختبار `tests/farmBalance.test.ts` فأي تغيير يُخبر أي هدف تحرّك | 🟡 | الإدارة → مزرعة الطابعات → الأقسام (`PUT /api/admin/farm/config/:section` مع `expected_version`) |
+| 97 | **تصليب مزرعة الطابعات بعد المراجعة العدائية (0054)**: (١) **العشوائية للخادم وحده** — بذرة نتيجة الطباعة 32 بايت عشوائيًا تُكتب على الصف عند الإدراج (لا تُستخرج من مفتاح التكرار)، والعروض تُبذَر من سرّ لكل لاعب `offer_salt` لا يعود في أي مسار أو إسقاط؛ (٢) **سياج المراجعة** `farm_profiles.revision` يفتح كل batch (المحلّل والنيّة) بـ`CASE WHEN revision = ? THEN revision + 1 ELSE -1 END` وقيد `CHECK (revision >= 0)` فتسقط القراءة القديمة كاملةً ولا يُكتب منها شيء — إعادة قراءة، ثم `409 STATE_CHANGED`؛ (٣) **معرّفات الدفتر تسمّي الحدث** (`fl_sale_<printer>`، `fl_maint_<printer>_<revision>`، `fl_cancelpen_<job>`) ومساحتا أسماء لمفاتيح التكرار `req:` / `sys:` / `adm:`؛ (٤) **الطابعة المبيعة لا تُحذف** (`sold_at` + إيقاف الفتحة عند `slot + 1,000,000 × n`) فيحتفظ الطلب نصف المسلَّم بأجزائه؛ (٥) **ذاكرة الإعادة لكل نيّة** `farm_requests` — المفتاح نفسه على المسار نفسه `replayed: true`، وعلى مسار آخر `409 IDEMPOTENCY_KEY_REUSED`؛ (٦) **الحدّ اليومي لا يترك دفعة على السرير**: الجمع يحرّر الطابعة دائمًا والدفع يُؤجَّل إلى يوم بغداد التالي (`payout_deferred_day`) وتأخّر الطلب يُحكم بوقت التسليم؛ (٧) مساعد الأدمن لا يعدّل `limits`/`rewards` ولا يمنح عملات (`403 FINANCIAL_SCOPE_REQUIRED`)؛ (٨) الصيانة مقفلة تحت مستواها من الخادم (`409 FEATURE_LOCKED`)، والإصلاح مفتوح دائمًا؛ (٩) الطلب المتأخر يُعلن جاهزًا عند اكتمال آخر جزء؛ (١٠) كل طابعة تولد باسم («A1 mini 1») ويحمل الإسقاط `resale_coins` وكتلة `limits` كاملة | ✅ منفَّذ (`tests/farmHardening.test.ts`، `tests/farmEngine.test.ts`) | `migrations/0054_printer_farm_hardening.sql`، `worker/routes/farm.ts`، `farmAdmin.ts`، `worker/lib/farm/sim.ts`، `ledger.ts`، `rng.ts`، `state.ts`؛ docs/PRINTER_FARM.md §7 و§9a |
 
 **English summary**: each row above is a pending owner decision. Structure
 ships configurable-and-disabled; nothing unpriced or undefined activates in
@@ -434,3 +440,87 @@ can the new holder link it by its serial or receipt. A later holder gets the
 coverage proof — the receipt document with the customer block and price
 redacted, the coverage timeline, claims — never the buyer's identity or order.
 
+## 2026-09-06 — LEVO Printer Farm: a server-authoritative simulator, Phase 1
+
+The mandate: a 3D-printing business simulator inside Levonis, "premium
+industrial", where the server is the game — every coin, gram, printer state,
+job state, reputation point and leaderboard row is decided in a route over D1,
+in one batch, on the server clock; the client renders and sends intents. Two
+currencies, one wall: Farm Coins live only in the game, Levonis Points are
+never minted in this phase. Everything numeric is configuration.
+
+Decisions taken while building the server slice (docs/PRINTER_FARM.md §9 has
+the full list):
+
+1. **Farm Coins are an in-game currency** (row 92). `farm_ledger` is the only
+   store; `wallet_transactions` is untouched. The config carries a
+   `rewards.levonis_points` section with `enabled: false`, and the validator
+   refuses `true` — a switch that promises what no code does is a fabricated
+   benefit, the kind this repository removes rather than ships.
+2. **The balance is derived, and the database guards it** (row 93). No coin
+   column anywhere; SUM over the ledger, an overdraft trigger with a stable
+   message, UNIQUE (user, idempotency_key), deterministic ids for business
+   events. Four more invariants moved into the schema rather than the route:
+   one printing batch per printer, one printer per slot, spools never negative
+   (grams are reserved at assignment), a job's live batches never exceed its
+   quantity. A named CHECK on `farm_profiles.level` doubles as the
+   compare-and-swap every write batch opens with.
+3. **Baghdad day** for `farm_daily` (row 94); the contract's draft said UTC.
+4. **Tickets stay untouched** (row 95) pending row 25.
+5. **Every default is a first balancing guess** (row 96), flagged 🟡, editable
+   per section through the versioned, audited farm admin route; the generic
+   settings PUT refuses the key so normalisation cannot be bypassed.
+6. Where the contract was silent: an assignment records its own `quality` and
+   `collected_at`; `late` is an overlay state (a late job stays deliverable
+   with the penalty) and the customer cancels after the grace; deadlines are
+   fixed at offer time; electricity and cancel penalties are clamped to the
+   balance so a resolution can always land; `colors` became a config section
+   so a colour name is editable in three languages like everything else;
+   `unlocks` reports a feature open only when the level is reached AND the
+   feature exists in this phase.
+
+Proof: `tests/farmEngine.test.ts` (11 — rng determinism, durations, monotonic
+failure risk, seeded offers and tier gates, progression, normaliser, public
+projection, resolver purity), `tests/farmRoutes.test.ts` (20 — bootstrap once,
+ledger sum, accept/assign/collect state machines, replay pays nothing, late and
+cancelled deadlines, forced failure and repair, market and the trigger, ledger
+paging, events, leaderboard privacy, player isolation, server-clock-only
+progression), `tests/farmAdmin.test.ts` (6 — merchant-host 404, version
+mismatch, invalid config, reset, generic PUT refusal, idempotent audited
+grants), `tests/farmBalance.test.ts` (4 — the §5 targets), and
+`node scripts/migrate-check.mjs --twice` on migration 0053.
+
+## 2026-09-07 — Printer Farm: the adversarial review's fixes (row 97)
+
+Two reviewers ran the Phase 1 routes against the real migrations and found:
+the client chose print outcomes (the seed derived from its idempotency key);
+the compare-and-swap on `last_resolved_at` did not fence a mutation after its
+own resolver batch, so a sandwiched pair credited a resale twice; selling a
+printer cascade-deleted its batch history; a client key could occupy a
+resolver ledger key and freeze the farm; replay memory existed only for
+ledger-writing intents; a daily-cap 429 left the batch on the bed; assistant
+admins had the whole console; maintenance was not locked server-side; a late
+job never announced ready; every printer was nameless.
+
+Decided, and built as migration 0054 + code:
+
+1. **Randomness is server-held** — random outcome seeds on the row, a secret
+   `offer_salt` per player. Deterministic ids remain the replay memory; the
+   stored seed decides.
+2. **An integer revision fence** on every batch instead of a timestamp token.
+   Stale reads commit nothing; the second failure is `409 STATE_CHANGED`.
+3. **Business ledger ids name events**, never requests, and client/server/admin
+   keys live in separate namespaces (`req:` / `sys:` / `adm:`).
+4. **Never delete a machine** — `sold_at` and a parked slot.
+5. **`farm_requests`** remembers every intent's result.
+6. **Collect never leaves work on the bed** — the payout is deferred to the
+   next Baghdad day under that day's caps, judged late by hand-over time.
+7. Financial scope gates limits, rewards and grants; maintenance is locked
+   below its level; late jobs report ready; printers are born named; the state
+   carries `resale_coins` and a full `limits` block so the client computes no
+   money and can explain a wait.
+
+Proof: `tests/farmHardening.test.ts` (20 — including a gated D1 adapter that
+interleaves two requests around the resolver batch), 4 new cases in
+`tests/farmEngine.test.ts`, the updated `tests/farmRoutes.test.ts`, and
+`node scripts/migrate-check.mjs --twice` on 0054.
