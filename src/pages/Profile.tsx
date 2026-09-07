@@ -67,7 +67,6 @@ export default function Profile() {
     !!user &&
     user.membership_tier !== 'free' &&
     (user.subscription_expiry === 0 || user.subscription_expiry > now);
-  const isPro = planActive && user?.membership_tier === 'pro';
 
   /**
    * Auth-aware navigation: a signed-out tap on a member-only destination
@@ -404,20 +403,6 @@ export default function Profile() {
             </button>
           </div>
 
-          {/* Bottom game tickets row */}
-          {planActive && (
-            <div className="bg-[#fff6f5] dark:bg-[#2a1111] rounded-lg p-2 flex justify-between items-center mt-3">
-               <div className="flex items-center gap-1.5">
-                 <Gamepad2 className="w-4 h-4 text-[#ff5000]" aria-hidden="true" />
-                 <span className="text-[11px] text-[#ff5000] font-medium whitespace-nowrap">
-                   {loc(`${isPro ? 5 : 3} تذاكر ألعاب مجانية يومياً`, `${isPro ? 5 : 3} Free daily game tickets`, `${isPro ? 5 : 3} بلیتی یاری بەخۆڕایی ڕۆژانە`)}
-                 </span>
-               </div>
-               <button type="button" onClick={() => navigate('/games')} className="bg-gradient-to-r from-[#ff0036] to-[#ff5000] text-white text-[11px] px-3 min-h-[32px] py-1 rounded-full font-bold whitespace-nowrap active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
-                 {loc('العب الان', 'Play Now', 'ئێستا یاری بکە')}
-               </button>
-            </div>
-          )}
         </div>
         )}
 
@@ -520,7 +505,7 @@ export default function Profile() {
         )}
 
         {/* Fourth Card: Quick Tiles — members only (all targets need auth;
-            unfinished tiles stay explicitly disabled, not fake). */}
+            every tile leads to a real page). */}
         {isAuthenticated && (
         <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 mb-3 shadow-sm overflow-hidden relative">
           <div className="flex overflow-x-auto gap-5 hide-scrollbar">
@@ -530,7 +515,9 @@ export default function Profile() {
                  working button was removed and the five-cell grid keeps its
                  sizes, spacing and alignment exactly as before. */
               { icon: UserPlus, label: loc('الإحالات', 'Referrals', 'بانگهێشتکردن'), color: 'text-sky-500', bg: 'bg-sky-100 dark:bg-sky-900/30', to: '/referrals' },
-              { icon: Coins, label: loc('جمع العملات', 'Collect Coins', 'کۆکردنەوەی دراو'), color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', to: null },
+              /* The Printer Farm is the real game behind the former "Collect
+                 Coins" placeholder: Farm Coins are earned there, on the server. */
+              { icon: Coins, label: loc('مزرعة الطباعة', 'Printer Farm', 'کێڵگەی چاپکەر'), color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', to: '/games/printer-farm' },
               { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30', to: '/points' },
               { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30', to: '/games' },
               { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', to: '/points' },
@@ -538,15 +525,14 @@ export default function Profile() {
               <button
                 key={i}
                 type="button"
-                disabled={!game.to}
-                onClick={() => { if (game.to) navigate(game.to); }}
-                className={`flex flex-col items-center gap-2 min-w-[56px] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg ${game.to ? 'hover:scale-105 active:scale-95' : 'opacity-40 cursor-not-allowed'}`}
+                onClick={() => navigate(game.to)}
+                className="flex flex-col items-center gap-2 min-w-[56px] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg hover:scale-105 active:scale-95"
               >
                 <span className={`w-[44px] h-[44px] rounded-full flex items-center justify-center ${game.bg}`} aria-hidden="true">
                   <game.icon className={`w-[22px] h-[22px] ${game.color}`} strokeWidth={2} />
                 </span>
                 <span className="text-[11px] text-black dark:text-white text-center whitespace-nowrap">
-                  {game.to ? game.label : loc('قريباً', 'Coming soon', 'بەم زووانە')}
+                  {game.label}
                 </span>
               </button>
             ))}

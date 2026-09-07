@@ -118,9 +118,10 @@ export interface OverlayProps {
   /**
    * Motion props merged onto the PANEL. `Sheet` uses this to make the panel
    * itself draggable — the drag has to move the window, not its contents, so
-   * it cannot live on an inner wrapper.
+   * it cannot live on an inner wrapper. A `ref` in here is MERGED with the
+   * panel's own ref (which takes initial focus), never substituted for it.
    */
-  panelMotion?: Record<string, unknown>;
+  panelMotion?: Record<string, unknown> & { ref?: (el: HTMLDivElement | null) => void };
   /**
    * Opt OUT of the glass material, for a surface whose content needs its own
    * ground: a QR code has to stay dark-on-light to scan at all, and a photo
@@ -167,8 +168,20 @@ export function Overlay({
 }: OverlayProps) {
   const m = useMotion();
   const { dir } = useLanguage();
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const originRef = useRef<string | undefined>(undefined);
+  // The caller's motion props may carry their own ref (Sheet measures the
+  // panel through one). Spreading it after `ref=` would REPLACE the panel ref
+  // and initial focus would silently never happen on phones, so the two are
+  // merged into one callback and the spread carries everything but `ref`.
+  const { ref: callerRef, ...panelMotionRest } = panelMotion ?? {};
+  const setPanel = useCallback(
+    (el: HTMLDivElement | null) => {
+      panelRef.current = el;
+      callerRef?.(el);
+    },
+    [callerRef]
+  );
 
   // The origin is read ONCE, when the window opens: the trigger may scroll or
   // unmount while the window is up, and re-reading it then would make the exit
@@ -220,7 +233,7 @@ export function Overlay({
             <Scrim visible={open} label={label ?? 'إغلاق'} onClose={dismissOnScrim ? onClose : undefined} />
           )}
           <motion.div
-            ref={panelRef}
+            ref={setPanel}
             dir={dir}
             role="dialog"
             aria-modal={mode === 'modal'}
@@ -235,7 +248,7 @@ export function Overlay({
             exit={{ opacity: 0, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
             transition={m.spring(placement === 'bottom' ? 'sheet' : 'ui')}
             style={{ transformOrigin: originRef.current, outline: 'none' }}
-            {...panelMotion}
+            {...panelMotionRest}
             className={`relative min-w-0 ${solid ? 'shadow-2xl' : 'material material-thick border border-white/10'} ${
               placement === 'bottom' ? 'rounded-t-3xl sm:rounded-3xl' : 'rounded-3xl'
             } ${panelClassName}`}
@@ -268,6 +281,10 @@ export interface SheetProps extends Omit<OverlayProps, 'placement' | 'anchor'> {
 export function Sheet({ open, onClose, children, height, panelClassName = '', ...rest }: SheetProps) {
   const m = useMotion();
   const measured = useRef(0);
+  // Stable, so the merged panel ref in Overlay is not re-attached every render.
+  const measure = useCallback((el: HTMLDivElement | null) => {
+    if (el) measured.current = el.offsetHeight;
+  }, []);
 
   const onDragEnd = useCallback(
     (_: unknown, info: PanInfo) => {
@@ -296,9 +313,7 @@ export function Sheet({ open, onClose, children, height, panelClassName = '', ..
         dragPropagation: false,
         dragSnapToOrigin: true,
         onDragEnd,
-        ref: (el: HTMLDivElement | null) => {
-          if (el) measured.current = el.offsetHeight;
-        },
+        ref: measure,
       };
 
   return (

@@ -53,8 +53,20 @@ import Welcome from './pages/Welcome';
 import CompleteProfileSheet from './components/profile/CompleteProfileSheet';
 import Rewards from './pages/Rewards';
 import Referrals from './pages/Referrals';
-import Games from './pages/Games';
-import Leaderboards from './pages/Leaderboards';
+/**
+ * THE GAMES SURFACE IS ITS OWN CHUNK. The Printer Farm (its isometric room,
+ * sheets and trilingual strings) is reached from /games, not from browsing
+ * the store, so none of it belongs in the first byte of the storefront. The
+ * hub, the leaderboards and the two small game pages share that chunk's
+ * strings, so they load lazily too; FarmSkeleton is the eager, tiny fallback
+ * that keeps the layout from jumping while the chunk arrives.
+ */
+const Games = React.lazy(() => import('./pages/Games'));
+const Leaderboards = React.lazy(() => import('./pages/Leaderboards'));
+const PrinterFarm = React.lazy(() => import('./pages/farm/PrinterFarm'));
+const GameProfile = React.lazy(() => import('./pages/games/GameProfile'));
+const GameRedeem = React.lazy(() => import('./pages/games/GameRedeem'));
+import FarmSkeleton, { GamesPageSkeleton } from './pages/farm/FarmSkeleton';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
 import Policies from './pages/Policies';
 import Support from './pages/Support';
@@ -157,11 +169,52 @@ function AppContent() {
             <Route path="/addresses" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
             <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
-            {/* OPEN TO GUESTS. Games makes no network call and reads no user
-                at all; Leaderboards already draws a guest avatar and falls
-                back on every name it shows. */}
-            <Route path="/games" element={<Games />} />
-            <Route path="/leaderboards" element={<Leaderboards />} />
+            {/* OPEN TO GUESTS. The games hub shows a guest an honest sign-in
+                panel and fetches nothing for them; the leaderboards read the
+                one public farm route (GET /api/farm/leaderboard). The farm
+                itself is a member page: every /api/farm call is requireAuth. */}
+            <Route
+              path="/games"
+              element={
+                <Suspense fallback={<GamesPageSkeleton />}>
+                  <Games />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/leaderboards"
+              element={
+                <Suspense fallback={<GamesPageSkeleton />}>
+                  <Leaderboards />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/games/printer-farm"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<FarmSkeleton />}>
+                    <PrinterFarm />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/games/profile"
+              element={
+                <Suspense fallback={<GamesPageSkeleton />}>
+                  <GameProfile />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/games/redeem"
+              element={
+                <Suspense fallback={<GamesPageSkeleton />}>
+                  <GameRedeem />
+                </Suspense>
+              }
+            />
             <Route path="/support" element={<Support />} />
             {/* PUBLIC BY DESIGN, AND THAT IS THE WHOLE POINT OF THE TOKEN.
                 A print model belongs to the customer, so the preview is not
