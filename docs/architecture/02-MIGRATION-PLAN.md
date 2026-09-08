@@ -23,6 +23,13 @@ Names marked **(new)** do not exist yet. Every other file, table, route, test, s
 - **Rollback levels**: (a) revert PR / `wrangler rollback`; (b) gateway prefix → `CORE` (kill switch, seconds); (c) delete the six gateway `/api/*`,`/files/*` zone routes (seconds; the Custom Domains never move); (d) additive migrations never need a down-migration; (e) a var flip between two declared bindings (`LEDGER_TARGET`, Phase 8.1).
 - **Owner gates**: **G0** the Workers Builds Git integration on `levonis-staging` is disconnected and the two-PR rule is in force (before any `0055+` code merges) · **G1** dark report accepted · **G2** bindings, vars/secrets, per-minute cron and migrations on the live core (the exact list is in 2.2) · **G3** the six zone routes added to `levonis-gateway`; `workers_dev:false` + `preview_urls:false` on the core · **G4** secrets move (email/Telegram → Notifications; `KYC_ENC_KEY` → KYC; `ALWASEET_*` → Fulfilment) · **G5** production D1 databases for own-store services · **G6** PostgreSQL + Hyperdrive, and a separate approval per data migration · **G7** core retirement · **D-numbers** = decisions listed in §13.
 - **Two-PR rule (from G0 on)**: a migration ships in its own PR and is applied to the live database by workflow 7 **before** the PR that writes the new column or table merges; code that can run before its migration guards on table presence (`EVENT_BUS_ENABLED`, boot probe) and is tested for "table absent → no statement appended".
+- **Migration numbers shifted by one on 2026-09-08**: `0055_option_color_names.sql` was
+  merged by the TXT-import parity round (it gives `product_option_values` and
+  `product_colors` their `name_ar`/`name_ckb` columns), so every number this plan
+  reserved moves up: `0056_ledger_keys` (0.4), `0057_core_outbox` (1.6),
+  `0058_state_tables` (0.5), `0059_service_keys` (1.6), `0060_checkout_sagas` (7.1),
+  `0061_ledger_balances` (8.1). The names below are the ORIGINAL allocation, kept so
+  the cross-references in the slice table still resolve; read them one higher.
 - **Migration numbers** are allocated in merge order; the plan pins the file *names*: `0055_ledger_keys` (0.4), `0056_core_outbox` (1.6), `0057_state_tables` (0.5: `username_changes`, `mission_streaks`, `product_imports.fingerprint`, `warranty_receipts` column), `0058_service_keys` (1.6, Identity-owned), `0059_checkout_sagas` (7.1), `0060_ledger_balances` (8.1). Every `0055+` header names its owner.
 - Slice PR template (verbatim in every PR): *Scope · Strangler seam · Behaviour preserved (legacy paths still answering; parity test) · Gates run · Rollback · Needs provisioned · Owner gate · Vars/secrets flipped (who, where, propagation) · Verify workflow re-pointed*.
 
