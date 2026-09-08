@@ -35,6 +35,35 @@
 import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
 import { newId } from './crypto';
+import { isInventoryMode, type InventoryMode } from './inventory';
+
+/** What the bridge decided on the file's behalf — surfaced by the route as
+ *  warnings, never swallowed. */
+export interface BridgeDiagnostics {
+  warnings: string[];
+}
+
+/**
+ * WHICH LEVEL COUNTS THE STOCK — the rule the admin form applies on every
+ * save (src/components/adminProducts/form/model.ts deriveInventoryMode),
+ * applied here so a file lands with the same answer the form would give:
+ * an explicit mode wins; otherwise a colour with a stock number means COLOR,
+ * an option with one means OPTION, a product already tracking modelled
+ * combinations that still has some keeps VARIANT_COMBINATION, and anything
+ * else is BASE.
+ */
+export function deriveInventoryModeFromDoc(
+  doc: ProductDoc,
+  view: ProductRelationsView,
+  explicit: string | undefined,
+  keptVariants: number
+): InventoryMode {
+  if (explicit && isInventoryMode(explicit)) return explicit;
+  if (view.inventory_mode === 'VARIANT_COMBINATION' && keptVariants > 0) return 'VARIANT_COMBINATION';
+  if (doc.colors.some((c) => (c.stock ?? null) !== null)) return 'COLOR';
+  if (doc.options.some((o) => (o.stock ?? null) !== null)) return 'OPTION';
+  return 'BASE';
+}
 
 /** One option group, rebuilt from the flat `options.N.group` column. */
 interface GroupOut {
@@ -87,7 +116,12 @@ export function selectionFromComboKey(key: string): { option_value_ids: string[]
  * variants the template cannot express. Everything else comes from the doc,
  * so a key the owner deleted from the file really is a deletion.
  */
-export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView): Record<string, unknown> {
+export function relationsBodyFromDoc(
+  doc: ProductDoc,
+  view: ProductRelationsView,
+  opts: { inventoryMode?: string; diag?: BridgeDiagnostics } = {}
+): Record<string, unknown> {
+  const warn = (msg: string) => opts.diag?.warnings.push(msg);
   // ---- groups, rebuilt from the flat rows --------------------------------
   // Rows that name the same group belong together, in first-appearance order.
   // A row that names none joins the first group, so a file written before this
@@ -151,13 +185,22 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
     return first ? groupOut(first.id, first.name_en) : groupOut(newId('og'), 'Options');
   };
 
-  doc.options.forEach((o, i) => {
-    groupFor(o).values.push({
+  doc.options.forEach((o) => {
+    const target = groupFor(o);
+    target.values.push({
       id: o.id,
       name_en: o.name_en || o.name_ar,
+      // 0055 — the authored names reach the row. An empty string is an
+      // honest "none" the overlay displays as the English name.
+      name_ar: o.name_ar ?? '',
+      name_ckb: o.name_ckb ?? '',
       sku_part: o.sku_part ?? '',
       image: o.image ?? '',
-      sort: typeof o.order === 'number' ? o.order : i,
+      // Position WITHIN the group, exactly as the form numbers it: the doc's
+      // `order` is the position in the whole file, and writing that as the
+      // per-group sort renumbered every value on each round trip
+      // (docs/TXT_IMPORT_PARITY.md, root cause 13).
+      sort: target.values.length,
       active: o.active !== false,
       stock: o.stock ?? null,
       low_stock_threshold: o.low_stock_threshold ?? null,
@@ -180,12 +223,19 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
     const declared = (c.option_ids && c.option_ids.length > 0 ? c.option_ids : c.option_id ? [c.option_id] : []).filter(
       (id) => valueIds.has(id)
     );
+    const wanted = c.option_ids && c.option_ids.length > 0 ? c.option_ids : c.option_id ? [c.option_id] : [];
+    const missing = wanted.filter((id) => !valueIds.has(id));
+    if (missing.length) {
+      warn(`colors.${i + 1} (${c.name_en || c.name_ar}): link(s) to option ${missing.join(', ')} dropped — not in this file`);
+    }
     return {
       id: c.id,
       name_en: c.name_en || c.name_ar,
+      name_ar: c.name_ar ?? '',
+      name_ckb: c.name_ckb ?? '',
       hex: c.hex,
       image: c.image ?? '',
-      sort: typeof c.order === 'number' ? c.order : i,
+      sort: i,
       active: c.active !== false,
       stock: c.stock ?? null,
       low_stock_threshold: c.low_stock_threshold ?? null,
@@ -208,25 +258,22 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
     const ov = m.option_value_id && valueIds.has(m.option_value_id) ? m.option_value_id : null;
     const col = !ov && m.color_id && colorIds.has(m.color_id) ? m.color_id : null;
     const va = !ov && !col && m.variant_id && view.variants.some((v) => v.id === m.variant_id) ? m.variant_id : null;
+    if (m.option_value_id && !ov) warn(`images.${i + 1}: option_value_id=${m.option_value_id} is not in this file — the picture is a gallery image`);
+    if (m.color_id && !col && !ov) warn(`images.${i + 1}: color_id=${m.color_id} is not in this file — the picture is a gallery image`);
+    if (m.variant_id && !va && !ov && !col) warn(`images.${i + 1}: variant_id=${m.variant_id} is not a combination of this product — the picture is a gallery image`);
     return {
       id: m.id,
       url: m.url,
       alt_en: m.alt_en,
-      /**
-       * A .txt exported before 0048 carries the ENGLISH alt in alt_ar and
-       * alt_ckb, because the overlay faked both from alt_en — product_images
-       * had no column for either. Applying such a file would write English
-       * into the Arabic column and call it Arabic. A value byte-identical to
-       * the English one is therefore treated as the fake it is and dropped;
-       * the writer keeps whatever is stored when a field arrives empty, so
-       * nothing real is lost. A genuinely identical Arabic alt is possible in
-       * principle (a model number) and costs nothing when it is skipped.
-       */
-      alt_ar: m.alt_ar && m.alt_ar !== m.alt_en ? m.alt_ar : '',
-      alt_ckb: m.alt_ckb && m.alt_ckb !== m.alt_en ? m.alt_ckb : '',
-      r2_key: m.key,
-      source_url: m.source_url,
-      sort_order: typeof m.order === 'number' ? m.order : i,
+      // 0048 — written AS THE FILE SAYS, '' included: the writer takes an
+      // explicit value as a write and only an absent one as "preserve", so
+      // `images.N.alt_ar=__CLEAR__` finally clears (root cause 7). An Arabic
+      // alt equal to the English one is what the file says it is.
+      alt_ar: m.alt_ar ?? '',
+      alt_ckb: m.alt_ckb ?? '',
+      r2_key: m.key ?? '',
+      source_url: m.source_url ?? '',
+      sort_order: i,
       is_primary: m.primary === true,
       option_value_id: ov,
       color_id: col,
@@ -262,6 +309,17 @@ export function relationsBodyFromDoc(doc: ProductDoc, view: ProductRelationsView
       (v) =>
         v.option_value_ids.every((id) => valueIds.has(id)) && (!v.color_id || colorIds.has(v.color_id))
     );
+  if (view.variants.length > 0) {
+    const dropped = view.variants.length - variants.length;
+    warn(
+      dropped > 0
+        ? `${dropped} من التركيبات المسعّرة حُذفت لأن خيارها أو لونها لم يعد موجودًا في الملف` +
+            (variants.length > 0 ? `، و${variants.length} نُقلت كما هي.` : '.')
+        : `التركيبات المسعّرة (${variants.length}) لا يعبّر عنها قالب TXT، فقد نُقلت كما هي دون تغيير.`
+    );
+  }
 
-  return { groups, colors, images, variants };
+  const inventory_mode = deriveInventoryModeFromDoc(doc, view, opts.inventoryMode, variants.length);
+
+  return { inventory_mode, groups, colors, images, variants };
 }

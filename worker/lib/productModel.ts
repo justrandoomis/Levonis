@@ -424,6 +424,22 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
   }).sort((a, b) => a.order - b.order);
 }
 
+/**
+ * The full link set of a colour. An explicit non-empty list wins; an EMPTY
+ * list (or the '' the TXT template writes for "no list") beside a single
+ * `option_id` means that one link — a hand-written `colors.N.option_id=opt_x`
+ * under the blank template's `option_ids=` line used to lose its link here.
+ */
+function readOptionIds(raw: unknown, optionId: string | null): string[] {
+  const list = Array.isArray(raw)
+    ? (raw as unknown[]).filter((x): x is string => typeof x === 'string' && !!x)
+    : typeof raw === 'string'
+      ? raw.split(',').map((x) => x.trim()).filter(Boolean)
+      : [];
+  if (list.length) return list;
+  return optionId ? [optionId] : [];
+}
+
 export function upgradeColors(raw: unknown): ColorV2[] {
   const arr = safeParseArr(raw);
   return arr.map((item, i) => {
@@ -448,13 +464,7 @@ export function upgradeColors(raw: unknown): ColorV2[] {
       // meaning; this is what a colour offered for two of four options needs,
       // and it is what the relational writer actually stores. A comma string
       // is accepted because that is how the TXT template writes a list.
-      option_ids: Array.isArray(c.option_ids)
-        ? (c.option_ids as unknown[]).filter((x): x is string => typeof x === 'string' && !!x)
-        : typeof c.option_ids === 'string'
-          ? (c.option_ids as string).split(',').map((x) => x.trim()).filter(Boolean)
-          : optionId
-            ? [optionId]
-            : [],
+      option_ids: readOptionIds(c.option_ids, optionId),
       stock: num(c.stock),
       low_stock_threshold: num(c.low_stock_threshold),
       sku_part: s(c.sku_part, 40),

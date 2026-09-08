@@ -16,6 +16,7 @@
  */
 
 import { newId } from './crypto';
+import { localizableSlots } from './translationSlots';
 import { isMixed } from './availability';
 import { normalizeCheapestBase } from './cheapestBase';
 import { buildGrid, COLUMN_OF, FIELDS, type Field } from './priceGrid';
@@ -65,6 +66,10 @@ export interface FieldSpec {
   max?: number;
   /** import-only convenience keys are parsed but never exported */
   exported?: boolean;
+  /** A required subfield that may be omitted when THIS sibling is given —
+   *  an option or colour authored in the (English-only) form has a name_en
+   *  and no name_ar, and such a file must import. */
+  requiredUnless?: string;
   /**
    * Price fields on options and colours: a value written WITH A SIGN (`+60000`,
    * `-5000`) is not a price but the increase (or discount) over the level
@@ -173,6 +178,13 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. والأدق أن تترك الخيارات تقرر: أنواع البيع تُشتق من availability_type لكل خيار.', { enumValues: ['direct_sale', 'pre_order', 'bundle', 'mixed'] as const }),
   f('stock', 'int', 'selling', 'المخزون — stock count; __NULL__ = not tracked', { nullable: true, min: 0, max: 1_000_000 }),
   f('low_stock_threshold', 'int', 'selling', 'حد التنبيه لمخزون المنتج — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
+  // WHICH LEVEL COUNTS THE STOCK. The form derives it from where the numbers
+  // are (colour stock → COLOR, option stock → OPTION, else BASE) on every
+  // save; the file may state it explicitly, and an empty value asks for the
+  // same derivation — never for a silent BASE (docs/TXT_IMPORT_PARITY.md,
+  // root cause 3). Not a document field: it is written by the relations
+  // writer, in the same batch.
+  f('inventory_mode', 'enum', 'selling', 'مستوى المخزون المعتمد: فارغ = يُشتق من مكان الأرقام (stock على اللون → COLOR، على الخيار → OPTION، وإلا BASE) كما يفعل النموذج | BASE | OPTION | COLOR | VARIANT_COMBINATION', { enumValues: ['', 'BASE', 'OPTION', 'COLOR', 'VARIANT_COMBINATION'] as const }),
   // Real money on a direct line, added on top of the price. Exporting a file
   // that showed a price the customer never pays was the quiet half of the
   // owner's complaint about the numbers in the export.
@@ -234,7 +246,7 @@ const GROUP_SPECS: GroupSpec[] = [
       // four ungrouped options and re-import as four separate groups. Rows
       // sharing a group name belong to one group, in first-appearance order.
       f('group', 'string', 'options', 'اسم مجموعة الخيارات التي ينتمي إليها هذا الصف (مثل Model أو التوفر) — الصفوف التي تحمل نفس الاسم تُجمع في مجموعة واحدة. فارغ = المجموعة الافتراضية.'),
-      f('name_ar', 'string', 'options', 'اسم الخيار بالعربية', { required: true, lang: 'ar' }),
+      f('name_ar', 'string', 'options', 'اسم الخيار بالعربية — مطلوب ما لم يُعطَ name_en (0055: يُخزَّن في صف الخيار ويعرضه المتجر)', { required: true, requiredUnless: 'name_en', lang: 'ar' }),
       f('name_en', 'string', 'options', 'Option name (English)', { lang: 'en' }),
       f('name_ckb', 'string', 'options', 'ناوی هەڵبژاردە بە کوردی', { lang: 'ckb' }),
       f('image', 'string', 'options', 'صورة الخيار — option image URL'),
@@ -246,7 +258,6 @@ const GROUP_SPECS: GroupSpec[] = [
       f('regular_price_iqd', 'iqd', 'options', 'الزيادة فوق السعر الأساسي بصيغة +N (مثال +60000)، أو __NULL__ = نفس السعر الأساسي. رقم بلا إشارة = سعر ثابت، ويُعاد التعبير عنه كزيادة عند الاستيراد دون تغيير ما يدفعه الزبون.', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
       f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للخيار — __NULL__ = وراثة لكل حقل (خيار ← أساسي)؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
       f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للخيار — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
-      f('compare_at_iqd', 'iqd', 'options', 'سعر المقارنة للخيار — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'options', 'كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
       // ---- 0044: an ADJUSTMENT instead of a pin. A row that says "+60,000
       // above the base" keeps following the base; a row that pins a number
@@ -272,7 +283,7 @@ const GROUP_SPECS: GroupSpec[] = [
     titleAr: 'الألوان', titleEn: 'Colors',
     fields: [
       f('id', 'string', 'colors', 'معرف ثابت — stable id for merge-by-id'),
-      f('name_ar', 'string', 'colors', 'اسم اللون بالعربية', { required: true, lang: 'ar' }),
+      f('name_ar', 'string', 'colors', 'اسم اللون بالعربية — مطلوب ما لم يُعطَ name_en (0055: يُخزَّن في صف اللون)', { required: true, requiredUnless: 'name_en', lang: 'ar' }),
       f('name_en', 'string', 'colors', 'Color name (English)', { lang: 'en' }),
       f('name_ckb', 'string', 'colors', 'ناوی ڕەنگ بە کوردی', { lang: 'ckb' }),
       f('hex', 'hex', 'colors', 'رمز اللون #RRGGBB أو فارغ'),
@@ -291,7 +302,6 @@ const GROUP_SPECS: GroupSpec[] = [
       f('regular_price_iqd', 'iqd', 'colors', 'الزيادة فوق سعر الخيار المختار (أو الأساسي) بصيغة +N، أو __NULL__ = نفس سعر الخيار. رقم بلا إشارة = سعر ثابت يستبدل السعر (لون ← خيار ← أساسي).', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
       f('pro_price_iqd', 'iqd', 'colors', 'سعر PRO للون — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
       f('prime_price_iqd', 'iqd', 'colors', 'سعر PRIME للون — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
-      f('compare_at_iqd', 'iqd', 'colors', 'سعر المقارنة للون — __NULL__ = inherit', { nullable: true, min: 0, max: IQD_MAX }),
       f('cost_iqd', 'iqd', 'colors', 'كلفة اللون (داخلي) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
       // ---- 0044: see the options group above.
       f('regular_adjust_iqd', 'int', 'colors', 'الزيادة فوق سعر الخيار المختار (أو الأساسي) بالدينار — الطريقة المعتمدة لتسعير اللون: يتبع ما تحته ويبقى الفرق ثابتًا. يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
@@ -757,6 +767,9 @@ export function parseTemplate(text: string): ParsedTemplate {
 export interface ExportOpts {
   /** brand slug for readability (falls back to doc.brand_id / __NULL__) */
   brand?: string | null;
+  /** `products.inventory_mode` — not on the document, supplied by the route
+   *  so the export says which level counts the stock and a re-import keeps it. */
+  inventoryMode?: string | null;
   /**
    * The §10 spec field ids this product's family declares, in form order.
    * Supplied by the route from `fieldsFor(template_family, sections)`; the
@@ -911,6 +924,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   push('selling_type', isMixed(doc.sale_types) ? 'mixed' : doc.selling_type);
   push('stock', numStr(doc.stock));
   push('low_stock_threshold', numStr(doc.low_stock_threshold));
+  if (opts.inventoryMode !== undefined) push('inventory_mode', opts.inventoryMode ?? '');
   push('direct_surcharge_iqd', numStr(doc.direct_surcharge_iqd));
   push('payment_options', doc.payment_options.join(','));
   // Device coverage — written whenever the product states it. A product that
@@ -1489,6 +1503,10 @@ export interface ResolvedRefs {
 
 export interface ToDocResult {
   body: Record<string, unknown>;
+  /** The file's `inventory_mode` line: a mode, '' = derive like the form,
+   *  undefined = the line was absent (preserve the stored mode). Not a
+   *  document field — the relations writer owns the column. */
+  inventory_mode?: string;
   applied_fields: string[];
   cleared_fields: string[];
   preserved_fields: string[];
@@ -1553,6 +1571,8 @@ function buildGroupItems(
     if (g.idPrefix && (typeof item.id !== 'string' || !item.id)) item.id = newId(g.idPrefix);
     // requiredness of subfields — never silently drop an item
     for (const spec of g.fields) {
+      const sibling = spec.requiredUnless ? item[spec.requiredUnless] : undefined;
+      if (spec.requiredUnless && typeof sibling === 'string' && sibling.trim() !== '') continue;
       if (spec.required && spec.type !== 'iqd' && spec.type !== 'int') {
         const v = item[spec.key];
         if (v === undefined || v === null || v === '') {
@@ -1794,6 +1814,9 @@ export function toDocBody(
         // The enum allows '' for "no family"; the column holds NULL for that.
         body.template_family = pf.value ? pf.value : null;
         break;
+      case 'inventory_mode':
+        result.inventory_mode = typeof pf.value === 'string' ? pf.value : '';
+        break;
       case 'usage_official_url':
         // Nested in usage_guide; the steps beside it are a group (below).
         body.usage_guide = { ...guideOf(body), official_url: typeof pf.value === 'string' ? pf.value : '' };
@@ -1916,6 +1939,23 @@ export function toDocBody(
       });
     }
     if (g.name === 'colors') {
+      // `option_ids` is the full link set and wins over the single-link
+      // `option_id` — the store's own export writes both, with `__NULL__` in
+      // the single slot whenever the set has more than one entry. A single
+      // link that names an option the set does NOT contain is a genuine
+      // contradiction, and it is reported rather than resolved silently.
+      templateItems.forEach((it) => {
+        const single = it.fields.option_id;
+        const list = it.fields.option_ids;
+        const listed = Array.isArray(list?.value) ? (list!.value as string[]) : [];
+        const named = typeof single?.value === 'string' ? single.value.trim() : '';
+        if (named && listed.length > 0 && !listed.includes(named)) {
+          result.needs_review.push({
+            key: `colors.${it.index}.option_id`, line: single!.line, value: named,
+            message: `conflicting link keys: option_id=${named} is not in option_ids=${listed.join(',')} — keep one, or list it`,
+          });
+        }
+      });
       // Resolve import-only option_index references onto option ids.
       templateItems.forEach((it, i) => {
         const pf = it.fields.option_index;
@@ -2002,6 +2042,47 @@ export function translationBookkeeping(
   };
   track('name');
   track('description');
+
+  /**
+   * WHAT THE FILE WROTE IN ARABIC OR KURDISH WAS WRITTEN BY A PERSON. The
+   * template path never machine-translates, so every ar/ckb text that lands
+   * through it is authored — and the form's localiser must not regenerate it
+   * on the next save (docs/TXT_IMPORT_PARITY.md, root cause 10). The mark is
+   * `approved`: the one status the form's tracking already keeps while the
+   * English source is unchanged, and the one its localiser now restores. A
+   * text identical to what is stored keeps whatever status it had, so an
+   * untouched re-import of a form-built product does not freeze machine copy.
+   */
+  const existingSlots = new Map(
+    existing ? localizableSlots(existing as unknown as Record<string, unknown>).map((s) => [s.key, s]) : []
+  );
+  for (const slot of localizableSlots(body)) {
+    const before = existingSlots.get(slot.key);
+    for (const lang of ['ar', 'ckb'] as const) {
+      const text = slot[lang];
+      if (!text.trim()) {
+        /**
+         * AN EMPTY FIELD IS A STATED ABSENCE, NOT A GAP TO FILL. The file
+         * carries every slot it knows about; leaving one blank is the author
+         * saying "there is no Kurdish for this row". Without a mark, the first
+         * form save ran the localiser over it and invented one — `title_ckb`
+         * '' became 'Group', `body_ckb` '' became the English body — so the
+         * same document did not survive TXT create → form save unchanged
+         * (docs/TXT_IMPORT_PARITY.md). `missing` is the honest status, and
+         * `localizeRespectingAuthored` keeps it empty while the English source
+         * is unchanged.
+         */
+        if (slot.en.trim()) {
+          meta[slot.key] = { ...(meta[slot.key] ?? {}), [lang]: { status: 'missing', src_rev: contentRev } };
+        }
+        continue;
+      }
+      const unchanged = !!before && before[lang] === text && before.en === slot.en;
+      const prior = meta[slot.key]?.[lang];
+      if (unchanged && prior && prior.status !== 'approved') continue;
+      meta[slot.key] = { ...(meta[slot.key] ?? {}), [lang]: { status: 'approved', src_rev: contentRev } };
+    }
+  }
   return { content_rev: contentRev, translation_meta: meta };
 }
 

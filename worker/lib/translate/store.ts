@@ -36,23 +36,32 @@ interface ExistingRow {
   status: string;
 }
 
+/** The statements of one translation sync, so a caller that already runs a
+ *  transaction (the shared product persistence contract) can put them in ITS
+ *  batch instead of a second one. */
+export interface TranslationPlan {
+  statements: D1PreparedStatement[];
+  summary: TranslationWriteSummary;
+}
+
 /**
- * Regenerates and stores translations for the given fields of one product.
- * Returns a summary the caller can surface in the admin UI — the fields still
- * needing a human are named explicitly, never hidden behind a success message.
+ * Plans — but does NOT execute — the regeneration of the given fields of one
+ * product. Returns a summary the caller can surface in the admin UI — the
+ * fields still needing a human are named explicitly, never hidden behind a
+ * success message.
  */
-export async function syncProductTranslations(
+export async function planProductTranslations(
   db: D1Database,
   productId: string,
   inputs: TranslationInput[]
-): Promise<TranslationWriteSummary> {
+): Promise<TranslationPlan> {
   const summary: TranslationWriteSummary = {
     written: 0,
     skipped_unchanged: 0,
     kept_approved: 0,
     review_needed: [],
   };
-  if (inputs.length === 0) return summary;
+  if (inputs.length === 0) return { statements: [], summary };
 
   const { results } = await db
     .prepare('SELECT field, source_hash, status FROM product_translations WHERE product_id = ?')
@@ -120,8 +129,22 @@ export async function syncProductTranslations(
     }
   }
 
-  if (statements.length) await db.batch(statements);
-  return summary;
+  return { statements, summary };
+}
+
+/**
+ * Regenerates and stores translations for the given fields of one product —
+ * `planProductTranslations` plus its own batch, for callers with no
+ * transaction of their own.
+ */
+export async function syncProductTranslations(
+  db: D1Database,
+  productId: string,
+  inputs: TranslationInput[]
+): Promise<TranslationWriteSummary> {
+  const plan = await planProductTranslations(db, productId, inputs);
+  if (plan.statements.length) await db.batch(plan.statements);
+  return plan.summary;
 }
 
 export interface StoredTranslation {

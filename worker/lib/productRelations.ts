@@ -38,6 +38,11 @@ export interface OptionValueRow {
   product_id: string;
   group_id: string;
   name_en: string;
+  /** 0055. Authored Arabic / Kurdish names; '' = none (display falls back to
+   *  name_en). Optional on the type so a row read before the migration ran
+   *  still parses. */
+  name_ar?: string | null;
+  name_ckb?: string | null;
   sku_part: string;
   image: string;
   sort: number;
@@ -71,6 +76,9 @@ export interface ColorRow {
   id: string;
   product_id: string;
   name_en: string;
+  /** 0055 — see OptionValueRow. */
+  name_ar?: string | null;
+  name_ckb?: string | null;
   hex: string;
   image: string;
   sku_part: string;
@@ -228,6 +236,20 @@ export interface ProductRelations {
   links: ColorLinkRow[];
 }
 
+/**
+ * Values are ordered GROUP BY GROUP — the group's sort first, then the value's
+ * sort within it. The flat `ORDER BY sort, name_en` this used to be interleaved
+ * the groups ("Model / A1", "Nozzle / 0.4", "Model / A1 Combo") and, because
+ * the TXT export derives group order from first appearance, flipped the group
+ * order on every round trip (docs/TXT_IMPORT_PARITY.md, root cause 13). Shared
+ * by the one-product and the paged reads so every consumer sees one order.
+ */
+export const VALUES_ORDER_SQL =
+  `SELECT v.* FROM product_option_values v
+     LEFT JOIN product_option_groups g ON g.id = v.group_id
+    WHERE v.product_id = ?
+    ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`;
+
 /** Loads every relational piece of one product in four indexed reads. */
 export async function loadProductRelations(
   db: D1Database,
@@ -238,10 +260,7 @@ export async function loadProductRelations(
       .prepare('SELECT * FROM product_option_groups WHERE product_id = ? ORDER BY sort, name_en')
       .bind(productId)
       .all<OptionGroupRow>(),
-    db
-      .prepare('SELECT * FROM product_option_values WHERE product_id = ? ORDER BY sort, name_en')
-      .bind(productId)
-      .all<OptionValueRow>(),
+    db.prepare(VALUES_ORDER_SQL).bind(productId).all<OptionValueRow>(),
     db
       .prepare('SELECT * FROM product_colors WHERE product_id = ? ORDER BY sort, name_en')
       .bind(productId)

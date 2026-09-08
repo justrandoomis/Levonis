@@ -201,8 +201,18 @@ export async function loadRelationsViews(
     softAll<OptionGroupRow>('groups', () =>
       db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionGroupRow>()
     ),
+    // Group by group, then value sort — the same order loadProductRelations
+    // reads, so a listing and a product page never disagree about it.
     softAll<OptionValueRow>('values', () =>
-      db.prepare(`SELECT * FROM product_option_values WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionValueRow>()
+      db
+        .prepare(
+          `SELECT v.* FROM product_option_values v
+             LEFT JOIN product_option_groups g ON g.id = v.group_id
+            WHERE v.product_id IN (${ph})
+            ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`
+        )
+        .bind(...ids)
+        .all<OptionValueRow>()
     ),
     softAll<ColorRow>('colors', () =>
       db.prepare(`SELECT * FROM product_colors WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<ColorRow>()
@@ -267,13 +277,19 @@ export async function loadRelationsViews(
 
 const truthy = (v: number | boolean) => v !== 0 && v !== false;
 
+/** The stored name in a language, or the English one when none was authored. */
+export const authoredName = (stored: string | null | undefined, english: string): string =>
+  typeof stored === 'string' && stored.trim() !== '' ? stored : english;
+
 /**
  * Projects relational rows into the OptionV2/ColorV2 shapes the price resolver
  * and every existing consumer already understand.
  *
- * The ar/ckb name slots carry the ENGLISH name: §7 defines option and colour
- * names as English-only, and copying rather than blanking means a locale-aware
- * caller still gets a readable label.
+ * The ar/ckb name slots carry the AUTHORED name when the row has one (0055 —
+ * a TXT template can state `options.N.name_ar`) and fall back to the English
+ * name otherwise: §7 defines option and colour names as English-only in the
+ * form, and copying rather than blanking means a locale-aware caller still
+ * gets a readable label. The fallback is display-only; nothing is stored.
  *
  * `option_id` on a colour is filled ONLY when the colour links to exactly one
  * option value — that is the one case the old single-link field can express
@@ -294,6 +310,14 @@ export interface OverlayOpts {
    * REAL active flag.
    */
   includeInactive?: boolean;
+  /**
+   * Arabic and Kurdish names AS STORED — '' when none was authored — instead
+   * of the English display fallback. The storefront wants the fallback (a
+   * readable label); the admin document, the TXT export and the read-back
+   * verification want the truth, because the fallback exported and
+   * re-imported would be stored as an authored Kurdish name that nobody wrote.
+   */
+  authoredNames?: boolean;
 }
 
 export function applyRelations(
@@ -303,15 +327,17 @@ export function applyRelations(
 ): ProductDoc {
   if (!view.has_relations) return doc;
   const showAll = opts.includeInactive === true;
+  const nameIn = (stored: string | null | undefined, english: string): string =>
+    opts.authoredNames ? (typeof stored === 'string' ? stored : '') : authoredName(stored, english);
   const groupNameById = new Map(view.groups.map((g) => [g.id, g.name_en]));
 
   const options: OptionV2[] = view.values
     .filter((v) => showAll || truthy(v.active))
     .map((v) => ({
       id: v.id,
-      name_ar: v.name_en,
+      name_ar: nameIn(v.name_ar, v.name_en),
       name_en: v.name_en,
-      name_ckb: v.name_en,
+      name_ckb: nameIn(v.name_ckb, v.name_en),
       image: v.image,
       order: v.sort,
       active: showAll ? truthy(v.active) : true,
@@ -356,9 +382,9 @@ export function applyRelations(
       const linked = linksByColor.get(x.id) ?? [];
       return {
         id: x.id,
-        name_ar: x.name_en,
+        name_ar: nameIn(x.name_ar, x.name_en),
         name_en: x.name_en,
-        name_ckb: x.name_en,
+        name_ckb: nameIn(x.name_ckb, x.name_en),
         hex: x.hex,
         image: x.image,
         option_id: linked.length === 1 ? linked[0] : null,
