@@ -29,6 +29,8 @@ export interface Env {
    *  only sent to these addresses (other requests behave normally but skip
    *  the send). Leave unset in production. */
   EMAIL_ALLOWED_RECIPIENTS?: string;
+  /** `on` makes an EMPTY `EMAIL_ALLOWED_RECIPIENTS` mean "nobody" — the dark core's setting */
+  EMAIL_ALLOWLIST_REQUIRED?: string;
   /** Secret compared against Telegram's X-Telegram-Bot-Api-Secret-Token
    *  webhook header; the webhook stays honestly disabled until set. */
   TELEGRAM_WEBHOOK_SECRET?: string;
@@ -49,6 +51,49 @@ export interface Env {
   ALWASEET_BASE_URL?: string;
   ALWASEET_USERNAME?: string;
   ALWASEET_PASSWORD?: string;
+
+  // ------------------------------------------------------------------ Phase 1
+  // The event bus and the named entrypoints (02-MIGRATION-PLAN.md 1.6). EVERY
+  // one of these is optional and absent on the live Worker today, and the code
+  // behind them is a no-op while they are: the monolith with none of them set
+  // behaves exactly as it did before they existed. They are bound in `env.dark`
+  // first (1.4/1.7) and on the live Worker only at G2 (2.2).
+  /** Consumer Workers this Worker fans events out to. Absent = outbox rows accumulate, nothing is delivered. */
+  AUDIT?: EventConsumerBinding;
+  ANALYTICS?: EventConsumerBinding;
+  ADS?: EventConsumerBinding;
+  NOTIFICATIONS?: EventConsumerBinding;
+  /** Queue producers for `EVENT_BUS_MODE=queue`; the same dispatcher drives both. */
+  Q_AUDIT?: EventQueueBinding;
+  Q_ANALYTICS?: EventQueueBinding;
+  Q_ADS?: EventQueueBinding;
+  Q_NOTIFICATIONS?: EventQueueBinding;
+  /** `on` publishes; anything else (the default) appends no statement anywhere. */
+  EVENT_BUS_ENABLED?: string;
+  /** `rpc` (default) | `queue`. */
+  EVENT_BUS_MODE?: string;
+  /** base64url PKCS#8 / raw public half of the core's event + hop signing key. Never logged. */
+  CORE_SIGNING_KEY?: string;
+  CORE_SIGNING_PUBLIC_KEY?: string;
+  /** `service:kid:publicKey,…` — the callers whose hop envelopes the entrypoints accept. */
+  ALLOWED_CALLER_KIDS?: string;
+  /** `off` (today) | `log` | `on` — the inbound gateway assertion on HTTP. */
+  GATEWAY_ONLY?: string;
+  /** Constant-time-compared token that lets a health probe past the gateway assertion. */
+  HEALTH_PROBE_TOKEN?: string;
+  /** Deployed commit, echoed by health as `ver`. */
+  LEVONIS_VERSION?: string;
+}
+
+/** What a bound consumer Worker exposes (`packages/contracts` `rpc/consumer.ts`). */
+export interface EventConsumerBinding {
+  deliver(batch: unknown[], hop?: unknown): Promise<{ results: Array<{ event_id: string; result: string; error?: string }> }>;
+  health?(): Promise<unknown>;
+}
+
+/** What a queue producer binding exposes. */
+export interface EventQueueBinding {
+  sendBatch(messages: Array<{ body: unknown }>): Promise<void>;
 }
 
 export interface SessionUser {

@@ -22,6 +22,9 @@ import { createSession, destroySession, destroyAllSessions, loadSessionUser , FR
 import { verifyGoogleIdToken } from '../lib/google';
 import { identifierKey, rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { emitEvent, emitFromRequest, eventsEnabled } from '../lib/eventBus';
+import { UserCreatedV1 } from '@levonis/contracts/events/v1/UserCreated';
+import { ReferralUsedV1 } from '@levonis/contracts/events/v1/ReferralUsed';
 import { normalizePhone, maskPhone, DEFAULT_COUNTRY, allCountries } from '../lib/phone';
 import { canonicalUsername, usernameRejection, suggestUsername } from '../lib/usernames';
 import {
@@ -178,6 +181,33 @@ async function resolveReferrer(env: Env, raw: string): Promise<SupportRef | null
 }
 
 /**
+ * `UserCreated` (03-EVENTS.md §3.1) — one event per account, whichever of the
+ * four signup paths created it, seq 1 of the user aggregate. No contact and no
+ * hash: at signup `marketing_consent` is necessarily `none`, so a hash here
+ * would reach Ads before any consent exists. Never throws and never delays the
+ * response — while the bus is off (today) it does not even run.
+ */
+async function emitUserCreated(
+  c: { env: Env },
+  p: { userId: string; method: 'password' | 'google' | 'telegram' | 'email_first'; localeDb: string; referrerCode: string; emailVerified: boolean; createdAt?: string }
+): Promise<void> {
+  if (!eventsEnabled(c.env)) return;
+  await emitFromRequest(
+    c,
+    UserCreatedV1,
+    {
+      user_id: p.userId,
+      method: p.method,
+      locale: localeToApi(p.localeDb),
+      referrer_code: p.referrerCode ? p.referrerCode.slice(0, 64) : null,
+      email_verified: p.emailVerified,
+      created_at: p.createdAt ?? new Date().toISOString(),
+    },
+    { aggregateId: p.userId, actorId: p.userId, aggregateSeq: 1 }
+  );
+}
+
+/**
  * Best-effort referral attribution after a successful account CREATION
  * (§3.2). Binds exactly ONCE at account creation — UNIQUE(referred_id,
  * campaign) makes the first attribution final; self-referral never binds.
@@ -190,7 +220,7 @@ async function tryAttributeReferral(env: Env, newUserId: string, ref: string): P
   try {
     const resolved = await resolveReferrer(env, ref);
     if (!resolved) return;
-    await bindReferral(env, newUserId, resolved.userId);
+    await bindReferral(env, newUserId, resolved.userId, ref);
   } catch (e) {
     console.error('referral attribution failed for user', newUserId, e instanceof Error ? e.message : String(e));
   }
@@ -203,15 +233,26 @@ async function tryAttributeReferral(env: Env, newUserId: string, ref: string): P
  * a replayed request or a second signup attempt can never rebind an account
  * to a different referrer. Self-referral never binds.
  */
-async function bindReferral(env: Env, newUserId: string, referrerId: string): Promise<void> {
+async function bindReferral(env: Env, newUserId: string, referrerId: string, code = ''): Promise<void> {
   if (!referrerId || referrerId === newUserId) return; // self-referral never binds
   for (const campaign of ['printer', 'pro_sub'] as const) {
+    const attributionId = newId('rat');
     try {
       await env.DB.prepare(
         'INSERT INTO referral_attributions (id, referrer_id, referred_id, campaign) VALUES (?, ?, ?, ?)'
       )
-        .bind(newId('rat'), referrerId, newUserId, campaign)
+        .bind(attributionId, referrerId, newUserId, campaign)
         .run();
+      // `ReferralUsed` (03-EVENTS.md §3.15) — the attribution that was actually
+      // created, never the one that was refused by UNIQUE(referred_id, campaign).
+      if (campaign === 'printer') {
+        await emitEvent(
+          env.DB,
+          ReferralUsedV1,
+          { referrer_id: referrerId, referee_id: newUserId, code: code || referrerId, attribution_id: attributionId, context: 'signup', order_id: null },
+          { aggregateId: attributionId, actorId: newUserId, aggregateSeq: 1 }
+        );
+      }
     } catch (e) {
       // UNIQUE(referred_id, campaign): already bound once — never rebind.
       const msg = e instanceof Error ? e.message : String(e);
@@ -450,6 +491,7 @@ authRoutes.post('/register', async (c) => {
     throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
   }
 
+  await emitUserCreated(c, { userId: id, method: 'password', localeDb: locale, referrerCode: referralCode, emailVerified: false });
   await tryAttributeReferral(c.env, id, referralCode);
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
@@ -618,6 +660,7 @@ authRoutes.post('/signup/complete', async (c) => {
       throw e;
     }
   }
+  await emitUserCreated(c, { userId: id, method: 'email_first', localeDb: p.locale, referrerCode: referral, emailVerified: true, createdAt: now });
   await tryAttributeReferral(c.env, id, referral);
   await createSession(c, id);
   await audit(c.env.DB, id, 'auth.signup_completed', id, usernameDropped ? { username_dropped: true } : {});
@@ -812,6 +855,7 @@ export async function resolveGoogleIdentity(
       .bind(id, identity.email, uname, identity.name || 'User', identity.sub)
       .run();
     row = (await getFullUser(env.DB, id))!;
+    await emitUserCreated({ env }, { userId: id, method: 'google', localeDb: row.locale, referrerCode: referralCode, emailVerified: true, createdAt: row.created_at });
     // Referral attribution happens ONLY on account creation — an existing
     // account signing in with a ?ref= link must never be re-attributed.
     await tryAttributeReferral(env, id, referralCode);
@@ -1556,6 +1600,17 @@ authRoutes.post('/telegram/complete', async (c) => {
     );
   }
 
+  await emitUserCreated(c, {
+    userId: id,
+    method: 'telegram',
+    // The Telegram signup INSERT names no locale, so the account carries the
+    // column's default rather than a guess made here.
+    localeDb: 'en',
+    referrerCode: referralCodeFrom(body),
+    emailVerified: false,
+    createdAt: now,
+  });
+
   // Referral binds ONCE, here, at account creation (§3.2) — never on a link
   // visit and never on a later sign-in. An explicit code in THIS request
   // wins over the one captured when the flow started; with none, the
@@ -1816,6 +1871,13 @@ async function sendEmail(env: Env, to: string, subject: string, html: string, te
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+  // An empty allowlist means "everyone", EXCEPT where the deployment declares
+  // that it must not reach a real address at all (`EMAIL_ALLOWLIST_REQUIRED`,
+  // the dark core), where it means "nobody".
+  if (allowed.length === 0 && (env.EMAIL_ALLOWLIST_REQUIRED || '').trim().toLowerCase() === 'on') {
+    console.warn('sendEmail: EMAIL_ALLOWED_RECIPIENTS is empty and EMAIL_ALLOWLIST_REQUIRED is on — send skipped');
+    return false;
+  }
   if (allowed.length > 0 && !allowed.includes(to.toLowerCase())) {
     console.warn('sendEmail: recipient is not in EMAIL_ALLOWED_RECIPIENTS — send skipped (staging guard)');
     return false;

@@ -40,6 +40,9 @@
  * negative row.
  */
 
+import { InventoryChangedV1 } from '@levonis/contracts/events/v1/InventoryChanged';
+import { outboxStatement } from './eventBus';
+
 export type InventoryMode = 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION';
 
 export const INVENTORY_MODES: readonly InventoryMode[] = [
@@ -370,6 +373,14 @@ function guardHolds(kind: LedgerKind, qty: number, row: { stock: number | null; 
 export interface InventoryPlan extends ApplyResult {
   /** Statements to execute. Empty when everything was skipped or rejected. */
   statements: D1PreparedStatement[];
+  /**
+   * The `InventoryChanged` event ids this plan appended, so the caller can hand
+   * them to `pumpAfter()` alongside its own. Without them the stock facts of a
+   * checkout wait for the cron — up to fifteen minutes of avoidable lag on the
+   * highest-volume event in the system, while the order event next to them in
+   * the very same batch is delivered at once. Empty while the bus is off.
+   */
+  eventIds: string[];
 }
 
 /**
@@ -407,7 +418,7 @@ export async function planInventory(
       wanted.push({ key: KEY(opts.kind, opts.operationId, move.line_id, t.scope, t.scope_id), move, target: t });
     }
   }
-  if (wanted.length === 0) return { applied: 0, skipped: 0, rejected: [], keys: [], statements: [] };
+  if (wanted.length === 0) return { applied: 0, skipped: 0, rejected: [], keys: [], statements: [], eventIds: [] };
 
   const placeholders = wanted.map(() => '?').join(', ');
   const { results } = await db
@@ -418,11 +429,14 @@ export async function planInventory(
 
   const candidates = wanted.filter((w) => !done.has(w.key));
   const skipped = wanted.length - candidates.length;
-  if (candidates.length === 0) return { applied: 0, skipped, rejected: [], keys: [], statements: [] };
+  if (candidates.length === 0) return { applied: 0, skipped, rejected: [], keys: [], statements: [], eventIds: [] };
 
   // Guard pre-check against live values.
   const rejected: RejectedMove[] = [];
   const fresh: typeof candidates = [];
+  // The row as it stood when the guard was evaluated, kept so the event can
+  // state stock_after/reserved_after without a second read (03-EVENTS.md §3.4).
+  const before = new Map<string, { stock: number; reserved: number }>();
   for (const w of candidates) {
     const table = tableFor(w.target.scope);
     const reserved = reservedColumn(w.target.scope);
@@ -444,11 +458,13 @@ export async function planInventory(
       });
       continue;
     }
+    before.set(w.key, { stock: row.stock ?? 0, reserved: row.reserved ?? 0 });
     fresh.push(w);
   }
-  if (fresh.length === 0) return { applied: 0, skipped, rejected, keys: [], statements: [] };
+  if (fresh.length === 0) return { applied: 0, skipped, rejected, keys: [], statements: [], eventIds: [] };
 
   const statements: D1PreparedStatement[] = [];
+  const eventIds: string[] = [];
   let seq = 0;
   for (const w of fresh) {
     const { table, set, setArgs, guard, guardArgs } = counterSql(opts.kind, w.target.scope, w.move.qty);
@@ -488,7 +504,97 @@ export async function planInventory(
     );
   }
 
-  return { applied: fresh.length, skipped, rejected, keys: fresh.map((w) => w.key), statements };
+  // §7 of the events catalogue: one InventoryChanged per ledger write, in the
+  // SAME batch as the counter change, so a stock movement and the fact that it
+  // happened commit together. `outboxStatement` returns null — and this loop
+  // therefore adds nothing at all — while the bus is off, which is every
+  // deployment until G2.
+  //
+  // EVERY ROW IS GUARDED BY THE LEDGER ROW IT DESCRIBES. The ledger INSERT and
+  // the counter UPDATE above are conditional: when the guard stops holding
+  // between the pre-check read and the batch — two checkouts of the last unit,
+  // a checkout racing an admin adjustment — they match zero rows and the batch
+  // still commits. An unconditional event row would then announce a movement
+  // that never happened, which is the outbox's own promise inverted for the
+  // highest-volume transactional event in the system. The `inventory_ledger`
+  // row is the proof the movement happened, and these statements come after it
+  // in the batch, so the guard sees it.
+  //
+  // `delta` is exact. `stock_after`/`reserved_after` are the guard's own
+  // reading plus that delta: correct whenever this operation is the only one
+  // moving the row, and under concurrency an absolute that was true at the
+  // pre-check rather than at commit. Consumers that must not drift key on
+  // `delta` and `op_id`; deriving the absolutes in SQL is not open to us
+  // because the envelope is signed over its payload.
+  for (const w of fresh) {
+    const b = before.get(w.key) ?? { stock: 0, reserved: 0 };
+    const after = stockAfter(opts.kind, w.move.qty, b);
+    const pending = await outboxStatement(
+      db,
+      InventoryChangedV1,
+      {
+        product_id: w.move.product_id,
+        scope: { table: eventTableFor(w.target.scope), id: w.target.scope === 'base' ? w.move.product_id : w.target.scope_id },
+        delta: after.stock - b.stock,
+        stock_after: after.stock,
+        reserved_after: after.reserved,
+        reason: EVENT_REASON[opts.kind],
+        op_id: w.key,
+        order_id: opts.orderId ?? null,
+      },
+      {
+        aggregateId: w.move.product_id,
+        actorId: opts.actorUserId ?? null,
+        guard: { sql: 'EXISTS (SELECT 1 FROM inventory_ledger WHERE idempotency_key = ?)', args: [w.key] },
+      }
+    );
+    if (pending) {
+      statements.push(pending.statement);
+      eventIds.push(pending.eventId);
+    }
+  }
+
+  return { applied: fresh.length, skipped, rejected, keys: fresh.map((w) => w.key), statements, eventIds };
+}
+
+/** The table whose stock row moved, as the event catalogue spells it. */
+function eventTableFor(scope: StockScope): 'products' | 'product_option_values' | 'product_colors' | 'product_variants' {
+  return scope === 'base' ? 'products' : scope === 'option' ? 'product_option_values' : scope === 'color' ? 'product_colors' : 'product_variants';
+}
+
+/** The ledger kind as the event catalogue names it (03-EVENTS.md §3.4). */
+const EVENT_REASON: Record<LedgerKind, 'reserve' | 'commit' | 'release' | 'deduct' | 'restore' | 'adjust'> = {
+  reserve: 'reserve',
+  release: 'release',
+  deduct: 'deduct',
+  restore: 'restore',
+  adjust_in: 'adjust',
+  adjust_out: 'adjust',
+};
+
+/**
+ * What the row will read once this move's guarded statements have run — the
+ * same arithmetic `counterSql` writes, kept beside it so the event can never
+ * describe a movement different from the one performed.
+ */
+export function stockAfter(
+  kind: LedgerKind,
+  qty: number,
+  before: { stock: number; reserved: number }
+): { stock: number; reserved: number } {
+  switch (kind) {
+    case 'reserve':
+      return { stock: before.stock, reserved: before.reserved + qty };
+    case 'release':
+      return { stock: before.stock, reserved: before.reserved - qty };
+    case 'deduct':
+      return { stock: before.stock - qty, reserved: before.reserved - qty };
+    case 'restore':
+    case 'adjust_in':
+      return { stock: before.stock + qty, reserved: before.reserved };
+    case 'adjust_out':
+      return { stock: before.stock - qty, reserved: before.reserved };
+  }
 }
 
 /** Plans and executes in one call — for callers with no transaction of their

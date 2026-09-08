@@ -35,7 +35,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { feeFor } from '../lib/merchantOps';
 import { exchangeRate, iqdToUsdCents } from '../lib/escrowOps';
-import { createPurchaseHold, commitHoldStatements } from '../lib/walletOps';
+import { createPurchaseHold, commitHoldStatements, holdSettledEventStatements } from '../lib/walletOps';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -352,7 +352,12 @@ storeOrderRoutes.post('/', async (c) => {
         holdId,
         note: `Wallet payment on order ${orderId}`,
         ref: orderId,
-      })
+      }),
+      // The settlement event (§3.9) rides in the SAME batch as the debit,
+      // guarded by it: this is the path that actually settles a store order,
+      // so publishing afterwards would lose the event to any crash in between.
+      // Nothing at all while the bus is off.
+      ...(await holdSettledEventStatements(c.env.DB, holdId))
     );
   }
 

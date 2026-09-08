@@ -51,10 +51,25 @@ import { adminCommunityRoutes } from './routes/adminCommunity';
 import { bundlesRoutes, adminBundlesRoutes } from './routes/bundles';
 import { farmRoutes } from './routes/farm';
 import { farmAdminRoutes } from './routes/farmAdmin';
+import { configureEventBus } from './lib/eventBus';
+import { gatewayAssertion } from './entrypoints/gatewayAssertion';
 
 const app = new Hono<AppContext>();
 
+/**
+ * The inbound gateway assertion (`01-TARGET.md` §4 item 1, Phase 1.6). At
+ * `GATEWAY_ONLY=off` — its default and the only value any deployment has today
+ * — it returns immediately, before reading a header or building a key ring, so
+ * this line changes nothing until the gateway exists. Then `log` counts the
+ * requests that did not come through the gateway and `on` refuses them.
+ */
+// SECURITY HEADERS OUTERMOST, so they are set even on a refusal thrown further
+// in — the gateway's own app says the same thing for the same reason
+// (`services/gateway/src/app.ts`). `gatewayAssertion` short-circuits with a 403
+// NOT_VIA_GATEWAY and never calls `next()`, and Hono composes in registration
+// order, so registering it FIRST meant that refusal carried no CSP and no HSTS.
 app.use('*', securityHeaders());
+app.use('*', gatewayAssertion);
 app.use('*', originCheck());
 
 /**
@@ -216,10 +231,39 @@ app.onError((err, c) => {
 });
 
 export default {
-  fetch: app.fetch,
-  // Durable jobs: outbox delivery (email/telegram), stale-challenge expiry,
-  // gated BNPL overdue stub. Idempotent — safe under overlapping runs.
+  // Unchanged behaviour: the same Hono app, called the same way. The one added
+  // line hands this invocation's `env` to the event bus, which is how
+  // `audit(db, …)` and the wallet/inventory helpers — all of which take a
+  // database, not an environment — find their producer. With no
+  // `EVENT_BUS_ENABLED=on` var that call builds one small object and nothing
+  // else ever happens.
+  //
+  // (Line comments, not a block, and no comment terminator anywhere below the
+  // admin mount: the naive comment stripper in tests/storefrontIsolation.test.ts
+  // reads the slash-star inside the string '/api/admin/[star]' above as a
+  // comment opener, so the next terminator after that line would swallow the
+  // admin host guard the test is asserting on.)
+  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    configureEventBus(env);
+    return app.fetch(request, env, ctx);
+  },
+  // Durable jobs: the event pump (step 0), outbox delivery (email/telegram),
+  // stale-challenge expiry, gated BNPL overdue stub. Idempotent — safe under
+  // overlapping runs.
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    configureEventBus(env);
     ctx.waitUntil(runDurableJobs(env));
   },
 };
+
+// THE NAMED ENTRYPOINTS (02-MIGRATION-PLAN.md 1.6). A binding of the form
+// `{ binding: 'IDENTITY', service: 'levonis-core-dark', entrypoint:
+// 'IdentityEntrypoint' }` reaches these classes and nothing else — the default
+// export above is untouched, so every route this Worker serves today is served
+// exactly as it was. Their methods are the contract
+// (worker/entrypoints/CONTRACT.md, typed by packages/contracts/src/rpc/) and
+// each one verifies the caller's signed hop before it touches anything.
+export { IdentityEntrypoint } from './entrypoints/IdentityEntrypoint';
+export { LedgerEntrypoint } from './entrypoints/LedgerEntrypoint';
+export { CatalogEntrypoint } from './entrypoints/CatalogEntrypoint';
+export { OrdersEntrypoint } from './entrypoints/OrdersEntrypoint';

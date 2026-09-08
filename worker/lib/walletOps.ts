@@ -1,6 +1,10 @@
 import type { Env } from './types';
 import { newId } from './crypto';
 import { audit } from './audit';
+import { busFor, emitEvent, outboxStatement } from './eventBus';
+import { PaymentAuthorizedV1 } from '@levonis/contracts/events/v1/PaymentAuthorized';
+import { PaymentCompletedV1 } from '@levonis/contracts/events/v1/PaymentCompleted';
+import { PaymentFailedV1 } from '@levonis/contracts/events/v1/PaymentFailed';
 
 /**
  * Wallet engine — holds, withdrawal state machine and reconciliation
@@ -290,13 +294,150 @@ async function createHold(db: D1Database, kind: HoldKind, p: CreateHoldInput): P
   if (!p.eventKey) return { ok: false, reason: 'MISSING_EVENT_KEY' };
   const holdId = newId('whold');
   try {
-    const res = await db.batch([holdInsertStatement(db, holdId, kind, p)]);
-    if ((res[0]?.meta.changes ?? 0) > 0) return { ok: true, holdId, replayed: false };
+    // A purchase hold is a payment authorisation (§3.8), and the event commits
+    // WITH the reservation rather than after it: a crash between the two would
+    // otherwise lose the only record that the money was authorised.
+    const res = await db.batch([
+      holdInsertStatement(db, holdId, kind, p),
+      ...(kind === 'purchase' ? await holdAuthorizedEventStatements(db, holdId, p) : []),
+    ]);
+    if ((res[0]?.meta.changes ?? 0) > 0) {
+      return { ok: true, holdId, replayed: false };
+    }
   } catch {
     // A concurrent insert won the UNIQUE(user_id, kind, event_key) race; the
     // batch rolled back, so nothing partial was written.
   }
-  return classifyHoldFailure(db, kind, p);
+  const outcome = await classifyHoldFailure(db, kind, p);
+  // A purchase hold is a payment authorisation; a withdrawal hold is not
+  // (§3.8), so only the purchase side reports one.
+  if (kind === 'purchase') await emitHoldOutcome(db, p, outcome);
+  return outcome;
+}
+
+/**
+ * The money events of 03-EVENTS.md §3.8-§3.10, published from the ONE place
+ * that actually places, settles and refuses a purchase hold. Every one of
+ * them starts with `busFor(db)`: with no bus configured — the live Worker
+ * today — they return before doing anything at all, so the wallet path costs
+ * exactly what it costs now.
+ */
+/**
+ * Which refusals are a PAYMENT FAILURE, and which are not.
+ *
+ * `DUPLICATE_EVENT` is deliberately absent. It means "same (user, kind,
+ * event_key), and the hold is no longer active" — i.e. the ordinary idempotent
+ * replay of a request whose payment already SETTLED: a double tap, a client
+ * retry, a proxy retry. Reporting that as `PaymentFailed{HOLD_CONFLICT}` would
+ * feed every consumer counting payment failures a false negative about a
+ * payment that succeeded, on the one path where being wrong about money is
+ * least acceptable. The replay is silent, exactly as the successful-replay
+ * branch above it is.
+ *
+ * `INVALID_AMOUNT` / `MISSING_EVENT_KEY` are absent too: nothing was attempted.
+ */
+const HOLD_FAILURE_REASON: Partial<Record<HoldFailure, 'INSUFFICIENT_FUNDS' | 'HOLD_CONFLICT' | 'STATE_CONFLICT'>> = {
+  INSUFFICIENT_AVAILABLE: 'INSUFFICIENT_FUNDS',
+  EVENT_KEY_REUSED: 'HOLD_CONFLICT',
+  STATE_CONFLICT: 'STATE_CONFLICT',
+};
+
+/**
+ * `PaymentAuthorized` (03-EVENTS.md §3.8) for the batch that is about to place
+ * the hold, guarded by the hold row itself.
+ *
+ * `holdInsertStatement` is conditional — it reserves money that exists or
+ * writes nothing — so the event has to carry the same condition, or a refused
+ * reservation would still announce an authorisation. Append AFTER the insert;
+ * returns `[]` while the bus is off.
+ */
+async function holdAuthorizedEventStatements(db: D1Database, holdId: string, p: CreateHoldInput): Promise<D1PreparedStatement[]> {
+  if (!busFor(db)) return [];
+  const pending = await outboxStatement(
+    db,
+    PaymentAuthorizedV1,
+    {
+      order_id: p.refType === 'order' ? (p.refId ?? null) : null,
+      user_id: p.userId,
+      kind: 'wallet_hold',
+      currency: 'USD',
+      amount: p.amountCents,
+      hold_id: holdId,
+      event_key: p.eventKey,
+    },
+    {
+      aggregateId: p.userId,
+      actorId: p.userId,
+      guard: { sql: 'EXISTS (SELECT 1 FROM wallet_holds WHERE id = ?)', args: [holdId] },
+    }
+  );
+  return pending ? [pending.statement] : [];
+}
+
+/** The REFUSAL half: a hold that was placed publishes its event from the batch, not from here. */
+async function emitHoldOutcome(db: D1Database, p: CreateHoldInput, result: HoldResult): Promise<void> {
+  if (!busFor(db)) return;
+  const orderId = p.refType === 'order' ? (p.refId ?? null) : null;
+  if (result.ok) return; // placed (in the batch) or replayed (already said once)
+  const reason = HOLD_FAILURE_REASON[result.reason];
+  if (!reason) return; // a replay, or a refusal that never reached the money
+  await emitEvent(
+    db,
+    PaymentFailedV1,
+    { order_id: orderId, user_id: p.userId, kind: 'wallet_hold', currency: 'USD', amount: p.amountCents, reason, event_key: p.eventKey },
+    { aggregateId: p.userId, actorId: p.userId }
+  );
+}
+
+/**
+ * `PaymentCompleted` (03-EVENTS.md §3.9) FOR A BATCH THAT IS ABOUT TO POST THE
+ * DEBIT — the settlement event, as statements to append rather than a write
+ * that happens afterwards.
+ *
+ * Why statements and not `emitEvent`. The two paths that actually settle money
+ * in production — `routes/storeOrders.ts` and `lib/escrowOps.ts` — call
+ * `commitHoldStatements()` directly, because the debit has to ride in the
+ * order's own batch. A settlement event published after that batch would be
+ * lost by any crash in between, with no reconciliation path, and an event
+ * emitted only from `commitHold()` would never be published by the paths that
+ * really settle. So the event goes where the debit goes.
+ *
+ * The guard is the debit row itself: `commitHoldStatements` posts
+ * `wallet_transactions.id = holdDebitTxId(holdId)` under a CHECK that aborts
+ * the batch unless the hold is an active, still-funded reservation, so a row
+ * with that id is the proof the money moved. Statement order matters — append
+ * these AFTER `commitHoldStatements(...)`.
+ *
+ * Returns `[]` while the bus is off, which is every deployment until G2: no
+ * read, no statement, no cost on the checkout path.
+ */
+export async function holdSettledEventStatements(db: D1Database, holdId: string): Promise<D1PreparedStatement[]> {
+  if (!busFor(db)) return [];
+  const txId = holdDebitTxId(holdId);
+  const hold = await db
+    .prepare('SELECT user_id, amount_cents, event_key, ref_type, ref_id FROM wallet_holds WHERE id = ?')
+    .bind(holdId)
+    .first<{ user_id: string; amount_cents: number; event_key: string; ref_type: string; ref_id: string }>();
+  if (!hold) return [];
+  const pending = await outboxStatement(
+    db,
+    PaymentCompletedV1,
+    {
+      order_id: hold.ref_type === 'order' ? (hold.ref_id || null) : null,
+      user_id: hold.user_id,
+      kind: 'wallet_debit',
+      currency: 'USD',
+      amount: hold.amount_cents,
+      ledger_tx_ids: [txId],
+      event_key: hold.event_key || txId,
+    },
+    {
+      aggregateId: hold.user_id,
+      actorId: null,
+      guard: { sql: "EXISTS (SELECT 1 FROM wallet_transactions WHERE id = ? AND status = 'approved')", args: [txId] },
+    }
+  );
+  return pending ? [pending.statement] : [];
 }
 
 /**
@@ -406,10 +547,15 @@ export async function commitHold(
 ): Promise<HoldResult> {
   const txId = holdDebitTxId(p.holdId);
   try {
-    const res = await db.batch(
-      commitHoldStatements(db, { holdId: p.holdId, note: p.note ?? 'Purchase settled', ref: p.ref ?? '' })
-    );
-    if ((res[1]?.meta.changes ?? 0) > 0) return { ok: true, holdId: p.holdId, replayed: false, txId };
+    // The settlement event rides in this batch too, guarded by the debit row,
+    // so it commits with the money or not at all.
+    const res = await db.batch([
+      ...commitHoldStatements(db, { holdId: p.holdId, note: p.note ?? 'Purchase settled', ref: p.ref ?? '' }),
+      ...(await holdSettledEventStatements(db, p.holdId)),
+    ]);
+    if ((res[1]?.meta.changes ?? 0) > 0) {
+      return { ok: true, holdId: p.holdId, replayed: false, txId };
+    }
   } catch (e) {
     // CHECK abort (not an active purchase hold) or a PRIMARY KEY replay of
     // the debit row: the batch rolled back, nothing partial was written.

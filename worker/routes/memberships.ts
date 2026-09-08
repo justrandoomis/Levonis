@@ -8,6 +8,8 @@ import { getLaunchConfig, getTierStatus, type LaunchConfig } from '../lib/entitl
 import { addMonths, attributeReferral, onProSubscriptionPurchased } from '../lib/membershipOps';
 import { TIER_RANK } from '../lib/pricing';
 import { audit } from '../lib/audit';
+import { emitEvent, eventsEnabled } from '../lib/eventBus';
+import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/SubscriptionChanged';
 import { rateLimit } from '../lib/ratelimit';
 
 export const membershipsRoutes = new Hono<AppContext>();
@@ -614,6 +616,29 @@ export async function subscribeUser(
   const membership = (await db.prepare('SELECT * FROM memberships WHERE id = ?')
     .bind(membershipId)
     .first<MembershipDbRow>())!;
+
+  // `SubscriptionChanged` (03-EVENTS.md §3.16) — read off the row that was
+  // actually written, so a purchase that landed in `conflict` (the INSERT's
+  // one-live-membership guard) publishes nothing. Identity's consumer, which
+  // owns the `users.membership_tier` copy, is added in Phase 6b.
+  if (eventsEnabled(env) && membership.state !== 'conflict') {
+    await emitEvent(
+      db,
+      SubscriptionChangedV1,
+      {
+        user_id: user.id,
+        from_tier: upgradeFrom ? upgradeFrom.tier : null,
+        to_tier: plan.tier,
+        plan_id: plan.id,
+        membership_id: membershipId,
+        active: membership.state === 'active',
+        expires_at: expiresAt ?? null,
+        reason: 'purchased',
+      },
+      { aggregateId: user.id, actorId: user.id }
+    );
+  }
+
   return {
     membership,
     replay: false,
@@ -1196,6 +1221,23 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
   if (flip.meta.changes === 0) throw badRequest('Membership state changed concurrently — reload and retry', 'CONFLICT_RETRY');
 
   const nowIso = new Date().toISOString();
+  if (eventsEnabled(c.env)) {
+    await emitEvent(
+      c.env.DB,
+      SubscriptionChangedV1,
+      {
+        user_id: m.user_id,
+        from_tier: m.tier ?? null,
+        to_tier: null,
+        plan_id: m.plan_id ?? null,
+        membership_id: id,
+        active: false,
+        expires_at: null,
+        reason: 'cancelled',
+      },
+      { aggregateId: m.user_id, actorId: admin.id }
+    );
+  }
   let refundedUsdCents = 0;
   let alreadyRefunded = false;
   if (refund) {

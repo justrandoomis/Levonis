@@ -35,6 +35,8 @@ import { safeParse } from '../lib/types';
 import { requireAuth, requireAdmin, badRequest, notFound, int, str, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { emitFromRequest, eventsEnabled } from '../lib/eventBus';
+import { RefundCompletedV1 } from '@levonis/contracts/events/v1/RefundCompleted';
 import { rateLimit } from '../lib/ratelimit';
 import { notifyAdmins } from '../lib/telegram';
 import { getSettings } from '../lib/settings';
@@ -348,6 +350,24 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
             .bind(`wtx_ret_${id}`, kase.user_id, cents, `Refund for approved return ${id} (order ${kase.order_id})`, kase.order_id, nowIso)
             .run();
           credited = true;
+          // `RefundCompleted` (03-EVENTS.md §3.11) — keyed on the same
+          // deterministic ledger id, so a redelivery is a replay everywhere.
+          if (eventsEnabled(c.env)) {
+            await emitFromRequest(
+              c,
+              RefundCompletedV1,
+              {
+                ref_type: 'return',
+                ref_id: id,
+                user_id: kase.user_id,
+                usd_cents: cents,
+                points: 0,
+                ledger_tx_ids: [`wtx_ret_${id}`],
+                event_key: `wtx_ret_${id}`,
+              },
+              { aggregateId: kase.user_id, actorId: admin.id }
+            );
+          }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           if (!(msg.includes('UNIQUE') || msg.includes('PRIMARY KEY'))) throw e;
@@ -733,6 +753,22 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
         .bind(`wtx_pp_${id}`, claim.user_id, cents, `Price-protection credit for claim ${id} (order ${claim.order_id})`, claim.order_id, nowIso)
         .run();
       credited = true;
+      if (eventsEnabled(c.env)) {
+        await emitFromRequest(
+          c,
+          RefundCompletedV1,
+          {
+            ref_type: 'price_protection',
+            ref_id: id,
+            user_id: claim.user_id,
+            usd_cents: cents,
+            points: 0,
+            ledger_tx_ids: [`wtx_pp_${id}`],
+            event_key: `wtx_pp_${id}`,
+          },
+          { aggregateId: claim.user_id, actorId: admin.id }
+        );
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!(msg.includes('UNIQUE') || msg.includes('PRIMARY KEY'))) throw e;

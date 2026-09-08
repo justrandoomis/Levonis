@@ -21,6 +21,9 @@ import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { saleAvailability } from './products';
 import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
 import { planInventory, resolveStock } from '../lib/inventory';
+import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAfter, waitUntilFrom } from '../lib/eventBus';
+import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted';
+import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import type { StockMove, StockTarget } from '../lib/inventory';
@@ -1261,6 +1264,33 @@ orderRoutes.post('/', async (c) => {
     );
   }
 
+  // `CheckoutStarted` (03-EVENTS.md §3.6) — the quote step, keyed on the
+  // checkout session (the idempotency key until `checkout_sagas` exists). At
+  // most one per session: the outbox's UNIQUE (aggregate_type, aggregate_id,
+  // aggregate_seq) enforces it, and a replay is a logged no-op rather than a
+  // second event, because this is written on its own and never inside the
+  // order's batch.
+  if (eventsEnabled(c.env)) {
+    await emitFromRequest(
+      c,
+      CheckoutStartedV1,
+      {
+        session_id: idempotencyKey,
+        user_hash: await dailyUserHash(user.id),
+        lines: comp.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })),
+        totals: {
+          items_iqd: Math.max(0, comp.merchandise),
+          delivery_iqd: Math.max(0, comp.shipping.total_iqd),
+          discount_iqd: Math.max(0, comp.couponDiscount + comp.pointsDiscount),
+          grand_iqd: Math.max(0, comp.totalIqd),
+        },
+        payment_method: isCod(input.paymentMethodId) ? 'cash' : 'wallet',
+        seller_type: 'platform',
+      },
+      { aggregateId: idempotencyKey, actorId: user.id, aggregateSeq: 1 }
+    );
+  }
+
   const orderId = newOrderId();
   const now = new Date().toISOString();
   // The cart rule guarantees a single type across the lines, so the first one
@@ -1469,6 +1499,8 @@ orderRoutes.post('/', async (c) => {
       line_id: it.id,
       targets: it.stock_targets,
     }));
+  /** The `InventoryChanged` ids this batch commits, delivered with the order's. */
+  const inventoryEventIds: string[] = [];
   if (stockMoves.length > 0) {
     const reservePlan = await planInventory(c.env.DB, stockMoves, {
       kind: 'reserve',
@@ -1487,7 +1519,58 @@ orderRoutes.post('/', async (c) => {
     // and the return at cancellation, so an order that is never confirmed
     // frees its units instead of permanently consuming them.
     stmts.push(...reservePlan.statements);
+    inventoryEventIds.push(...reservePlan.eventIds);
   }
+
+  // `OrderCreated` (03-EVENTS.md §3.7) — the outbox row rides in the ORDER'S
+  // OWN BATCH, so the event exists if and only if the order does. References
+  // only: no commission, no platform fee, no receivable, no address (its id),
+  // no admin note. Returns null while the bus is off, and then this batch is
+  // exactly the batch it is today.
+  const orderEvent = await outboxStatement(
+    c.env.DB,
+    OrderCreatedV1,
+    {
+      order_id: orderId,
+      user_id: user.id,
+      user_hash: await dailyUserHash(user.id),
+      seller_type: 'platform',
+      merchant_id: null,
+      store_id: null,
+      payment_state: comp.walletUsdCents > 0 ? 'authorized' : 'cod',
+      items: comp.lines.map((l) => ({
+        order_item_id: l.id,
+        product_id: l.product_id,
+        qty: l.qty,
+        unit_price_iqd: Math.max(0, Math.round(l.unit)),
+        is_printer: !!l.is_printer,
+        warranty_plan_id: safeParse<{ plan_id?: string } | null>(l.warranty_snapshot, null)?.plan_id ?? null,
+        ops_policy_id: null,
+      })),
+      totals: {
+        merchandise_iqd: Math.max(0, comp.merchandise),
+        delivery_iqd: Math.max(0, shippingTotal),
+        discount_iqd: Math.max(0, comp.couponDiscount + comp.pointsDiscount),
+        total_iqd: Math.max(0, comp.totalIqd),
+      },
+      payment: {
+        method: isCod(input.paymentMethodId) ? 'cash' : 'wallet',
+        wallet_usd_cents: Math.max(0, comp.walletUsdCents),
+        points: Math.max(0, comp.pointsDiscount),
+        cod_iqd: Math.max(0, comp.dueOnDelivery),
+        exchange_rate: comp.exchangeRate,
+      },
+      shipping_type: orderShippingType,
+      address_snapshot_ref: String((comp.address as { id?: unknown }).id ?? input.addressId ?? orderId),
+      coupon_code: comp.couponId ? String(comp.couponId) : null,
+      membership_gift: membershipGift !== '',
+      referral_delivery_waived: referralWaived === 1,
+      idempotency_key: idempotencyKey,
+      created_at: now,
+    },
+    { aggregateId: orderId, actorId: user.id, aggregateSeq: 1 }
+  );
+  if (orderEvent) stmts.push(orderEvent.statement);
 
   try {
     await c.env.DB.batch(stmts);
@@ -1515,6 +1598,15 @@ orderRoutes.post('/', async (c) => {
     console.error('Order batch failed', msg);
     throw badRequest('Order could not be placed. Please try again.');
   }
+
+  // Delivered after the response, and only the ids this request just wrote:
+  // no lock and no "select everything pending" on the shared database.
+  //
+  // EVERY id, not only the order's. The same batch committed the reservation's
+  // `InventoryChanged` rows; handing the pump one of the two left the stock
+  // facts waiting for the cron — the highest-volume event in the system taking
+  // up to fifteen minutes while the order event beside it went at once.
+  pumpAfter(c.env.DB, [orderEvent?.eventId, ...inventoryEventIds], waitUntilFrom(c));
 
   // The order takes on its tracking stage the moment it exists. Deliberately
   // AFTER the batch, not inside it: the first stage's successor is manual

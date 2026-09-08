@@ -46,6 +46,9 @@ import {
   stagesFor,
 } from './orderStages';
 import { deductOrderStock, returnOrderStock } from './orderInventory';
+import { emitEvent, eventsEnabled } from './eventBus';
+import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
+import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
 import { getSetting } from './settings';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
@@ -183,6 +186,31 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     )
     .run();
 
+  // The order aggregate's events (03-EVENTS.md §3.12/§3.13) — emitted from the
+  // ONE place a stage move happens, after the conditional flip has proved this
+  // caller won the race, so a losing mover publishes nothing. Both are written
+  // outside the flip's statement (there is no batch here to ride in) and are
+  // delivered by the pump; neither can fail the move.
+  if (eventsEnabled(env)) {
+    if (legacyFrom !== legacyTo) {
+      await emitEvent(
+        env.DB,
+        OrderStatusChangedV1,
+        {
+          order_id: order.id,
+          from: legacyFrom,
+          to: legacyTo,
+          stage: opts.to,
+          cause: STAGE_EVENT_CAUSE[opts.source] ?? 'system',
+          actor_id: opts.changedBy || null,
+          at: nowIso,
+        },
+        { aggregateId: order.id, actorId: opts.changedBy || null }
+      );
+    }
+    if (opts.to === 'delivered') await emitOrderDelivered(env, row, order.id, nowIso, opts.source);
+  }
+
   const notes: string[] = [];
   const wasDeducted = STOCK_DEDUCTED_STATES.has(legacyFrom);
   const nowDeducted = STOCK_DEDUCTED_STATES.has(legacyTo);
@@ -206,6 +234,79 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     next_stage_at: schedule.next_stage_at,
     notes,
   };
+}
+
+/** Who moved it, as the event catalogue names causes and actors. */
+const STAGE_EVENT_CAUSE: Record<string, 'stage' | 'admin' | 'courier' | 'system'> = {
+  manual: 'admin',
+  automatic: 'stage',
+  delivery_api: 'courier',
+  system: 'system',
+};
+const STAGE_EVENT_BY: Record<string, 'admin' | 'merchant' | 'courier' | 'customer_confirm'> = {
+  manual: 'admin',
+  automatic: 'admin',
+  delivery_api: 'courier',
+  system: 'admin',
+};
+
+/**
+ * `OrderDelivered` — the canonical "it reached the customer" fact Devices,
+ * Loyalty, Referrals, Reviews and Merchants all hang off. Item REFERENCES
+ * only: the frozen warranty/ops snapshots are fetched by the consumer through
+ * `OrdersEntrypoint.itemSnapshots`, which keeps the envelope small.
+ */
+async function emitOrderDelivered(
+  env: Env,
+  orderRow: Record<string, unknown>,
+  orderId: string,
+  deliveredAt: string,
+  source: StageSource | 'system'
+): Promise<void> {
+  const { results } = await env.DB.prepare(
+    `SELECT oi.id, oi.product_id, oi.qty, oi.unit_price_iqd, oi.warranty_snapshot,
+            EXISTS (SELECT 1 FROM product_catalogs pc
+                      JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                     WHERE pc.product_id = oi.product_id) AS is_printer
+       FROM order_items oi WHERE oi.order_id = ? LIMIT 200`
+  )
+    .bind(orderId)
+    .all<{ id: string; product_id: string; qty: number; unit_price_iqd: number; warranty_snapshot: string | null; is_printer: number }>();
+  const cod = Number(orderRow.due_on_delivery_iqd ?? 0);
+  await emitEvent(
+    env.DB,
+    OrderDeliveredV1,
+    {
+      order_id: orderId,
+      user_id: String(orderRow.user_id ?? ''),
+      seller_type: String(orderRow.seller_type ?? '') === 'merchant' ? 'merchant' : 'platform',
+      merchant_id: orderRow.merchant_id ? String(orderRow.merchant_id) : null,
+      delivered_at: deliveredAt,
+      items: (results ?? []).map((r) => ({
+        order_item_id: String(r.id),
+        product_id: String(r.product_id),
+        qty: Math.max(1, Number(r.qty) || 1),
+        unit_price_iqd: Math.max(0, Math.round(Number(r.unit_price_iqd) || 0)),
+        is_printer: !!Number(r.is_printer),
+        warranty_plan_id: warrantyPlanIdOf(r.warranty_snapshot),
+        ops_policy_id: null,
+      })),
+      payment_method: String(orderRow.payment_method_id ?? '') === 'cash' ? 'cash' : 'wallet',
+      cod_amount_iqd: cod > 0 ? cod : null,
+      by: STAGE_EVENT_BY[source] ?? 'admin',
+    },
+    { aggregateId: orderId, actorId: null }
+  );
+}
+
+function warrantyPlanIdOf(snapshot: string | null): string | null {
+  if (!snapshot) return null;
+  try {
+    const parsed = JSON.parse(snapshot) as { plan_id?: unknown };
+    return typeof parsed.plan_id === 'string' && parsed.plan_id ? parsed.plan_id : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

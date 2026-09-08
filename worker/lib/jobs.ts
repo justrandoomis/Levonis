@@ -1,5 +1,6 @@
 import type { Env } from './types';
 import { processOutbox } from './outbox';
+import { pumpOutbox, pruneOutbox, type RetentionReport } from './eventBus';
 import { releaseDueAccruals } from './pointsOps';
 import type { ReleaseSweepReport } from './pointsOps';
 import { processWalletNotifications } from './walletNotify';
@@ -23,6 +24,21 @@ import type { SupportGiftReconciliation } from './membershipOps';
 
 export interface DurableJobsReport {
   ran_at: string;
+  /**
+   * Step 0 (02-MIGRATION-PLAN.md 1.6): the event bus's cron sweep — the ONLY
+   * holder of `pump_lock`. `null` whenever there is nothing to do: the bus is
+   * off, no consumer is bound, the outbox table is absent, or another run holds
+   * the lock. On the live Worker today it is always null.
+   */
+  event_pump: { selected: number; delivered: number; retried: number; dead: number; budget_hit: boolean } | null;
+  /**
+   * Step 0b: outbox retention. `core_outbox_events` keeps a full signed
+   * envelope per event and `core_audit_details` a second copy of every audit
+   * body, both in the shared customer database — so a bus that is on and never
+   * pruned is unbounded growth against D1's 10 GB cap. `null` while the bus is
+   * off or the tables are absent, which is the live Worker today.
+   */
+  event_retention: RetentionReport | null;
   outbox: { sent: number; failed: number };
   expired_link_challenges: number;
   pruned_otp_challenges: number;
@@ -64,6 +80,8 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   const pruneBefore = new Date(Date.now() - PRUNE_GRACE_DAYS * 86_400_000).toISOString();
   const report: DurableJobsReport = {
     ran_at: nowIso,
+    event_pump: null,
+    event_retention: null,
     outbox: { sent: 0, failed: 0 },
     expired_link_challenges: 0,
     pruned_otp_challenges: 0,
@@ -89,6 +107,24 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
       report.errors.push(`${name}: ${msg.slice(0, 200)}`);
     }
   };
+
+  // 0. Deliver whatever the per-request pumps missed. FIRST, and its own step:
+  //    a producer whose events sit undelivered is a producer nobody can trust,
+  //    and the lock means two overlapping cron runs cannot double-deliver.
+  await step('event_pump', async () => {
+    const pump = await pumpOutbox(env, `cron:${nowIso}`);
+    report.event_pump = pump
+      ? { selected: pump.selected, delivered: pump.delivered, retried: pump.retried, dead: pump.dead, budget_hit: pump.budget_hit }
+      : null;
+  });
+
+  // 0b. Retention for what the pump leaves behind. After the pump, so a row
+  //     acked in this very run is a candidate the moment its window passes,
+  //     and bounded per run so a first pass over a large table cannot time the
+  //     whole cron out.
+  await step('event_retention', async () => {
+    report.event_retention = await pruneOutbox(env);
+  });
 
   // 1. Deliver pending outbox notifications (email/telegram) with retries.
   await step('outbox', async () => {

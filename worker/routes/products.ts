@@ -13,7 +13,9 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { safeParse } from '../lib/types';
+import { safeParse, localeToApi } from '../lib/types';
+import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
+import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
 import { notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -780,6 +782,28 @@ productRoutes.get('/:slug', async (c) => {
     // is the server's sentence, never the browser's arithmetic. Empty for a
     // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
     out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
+
+    // `ProductViewed` (03-EVENTS.md §3.2) — `best_effort` and SAMPLED (1:1
+    // signed in, 1:5 anonymous): it never touches the outbox and never adds a
+    // D1 write to a page read. The viewer travels as a daily-salted hash, or
+    // not at all when nobody is signed in.
+    if (eventsEnabled(c.env) && (user || Math.random() < 0.2)) {
+      await emitBestEffort(
+        c.env.DB,
+        ProductViewedV1,
+        {
+          product_id: String(row.id),
+          slug,
+          catalog_id: parsed.category_id ? String(parsed.category_id) : null,
+          brand_id: parsed.brand_id ? String(parsed.brand_id) : null,
+          lang: localeToApi(user?.locale ?? 'en'),
+          host_kind: c.get('host').kind === 'merchant' ? 'merchant' : 'main',
+          tier: ctx.tierActive ? ctx.tier : null,
+          viewer_hash: user ? await dailyUserHash(user.id) : null,
+        },
+        { aggregateId: String(row.id), actorId: user?.id ?? null, waitUntil: waitUntilFrom(c) }
+      );
+    }
 
     return c.json({
       success: true,

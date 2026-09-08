@@ -33,6 +33,7 @@ import {
   commitHoldStatements,
   createPurchaseHold,
   holdDebitTxId,
+  holdSettledEventStatements,
   isConstraintAbort,
   releaseHoldStatement,
   type HoldState,
@@ -285,6 +286,9 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
       note: 'Community order payment',
       ref: esc.community_order_id,
     }),
+    // §3.9's settlement event, guarded by the debit this batch posts. Nothing
+    // at all while the bus is off.
+    ...(await holdSettledEventStatements(db, esc.hold_id)),
     db
       .prepare(
         `INSERT INTO merchant_payout_ledger
@@ -419,6 +423,7 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
         note: 'Community order payment',
         ref: esc.community_order_id,
       }),
+      ...(await holdSettledEventStatements(db, esc.hold_id)),
       // The returned part comes back as its own approved credit — only once
       // the full debit is posted, so the two movements always appear together.
       db

@@ -48,6 +48,9 @@
 import { badRequest, notFound, str, int, HttpError } from './http';
 import { newId } from './crypto';
 import { audit } from './audit';
+import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
+import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
+import { sha256Hex } from '@levonis/contracts/canonical';
 import { deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
 import {
   normalizeSaleTypes,
@@ -1852,6 +1855,35 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     translations = { written: t.summary.written, review_needed: t.summary.review_needed };
   }
 
+  // `ProductAdded` (= ProductUpserted, 03-EVENTS.md §3.3) — ONE event per saved
+  // product, in the SAME batch as the product row, from the one function every
+  // writer goes through (the admin form, the template apply and the import all
+  // call `planProductSave`). Display facts only: never cost, never margin,
+  // never a supplier price (DECISIONS rows 41/91).
+  if (doc && busFor(db)) {
+    const seq = nextAggregateSeq();
+    const effectiveCatalogs = catalogIds ?? (await currentCatalogIds(db, productId));
+    const pending = await outboxStatement(
+      db,
+      ProductAddedV1,
+      {
+        product_id: productId,
+        slug: doc.slug || productId,
+        status: doc.status || 'draft',
+        catalog_ids: effectiveCatalogs.slice(0, 50),
+        brand_id: doc.brand_id ? String(doc.brand_id) : null,
+        is_printer: await anyPrinterCatalog(db, effectiveCatalogs),
+        doc_version: Math.max(0, Number(doc.doc_version) || 0),
+        structure_hash: await structureHash(doc),
+        names: { ar: doc.name_ar, en: doc.name_en, ckb: doc.name_ckb },
+        images: doc.media.map((m) => m.key || m.url).filter((k) => !!k).slice(0, 100),
+        op_id: `${intent.mode}:${productId}:${seq}`,
+      },
+      { aggregateId: productId, actorId: actor.adminId, aggregateSeq: seq }
+    );
+    if (pending) statements.push(pending.statement);
+  }
+
   return {
     productId,
     mode: intent.mode,
@@ -1868,6 +1900,39 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     money: actor.money,
     actorId: actor.adminId,
   };
+}
+
+/**
+ * A fingerprint of the STRUCTURE a save produced — the option, colour and
+ * variant identities, not their prices. A consumer that keeps an index uses it
+ * to tell "the same shape, re-saved" from "the shape changed".
+ */
+async function structureHash(doc: ProductDoc): Promise<string> {
+  const shape = [
+    doc.options.map((o) => o.id).join(','),
+    doc.colors.map((c) => c.id).join(','),
+    doc.media.map((m) => m.id).join(','),
+  ].join(';');
+  return sha256Hex(shape);
+}
+
+/** The product's catalogue memberships when this save did not restate them. */
+async function currentCatalogIds(db: D1Database, productId: string): Promise<string[]> {
+  const { results } = await db
+    .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ? LIMIT 50')
+    .bind(productId)
+    .all<{ catalog_id: string }>();
+  return (results ?? []).map((r) => String(r.catalog_id));
+}
+
+/** `catalogs.is_printer_catalog` resolved at write time (03-EVENTS.md §3.3). */
+async function anyPrinterCatalog(db: D1Database, ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return false;
+  const row = await db
+    .prepare(`SELECT 1 AS x FROM catalogs WHERE is_printer_catalog = 1 AND id IN (${ids.slice(0, 50).map(() => '?').join(', ')}) LIMIT 1`)
+    .bind(...ids.slice(0, 50))
+    .first<{ x: number }>();
+  return !!row;
 }
 
 /**

@@ -14,6 +14,8 @@ import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, int, str, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
+import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
+import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
 import { parseProductRow, type ProductDoc } from '../lib/productModel';
 import {
@@ -665,6 +667,31 @@ cartRoutes.post('/items', async (c) => {
     .run();
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
+
+  // `AddToCart` (03-EVENTS.md §3.5) — `best_effort` BY DESIGN: it is fired at
+  // the subscribers over RPC in `waitUntil` and never written to the outbox,
+  // because five D1 writes per add-to-cart in the customer database would buy
+  // nothing a dropped telemetry event costs. The price is the one the cart
+  // just resolved, not a second lookup.
+  if (eventsEnabled(c.env)) {
+    const line = items.find(
+      (it) => String(it.productId) === productId && String(it.option_id ?? '') === primaryOption && String(it.color_id ?? '') === colorId
+    );
+    await emitBestEffort(
+      c.env.DB,
+      AddToCartV1,
+      {
+        user_hash: await dailyUserHash(user.id),
+        product_id: productId,
+        line_key: `${productId}:${primaryOption}:${colorId}`,
+        qty,
+        seller_type: 'platform',
+        price_iqd_snapshot: Math.max(0, Math.round(Number(line?.unit_price_iqd ?? 0))),
+      },
+      { aggregateId: user.id, actorId: user.id, waitUntil: waitUntilFrom(c) }
+    );
+  }
+
   return c.json({ success: true, items, tier: t, tierActive: ta });
 });
 

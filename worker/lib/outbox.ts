@@ -53,10 +53,18 @@ export async function enqueue(
   }
 }
 
+/**
+ * The staging guard. An empty allowlist normally means "everyone" — the live
+ * Worker has to be able to mail real customers — but a deployment that must
+ * NOT reach a real address (the dark core) sets `EMAIL_ALLOWLIST_REQUIRED=on`,
+ * which flips the empty case to "nobody". Without that flip the dark config's
+ * own comment ("must never be able to mail a real address") was the opposite
+ * of what an empty var did.
+ */
 function allowedRecipient(env: Env, kind: string, recipient: string): boolean {
   if (kind !== 'email') return true;
   const allow = (env.EMAIL_ALLOWED_RECIPIENTS || '').trim();
-  if (!allow) return true;
+  if (!allow) return (env.EMAIL_ALLOWLIST_REQUIRED || '').trim().toLowerCase() !== 'on';
   return allow.split(',').map((s) => s.trim().toLowerCase()).includes(recipient.toLowerCase());
 }
 
