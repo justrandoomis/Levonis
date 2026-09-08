@@ -238,6 +238,35 @@ Date: 2026-09-07. Base tree: `69ee814`. One record per structural decision behin
 | j | Analytics Engine dataset created on first `writeDataPoint` | unverified | D1 sink |
 | k | PBKDF2/bcrypt CPU time when the core runs under a binding | unverified | `limits.cpu_ms` on the core (schema key) |
 
+**How the owner fills the table** (added by slice 1.9 — the probes exist as files; nothing has been deployed). One throwaway Worker per row lives in `services/probes/<dir>/`, each answering `GET /` with `{row, question, answer, verdict}`; `29 - Platform probes (DARK throwaway Workers — serve no domain)` deploys them, curls them and writes the eleven one-line verdicts into the run's job summary, which is what gets pasted above.
+
+```
+Actions -> "29 - Platform probes (DARK throwaway Workers - serve no domain)" -> Run workflow
+    confirm:              DEPLOY-PROBES
+    paid_plan_confirmed:  checked, if the Workers Paid badge is confirmed in the dashboard   (row b)
+    dark_root:            <darkroot>        the throwaway dark zone of D21                   (rows f, g)
+    dark_db:              levonis-db-dark   optional; a *-dark database ONLY                 (row e)
+    include_optional:     checked to also deploy the Workflows probe                         (row h)
+
+# then, once the verdicts are in the table above:
+Actions -> the same workflow -> Run workflow
+    confirm:              DELETE-PROBES
+```
+
+| Probe directory | Worker | Row | What its answer decides |
+|---|---|---|---|
+| `a-worker-name/` | `levonis-probe-name` | a | whether every later slice may deploy its own Worker, or the owner creates each name in the dashboard once |
+| `b-plan-and-cron/` | `levonis-probe-cron` | b | the plan precondition (from `scripts/assert-paid-plan.mjs`, run in the same job) and what a `* * * * *` trigger really costs |
+| `c-self-binding/` | `levonis-probe-selfbind` | c | whether ADR-004's merged deployables can call their own named entrypoints — it also exercises the two-step first deploy, since it binds to itself |
+| `d-assets-binding/` | `levonis-probe-assets` | d | D23: whether the SPA may ever move to a gateway `assets` block |
+| `e-budgets/` | `levonis-probe-budgets` | e | ADR-005's pump budgets. Bound to a `*-dark` database only, and it only ever runs `SELECT 1` |
+| `f-route-precedence/` | `levonis-probe-route` + `levonis-probe-domain` | f | whether the Phase 3 cut-over is a route ADD (rollback: delete six routes) or needs plan 3.0-alt first. Needs two dashboard attachments on the dark zone, which the workflow prints |
+| `g-cache-api/` | `levonis-probe-cache` | g | the gateway's safe-cache layer. Meaningless on workers.dev, and the probe says so in its own answer rather than reporting a clean miss |
+| `h-workflow-sleep/` | `levonis-probe-workflow` | h | whether the process adapter's Workflow implementation is worth switching on, or `CronSweepRunner` stays. **Opt-in** |
+| `i-do-sqlite/` | `levonis-probe-do` | i | D22's "deploy-only" claim for every Durable Object class in §7 |
+| `j-analytics-engine/` | `levonis-probe-ae` | j | whether the metrics sink of §11.4 is a config switch |
+| `k-pbkdf2-cpu/` | `levonis-probe-cpu` + `levonis-probe-cpu-caller` | k | whether `limits.cpu_ms` goes on the core before the cut-over. Measured on both sides of the hop, because the hop is the question |
+
 **Consequences.** Slice 1.0 costs a day; every later slice cites a row instead of an assumption. The probe Workers are deleted after the table is filled.
 
 **Rejected.** *Assume and discover in production*: the incidents documented in `docs/DECISIONS.md` rows 36 and 52 are what that looks like.

@@ -87,6 +87,15 @@ export interface CheckContext {
 const CORE_LIB_FACADES = /worker\/lib\/(ratelimit|audit|session)\b/;
 const EVENT_KEY_FROM_REQUEST = /eventKey\s*[:=]\s*[^,;]*(c\.req\.header|body\.|req\.)/;
 const BARE_FETCH = /(?<![.\w])fetch\s*\(/;
+/**
+ * A DECLARATION named `fetch` is not a call to the global one: every
+ * `WorkerEntrypoint` declares `fetch(request: Request)`, and every service
+ * binding type declares it too. The rule bans the outbound call, so the line
+ * that starts a method or interface member of that name is exempt.
+ */
+const FETCH_DECLARATION = /^\s*(?:export\s+|declare\s+|abstract\s+|public\s+|override\s+|async\s+|static\s+)*fetch\s*\(/;
+export const usesBareFetch = (src: string): boolean =>
+  src.split('\n').some((line) => BARE_FETCH.test(line) && !FETCH_DECLARATION.test(line));
 
 /** True for the one allowed cross-package import inside a deployable: a sibling's statement descriptors (ADR-004). */
 export function isSiblingStatementsImport(resolved: string, serviceRoot: string): boolean {
@@ -132,7 +141,7 @@ export function checkSource(ctx: CheckContext, src: string): string[] {
     }
   }
 
-  if (BARE_FETCH.test(src) && !/platform-kit\/src\/httpx/.test(fileRel)) violations.push(`${fileRel}: uses bare fetch( — use fetchWithBudget`);
+  if (usesBareFetch(src) && !/platform-kit\/src\/httpx/.test(fileRel)) violations.push(`${fileRel}: uses bare fetch( — use fetchWithBudget`);
   if (EVENT_KEY_FROM_REQUEST.test(src)) violations.push(`${fileRel}: builds an eventKey from request input`);
   return violations;
 }

@@ -29,6 +29,48 @@ custom domain names the same service, so both mechanisms agree.
 **The `-staging` suffix is a historical name, not an environment.** These are
 the production Workers. Nothing called "production" serves a user.
 
+## The dark Workers (Phase 1) — every one of them serves no domain
+
+`docs/architecture/02-MIGRATION-PLAN.md` Phase 1 is fully **dark**: it adds
+Workers, and not one of them is reachable from `levonis-iq.com`. They exist so
+the gateway, the event bus and the four leaf consumers can be driven end to end
+before anything live changes.
+
+| Worker | Serves | Database | Config | Deployed by |
+| --- | --- | --- | --- | --- |
+| `levonis-core-dark` | `<darkroot>/*` on the **dark zone** only (D21) | `levonis-db-dark` (empty) | `wrangler.jsonc` `env.dark` | `30 - Deploy DARK levonis-core-dark` |
+| `levonis-gateway-dark` | `<darkroot>/api/*`, `<darkroot>/files/*`, `*.<darkroot>/api/*`, `*.<darkroot>/files/*` | — (the gateway executes no SQL) | `services/gateway/wrangler.jsonc` `env.dark` | `31 - Deploy DARK levonis-gateway-dark` |
+| `levonis-audit-dark` | **nothing** — a service binding is its only door | `levonis-audit-db-dark` | `services/audit/wrangler.jsonc` `env.dark` | `32 - Deploy DARK levonis-audit-dark` |
+| `levonis-analytics-dark` | **nothing** | `levonis-analytics-db-dark` | `services/analytics/wrangler.jsonc` `env.dark` | `33 - Deploy DARK levonis-analytics-dark` |
+| `levonis-ads-dark` | **nothing** | `levonis-ads-db-dark` | `services/ads/wrangler.jsonc` `env.dark` | `34 - Deploy DARK levonis-ads-dark` |
+| `levonis-notifications-dark` | **nothing** | `levonis-notifications-db-dark` | `services/notifications/wrangler.jsonc` `env.dark` | `35 - Deploy DARK levonis-notifications-dark` |
+| `levonis-probe-*` | **nothing** (throwaway, deleted after ADR-017 is filled in) | — | `services/probes/*/wrangler.jsonc` | `29 - Platform probes` |
+
+**A dark Worker has no route.** Not a zone route, not a Custom Domain, and —
+for the dark core and the dark gateway — not even a workers.dev URL: they
+declare `workers_dev: false` and `preview_urls: false`, and the **dark zone**
+(a throwaway domain the owner provisions, D21) is the only way to reach them.
+The four leaf consumers enable workers.dev deliberately and only because a
+Worker with no URL cannot be health-probed before anything binds it; they hold
+no live data.
+
+Nothing in the repository declares those routes. As with the live Workers,
+routing is a dashboard fact — and for the gateway that is the whole rollback
+plan: the six `/api/*` and `/files/*` zone routes are ADDED at G3 and deleting
+them is the undo, which only works while they are not in a config file.
+`tests/workflowNaming.test.ts` fails on any `routes`, `route` or
+`custom_domains` key in any wrangler config in the tree.
+
+### The eventual production names
+
+Every dark Worker has a production twin named without the suffix —
+`levonis-gateway`, `levonis-audit`, `levonis-analytics`, `levonis-ads`,
+`levonis-notifications` — declared at the top level of the same config and
+**not deployed by any workflow in this repository yet**: that is Phase 2.1 and
+Phase 3.1, each behind its own owner gate. The legacy core keeps its historical
+name `levonis-staging` for ever (ADR-011); no new Worker may carry `-staging`,
+and the tests fail on one that does.
+
 ## Which workflow to run
 
 | To do this | Run | Deploys | Notes |
@@ -39,6 +81,9 @@ the production Workers. Nothing called "production" serves a user.
 | Rebuild Studio's resources and reset its vars | `4 - Rebuild levonis-studio-staging` | `levonis-studio-staging` | **Replaces plain-text vars wholesale.** Running it with the origin secrets unset overwrites `APP_ORIGIN` on a working site with a workers.dev URL. |
 | Deploy the alternate main Worker | `3 - Deploy levonis (ALTERNATE …)` | `levonis` | Serves no domain. The Worker does not currently exist. |
 | Deploy the alternate Studio Worker | `5 - Deploy levonis-studio (ALTERNATE …)` | `levonis-studio` | Serves no domain. A green run here changes nothing users see. |
+| Deploy one dark Worker | `30`–`35 - Deploy DARK levonis-<svc>-dark` | that Worker only | Thin wrappers around `_deploy-worker.yml`. Each asks for a confirmation phrase and for the Workers Paid confirmation, and creates a database only when told to. **Serves no domain.** |
+| Deploy and prove the WHOLE dark stack from a branch | `36 - Verify DARK stack end to end` | the six dark Workers | Consumers, then the core that binds them, then the gateway in front of it; then it seeds the empty dark database and drives the event path through the gateway. **Touches nothing live.** |
+| Answer the eleven platform questions of ADR-017 | `29 - Platform probes` | `levonis-probe-*` | Throwaway Workers, one per question; the verdicts land in the run's job summary and are pasted into ADR-017. Re-run with `DELETE-PROBES` to remove them. |
 
 The confirmation phrases for 3 and 5 are `DEPLOY-ALTERNATE-MAIN-WORKER` and
 `DEPLOY-ALTERNATE-STUDIO-WORKER`. They previously each contained the word

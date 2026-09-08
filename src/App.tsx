@@ -3,9 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import { StoreProvider, useStore } from './StoreContext';
 import Storefront from './pages/Storefront';
 import MerchantStart from './pages/MerchantStart';
-import MerchantDashboardPage from './pages/MerchantDashboardPage';
 import StorefrontProduct from './pages/StorefrontProduct';
-import Requests from './pages/Requests';
 /**
  * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
  * pulls in `ogl`, a WebGL renderer and a mesh parser, and it is reached from a
@@ -14,6 +12,46 @@ import Requests from './pages/Requests';
  * first byte of every page, so it arrives when the route does.
  */
 const ModelViewer = React.lazy(() => import('./pages/ModelViewer'));
+
+/**
+ * ROUTE-LEVEL CODE SPLITTING (`01-TARGET.md` §10, plan slice 1.8).
+ *
+ * Every page below is reached by navigating to it, and none of them is on the
+ * path a visitor takes to see a product: the admin console, the merchant
+ * dashboard, the wallet, both checkouts, the request marketplace, chat, the
+ * warranty centre, the investor pages, the calculator, points and referrals.
+ * Loading them eagerly put the whole application — recharts, the phone-number
+ * library, twenty admin panels — into the first byte of the storefront.
+ *
+ * NO API CHANGE AND NO BEHAVIOUR CHANGE: the routes, their guards, their
+ * paths and what they render are untouched; only the moment their code is
+ * fetched moves. `tests/bundleBudget.test.ts` is what keeps it that way.
+ */
+const MerchantDashboardPage = React.lazy(() => import('./pages/MerchantDashboardPage'));
+const Requests = React.lazy(() => import('./pages/Requests'));
+const Admin = React.lazy(() => import('./pages/Admin'));
+const Invest = React.lazy(() => import('./pages/Invest'));
+const InvestAdmin = React.lazy(() => import('./pages/InvestAdmin'));
+const Warranty = React.lazy(() => import('./pages/Warranty'));
+const WarrantyVerify = React.lazy(() => import('./pages/WarrantyVerify'));
+const Checkout = React.lazy(() => import('./pages/Checkout'));
+const StoreCheckout = React.lazy(() => import('./pages/StoreCheckout'));
+const Chats = React.lazy(() => import('./pages/Chats'));
+const Chat = React.lazy(() => import('./pages/Chat'));
+const Tools = React.lazy(() => import('./pages/Tools'));
+const Wallet = React.lazy(() => import('./pages/Wallet'));
+const Rewards = React.lazy(() => import('./pages/Rewards'));
+const Referrals = React.lazy(() => import('./pages/Referrals'));
+
+/**
+ * The one fallback every lazy route shares. It is the same markup the two
+ * route guards already render while the session is loading, so a chunk arriving
+ * looks exactly like a session resolving and the page never flashes a second
+ * kind of "loading".
+ */
+const RouteFallback = () => (
+  <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>
+);
 import { LanguageProvider } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -24,35 +62,22 @@ import Home from './pages/Home';
 import Products from './pages/Products';
 import Product from './pages/Product';
 import Bundles from './pages/Bundles';
-import Admin from './pages/Admin';
-import Invest from './pages/Invest';
-import InvestAdmin from './pages/InvestAdmin';
 
 import Profile from './pages/Profile';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
-import Warranty from './pages/Warranty';
-import WarrantyVerify from './pages/WarrantyVerify';
 import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import StoreCheckout from './pages/StoreCheckout';
 import Community from './pages/Community';
 import CommunityStorePage from './pages/CommunityStorePage';
 import FollowedStores from './pages/FollowedStores';
 import SavedProducts from './pages/SavedProducts';
-import Chats from './pages/Chats';
-import Chat from './pages/Chat';
-import Tools from './pages/Tools';
 import EditProfile from './pages/EditProfile';
 import Settings from './pages/Settings';
 import Addresses from './pages/Addresses';
 import Subscription from './pages/Subscription';
-import Wallet from './pages/Wallet';
 import Auth from './pages/Auth';
 import Welcome from './pages/Welcome';
 import CompleteProfileSheet from './components/profile/CompleteProfileSheet';
-import Rewards from './pages/Rewards';
-import Referrals from './pages/Referrals';
 /**
  * THE GAMES SURFACE IS ITS OWN CHUNK. The Printer Farm (its isometric room,
  * sheets and trilingual strings) is reached from /games, not from browsing
@@ -107,6 +132,7 @@ function StorefrontApp() {
   const { store } = useStore();
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Storefront store={store} />} />
         <Route path="/products" element={<Storefront store={store} />} />
@@ -125,6 +151,7 @@ function StorefrontApp() {
         <Route path="/admin" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
         <Route path="*" element={<Storefront store={store} />} />
       </Routes>
+      </Suspense>
     </div>
   );
 }
@@ -152,6 +179,7 @@ function AppContent() {
     return (
       <div className="h-[100dvh] flex flex-col font-sans overflow-hidden bg-white dark:bg-black">
         <main className="flex-1 flex overflow-hidden">
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
@@ -240,7 +268,7 @@ function AppContent() {
               }
             />
           </Routes>
-        
+          </Suspense>
         </main>
       </div>
     );
@@ -271,6 +299,7 @@ function AppContent() {
         {/* Asks once, on the server's schedule, never on the routes where an
             interruption costs the person something. */}
         <CompleteProfileSheet />
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
@@ -350,6 +379,7 @@ function AppContent() {
           <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>
+        </Suspense>
 
         {/* Clearance for the floating BottomNav: its bottom offset plus its
             height plus a small visual gap. `shrink-0` so a flex column cannot

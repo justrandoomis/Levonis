@@ -28,7 +28,7 @@ import {
   removeSupportRef,
   normalizeSupportRef,
   type SupportRefState,
-} from './Referrals';
+} from '../lib/supportRef';
 import MerchantCartView from '../components/merchant/MerchantCartView';
 
 /**

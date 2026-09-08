@@ -32,7 +32,7 @@ import {
   productShareLink,
   SUPPORT_REF_TTL_MS,
   type RefStore,
-} from '../src/pages/Referrals';
+} from '../src/lib/supportRef';
 
 // --------------------------------------------------------------- ref shapes
 

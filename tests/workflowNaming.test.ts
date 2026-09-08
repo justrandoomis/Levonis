@@ -362,3 +362,200 @@ test('the outbox step proves the email-first sign-up from the database, by count
   }
   assert.match(yml, /\[ "\$\{\{ steps\.account\.outcome \}\}" = "success" \]/, 'the final gate must include the identity step');
 });
+
+/* ==========================================================================
+ * PHASE 1 — the per-service deploy workflows (02-MIGRATION-PLAN.md 1.9, §12).
+ *
+ * The six `svc-<name>.yml` files, the reusable `_deploy-worker.yml` they call,
+ * `svc-probes.yml` and `verify-dark.yml` are new deploy paths, and every rule
+ * above exists because a deploy workflow that misdescribed itself cost real
+ * work. So the same rules apply to them, plus the three this programme adds:
+ * a new Worker name never contains "staging" (on this account that suffix
+ * means LIVE — ADR-011), a dark Worker says out loud that it serves no domain,
+ * and no new workflow may deploy, tail or otherwise target one of the two live
+ * Workers.
+ * ======================================================================== */
+
+/** The truth, read from the wrangler configs by `workerFromServiceConfig` below. */
+const SVC_DEPLOYS: Array<{ file: string; service: string; worker: string; env: string }> = [
+  { file: 'svc-core-dark.yml', service: 'core', worker: 'levonis-core-dark', env: 'dark' },
+  { file: 'svc-gateway.yml', service: 'gateway', worker: 'levonis-gateway-dark', env: 'dark' },
+  { file: 'svc-audit.yml', service: 'audit', worker: 'levonis-audit-dark', env: 'dark' },
+  { file: 'svc-analytics.yml', service: 'analytics', worker: 'levonis-analytics-dark', env: 'dark' },
+  { file: 'svc-ads.yml', service: 'ads', worker: 'levonis-ads-dark', env: 'dark' },
+  { file: 'svc-notifications.yml', service: 'notifications', worker: 'levonis-notifications-dark', env: 'dark' },
+];
+
+const LIVE_WORKERS = ['levonis-staging', 'levonis-studio-staging'];
+
+const REPO = new URL('../', import.meta.url);
+
+/** Every wrangler config in the repository: root, studio, services and probes. */
+function wranglerConfigs(): string[] {
+  const out: string[] = [];
+  const walk = (rel: string, depth: number) => {
+    if (depth > 4) return;
+    const url = new URL(rel, REPO);
+    for (const entry of readdirSync(url, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue;
+      if (entry.isDirectory()) walk(`${rel}${entry.name}/`, depth + 1);
+      else if (entry.name === 'wrangler.jsonc' || entry.name === 'wrangler.json') out.push(new URL(`${rel}${entry.name}`, REPO).pathname);
+    }
+  };
+  walk('', 0);
+  return out.sort();
+}
+
+/** Resolve a Worker name the way wrangler does: from the config and the env the file passes. */
+function workerFromServiceConfig(service: string, env: string): string {
+  const rel = service === 'core' ? '../wrangler.jsonc' : `../services/${service}/wrangler.jsonc`;
+  const text = readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const bare = text.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  if (!env || env === 'production') {
+    const top = bare.match(/"name"\s*:\s*"([^"]+)"/);
+    assert.ok(top, `${rel} has no top-level name`);
+    return top[1];
+  }
+  const at = bare.indexOf(`"${env}"`);
+  assert.ok(at > 0, `${rel} declares no env "${env}"`);
+  const named = bare.slice(at).match(/"name"\s*:\s*"([^"]+)"/);
+  assert.ok(named, `${rel} has no name under env "${env}"`);
+  return named[1];
+}
+
+test('every svc-*.yml names the Worker it deploys, and says it serves no domain', () => {
+  for (const { file, worker } of SVC_DEPLOYS) {
+    const name = displayName(read(file));
+    assert.ok(name.includes(worker), `${file}: display name "${name}" does not name its Worker "${worker}"`);
+    assert.match(name, /DARK/, `${file}: "${name}" deploys a dark Worker and must say DARK`);
+    assert.match(name, /serves no domain/, `${file}: "${name}" must state plainly that it serves no domain`);
+    assert.ok(!/LIVE/.test(name), `${file}: "${name}" says LIVE for a Worker no domain points at`);
+  }
+});
+
+test('each svc-*.yml really deploys the Worker its name claims, resolved from the wrangler config', () => {
+  // The display name is a claim; this resolves it the way wrangler would, from
+  // the `service:`/`env:` the file hands the reusable workflow. Renaming a
+  // Worker in a config without renaming the workflow fails here.
+  for (const { file, service, worker, env } of SVC_DEPLOYS) {
+    const text = read(file);
+    const svc = text.match(/^\s*service:\s*([a-z0-9-]+)\s*$/m);
+    const en = text.match(/^\s*env:\s*([a-z0-9-]+)\s*$/m);
+    assert.ok(svc && en, `${file} does not pass a service and an env to _deploy-worker.yml`);
+    assert.equal(svc[1], service, `${file} deploys service "${svc[1]}", not "${service}"`);
+    assert.equal(en[1], env, `${file} deploys env "${en[1]}", not "${env}"`);
+    assert.equal(workerFromServiceConfig(svc[1], en[1]), worker, `${file}: the config resolves to a different Worker than its name claims`);
+  }
+});
+
+test('no new Worker name contains "staging" — on this account that suffix means LIVE', () => {
+  for (const { file, worker } of SVC_DEPLOYS) {
+    assert.ok(!/staging/.test(worker), `${file}: "${worker}" — ADR-011 forbids the suffix on any new Worker`);
+  }
+  // and no wrangler config in the tree introduces one either
+  for (const file of wranglerConfigs()) {
+    const bare = readFileSync(file, 'utf8').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    for (const m of bare.matchAll(/"name"\s*:\s*"([^"]+)"/g)) {
+      if (LIVE_WORKERS.includes(m[1])) continue; // the two historical names, never renamed
+      assert.ok(!/staging/.test(m[1]), `${file.split('/Levonis/')[1]}: new Worker name "${m[1]}" contains "staging"`);
+    }
+  }
+});
+
+test('every new deploy workflow carries the worker-truth banner and a confirmation', () => {
+  for (const { file } of [...SVC_DEPLOYS, { file: 'svc-probes.yml' }, { file: 'verify-dark.yml' }]) {
+    const text = read(file);
+    assert.match(text, /WHICH WORKER SERVES WHOM/, `${file} has no banner`);
+    assert.match(text, /studio\.levonis-iq\.com {2}-> Worker {2}levonis-studio-staging {3}\[LIVE\]/, `${file}: the banner no longer states the Studio mapping`);
+    assert.match(text, /inputs:\s*[\s\S]*?confirm:/, `${file} has no confirm input`);
+    const phrase = /Type ([A-Z-]+)(?: to deploy them, or ([A-Z-]+))? to confirm|Type ([A-Z-]+)/.exec(text);
+    assert.ok(phrase, `${file}: the confirm input does not name a phrase to type`);
+    const typed = phrase[1] ?? phrase[3];
+    // Either shape counts: `[ "$..." = "PHRASE" ]` or a `case` arm `PHRASE)`.
+    assert.ok(
+      text.includes(`= "${typed}"`) || new RegExp(`^\\s*${typed}\\)`, 'm').test(text),
+      `${file}: nothing actually compares the input against ${typed}`
+    );
+    assert.ok(!/DEPLOY-PRODUCTION|-PRODUCTION"/.test(text), `${file}: a Worker that serves no domain must not be confirmed with the word production`);
+  }
+});
+
+test('no new workflow deploys, tails or targets one of the two live Workers', () => {
+  const NEW = [...SVC_DEPLOYS.map((s) => s.file), 'svc-probes.yml', 'verify-dark.yml', '_deploy-worker.yml'];
+  for (const file of NEW) {
+    const text = read(file);
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#')) continue; // the banner names them on purpose
+      for (const live of LIVE_WORKERS) {
+        if (!trimmed.includes(live)) continue;
+        // The only legal mention outside a comment is the guard that REFUSES it.
+        assert.match(
+          trimmed,
+          /error::|case |\|levonis-studio-staging\)|refus/i,
+          `${file}: names the live Worker ${live} outside a refusal:  ${trimmed}`
+        );
+      }
+    }
+    assert.ok(!/wrangler\s+tail/.test(text), `${file}: a dark deploy has no business tailing a Worker`);
+  }
+});
+
+test('the reusable workflow runs the gates first and the migrations before the code', () => {
+  // Comment lines are stripped first: this file explains its own ordering in
+  // its header, and a search over the prose would find every step before the
+  // first one actually runs.
+  const text = read('_deploy-worker.yml')
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('#'))
+    .join('\n');
+  const order = (re: RegExp) => text.search(re);
+  const gates = order(/npm run check/);
+  const plan = order(/assert-paid-plan\.mjs/);
+  const ids = order(/resolve-ids\.mjs/);
+  const vars = order(/preserve-vars\.mjs/);
+  const migrations = order(/d1 migrations apply/);
+  const deploy = order(/wrangler deploy -c/);
+  const secrets = order(/upload-secrets\.mjs/);
+  const health = order(/probe-health\.mjs/);
+  for (const [what, at] of Object.entries({ gates, plan, ids, vars, migrations, deploy, secrets, health })) {
+    assert.ok(at > 0, `_deploy-worker.yml never runs ${what}`);
+  }
+  assert.ok(gates < plan, 'the tests must run before anything is created');
+  assert.ok(plan < ids, 'the Workers Paid precondition must be checked before a resource is created');
+  assert.ok(vars < deploy, 'the running vars must be read back before the deploy that would replace them');
+  assert.ok(migrations < deploy, 'migrations go before the code that needs them — the 2026-08-30 outage');
+  assert.ok(deploy < secrets, 'a secret uploaded to a Worker about to be replaced is pointless ordering');
+  assert.ok(secrets < health, 'health is the last word');
+  // The two-step first deploy is what makes self-bindings and cycles deployable.
+  assert.match(text, /--full/, '_deploy-worker.yml has no second deploy pass, so a self-binding could never be deployed');
+});
+
+test('verify-dark.yml deploys the whole dark stack in the plan order: consumers, core, gateway', () => {
+  const text = read('verify-dark.yml');
+  for (const { service } of SVC_DEPLOYS) {
+    assert.ok(new RegExp(`service:\\s*${service}\\b`).test(text), `verify-dark.yml never deploys ${service}`);
+  }
+  const at = (s: string) => text.search(new RegExp(`service:\\s*${s}\\b`));
+  for (const consumer of ['audit', 'analytics', 'ads', 'notifications']) {
+    assert.ok(at(consumer) < at('core'), `verify-dark.yml deploys core before ${consumer} — the upload API rejects a binding to a Worker that does not exist yet`);
+  }
+  assert.ok(at('core') < at('gateway'), 'the gateway binds the core, so the core is deployed first');
+  assert.match(text, /e2e-dark\.mjs/, 'verify-dark.yml must drive the event path end to end');
+  assert.match(text, /api-tests\.mjs/, 'verify-dark.yml must seed the empty dark database');
+});
+
+test('no wrangler config anywhere in the repository declares routes or custom domains', () => {
+  // Routing lives in the Cloudflare dashboard (docs/WORKERS.md). The rule used
+  // to cover the two configs that existed; there are now fifteen, including
+  // eleven throwaway probes, and the ONE that will eventually have zone routes
+  // is the gateway — whose routes are added at G3 and whose rollback is
+  // deleting them, which only works while they are not in the repository.
+  for (const file of wranglerConfigs()) {
+    const bare = readFileSync(file, 'utf8').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    const rel = file.split('/Levonis/')[1] ?? file;
+    assert.ok(!/"routes"\s*:/.test(bare), `${rel} now declares routes`);
+    assert.ok(!/"route"\s*:/.test(bare), `${rel} now declares a route`);
+    assert.ok(!/"custom_domains"\s*:/.test(bare), `${rel} now declares custom_domains`);
+  }
+});

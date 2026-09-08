@@ -53,7 +53,7 @@ import { Overlay } from '../components/ui/Overlay';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
-import { captureSupportRefFromSearch } from './Referrals';
+import { captureSupportRefFromSearch } from '../lib/supportRef';
 
 // ------------------------------------------------------------------ strings
 

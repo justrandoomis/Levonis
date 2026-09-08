@@ -13,6 +13,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 import type { AppContext } from '../worker/lib/types';
 import { securityHeaders } from '../worker/lib/http';
@@ -44,6 +47,7 @@ function directive(csp: string, name: string): string[] | null {
 }
 
 const ROOT = 'levonis-iq.com';
+const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ------------------------------------------------------------ the SPA policy
 
@@ -237,4 +241,40 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
   const wrangler = readFileSync('wrangler.jsonc', 'utf8');
   assert.match(wrangler, /"run_worker_first":\s*\["\/api\/\*",\s*"\/files\/\*"\]/,
     'if the Worker starts running first for pages, revisit whether _headers is still the right layer');
+});
+
+/**
+ * A REFUSAL IS A RESPONSE, AND IT CARRIES THE HEADERS TOO.
+ *
+ * `gatewayAssertion` answers `403 NOT_VIA_GATEWAY` and never calls `next()`.
+ * Hono composes in registration order, so a middleware registered BEFORE
+ * `securityHeaders()` that short-circuits skips it entirely — CSP, HSTS and the
+ * static headers absent on exactly the responses an attacker sees. The gateway's
+ * own app puts security headers outermost for this reason, and
+ * `worker/index.ts` now does the same; this test is what keeps the order.
+ */
+test('a short-circuiting middleware registered after securityHeaders still carries CSP and HSTS', async () => {
+  const app = new Hono<AppContext>();
+  app.use('*', async (c, next) => {
+    c.env = PROD as never;
+    await next();
+  });
+  app.use('*', securityHeaders());
+  // stands in for `gatewayAssertion` at GATEWAY_ONLY=on
+  app.use('*', async (c) => c.json({ success: false, error: 'Not via gateway', code: 'NOT_VIA_GATEWAY' }, 403));
+  app.get('/api/x', (c) => c.json({ ok: true }));
+
+  const res = await app.request('https://levonis-iq.com/api/x');
+  assert.equal(res.status, 403);
+  assert.equal(res.headers.get('Content-Security-Policy'), spaCsp());
+  assert.equal(res.headers.get('Strict-Transport-Security'), STRICT_TRANSPORT_SECURITY);
+  assert.equal(res.headers.get('X-Content-Type-Options'), 'nosniff');
+});
+
+test('worker/index.ts registers securityHeaders() before gatewayAssertion', () => {
+  const src = readFileSync(join(ROOT_DIR, 'worker', 'index.ts'), 'utf8');
+  const headers = src.indexOf("app.use('*', securityHeaders())");
+  const assertion = src.indexOf("app.use('*', gatewayAssertion)");
+  assert.ok(headers > 0 && assertion > 0, 'both middlewares are registered');
+  assert.ok(headers < assertion, 'securityHeaders() must be outermost, or a 403 NOT_VIA_GATEWAY carries no CSP');
 });

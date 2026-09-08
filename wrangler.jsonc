@@ -49,6 +49,11 @@
     "EXTRA_ALLOWED_ORIGINS": "",
     "APP_ORIGIN": "",
     "EMAIL_ALLOWED_RECIPIENTS": "",
+    // `on` makes an EMPTY allowlist mean "mail NOBODY" rather than "mail
+    // everybody" (`worker/lib/outbox.ts` `allowedRecipient`). Off here: on the
+    // live Worker the allowlist is a staging convenience and mail must reach
+    // real customers.
+    "EMAIL_ALLOWLIST_REQUIRED": "off",
     "EMAIL_FROM": "",
     // The root domain the host classifier measures every request against.
     // Declared here even though it is filled at deploy time: a name that is
@@ -99,6 +104,7 @@
         "EXTRA_ALLOWED_ORIGINS": "",
         "APP_ORIGIN": "",
         "EMAIL_ALLOWED_RECIPIENTS": "",
+        "EMAIL_ALLOWLIST_REQUIRED": "off",
         "EMAIL_FROM": "",
         "STORE_ROOT_DOMAIN": "",
         // levonis-staging is the Worker that serves levonis-iq.com, so this
@@ -106,6 +112,98 @@
         "STUDIO_ALLOWED_DESTINATIONS": ""
       },
       "observability": { "enabled": true },
+      "triggers": { "crons": ["*/15 * * * *"] }
+    },
+
+    // ------------------------------------------------------------------ dark
+    // The DARK twin of the core (`02-MIGRATION-PLAN.md` slice 1.4). It is the
+    // SAME code as env.staging with its OWN empty database and bucket, so the
+    // gateway, the event bus and the four leaf consumers can be driven end to
+    // end before anything live changes.
+    //
+    // NOTHING HERE IS DEPLOYED BY THIS SLICE. Creating `levonis-core-dark`,
+    // `levonis-db-dark` and `levonis-files-dark` changes the Cloudflare account
+    // and is gated on the owner (G1/G2). `svc-core-dark.yml` is the workflow
+    // that does it, and it refuses to run until the Paid-plan precondition (D1)
+    // is confirmed.
+    //
+    // Reachability: no `routes` here — routing lives in the dashboard
+    // (`docs/WORKERS.md`), and the dark core is reached on the DARK ZONE
+    // (`<darkroot>/*`, D21), never on workers.dev. `workers_dev` and
+    // `preview_urls` are therefore both false: a Worker holding a seeded copy
+    // of the whole product should not also answer on a second, unrouted door.
+    "dark": {
+      "name": "levonis-core-dark",
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/files/*"]
+      },
+      "workers_dev": false,
+      "preview_urls": false,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "levonis-db-dark",
+          "database_id": "DARK-DB-ID-PLACEHOLDER",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "levonis-files-dark"
+        }
+      ],
+      "vars": {
+        // The same names env.staging declares — an undeclared name is a name
+        // the deploy-config preservation pass cannot see, and an unpreserved
+        // var is a wiped var.
+        "GOOGLE_CLIENT_ID": "",
+        "INITIAL_ADMIN_EMAIL": "",
+        "EXTRA_ALLOWED_ORIGINS": "",
+        // Both are the DARK zone (D21), filled by svc-core-dark.yml.
+        "APP_ORIGIN": "",
+        "STORE_ROOT_DOMAIN": "",
+        // The dark stack must never be able to mail a real address — and
+        // `EMAIL_ALLOWLIST_REQUIRED` is what makes that true rather than
+        // merely intended: with it the empty allowlist below means "nobody",
+        // so the dark core mails no one until the owner puts real dark
+        // addresses in `EMAIL_ALLOWED_RECIPIENTS`.
+        "EMAIL_ALLOWED_RECIPIENTS": "",
+        "EMAIL_ALLOWLIST_REQUIRED": "on",
+        "EMAIL_FROM": "",
+        "STUDIO_ALLOWED_DESTINATIONS": "",
+        // Phase 1 additions (`worker/lib/types.ts` Env, slice 1.6). Every one
+        // of them is optional in the code and absent on the live Worker; they
+        // exist here so the dark stack can publish while the live core cannot.
+        "EVENT_BUS_ENABLED": "on",
+        "EVENT_BUS_MODE": "rpc",
+        // The core's own public half is set by the workflow beside the secret.
+        "CORE_SIGNING_PUBLIC_KEY": "",
+        // `service:kid:publicKey,…` — empty means the entrypoints run with hop
+        // verification off, exactly as the live core does today.
+        "ALLOWED_CALLER_KIDS": "",
+        // off | log | on. `off` until one release after G3.
+        "GATEWAY_ONLY": "off",
+        "LEVONIS_VERSION": ""
+      },
+      // The four dark leaf consumers (slice 1.7). They are bound ONLY here:
+      // the live core binds nothing until G2, and `subscriptionsFor` narrows
+      // the fan-out to the consumers a deployment can actually reach, so an
+      // absent binding is simply not a subscriber.
+      "services": [
+        { "binding": "AUDIT", "service": "levonis-audit-dark" },
+        { "binding": "ANALYTICS", "service": "levonis-analytics-dark" },
+        { "binding": "ADS", "service": "levonis-ads-dark" },
+        { "binding": "NOTIFICATIONS", "service": "levonis-notifications-dark" }
+      ],
+      "observability": { "enabled": true },
+      // The same cadence as the live core (D5): the per-minute trigger is part
+      // of the G2 change set, not of a dark deploy. `pumpAfter` in `waitUntil`
+      // delivers what a request just committed, so the dark end-to-end proof
+      // does not wait for a tick.
       "triggers": { "crons": ["*/15 * * * *"] }
     }
   }

@@ -3,27 +3,58 @@ import { useLanguage } from '../LanguageContext';
 
 import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
-import AdminCoupons from '../components/adminCoupons/AdminCoupons';
-import AdminDelivery from '../components/adminDelivery/AdminDelivery';
-import AdminCommunity from '../components/adminCommunity/AdminCommunity';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
-import AdminProducts from '../components/AdminProducts';
-import AdminBundles from '../components/AdminBundles';
-import AdminTaxonomy from '../components/adminTaxonomy/AdminTaxonomy';
-import AdminWarranties from '../components/adminWarranty/AdminWarranties';
-import AdminAds from '../components/AdminAds';
-import AdminHomeSettings from '../components/AdminHomeSettings';
-import AdminOverview from '../components/AdminOverview';
-import AdminUsers from '../components/AdminUsers';
-import AdminWalletRequests from '../components/AdminWalletRequests';
-import AdminWalletSettings from '../components/AdminWalletSettings';
-import AdminStoreSettings from '../components/AdminStoreSettings';
-import AdminSerials from '../components/AdminSerials';
-import AdminReviews from '../components/AdminReviews';
-import AdminKyc from '../components/AdminKyc';
-import AdminMemberships from '../components/AdminMemberships';
-import AdminFarmConfig from '../components/adminFarm/AdminFarmConfig';
 import DashboardLayout from '../components/DashboardLayout';
+
+/**
+ * THE NINETEEN ADMIN PANELS, EACH ITS OWN CHUNK (`01-TARGET.md` §10, plan 1.8).
+ *
+ * They were static imports, so opening any page of the site downloaded the
+ * product form, the import panel, the taxonomy editor, the KYC console and the
+ * printer-farm configuration — the largest components in the application, used
+ * by a handful of people, reached from a tab that renders exactly one of them
+ * at a time. `activeTab` already decides which one mounts; making the import
+ * follow that decision changes nothing a user can do and everything about what
+ * they download.
+ *
+ * NO API CHANGE. Same components, same props, same tabs, same order. The one
+ * visible difference is a brief fallback the first time a tab is opened, and
+ * `<Suspense>` below is scoped to the panel area so the sidebar and the title
+ * never flicker with it.
+ */
+const AdminCoupons = React.lazy(() => import('../components/adminCoupons/AdminCoupons'));
+const AdminDelivery = React.lazy(() => import('../components/adminDelivery/AdminDelivery'));
+const AdminCommunity = React.lazy(() => import('../components/adminCommunity/AdminCommunity'));
+const AdminProducts = React.lazy(() => import('../components/AdminProducts'));
+const AdminBundles = React.lazy(() => import('../components/AdminBundles'));
+const AdminTaxonomy = React.lazy(() => import('../components/adminTaxonomy/AdminTaxonomy'));
+const AdminWarranties = React.lazy(() => import('../components/adminWarranty/AdminWarranties'));
+const AdminAds = React.lazy(() => import('../components/AdminAds'));
+const AdminHomeSettings = React.lazy(() => import('../components/AdminHomeSettings'));
+const AdminOverview = React.lazy(() => import('../components/AdminOverview'));
+const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
+const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRequests'));
+const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSettings'));
+const AdminStoreSettings = React.lazy(() => import('../components/AdminStoreSettings'));
+const AdminSerials = React.lazy(() => import('../components/AdminSerials'));
+const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
+const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
+const AdminMemberships = React.lazy(() => import('../components/AdminMemberships'));
+const AdminFarmConfig = React.lazy(() => import('../components/adminFarm/AdminFarmConfig'));
+
+/**
+ * What a tab shows while its chunk arrives. Deliberately the panel's own empty
+ * frame rather than a spinner in the middle of the screen: the sidebar, the
+ * title bar and the panel's box are already on screen, so replacing only the
+ * contents is what the person actually sees happening.
+ */
+function PanelFallback({ dir }: { dir: 'rtl' | 'ltr' }) {
+  return (
+    <div className="py-16 text-center text-sm text-zinc-500" dir={dir}>
+      {dir === 'rtl' ? 'جارٍ التحميل…' : 'Loading…'}
+    </div>
+  );
+}
 
 type AdminTab =
   | 'overview'
@@ -482,6 +513,7 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'taxonomy' || activeTab === 'warranties' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+        <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
           <AdminOverview onNavigateTab={(tab) => setActiveTab(tab as AdminTab)} />
@@ -545,6 +577,7 @@ export default function Admin() {
         {activeTab === 'community' && <AdminCommunity dir={dir} />}
 
         {activeTab === 'printer_farm' && <AdminFarmConfig />}
+        </React.Suspense>
       </div>
     </DashboardLayout>
   );

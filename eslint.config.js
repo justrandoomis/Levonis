@@ -18,7 +18,9 @@ export default tseslint.config(
       'dist/**',
       'studio/**',
       'node_modules/**',
-      '.wrangler/**',
+      // `**/` because every Worker keeps its own build scratch: the root's,
+      // and one per `services/*/wrangler.jsonc` the local dev rig bundles.
+      '**/.wrangler/**',
       'coverage/**',
       '**/*.d.ts',
     ],
@@ -75,7 +77,9 @@ export default tseslint.config(
     // Node scripts and tests. The verification scripts drive a real browser
     // through Playwright, so callbacks handed to page.evaluate() reference
     // window/document from inside a Node file — both global sets belong here.
-    files: ['scripts/**/*.{js,mjs}', 'tests/**/*.ts'],
+    // `services/*/dev/**` holds the local rigs' probe scripts — Node files by
+    // the same reasoning as scripts/.
+    files: ['scripts/**/*.{js,mjs}', 'tests/**/*.ts', 'services/*/dev/**/*.{js,mjs}'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   }
 );

@@ -491,6 +491,13 @@ test('the console mounts the server’s document, never a client schema, and the
   assert.ok(admin.includes("id: 'printer_farm'"), 'the sidebar lists the farm');
   assert.ok(admin.includes("loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر')"), 'the sidebar label is trilingual');
   assert.ok(admin.includes("{activeTab === 'printer_farm' && <AdminFarmConfig />}"), 'the tab renders the console');
-  assert.match(admin, /import AdminFarmConfig from '\.\.\/components\/adminFarm\/AdminFarmConfig'/);
+  // Static or lazy — what this pins is the PATH, so a moved or renamed console
+  // is caught. Plan slice 1.8 made the nineteen admin panels `React.lazy`
+  // (01-TARGET.md §10): the console is still imported from exactly here, and
+  // still only when its tab is open.
+  assert.match(
+    admin,
+    /(import AdminFarmConfig from '\.\.\/components\/adminFarm\/AdminFarmConfig'|React\.lazy\(\(\) => import\('\.\.\/components\/adminFarm\/AdminFarmConfig'\)\))/
+  );
   assert.match(admin, /icon: Factory/, 'a lucide icon, not an emoji');
 });

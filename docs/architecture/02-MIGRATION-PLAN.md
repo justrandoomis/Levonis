@@ -430,3 +430,536 @@ Split by what is needed: **(a)** a dashboard action or a token scope the CI toke
 **Decisions taken inside the slice (owner may overrule).** (a) `merchant_id` is not annotated `pii` on `OrderCreated`/`OrderDelivered`: the §1 identifier rule would drop it at Analytics ingest, but §9.2's `analytics_daily_merchant` rollups need it, and a merchant is a store, not a person; `tests/eventSchemas.test.ts` enforces the rule for `user_id`, `buyer_id`, `referee_id`, `referrer_id`, `actor_id`, `decided_by`, `owner_id`. (b) `user_id` IS annotated `pii` on the `none`-class money events (`PaymentAuthorized/Completed/Failed`, `RefundCompleted`, `SubscriptionChanged`) because Analytics consumes them — the rule as written. (c) Fixtures carry `sig: "fixture"` and are signed with a throwaway key at test time, so no key material is committed; `defineConsumer` accepts that marker only when `acceptFixtureSig` is set (dark/tests). (d) Event signatures and hop envelopes use `b64url(header{alg:'EdDSA',kid}).b64url(sig)` over canonical JSON (sorted keys); secrets are base64url PKCS#8, public keys base64url raw, `kid` = first 16 hex of sha256(public key) — the format `svc-*.yml` and `ALLOWED_CALLER_KIDS` (`service:kid:publicKey,…`) will use. (e) The `rateLimit(c, …)` facade refuses with 503 when neither `c.get('rateLimiter')` nor `env.IDENTITY` exists, unless `RATE_LIMIT_MODE=memory` (dark/local) — never a silent per-isolate fallback (ADR-016). (f) Delivery outcomes `invalid`/`forged`/`pii_refused` mark the delivery `dead` with the reason and are never retried (the DLQ is the deliveries table, replayable by `redeliver`). (g) The saga fence guard is `UPDATE <svc>_sagas SET step = CASE WHEN state = ? THEN step ELSE NULL END` — a NOT NULL violation aborts the batch when the sweep won, leaving no trace when the request won.
 
 **Not in this slice (later slices of Phase 1 own them).** `wrangler.jsonc` `env.dark` (1.4); `services/*` (1.5, 1.7) — the boundary tests are scaffolds over zero services today and need `OWNERSHIP.json` + `SECRETS.md` in every service directory; `worker/entrypoints/*`, migrations `0056`/`0058`, the emitters and `lib/audit.ts` as a facade (1.6 — the kit's `auditStatements`/`publishStatement` are ready and are no-ops while `EVENT_BUS_ENABLED` is off or the outbox table is absent); `scripts/gateway-parity.mjs`, `_deploy-worker.yml`, `svc-*.yml`, `verify-dark.yml` (1.5, 1.9); `tests/routeTable`, `gatewayRoutes`, `gatewayCapabilities`, `gatewayUploadClasses`, `rateLimitParity`, `bundleBudget` (1.5, 1.8). No package imports zod; if a later slice wants it, `03-EVENTS.md` §1 must change first.
+
+**Completion pass — the shared HTTP contracts (§1.1's `http/<service>.ts`).** The first pass left `packages/contracts/src/http/` at `common.ts` + `health.ts`; §1.1 and `01-TARGET.md` §10 (API-versioning row) also name one file per service, so the five Phase 1 services now have one: `http/gateway.ts` (`RouteTarget`/`RouteHosts`/`RouteRequires` and `RouteOverride` — the `ROUTE_OVERRIDES` kill switch as a type — the gateway's own `?gw=1` health and the four permanent 410 bodies of `worker/index.ts:193-196`), `http/audit.ts`, `http/analytics.ts`, `http/ads.ts` and `http/notifications.ts`. Two of them are pins rather than designs: `http/notifications.ts` carries today's `/api/notifications/*` responses field for field (`worker/routes/notifications.ts` — including `next_before` being `null` on a short page), and `http/analytics.ts` carries the counter names `admin.ts:125-159` already returns, so the Phase 4 and §9.2 prefix flips are invisible to the SPA. `probes/` is throwaway (1.0) and never gets a contract.
+
+`packages/contracts/test/http.test.ts` holds the surface to the plan in both directions — every Phase 1 HTTP service has a file, nothing else is in `http/`, every file is re-exported from the index — and enforces that the per-service files are **type-only**: no `const`, `function`, `class` or `enum`, and no runtime import (`http/common.ts` stays the deliberate exception, since both sides need the same header strings as values). That is what makes the SPA half safe, and `tests/store-isolation.test.ts` now enforces it: nothing under `src/` or `worker/` may import `services/` in any form (a type-only import would still make a service's source a build input of the core), and `src/` may only `import type` from `@levonis/*`, so no validator, canonicaliser or kit module can reach the browser bundle by an import written the wrong way. Its `runtimeSpecifiers()` helper (type-only imports erased, bare/dynamic/`require` never) is unit-tested on inline samples and all three rules were mutation-checked against a real violation before being trusted. Together with `tests/serviceBoundaries.test.ts` (services → core/sibling) the ring is closed in both directions. Gates re-run after the addition: `npm run check`, `npm run test:unit` (1849 + 19 workspace files), `npm run build` — `dist/` byte-identical, all 19 hashes unchanged — and `node scripts/migrate-check.mjs --twice`.
+
+### Slice 1.5 (the dark gateway) — landed as code, deployed nowhere
+
+**What exists now.** `services/gateway/` is a complete Worker: `wrangler.jsonc`
+(production `levonis-gateway` + `env.dark` `levonis-gateway-dark`, both with
+`workers_dev:false` and `preview_urls:false`, no `routes` — those are added in
+the dashboard at G3 and deleting them is the rollback), `OWNERSHIP.json` (empty
+`owns`/`reads`: the gateway executes no SQL), `SECRETS.md` (three names,
+`GATEWAY_SIGNING_KEY`, `TURNSTILE_SECRET`, `HEALTH_PROBE_TOKEN`), `CONTRACT.md`,
+`README.md`, `src/` and `test/`. It is **not deployed**: no `wrangler deploy`,
+no `d1 create`, no `secret put`, no workflow run.
+
+- **Routing table** (`src/routes.ts`): 89 rows for `01-TARGET.md` §3.3, each with
+  hosts, eventual owner, `flipPhase`, requirement, rate class and cacheability.
+  `targetFor()` returns `CORE` until `GATEWAY_PHASE` reaches a row's
+  `flipPhase`, so at phase 1 the gateway is a transparent hop; `ROUTE_OVERRIDES`
+  ("<prefix>=<TARGET>,…") is applied last and therefore beats the phase — the
+  seconds-long rollback of level (b). The strangler default `/api` → CORE means
+  an unclaimed prefix keeps being served by the Worker that serves it today.
+- **Pipeline** (`src/pipeline.ts`): the thirteen steps of §3.2 in order, behind
+  the platform kit's copies of the core's `securityHeaders()` and
+  `originCheck()` and one host classification per request — the same three
+  middlewares, in the same order, as `worker/index.ts`.
+- **Degradation is the design.** Every dependency is optional and every absence
+  has one behaviour: no `IDENTITY` → anonymous and the cookie still reaches
+  CORE; no `GATEWAY_SIGNING_KEY` → no hop envelope (legal while every callee is
+  `GATEWAY_ONLY=off`, and the gateway never forges one to look signed); no
+  `TURNSTILE_SECRET` → the hook is inert; a target's binding missing → CORE; a
+  rate limiter missing → **503, never a silent per-isolate fallback** (ADR-016).
+- **Tests** (`services/gateway/test/`, 90 cases, run by `npm run test:unit`
+  through `scripts/test-workspaces.mjs`): routing parity reads every
+  `app.route(...)` out of `worker/index.ts` and fails if one does not resolve to
+  the owner recorded here; the capability suite DISCOVERS the core's admin
+  surface (85 paths, including the seven outside `/api/admin/*`) and drives each
+  one on a merchant host; the upload classes are re-read from the constants they
+  cite in `worker/routes/`; the rate-limit parity suite extracts every
+  `rateLimit(c, …)` call site and fails if a gateway class is slower in
+  requests per second; the cache suite proves each refusal reason separately.
+  They read `worker/` as TEXT — importing it would make the core a build input
+  of a service's tests.
+
+**Decisions taken inside the slice (owner may overrule).** (a) The gateway
+resolves sessions through `IDENTITY.resolveSession` and **verifies the signature
+itself** before believing a claim, so a key rotation fails once here rather than
+as a 403 storm in every service. (b) `introspect` is deliberately NOT used: it
+is not in ADR-015's pinned call set, and Studio's allowlist is a different
+concern. (c) `/api/returns/admin`, `/api/price-protection/admin` and
+`/api/referrals/admin` gained explicit admin rows — the discovery test found
+them mounted as admin surfaces with only an `auth` requirement in the first
+draft of the table. (d) JSON size classes exist beside the upload classes: a
+flat 1 MB cap would have refused `POST /api/admin/template/apply`, which
+legitimately carries `MAX_TEMPLATE_CHARS` = 1,500,000 characters (several MB in
+Arabic); admin bodies are authenticated, apex-only and `admin-write` limited, so
+4 MB there costs nothing an anonymous surface pays, and `BODY_LIMIT_MODE`-style
+escape hatches stay unnecessary. (e) The Turnstile challenge marker is per
+isolate, not in the limiter store: a fixed-window counter cannot be READ without
+incrementing it, and a peek would need an Identity method the gateway must not
+hold — the consequence (an attacker on another isolate is not challenged by the
+gateway; Identity still counts and refuses per identifier) is stated in the
+code. (f) `SEARCH` was added to `RouteTarget` in `packages/contracts` — §3.3 has
+a `/api/v1/search` row and §1.2 row 16 a Worker, but the union omitted it.
+(g) `hosts:'main'` is `adminAllowedOn()` verbatim, including its
+"foreign-and-outside-the-root is the operator's own deployment" branch, so a
+mistyped `STORE_ROOT_DOMAIN` cannot 404 the whole admin API again; a host under
+the root but too deep to be a store (`a.b.<root>`) is refused outright (§3.2
+step 3), which is stricter than the core is today and is called out here because
+the dark parity corpus will see it.
+
+**Proven locally, on the multi-config `wrangler dev` rig** (`services/gateway/dev/`,
+never deployed): the gateway inside workerd, the stub core behind a real service
+binding, `--env dark`. 15 checks pass in the Phase-1 default and 16 with
+`--var PRINCIPAL_MODE:on`, where the stub Identity generates an Ed25519 key **in
+memory**, signs a principal, publishes the public half through
+`getPublicKeys()`, and the gateway verifies it and answers the capability guard
+from the signed claims — no key material in the repository, in a var or on a
+command line. The rig has already earned its keep: **workerd hands a bodiless
+`POST` a non-null empty body stream**, so the "a body needs a content type" rule
+refused all 41 of the SPA's bodiless `POST`/`DELETE` calls with a 415;
+`hasBody()` now treats a declared `Content-Length: 0` as authoritative and
+`test/validation.test.ts` pins it. That class of bug is invisible to a stubbed
+binding and would have surfaced as an outage on the dark zone at best.
+
+**Shared files touched, minimally.** `tests/lib/boundaries.ts`: the bare-`fetch(`
+rule now exempts a DECLARATION named `fetch` — every `WorkerEntrypoint` has one,
+so without this every service would trip the lint (the inline sample in
+`tests/serviceBoundaries.test.ts` gained that case). `eslint.config.js`:
+`**/.wrangler/**` instead of `.wrangler/**` (each Worker keeps its own build
+scratch) and `services/*/dev/**` gets Node globals.
+`packages/contracts/src/http/gateway.ts`: `SEARCH` added to `RouteTarget`.
+
+**Not in this slice.** The dark deploy itself (1.4 for the core, 1.9 for the
+workflows and `svc-gateway.yml`); `scripts/gateway-parity.mjs` and the ≥300
+request corpus, which need the dark zone; `PRINCIPAL_MODE=on` in any deployed
+environment (it stays `off` while the core runs `loadSessionUser` itself);
+`RateLimitHit`/`TurnstileFailed` emission, which needs RISK and ANALYTICS
+bindings that do not exist yet; the KV `FLAGS`/`GW_CACHE` namespaces and the
+`assets` block of Phase 9.
+
+Gates run for this slice: `npm run check` (root, worker and workspace
+typechecks, `eslint .` clean, `check:workspaces` including
+`services/gateway`, `check:boundaries` 26 cases), `npm run test:unit`
+(0 failures; 27 workspace test files), `npm run build` (exit 0,
+`dist/_headers` regenerated), `node scripts/migrate-check.mjs --twice`
+(142 tables, 0 foreign-key violations).
+
+### Slice 1.6 (the core's event bus, its outbox migrations and the named entrypoints) — landed, dark, nothing live touched
+
+**The property everything else is judged against.** With `EVENT_BUS_ENABLED` unset (its default), no `core_outbox_events` table or no consumer binding — which is the live Worker today and the live Worker the moment this ships — every emitter is a no-op, every batch is byte-for-byte the batch it is now, and the only added work per request is one string comparison. `tests/coreEventBus.test.ts` asserts that as *statement counts of the business batch*, not merely as "no event was written": the inventory reserve plans exactly two statements with the bus off and with the table dropped, and three with it on. All 1849 existing tests pass unchanged.
+
+**Migrations (each additive, `CREATE`-only, applied before the code that fills them).** `0056_ledger_keys.sql` — `event_key`, `correlation_id`, `source_service` on `wallet_transactions` (`NOT NULL DEFAULT ''`, so every existing row keeps its meaning and none is rewritten), a **partial** UNIQUE index on `event_key` (`WHERE event_key <> ''`, so today's rows do not collide with each other), the `(user_id, currency, status, type)` balance index, and the pure `CREATE INDEX` list of assessment §4.3. That list resolves §4.3's own open question: `products` carries **both** `subcategory_id` (indexed since 0001) and `sub_category_id` (what the queries filter on) — the second is the one that was unindexed. Two §4.3 items are deliberately absent: `order_items(merchant_id, …)` (the column does not exist on that table) and the `LIKE`-scan items, which an index cannot serve (they are the Search service's job, 4i). `0057_core_outbox.sql` — `core_outbox_events`, `core_outbox_deliveries`, `pump_lock` and `core_audit_details` (the audit facade needs it: the body never travels in an envelope). Its DDL is the platform kit's `outboxSchemaSql('core')`/`auditDetailsSchemaSql('core')` verbatim, and `tests/coreEventBus.test.ts` compares the file against those generators so the dispatcher and the schema cannot drift. It ships **no seed row** for `pump_lock`: that would be its only non-`CREATE` statement, so the pump creates the row idempotently on first use instead (which also covers a database restored without it) — and a missing lock row would otherwise make the sweep a silent no-op for ever, since its acquire is a conditional `UPDATE`. `0058_service_keys.sql` is Identity-owned and stays with the slice that needs it.
+
+**`worker/lib/eventBus.ts` — the producer.** `outboxStatement()` returns ONE statement for the caller's existing `db.batch()`; `emitEvent()` writes it directly where no batch exists; `emitBestEffort()` fires `ProductViewed`/`AddToCart` at bound subscribers in `waitUntil` and never touches D1; `pumpAfter()` delivers only the ids the request just committed; `pumpOutbox()` is cron step 0 and the only `pump_lock` holder. Two decisions worth naming: **(a)** the bus is looked up **by the database object** (`busFor(db)`), because `audit(db, …)` and the wallet/inventory helpers take a `D1Database` at two hundred call sites — `configureEventBus(env)` runs once per invocation in `fetch`/`scheduled`, and a test that configures nothing, or configures another database, gets the legacy path by object identity rather than by hope. **(b)** `SUBSCRIPTIONS` is narrowed to the consumers this deployment can actually reach (`subscriptionsFor`): the end-state table names `risk` and `search`, Workers that do not exist, and a delivery row for an unreachable consumer would leave every event `pending` for ever, so `dispatched_at` would never be set and the cron would re-select a growing backlog every minute. An unbound consumer is simply not a subscriber yet; what it missed is replayable from the outbox by `seq` range, which is why the envelopes are retained. `aggregate_seq` is `ms × 1000 + a per-isolate slot` — monotonic for the projections, and collision-proof inside a millisecond so the outbox's `UNIQUE (aggregate_type, aggregate_id, aggregate_seq)` can never abort the business batch it rides in. Envelopes are signed with `CORE_SIGNING_KEY` when it is configured and carry the `fixture` marker when it is not, which only a consumer running with `acceptFixtureSig` (dark, tests) will take.
+
+**`lib/audit.ts` is now a facade** over the kit's `audit()`: the same signature, the same `audit_log` row, every one of the ~200 call sites untouched — plus, when the bus is enabled, the `AuditRecorded` outbox row and the detail body in `core_audit_details` **in one batch with the legacy insert**, so the future hash chain and today's table cannot disagree. The kit gained one additive field for this (`AuditContext.sign`), because the outbox stores the envelope verbatim and therefore has to sign it at build time rather than at pump time.
+
+**Emitters, at the sites the assessment names.** `UserCreated` (all four signup paths in `auth.ts`), `ReferralUsed` (`bindReferral`), `AddToCart` (`cart.ts`, best-effort), `ProductViewed` (`products.ts`, best-effort, sampled 1:1 signed-in / 1:5 anonymous), `ProductAdded` (`lib/productPersistence.ts#planProductSave` — the one function the admin form, the template apply and the import all go through), `InventoryChanged` (`lib/inventory.ts#planInventory`, in the same batch as the counter change, stating the row *after* the guarded statements it travels with), `CheckoutStarted` and `OrderCreated` (`routes/orders.ts`; the order event is inside the order's own batch, the checkout event outside it so a replay is a logged no-op instead of a second event), `PaymentAuthorized`/`PaymentCompleted`/`PaymentFailed` (`walletOps.ts`, from the one place a purchase hold is placed, settled or refused), `RefundCompleted` (`returns.ts` return refunds and price-protection credits), `OrderStatusChanged`/`OrderDelivered` (`lib/orderStageOps.ts#moveOrderStage`, after the conditional flip has proved this caller won the race, so a loser publishes nothing), `SubscriptionChanged` (membership purchase — read off the row that was actually written, so a purchase that landed in `conflict` publishes nothing — and admin cancellation). Every emitter checks `eventsEnabled` first and cannot throw into its caller: an event describes something that happened and must never be the reason it fails to happen.
+
+**Entrypoints.** `worker/entrypoints/{Identity,Ledger,Catalog,Orders}Entrypoint.ts`, exported from `worker/index.ts` beside the unchanged default export, documented in `worker/entrypoints/CONTRACT.md` and typed by `packages/contracts/src/rpc/*` — each file ends in a compile-time proof that its methods still match the contract. Every method except `health()` verifies the caller's signed hop (signature, per-method allowlist, `args_hash`, the 30-s window, replay) before touching anything; the mode is `off` while `ALLOWED_CALLER_KIDS` is empty and `on` the moment it is set. `LedgerEntrypoint` delegates to the wallet engine's own exported functions and implements no money path of its own — `credit`/`debit`/`refund`/points/`decideDeposit` arrive with the slices that move their callers, because a second implementation beside the routes' is the duplication Phase 0 spent its time removing. `OrdersEntrypoint` is the read-only half, as §1.6 says. `CatalogEntrypoint` answers the printer flag and the Search backfill feed; `getProductsForCart` moves with the read routes in 5.1. **One structural decision:** the base class is imported from `cloudflare:workers` *dynamically*, with a Node stand-in as the fallback, because Node cannot resolve that specifier at all and `tests/adminHostGuard.test.ts` imports `worker/index.ts` to drive all 225 admin routes — a static import would take the unit suite down. Both halves are proven rather than assumed (below). `worker/index.ts` also gained the inbound `gatewayAssertion` middleware at `GATEWAY_ONLY=off`, which returns before reading a header while it is off.
+
+**Proven locally on the real runtime**, with the multi-config rig (`npx wrangler dev -c <core> -c <consumer stub>`, local D1 with all 57 migrations applied, `--persist-to` a scratch directory; nothing was deployed, created or probed on the account): a consumer Worker called `IdentityEntrypoint.rateLimitHit` over a service binding and the counter incremented across calls in D1 (`{allowed:true,count:1}` → `{allowed:false,count:3}`), `health()` answered `{ok:true, svc:'core', checks:{db:'ok', outbox_lag_s:null}}`, `CatalogEntrypoint.listForIndex` answered its page, and — with an outbox row seeded and the scheduled handler triggered — cron step 0 took the lock, fanned the event out to the bound consumer's `deliver()`, recorded `state='acked', attempts=1`, set `dispatched_at` and released the lease.
+
+**Left for the slices that own them.** `event_key` is not yet *populated* by the ledger writers: that is plan 0.4's second PR, and this round was forbidden from touching `walletOps.ts`/`escrowOps.ts`/`storeOrders.ts`/the cancel path except to add an emitter call. For the same reason `OrderCreated` is not emitted from `routes/storeOrders.ts` (6a) and `RefundCompleted` not from `lib/orderCancelOps.ts` (7.2); both events already have a producer entry, so adding those sites later changes no contract. `PaymentCompleted` for approved deposits (`decideDeposit`) and points settlements (`pointsOps.ts`) waits for 4b-ii/8.0. Consumer bindings, `env.dark` and the deploy workflows belong to 1.4/1.7/1.9 — this slice binds nothing.
+
+**Gates.** `npm run check`, `npm run test:unit` (1849 root + workspace suites, all green, 33 new tests in `tests/coreEventBus.test.ts` and `tests/coreEntrypoints.test.ts`), `npm run build`, `node scripts/migrate-check.mjs --twice` (57 files, second pass applies 0, `0057`'s six idempotent statements re-run with no row added).
+
+### Slice 1.7 (Audit and Analytics, dark) — landed as code, deployed nowhere
+
+**What exists now.** `services/audit/` and `services/analytics/` are complete Workers — `wrangler.jsonc` (production `levonis-audit` / `levonis-analytics` plus `env.dark` twins, **their own D1** `levonis-{audit,analytics}-db[-dark]` with `migrations_dir`, no `routes`, `preview_urls:false` everywhere and `workers_dev:false` except the dark twins, whose `/health` is plan 2.1's gate), `OWNERSHIP.json`, `SECRETS.md` (names only), `CONTRACT.md`, `README.md`, `migrations/0001_*.sql`, `src/`, `test/` and a local `dev/` rig. **Nothing was deployed**: no `wrangler deploy`, no `d1 create`, no `secret put`, no workflow run; the database ids in both configs are `*-PLACEHOLDER` strings the deploy workflow fills in, exactly as `scripts/set-deploy-ids.mjs` does for the core.
+
+- **Audit.** `audit_events` (append-only) + `audit_chain_heads` in its own database. Ingest is a plain INSERT batched with `audit_processed_events`; the chain is built by a **separate sealing pass** (the per-minute cron, and opportunistically in `waitUntil` after a delivery). That separation is the slice's main design decision and `src/chain.ts` opens with the reason: a chain link is read-then-write, and a fence for it inside the delivery batch would fail with a constraint error that `defineConsumer` cannot distinguish from the `processed_events` PK violation meaning "already delivered" — an audit entry silently reported as a replay is precisely the failure this service exists to prevent. Sealing instead advances the head with ONE conditional UPDATE whose loss rolls back its own batch and nothing else, so two sealers racing produce one chain and the loser writes nothing (`test/chain.test.ts` drives that race against real SQLite). Verification walks `chain_index` — seal order, not `seq` order, because two concurrent inserts can commit out of order — and catches an edited row, a deleted row, a reordered chain and a rewritten head, each with its own case. The hash is `HMAC(AUDIT_CHAIN_KEY, canonical(core))` with a plain digest as the keyless fallback; each row records which algorithm it used, so adding the key later invalidates nothing. What the hash covers is `detail_hash`, never the `detail` body — which is what lets an `AuditRecorded` envelope (hash + `detail_ref`, `03-EVENTS.md` §4) be filled in later by `record()` without disturbing the chain.
+- **Analytics.** `analytics_events` (the projection, rolled at 30 days) + `analytics_daily_platform` + `analytics_daily_merchant` (kept indefinitely) in its own database. The PII projection is **driven by the catalogue, not by a list in the service**: it drops `EVENT_SCHEMAS[key].pii` field by field, so an annotation added in `packages/contracts` takes effect here with no change and no release. Two additions the annotation cannot express are made explicitly: the envelope's `actor_id` becomes `sha256(day : ANALYTICS_HASH_SALT : actor)`, and `aggregate_id` gets the same treatment when the aggregate IS a person (`user`, `wallet`, `membership`, `cart`) — otherwise dropping `user_id` from an `OrderCreated` payload would be theatre, since the wallet events beside it carry the same person as their aggregate id. `test/projection.test.ts` asserts all of it over the whole subscribed catalogue and then reads the entire store back as text to prove no raw person id is in it. Rollups are maintained twice on purpose: **added** in the delivery batch (so idempotency is the consumer's, for free — a redelivery aborts the batch and adds nothing) and **recomputed** for the last two days by the cron, which replaces the day; both call the same pure `metricsOf`, and a day above `ANALYTICS_ROLLUP_MAX_ROWS` is left to the incremental numbers rather than half-recomputed.
+
+**Decisions taken inside the slice (owner may overrule).** (a) `AuditApi` gained `record()` and its two types in `packages/contracts/src/rpc/audit.ts` — the slice brief asks for the method and the interface had only `query`/`verifyChain`; `source_service` on it is taken from the SIGNED hop and never from the argument, so a caller cannot write the log in another service's name. (b) Audit's HTTP reads are `admin:full` (row 20), but Analytics' admin reads require only `role:'admin'`: they are aggregates with no money row and no person in them, which is the whole point of the store — an assistant admin may read them. (c) `merchantDaily` over HTTP proves ownership the only way a service with no merchant table can — the principal's own `sub`, or a full-scope admin — and Marketplace reaches it over RPC instead, where the hop allowlist is the check; that route is deliberately NOT apex-only, because a merchant dashboard lives on its storefront host. (d) `overview()` reports what Analytics cannot know as zero and says so in `src/read.ts` rather than guessing: `users.investors` is always 0 (the flag travels on `RoleChanged`, a `personal` event this store may never see) and `users.total` counts signups seen since the bus started. (e) Neither service creates `audit_log` or `merchant_store_analytics_daily`: the design assigns both to these owners, but they live in the shared database and moving their rows is an owner decision, not a migration this slice may take. (f) Both services bind `IDENTITY` for `getPublicKeys` only — a producer's key is what makes an event evidence — and nothing else; a log or a metric store that calls the systems it records is neither. (g) Each service's `migrations/0001_*.sql` is GENERATED from its `src/schema.ts` and a test compares them statement by statement, so the DDL the deploy applies and the SQL the code writes cannot drift.
+
+**Proven locally on the real runtime**, with the multi-config rig (`services/{audit,analytics}/dev/`, never deployed; local D1 via `--persist-to`, nothing created or probed on the account). Each rig is a producer stub carrying the dark core's NAME — so the service's own `IDENTITY` binding resolves to it — which generates **one Ed25519 key per producer service in memory**, signs envelopes with them and publishes the public halves through `IdentityEntrypoint.getPublicKeys()`; the service under test fetches those over the binding and verifies with them, so no key material exists in the repository, in a var or on a command line. Audit: 8 checks green — health behind the binding, a signed `AuditRecorded` and a signed `RoleChanged` recorded, the same envelope `acked` then `replayed`, a tampered envelope refused as `forged`, `record()` over RPC, `query()` newest-first with chain hashes, `verifyChain()` intact — plus, with the configs swapped so the service is primary, `curl /cdn-cgi/local/scheduled` sealed the last unchained entry (`unsealed 0, head 4`). Analytics: 9 checks green — four signed envelopes ingested, a `personal` envelope refused, the overview read from the rollups, a redelivery adding nothing, the daily series, a merchant rollup holding only its own order, and the HTTP surface answering `401` unsigned / `200` admin / `403` for another store's numbers through the service's real principal check — plus a cron tick that repaired a counter someone had set to 99 back to the 3 the raw rows say. **The rig earned its keep immediately**: publishing one key under two service names made every `core`-signed envelope fail `PRODUCER_KEY_MISMATCH`, because a `KeyRing` is keyed by `kid` and a producer's key IS its identity. That is invisible to an in-process test that hands the consumer a ring it built itself.
+
+**Left for the slices that own them.** The `AUDIT`/`ANALYTICS` service bindings on the core and the root `wrangler.jsonc` `env.dark` block belong to 1.4/1.6 (the core's `subscriptionsFor` already knows both names); `svc-audit.yml` / `svc-analytics.yml`, the two-step first deploy and `verify-dark.yml` belong to 1.9 — each needs its D1 created, `migrations/` applied before the code, and the secret NAMES of the two `SECRETS.md` files. The R2 `audit-archive/` anchor is designed for (`audit_chain_heads.anchored_*`, and `verifyChain` reports `anchored_head: null` until it exists) but no bucket is bound in Phase 1. `analytics_engine_datasets: EVENTS_AE` is likewise a later sink behind the same read models. The detail BODY of an `AuditRecorded` envelope still travels only through `record()`: the platform kit's `RpcFanoutBus` calls `deliver(batch, hop)` and has no channel for the producer's `<svc>_audit_details` row, so the chain records the producer's `detail_hash` and `detail_ref` and the body follows when the producer hands it over.
+
+**Gates.** `npm run check` (root, worker and tests typechecks, `eslint .` clean, `check:workspaces` including both new services, `check:boundaries` 26 cases), `npm run test:unit` (1882 root + 335 workspace tests across 46 files, 0 failures; 44 new tests in `services/{audit,analytics}/test/`), `npm run build` (exit 0, `dist/_headers` regenerated), `node scripts/migrate-check.mjs --twice` (142 tables, 0 foreign-key violations — the two new migration streams are the services' own and never touch the core's).
+
+### Slice 1.7 (Ads and Notifications, dark) — landed as code, deployed nowhere
+
+**What exists now.** `services/ads/` and `services/notifications/` are complete Workers — `wrangler.jsonc` (production `levonis-ads` / `levonis-notifications` plus `env.dark` twins, **their own D1** `levonis-{ads,notifications}-db[-dark]` with `migrations_dir` and `*-PLACEHOLDER` ids the deploy workflow fills in, per-minute crons, no `routes`, `preview_urls:false` everywhere and `workers_dev:false` except the dark twins), `OWNERSHIP.json`, `SECRETS.md` (names only), `CONTRACT.md`, `README.md`, `migrations/0001_*.sql`, `src/`, `test/`, and a shared local rig at `services/ads/dev/`. **Nothing was deployed**: no `wrangler deploy`, no `d1 create`, no `secret put`, no workflow run. Neither service touches the shared core database, and neither removes anything from the monolith.
+
+- **Ads.** Five adapters behind one interface (`meta_capi`, `google_ads`, `tiktok`, `snapchat`, `noop`), each with a **recorded-exchange contract test** under `test/fixtures/` that pins the mapped payload, the request method/URL/header NAMES/body and the parsed response — header *values* are never recorded, so no fixture can carry a credential. Four "off" states are kept distinct because they mean different things operationally: the global `ADS_ENABLED` var (fails closed — acks the event and writes nothing at all), `ads_providers.enabled`, `ads_event_map.enabled`, and **not configured**, which is the strongest: a provider missing one secret NAME is replaced by `SandboxProvider`, so the mapping still runs, the row still says exactly what would have been sent, and there is no code path from an unconfigured provider to a `fetch`. The consent rule is executed in the order the design states: without an `ads` snapshot the row is `no_consent` with an EMPTY payload column, and a consent withdrawal writes NULLs over the stored hashes rather than flagging them — the drop is before persistence, not at send time. Delivery is idempotent three times over: `ads_processed_events`, `UNIQUE (event_id, provider)` on `ads_deliveries`, and the provider's own dedup on OUR `event_id`; a 5xx becomes a `failed` row with the kit's `backoffSeconds` and the per-minute cron sweeps it to `dead` plus an `ads_dead_letters` row after 8 attempts, while a 4xx is `rejected` once and never retried.
+- **Notifications.** `notify_outbox` is the legacy `outbox` shape **column for column** — `test/migrations.test.ts` compares it against `migrations/0003_final_phase.sql` read from the repository, so Phase 3 can copy the monolith's rows with an `INSERT SELECT` and the day someone alters the core's table this suite says so. `user_notifications` is the same table minus `REFERENCES users(id)`, which cannot exist in a database that does not own `users`. The two transports are moved, not rewritten, and `test/transports.test.ts` reads `worker/lib/outbox.ts` off disk to prove it: the Resend `Idempotency-Key` is still the `event_key` truncated to 256, `EMAIL_ALLOWED_RECIPIENTS` still skips rather than sends, Telegram is still plain text capped at 4000 with no `parse_mode`. The claim is still the compare-and-swap on `attempts`, so two pumps cannot double-send. **The monolith keeps every copy** (`worker/lib/{outbox,telegram,notifications}.ts` and its own rows) and keeps sending; a test fails if they disappear.
+
+**Decisions taken inside the slice (owner may overrule).** (a) `packages/contracts/src/ownership.ts` gained ONE table, `notify_outbox`, to the notifications list — the plan names the table and `tests/ownership.test.ts` refuses a manifest claiming a table the design does not know. (b) `AdsProviderName` was NOT extended: `01-TARGET.md` §9.1 fixes the union at four adapters plus `noop`, and the Meta Marketing API is the graph host the Conversions API posts to (`<graph>/<dataset_id>/events`), so one adapter covers both names honestly rather than two that differ only in a comment. (c) `SubscriptionChanged` carries only a `pii` `user_id`, so Ads derives its consent join key as `sha256(user_id)` and never stores the id; `packages/contracts` does not yet fix that function, and if Identity's stable hash differs the consequence is a `no_consent` delivery, never a leak — named in `services/ads/CONTRACT.md` as the one assumption to confirm. (d) The provider endpoint versions were written from the adapters and reviewed offline (the vendor documentation is unreachable from the build environment); `CONTRACT.md` lists all four and says they must be re-checked before any provider secret is set — until then every provider is unconfigured and a wrong URL costs nothing. (e) Notifications handles the four types slice 1.7 names and no more; the other ten `subscriptions.ts` gives it are named in `OWNERSHIP.json`, and `test/boundaries.test.ts` fails if one is neither handled nor named, so the gap cannot become an omission. (f) `UserCreated` carries no contact by design, so the recipient comes from an injectable `ContactResolver` that is ABSENT until `IDENTITY.contactFor` is bound in Phase 4; without it the handler writes a `skipped` outbox row saying `NO_CONTACT_RESOLVER`, which is the core's own "record honestly without sending" behaviour. (g) The Telegram webhook records and acknowledges but ROUTES NOTHING: a callback button becomes `LEDGER.decideDeposit`, a money command whose nonce Ledger verifies itself, and that binding does not exist yet. (h) Neither service declares a `publishes` entry: `AdConversionSent`/`NotificationSent` have no v1 schema, and declaring one would force `AUDIT`/`ANALYTICS` bindings onto Workers that must hold none.
+
+**Proven locally on the real runtime**, with the multi-config rig (`services/ads/dev/`, never deployed; local D1 via `--persist-to`, nothing created or probed on the account): a producer stub holding both service bindings drove `levonis-ads-dark` and `levonis-notifications-dark` together inside workerd — 12 checks green. Health over the binding for both; a consent change stored and mapped to one sandbox row per provider; a purchase reaching all four providers as `sandbox` with **no provider secret set, so nothing left the account**; a redelivery answered `replayed` with no second row; the provider kill switch removing one platform and leaving three; every provider reporting `configured:false` with a closed breaker; an order becoming an in-app row and its redelivery adding nothing; `send()` idempotent on the event key; a queued mail recorded `dropped` with `EMAIL_NOT_CONFIGURED` by the pump running in `waitUntil`; the webhook answering 200 and accepting nothing without its secret; the inbox answering 401 to a request it cannot attribute. **The rig earned its keep**: `wrangler d1 migrations apply --local` writes under the CONFIG's directory while `wrangler dev` opens a different state directory, so without a shared `--persist-to` every table was missing and every health check still said `db: ok` — because `SELECT 1` works fine on an empty database. `dev/README.md` leads with that.
+
+**Left for the slices that own them.** `svc-ads.yml` and `svc-notifications.yml`, the reusable `_deploy-worker.yml` and `verify-dark.yml` belong to slice 1.9 — each service's `README.md` ends with the exact table that workflow needs (config path, Worker name, D1 name to create, migrations directory, secret NAMES, health probe, which var ships `off`). The `ADS`/`NOTIFICATIONS` service bindings on the core and the root `env.dark` block belong to 1.4/1.6. `IDENTITY.contactFor` (Notifications' recipient) and `LEDGER.decideDeposit` (the webhook's router) are Phase 4/6. `tg_admin_notifications`, `tg_admin_actions` and `notification_preferences` are notifications-owned in the design but stay in the core until the wallet-approval flow moves: claiming a table this service does not create is a claim `tests/ownership.test.ts` cannot check.
+
+**Gates.** `npm run check` (root, worker and tests typechecks, `check:workspaces` including both new services, `check:boundaries` 26 cases; `eslint services/ads services/notifications` clean), `npm run test:unit` (1882 root + 335 workspace tests across 46 files, 0 failures; 62 new tests in `services/ads/test/` and 53 in `services/notifications/test/`), `npm run build` (exit 0), `node scripts/migrate-check.mjs --twice` (142 tables, 0 foreign-key violations — the two new migration streams are the services' own and are applied only to their own D1, so the root harness never sees them; each service's `test/migrations.test.ts` gives its file the same apply-twice guarantee).
+
+### Slices 1.0, 1.4, 1.8, 1.9 (probes, the dark core's env, the frontend split, the deploy tooling) — landed as files, deployed nowhere
+
+**Nothing was deployed, created or probed on the Cloudflare account.** No
+`wrangler deploy`, no `d1 create`, no `secret put`, no workflow run. Every live
+route, DNS record, secret and binding of `levonis-staging` and
+`levonis-studio-staging` is exactly what it was; the monolith keeps serving
+everything. What this round produced is the tooling that makes G1/G2 a workflow
+run rather than a design exercise — plus the proof, on the real runtime, that
+the stack those workflows will deploy actually works.
+
+**1.0 — the platform probes.** `services/probes/` holds one tiny throwaway
+Worker per ADR-017 question (eleven rows, thirteen Workers — (f) and (k) need
+two each because their questions are about a boundary and one number on one side
+of it means nothing). Each answers `GET /` with `{row, question, answer,
+verdict}`, and `29 - Platform probes` deploys them, curls them and writes the
+verdicts into the run's job summary, which is what gets pasted into ADR-017's
+table; re-running it with `DELETE-PROBES` removes them, because leaving eleven
+Workers and a per-minute cron on the account is not free. The exact command and
+the directory-to-row map are now in ADR-017 itself. The directory is
+deliberately **not** a service — no `package.json`, no `OWNERSHIP.json`, no
+top-level `wrangler.jsonc` — so the boundary suites do not treat it as one; it
+still typechecks, through a `tsconfig.json` that `scripts/check-workspaces.mjs`
+now picks up for any workspace-shaped directory that has a tsconfig and no
+package.
+
+Three probes were written differently from the way §1.0 words them, and each
+difference is a refusal to let a probe be dangerous or meaningless:
+`e-budgets` commits **no** `d1_databases` entry (the database is bound on the
+command line by the workflow, and only a `*-dark` name is accepted — a probe
+that could reach a live database by default is not a probe anyone should run);
+`g-cache-api` reports its own verdict as meaningless when it is reached on
+workers.dev, where `caches.default` is a no-op, rather than reporting a clean
+miss for ever; and `h-workflow-sleep` is opt-in behind an input, because it is
+the one probe that declares a binding class rather than measuring the platform
+with a fetch.
+
+**1.4 — `env.dark` on the core.** `wrangler.jsonc` gains a `dark` environment:
+`levonis-core-dark`, `levonis-db-dark`, `levonis-files-dark`, the same assets,
+vars and `*/15` cron as `env.staging`, the four dark consumers bound, and the
+Phase 1 vars (`EVENT_BUS_ENABLED=on`, `EVENT_BUS_MODE=rpc`,
+`ALLOWED_CALLER_KIDS`, `GATEWAY_ONLY=off`). `env.staging` is untouched, and the
+placeholder ids are still placeholders. Two choices are worth stating: the dark
+core declares **`workers_dev:false` and `preview_urls:false`** — §1.1 allows a
+dark leaf to enable workers.dev, but this one holds a seeded copy of the whole
+product, so the dark zone (D21) is its only door — and it keeps the `*/15` cron
+rather than taking the per-minute trigger early, because that trigger is part of
+the G2 change set (D5) and `pumpAfter` in `waitUntil` already delivers what a
+request just committed, which the end-to-end run below demonstrates.
+
+`scripts/lib/preserve-vars.mjs` is the var-preservation rule extracted from
+`prepare-deploy-config.mjs` (which now imports it, so the two cannot drift), and
+`scripts/{resolve-ids,upload-secrets,probe-health,worker-name,assert-paid-plan}.mjs`
+are the rest of §12's step list. Each of them refuses rather than guesses:
+`worker-name.mjs` reads the Worker name out of the block wrangler itself would
+use instead of computing `levonis-<svc>-<env>`; `resolve-ids.mjs` and
+`upload-secrets.mjs` refuse outright if the resolved name is one of the two live
+Workers; `assert-paid-plan.mjs` prints **which** of three kinds of evidence it
+used and exits non-zero with none; `probe-health.mjs` treats "could not look" as
+a failure and makes "deployed but bound nowhere" say so out loud rather than
+pass. `tests/preserveVars.test.ts` pins both halves of the extraction — that
+EVERY live name is preserved (the gap that erased `STORE_ROOT_DOMAIN` on the
+live site) and that an unreadable Worker is `null` while an undeployed one is
+`{}`, which is the distinction that lets a caller refuse to deploy blind and
+still allow a first deploy.
+
+**1.8 — the frontend split, with no API change.** `React.lazy` for the nineteen
+admin panels of `src/pages/Admin.tsx` and for the fifteen routes §10 names;
+`manualChunks` in `vite.config.ts`; `tests/bundleBudget.test.ts` as the gate.
+Measured, gzip: the entry chunk **817 KB → 246 KB** (§10's budget is 350 KB),
+the largest single chunk 95 KB (budget 250 KB), across 86 chunks instead of 17.
+
+Two things the numbers alone would have hidden, and both are now assertions.
+First, **§10's `vendor-motion` grouping was wrong to follow literally**: `ogl` is
+imported only by the model viewer, a lazy route, while `motion` is on the home
+page — so putting them in one chunk made a WebGL renderer a static dependency of
+every first visit. `ogl` has its own `vendor-webgl` group, and the test fails if
+`vendor-charts`, `vendor-qr` or `vendor-webgl` ever appears in the entry's
+static closure again. Second, an entry-chunk number flatters: the suite also
+measures the **initial payload** — the entry plus the transitive closure of its
+static imports — which is 406 KB gzip and is what a browser downloads before it
+can render anything. `vendor-i18n` is `src/translations.ts` in its own chunk;
+splitting it per language is deliberately not done, because at 31 KB raw it
+would change the module's public shape for ~6 KB gzip and the budget is met
+without it.
+
+One small refactor was needed rather than optional: `src/pages/Cart.tsx` and
+`src/pages/Product.tsx` import the support-ref helpers from
+`src/pages/Referrals.tsx`, which pinned that whole page into the entry chunk no
+matter how its route was declared. The helpers moved verbatim to
+`src/lib/supportRef.ts`; `Referrals.tsx` re-exports every symbol, so no import
+path breaks. `tests/farmAdminPanel.test.ts` was widened by one regex — it pinned
+a *static* import of `AdminFarmConfig`; it now accepts the lazy form and still
+pins the path.
+
+**1.9 — the deploy tooling.** `_deploy-worker.yml` is the reusable workflow of
+§12, parameterised by service directory and environment: gates first
+(`npm run check` + `npm run test:unit`), then the Paid-plan precondition, then
+ids by name, then the running Worker's vars read back, then **that service's**
+migrations, then the deploy, then the second pass that adds back any `services`
+binding whose target did not exist yet, then secrets by name only, then health.
+Six thin `svc-*.yml` files call it (`svc-core-dark`, `svc-gateway`, `svc-audit`,
+`svc-analytics`, `svc-ads`, `svc-notifications`), each with its own confirmation
+phrase; `verify-dark.yml` deploys the whole stack from a branch in the plan's
+order — the four consumers, then the core that binds them, then the gateway —
+seeds the empty database with `api-tests.mjs` (D4) and drives the corpus through
+the gateway. All six ship **dark only**: Phase 1 is dark, and the production
+twins are Phase 2.1 and 3.1, each behind its own gate.
+
+`tests/workflowNaming.test.ts` gained eight cases: each new workflow names its
+Worker and says `DARK … serves no domain`; each really deploys the Worker its
+name claims, resolved from the wrangler config rather than from the table in the
+test; no new Worker name contains `staging`; the numbers `29`–`36` are unique;
+every new file carries the worker-truth banner and a confirmation phrase
+something actually compares; no new workflow deploys, tails or names a live
+Worker outside a refusal; the reusable workflow's step ORDER is asserted
+(gates < plan < ids; vars < deploy; migrations < deploy; deploy < secrets <
+health); and the routes rule now covers **every** wrangler config in the tree,
+not the two it was written for. `docs/WORKERS.md` gains the dark table, the
+statement that a dark Worker has no route, and the new workflow rows.
+
+**Boundaries (§11).** Two new suites, both in `npm run check`.
+`tests/boundariesBindings.test.ts` holds every binding a service declares — in
+every environment, of every kind — against its `CONTRACT.md`, **in both
+directions**: a binding in the config and not in the contract is privilege
+nobody agreed to (a service binding is account-level trust, §13.3 risk 3), and a
+binding in the contract and not in the config is a service that documents a
+dependency it does not hold and therefore looks configured while behaving as
+though the dependency were merely down. Four `CONTRACT.md` files gained a
+"Bindings (least privilege)" table so the rule has something to read.
+`tests/boundariesEvents.test.ts` reads every emitter call site in `worker/` and
+`services/<name>/src` and holds the argument the emitter was actually handed
+against `packages/contracts`: it must be a `<Type>V1` binding imported from
+`@levonis/contracts/events/v1/<Type>`, `<Type>.v1` must exist in
+`EVENT_SCHEMAS`, and `PRODUCERS[key]` must list the emitting service — the three
+ways an emitted event can be wrong, each of which otherwise surfaces only as a
+`forged` or `invalid` delivery row on a Worker nobody is watching. It also
+names, as a list rather than a count, the fifteen event types the core must
+still emit, so the suite cannot pass by scanning nothing.
+
+**Proven on the real runtime, locally, with nothing deployed.**
+`scripts/dev-stack.mjs` starts the WHOLE dark stack — gateway, core and the four
+consumers — in one `wrangler dev` with six `-c` configs, `--env dark`, one
+`--persist-to` shared with the migration pass (the trap `services/ads/dev`
+already documents: `d1 migrations apply --local` writes under the config's own
+directory while `wrangler dev` opens another, and `SELECT 1` succeeds on an
+empty database, so every health check still says `ok`). `scripts/e2e-dark.mjs`
+then drives it and **reads the consumers' own databases**, because every cheaper
+way of asking "did the event arrive?" answers a different question. Ten checks,
+all green on this branch: the gateway is the Worker on the port; `/api/health`
+is forwarded to the core unchanged and the gateway does not answer it itself; a
+`POST /api/auth/register` goes through the gateway into the core and opens an
+account; the session cookie survives the hop; the core wrote `UserCreated` to
+`core_outbox_events` **inside the request**; the pump delivered it to all three
+subscribed consumers with every delivery `acked` and none dead (Ads is correctly
+absent — no consent can exist at signup); Audit has the entry and its
+`processed_events` row; Analytics has the projection and **no raw identifier
+anywhere in its store**; Notifications recorded it and sent nothing, because no
+transport secret exists; nothing arrives twice and no delivery is left pending;
+and the gateway echoes a correlation id while leaking no internal header.
+
+The SPA was verified the same way rather than by inspection: the built `dist/`
+was served with SPA fallback against the running dark stack's real API, and all
+33 routes were loaded in headless Chromium — every one rendered, with no page
+error. Two facts about the e2e script are worth recording because they were
+found by running it: Audit stores the catalogue KEY (`UserCreated.v1`) while
+Analytics stores the bare type, and the core's `/api/health` really answers
+`{status:"ok"}` — §3.3's "legacy shape `{success:true,…}`" describes the
+GATEWAY's own `?gw=1` answer, not the core's, and workflow 7's probe depends on
+the core's staying exactly what it is.
+
+**Left for the slices that own them.** `scripts/gateway-parity.mjs` and the
+≥300-request corpus (1.5; `verify-dark.yml` calls it when it exists and emits a
+warning saying parity was NOT proved when it does not); the production `svc-*`
+paths for `levonis-gateway` and the four leaves (2.1/3.1, each gated);
+`env.dark`'s `CORE_SIGNING_KEY` (a secret, uploaded by a workflow run, never
+here); the `2 - Rebuild levonis-staging` re-point at the dark stack (D4 — it
+touches a live workflow and belongs with the owner gate that approves it); and
+per-language `translations.ts` splitting, which §10 lists and this slice
+measured its way out of.
+
+**Gates.** `npm run check` (root, worker and tests typechecks, `eslint .` with
+0 errors, `check:workspaces` including `services/probes`, `check:boundaries` now
+58 cases across eight suites), `npm run test:unit` (1910 root tests + the
+workspace suites, 0 failures), `npm run build` (entry 246 KB gzip, 86 chunks,
+`dist/_headers` regenerated), `node scripts/migrate-check.mjs --twice` (57
+files, second pass applies 0, 142 tables, 0 foreign-key violations), plus
+`scripts/dev-stack.mjs` + `scripts/e2e-dark.mjs` green on the local rig and 33
+SPA routes rendered in headless Chromium.
+
+### Integration of the Phase 1 slices — landed, dark, nothing live touched
+
+**Nothing was deployed, created or probed on the Cloudflare account.** No
+`wrangler deploy`, no `d1 create`, no `secret put`, no workflow run. Every route,
+DNS record, secret and binding of `levonis-staging` and `levonis-studio-staging`
+is what it was; the monolith keeps serving everything. What this round did was
+run the six Workers the parallel slices wrote **together**, on the real runtime,
+and fix what only that could show. The full transcript and the numbers are in
+`docs/evidence/msa-phase1/`.
+
+**The four gates came back green with no reconciliation needed.** The slices did
+not collide: `npm run check`, `npm run test:unit`, `npm run build` and
+`node scripts/migrate-check.mjs --twice` all passed on the assembled tree before
+a line was changed. The work was therefore not merge repair — it was proving the
+assembly, and everything below came out of the run rather than out of the diff.
+
+**`wrangler dev` gives the flags to the PRIMARY config only.** Every config
+after the first is started with `{env, disableDevRegistry, multiworkerPrimary}`
+and nothing else (`setupDevEnv` in the CLI), so `--var`, `--test-scheduled` and
+the port reach one Worker per run; the runtime, the bindings and the persisted
+D1 files are shared. That is a fact about the rig, not about the design, and it
+decides the shape of the proof: `scripts/dev-stack.mjs` gained `--primary`,
+`--set NAME=VALUE` and `--test-scheduled`, and `scripts/e2e-dark.mjs` became six
+phases over one `--persist-to` — gateway, core, then each consumer in front of
+its own port. Phase 1 writes the order, phase 2 replays phase 1's own recorded
+responses against the core alone, phases 3-6 read what the events built. `--all`
+starts and stops each stack itself and `--fresh` throws the local state away
+first, so a run cannot pass on rows an earlier run left behind.
+
+**What the assembled stack proved that no slice could on its own.** One
+checkout through the real gateway into the real core — register, sign in,
+bootstrap an admin, create the api-tests product, add two to the cart, place the
+order, **server-computed total 25 000 IQD**, idempotent replay — produced
+`UserCreated ×2, AuditRecorded ×2, CheckoutStarted, InventoryChanged,
+OrderCreated` in the core's outbox. The request-scoped pump acked 12 of 13
+deliveries inside the request; the **cron tick** (`GET /cdn-cgi/local/scheduled`
+→ `scheduled()` → `runDurableJobs` step 0) delivered the two it left — one to
+Audit, one to Analytics — and a **second tick delivered nothing twice**. Audit's
+chain verifies (5 links) through its own `verifyPrincipal`; Analytics' overview
+counts the run (6 raw events → users 2, orders 1) and its rollup carries the
+checkout's own 25 000 IQD; Ads is in sandbox with 0 providers configured and 0
+sent; Notifications built the customer's inbox row and holds **0** outbox rows in
+state `sent`. **Thirteen read routes answer byte-identically through the gateway
+and from the core alone**, with every header the core sets arriving unchanged.
+
+**Two things the run changed.**
+
+1. `services/{audit,analytics}` answered `/health` with `legacyHealthBody` and
+   never touched D1, while `services/{ads,notifications}` answered §11.3's
+   `{ok, svc, ver, checks}` with a real `SELECT 1`. Two parallel slices, two
+   shapes — and `scripts/probe-health.mjs` reads `checks.db`, so for half the
+   dark twins plan 2.1's gate could not tell a Worker with no tables from a
+   healthy one, which is the exact failure `dev-stack.mjs`'s own header warns
+   about. Both now return **both**: the legacy fields stay and the report is
+   added on top, so nothing that reads the old shape changes.
+2. The gateway's anonymous read cache is real and it is the one reason a public
+   read can be stale: `/api/products` and `/api/products/:slug` carry a 60 s TTL,
+   so a read taken straight after an admin write answers the pre-write body. The
+   end-to-end run now says that explicitly — a check that a second identical
+   anonymous GET is a HIT while the client copy stays `private, max-age=0` and a
+   cookie-carrying request bypasses the store — and asks its parity questions on
+   cache-busting URLs, so "parity" means the two Workers computed the same
+   answer rather than that a stored copy matched itself.
+
+**One deliberate duplication, pinned.** `scripts/e2e-dark.mjs` runs under plain
+`node` (that is how `verify-dark.yml` invokes it) and the contracts and kit
+packages publish TypeScript, so reading Audit's and Analytics' admin surfaces
+through their real authorisation path needs a signer `node` can import:
+`scripts/lib/sign.mjs`. It is a second implementation of a signature format,
+which is a liability, so `tests/e2eSigning.test.ts` signs the same payload with
+it and with `@levonis/platform-kit/keys` and fails on any byte of difference,
+and hands what it mints to `verifyPrincipal` itself. The key pair is generated
+per run, handed to the local `wrangler dev` as `ALLOWED_CALLER_KIDS` — the
+documented bootstrap path — and never leaves the machine.
+
+**Left where it was.** `services/{audit,analytics}/src/{keys,guard}.ts` are ~40
+structurally identical lines each; the difference between them is the service
+name and the method allowlist, which must differ. A `platform-kit` helper is the
+additive fix and it is not this round's: both files are covered by their own
+services' suites, the boundary rule that produced them is deliberate, and
+refactoring two service boundaries to save eighty lines is risk without a
+finding. `AuditRecorded` reaching Audit still depends on the audit facade's
+`pumpAfter` having no `waitUntil`; when its floating promise wins the race the
+end-to-end run re-arms one delivery through `redeliver()`'s own two statements
+and says so in its output, rather than asserting something the runtime does not
+promise.
+
+### Implementation notes — Phase 1, the review-fix slice
+
+The review of the Phase 1 tree produced eight HIGH, ten MEDIUM and six LOW
+findings across four lenses. All eighteen HIGH/MEDIUM and all six LOW were
+applied at the root, each HIGH with a permanent test, and the whole tree stayed
+green (`npm run check`, `npm run test:unit`, `npm run build`,
+`migrate-check --twice`, `scripts/e2e-dark.mjs --all --fresh`). Nothing was
+deployed and nothing on the Cloudflare account was touched.
+
+**Authorisation the services enforce themselves.** Notifications was the outlier
+of `01-TARGET.md` §4 item 2: its inbox DECODED the forwarded principal instead
+of verifying it, so `GET /api/notifications` bound whatever `sub` the caller
+chose — reachable from the internet through the dark twin's `workers_dev`. It
+now verifies against its own key ring (`services/notifications/src/keys.ts`) and
+fails closed while none is registered. Ads' and Notifications' admin routers
+enforced nothing at all: `gatewayOnly()` answers WHERE a request came from,
+never WHO sent it, and `POST /api/v1/ads/admin/flags` is a provider kill switch.
+Both now require a full-scope admin principal, apex-only, in one router-level
+middleware so a later route cannot forget it. `NotificationsEntrypoint.send` —
+an RPC that mails an arbitrary address with the platform's own credentials — had
+no hop assertion; it has `services/notifications/src/guard.ts` and an explicit
+caller allowlist that is deliberately not `*`. In `log` mode both guards now
+return `null` rather than the unverified `iss`, because `log` means "count it,
+do not enforce", never "believe it" — Audit stored that claim as
+`source_service` on the hash-chained log.
+
+**The outbox's promise, restored in both directions.** `InventoryChanged` rode
+in the same batch as a GUARDED ledger insert and counter update but carried no
+guard of its own, so a lost race committed the event and nothing else.
+`publishStatement()` now takes a `PublishGuard`, `planInventory` passes the
+ledger row as its own proof, and the money emitters do the same:
+`PaymentAuthorized` rides in the hold's batch and `PaymentCompleted` in the
+batch that posts the debit (`holdSettledEventStatements`, appended additively by
+`storeOrders.ts` and `escrowOps.ts` — the paths that actually settle, which
+`commitHold()` is not). An idempotent replay of a settled payment no longer
+publishes `PaymentFailed`. `aggregate_seq` resets its slot per millisecond so
+one aggregate is never numbered backwards, and the outbox INSERT carries
+`ON CONFLICT DO NOTHING` so a cross-isolate collision loses the EVENT rather
+than the order — an event must never be the reason the thing fails to happen.
+
+**The bus makes progress under every failure.** A delivery whose consumer is no
+longer bound was skipped without bumping `attempts`, which made the dead state
+unreachable and `dispatched_at` permanently NULL — a few hundred such rows would
+starve every live event behind them. It now takes the ordinary backoff and
+dead-letters. A consumer with no handler for a type answers `retry`, not
+`invalid`: that is the normal, temporary state of a Worker that has not been
+redeployed yet, and dead-lettering it on attempt 1 lost every event in a deploy
+window. The pump lock is released `WHERE holder = ?` and an overrun run stops
+delivering once its lease has passed.
+
+**Cost and blast radius.** Ads' `deliver()` fanned one 50-envelope bus batch out
+to 200–400 sequential provider fetches — ~600 subrequests and 30 s inside the
+CORE'S PUMP, whose lease is 55 s. It now writes `pending` rows and the per-minute
+cron owns every outbound call, claiming each row before it sends (so overlapping
+ticks cannot double-send) and stopping at an explicit send and wall-clock budget.
+Analytics' `repairDay` chunks its write at 100 statements instead of one batch
+that grew to ~20 000. Retention exists where the migration promised it:
+`pruneOutbox()` in the core's cron (audit details 24 h; deliveries and events
+past a stated 30-day replay window; a `dead` row is never pruned), plus rolls for
+`ads_deliveries` and the Notifications delivery log — while `notify_outbox` is
+deliberately never rolled, because its `event_key UNIQUE` IS the "one delivery
+per key, forever" guarantee.
+
+**Deploy tooling that can actually bring the stack up.** `resolve-ids --full`
+re-checks the account instead of restoring stripped bindings blind: the two-pass
+dance closes a self-binding, not the core↔leaf cycle it was written for, and
+restoring `IDENTITY -> levonis-core-dark` before the core exists produced a
+second deploy the upload API refuses. `verify-dark.yml` gained a `rebind` stage
+after `core`, and `tests/darkDeployOrder.test.ts` reads the job graph against
+every dark `services` block so the order cannot drift again. Seven ads secret
+names in `_deploy-worker.yml` were spelt differently from `SECRETS.md` and eight
+could never be uploaded at all — a deploy that "succeeds" with every provider
+permanently in sandbox; the names now match and `tests/leastPrivilege.test.ts`
+holds the two files together in both directions. `<SVC>__DARK__<NAME>` secrets
+let a dark Worker hold its own provider credentials rather than production's.
+
+**Configuration that matches its own comments.** The dark stack's
+"must never be able to mail a real address" was a comment above an EMPTY
+allowlist, which means "everyone"; `EMAIL_ALLOWLIST_REQUIRED=on` inverts the
+empty case to "nobody" in the dark core and dark Notifications, and
+`svc-notifications.yml` refuses a dark deploy where the pair ever drifts back.
+The dark gateway takes its own rate-limit namespace ids, so the question of
+whether that namespace is account-scoped can be answered at leisure rather than
+being a precondition. `tests/coreOutbox.test.ts` — which `0057`'s header already
+claimed existed — now compares the migration against the generators the pump
+reads through.
+
+**Left undone, deliberately.** `InventoryChanged.stock_after`/`reserved_after`
+are still the guard's own reading plus the delta, so under concurrency they are
+absolutes that were true at the pre-check rather than at commit. `delta` and
+`op_id` are exact and are what a consumer that must not drift should key on;
+making the absolutes exact means either dropping them from the schema — which
+`03-EVENTS.md` §3.4 pins — or deriving them in SQL, which the signature over the
+payload forbids. The audit facade's `pumpAfter` still has no `waitUntil`,
+because threading an `ExecutionContext` through every `audit()` caller is a
+larger change than the finding it answers; the end-to-end run already reports
+the re-armed delivery honestly rather than asserting what the runtime does not
+promise.
