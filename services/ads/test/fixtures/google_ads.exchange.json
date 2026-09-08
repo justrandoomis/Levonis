@@ -1,0 +1,66 @@
+{
+  "provider": "google_ads",
+  "source_event": "PurchaseCompleted.v1",
+  "provider_event": "purchase",
+  "mapped": {
+    "orderId": "ord_01",
+    "conversionDateTime": "2026-09-07 10:00:13+00:00",
+    "conversionValue": 904000,
+    "currencyCode": "IQD",
+    "userIdentifiers": [
+      {
+        "hashedEmail": "1e1f8fb2fc0418591b31044730f2d535e18d547ef854b76fcadcc5d9a1241544"
+      },
+      {
+        "hashedPhoneNumber": "904305c3f22aa24aeedf911ac0488173924f3337ba67de1a4686e3fe193fbb63"
+      }
+    ],
+    "conversionAction": ""
+  },
+  "request": {
+    "method": "POST",
+    "url": "https://googleads.googleapis.com/v18/customers/1112223333:uploadClickConversions",
+    "headers": [
+      "Authorization",
+      "Content-Type",
+      "X-Request-Id",
+      "developer-token"
+    ],
+    "body": {
+      "conversions": [
+        {
+          "orderId": "ord_01",
+          "conversionDateTime": "2026-09-07 10:00:13+00:00",
+          "conversionValue": 904000,
+          "currencyCode": "IQD",
+          "userIdentifiers": [
+            {
+              "hashedEmail": "1e1f8fb2fc0418591b31044730f2d535e18d547ef854b76fcadcc5d9a1241544"
+            },
+            {
+              "hashedPhoneNumber": "904305c3f22aa24aeedf911ac0488173924f3337ba67de1a4686e3fe193fbb63"
+            }
+          ],
+          "conversionAction": "customers/1112223333/conversionActions/987654321"
+        }
+      ],
+      "partialFailure": true,
+      "validateOnly": false
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "results": [
+        {
+          "gclid": "",
+          "conversionAction": ""
+        }
+      ]
+    }
+  },
+  "result": {
+    "accepted": 1,
+    "rejected": 0
+  }
+}

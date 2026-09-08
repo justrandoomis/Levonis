@@ -1,0 +1,16 @@
+{
+  "name": "@levonis/svc-ads",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "levonis-ads — the only Worker that talks to an advertising platform: a provider registry behind one adapter interface (Meta Conversions API on the Meta graph/Marketing endpoint, Google Ads offline conversions, TikTok events, Snapchat conversions, plus noop), a SANDBOX implementation used whenever a provider's secret NAME is not configured, consent-gated identifiers, the seeded event -> provider-event map, per-provider and global kill switches, an idempotent deliveries table keyed (event_id, provider), retry/backoff with dead-letter rows, per-provider timeouts and circuit breakers.",
+  "dependencies": {
+    "@levonis/contracts": "*",
+    "@levonis/platform-kit": "*",
+    "hono": "^4.9.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  }
+}

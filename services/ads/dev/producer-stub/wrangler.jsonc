@@ -1,0 +1,36 @@
+{
+  // LOCAL DEVELOPMENT ONLY — never deployed, never referenced by a workflow.
+  //
+  // It is the PRIMARY config of the rig, so `wrangler dev` serves it on the
+  // port and resolves its `services` bindings to the other configs listed on
+  // the same command line:
+  //
+  //   npx wrangler dev -c services/ads/dev/producer-stub/wrangler.jsonc \
+  //                    -c services/ads/wrangler.jsonc \
+  //                    -c services/notifications/wrangler.jsonc \
+  //                    --env dark --port 8811
+  //
+  // See ../README.md.
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-producer-stub",
+  "main": "index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "services": [
+    { "binding": "ADS", "service": "levonis-ads-dark" },
+    { "binding": "NOTIFICATIONS", "service": "levonis-notifications-dark" }
+  ],
+  "env": {
+    "dark": {
+      "name": "levonis-producer-stub",
+      "workers_dev": false,
+      "preview_urls": false,
+      "services": [
+        { "binding": "ADS", "service": "levonis-ads-dark" },
+        { "binding": "NOTIFICATIONS", "service": "levonis-notifications-dark" }
+      ]
+    }
+  }
+}

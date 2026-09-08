@@ -1,0 +1,56 @@
+{
+  "provider": "snapchat",
+  "source_event": "PurchaseCompleted.v1",
+  "provider_event": "PURCHASE",
+  "mapped": {
+    "event_type": "PURCHASE",
+    "event_conversion_type": "WEB",
+    "timestamp": 1788775213000,
+    "client_dedup_id": "01a07b4f-a7c8-79ad-afce-146e70106b34",
+    "price": 904000,
+    "currency": "IQD",
+    "number_items": 1,
+    "hashed_email": "1e1f8fb2fc0418591b31044730f2d535e18d547ef854b76fcadcc5d9a1241544",
+    "hashed_phone_number": "904305c3f22aa24aeedf911ac0488173924f3337ba67de1a4686e3fe193fbb63",
+    "item_ids": [
+      "prd_bambu_a1"
+    ],
+    "transaction_id": "ord_01"
+  },
+  "request": {
+    "method": "POST",
+    "url": "https://tr.snapchat.com/v2/conversion",
+    "headers": [
+      "Authorization",
+      "Content-Type",
+      "X-Request-Id"
+    ],
+    "body": {
+      "pixel_id": "snap-pixel-1",
+      "event_type": "PURCHASE",
+      "event_conversion_type": "WEB",
+      "timestamp": 1788775213000,
+      "client_dedup_id": "01a07b4f-a7c8-79ad-afce-146e70106b34",
+      "price": 904000,
+      "currency": "IQD",
+      "number_items": 1,
+      "hashed_email": "1e1f8fb2fc0418591b31044730f2d535e18d547ef854b76fcadcc5d9a1241544",
+      "hashed_phone_number": "904305c3f22aa24aeedf911ac0488173924f3337ba67de1a4686e3fe193fbb63",
+      "item_ids": [
+        "prd_bambu_a1"
+      ],
+      "transaction_id": "ord_01"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "status": "SUCCESS",
+      "reason": ""
+    }
+  },
+  "result": {
+    "accepted": 1,
+    "rejected": 0
+  }
+}

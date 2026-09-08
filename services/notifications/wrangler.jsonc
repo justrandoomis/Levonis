@@ -1,0 +1,111 @@
+{
+  // levonis-notifications — the durable outbox and the two transports
+  // (`01-TARGET.md` §1.2 row 12, `02-MIGRATION-PLAN.md` 1.7).
+  //
+  // NOTHING HERE IS DEPLOYED BY THIS SLICE, and nothing about the live core
+  // changes because of it: the monolith keeps its own `outbox`,
+  // `user_notifications`, `lib/outbox.ts` and `lib/telegram.ts` and keeps
+  // sending from them. This Worker is a second, dark copy until Phase 3.
+  //
+  // Visibility: `workers_dev` and `preview_urls` are declared in EVERY
+  // environment and false in production — this Worker holds the mail and bot
+  // credentials, and its webhook route is the one unauthenticated ingress in
+  // the platform, so it must be reachable only over a service binding (and,
+  // from Phase 4, through the gateway). The dark twin turns workers.dev ON
+  // because it has no zone and the dark run needs a URL to probe.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-notifications",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+
+  "vars": {
+    // The master switch for OUTBOUND delivery. Fails CLOSED: anything other
+    // than the exact string `on` means rows are enqueued and recorded but the
+    // pump sends nothing. Production ships `off` — while the monolith is still
+    // the sender, two Workers sending the same mail is the failure mode to
+    // avoid, and this var is what makes the hand-over a workflow run.
+    "NOTIFY_DELIVERY": "off",
+    // The staging/dark guard carried over from the core verbatim
+    // (`worker/lib/outbox.ts` `allowedRecipient`): a comma-separated allowlist;
+    // empty means "no allowlist". A recipient outside it is recorded `skipped`
+    // with the reason, never silently dropped.
+    "EMAIL_ALLOWED_RECIPIENTS": "",
+    // `on` would make the empty allowlist above mean "mail NOBODY". Production
+    // keeps it off: there the allowlist is a staging convenience, and the
+    // monolith is still the sender anyway (`NOTIFY_DELIVERY` is `off`).
+    "EMAIL_ALLOWLIST_REQUIRED": "off",
+    "EMAIL_FROM": "",
+    // In-app path prefix for notification links. A stored ORIGIN is a stored
+    // mistake the day the domain changes (`worker/lib/notifications.ts`), so
+    // links are paths and this is only used to render an absolute URL in mail.
+    "APP_ORIGIN": "",
+    "GATEWAY_ONLY": "off",
+    "OWNERSHIP_GUARD": "throw",
+    "ALLOWED_CALLER_KIDS": "",
+    "ACCEPT_FIXTURE_SIG": "off",
+    // How long the SETTLED delivery log and the Telegram dedup set are kept.
+    // `notify_outbox` (the "one delivery per key, forever" guarantee) and
+    // `user_notifications` (a customer's inbox) are never rolled.
+    "NOTIFY_RETENTION_DAYS": "30",
+    "SVC_VERSION": ""
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "levonis-notifications-db",
+      "database_id": "NOTIFICATIONS-DB-ID-PLACEHOLDER",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // The outbox pump. Per minute, as the design asks of every service that
+  // produces or delivers on a clock (`01-TARGET.md` §5): the core's `*/15`
+  // cadence is what makes a verification mail take a quarter of an hour today.
+  "triggers": { "crons": ["* * * * *"] },
+
+  "env": {
+    "dark": {
+      "name": "levonis-notifications-dark",
+      "workers_dev": true,
+      "preview_urls": false,
+      "observability": { "enabled": true },
+      "vars": {
+        // On in dark, where the secrets are the dark ones (or absent, in which
+        // case every transport is disabled and rows are recorded `dropped`).
+        "NOTIFY_DELIVERY": "on",
+        // The dark stack keeps the email allowlist ON: a dark run must not be
+        // able to mail a real customer. `EMAIL_ALLOWLIST_REQUIRED` is what
+        // makes that true rather than merely intended — with it, the empty
+        // allowlist below means "mail NOBODY" instead of "mail everybody", so
+        // the guard is on by default and stays on until the owner puts real
+        // dark addresses in `EMAIL_ALLOWED_RECIPIENTS`. Every mail a dark run
+        // produces until then is recorded `dropped` with its reason, which is
+        // exactly what a dark run should show.
+        "EMAIL_ALLOWED_RECIPIENTS": "",
+        "EMAIL_ALLOWLIST_REQUIRED": "on",
+        "EMAIL_FROM": "",
+        "APP_ORIGIN": "",
+        "GATEWAY_ONLY": "off",
+        "OWNERSHIP_GUARD": "throw",
+        "ALLOWED_CALLER_KIDS": "",
+        "ACCEPT_FIXTURE_SIG": "on",
+        "NOTIFY_RETENTION_DAYS": "30",
+        "SVC_VERSION": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "levonis-notifications-db-dark",
+          "database_id": "NOTIFICATIONS-DARK-DB-ID-PLACEHOLDER",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": ["* * * * *"] }
+    }
+  }
+}

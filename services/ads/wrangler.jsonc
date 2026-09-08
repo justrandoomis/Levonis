@@ -1,0 +1,99 @@
+{
+  // levonis-ads — conversion delivery to the advertising platforms
+  // (`01-TARGET.md` §9.1, `02-MIGRATION-PLAN.md` 1.7).
+  //
+  // NOTHING HERE IS DEPLOYED BY THIS SLICE. The file exists so the dark deploy
+  // (G1) is a workflow run rather than a design exercise: `levonis-ads-dark`
+  // and `levonis-ads-db-dark` are created by `svc-ads.yml` behind the owner
+  // gate, never from a developer's shell.
+  //
+  // Visibility: `workers_dev` and `preview_urls` are declared in EVERY
+  // environment and false in production — this Worker holds the advertising
+  // secrets and must be reachable only over a service binding
+  // (`01-TARGET.md` §4 item 1). The dark twin turns workers.dev ON because it
+  // has no zone and the dark end-to-end run needs a URL to probe.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-ads",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+
+  // Non-secret configuration. Every value is filled at deploy time by
+  // `_deploy-worker.yml` (slice 1.9); a name that is not declared here is a
+  // name the deploy-config preservation pass cannot see, and an unpreserved
+  // var is a wiped var.
+  "vars": {
+    // The GLOBAL kill switch (`01-TARGET.md` §9.1 `CONFIG.flag('ads.enabled')`).
+    // Fails CLOSED: anything other than the exact string `on` means Ads acks
+    // every event and writes no delivery row at all. Production ships `off`
+    // and stays off until the owner turns it on.
+    "ADS_ENABLED": "off",
+    // `off` | `log` | `on` — the inbound gateway-hop check (§4 item 1).
+    "GATEWAY_ONLY": "off",
+    // The ownership guard mode: `throw` in dark, `log` for the first
+    // production release, then `throw` (ADR-003).
+    "OWNERSHIP_GUARD": "throw",
+    // `service:kid:publicKey,…` — the producers whose event signatures this
+    // consumer will verify, before Identity's `service_keys` registry exists.
+    "ALLOWED_CALLER_KIDS": "",
+    // Dark/test only. `on` lets the committed contract fixtures — whose `sig`
+    // is the literal marker `fixture` — be delivered without a real producer
+    // key. Never `on` in production: it would disable signature verification.
+    "ACCEPT_FIXTURE_SIG": "off",
+    // How long a SETTLED delivery row and its processed-events marker are kept.
+    // Unsettled rows and every `ads_dead_letters` row are never rolled.
+    "ADS_RETENTION_DAYS": "30",
+    "SVC_VERSION": ""
+  },
+
+  // Own store, own database: Ads reads no other service's tables and no other
+  // service reads `ads_*` (`01-TARGET.md` §2.1). `database_id` is resolved by
+  // name at deploy time (`scripts/resolve-ids.mjs`, slice 1.9) — no real id is
+  // ever committed.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "levonis-ads-db",
+      "database_id": "ADS-DB-ID-PLACEHOLDER",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // The retry sweeper for `ads_deliveries` rows whose backoff has expired, and
+  // the dead-letter promotion. Ads is never on the hot path, so a minute of
+  // latency on a retry is free.
+  "triggers": { "crons": ["* * * * *"] },
+
+  "env": {
+    // The dark stack (slice 1.7): its own D1, its own secrets (or none, in
+    // which case every provider runs in SANDBOX and nothing leaves the
+    // account), workers.dev ON so the dark end-to-end run has a URL.
+    "dark": {
+      "name": "levonis-ads-dark",
+      "workers_dev": true,
+      "preview_urls": false,
+      "observability": { "enabled": true },
+      "vars": {
+        "ADS_ENABLED": "on",
+        "GATEWAY_ONLY": "off",
+        "OWNERSHIP_GUARD": "throw",
+        "ALLOWED_CALLER_KIDS": "",
+        "ACCEPT_FIXTURE_SIG": "on",
+        "ADS_RETENTION_DAYS": "30",
+        "SVC_VERSION": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "levonis-ads-db-dark",
+          "database_id": "ADS-DARK-DB-ID-PLACEHOLDER",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": ["* * * * *"] }
+    }
+  }
+}

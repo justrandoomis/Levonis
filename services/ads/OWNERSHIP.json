@@ -1,0 +1,44 @@
+{
+  "service": "ads",
+  "owns": [
+    "ads_providers",
+    "ads_event_map",
+    "ads_deliveries",
+    "ads_consent_snapshots",
+    "ads_dead_letters"
+  ],
+  "reads": [],
+  "calls": [],
+  "publishes": [],
+  "consumes": [
+    "UserUpdated.v1",
+    "ProductViewed.v1",
+    "AddToCart.v1",
+    "CheckoutStarted.v1",
+    "PurchaseCompleted.v1",
+    "SubscriptionChanged.v1"
+  ],
+  "secrets": [
+    "META_CAPI_ACCESS_TOKEN",
+    "META_CAPI_DATASET_ID",
+    "GOOGLE_ADS_DEVELOPER_TOKEN",
+    "GOOGLE_ADS_ACCESS_TOKEN",
+    "GOOGLE_ADS_CUSTOMER_ID",
+    "GOOGLE_ADS_CONVERSION_ACTION_ID",
+    "TIKTOK_ADS_ACCESS_TOKEN",
+    "TIKTOK_ADS_PIXEL_CODE",
+    "SNAPCHAT_ADS_ACCESS_TOKEN",
+    "SNAPCHAT_ADS_PIXEL_ID",
+    "ADS_SIGNING_KEY",
+    "HEALTH_PROBE_TOKEN"
+  ],
+  "legacyRoutes": [],
+  "notes": {
+    "owns": "The five tables 01-TARGET.md §2.1 assigns to ads, plus the implied platform tables ads_processed_events and ads_idempotency. They live in the service's OWN D1 (levonis-ads-db), not in the shared core database.",
+    "reads": "Empty on purpose. Ads joins nothing: PurchaseCompleted carries user_hash and Ads looks the consent snapshot up in its own ads_consent_snapshots (01-TARGET.md §9.1). tests/serviceBoundaries.test.ts fails on the first foreign table a SQL literal names.",
+    "calls": "Empty: Ads calls no other service. It is a pure consumer plus outbound provider HTTP through fetchWithBudget.",
+    "publishes": "AdConversionSent / AdConversionFailed (03-EVENTS.md §4) have no v1 schema yet, so nothing is declared — tests/eventSchemas.test.ts refuses a publishes entry without a schema, and declaring one would also force an AUDIT/ANALYTICS binding onto a Worker that must hold none.",
+    "consumes": "Exactly the six types subscriptions.ts lists for ads. UserCreated is deliberately absent: no consent can exist at signup (03-EVENTS.md §3.1). Every one of the six is pseudonymous or none — CONSUMER_PII_MAX pins ads to pseudonymous and the kit refuses a personal envelope before any state is touched.",
+    "secrets": "Names only, never values. A provider whose secret NAMES are not all present is NOT configured, and every delivery for it is recorded status='sandbox' with no outbound request — that is also the emergency kill switch (01-TARGET.md §9.1)."
+  }
+}

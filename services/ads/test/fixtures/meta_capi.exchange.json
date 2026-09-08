@@ -1,0 +1,84 @@
+{
+  "provider": "meta_capi",
+  "source_event": "PurchaseCompleted.v1",
+  "provider_event": "Purchase",
+  "mapped": {
+    "event_name": "Purchase",
+    "event_time": 1788775213,
+    "event_id": "01a07b4f-a7c8-79ad-afce-146e70106b34",
+    "action_source": "website",
+    "user_data": {
+      "em": [
+        "1e1f8fb2fc0418591b31044730f2d535e18d547ef854b76fcadcc5d9a1241544"
+      ],
+      "ph": [
+        "904305c3f22aa24aeedf911ac0488173924f3337ba67de1a4686e3fe193fbb63"
+      ],
+      "external_id": [
+        "fd7f00b62d225a902278575fd1addcd2633ee9def3b5b1593ef19982d355c1fa"
+      ]
+    },
+    "custom_data": {
+      "currency": "IQD",
+      "value": 904000,
+      "content_ids": [
+        "prd_bambu_a1"
+      ],
+      "content_type": "product",
+      "num_items": 1,
+      "order_id": "ord_01"
+    }
+  },
+  "request": {
+    "method": "POST",
+    "url": "https://graph.facebook.com/v21.0/1234567890/events",
+    "headers": [
+      "Authorization",
+      "Content-Type",
+      "X-Request-Id"
+    ],
+    "body": {
+      "data": [
+        {
+          "event_name": "Purchase",
+          "event_time": 1788775213,
+          "event_id": "01a07b4f-a7c8-79ad-afce-146e70106b34",
+          "action_source": "website",
+          "user_data": {
+            "em": [
+              "1e1f8fb2fc0418591b31044730f2d535e18d547ef854b76fcadcc5d9a1241544"
+            ],
+            "ph": [
+              "904305c3f22aa24aeedf911ac0488173924f3337ba67de1a4686e3fe193fbb63"
+            ],
+            "external_id": [
+              "fd7f00b62d225a902278575fd1addcd2633ee9def3b5b1593ef19982d355c1fa"
+            ]
+          },
+          "custom_data": {
+            "currency": "IQD",
+            "value": 904000,
+            "content_ids": [
+              "prd_bambu_a1"
+            ],
+            "content_type": "product",
+            "num_items": 1,
+            "order_id": "ord_01"
+          }
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "events_received": 1,
+      "messages": [],
+      "fbtrace_id": "A0"
+    }
+  },
+  "result": {
+    "accepted": 1,
+    "rejected": 0
+  }
+}

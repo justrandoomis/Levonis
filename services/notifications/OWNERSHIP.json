@@ -1,0 +1,41 @@
+{
+  "service": "notifications",
+  "owns": [
+    "notify_outbox",
+    "user_notifications",
+    "notify_deliveries",
+    "telegram_updates"
+  ],
+  "reads": [],
+  "calls": [],
+  "publishes": [],
+  "consumes": [
+    "UserCreated.v1",
+    "OrderCreated.v1",
+    "DepositDecided.v1",
+    "RequestPublished.v1"
+  ],
+  "secrets": [
+    "EMAIL_API_KEY",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_ADMIN_CHAT_ID",
+    "TELEGRAM_WEBHOOK_SECRET",
+    "NOTIFICATIONS_SIGNING_KEY",
+    "HEALTH_PROBE_TOKEN"
+  ],
+  "legacyRoutes": [
+    "/api/notifications",
+    "/api/notifications/unread-count",
+    "/api/notifications/read",
+    "/api/telegram/webhook"
+  ],
+  "notes": {
+    "owns": "Its own D1, not the shared core database. `notify_outbox` is the legacy `outbox` shape column for column so Phase 3 can copy the monolith's rows with an INSERT SELECT; `user_notifications` is the same table minus the users(id) foreign key, which cannot exist in a database that does not own `users`. `tg_admin_notifications`, `tg_admin_actions` and `notification_preferences` are ours in the design too but stay in the core until the wallet-approval flow moves (Phase 6) — claiming a table this service does not yet create would be a claim tests/ownership.test.ts cannot check.",
+    "reads": "Empty. The events carry what a message needs; a contact is fetched with IDENTITY.contactFor at send time from Phase 4, never by reading `users`.",
+    "calls": "Empty in this slice. From Phase 4 this service calls IDENTITY.contactFor (the recipient of a verification mail) and LEDGER.decideDeposit (the Telegram approval buttons, whose nonce Ledger verifies itself — 01-TARGET.md §6.5); neither binding is declared yet because binding a Worker that does not exist fails the upload.",
+    "publishes": "NotificationSent / NotificationFailed (03-EVENTS.md §4) have no v1 schema yet, so nothing is declared: tests/eventSchemas.test.ts refuses a publishes entry without a schema, and declaring one would force ANALYTICS and AUDIT bindings onto this Worker before those services exist.",
+    "consumes": "The four the plan's slice 1.7 names — UserCreated{verify}, OrderCreated, DepositDecided, RequestPublished. subscriptions.ts lists notifications on more types (OrderPaid, PaymentCompleted, RefundCompleted, OrderStatusChanged, OrderDelivered, ReferralUsed, SubscriptionChanged, PaymentFailed, WithdrawalStateChanged, DepositRequested); their handlers land with the templates they need in Phase 4, and until then this service is not bound as their consumer.",
+    "secrets": "Names only. A transport whose names are absent is DISABLED: the row is recorded `dropped` with the reason and no request is made. That is the same honest behaviour worker/lib/outbox.ts already has (`EMAIL_NOT_CONFIGURED` / `TELEGRAM_NOT_CONFIGURED`), kept rather than replaced.",
+    "legacyRoutes": "The core's routes this service will take over at the Phase 4 prefix flip. Until then the core keeps serving them and this list is documentation, not a claim."
+  }
+}
