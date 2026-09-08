@@ -18,7 +18,7 @@ import { mayConsume, SUBSCRIPTIONS } from '@levonis/contracts/subscriptions';
 import type { DeliverResult, HopEnvelope } from '@levonis/contracts/rpc/common';
 import { DELIVER_MAX_BYTES, DELIVER_MAX_EVENTS } from '@levonis/contracts/rpc/consumer';
 import { chunk, inList, placeholders } from './inList';
-import { outboxTables, publishStatement, type OutboxProbe } from './outbox';
+import { outboxTables, publishStatement, type OutboxProbe, type PublishGuard } from './outbox';
 import { signHop, type HopSigner } from './hop';
 import type { Logger, PumpReport } from './log';
 
@@ -129,6 +129,13 @@ export class RpcFanoutBus {
   private readonly limits: BusBudgets;
   private readonly subs: Record<string, string[]>;
   private readonly now: () => number;
+  /**
+   * When this run's `pump_lock` lease expires. `pumpIds()` holds no lock and
+   * leaves it null; `pump()` sets it, and the delivery loop stops as soon as
+   * it passes, so an overrun run never keeps delivering while the next run is
+   * legitimately holding the lock.
+   */
+  private leaseUntilMs: number | null = null;
 
   constructor(private readonly opts: BusOptions) {
     this.tables = outboxTables(opts.prefix);
@@ -137,9 +144,14 @@ export class RpcFanoutBus {
     this.now = opts.now ?? (() => Date.now());
   }
 
-  /** The outbox statement for the business batch — or null while the bus is off / the table absent. */
-  publishStatement(envelope: EventEnvelope): Promise<D1PreparedStatement | null> {
-    return publishStatement(this.opts.db, envelope, { enabled: this.opts.enabled, prefix: this.opts.prefix, probe: this.opts.probe });
+  /**
+   * The outbox statement for the business batch — or null while the bus is off
+   * / the table absent. `guard` makes the row conditional on the business write
+   * it describes actually having happened (see `PublishGuard`); pass it
+   * whenever the statements it rides with are themselves guarded.
+   */
+  publishStatement(envelope: EventEnvelope, guard?: PublishGuard): Promise<D1PreparedStatement | null> {
+    return publishStatement(this.opts.db, envelope, { enabled: this.opts.enabled, prefix: this.opts.prefix, probe: this.opts.probe }, guard);
   }
 
   /** Subscribers of this envelope that may receive its PII class (the bus never delivers `personal` to Ads/Analytics/Search/Farm). */
@@ -187,6 +199,7 @@ export class RpcFanoutBus {
       .bind(iso(nowMs + PUMP_LOCK_TTL_S * 1000), holder, this.opts.prefix, iso(nowMs))
       .run();
     if ((lock.meta.changes ?? 0) !== 1) return null;
+    this.leaseUntilMs = nowMs + PUMP_LOCK_TTL_S * 1000;
     try {
       budget.statements++;
       const rows = await this.opts.db
@@ -195,8 +208,18 @@ export class RpcFanoutBus {
         .all<EventRow>();
       await this.process(rows.results ?? [], budget, report);
     } finally {
+      // RELEASE ONLY WHAT THIS RUN STILL HOLDS. A sweep can outlive the 55-second
+      // lease (`callDeliver` has no timeout and a run is budgeted at 60 RPC
+      // calls); when it does, the next scheduled run legitimately takes the
+      // lease, and an unscoped release would then unlock the run that took over
+      // — letting a third start on top of the second. `AND holder = ?` makes the
+      // release a no-op for an overrun run, so the lock does what it exists to do.
       budget.statements++;
-      await this.opts.db.prepare(`UPDATE ${this.tables.lock} SET locked_until = ?, holder = '' WHERE name = ?`).bind(LOCK_RELEASED, this.opts.prefix).run();
+      await this.opts.db
+        .prepare(`UPDATE ${this.tables.lock} SET locked_until = ?, holder = '' WHERE name = ? AND holder = ?`)
+        .bind(LOCK_RELEASED, this.opts.prefix, holder)
+        .run();
+      this.leaseUntilMs = null;
     }
     return this.finish(report, budget);
   }
@@ -263,6 +286,24 @@ export class RpcFanoutBus {
     await this.opts.db.batch(stmts);
   }
 
+  /**
+   * One statement for a whole batch of transient failures: attempts + 1,
+   * exponential backoff with jitter, and `dead` once the eighth attempt has
+   * been spent — the DLQ being the deliveries table itself, replayable.
+   */
+  private retryStatement(consumer: string, eventIds: string[], error: string, nowIso: string): D1PreparedStatement {
+    return this.opts.db
+      .prepare(
+        `UPDATE ${this.tables.deliveries}
+            SET attempts = attempts + 1,
+                last_error = ?,
+                state = CASE WHEN attempts + 1 >= ${MAX_DELIVERY_ATTEMPTS} THEN 'dead' ELSE 'pending' END,
+                next_attempt_at = strftime('%Y-%m-%dT%H:%M:%fZ', ?, '+' || (min(${BACKOFF_CAP_S}, 5 * (1 << min(attempts + 1, 20))) + (abs(random()) % 5)) || ' seconds')
+          WHERE consumer = ? AND event_id IN (${placeholders(eventIds.length)})`
+      )
+      .bind(error, nowIso, consumer, ...eventIds);
+  }
+
   private async callDeliver(binding: ConsumerBinding, consumer: string, batch: EventEnvelope[]): Promise<DeliverResult> {
     const hop = this.opts.hopSigner
       ? await signHop(this.opts.hopSigner, { method: `${consumer}.deliver`, args: [batch], nowSeconds: Math.floor(this.now() / 1000) })
@@ -314,12 +355,38 @@ export class RpcFanoutBus {
     for (const [consumer, rowsForConsumer] of byConsumer) {
       const binding = this.opts.consumers[consumer];
       if (!binding) {
+        // AN UNREACHABLE CONSUMER IS A TRANSIENT FAILURE, NOT A FREE PASS.
+        //
+        // `subscriptionsFor()` stops NEW delivery rows being created for a
+        // consumer this deployment cannot reach; it cannot help rows written
+        // while the consumer WAS bound (a rollback, a renamed Worker, a
+        // removed binding, a config typo). Skipping those without bumping
+        // `attempts` means MAX_DELIVERY_ATTEMPTS is never reached, so the dead
+        // state is unreachable, step 4's `NOT EXISTS (… 'pending')` can never
+        // be satisfied, `dispatched_at` stays NULL for ever, and the same rows
+        // are re-selected by `ORDER BY seq LIMIT n` on every sweep — a few
+        // hundred of them permanently starve every live event behind them.
+        // So they take the ordinary backoff and dead-letter after the eighth
+        // attempt, where the DLQ depth makes the misconfiguration visible.
         this.opts.log?.warn('bus.consumer_unbound', { consumer, pending: rowsForConsumer.length });
+        if (budget.canStatement()) {
+          await this.runStatements([this.retryStatement(consumer, rowsForConsumer.map((d) => d.event_id), 'consumer_unbound', nowIso)], budget);
+          report.retried += rowsForConsumer.length;
+        }
         continue;
       }
       const ordered = rowsForConsumer.map((d) => envelopes.get(d.event_id)!).sort((a, b) => (rows.findIndex((r) => r.event_id === a.event_id) - rows.findIndex((r) => r.event_id === b.event_id)));
       for (const batch of batchEnvelopes(ordered, this.limits.batchEvents, this.limits.batchBytes)) {
         if (!budget.canRpc() || !budget.canStatement(3)) return;
+        // The lease is gone: another run has taken over and is delivering these
+        // very rows. Stop rather than double-deliver — Ads' provider call
+        // happens before its batch commits, so a duplicate delivery is a
+        // duplicate outbound conversion request.
+        if (this.leaseUntilMs !== null && this.now() >= this.leaseUntilMs) {
+          budget.hit = true;
+          this.opts.log?.warn('bus.lease_expired', { consumer, remaining: rowsForConsumer.length });
+          return;
+        }
         budget.rpcCalls++;
         let outcome: DeliverResult | null = null;
         let error = '';
@@ -361,18 +428,7 @@ export class RpcFanoutBus {
           this.opts.log?.error('bus.poison', { consumer, events: poison });
         }
         if (retry.length) {
-          stmts.push(
-            this.opts.db
-              .prepare(
-                `UPDATE ${this.tables.deliveries}
-                    SET attempts = attempts + 1,
-                        last_error = ?,
-                        state = CASE WHEN attempts + 1 >= ${MAX_DELIVERY_ATTEMPTS} THEN 'dead' ELSE 'pending' END,
-                        next_attempt_at = strftime('%Y-%m-%dT%H:%M:%fZ', ?, '+' || (min(${BACKOFF_CAP_S}, 5 * (1 << min(attempts + 1, 20))) + (abs(random()) % 5)) || ' seconds')
-                  WHERE consumer = ? AND event_id IN (${placeholders(retry.length)})`
-              )
-              .bind(error || 'retry', nowIso, consumer, ...retry)
-          );
+          stmts.push(this.retryStatement(consumer, retry, error || 'retry', nowIso));
           report.retried += retry.length;
         }
         await this.runStatements(stmts, budget);

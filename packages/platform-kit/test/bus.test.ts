@@ -198,3 +198,73 @@ test('queue mode reuses the same bookkeeping: a queue binding acks what it accep
   assert.equal(selectConsumers('rpc', { analytics: new FakeConsumer() }, { notifications: q }, 'commerce').notifications, undefined);
   assert.equal(typeof queueAsConsumer(q, 'commerce').deliver, 'function');
 });
+
+/**
+ * A DELIVERY WHOSE CONSUMER IS NO LONGER BOUND MUST STILL MAKE PROGRESS.
+ *
+ * `subscriptionsFor()` stops NEW rows being created for an unreachable
+ * consumer; it cannot help rows written while the consumer WAS bound. If the
+ * pump skipped those without bumping `attempts`, the dead state would be
+ * unreachable, `dispatched_at` would stay NULL for ever, and the same rows
+ * would be re-selected ahead of every live event on every sweep.
+ */
+test('an unbound consumer backs off, dead-letters after the eighth attempt, and stops holding the event open', async () => {
+  const audit = new FakeConsumer();
+  // Bound while the events are published…
+  const { db, raw, bus } = setup({ audit, notifications: audit, risk: audit, analytics: audit });
+  const ids = await publish(db, bus, [orderCreated(701)]);
+  await bus.pumpIds(ids);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM commerce_outbox_deliveries WHERE state = 'acked'"), 4);
+
+  // …and now one consumer's binding is gone (a rollback, a rename, a removed
+  // binding), with a pending delivery already on the books.
+  raw.exec("UPDATE commerce_outbox_deliveries SET state = 'pending', attempts = 0, acked_at = NULL WHERE consumer = 'analytics'");
+  raw.exec('UPDATE commerce_outbox_events SET dispatched_at = NULL');
+  const gone = new RpcFanoutBus({
+    db, prefix: 'commerce', source: 'commerce', enabled: 'on',
+    consumers: { audit, notifications: audit, risk: audit }, now: clock.now, probe: new OutboxProbe(),
+  });
+
+  for (let i = 1; i <= MAX_DELIVERY_ATTEMPTS; i++) {
+    clockMs += 60 * 60 * 1000; // past any backoff
+    const report = await gone.pump(`run-${i}`);
+    assert.ok(report, 'the lock is free');
+    const state = row<{ state: string; attempts: number }>(raw, "SELECT state, attempts FROM commerce_outbox_deliveries WHERE consumer = 'analytics'");
+    assert.equal(state?.attempts, i, `attempt ${i} is counted`);
+    if (i < MAX_DELIVERY_ATTEMPTS) assert.equal(state?.state, 'pending');
+  }
+  const final = row<{ state: string; last_error: string }>(raw, "SELECT state, last_error FROM commerce_outbox_deliveries WHERE consumer = 'analytics'");
+  assert.equal(final?.state, 'dead', 'the dead state is reachable');
+  assert.equal(final?.last_error, 'consumer_unbound', 'and the reason is on the row');
+
+  clockMs += 60 * 60 * 1000;
+  await gone.pump('run-final');
+  assert.equal(
+    count(raw, 'SELECT COUNT(*) AS n FROM commerce_outbox_events WHERE dispatched_at IS NOT NULL'),
+    1,
+    'the event no longer blocks the head of the queue'
+  );
+});
+
+/**
+ * THE LEASE IS THE HOLDER'S, NOT THE TABLE'S. A sweep that outlives its
+ * 55-second lease must not unlock the sweep that took over from it.
+ */
+test('an overrun run releases nothing: the lock stays with whoever holds it', async () => {
+  const audit = new FakeConsumer();
+  const { db, raw, bus } = setup({ audit, notifications: audit, risk: audit, analytics: audit });
+  await publish(db, bus, [orderCreated(801)]);
+
+  // `first` takes the lease…
+  const started = clockMs;
+  await bus.pump('first');
+  // …and the release is scoped, so a stale release by a different holder is a
+  // no-op. Simulate the overrun: `second` holds the lock, `first` returns.
+  raw.exec(`UPDATE pump_lock SET locked_until = '${new Date(started + 55_000).toISOString()}', holder = 'second' WHERE name = 'commerce'`);
+  await db.prepare("UPDATE pump_lock SET locked_until = '1970-01-01T00:00:00.000Z', holder = '' WHERE name = ? AND holder = ?").bind('commerce', 'first').run();
+  const held = row<{ holder: string }>(raw, "SELECT holder FROM pump_lock WHERE name = 'commerce'");
+  assert.equal(held?.holder, 'second', 'the overrun run did not unlock the run that took over');
+
+  // and while `second` holds it, a third run is refused
+  assert.equal(await bus.pump('third'), null);
+});

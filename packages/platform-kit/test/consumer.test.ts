@@ -79,9 +79,11 @@ test('unsigned, wrong-producer, above-PII-class and schema-invalid envelopes are
   const r = await consumer.deliver(db, [bad]);
   assert.equal(r.results[0].result, 'invalid');
   assert.match(r.results[0].error ?? '', /admin_note/);
-  // a type this consumer does not accept
+  // A type this consumer does not accept is RETRYABLE, not poison: it is what
+  // a consumer that has not been redeployed yet looks like, and dead-lettering
+  // it on the first attempt would lose every event emitted in a deploy window.
   const other = await sign({ ...good, event_type: 'RefundCompleted' } as EventEnvelope);
-  assert.equal((await consumer.deliver(db, [other])).results[0].result, 'invalid');
+  assert.equal((await consumer.deliver(db, [other])).results[0].result, 'retry');
   // a malformed envelope
   assert.equal((await consumer.deliver(db, [{ event_id: 'x' } as never])).results[0].result, 'invalid');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM analytics_events'), 0);

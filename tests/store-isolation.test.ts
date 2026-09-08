@@ -282,3 +282,98 @@ test('the Studio entry is a plain anchor to the configurable STUDIO_URL constant
     );
   }
 });
+
+/**
+ * Deployable isolation (`01-TARGET.md` §10, API-versioning row): the SPA and the
+ * core may share the CONTRACT of a service — `packages/contracts/src/http/<service>.ts`
+ * — but never its CODE. So:
+ *
+ *   1. nothing under `src/` or `worker/` imports `services/` in any form (a
+ *      type-only import would still make a service's source a build input of the
+ *      core, and a runtime one would bundle another Worker into this one);
+ *   2. `src/` imports `@levonis/*` packages TYPE-ONLY, so no validator, no
+ *      envelope canonicaliser and no platform-kit module can reach the browser
+ *      bundle by accident. `worker/` may import them at runtime — it already
+ *      re-exports `@levonis/pricing` and `@levonis/shipping`.
+ *
+ * The complement (a service importing `worker/` or a sibling) is
+ * `tests/serviceBoundaries.test.ts`; together they close the ring.
+ */
+
+/** True when a (relative or bare) specifier resolves into the services/ workspace. */
+function reachesServiceWorkspace(spec: string, fromFile: string): boolean {
+  if (spec === 'services' || spec.startsWith('services/') || spec.startsWith('@levonis/svc-')) return true;
+  if (spec.startsWith('.')) {
+    const resolved = resolve(dirname(fromFile), spec);
+    const servicesRoot = join(ROOT, 'services');
+    return resolved === servicesRoot || resolved.startsWith(servicesRoot + sep);
+  }
+  return false;
+}
+
+/**
+ * Every specifier the module graph pulls in AT RUNTIME: `import type …` and
+ * `export type … from` are erased by the compiler, so they are excluded; a bare
+ * side-effect import, a `import(...)` and a `require(...)` never are.
+ */
+export function runtimeSpecifiers(source: string): string[] {
+  const out: string[] = [];
+  // import/export clauses with a `from`: the clause decides whether it survives.
+  for (const m of source.matchAll(/\b(?:import|export)\s+([^;'"]*?)\bfrom\s*['"]([^'"]+)['"]/g)) {
+    const clause = m[1].trim();
+    if (/^type\b/.test(clause)) continue; // import type X from '…' / export type { X } from '…'
+    const braces = /\{([\s\S]*)\}/.exec(clause);
+    if (braces) {
+      const names = braces[1].split(',').map((s) => s.trim()).filter(Boolean);
+      const outsideBraces = clause.replace(/\{[\s\S]*\}/, '').replace(/,/g, '').trim();
+      // `import { type A, type B } from '…'` is fully erased; a default or
+      // namespace binding beside the braces is not.
+      if (names.length > 0 && names.every((n) => /^type\s/.test(n)) && outsideBraces === '') continue;
+    }
+    out.push(m[2]);
+  }
+  for (const re of [/\bimport\s+['"]([^'"]+)['"]/g, /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g, /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g]) {
+    for (const m of source.matchAll(re)) out.push(m[1]);
+  }
+  return out;
+}
+
+test('runtimeSpecifiers erases type-only imports and keeps everything else', () => {
+  const kept = (src: string) => runtimeSpecifiers(src);
+  assert.deepEqual(kept("import type { A } from 'a';"), []);
+  assert.deepEqual(kept("export type { A } from 'a';"), []);
+  assert.deepEqual(kept("import { type A, type B } from 'a';"), []);
+  assert.deepEqual(kept("import { type A, b } from 'a';"), ['a']);
+  assert.deepEqual(kept("import D, { type A } from 'a';"), ['a']);
+  assert.deepEqual(kept("import * as ns from 'a';"), ['a']);
+  assert.deepEqual(kept("import 'a';"), ['a']);
+  assert.deepEqual(kept("const m = await import('a');"), ['a']);
+  assert.deepEqual(kept("const m = require('a');"), ['a']);
+  assert.deepEqual(kept("export * from 'a';"), ['a']);
+});
+
+test('no store or core source imports a service; the SPA imports @levonis packages type-only', () => {
+  let scanned = 0;
+  for (const file of storeSourceFiles()) {
+    const rel = file.slice(ROOT.length + 1);
+    if (!/\.(ts|tsx|js|jsx|mjs)$/.test(file)) continue;
+    scanned++;
+    const source = readFileSync(file, 'utf8');
+
+    for (const spec of moduleSpecifiers(source)) {
+      assert.ok(
+        !reachesServiceWorkspace(spec, file),
+        `${rel}: imports a service (${spec}) — share the contract via @levonis/contracts, never the code`
+      );
+    }
+
+    if (!rel.startsWith(`src${sep}`)) continue;
+    for (const spec of runtimeSpecifiers(source)) {
+      assert.ok(
+        !spec.startsWith('@levonis/'),
+        `${rel}: runtime-imports ${spec} — the SPA may only \`import type\` from @levonis/* (contract types are erased at build time)`
+      );
+    }
+  }
+  assert.ok(scanned > 100, `expected the store + core sources to be scanned, saw ${scanned} files`);
+});

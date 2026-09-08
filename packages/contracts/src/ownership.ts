@@ -53,6 +53,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',
     'notify_deliveries',
+    // `notify_outbox` is the service's own copy of the legacy `outbox` SHAPE
+    // (`02-MIGRATION-PLAN.md` 1.7), column for column, so the monolith's rows
+    // can be copied into the Notifications database in Phase 3 without a
+    // transform. The legacy table keeps its own name in the shared D1 and both
+    // exist until the dual-write ends.
+    'notify_outbox',
   ]),
   ...owned('invoices', ['invoices']),
   ...owned('policies', ['policy_documents', 'policy_acceptances']),

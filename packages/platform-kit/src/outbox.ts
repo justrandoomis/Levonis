@@ -92,6 +92,30 @@ export interface PublishOptions {
   probe?: OutboxProbe;
 }
 
+/**
+ * A CONDITION THE OUTBOX ROW SHARES WITH THE BUSINESS WRITE IT DESCRIBES.
+ *
+ * The outbox's promise is "an event is published if and only if the business
+ * write committed" (`migrations/0057_core_outbox.sql`). A plain INSERT keeps
+ * that promise only when the business statements it rides with are
+ * unconditional. Where they are guarded — `INSERT … WHERE EXISTS (…)`,
+ * `UPDATE … WHERE <guard>`, the shape every concurrency-safe write in this
+ * repo uses — a guard that stops holding between the pre-check and the batch
+ * makes those statements match zero rows while the batch still commits, and an
+ * unguarded event row then announces something that never happened.
+ *
+ * So a guarded write hands its own proof to the event: `sql` is a boolean
+ * expression evaluated inside the same batch (`EXISTS (SELECT 1 FROM … )` over
+ * the row the business statement was supposed to write), `args` are its
+ * bindings. Statement ORDER matters — D1 runs a batch sequentially in one
+ * transaction, so the outbox statement must come AFTER the write it is proving.
+ */
+export interface PublishGuard {
+  /** a boolean SQL expression, e.g. `EXISTS (SELECT 1 FROM inventory_ledger WHERE idempotency_key = ?)` */
+  sql: string;
+  args: unknown[];
+}
+
 export const busEnabled = (v: string | boolean | undefined): boolean => v === true || v === 'on';
 
 /**
@@ -99,17 +123,28 @@ export const busEnabled = (v: string | boolean | undefined): boolean => v === tr
  * or the table is absent. Deliveries rows are created by the pump when it
  * first picks the event up, so the batch grows by exactly one statement.
  */
-export async function publishStatement(db: D1Database, envelope: EventEnvelope, opts: PublishOptions): Promise<D1PreparedStatement | null> {
+export async function publishStatement(db: D1Database, envelope: EventEnvelope, opts: PublishOptions, guard?: PublishGuard): Promise<D1PreparedStatement | null> {
   if (!busEnabled(opts.enabled)) return null;
   if (envelope.delivery !== 'transactional') throw new Error(`publishStatement: ${envelope.event_type} is best_effort — use emitBestEffort`);
   const t = outboxTables(opts.prefix);
   if (!(await (opts.probe ?? defaultProbe).present(db, t.events))) return null;
-  return db
-    .prepare(
-      `INSERT INTO ${t.events} (event_id, event_type, version, aggregate_type, aggregate_id, aggregate_seq, envelope, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(envelope.event_id, envelope.event_type, envelope.version, envelope.aggregate_type, envelope.aggregate_id, envelope.aggregate_seq, JSON.stringify(envelope), envelope.created_at);
+  const columns = '(event_id, event_type, version, aggregate_type, aggregate_id, aggregate_seq, envelope, created_at)';
+  const values = [envelope.event_id, envelope.event_type, envelope.version, envelope.aggregate_type, envelope.aggregate_id, envelope.aggregate_seq, JSON.stringify(envelope), envelope.created_at];
+  // An unguarded publish stays exactly the statement it has always been; a
+  // guarded one becomes `INSERT … SELECT … WHERE <guard>`, which inserts zero
+  // rows — and still commits the batch — when the business write did.
+  //
+  // `ON CONFLICT DO NOTHING` covers both UNIQUEs on the table. `event_id` is a
+  // UUIDv7, so that one only ever fires on a genuine re-publish, which should
+  // indeed write nothing. `(aggregate_type, aggregate_id, aggregate_seq)` is
+  // the one that matters: `aggregate_seq` is minted per isolate, so two
+  // isolates emitting for the same aggregate in the same millisecond CAN land
+  // on the same number — and this statement rides in the caller's own business
+  // batch, so without this clause that collision would abort the ORDER, not
+  // merely the event. An event must never be the reason the thing fails to
+  // happen (`migrations/0057_core_outbox.sql`).
+  if (!guard) return db.prepare(`INSERT INTO ${t.events} ${columns}\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`).bind(...values);
+  return db.prepare(`INSERT INTO ${t.events} ${columns}\n       SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard.sql} ON CONFLICT DO NOTHING`).bind(...values, ...guard.args);
 }
 
 /**

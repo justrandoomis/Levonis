@@ -33,6 +33,9 @@ test('the scanner accepts a clean service file', () => {
     import { fetchWithBudget } from '@levonis/platform-kit/httpx';
     import type { InvoiceIssuedV1 } from '@levonis/contracts/events/v1/InvoiceIssued';
     import { invoiceStatements } from '../statements';
+    export interface Binding {
+      fetch(request: Request): Promise<Response>;
+    }
     export async function list(db: D1Database, orderId: string) {
       const rows = await db.prepare('SELECT i.id, i.total_iqd FROM invoices i JOIN orders o ON o.id = i.order_id WHERE o.id = ?').bind(orderId).all();
       await db.prepare(\`INSERT INTO \${'invoices'} (id) VALUES (?)\`).bind('x').run();

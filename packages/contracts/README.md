@@ -25,6 +25,11 @@ validators, no runtime dependency; imports nothing outside the package.
 | `rpc/audit` | `AuditApi` (`query`, `verifyChain` + consumer) |
 | `http/common` | the `{success, error, code, details}` envelope, platform error codes, the internal header names |
 | `http/health` | `GET /api/health` shapes |
+| `http/gateway` | `RouteTarget`/`RouteHosts`/`RouteRequires`, `RouteOverride` (the kill switch), the gateway's own health and the four permanent 410 bodies |
+| `http/audit` | `/api/v1/audit/admin/*` — the event page and the chain-verification report |
+| `http/analytics` | `/api/v1/analytics/*` — the overview counters (field-for-field the ones `admin.ts:125-159` returns today) and the daily platform/merchant series |
+| `http/ads` | `/api/v1/ads/admin/*` — provider status and breakers, the seeded event map, deliveries (`sandbox`/`no_consent`) and flag flips |
+| `http/notifications` | `/api/notifications/*` pinned to today's core responses, plus the admin delivery view and the webhook ack |
 
 Events in v1 today: the 17 of `03-EVENTS.md` §3 plus the 11 §4 events the
 Phase 1–3 subscriptions seed names (`UserUpdated`, `SessionRevoked`,

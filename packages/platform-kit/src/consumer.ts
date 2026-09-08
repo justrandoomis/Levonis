@@ -76,8 +76,18 @@ export function defineConsumer(def: ConsumerDefinition): Consumer {
     const key = eventKeyOf(env);
     const handler = def.handlers[key];
     if (!handler) {
+      // RETRY, NOT POISON. "I have no handler for this key" is the NORMAL and
+      // TEMPORARY state of a consumer that has not been redeployed yet: every
+      // service bundles its own snapshot of `@levonis/contracts` and the
+      // `svc-*.yml` workflows deploy independently, so a producer that starts
+      // emitting a new type — or a new version — minutes before the consumer's
+      // deploy lands would otherwise dead-letter every event in that window on
+      // the FIRST attempt, with the producer marking them dispatched. A retry
+      // backs off instead and only dies after the eighth attempt (~2 h at the
+      // per-minute cron), by which time the deploy has landed. A payload that
+      // fails ITS OWN handler's schema is a different thing and stays poison.
       await def.onRejected?.(env, 'unknown_type');
-      return { event_id: env.event_id, result: 'invalid', error: `unknown type ${key}` };
+      return { event_id: env.event_id, result: 'retry', error: `unknown type ${key}` };
     }
     if (!isAllowedProducer(key, env.source_service) || (hop && hop.iss !== env.source_service && !isAllowedProducer(key, hop.iss))) {
       await def.onRejected?.(env, 'forged');
@@ -97,7 +107,9 @@ export function defineConsumer(def: ConsumerDefinition): Consumer {
       return { event_id: env.event_id, result: 'pii_refused', error: `${env.pii_class} above ${def.piiMax}` };
     }
     const schema = EVENT_SCHEMAS[key];
-    if (!schema) return { event_id: env.event_id, result: 'invalid', error: `no schema for ${key}` };
+    // Same reasoning as the missing handler: this consumer's bundled contracts
+    // snapshot simply does not know the type yet.
+    if (!schema) return { event_id: env.event_id, result: 'retry', error: `no schema for ${key}` };
     try {
       schema.parse(env.payload);
     } catch (e) {

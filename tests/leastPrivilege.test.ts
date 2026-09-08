@@ -80,3 +80,43 @@ test('every services/*/wrangler.jsonc in the tree passes; OWNERSHIP.json and SEC
     assert.deepEqual(violations, [], violations.join('\n'));
   }
 });
+
+/**
+ * THE DEPLOY WORKFLOW'S SECRET NAMES AND `SECRETS.md` ARE ONE THING.
+ *
+ * `scripts/upload-secrets.mjs` reads `<SVC>__<NAME>` for every name a
+ * service's `SECRETS.md` declares, and rule 2 of that script makes an ABSENT
+ * variable mean "leave the Worker's secret untouched" — never an error. So a
+ * name declared in `SECRETS.md` but missing from `_deploy-worker.yml`'s env
+ * block can never be uploaded, and the deploy still reports success: the
+ * provider stays unconfigured, `/health` stays green, every conversion is
+ * recorded `sandbox`, and nothing says why. Seven ads names were spelt
+ * differently in the two files and eight could never be uploaded at all.
+ *
+ * A dead entry (in the workflow, not in any SECRETS.md) is the same mistake
+ * seen from the other side, so both directions are checked.
+ */
+test('every SECRETS.md name appears in _deploy-worker.yml, and every ads/analytics/audit/gateway/notifications entry there is a declared name', () => {
+  const yml = readFileSync(join(ROOT, '.github', 'workflows', '_deploy-worker.yml'), 'utf8');
+  const block = yml.slice(yml.indexOf("- name: Upload this service's secrets, by name only"));
+  const inWorkflow = new Set([...block.matchAll(/^\s{10}([A-Z][A-Z0-9_]*__[A-Z][A-Z0-9_]*):/gm)].map((m) => m[1]));
+
+  const missing: string[] = [];
+  const declaredKeys = new Set<string>();
+  for (const svc of listServices(ROOT)) {
+    const secretsMd = join(ROOT, 'services', svc, 'SECRETS.md');
+    if (!existsSync(secretsMd)) continue;
+    const prefix = `${svc.toUpperCase().replace(/-/g, '_')}__`;
+    for (const name of secretNamesIn(readFileSync(secretsMd, 'utf8'))) {
+      declaredKeys.add(`${prefix}${name}`);
+      // `<SVC>__DARK__<NAME>` is the optional per-environment twin; it is a
+      // valid workflow key for the same declared name.
+      declaredKeys.add(`${prefix}DARK__${name}`);
+      if (!inWorkflow.has(`${prefix}${name}`)) missing.push(`${prefix}${name} (services/${svc}/SECRETS.md declares ${name})`);
+    }
+  }
+  assert.deepEqual(missing, [], `these secrets can never be uploaded:\n${missing.join('\n')}`);
+
+  const dead = [...inWorkflow].filter((k) => !declaredKeys.has(k));
+  assert.deepEqual(dead, [], `these workflow env entries match no SECRETS.md name:\n${dead.join('\n')}`);
+});

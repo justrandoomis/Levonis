@@ -42,10 +42,39 @@ test('once the table exists and the var is on, the outbox row rides in the same 
   await uow.commit();
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 1);
   assert.deepEqual(uow.eventIds, [env.event_id]);
-  // the UNIQUE (aggregate, seq) and event_id constraints hold
+  // A RE-PUBLISH IS A NO-OP, NOT A ROLLBACK. The two UNIQUEs still hold — the
+  // table gains no second row — but `ON CONFLICT DO NOTHING` means the
+  // COMMAND'S OWN BATCH survives. `aggregate_seq` is minted per isolate, so a
+  // collision between two isolates is possible, and the outbox statement rides
+  // inside the caller's business batch: without this an event could be the
+  // reason an order fails to be placed.
   const dup = new Uow(db, { enabled: 'on', prefix: 'core', probe });
+  dup.add(db.prepare("INSERT INTO orders (id) VALUES ('ord_02b')"));
   await dup.publish(env);
-  await assert.rejects(() => dup.commit(), /UNIQUE/);
+  await dup.commit();
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 1, 'still exactly one event row');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM orders WHERE id = 'ord_02b'"), 1, 'and the business write committed');
+});
+
+test('a colliding aggregate_seq loses the EVENT, never the business batch it rides in', async () => {
+  const { db, raw } = memoryDb('CREATE TABLE orders (id TEXT PRIMARY KEY);' + outboxSchemaSql('core'));
+  const probe = new OutboxProbe();
+  const first = env;
+  const uow = new Uow(db, { enabled: 'on', prefix: 'core', probe });
+  uow.add(db.prepare("INSERT INTO orders (id) VALUES ('ord_c1')"));
+  await uow.publish(first);
+  await uow.commit();
+
+  // A DIFFERENT event (its own event_id) that another isolate numbered onto the
+  // same (aggregate_type, aggregate_id, aggregate_seq).
+  const clash = { ...first, event_id: `${first.event_id}-other` };
+  const second = new Uow(db, { enabled: 'on', prefix: 'core', probe });
+  second.add(db.prepare("INSERT INTO orders (id) VALUES ('ord_c2')"));
+  await second.publish(clash);
+  await second.commit();
+
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM orders WHERE id = 'ord_c2'"), 1, 'the order was placed');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM core_outbox_events'), 1, 'the colliding event was dropped, not the order');
 });
 
 test('Uow refuses to commit a command declared as publishing without its outbox statement (bus enabled), and passes when the bus is off', async () => {

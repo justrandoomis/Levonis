@@ -6,7 +6,7 @@
  * never travels in the envelope: it is stored in `<svc>_audit_details`
  * (pruned within 24 h of ack) and handed to Audit in the same `deliver()`.
  */
-import type { EventEnvelope } from '@levonis/contracts/envelope';
+import { FIXTURE_SIG, type EventEnvelope, type UnsignedEnvelope } from '@levonis/contracts/envelope';
 import { AuditRecordedV1 } from '@levonis/contracts/events/v1/AuditRecorded';
 import { canonicalHash } from '@levonis/contracts/canonical';
 import { publishStatement, type PublishOptions } from './outbox';
@@ -29,6 +29,13 @@ export interface AuditContext extends PublishOptions {
   correlationId: string;
   /** dual-write the legacy `audit_log` row (the core, until Phase 3) */
   legacyAuditLog?: boolean;
+  /**
+   * Signs the envelope with the producer's `<SVC>_SIGNING_KEY` (`eventSig.ts`
+   * `signEnvelope`). Omitted where no key is configured yet — the envelope then
+   * carries the `fixture` marker, which only a consumer running with
+   * `acceptFixtureSig` (dark, tests) will take.
+   */
+  sign?: (envelope: UnsignedEnvelope) => Promise<EventEnvelope>;
   clock?: Clock;
 }
 
@@ -57,20 +64,20 @@ export async function auditStatements(
     statements.push(db.prepare('INSERT INTO audit_log (actor_id, action, target, detail) VALUES (?, ?, ?, ?)').bind(actorId, action, target, detailJson));
   }
   const eventId = uuidv7(clock);
-  const envelope: EventEnvelope = {
-    ...AuditRecordedV1.envelope({
-      event_id: eventId,
-      created_at: new Date(clock.now()).toISOString(),
-      source_service: ctx.source,
-      correlation_id: ctx.correlationId,
-      causation_id: null,
-      actor_id: actorId,
-      aggregate_id: eventId,
-      aggregate_seq: 1,
-      payload: { actor_id: actorId, action, target, detail_hash: await canonicalHash(detail), detail_ref: eventId, source_service: ctx.source },
-    }),
-    sig: 'fixture', // replaced by the producer's signature at pump time when the outbox row is signed (1.6)
-  };
+  const unsigned = AuditRecordedV1.envelope({
+    event_id: eventId,
+    created_at: new Date(clock.now()).toISOString(),
+    source_service: ctx.source,
+    correlation_id: ctx.correlationId,
+    causation_id: null,
+    actor_id: actorId,
+    aggregate_id: eventId,
+    aggregate_seq: 1, // the aggregate IS this event (aggregate_id = event_id), so 1 is unique by construction
+    payload: { actor_id: actorId, action, target, detail_hash: await canonicalHash(detail), detail_ref: eventId, source_service: ctx.source },
+  });
+  // Signed by the producer here, at build time, because the outbox row stores
+  // the envelope verbatim; `fixture` when no key is configured yet.
+  const envelope: EventEnvelope = ctx.sign ? await ctx.sign(unsigned) : { ...unsigned, sig: FIXTURE_SIG };
   const outbox = await publishStatement(db, envelope, ctx);
   if (outbox) {
     statements.push(
