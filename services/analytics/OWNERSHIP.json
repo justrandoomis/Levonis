@@ -1,0 +1,40 @@
+{
+  "service": "analytics",
+  "owns": ["analytics_events", "analytics_daily_platform", "analytics_daily_merchant"],
+  "reads": [],
+  "calls": ["IDENTITY.getPublicKeys"],
+  "publishes": [],
+  "consumes": [
+    "UserCreated.v1",
+    "UserUpdated.v1",
+    "ProductViewed.v1",
+    "ProductAdded.v1",
+    "InventoryChanged.v1",
+    "AddToCart.v1",
+    "CheckoutStarted.v1",
+    "OrderCreated.v1",
+    "OrderPaid.v1",
+    "PaymentAuthorized.v1",
+    "PaymentCompleted.v1",
+    "PaymentFailed.v1",
+    "RefundCompleted.v1",
+    "OrderStatusChanged.v1",
+    "OrderDelivered.v1",
+    "PurchaseCompleted.v1",
+    "ReferralUsed.v1",
+    "SubscriptionChanged.v1",
+    "RequestPublished.v1",
+    "RateLimitHit.v1",
+    "TurnstileFailed.v1"
+  ],
+  "secrets": ["ANALYTICS_HASH_SALT", "ANALYTICS_SIGNING_KEY", "HEALTH_PROBE_TOKEN"],
+  "legacyRoutes": [],
+  "notes": {
+    "owns": "Its OWN D1 from Phase 1 (01-TARGET.md row 17, plan 1.7). `merchant_store_analytics_daily` is assigned to Analytics by the design as the dead table it takes over, but it lives in the shared database and this service never names it in SQL — it is deliberately absent from `owns` until the day its rows move, which is a data decision the owner takes. `analytics_processed_events` is this service's platform table.",
+    "reads": "Empty, and structurally so: Analytics is a consumer-owned replica (01-TARGET.md §2.4, the merchant-analytics row). It answers from what the bus gave it and never queries another service's tables — that is the whole point of replacing the live aggregates over `orders`.",
+    "calls": "Only Identity's public-key registry, to verify producers' event signatures. Analytics calls nothing else and holds no privilege anywhere: it is the least-trusted store on the platform (03-EVENTS.md §5) and its bindings say so.",
+    "publishes": "Nothing. Analytics is a sink.",
+    "consumes": "Exactly the `analytics` rows of packages/contracts/src/subscriptions.ts — the explicit allowlist that replaced the wildcard (01-TARGET.md §9.2). Every one is `none` or `pseudonymous`; `piiMax` is `pseudonymous`, so the bus and defineConsumer both refuse a `personal` envelope even if a future subscriptions row tried to add one.",
+    "secrets": "ANALYTICS_HASH_SALT is the salt folded into the daily actor hash, so the pseudonyms in this store cannot be reversed by enumerating user ids; ANALYTICS_SIGNING_KEY is this Worker's hop key; HEALTH_PROBE_TOKEN lets the deep-health probe reach a Worker with no URL. Names only."
+  }
+}

@@ -1,0 +1,94 @@
+{
+  // levonis-analytics — the consumer-owned read models (`01-TARGET.md` row 17,
+  // §9.2, `02-MIGRATION-PLAN.md` 1.7).
+  //
+  // NOTHING HERE IS DEPLOYED BY THIS SLICE. No `wrangler deploy`, no
+  // `d1 create`, no `secret put`. The database ids are placeholders the deploy
+  // workflow fills in (the pattern of `scripts/set-deploy-ids.mjs`), never
+  // committed.
+  //
+  // Visibility: no route, ever — the admin and merchant read models are reached
+  // through the gateway's `/api/v1/analytics/*` prefix or over a service
+  // binding. Production is `workers_dev:false` + `preview_urls:false`; the dark
+  // twin enables workers.dev only so its `/health` can be probed before
+  // anything binds it (plan 2.1's gate). It holds no live data and, by
+  // construction, no personal data at all.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-analytics",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+
+  "d1_databases": [
+    { "binding": "DB", "database_name": "levonis-analytics-db", "database_id": "ANALYTICS-DB-ID-PLACEHOLDER", "migrations_dir": "migrations" }
+  ],
+
+  // Every five minutes, not every minute: Analytics publishes no events, so
+  // this cron is not a pump. It reconciles the last day or two of rollups
+  // against the raw rows (the fast path is incremental, in the delivery batch)
+  // and rolls raw events out at the retention window. Nothing a user waits on
+  // runs here.
+  "triggers": { "crons": ["*/5 * * * *"] },
+
+  // Identity's public-key registry, for verifying producers' event signatures.
+  // Analytics binds nothing else — it is a sink with no privileges anywhere.
+  "services": [
+    { "binding": "IDENTITY", "service": "levonis-staging", "entrypoint": "IdentityEntrypoint" }
+  ],
+
+  "vars": {
+    // `service:kid:publicKey,…` — the bootstrap producer key list, until
+    // Identity's `service_keys` registry exists.
+    "ALLOWED_CALLER_KIDS": "",
+    // off | log | on — inbound gateway-hop enforcement (`01-TARGET.md` §4 item 1).
+    "GATEWAY_ONLY": "off",
+    // on | off (dark and local ONLY) — accept the committed fixtures' `sig`
+    // marker so the dark stack can be driven before any signing key exists.
+    "ACCEPT_FIXTURE_SIG": "off",
+    // Days of RAW events kept (`03-EVENTS.md` §5 rule 6: raw rolls 30 days,
+    // rollups are kept indefinitely).
+    "ANALYTICS_RETENTION_DAYS": "30",
+    // How many recent days the cron re-computes from the raw rows. The
+    // incremental rollup in the delivery batch is the fast path; this is the
+    // repair pass, and it only ever covers days still inside the retention
+    // window.
+    "ANALYTICS_ROLLUP_DAYS": "2",
+    // Raw rows the repair pass reads per day before it gives up and leaves the
+    // incremental numbers standing — a bound on one invocation's D1 reads.
+    "ANALYTICS_ROLLUP_MAX_ROWS": "20000",
+    "SVC_VERSION": ""
+  },
+
+  "env": {
+    "dark": {
+      "name": "levonis-analytics-dark",
+      "workers_dev": true,
+      "preview_urls": false,
+      "observability": { "enabled": true },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "levonis-analytics-db-dark",
+          "database_id": "ANALYTICS-DB-DARK-ID-PLACEHOLDER",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": ["*/5 * * * *"] },
+      "services": [
+        { "binding": "IDENTITY", "service": "levonis-core-dark", "entrypoint": "IdentityEntrypoint" }
+      ],
+      "vars": {
+        "ALLOWED_CALLER_KIDS": "",
+        "GATEWAY_ONLY": "off",
+        "ACCEPT_FIXTURE_SIG": "on",
+        "ANALYTICS_RETENTION_DAYS": "30",
+        "ANALYTICS_ROLLUP_DAYS": "2",
+        "ANALYTICS_ROLLUP_MAX_ROWS": "20000",
+        "SVC_VERSION": ""
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  // LOCAL DEVELOPMENT ONLY — never deployed, never referenced by a workflow.
+  //
+  // It carries the dark core's NAME so the audit service's own `IDENTITY`
+  // binding (`services/audit/wrangler.jsonc` env.dark → `levonis-core-dark`)
+  // resolves to it under multi-config `wrangler dev`, and it binds AUDIT the
+  // way the bus will:
+  //
+  //   npx wrangler dev -c services/audit/dev/producer-stub/wrangler.jsonc \
+  //                    -c services/audit/wrangler.jsonc --env dark
+  //
+  // See ../README.md.
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-core-dark",
+  "main": "index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "services": [{ "binding": "AUDIT", "service": "levonis-audit-dark" }],
+  "env": {
+    "dark": {
+      "name": "levonis-core-dark",
+      "workers_dev": false,
+      "preview_urls": false,
+      "services": [{ "binding": "AUDIT", "service": "levonis-audit-dark" }]
+    }
+  }
+}

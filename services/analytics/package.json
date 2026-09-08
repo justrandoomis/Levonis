@@ -1,0 +1,16 @@
+{
+  "name": "@levonis/svc-analytics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "levonis-analytics — the platform's read models on its own D1: a consumer of the whole v1 catalogue it is allowed to see, a PII projection that drops every field the schema annotates, a raw event table with a 30-day roll, daily platform and merchant rollups, and the overview()/merchantDaily() read RPC.",
+  "dependencies": {
+    "@levonis/contracts": "*",
+    "@levonis/platform-kit": "*",
+    "hono": "^4.9.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  }
+}

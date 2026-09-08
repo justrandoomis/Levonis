@@ -1,0 +1,16 @@
+{
+  "name": "@levonis/svc-audit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "levonis-audit — the append-only, hash-chained audit log on its own D1: a consumer of AuditRecorded and of every privileged event the plan lists, an RPC record() for direct entries, chain sealing and verification, and the admin read surface under /api/v1/audit/admin/*.",
+  "dependencies": {
+    "@levonis/contracts": "*",
+    "@levonis/platform-kit": "*",
+    "hono": "^4.9.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  }
+}

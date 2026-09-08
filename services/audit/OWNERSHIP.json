@@ -1,0 +1,28 @@
+{
+  "service": "audit",
+  "owns": ["audit_events", "audit_chain_heads"],
+  "reads": [],
+  "calls": ["IDENTITY.getPublicKeys"],
+  "publishes": [],
+  "consumes": [
+    "AuditRecorded.v1",
+    "EventRejected.v1",
+    "UserCreated.v1",
+    "OrderCreated.v1",
+    "PaymentCompleted.v1",
+    "RefundCompleted.v1",
+    "RoleChanged.v1",
+    "DepositDecided.v1",
+    "WithdrawalStateChanged.v1"
+  ],
+  "secrets": ["AUDIT_CHAIN_KEY", "AUDIT_SIGNING_KEY", "HEALTH_PROBE_TOKEN"],
+  "legacyRoutes": [],
+  "notes": {
+    "owns": "Its OWN D1 from Phase 1 (01-TARGET.md row 20, plan 1.7) — `audit_events` and `audit_chain_heads` live in `levonis-audit-db`, not in the shared database. The legacy `audit_log` stays in the core's D1 and is frozen read-only after Phase 3; this service never names it, so it is deliberately absent from `owns` even though the design assigns the table to Audit. `audit_processed_events` and `audit_idempotency` are platform tables of this service.",
+    "reads": "Empty: Audit joins nothing. A query that needs a user's name is answered by the caller, not here — Audit holds the fact, not the person.",
+    "calls": "Only Identity's public-key registry, to verify producers' event signatures (03-EVENTS.md §1). Audit calls nobody else: a log that depends on the systems it audits is not a log. `ALLOWED_CALLER_KIDS` is the bootstrap alternative and the only source in dark.",
+    "publishes": "Nothing in Phase 1. Audit is a sink; `AuditRecorded` is produced by every OTHER service through the audit() facade.",
+    "consumes": "Exactly the `audit` rows of packages/contracts/src/subscriptions.ts — AuditRecorded plus the privileged/money events of 03-EVENTS.md §6. Adding one here without adding it there fails tests/eventSchemas.test.ts.",
+    "secrets": "AUDIT_CHAIN_KEY keys the chain HMAC (an attacker with database write access cannot recompute a consistent chain without it); AUDIT_SIGNING_KEY is this Worker's hop key (`<SVC>_SIGNING_KEY`, 01-TARGET.md §4 item 3); HEALTH_PROBE_TOKEN lets the deep-health probe reach a Worker that has no URL. Names only — no value is ever in the repository."
+  }
+}

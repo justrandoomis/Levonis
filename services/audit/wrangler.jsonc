@@ -1,0 +1,107 @@
+{
+  // levonis-audit — the hash-chained audit log (`01-TARGET.md` row 20, ADR-012,
+  // `02-MIGRATION-PLAN.md` 1.7).
+  //
+  // NOTHING HERE IS DEPLOYED BY THIS SLICE. No `wrangler deploy`, no
+  // `d1 create`, no `secret put`. The file exists so the dark deploy (G1) and
+  // the production deploy (2.1, after G5) are a workflow run rather than a
+  // design exercise. The D1 databases it names DO NOT EXIST YET: their ids are
+  // filled in by the deploy workflow (the pattern of `deploy-staging.yml`,
+  // which creates the database when it is missing and writes the id into the
+  // config before `wrangler deploy`), never committed here.
+  //
+  // Visibility: no route, ever. Audit is reachable only over a service binding
+  // and, for admins, through the gateway's `/api/v1/audit/admin/*` prefix.
+  // `workers_dev` and `preview_urls` are declared in every environment;
+  // production is false in both, and the dark twin enables workers.dev only
+  // because a Worker with no URL cannot be health-probed before it is bound to
+  // anything (plan 2.1's gate) — it holds no live data.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-audit",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+
+  // Its own database (`01-TARGET.md` §1.1 "Data today": a new leaf service with
+  // no legacy tables gets its own D1 from day one). `migrations/` here is
+  // applied by this service's own workflow before its code, never by the core's
+  // migration stream (`01-TARGET.md` §2.3 item 6).
+  "d1_databases": [
+    { "binding": "DB", "database_name": "levonis-audit-db", "database_id": "AUDIT-DB-ID-PLACEHOLDER", "migrations_dir": "migrations" }
+  ],
+
+  // The chain is sealed and the head advanced once a minute. Audit produces no
+  // events in Phase 1, so this cron is NOT an outbox pump: it is the sealing
+  // pass that turns freshly ingested rows into chain links, which is why it
+  // runs at the ingest cadence rather than every quarter hour.
+  "triggers": { "crons": ["* * * * *"] },
+
+  // Identity's public-key registry, for verifying producers' event signatures
+  // (`03-EVENTS.md` §1). Until Phase 9 that entrypoint lives in the core.
+  // Audit binds nothing else — a log that calls the systems it audits is not a
+  // log — and `tests/leastPrivilege.test.ts` fails on any binding absent from
+  // OWNERSHIP.json `calls`.
+  "services": [
+    { "binding": "IDENTITY", "service": "levonis-staging", "entrypoint": "IdentityEntrypoint" }
+  ],
+
+  "vars": {
+    // `service:kid:publicKey,…` — the bootstrap producer/caller key list used
+    // before Identity's `service_keys` registry exists. Empty here; the deploy
+    // workflow sets it. Empty means: every signed envelope is refused as
+    // `forged` unless the fixture switch below is on.
+    "ALLOWED_CALLER_KIDS": "",
+    // off | log | on — inbound gateway-hop enforcement (`01-TARGET.md` §4
+    // item 1). `off` until one release after G3, exactly like the core.
+    "GATEWAY_ONLY": "off",
+    // on | off (dark and local ONLY) — accept the committed fixtures' `sig:
+    // "fixture"` marker, so the dark stack can be driven end to end before any
+    // signing key exists. Never set in production: it would make an unsigned
+    // envelope acceptable.
+    "ACCEPT_FIXTURE_SIG": "off",
+    // Rows sealed into the chain per cron run — a bound on the D1 statements
+    // one invocation writes (`03-EVENTS.md` §2.2 budget reasoning).
+    "AUDIT_SEAL_BATCH": "200",
+    // Rows walked per verifyChain page.
+    "AUDIT_VERIFY_PAGE": "500",
+    // The ceiling on ONE verification request. `verifyChain` reports a
+    // truncated prefix honestly, so this bounds the CPU an admin can ask for
+    // in a single, repeatable request rather than changing what it says.
+    "AUDIT_VERIFY_MAX_ROWS": "5000",
+    "SVC_VERSION": ""
+  },
+
+  "env": {
+    // The dark twin (slice 1.7). Same code, its own database, workers.dev on so
+    // `/health` can be probed before anything binds it.
+    "dark": {
+      "name": "levonis-audit-dark",
+      "workers_dev": true,
+      "preview_urls": false,
+      "observability": { "enabled": true },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "levonis-audit-db-dark", "database_id": "AUDIT-DB-DARK-ID-PLACEHOLDER", "migrations_dir": "migrations" }
+      ],
+      "triggers": { "crons": ["* * * * *"] },
+      "services": [
+        { "binding": "IDENTITY", "service": "levonis-core-dark", "entrypoint": "IdentityEntrypoint" }
+      ],
+      "vars": {
+        "ALLOWED_CALLER_KIDS": "",
+        "GATEWAY_ONLY": "off",
+        "ACCEPT_FIXTURE_SIG": "on",
+        "AUDIT_SEAL_BATCH": "200",
+        "AUDIT_VERIFY_PAGE": "500",
+        "AUDIT_VERIFY_MAX_ROWS": "5000",
+    // The ceiling on ONE verification request. `verifyChain` reports a
+    // truncated prefix honestly, so this bounds the CPU an admin can ask for
+    // in a single, repeatable request rather than changing what it says.
+    "AUDIT_VERIFY_MAX_ROWS": "5000",
+        "SVC_VERSION": ""
+      }
+    }
+  }
+}
