@@ -94,6 +94,25 @@ pipeline**, so everything you write is applied literally.
   تلقائياً أبداً — تظهر كـ "needs review" ليقررها المشرف.
   Brand/catalogs are written as slugs; unknown values are never silently
   created — they surface as needs-review items for the admin.
+- **مستوى المخزون**: اترك `inventory_mode` فارغًا وسيُشتق من مكان الأرقام —
+  مخزون على اللون ⇒ `COLOR`، على الخيار ⇒ `OPTION`، وإلا `BASE` — وهي نفس
+  القاعدة التي يطبّقها نموذج المنتج. اكتبه صراحةً فقط إن أردت مستوىً محدَّدًا.
+  Leave `inventory_mode` empty and it follows where the stock numbers are —
+  the same rule the product form applies. State it only to force a level.
+- **لون بلا كود لا يُقبل**: `colors.N.hex` يجب أن يكون `#RRGGBB` حقيقيًا
+  (نفس ما يشترطه النموذج). الملف بلون بلا كود **يُرفض بالاسم** ولا يُكتب منه
+  شيء. A colour needs a real `#RRGGBB`; a file without one is refused by name
+  and nothing is written.
+- **مفتاح غير معروف لا يُبتلع**: أي مفتاح لا يعرفه القالب — بما فيها
+  `compare_at_iqd` الذي أُزيل — يظهر في `unknown_keys` في نتيجة الفحص
+  **وفي نتيجة الاستيراد**، فلا يمرّ سطر بصمت. Unknown keys (including the
+  removed `compare_at_iqd`) are listed in `unknown_keys` at check time AND at
+  import time — no line is swallowed.
+- **نتيجة الاستيراد تُقرأ من قاعدة البيانات لا من الملف**: بعد الكتابة يعيد
+  الخادم قراءة المنتج ويقارن المطلوب بالمخزَّن؛ إن اختلف قسمٌ واحد تُرفض
+  النتيجة باسم القسم والحقل بدل أن تقول «تم». The import result is read back
+  from the database, not counted from the file: any section that did not
+  persist is named, and the answer is a failure, not a success.
 
 ## مثال قصير مكتمل / Short worked example
 

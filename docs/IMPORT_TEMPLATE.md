@@ -206,6 +206,30 @@ form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة �
 على رسائل متخيَّلة — فإعادة صياغة رسالة تحقق تُسقط الاختبار بدل أن تُفسد
 التقرير بصمت.
 
+**النتيجة تُقرأ من قاعدة البيانات.** بعد `POST /api/admin/template/apply`
+يعيد الخادم قراءة المنتج عبر **نفس** نقطتَي النموذج
+(`GET /api/admin/products-v2/:id` و`GET /api/admin/products/:id/relations`)
+ويقارن ما طُلب بما خُزِّن، فتحمل الإجابة عدّادات القراءة الرجعية —
+`relations` (مجموعات/قيم/ألوان/روابط/تركيبات/صور/الصورة الرئيسية/`inventory_mode`)،
+و`spec_fields` (`stored`/`visible_in_form`/`outside_section`/`family`)،
+و`images`/`option_groups`/`option_values`/`colors` بصيغة
+`{ requested, stored }`، مع `unknown_keys` و`warnings` و`cost_refused`
+و`mismatches`. **نجاح المحلّل ليس نجاح الاستيراد**: أي عنصر في `mismatches`
+يجعل السطر فاشلًا باسم القسم ولو كانت الحالة 200، وعدم تطابق القراءة الرجعية
+يردّ `500 APPLY_VERIFY_FAILED` يسمّي القسم والحقل — ويُزال المنتج المُنشأ
+حديثًا فلا يبقى شيء نصف محفوظ. النافذة لا تخترع رقمًا: العدّاد الذي لم
+يذكره الخادم يُكتب «غير مُبلَّغ» ولا يُكتب صفرًا.
+`tests/templateParity.test.ts` يثبت ذلك بمحوّل D1 يُسقط عبارة علائقية واحدة
+بصمت.
+
+The apply answer is the READ-BACK, never a count of the file: the server
+reloads the product through the same two endpoints the form uses and compares
+requested with stored. Any mismatch fails the row by name (even on HTTP 200),
+a verification failure answers `500 APPLY_VERIFY_FAILED` naming the section
+and field, and a freshly created product is removed again rather than left
+half-applied. A counter the server did not report is shown as "unreported",
+never as 0.
+
 **التكرار سؤال لا قرار.** `POST /apply` يرفض منتجاً يطابق موجوداً بالـslug أو
 بالاسم العربي ويعيد `409 DUPLICATE`؛ النافذة تسأل «تحديث الموجود» أو «مسودة
 جديدة»، وعند الإجابة تُعيد إرسال **الملفات المنتظرة وحدها** — إعادة إرسال

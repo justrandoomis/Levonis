@@ -15,6 +15,44 @@
 > `images.N.option_value_id` / `color_id` / `variant_id` / `width` / `height`.
 > Read the registry, or an actual export, for the complete list.
 
+> **Correction, 2026-09-08 (TXT import parity round).** Two further drifts are
+> fixed here: `options.N.compare_at_iqd` and `colors.N.compare_at_iqd` were
+> listed as stored while the model had no slot for them — they are out of the
+> registry and now surface in `unknown_keys`, so the rows are removed; and
+> `colors.N.hex` was described as accepting empty, which the single save path
+> refuses (the same rule `ProductForm` applies). **The "DB column" cells that
+> read `products.options` / `products.colors` / `products.images` are the JSON
+> MIRROR, not the destination**: since the shared persistence contract
+> (`worker/lib/productPersistence.ts`) options, colours, links, variants and
+> images are written as rows in `product_option_groups`,
+> `product_option_values`, `product_colors`, `product_color_option_links`,
+> `product_variants` and `product_images`, for the template path exactly as
+> for the form. See `docs/TXT_IMPORT_PARITY.md` §7.
+
+> **Correction, 2026-09-08 (second parity round).** The JSON mirror is now a
+> DERIVED artefact: whenever a write carries a relations body, the contract
+> rebuilds `products.options` / `colors` / `images` from the rows that same
+> batch writes (and empties them when the rows are emptied), so the mirror can
+> never outlive the structure it mirrors. It is never taken from the caller.
+>
+> **What "omitted" means, per level, in the relations body** (`PUT
+> /api/admin/products/:id/relations`, and the `relations` field of `POST
+> /api/admin/products-v2`):
+>
+> | Level | Omitted | `[]` / `__CLEAR__` |
+> |---|---|---|
+> | the whole body | the relation tables are not touched at all | — |
+> | `groups`, `colors`, `variants`, `images` | **a full replacement with an empty list** — every stored row of that collection is deleted | the same |
+> | `facet_ids` | preserved | replaced by the empty set |
+> | `inventory_mode` | the stored level is preserved while it still has rows; otherwise derived from where the stock numbers are, with a warning naming both | — |
+> | a text field inside a row (`name_ar`, `name_ckb`, image `alt_ar`/`alt_ckb`/`key`/`source_url`) | preserved | written as `''` |
+>
+> A collection is a replacement, not a merge: every caller in this repository
+> (`relationsToWire` in the form, the TXT bridge, the CSV importer) sends all
+> four keys on every write. Deletions are still subject to the guards — a row
+> holding reserved units refuses the whole save, and a row a live order names
+> is deactivated rather than deleted.
+
 `FIELD_REGISTRY` in `worker/lib/template.ts` is the single source of truth for
 what the TXT template can read and write. The template pipeline is fully
 deterministic — **no AI is involved at any step** (parsing, merging,
@@ -114,7 +152,6 @@ Stored in products.options (JSON); served as `options[]`. Variant picker; option
 | `options.N.active` | bool | no | — | not nullable; omitted = keep | true / false | الخيارات (Options) | `options[].active` | products.options (JSON) | Variant picker; option regular price replaces/moves the base and its surcharge reaches PRIME/PRO; inactive hidden |
 | `options.N.regular_price_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الخيارات (Options) | `options[].regular_price_iqd` | products.options (JSON) | Variant picker; option regular price replaces/moves the base and its surcharge reaches PRIME/PRO; inactive hidden |
 | `options.N.pro_price_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الخيارات (Options) | `options[].pro_price_iqd` | products.options (JSON) | Variant picker; option regular price replaces/moves the base and its surcharge reaches PRIME/PRO; inactive hidden |
-| `options.N.compare_at_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الخيارات (Options) | `options[].compare_at_iqd` | products.options (JSON) | Variant picker; option regular price replaces/moves the base and its surcharge reaches PRIME/PRO; inactive hidden |
 | `options.N.cost_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الخيارات (Options) | `options[].cost_iqd` | products.options (JSON) | NEVER — stripped from public payloads |
 
 ### Repeatable group `colors.N.*` — الألوان / Colors
@@ -127,14 +164,13 @@ Stored in products.colors (JSON); served as `colors[]`. Color picker; colour reg
 | `colors.N.name_ar` | string | yes | ar | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text (single line) | الألوان (Colors) | `colors[].name_ar` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.name_en` | string | no | en | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text (single line) | الألوان (Colors) | `colors[].name_en` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.name_ckb` | string | no | ckb | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text (single line) | الألوان (Colors) | `colors[].name_ckb` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
-| `colors.N.hex` | hex | no | — | empty stays empty; `__CLEAR__` = clear; omitted = keep | #RRGGBB or empty | الألوان (Colors) | `colors[].hex` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
+| `colors.N.hex` | hex | no | — | a real code is required; omitted = keep | #RRGGBB (empty is refused by the save path) | الألوان (Colors) | `colors[].hex` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.image` | string | no | — | empty stays empty; `__CLEAR__` = clear; omitted = keep | free text (single line) | الألوان (Colors) | `colors[].image` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.option_id` | string | no | — | `__NULL__` = null; omitted = keep | free text (single line) | الألوان (Colors) | `colors[].option_id` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.option_index` | int | no | — | not nullable; omitted = keep current value | integer 1..999 | الألوان (Colors) | `colors[].option_index` | products.colors (JSON) | Import-only convenience, resolved to option_id before save |
 | `colors.N.active` | bool | no | — | not nullable; omitted = keep | true / false | الألوان (Colors) | `colors[].active` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.regular_price_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الألوان (Colors) | `colors[].regular_price_iqd` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.pro_price_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الألوان (Colors) | `colors[].pro_price_iqd` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
-| `colors.N.compare_at_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الألوان (Colors) | `colors[].compare_at_iqd` | products.colors (JSON) | Color picker; colour regular price replaces/moves (colour → option → base) and its surcharge reaches PRIME/PRO; inactive hidden |
 | `colors.N.cost_iqd` | iqd | no | — | `__NULL__` = inherit / none; 0 is explicit, never blank; omitted = keep | integer IQD 0..2e9 | الألوان (Colors) | `colors[].cost_iqd` | products.colors (JSON) | NEVER — stripped from public payloads |
 
 ### Repeatable group `spec_groups.N.*` — المواصفات / Specification groups
