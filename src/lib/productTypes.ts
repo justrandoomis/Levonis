@@ -13,8 +13,24 @@ export interface PriceFieldsV2 {
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
   cost_iqd: number | null; // admin-only; absent from public payloads
+  /**
+   * 0044 adjustments — a signed dinar delta on the value the row would
+   * otherwise inherit. Null (or absent) on every row written before 0044.
+   * Mirrors packages/pricing/src/pricing.ts PriceFields.
+   */
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
 }
 
+/**
+ * One option as the ADMIN document carries it. The fields after `active` are
+ * the ones the server's OptionV2 (packages/pricing/src/pricing.ts) declares
+ * for the admin surfaces: the TXT template writes them into the product
+ * document, the overlay copies them from the relational rows, and the editor
+ * reads them when a product has a document but no relation rows yet.
+ */
 export interface OptionV2 extends PriceFieldsV2 {
   id: string;
   name_ar: string;
@@ -23,6 +39,19 @@ export interface OptionV2 extends PriceFieldsV2 {
   image: string;
   order: number;
   active: boolean;
+  /** 0043 — '' or absent = inherit the product's sale types. */
+  availability_type?: '' | 'direct_sale' | 'pre_order';
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  variant_key?: string;
+  variant_label?: string;
+  /** Sellable units at this level; null = this level does not track stock. */
+  stock?: number | null;
+  /** The option GROUP this value belongs to, by English name. */
+  group_en?: string;
+  sku_part?: string;
+  low_stock_threshold?: number | null;
 }
 
 export interface ColorV2 extends PriceFieldsV2 {
@@ -35,6 +64,12 @@ export interface ColorV2 extends PriceFieldsV2 {
   option_id: string | null;
   order: number;
   active: boolean;
+  /** EVERY option this colour is sold with; `option_id` holds it only when
+   *  there is exactly one. */
+  option_ids?: string[];
+  stock?: number | null;
+  low_stock_threshold?: number | null;
+  sku_part?: string;
 }
 
 export interface MediaV2 {
@@ -50,6 +85,11 @@ export interface MediaV2 {
   width: number | null;
   height: number | null;
   source_url: string;
+  /** What the picture is of — at most one is set; '' = general gallery image.
+   *  Carried by the server's MediaV2 since 0048. */
+  option_value_id?: string;
+  color_id?: string;
+  variant_id?: string;
 }
 
 export interface SpecRowV2 {
@@ -154,6 +194,8 @@ export interface ProductDocV2 {
   price_iqd: number;
   pro_price_iqd: number | null;
   prime_price_iqd: number | null;
+  /** Compare-at strikethrough; stored and carried by the editor, no input. */
+  original_price_iqd?: number | null;
   product_cost_iqd: number | null; // admin-only
   /** Legacy scalar kept in sync with sale_types[0]. */
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';

@@ -46,7 +46,8 @@ import { useLanguage } from '../../LanguageContext';
 import { btnPrimary, btnSecondary, inputCls, ErrorBanner } from './ui';
 import { downloadAdminFile, DownloadError } from './download';
 import { readIssueText, readIssueEntry, bucketise, issueWhere, type ImportIssue } from './importIssues';
-import type { ParseResponse, ApplyResponse, ZipParseResponse, DuplicateChoice } from './types';
+import type { ParseResponse, ApplyResponse, ApplySpecReport, ZipParseResponse, DuplicateChoice } from './types';
+import { applyFailure, applyOutcome, verificationLine, type ApplyOutcome, type VerificationWords } from './applyResult';
 
 // ------------------------------------------------------------------ strings
 
@@ -138,6 +139,20 @@ const STRINGS = {
     zipOverLimit: 'ملفات تجاوزت حد الأرشيف ({n}) ولم تُفحص:',
     zipNotTxt: 'مدخلات ليست ‎.txt وتم تجاهلها:',
     zipLocalFailed: 'تعذّر فك ضغط الأرشيف محليًا — نتائج الفحص ظاهرة لكن الاستيراد يحتاج رفع كل ملف على حدة.',
+
+    // The apply result, read back from the database — never from the file.
+    verifyTitle: 'ما حُفظ فعلًا (قراءة من قاعدة البيانات بعد التنفيذ):',
+    verifyUnreported: 'الخادم لم يُبلّغ عن عدّادات القراءة — لا يمكن تأكيد ما حُفظ من هذه الشاشة.',
+    vw: { groups: 'مجموعة', values: 'قيمة', colors: 'لون', links: 'ربط', images: 'صورة', specs: 'مواصفة', outside: 'ظاهرة في النموذج', outsideSection: 'خارج قالب القسم', variants: 'تركيبة', inventory: 'المخزون', unreported: 'بلا عدّادات من الخادم' },
+    mismatched: 'لم يُحفظ قسم:',
+    productExists: 'المنتج موجود:',
+    fieldsLine: 'طُبّق {a} حقلًا · حُفظ كما هو {p} · مُسح {c}',
+    warningsAtApply: 'تنبيهات التنفيذ:',
+    unknownAtApply: 'مفاتيح لم يعرفها القالب ولم تُحفظ:',
+    ackUnknown: 'أفهم أن {n} مفتاحًا غير معروف سيُتجاهل ({keys}) — استورد رغم ذلك',
+    ackRequired: 'الملف يحمل مفاتيح غير معروفة — أكّد تجاهلها أولًا.',
+    openInForm: 'افتح في النموذج',
+    copyId: 'نسخ المعرّف',
 
     lookupsTitle: 'القيم المتاحة لأعمدة التصنيف',
     lookupsHint:
@@ -237,6 +252,19 @@ const STRINGS = {
     zipOverLimit: 'Files past the per-archive limit ({n}) and not checked:',
     zipNotTxt: 'Non-.txt entries, ignored:',
     zipLocalFailed: 'Could not unzip locally — the check results are shown, but importing needs each file uploaded on its own.',
+
+    verifyTitle: 'What was actually stored (read back from the database after the apply):',
+    verifyUnreported: 'The server reported no read-back counts — what was stored cannot be confirmed from this screen.',
+    vw: { groups: 'groups', values: 'values', colors: 'colours', links: 'links', images: 'images', specs: 'spec fields', outside: 'visible in the form', outsideSection: 'outside the section template', variants: 'variants', inventory: 'inventory', unreported: 'no counts from the server' },
+    mismatched: 'Section not stored:',
+    productExists: 'the product exists:',
+    fieldsLine: '{a} fields applied · {p} preserved · {c} cleared',
+    warningsAtApply: 'Apply warnings:',
+    unknownAtApply: 'Keys the template does not define and did not store:',
+    ackUnknown: 'I understand that {n} unknown keys will be ignored ({keys}) — import anyway',
+    ackRequired: 'The file carries unknown keys — acknowledge that they are ignored first.',
+    openInForm: 'Open in form',
+    copyId: 'Copy id',
 
     lookupsTitle: 'Accepted values for the classification columns',
     lookupsHint:
@@ -341,8 +369,19 @@ interface CheckedItem {
   action: 'create' | 'update' | 'blocked';
   images: number;
   issues: ImportIssue[];
+  /** Keys the template does not define. The apply IGNORES them, so the admin
+   *  must acknowledge that before the import button works. */
+  unknownKeys: string[];
   /** TXT only: the file's own text, so the import can re-post it verbatim. */
   text?: string;
+  /**
+   * §7.3 — WHAT THE APPLY WILL DO, said before anything is written.
+   * `/parse` and `/parse-zip` both answer with the spec-sheet report and the
+   * stock level the apply will derive; the check step used to receive them and
+   * render neither, so the admin learned about an outside-template spec id and
+   * a changed inventory level only after the write.
+   */
+  plan?: { specStored: number | null; specVisible: number | null; specOutside: string[]; inventoryMode: string | null };
 }
 
 /** The one shape the report card renders, for all three formats. */
@@ -358,12 +397,15 @@ interface CheckResult {
   txtMode?: 'single' | 'archive';
 }
 
-/** One row of the final result table, for all three formats. */
+/** One row of the final result table, for all three formats. TXT rows carry
+ *  the server's read-back verification; CSV/ZIP rows carry the report line. */
 interface ResultRow {
   key: string;
   name: string;
   action: 'created' | 'updated' | 'skipped' | 'failed';
   detail: string;
+  /** TXT only: the verified outcome (counts, warnings, unknown keys, fields). */
+  outcome?: ApplyOutcome;
 }
 
 /** What an import run answers, whichever lane ran it. */
@@ -411,10 +453,14 @@ function txtName(text: string): string {
 export default function ImportPanel({
   onApplied,
   onDirtyChange,
+  onOpenProduct,
 }: {
   onApplied?: () => void;
   /** Unapplied pasted text is "dirty" for the host dialog. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Offered on every applied row so the admin can verify, in the form, that
+   *  the same two endpoints render what the result table counted. */
+  onOpenProduct?: (productId: string) => void;
 }) {
   const { lang } = useLanguage();
   const t = pickStrings(lang);
@@ -429,6 +475,9 @@ export default function ImportPanel({
   const [check, setCheck] = useState<CheckResult | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [duplicates, setDuplicates] = useState<string[]>([]);
+  // Unknown keys are dropped by the apply. Importing over them is a decision
+  // the admin takes explicitly, per check — never a default.
+  const [ackUnknown, setAckUnknown] = useState(false);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -457,6 +506,7 @@ export default function ImportPanel({
     setCheck(null);
     setResult(null);
     setDuplicates([]);
+    setAckUnknown(false);
   }, []);
 
   const options = useMemo(
@@ -522,6 +572,7 @@ export default function ImportPanel({
     setNote(null);
     setResult(null);
     setDuplicates([]);
+    setAckUnknown(false);
     if (isTable && !sectionId) { setErr(t.pickSectionFirst); return; }
     if (!file && !pasted.trim()) { setErr(t.pickFileFirst); return; }
     setBusy('check');
@@ -551,6 +602,7 @@ export default function ImportPanel({
       (i) => i.action !== 'blocked' && (!dupChoice || duplicates.includes(i.id))
     );
     if (ready.length === 0) { setErr(t.nothingToApply); return; }
+    if (unknownKeysPending.length > 0 && !ackUnknown) { setErr(t.ackRequired); return; }
     setBusy('confirm');
     setErr(null);
     setDuplicates([]);
@@ -582,7 +634,12 @@ export default function ImportPanel({
   // rows the check accepted and leaves the rest, and refusing the whole file
   // would make one bad row hold ninety-nine good ones hostage. What the check
   // guarantees is that nothing is imported before the admin has seen this.
-  const canImport = importable > 0;
+  // Unknown keys the apply would ignore, across the rows that would be
+  // imported. The TXT lane is the one whose keys the server reports per file.
+  const unknownKeysPending = check
+    ? [...new Set(check.items.filter((i) => i.action !== 'blocked').flatMap((i) => i.unknownKeys))]
+    : [];
+  const canImport = importable > 0 && (unknownKeysPending.length === 0 || ackUnknown);
 
   return (
     <div className="min-w-0 text-sm" data-panel="import-v2">
@@ -785,6 +842,21 @@ export default function ImportPanel({
 
           <ItemTable items={check.items} t={t} />
 
+          {unknownKeysPending.length > 0 && (
+            <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200 cursor-pointer" data-import="ack-unknown">
+              <input
+                type="checkbox"
+                className="mt-0.5 shrink-0"
+                checked={ackUnknown}
+                onChange={(e) => setAckUnknown(e.target.checked)}
+                data-import="ack-unknown-input"
+              />
+              <span className="break-words">
+                {fill(t.ackUnknown, { n: unknownKeysPending.length, keys: unknownKeysPending.slice(0, 8).join(', ') + (unknownKeysPending.length > 8 ? ', …' : '') })}
+              </span>
+            </label>
+          )}
+
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
             <button
               type="button"
@@ -834,7 +906,7 @@ export default function ImportPanel({
           <p className="text-xs text-zinc-200 mb-2 font-bold">
             {fill(t.summary, { c: result.summary.created, u: result.summary.updated, s: result.summary.skipped, f: result.summary.failed })}
           </p>
-          <ResultTable rows={result.rows} t={t} />
+          <ResultTable rows={result.rows} t={t} onOpenProduct={onOpenProduct} />
           {(result.review?.length ?? 0) > 0 && (
             <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
               <p className="text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1">
@@ -879,6 +951,7 @@ async function checkTable(file: File, sectionId: string): Promise<CheckResult> {
       name: r.name,
       action: r.action === 'failed' ? 'blocked' : r.action,
       images: r.images,
+      unknownKeys: [],
       issues: [
         ...r.errors.map((m) => readIssueText(m, { product: r.key, severity: 'error', columns })),
         ...r.warnings.map((m) => readIssueText(m, { product: r.key, severity: 'warning', columns })),
@@ -910,6 +983,18 @@ async function applyTable(importId: string, t: Strings, note: (m: string) => voi
  * is ALSO unzipped locally, because /apply takes the template text and the
  * server's per-file results do not carry it back.
  */
+/** The pre-flight statement of a parse answer, or null when the server said
+ *  nothing — never a zero the server did not state. */
+function planOf(spec: ApplySpecReport | null | undefined, mode: string | undefined): CheckedItem['plan'] {
+  if (!spec && !mode) return undefined;
+  return {
+    specStored: typeof spec?.stored === 'number' ? spec.stored : null,
+    specVisible: typeof spec?.visible_in_form === 'number' ? spec.visible_in_form : null,
+    specOutside: Array.isArray(spec?.outside_section) ? spec!.outside_section : [],
+    inventoryMode: mode ?? null,
+  };
+}
+
 async function checkTxt(file: File | null, pasted: string, t: Strings): Promise<CheckResult> {
   if (file && file.name.toLowerCase().endsWith('.zip')) return checkTxtArchive(file, t);
 
@@ -937,8 +1022,10 @@ async function checkTxt(file: File | null, pasted: string, t: Strings): Promise<
         name: txtName(text),
         action: blocked ? 'blocked' : res.is_create ? 'create' : 'update',
         images: countTxtImages(text),
+        unknownKeys: res.unknown_keys ?? [],
         issues,
         text,
+        plan: planOf(res.spec_fields, res.inventory_mode),
       },
     ],
   };
@@ -996,12 +1083,17 @@ async function checkTxtArchive(file: File, t: Strings): Promise<CheckResult> {
       name,
       action: ok ? (f.is_create === false ? 'update' : 'create') : 'blocked',
       images: countTxtImages(text),
+      unknownKeys: f.unknown_keys ?? [],
       issues,
       text,
+      plan: planOf(f.spec_fields, f.inventory_mode),
     };
   });
 
-  return { format: 'txt', txtMode: 'archive', unknownColumns: [], notes, fileIssues: [], items };
+  // The archive's unknown keys, so the check report names them like the
+  // single-file lane does instead of hiding them inside each file.
+  const unknownColumns = [...new Set(items.flatMap((i) => i.unknownKeys))];
+  return { format: 'txt', txtMode: 'archive', unknownColumns, notes, fileIssues: [], items };
 }
 
 /**
@@ -1019,6 +1111,12 @@ async function applyTxt(ready: CheckedItem[], t: Strings, choice: DuplicateChoic
       summary.failed += 1;
       continue;
     }
+    // The row is what the server READ BACK, never what the file said: a 200
+    // whose `mismatches` is non-empty is a failure named by section, and the
+    // counts shown come from `relations` / `spec_fields` / `images` of the
+    // response (applyResult.ts), so "0 groups" is only ever written when the
+    // server stated 0.
+    let outcome: ApplyOutcome;
     try {
       const out = await api.post<ApplyResponse>('/api/admin/template/apply', {
         text: item.text,
@@ -1026,23 +1124,13 @@ async function applyTxt(ready: CheckedItem[], t: Strings, choice: DuplicateChoic
         confirm: true,
         duplicate_choice: choice,
       });
-      const action = out.created ? 'created' : 'updated';
-      rows.push({
-        key: item.id,
-        name: item.name,
-        action,
-        detail: out.already_applied ? t.alreadyApplied : out.product_id,
-      });
-      if (out.already_applied) summary.skipped += 1;
-      else summary[action] += 1;
+      outcome = applyOutcome(out, { alreadyApplied: t.alreadyApplied, mismatched: t.mismatched });
     } catch (e) {
-      const code = e instanceof ApiError ? e.code : '';
-      const detail =
-        code === 'DUPLICATE' ? t.dupTitle : code === 'APPLY_IN_PROGRESS' ? t.inProgress : e instanceof ApiError ? e.message : String(e);
-      rows.push({ key: item.id, name: item.name, action: 'failed', detail });
-      summary.failed += 1;
-      if (code === 'DUPLICATE') duplicates.push(item.id);
+      outcome = applyFailure(e, { duplicate: t.dupTitle, inProgress: t.inProgress, productExists: t.productExists });
+      if (e instanceof ApiError && e.code === 'DUPLICATE') duplicates.push(item.id);
     }
+    rows.push({ key: item.id, name: item.name, action: outcome.action, detail: outcome.detail, outcome });
+    summary[outcome.action] += 1;
   }
   return { summary, rows, duplicates, review: undefined as string[] | undefined, importId: undefined as string | undefined };
 }
@@ -1142,6 +1230,23 @@ function IssueList({ title, issues, t, tone }: { title: string; issues: ImportIs
   );
 }
 
+/** «5 spec fields (3 visible in the form) · outside the section template: 2
+ *  (made_up_a, made_up_b) · inventory OPTION» — the check step's half of the
+ *  same sentence the result row prints after the write, in the same words. */
+function planLine(p: NonNullable<CheckedItem['plan']>, t: Strings): string {
+  const w = t.vw as VerificationWords;
+  const parts: string[] = [];
+  if (p.specStored !== null) {
+    parts.push(
+      `${p.specStored} ${w.specs}` +
+        (p.specVisible !== null && p.specVisible !== p.specStored ? ` (${p.specVisible} ${w.outside})` : '')
+    );
+  }
+  if (p.specOutside.length > 0) parts.push(`${w.outsideSection}: ${p.specOutside.length} (${p.specOutside.join(', ')})`);
+  if (p.inventoryMode) parts.push(`${w.inventory} ${p.inventoryMode}`);
+  return parts.join(' · ');
+}
+
 function ItemTable({ items, t }: { items: CheckedItem[]; t: Strings }) {
   if (items.length === 0) return null;
   return (
@@ -1157,6 +1262,9 @@ function ItemTable({ items, t }: { items: CheckedItem[]; t: Strings }) {
                 {i.action === 'blocked' ? t.blockedRow : i.action === 'create' ? t.create : t.update}
               </td>
               <td className="py-1 text-zinc-500" dir="ltr">{i.images} img</td>
+              <td className="py-1 ps-2 text-zinc-500" dir="ltr" data-import-plan={i.plan ? 'reported' : 'none'}>
+                {i.plan ? planLine(i.plan, t) : ''}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -1165,7 +1273,7 @@ function ItemTable({ items, t }: { items: CheckedItem[]; t: Strings }) {
   );
 }
 
-function ResultTable({ rows, t }: { rows: ResultRow[]; t: Strings }) {
+function ResultTable({ rows, t, onOpenProduct }: { rows: ResultRow[]; t: Strings; onOpenProduct?: (id: string) => void }) {
   if (rows.length === 0) return null;
   const word = { created: t.created, updated: t.updated, skipped: t.skipped, failed: t.failed };
   const tone = { created: 'text-emerald-300', updated: 'text-emerald-300', skipped: 'text-amber-300', failed: 'text-red-300' };
@@ -1174,16 +1282,79 @@ function ResultTable({ rows, t }: { rows: ResultRow[]; t: Strings }) {
       <table className="w-full text-[11px] border-collapse min-w-[24rem]">
         <tbody>
           {rows.map((r, i) => (
-            <tr key={`${r.key}-${i}`} className="border-t border-zinc-800/60 align-top">
-              <td className="py-1 pe-2 font-mono text-zinc-300"><span dir="ltr">{r.key}</span></td>
-              <td className="py-1 pe-2 text-zinc-300"><span dir="ltr">{r.name}</span></td>
-              <td className={`py-1 pe-2 font-bold ${tone[r.action]}`}>{word[r.action]}</td>
-              <td className="py-1 text-zinc-400 break-words">{r.detail}</td>
-            </tr>
+            <React.Fragment key={`${r.key}-${i}`}>
+              <tr className="border-t border-zinc-800/60 align-top" data-import-row={r.action}>
+                <td className="py-1 pe-2 font-mono text-zinc-300"><span dir="ltr">{r.key}</span></td>
+                <td className="py-1 pe-2 text-zinc-300"><span dir="ltr">{r.name}</span></td>
+                <td className={`py-1 pe-2 font-bold ${tone[r.action]}`}>{word[r.action]}</td>
+                <td className="py-1 text-zinc-400 break-words">
+                  <span dir="auto">{r.detail}</span>
+                  {onOpenProduct && r.outcome?.productId && (
+                    <button
+                      type="button"
+                      className="ms-2 underline text-violet-300 hover:text-white"
+                      onClick={() => onOpenProduct(r.outcome!.productId)}
+                      data-import="open-product"
+                    >
+                      {t.openInForm}
+                    </button>
+                  )}
+                </td>
+              </tr>
+              {r.outcome && <OutcomeDetails o={r.outcome} t={t} />}
+            </React.Fragment>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Under each TXT row: the read-back counts (or the honest "unreported"), the
+ * apply-time warnings and unknown keys, and the applied / preserved / cleared
+ * tallies. Nothing here is computed from the file text.
+ */
+function OutcomeDetails({ o, t }: { o: ApplyOutcome; t: Strings }) {
+  const v = o.verify;
+  const line = verificationLine(v, t.vw as VerificationWords);
+  const hasFields = o.appliedFields.length + o.preservedFields.length + o.clearedFields.length > 0;
+  return (
+    <tr className="align-top" data-import-outcome={o.action}>
+      <td colSpan={4} className="pb-2 ps-2">
+        <div className="text-[10.5px] text-zinc-400 space-y-0.5">
+          <p data-import-verify={v.reported ? 'reported' : 'unreported'}>
+            <span className="text-zinc-500">{t.verifyTitle} </span>
+            <span dir="ltr" className={v.reported ? 'text-zinc-200' : 'text-amber-300'}>{line}</span>
+            {v.reported && v.spec_outside.length > 0 && (
+              <span className="text-amber-300" dir="ltr"> — {t.vw.outsideSection}: {v.spec_outside.length} ({v.spec_outside.join(', ')})</span>
+            )}
+          </p>
+          {!v.reported && o.action !== 'failed' && <p className="text-amber-300">{t.verifyUnreported}</p>}
+          {hasFields && (
+            <p dir="auto">{fill(t.fieldsLine, { a: o.appliedFields.length, p: o.preservedFields.length, c: o.clearedFields.length })}</p>
+          )}
+          {o.unknownKeys.length > 0 && (
+            <p className="text-amber-300" data-import-unknown-keys>
+              {t.unknownAtApply} <span dir="ltr">{o.unknownKeys.join(', ')}</span>
+            </p>
+          )}
+          {o.issues.length > 0 && (
+            <ul className="text-red-300 list-disc ms-4" data-import-apply-issues>
+              {o.issues.map((m, n) => <li key={n} dir="auto" className="break-words">{m}</li>)}
+            </ul>
+          )}
+          {o.warnings.length > 0 && (
+            <>
+              <p className="text-zinc-500">{t.warningsAtApply}</p>
+              <ul className="text-amber-200/90 list-disc ms-4" data-import-apply-warnings>
+                {o.warnings.map((w, n) => <li key={n} dir="auto" className="break-words">{w}</li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
 

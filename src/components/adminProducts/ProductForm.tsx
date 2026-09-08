@@ -22,20 +22,38 @@
  * translator on the server, and the fields it could not translate come back in
  * `translation_review_needed` and are shown honestly after saving.
  *
- * TWO ENDPOINTS, ONE SAVE. The document goes to /api/admin/products-v2 and the
- * structure to /api/admin/products/:id/relations. A new product must exist
- * before its structure can reference it, so the document is saved first and the
- * relations immediately after; a failure in the second step is reported as
- * exactly that, never as a whole-form failure.
+ * ONE REQUEST, ONE SAVE. The document AND the structure go to
+ * /api/admin/products-v2 in a single POST (`relations` beside the document
+ * fields), because the server plans both into ONE `db.batch`
+ * (worker/lib/productPersistence.ts). Saving them in two requests is what left
+ * a bare product row behind whenever the structure was refused by a rule only
+ * the server knows — a cross-store SKU, an id owned by another product, the
+ * price ladder, reserved stock — while the TXT apply refused the whole thing
+ * and rolled its create back. Now both surfaces behave the same way: either
+ * the product and its options, colours and pictures land together, or nothing
+ * does and the refusal names the row (docs/TXT_IMPORT_PARITY.md).
+ *
+ * The structure the form SHOWS afterwards is still read back from
+ * /api/admin/products/:id/relations — the rows, never an echo.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
+import { refusalIssues } from './applyResult';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
-import { blankDoc, toEditorDoc, type EditorDoc, type ProductResponse, type SaveResponse } from './types';
+import {
+  blankDoc,
+  importedTexts,
+  preservedGroups,
+  specIdsOutsideTemplate,
+  toEditorDoc,
+  type EditorDoc,
+  type ProductResponse,
+  type SaveResponse,
+} from './types';
 import PinnedPriceNotice from './PinnedPriceNotice';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
@@ -55,7 +73,9 @@ import {
 } from './form/formUi';
 import {
   emptyRelations,
+  hydrateRelations,
   relationsFromWire,
+  type RelationsResponse,
   relationsToWire,
   summarize,
   validateForm,
@@ -138,6 +158,9 @@ export default function ProductForm({
   const [brands, setBrands] = useState<BrandV2[]>([]);
   const [catalogs, setCatalogs] = useState<CatalogNode[]>([]);
   const [tplGroups, setTplGroups] = useState<TemplateGroup[]>([]);
+  // The family the chosen section resolves to — shown beside the stored one
+  // when they differ, never written over it silently.
+  const [sectionFamily, setSectionFamily] = useState<string | null>(null);
   const [brandSearch, setBrandSearch] = useState('');
   // Quick-add of a section / sub-section / brand from inside the form (the
   // same rows the التصنيفات page manages), selected on creation.
@@ -286,10 +309,13 @@ export default function ProductForm({
     try {
       const [p, r] = await Promise.all([
         api.get<ProductResponse>(`/api/admin/products-v2/${id}`),
-        api.get<Parameters<typeof relationsFromWire>[0]>(`/api/admin/products/${id}/relations`),
+        api.get<RelationsResponse>(`/api/admin/products/${id}/relations`),
       ]);
       const d = toEditorDoc(p.product);
-      const rs = relationsFromWire(r);
+      // Rows when they exist, else the document's own options / colours /
+      // media — the precedence the storefront sells by. A product whose
+      // structure lives only in the document is shown, and told so.
+      const rs = hydrateRelations(r, p.product);
       setDoc(d);
       setRel(rs);
       setLoadedUpdatedAt(p.product.updated_at ?? '');
@@ -320,6 +346,7 @@ export default function ProductForm({
     const id = doc.sub_category_id || doc.category_id;
     if (!id) {
       setTplGroups([]);
+      setSectionFamily(null);
       return;
     }
     let alive = true;
@@ -330,24 +357,39 @@ export default function ProductForm({
         );
         if (!alive) return;
         setTplGroups(res.groups ?? []);
-        if (res.template_family && res.template_family !== doc.template_family) {
-          setDoc((d) => ({ ...d, template_family: res.template_family }));
+        setSectionFamily(res.template_family ?? null);
+        // The section's family FILLS an empty template_family. It never
+        // overwrites a stored one silently (a TXT file's value used to vanish
+        // the moment the form opened): a mismatch is shown beside the field,
+        // with the section's family one click away.
+        if (res.template_family) {
+          setDoc((d) => (d.template_family ? d : { ...d, template_family: res.template_family }));
         }
       } catch {
-        if (alive) setTplGroups([]);
+        if (alive) {
+          setTplGroups([]);
+          setSectionFamily(null);
+        }
       }
     })();
     return () => {
       alive = false;
     };
-  }, [doc.category_id, doc.sub_category_id, doc.template_family]);
+  }, [doc.category_id, doc.sub_category_id]);
 
   // ------------------------------------------------------------- derived
 
-  const roots = useMemo(() => catalogs.filter((c) => !c.parent_id && c.active), [catalogs]);
-  const children = useMemo(
-    () => catalogs.filter((c) => c.parent_id === doc.category_id && c.active),
+  // The section a product ALREADY carries stays in its list even when it was
+  // deactivated (as the brand select below does): otherwise an imported
+  // product filed under an inactive section opens as «— اختر —» and the next
+  // save files it nowhere.
+  const roots = useMemo(
+    () => catalogs.filter((c) => !c.parent_id && (c.active || c.id === doc.category_id)),
     [catalogs, doc.category_id]
+  );
+  const children = useMemo(
+    () => catalogs.filter((c) => (c.parent_id === doc.category_id && c.active) || (!!doc.sub_category_id && c.id === doc.sub_category_id)),
+    [catalogs, doc.category_id, doc.sub_category_id]
   );
   const filteredBrands = useMemo(() => {
     // Sections were already filtered to the active ones; brands
@@ -367,9 +409,16 @@ export default function ProductForm({
   // Extended warranty is a PRINTER's option (owner mandate): the block shows,
   // and the server accepts plans, only when the chosen section or sub-section
   // is a printer catalog — the same flag worker/lib/printerIdentity.ts reads.
+  // The same answer the server gives (worker/lib/warrantyPlans.ts
+  // catalogsArePrinter): the section pair AND the catalogs list.
   const isPrinterCatalog = useMemo(
-    () => catalogs.some((c) => (c.id === doc.category_id || c.id === doc.sub_category_id) && c.is_printer_catalog),
-    [catalogs, doc.category_id, doc.sub_category_id]
+    () =>
+      catalogs.some(
+        (c) =>
+          c.is_printer_catalog &&
+          (c.id === doc.category_id || c.id === doc.sub_category_id || doc.catalog_ids.includes(c.id))
+      ),
+    [catalogs, doc.category_id, doc.sub_category_id, doc.catalog_ids]
   );
   const warrantyInput = useMemo(
     () => ({
@@ -500,38 +549,43 @@ export default function ProductForm({
     setSaveErr(null);
     setSaveNote(null);
     try {
+      // The document WITHOUT its derived copies of the structure: `options`,
+      // `colors` and `media` have no editor here, and the server rebuilds the
+      // product's JSON mirror from the rows this same request writes. Sending
+      // the copy the form happened to be holding is how a deleted option came
+      // back the next time the product was read.
+      const { options: _o, colors: _c, media: _m, ...docFields } = next as EditorDoc & Record<string, unknown>;
+      void _o; void _c; void _m;
       const body: Record<string, unknown> = {
-        ...next,
+        ...docFields,
+        relations: relationsToWire(rel),
         expected_updated_at: loadedUpdatedAt || undefined,
       };
-      const res = await api.post<SaveResponse & { translation_review_needed?: string[] }>(
+      const res = await api.post<SaveResponse & { translation_review_needed?: string[]; warnings?: string[] }>(
         '/api/admin/products-v2',
         body
       );
       const savedId = res.product?.id ?? next.id;
       setReviewNeeded(res.translation_review_needed ?? []);
 
-      // The structure needs the product to exist, so it always follows.
-      try {
-        const rres = await api.put<Parameters<typeof relationsFromWire>[0] & { errors?: string[] }>(
-          `/api/admin/products/${savedId}/relations`,
-          relationsToWire(rel)
-        );
-        setRel(relationsFromWire(rres));
-      } catch (e) {
-        // The product IS saved. Saying otherwise would be a lie, and the admin
-        // would re-save and create a duplicate.
-        setSaveNote(
-          `حُفظ المنتج، لكن تعذّر حفظ الخيارات/الصور: ${
-            e instanceof ApiError ? e.message : 'خطأ غير معروف'
-          }. أعد المحاولة من هذه الصفحة.`
-        );
-      }
+      // WHAT THE FORM SHOWS AFTER A SAVE IS A READ-BACK, NOT THE ECHO.
+      // The save answers with the product document; the structure is read from
+      // the same endpoint the form LOADS from, so the picture list, the
+      // variants and the stock level are the stored rows rather than a partial
+      // echo. The ROWS, not the document: falling back to the document's JSON
+      // copy here would resurrect an option or a picture just deleted.
+      const fresh = await api.get<RelationsResponse>(`/api/admin/products/${savedId}/relations`);
+      const savedRel = relationsFromWire(fresh);
+      setRel(savedRel);
+      if ((res.warnings?.length ?? 0) > 0) setSaveNote(res.warnings!.join(' · '));
 
-      const fresh = res.product ? toEditorDoc(res.product) : next;
-      setDoc(fresh);
+      const freshDoc = res.product ? toEditorDoc(res.product) : next;
+      setDoc(freshDoc);
       setLoadedUpdatedAt(res.product?.updated_at ?? loadedUpdatedAt);
-      setBaseline(JSON.stringify({ d: fresh, rs: rel }));
+      // The baseline is what the SERVER now holds — document and structure —
+      // so the form is clean after a save instead of showing the read-back's
+      // own normalisation (sort numbers, derived stock level) as unsaved work.
+      setBaseline(JSON.stringify({ d: freshDoc, rs: savedRel }));
       setShowErrors(false);
       onListChanged();
       if (!productId && savedId) {
@@ -539,7 +593,15 @@ export default function ProductForm({
         void loadProduct(savedId);
       }
     } catch (e) {
-      setSaveErr(e instanceof ApiError ? e.message : 'فشل الحفظ / save failed');
+      // THE ROW-LEVEL REASONS REACH THE ADMIN. A refused structure answers
+      // `{ code: 'VALIDATION', errors: ['colors[0].hex: must be #RGB or
+      // #RRGGBB'] }` with no `error` key, so `api.ts` can only build «Server
+      // error (400)». Reading the body's own lines — the same helper the
+      // import window uses — is the difference between "something failed" and
+      // "this row was rejected, for this reason".
+      const lines = e instanceof ApiError ? refusalIssues((e.body ?? e.details ?? {}) as Parameters<typeof refusalIssues>[0]) : [];
+      const base = e instanceof ApiError ? e.message : 'فشل الحفظ / save failed';
+      setSaveErr(lines.length ? `${base}: ${lines.join(' · ')}` : base);
     } finally {
       setSaving(false);
     }
@@ -591,6 +653,22 @@ export default function ProductForm({
   });
 
   const valueCount = rel.groups.reduce((n, g) => n + g.values.length, 0);
+  const imported = importedTexts(doc);
+  const preserved = preservedGroups(doc);
+  const templateFieldIds = tplGroups.flatMap((g) => g.fields.map((f) => f.id));
+  const outsideSpecs = specIdsOutsideTemplate(doc.spec_fields, templateFieldIds);
+  // A spec key whose value is empty is not a stored spec: it is a field the
+  // admin cleared, and counting it kept the badge one ahead of the truth.
+  const storedSpecCount = Object.values(doc.spec_fields ?? {}).filter((v) => (v ?? '').trim() !== '').length;
+  const familyMismatch = !!sectionFamily && !!doc.template_family && sectionFamily !== doc.template_family;
+  // The catalog placements that are not already visible as the section pair.
+  const extraCatalogs = doc.catalog_ids
+    .filter((id) => id !== doc.category_id && id !== doc.sub_category_id)
+    .map((id) => catalogs.find((c) => c.id === id)?.name_ar || catalogs.find((c) => c.id === id)?.name_en || id);
+  const activeTransportsHidden = !doc.sale_types.includes('pre_order') && doc.preorder_transports.some((o) => o.active);
+  const surchargeHidden = !doc.sale_types.includes('direct_sale') && doc.direct_surcharge_iqd !== null;
+  const warrantyHiddenValues =
+    !isPrinterCatalog && doc.warranty_plans.length === 0 && (doc.warranty_base_months !== null || doc.serialized !== null);
 
   return (
     // min-w-0 on the outer column is what keeps a long value from widening the
@@ -620,6 +698,15 @@ export default function ProductForm({
 
       {saveErr && <Banner kind="error">{saveErr}</Banner>}
       {saveNote && <Banner kind="warn">{saveNote}</Banner>}
+      {(rel.hydration_issues?.length ?? 0) > 0 && (
+        <div data-form="hydration-issues">
+          <Banner kind="warn">
+            {rel.hydration_issues!.map((m, i) => (
+              <div key={i}>{m}</div>
+            ))}
+          </Banner>
+        </div>
+      )}
       {reviewNeeded.length > 0 && (
         <Banner kind="warn">
           حُفظ المنتج. لم يستطع المترجم المحلي ترجمة {reviewNeeded.length} حقلًا بأمان، فبقيت بالإنجليزية وعُلّمت
@@ -821,12 +908,35 @@ export default function ProductForm({
           <Field
             ar="القالب"
             en="Template"
-            hint="يُشتق من القسم"
-            tip="القالب يحدد حقول المواصفات وأعمدة الاستيراد. يأتي من إعداد القسم في شجرة الأقسام."
+            hint={familyMismatch ? `القسم المختار يشتق «${sectionFamily}» بينما المنتج يحمل «${doc.template_family}»` : 'يُشتق من القسم'}
+            tip="القالب يحدد حقول المواصفات وأعمدة الاستيراد. يأتي من إعداد القسم في شجرة الأقسام. قيمة محفوظة (من ملف مثلًا) لا تُستبدل تلقائيًا."
           >
-            <TextInput value={doc.template_family ?? ''} readOnly placeholder="—" />
+            <div className="flex gap-1.5 min-w-0">
+              <TextInput value={doc.template_family ?? ''} readOnly placeholder="—" data-form="template-family" />
+              {familyMismatch && (
+                <button
+                  type="button"
+                  className={`${btnGhost} shrink-0 text-[11px]`}
+                  onClick={() => setDoc((d) => ({ ...d, template_family: sectionFamily }))}
+                  data-form="adopt-section-family"
+                >
+                  اعتمد قالب القسم
+                </button>
+              )}
+            </div>
           </Field>
         </Grid>
+        {/* The catalogs the product is filed under (`product_catalogs`). The
+            form has no picker for them — they are set from the catalogs page
+            and by the TXT template — so it SHOWS them: they decide the printer
+            warranty block and the storefront's shelves, and a product that
+            silently listed none was the reason an imported product looked
+            unfiled. */}
+        {extraCatalogs.length > 0 && (
+          <p className="text-[11px] text-zinc-400 mt-2" data-form="catalogs-preserved">
+            كتالوجات محفوظة: {extraCatalogs.join('، ')} — تُدار من صفحة التصنيفات أو عبر القالب النصي.
+          </p>
+        )}
       </SectionCard>
 
       {quickAdd && (
@@ -873,6 +983,25 @@ export default function ProductForm({
               onChange={(e) => setDoc((d) => ({ ...d, description_en: e.target.value }))}
             />
           </Field>
+          {imported.length > 0 && (
+            <Field
+              ar="نصوص محفوظة (عربي / كردي)"
+              en="Imported texts"
+              hint="مخزّنة كما وردت من القالب النصي — لا مدخل لها في هذا النموذج"
+              span
+            >
+              <div className="space-y-1 rounded-lg border border-zinc-800 bg-zinc-800/30 p-2" data-form="imported-texts">
+                {imported.map((r) => (
+                  <div key={r.key} className="text-[12px] min-w-0">
+                    <span className="text-zinc-500">{r.label}: </span>
+                    <span className="text-zinc-200 break-words" dir="auto">
+                      {r.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Field>
+          )}
           <Field ar="SKU" en="SKU" hint="اختياري">
             <TextInput value={doc.sku ?? ''} onChange={(e) => setDoc((d) => ({ ...d, sku: e.target.value || null }))} />
           </Field>
@@ -948,6 +1077,16 @@ export default function ProductForm({
             </Field>
           )}
         </Grid>
+
+        {/* Stored by the template as `original_price_iqd` (the struck-through
+            "was" price). No input here by design — but it is stored, it is
+            carried by every save, and it is shown so it is never mistaken for
+            a value the import lost. */}
+        {doc.original_price_iqd !== null && doc.original_price_iqd !== undefined && (
+          <p className="text-[11px] text-zinc-400 mb-3" data-form="original-price-preserved">
+            السعر قبل التخفيض المحفوظ: {formatIqd(doc.original_price_iqd)} — يُعدَّل عبر القالب النصي.
+          </p>
+        )}
 
         {/* The answer to "I changed the price and the cart still charges the
             old one". It appears the moment the base moves away from what this
@@ -1046,6 +1185,16 @@ export default function ProductForm({
             </Grid>
           </div>
         )}
+        {surchargeHidden && (
+          <p className="text-[11px] text-amber-300 mb-3" data-form="surcharge-preserved">
+            زيادة البيع المباشر المحفوظة {formatIqd(doc.direct_surcharge_iqd as number)} — تظهر للتعديل عند تفعيل «بيع مباشر»، وتبقى محفوظة كما هي.
+          </p>
+        )}
+        {activeTransportsHidden && (
+          <p className="text-[11px] text-amber-300 mb-3" data-form="transports-preserved">
+            طرق طلب مسبق مفعّلة محفوظة ({doc.preorder_transports.filter((o) => o.active).map((o) => TRANSPORTS.find((t) => t.method === o.method)?.ar ?? o.method).join('، ')}) — تظهر للتعديل عند تفعيل «طلب مسبق».
+          </p>
+        )}
         {doc.sale_types.includes('pre_order') && (
           <div className="mb-3 min-w-0">
             <div className="text-[12px] font-bold text-zinc-300 mb-1.5">
@@ -1110,6 +1259,18 @@ export default function ProductForm({
             device coverage they rest on. Hidden for anything that is not
             filed under a printer catalog; a non-printer that still carries
             plans is told the save will be refused and offered a clear. */}
+        {warrantyHiddenValues && (
+          <p className="text-[11px] text-zinc-400 mb-3" data-form="warranty-preserved">
+            محفوظ من الملف: {doc.warranty_base_months !== null ? `ضمان أساسي ${doc.warranty_base_months} شهرًا` : ''}
+            {doc.warranty_base_months !== null && doc.serialized !== null ? ' · ' : ''}
+            {doc.serialized !== null ? (doc.serialized ? 'جهاز مُرقَّم' : 'بلا تسجيل وحدات') : ''} — محرره يظهر لأقسام الطابعات فقط.
+          </p>
+        )}
+        {doc.payment_options.length > 0 && (
+          <p className="text-[11px] text-zinc-400 mb-3" data-form="payment-options-preserved">
+            خيارات الدفع المحفوظة: <span dir="ltr">{doc.payment_options.join(', ')}</span> — تُعدَّل عبر القالب النصي.
+          </p>
+        )}
         <WarrantySection
           isPrinter={isPrinterCatalog}
           plans={doc.warranty_plans}
@@ -1185,17 +1346,24 @@ export default function ProductForm({
         count={Object.keys(doc.spec_fields ?? {}).length + doc.usage_guide.steps.length}
         summary={summarize([
           tplGroups.length === 0
-            ? 'اختر قسمًا لعرض حقول القالب'
+            ? storedSpecCount > 0
+              ? `${storedSpecCount} مواصفة محفوظة بلا قالب قسم`
+              : 'اختر قسمًا لعرض حقول القالب'
             : `${tplGroups.reduce((n, g) => n + g.fields.length, 0)} حقل`,
+          storedSpecCount > 0 && tplGroups.length > 0 ? `${storedSpecCount} مواصفة محفوظة` : undefined,
+          outsideSpecs.length > 0 ? `${outsideSpecs.length} خارج القالب` : undefined,
           doc.usage_guide.steps.length ? `${doc.usage_guide.steps.length} خطوة دليل` : undefined,
+          preserved.length > 0 ? preserved.map((g) => `${g.count} ${g.label}`).join(' · ') : undefined,
         ])}
         {...section(7)}
       >
-        {tplGroups.length === 0 ? (
+        {tplGroups.length === 0 && (
           <p className="text-[12px] text-zinc-500 mb-3">
             حقول المواصفات تتبع القسم والقالب. اختر القسم الرئيسي في القسم رقم 1 لتظهر هنا.
+            {storedSpecCount > 0 ? ' المواصفات المحفوظة معروضة أدناه حتى بلا قالب.' : ''}
           </p>
-        ) : (
+        )}
+        {tplGroups.length > 0 && (
           <div className="space-y-4 mb-4">
             {tplGroups.map((g) => (
               <div key={g.id} className="min-w-0">
@@ -1244,6 +1412,68 @@ export default function ProductForm({
                     </Field>
                   ))}
                 </Grid>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Stored spec ids the section's template does not declare: a TXT file
+            may state any `spec.<id>`, and hiding a stored value behind the
+            section's field list is exactly the loss this form used to have.
+            Shown editable; an emptied value is deleted by the server. */}
+        {outsideSpecs.length > 0 && (
+          <div className="min-w-0 mb-4" data-form="spec-outside-template">
+            <h4 className="text-[13px] font-bold text-zinc-300 mb-2 truncate">
+              مواصفات محفوظة خارج قالب هذا القسم{' '}
+              <span className="text-[11px] font-medium text-zinc-500">Stored spec fields outside the section template</span>
+            </h4>
+            <Grid cols={2}>
+              {outsideSpecs.map((id) => (
+                <Field key={id} ar={id} en="Outside this section's template" hint="أفرغ القيمة لحذف الحقل">
+                  <TextInput
+                    value={doc.spec_fields?.[id] ?? ''}
+                    onChange={(e) =>
+                      setDoc((d) => {
+                        // THE HINT IS TRUE. Emptying the input used to store
+                        // the key with an empty value: the field came back on
+                        // every reload, the section badge kept counting it and
+                        // the apply kept reporting it. Clearing DELETES the
+                        // key, which is what "أفرغ القيمة لحذف الحقل" says.
+                        const rest = { ...d.spec_fields };
+                        delete rest[id];
+                        return { ...d, spec_fields: e.target.value ? { ...rest, [id]: e.target.value } : rest };
+                      })
+                    }
+                    data-spec-outside={id}
+                  />
+                </Field>
+              ))}
+            </Grid>
+          </div>
+        )}
+
+        {/* Groups this form has no editor for yet — spec groups, labels,
+            content blocks, payment options. They are stored and carried by
+            every save; showing them is the difference between "preserved" and
+            "lost" in the owner's eyes. */}
+        {preserved.length > 0 && (
+          <div className="min-w-0 mb-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-2.5" data-form="preserved-groups">
+            <h4 className="text-[12px] font-bold text-zinc-300 mb-1.5">
+              محتوى محفوظ يُعدَّل عبر القالب النصي{' '}
+              <span className="text-[11px] font-medium text-zinc-500">Preserved — edit via the TXT template</span>
+            </h4>
+            {preserved.map((g) => (
+              <div key={g.key} className="text-[11px] text-zinc-400 mb-1.5 min-w-0" data-preserved={g.key}>
+                <span className="text-zinc-200 font-bold">
+                  {g.label} ({g.count})
+                </span>
+                <ul className="ms-4 list-disc space-y-0.5">
+                  {g.lines.map((line, i) => (
+                    <li key={i} className="break-words" dir="auto">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
@@ -1314,7 +1544,7 @@ export default function ProductForm({
             dirty rather than showing a stale number as current. */}
         {doc.id && (
           <div className="mt-3">
-            <PricePreview productId={doc.id} savedDoc={doc} dirty={dirty} />
+            <PricePreview productId={doc.id} savedDoc={doc} rel={rel} dirty={dirty} />
           </div>
         )}
       </SectionCard>

@@ -16,6 +16,8 @@
  * server by the local translator, so this file has no field for them.
  */
 
+import type { ColorV2, MediaV2, OptionV2 } from '../../../lib/productTypes';
+
 export type SaleType = 'direct_sale' | 'pre_order' | 'bundle';
 export type InventoryMode = 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION';
 
@@ -40,6 +42,14 @@ export interface FormPrices {
 export interface FormValue extends FormPrices {
   id: string;
   name_en: string;
+  /**
+   * 0055 — the Arabic / Kurdish names a TXT template authored. The form has
+   * no input for them (§3, English-only) but it CARRIES them: the relations
+   * save replaces the whole row set, and a field the form drops is a field the
+   * save clears. Absent = the row never had one.
+   */
+  name_ar?: string;
+  name_ckb?: string;
   sku_part: string;
   image: string;
   sort: number;
@@ -68,6 +78,9 @@ export interface FormGroup {
 export interface FormColor extends FormPrices {
   id: string;
   name_en: string;
+  /** 0055 — carried, never edited here (see FormValue). */
+  name_ar?: string;
+  name_ckb?: string;
   hex: string;
   image: string;
   sku_part: string;
@@ -107,6 +120,15 @@ export interface FormImage {
    * whatever provenance it already had.
    */
   source_url?: string;
+  /**
+   * 0048 alt texts and storage key the TXT template writes and the server
+   * stores. Carried for the same reason as `source_url`: the form never edits
+   * them, and a save that omitted them would rely on the server's
+   * preserve-if-empty rule instead of stating what it read.
+   */
+  alt_ar?: string;
+  alt_ckb?: string;
+  r2_key?: string;
 }
 
 export interface RelationsState {
@@ -115,6 +137,12 @@ export interface RelationsState {
   colors: FormColor[];
   variants: FormVariant[];
   images: FormImage[];
+  /**
+   * What the loader had to do to show the stored data: an option value whose
+   * group row is missing, or a structure read from the product document
+   * because no relation rows exist yet. Shown to the admin, never sent.
+   */
+  hydration_issues?: string[];
 }
 
 export const emptyRelations = (): RelationsState => ({
@@ -213,6 +241,9 @@ interface WireValue extends FormPrices {
   id: string;
   group_id: string;
   name_en: string;
+  /** 0055 — optional on the wire (rows read before the migration). */
+  name_ar?: string | null;
+  name_ckb?: string | null;
   sku_part: string;
   image: string;
   sort: number;
@@ -237,6 +268,8 @@ interface WireGroup {
 interface WireColor extends FormPrices {
   id: string;
   name_en: string;
+  name_ar?: string | null;
+  name_ckb?: string | null;
   hex: string;
   image: string;
   sku_part: string;
@@ -269,6 +302,11 @@ interface WireImage {
   variant_id: string | null;
   width: number | null;
   height: number | null;
+  /** 0048 provenance — carried back so a re-save keeps it. */
+  source_url?: string | null;
+  alt_ar?: string | null;
+  alt_ckb?: string | null;
+  r2_key?: string | null;
 }
 
 export interface RelationsResponse {
@@ -306,6 +344,33 @@ export function parseComboKey(key: string): { option_value_ids: string[]; color_
   };
 }
 
+const valueFromWire = (v: WireValue): FormValue => ({
+  id: v.id,
+  name_en: v.name_en,
+  ...(typeof v.name_ar === 'string' && v.name_ar !== '' ? { name_ar: v.name_ar } : {}),
+  ...(typeof v.name_ckb === 'string' && v.name_ckb !== '' ? { name_ckb: v.name_ckb } : {}),
+  sku_part: v.sku_part ?? '',
+  image: v.image ?? '',
+  sort: v.sort,
+  active: v.active !== 0,
+  stock: v.stock ?? null,
+  low_stock_threshold: v.low_stock_threshold ?? null,
+  ...prices(v),
+  availability_type: readAvailability(v.availability_type),
+  lead_time_text: v.lead_time_text ?? '',
+  lead_time_min_days: v.lead_time_min_days ?? null,
+  lead_time_max_days: v.lead_time_max_days ?? null,
+  variant_key: v.variant_key ?? '',
+  variant_label: v.variant_label ?? '',
+});
+
+/**
+ * `GET /api/admin/products/:id/relations` → form state. EVERY ROW THE SERVER
+ * RETURNS IS SHOWN: a value whose `group_id` names no group row is not dropped
+ * (it used to be — the value existed in the database and the form said 0),
+ * it is placed in a synthesized group with an empty name so the admin sees it,
+ * is asked to name it, and the next save writes the missing group row.
+ */
 export function relationsFromWire(r: RelationsResponse): RelationsState {
   const values = r.values ?? [];
   const links = r.links ?? [];
@@ -316,45 +381,53 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
     else byColor.set(l.color_id, [l.option_value_id]);
   }
   const mode = r.product?.inventory_mode;
+  const wireGroups = r.groups ?? [];
+  const known = new Set(wireGroups.map((g) => g.id));
+  const issues: string[] = [];
+
+  const groups: FormGroup[] = wireGroups.map((g) => ({
+    id: g.id,
+    name_en: g.name_en,
+    sort: g.sort,
+    active: g.active !== 0,
+    values: values
+      .filter((v) => v.group_id === g.id)
+      .sort((a, b) => a.sort - b.sort)
+      .map(valueFromWire),
+  }));
+
+  // Orphans: values referencing a group the response does not carry.
+  const orphanGroupIds = [...new Set(values.filter((v) => !known.has(v.group_id)).map((v) => v.group_id))];
+  for (const gid of orphanGroupIds) {
+    const orphaned = values.filter((v) => v.group_id === gid).sort((a, b) => a.sort - b.sort);
+    groups.push({
+      id: gid || localId('og'),
+      name_en: '',
+      sort: groups.length,
+      active: true,
+      values: orphaned.map(valueFromWire),
+    });
+    issues.push(
+      `${orphaned.length} خيار (${orphaned.map((v) => v.name_en || v.id).join(', ')}) مخزّن بلا مجموعة — سمِّ المجموعة ثم احفظ لتُكتب.`
+    );
+  }
+
   return {
     inventory_mode:
       mode === 'OPTION' || mode === 'COLOR' || mode === 'VARIANT_COMBINATION' ? mode : 'BASE',
-    groups: (r.groups ?? []).map((g) => ({
-      id: g.id,
-      name_en: g.name_en,
-      sort: g.sort,
-      active: g.active !== 0,
-      values: values
-        .filter((v) => v.group_id === g.id)
-        .sort((a, b) => a.sort - b.sort)
-        .map((v) => ({
-          id: v.id,
-          name_en: v.name_en,
-          sku_part: v.sku_part ?? '',
-          image: v.image ?? '',
-          sort: v.sort,
-          active: v.active !== 0,
-          stock: v.stock,
-          low_stock_threshold: v.low_stock_threshold,
-          ...prices(v),
-          availability_type: readAvailability(v.availability_type),
-          lead_time_text: v.lead_time_text ?? '',
-          lead_time_min_days: v.lead_time_min_days ?? null,
-          lead_time_max_days: v.lead_time_max_days ?? null,
-          variant_key: v.variant_key ?? '',
-          variant_label: v.variant_label ?? '',
-        })),
-    })),
+    groups,
     colors: (r.colors ?? []).map((c) => ({
       id: c.id,
       name_en: c.name_en,
-      hex: c.hex,
+      ...(typeof c.name_ar === 'string' && c.name_ar !== '' ? { name_ar: c.name_ar } : {}),
+      ...(typeof c.name_ckb === 'string' && c.name_ckb !== '' ? { name_ckb: c.name_ckb } : {}),
+      hex: c.hex ?? '',
       image: c.image ?? '',
       sku_part: c.sku_part ?? '',
       sort: c.sort,
       active: c.active !== 0,
-      stock: c.stock,
-      low_stock_threshold: c.low_stock_threshold,
+      stock: c.stock ?? null,
+      low_stock_threshold: c.low_stock_threshold ?? null,
       option_value_ids: byColor.get(c.id) ?? [],
       ...prices(c),
     })),
@@ -363,8 +436,8 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       ...parseComboKey(v.combo_key),
       sku: v.sku ?? '',
       active: v.active !== 0,
-      stock: v.stock,
-      low_stock_threshold: v.low_stock_threshold,
+      stock: v.stock ?? null,
+      low_stock_threshold: v.low_stock_threshold ?? null,
       ...prices(v),
     })),
     images: (r.images ?? [])
@@ -376,12 +449,181 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
         alt_en: i.alt_en ?? '',
         sort_order: i.sort_order,
         is_primary: i.is_primary === 1,
-        option_value_id: i.option_value_id,
-        color_id: i.color_id,
-        variant_id: i.variant_id,
-        width: i.width,
-        height: i.height,
+        option_value_id: i.option_value_id ?? null,
+        color_id: i.color_id ?? null,
+        variant_id: i.variant_id ?? null,
+        width: i.width ?? null,
+        height: i.height ?? null,
+        source_url: i.source_url ?? '',
+        ...(typeof i.alt_ar === 'string' && i.alt_ar !== '' ? { alt_ar: i.alt_ar } : {}),
+        ...(typeof i.alt_ckb === 'string' && i.alt_ckb !== '' ? { alt_ckb: i.alt_ckb } : {}),
+        ...(typeof i.r2_key === 'string' && i.r2_key !== '' ? { r2_key: i.r2_key } : {}),
       })),
+    ...(issues.length > 0 ? { hydration_issues: issues } : {}),
+  };
+}
+
+/** Whether the relations view carries any structure at all (the storefront's `has_relations`). */
+export function hasRelationStructure(rel: RelationsState): boolean {
+  return rel.groups.length > 0 || rel.colors.length > 0 || rel.images.length > 0 || rel.variants.length > 0;
+}
+
+/** The product document's own copy of the structure, as the admin GET returns it. */
+export interface DocStructure {
+  options?: OptionV2[] | null;
+  colors?: ColorV2[] | null;
+  media?: MediaV2[] | null;
+}
+
+export function docHasStructure(doc: DocStructure): boolean {
+  return (doc.options?.length ?? 0) > 0 || (doc.colors?.length ?? 0) > 0 || (doc.media?.length ?? 0) > 0;
+}
+
+const docPrices = (x: OptionV2 | ColorV2): FormPrices =>
+  prices({
+    regular_price_iqd: x.regular_price_iqd ?? null,
+    prime_price_iqd: x.prime_price_iqd ?? null,
+    pro_price_iqd: x.pro_price_iqd ?? null,
+    cost_iqd: x.cost_iqd ?? null,
+    regular_adjust_iqd: x.regular_adjust_iqd ?? null,
+    prime_adjust_iqd: x.prime_adjust_iqd ?? null,
+    pro_adjust_iqd: x.pro_adjust_iqd ?? null,
+    cost_adjust_iqd: x.cost_adjust_iqd ?? null,
+  });
+
+/**
+ * Form state built from the product DOCUMENT (`products.options / colors /
+ * images` JSON) — the fallback the storefront already sells from
+ * (worker/lib/productOverlay.ts `!view.has_relations`), mirrored here so the
+ * admin sees the same options, colours and pictures the customer does.
+ *
+ * Grouping follows the server bridge (worker/lib/templateRelations.ts): a
+ * value joins the group its `group_en` names; a value naming none joins the
+ * first group, or a group called "Options" when there is none. Ids are the
+ * document's own, so saving this state creates the relation rows under the
+ * same ids the cart and the storefront already reference. Nothing is
+ * invented: an absent stock is null, an absent price inherits.
+ */
+export function relationsFromDoc(doc: DocStructure): RelationsState {
+  const options = (doc.options ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const groups: FormGroup[] = [];
+  const byName = new Map<string, FormGroup>();
+  const groupFor = (o: OptionV2): FormGroup => {
+    const name = (o.group_en ?? '').trim();
+    if (name) {
+      const found = byName.get(name.toLowerCase());
+      if (found) return found;
+      const made: FormGroup = { id: localId('og'), name_en: name, sort: groups.length, active: true, values: [] };
+      groups.push(made);
+      byName.set(name.toLowerCase(), made);
+      return made;
+    }
+    if (groups.length > 0) return groups[0];
+    const made: FormGroup = { id: localId('og'), name_en: 'Options', sort: 0, active: true, values: [] };
+    groups.push(made);
+    byName.set('options', made);
+    return made;
+  };
+  options.forEach((o, i) => {
+    const g = groupFor(o);
+    g.values.push({
+      id: o.id,
+      name_en: o.name_en || o.name_ar,
+      // CARRIED VERBATIM. This used to drop an Arabic or Kurdish name equal to
+      // the English one as a "fake translation" — but in this catalogue an
+      // Arabic option name is often a latin model token ('A1', '0.4mm'), and
+      // the writer now honours an explicit clear: the dropped field came back
+      // as '' in `relationsToWire` and BLANKED the row on the first save, on
+      // exactly the legacy JSON-only products this fallback exists to rescue
+      // (docs/TXT_IMPORT_PARITY.md, root cause 7 — client twin).
+      ...(o.name_ar ? { name_ar: o.name_ar } : {}),
+      ...(o.name_ckb ? { name_ckb: o.name_ckb } : {}),
+      sku_part: o.sku_part ?? '',
+      image: o.image ?? '',
+      sort: typeof o.order === 'number' ? o.order : i,
+      active: o.active !== false,
+      stock: o.stock ?? null,
+      low_stock_threshold: o.low_stock_threshold ?? null,
+      ...docPrices(o),
+      availability_type: readAvailability(o.availability_type),
+      lead_time_text: o.lead_time_text ?? '',
+      lead_time_min_days: o.lead_time_min_days ?? null,
+      lead_time_max_days: o.lead_time_max_days ?? null,
+      variant_key: o.variant_key ?? '',
+      variant_label: o.variant_label ?? '',
+    });
+  });
+  for (const g of groups) g.values.forEach((v, i) => (v.sort = i));
+
+  const valueIds = new Set(options.map((o) => o.id));
+  const colors: FormColor[] = (doc.colors ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((c, i) => {
+      const linked = (c.option_ids && c.option_ids.length > 0 ? c.option_ids : c.option_id ? [c.option_id] : []).filter((id) =>
+        valueIds.has(id)
+      );
+      return {
+        id: c.id,
+        name_en: c.name_en || c.name_ar,
+        ...(c.name_ar ? { name_ar: c.name_ar } : {}),
+        ...(c.name_ckb ? { name_ckb: c.name_ckb } : {}),
+        hex: c.hex ?? '',
+        image: c.image ?? '',
+        sku_part: c.sku_part ?? '',
+        sort: i,
+        active: c.active !== false,
+        stock: c.stock ?? null,
+        low_stock_threshold: c.low_stock_threshold ?? null,
+        option_value_ids: linked,
+        ...docPrices(c),
+      };
+    });
+
+  const colorIds = new Set(colors.map((c) => c.id));
+  const media = (doc.media ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const anyPrimary = media.some((m) => m.primary);
+  const images: FormImage[] = media.map((m, i) => ({
+    id: m.id,
+    url: m.url,
+    alt_en: m.alt_en ?? '',
+    sort_order: i,
+    is_primary: anyPrimary ? m.primary === true : i === 0,
+    option_value_id: m.option_value_id && valueIds.has(m.option_value_id) ? m.option_value_id : null,
+    color_id: m.color_id && colorIds.has(m.color_id) ? m.color_id : null,
+    variant_id: null,
+    width: m.width ?? null,
+    height: m.height ?? null,
+    source_url: m.source_url ?? '',
+    ...(m.alt_ar ? { alt_ar: m.alt_ar } : {}),
+    ...(m.alt_ckb ? { alt_ckb: m.alt_ckb } : {}),
+    ...(m.key ? { r2_key: m.key } : {}),
+  }));
+
+  const rel: RelationsState = { inventory_mode: 'BASE', groups, colors, variants: [], images };
+  rel.inventory_mode = deriveInventoryMode(rel);
+  return rel;
+}
+
+/**
+ * The editor's relation state for a loaded product: the relation tables when
+ * they hold anything, else the product document's copy. This is the SAME
+ * precedence the storefront applies (productOverlay.ts), so the two never
+ * disagree about what a product sells. Falling back is reported in
+ * `hydration_issues` — the admin is told the rows do not exist yet and that
+ * saving writes them.
+ */
+export function hydrateRelations(wire: RelationsResponse, doc: DocStructure): RelationsState {
+  const fromRows = relationsFromWire(wire);
+  if (hasRelationStructure(fromRows) || !docHasStructure(doc)) return fromRows;
+  const fromDoc = relationsFromDoc(doc);
+  const n = { v: fromDoc.groups.reduce((a, g) => a + g.values.length, 0), c: fromDoc.colors.length, i: fromDoc.images.length };
+  return {
+    ...fromDoc,
+    hydration_issues: [
+      ...(fromRows.hydration_issues ?? []),
+      `الخيارات (${n.v}) والألوان (${n.c}) والصور (${n.i}) مقروءة من مستند المنتج — لا صفوف علاقات بعد. الحفظ من هنا يكتبها كصفوف.`,
+    ],
   };
 }
 
@@ -415,6 +657,8 @@ export function relationsToWire(rel: RelationsState) {
       values: g.values.map((v, vi) => ({
         id: v.id,
         name_en: v.name_en,
+        name_ar: v.name_ar ?? '',
+        name_ckb: v.name_ckb ?? '',
         sku_part: v.sku_part,
         image: v.image,
         sort: vi,
@@ -436,6 +680,8 @@ export function relationsToWire(rel: RelationsState) {
     colors: rel.colors.map((c, ci) => ({
       id: c.id,
       name_en: c.name_en,
+      name_ar: c.name_ar ?? '',
+      name_ckb: c.name_ckb ?? '',
       hex: c.hex,
       image: c.image,
       sku_part: c.sku_part,
@@ -468,6 +714,9 @@ export function relationsToWire(rel: RelationsState) {
       width: i.width,
       height: i.height,
       source_url: i.source_url ?? '',
+      alt_ar: i.alt_ar ?? '',
+      alt_ckb: i.alt_ckb ?? '',
+      r2_key: i.r2_key ?? '',
     })),
   };
 }

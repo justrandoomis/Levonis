@@ -406,6 +406,20 @@ export function ImagesSection({
                   placeholder="Alt text (English)"
                   aria-label="Alt text"
                 />
+                {/* Alt text a TXT template authored in Arabic or Kurdish. The
+                    form is English-only, so it is SHOWN rather than edited —
+                    it is stored, it is carried by the next save, and hiding it
+                    was one of the losses this round removes. */}
+                {(img.alt_ar || img.alt_ckb) && (
+                  <p
+                    className="text-[10px] text-zinc-500 truncate"
+                    dir="auto"
+                    data-form="image-imported-alt"
+                    title="نص بديل محفوظ من القالب النصي"
+                  >
+                    {[img.alt_ar, img.alt_ckb].filter(Boolean).join(' · ')}
+                  </p>
+                )}
                 {hasTargets && (
                   <Select
                     aria-label="تظهر مع"

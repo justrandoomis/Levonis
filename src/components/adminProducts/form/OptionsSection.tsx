@@ -222,12 +222,19 @@ export function OptionsSection({
                       label={`صورة الخيار ${v.name_en || ''}`}
                       onChange={(url) => patchValue(g.id, v.id, { image: url ?? '' })}
                     />
-                    <TextInput
-                      value={v.name_en}
-                      onChange={(e) => patchValue(g.id, v.id, { name_en: e.target.value })}
-                      placeholder="Value (English)"
-                      aria-label="Option value"
-                    />
+                    <div className="min-w-0 flex-1">
+                      <TextInput
+                        value={v.name_en}
+                        onChange={(e) => patchValue(g.id, v.id, { name_en: e.target.value })}
+                        placeholder="Value (English)"
+                        aria-label="Option value"
+                      />
+                      {(v.name_ar || v.name_ckb) && (
+                        <p className="text-[10px] text-zinc-500 mt-0.5 truncate" dir="auto" data-form="value-imported-name" title="اسم محفوظ من القالب النصي">
+                          {[v.name_ar, v.name_ckb].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </div>
                     <TextInput
                       value={v.sku_part}
                       onChange={(e) => patchValue(g.id, v.id, { sku_part: e.target.value })}
@@ -317,12 +324,19 @@ export function OptionsSection({
                 aria-label="اختيار اللون"
                 className="w-10 h-10 rounded-lg border border-zinc-700 bg-zinc-800/40 p-1 shrink-0 cursor-pointer"
               />
-              <TextInput
-                value={c.name_en}
-                onChange={(e) => patchColor(c.id, { name_en: e.target.value })}
-                placeholder="Colour name (English)"
-                aria-label="Colour name"
-              />
+              <div className="min-w-0 flex-1">
+                <TextInput
+                  value={c.name_en}
+                  onChange={(e) => patchColor(c.id, { name_en: e.target.value })}
+                  placeholder="Colour name (English)"
+                  aria-label="Colour name"
+                />
+                {(c.name_ar || c.name_ckb) && (
+                  <p className="text-[10px] text-zinc-500 mt-0.5 truncate" dir="auto" data-form="color-imported-name" title="اسم محفوظ من القالب النصي">
+                    {[c.name_ar, c.name_ckb].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </div>
               <input
                 type="text"
                 dir="ltr"

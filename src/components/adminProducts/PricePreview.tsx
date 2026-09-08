@@ -10,6 +10,7 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import type { ProductDocV2 } from '../../lib/productTypes';
 import type { QuoteResponse } from './types';
+import { hasRelationStructure, type RelationsState } from './form/model';
 import { L, Section, inputCls } from './ui';
 
 const ERROR_AR: Record<string, string> = {
@@ -31,12 +32,28 @@ const METHOD_AR: Record<string, string> = { air: 'جوي', sea: 'بحري', land
 export default function PricePreview({
   productId,
   savedDoc,
+  rel,
   dirty,
 }: {
   productId: string;
   savedDoc: ProductDocV2;
+  /**
+   * The structure the form is showing (rows, or the document's copy when no
+   * rows exist). When given, the option / colour pickers list THAT, so the
+   * preview and sections 5–6 can never disagree about what the product sells
+   * (docs/TXT_IMPORT_PARITY.md §5.3.1); the document's JSON mirror is only
+   * the fallback for a caller that has no relation state.
+   */
+  rel?: RelationsState;
   dirty: boolean;
 }) {
+  const fromRel = rel && hasRelationStructure(rel);
+  const optionChoices = fromRel
+    ? rel.groups.flatMap((g) => g.values.map((v) => ({ id: v.id, label: v.name_en || v.name_ar || v.id, active: v.active })))
+    : (savedDoc.options ?? []).map((o) => ({ id: o.id, label: o.name_ar || o.name_en || o.id, active: o.active }));
+  const colorChoices = fromRel
+    ? rel.colors.map((c) => ({ id: c.id, label: c.name_en || c.name_ar || c.hex || c.id, active: c.active }))
+    : (savedDoc.colors ?? []).map((c) => ({ id: c.id, label: c.name_ar || c.name_en || c.hex || c.id, active: c.active }));
   const [optionId, setOptionId] = useState('');
   const [colorId, setColorId] = useState('');
   const [transport, setTransport] = useState('');
@@ -91,8 +108,8 @@ export default function PricePreview({
           <L ar="الخيار" en="Option" />
           <select value={optionId} onChange={(e) => setOptionId(e.target.value)} className={inputCls}>
             <option value="">بدون / none</option>
-            {(savedDoc.options ?? []).map((o) => (
-              <option key={o.id} value={o.id}>{(o.name_ar || o.name_en || o.id) + (o.active ? '' : ' (معطّل)')}</option>
+            {optionChoices.map((o) => (
+              <option key={o.id} value={o.id}>{o.label + (o.active ? '' : ' (معطّل)')}</option>
             ))}
           </select>
         </div>
@@ -100,8 +117,8 @@ export default function PricePreview({
           <L ar="اللون" en="Color" />
           <select value={colorId} onChange={(e) => setColorId(e.target.value)} className={inputCls}>
             <option value="">بدون / none</option>
-            {(savedDoc.colors ?? []).map((c) => (
-              <option key={c.id} value={c.id}>{(c.name_ar || c.name_en || c.hex || c.id) + (c.active ? '' : ' (معطّل)')}</option>
+            {colorChoices.map((c) => (
+              <option key={c.id} value={c.id}>{c.label + (c.active ? '' : ' (معطّل)')}</option>
             ))}
           </select>
         </div>

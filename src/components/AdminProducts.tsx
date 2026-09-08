@@ -1134,7 +1134,14 @@ export default function AdminProducts() {
           dirty={importDirty}
         >
           <Suspense fallback={<LazyFallback label={t.loading} />}>
-            <ImportPanel onApplied={handleImportApplied} onDirtyChange={handleImportDirty} />
+            <ImportPanel
+              onApplied={handleImportApplied}
+              onDirtyChange={handleImportDirty}
+              onOpenProduct={(id) => {
+                closeImport();
+                setEditing({ open: true, id });
+              }}
+            />
           </Suspense>
         </Modal>
       )}

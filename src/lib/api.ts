@@ -14,7 +14,17 @@ export class ApiError extends Error {
      * the UI can only repeat the generic message; with it the UI can name
      * both types and offer the right way out.
      */
-    public details?: Record<string, unknown>
+    public details?: Record<string, unknown>,
+    /**
+     * The WHOLE refusal body, exactly as the server sent it. Some routes
+     * answer with their machine-readable context at the top level rather than
+     * under `details` — the template apply names the section and field that
+     * did not persist, and lists the mismatches, that way. Without the body
+     * the UI could only repeat the sentence and would have to invent the
+     * numbers, which is the failure mode docs/TXT_IMPORT_PARITY.md §5.4
+     * forbids. Additive: `details` keeps its exact old meaning.
+     */
+    public body?: Record<string, unknown>
   ) {
     super(message);
   }
@@ -45,7 +55,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
   }
   if (!res.ok || data.success === false) {
-    throw new ApiError(res.status, data.error || `Server error (${res.status})`, data.code, data.details);
+    throw new ApiError(
+      res.status,
+      data.error || `Server error (${res.status})`,
+      data.code,
+      data.details,
+      data as unknown as Record<string, unknown>
+    );
   }
   return data;
 }
