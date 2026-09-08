@@ -34,14 +34,24 @@ import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, oneOf, str, HttpError } from '../lib/http';
-import { applyRelations, loadRelationsView, type ProductRelationsView } from '../lib/productOverlay';
-import { relationsBodyFromDoc } from '../lib/templateRelations';
-import { planRelationsWrite } from './adminProductRelations';
+import { applyRelations, loadRelationsView, EMPTY_RELATIONS, type ProductRelationsView } from '../lib/productOverlay';
+import { relationsBodyFromDoc, deriveInventoryModeFromDoc, type BridgeDiagnostics } from '../lib/templateRelations';
+import {
+  planProductSave,
+  saveProductAtomic,
+  reloadForVerification,
+  verifyApplied,
+  relationCounts,
+  translationInputsOf,
+  type Mismatch,
+  type ProductSavePlan,
+} from '../lib/productPersistence';
+import { resolveTemplateFamilies, type CatalogRow } from './adminTaxonomy';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
-import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { newId, sha256Hex } from '../lib/crypto';
+import { audit } from '../lib/audit';
 import {
   parseTemplate,
   exportProduct,
@@ -62,7 +72,6 @@ import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import {
   parseProductRow,
   validateProductDoc,
-  serializeDoc,
   projectAdmin,
   type ProductDoc,
 } from '../lib/productModel';
@@ -72,8 +81,10 @@ import {
   fieldsFor,
   flatFields,
   isProductType,
+  isTemplateFamily,
   productType,
   type ProductTypeId,
+  type TemplateField,
 } from '../lib/templateFamilies';
 
 export const templateRoutes = new Hono<AppContext>();
@@ -424,11 +435,6 @@ export function templateDownloadDiagnostics(): {
  * a product that has no relational rows, which is why the old products still
  * export exactly as before.
  */
-async function loadProductDoc(db: D1Database, id: string): Promise<ProductDoc | null> {
-  const loaded = await loadProductDocWithView(db, id);
-  return loaded ? loaded.doc : null;
-}
-
 /**
  * The same read, keeping the relational view the caller needs to write back.
  *
@@ -445,46 +451,16 @@ async function loadProductDocWithView(
   if (!row) return null;
   const doc = parseProductRow(row);
   const view = await loadRelationsView(db, id, row.inventory_mode);
-  return { doc: applyRelations(doc, view, { includeInactive: true }), view, row };
+  return { doc: applyRelations(doc, view, { includeInactive: true, authoredNames: true }), view, row };
 }
 
-/**
- * DOES THIS PRODUCT KEEP ITS STRUCTURE IN THE RELATIONAL TABLES?
- *
- * The TXT template is a JSON-column format: it reads `products` and writes
- * `products`, and its options/colours land in the JSON mirrors. Every product
- * built in the current admin form stores its option tree, colours and images
- * in product_option_values / product_colors / product_images instead, and the
- * storefront, the cart, the quote and the price grid all read THOSE whenever
- * they exist (worker/lib/productOverlay.ts applyRelations).
- *
- * So for such a product the TXT path would export an empty option list and
- * "apply" an option tree into a column nothing reads — reporting "applied, N
- * fields" while the customer's price does not move. That is worse than a
- * refusal, so the structure keys are refused and the CSV/ZIP path, which does
- * write the relational tables, is named instead. The scalar fields (names,
- * description, prices, classification) are unaffected either way.
- */
-async function hasRelationalStructure(db: D1Database, productId: string): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM product_option_values v
-            JOIN product_option_groups g ON g.id = v.group_id WHERE g.product_id = ?) AS values_n,
-         (SELECT COUNT(*) FROM product_colors WHERE product_id = ?) AS colors_n,
-         -- A product can be relational through its PICTURES alone: the gallery
-         -- is read from product_images the moment one row exists, so a TXT
-         -- image edit written to the JSON column would be invisible. Counting
-         -- images here is what routes it to the relational writer instead.
-         (SELECT COUNT(*) FROM product_images WHERE product_id = ?) AS images_n`
-    )
-    .bind(productId, productId, productId)
-    .first<{ values_n: number; colors_n: number; images_n: number }>();
-  return (row?.values_n ?? 0) > 0 || (row?.colors_n ?? 0) > 0 || (row?.images_n ?? 0) > 0;
-}
+/** The template groups whose rows live in the relation tables. */
+const STRUCTURE_GROUPS = ['options', 'colors', 'images'] as const;
 
-/** The template keys that describe structure rather than scalar fields. */
-const STRUCTURE_GROUPS = ['options', 'colors'] as const;
+/** Does this file WRITE structure — items or a whole-group clear? */
+function touchesStructure(parsed: ParsedTemplate): boolean {
+  return STRUCTURE_GROUPS.some((g) => (parsed.groups[g]?.length ?? 0) > 0 || !!parsed.groupClears[g]);
+}
 
 /** Resolves brand/catalog slug-or-id references against the DB. Unknown
  *  values become needs_review entries — the change is withheld entirely
@@ -558,40 +534,83 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
   return refs;
 }
 
-/** Replaces the product↔catalog associations, keeping existing positions and
- *  appending new memberships at the end of each catalog. */
-async function applyCatalogs(db: D1Database, productId: string, catalogIds: string[]): Promise<void> {
-  const { results } = await db
-    .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ?')
-    .bind(productId)
-    .all<{ catalog_id: string }>();
-  const current = new Set(results.map((r) => r.catalog_id));
-  const wanted = new Set(catalogIds);
-  for (const cid of current) {
-    if (!wanted.has(cid)) {
-      await db.prepare('DELETE FROM product_catalogs WHERE product_id = ? AND catalog_id = ?').bind(productId, cid).run();
+/**
+ * THE SPEC SHEET, CHECKED AGAINST THE SECTION THE FORM WILL RENDER.
+ *
+ * `spec.<id>` accepted any id and stored it; the form shows only the ids of
+ * the section's template (`GET /taxonomy/templates?category=`), so a value
+ * outside that list was stored and invisible — and a select value the sheet
+ * does not offer was stored as typed (docs/TXT_IMPORT_PARITY.md, root cause
+ * 9). Nothing is dropped here: every finding is a warning and a name in
+ * `outside_section`, so the owner sees it at check time and after apply.
+ */
+export interface SpecSheetReport {
+  stored: number;
+  visible_in_form: number;
+  outside_section: string[];
+  family: string | null;
+  warnings: string[];
+}
+
+async function specSheetReport(db: D1Database, doc: ProductDoc, parsed: ParsedTemplate): Promise<SpecSheetReport> {
+  const ids = Object.keys(doc.spec_fields);
+  const report: SpecSheetReport = { stored: ids.length, visible_in_form: 0, outside_section: [], family: null, warnings: [] };
+  const fileIds = new Set(Object.keys(parsed.specFields));
+  const sectionId = doc.sub_category_id || doc.category_id;
+  let fields: TemplateField[] = [];
+  if (sectionId) {
+    const { results } = await db.prepare('SELECT * FROM catalogs').all<CatalogRow>();
+    const byId = new Map(results.map((r) => [r.id, r]));
+    const family = resolveTemplateFamilies(results).get(sectionId) ?? doc.template_family;
+    if (family && isTemplateFamily(family)) {
+      report.family = family;
+      const slugs: string[] = [];
+      let cursor = byId.get(sectionId);
+      for (let i = 0; i < 20 && cursor; i++) {
+        slugs.push(cursor.slug);
+        cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
+      }
+      fields = flatFields(fieldsFor(family, slugs));
     }
   }
-  for (const cid of catalogIds) {
-    if (current.has(cid)) continue;
-    const row = await db
-      .prepare('SELECT COALESCE(MAX(position), 0) + 1 AS pos FROM product_catalogs WHERE catalog_id = ?')
-      .bind(cid)
-      .first<{ pos: number }>();
-    await db
-      .prepare('INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES (?, ?, ?)')
-      .bind(productId, cid, row?.pos ?? 1)
-      .run();
+  const known = new Map(fields.map((f) => [f.id, f]));
+  for (const id of ids) {
+    const f = known.get(id);
+    if (!f) {
+      report.outside_section.push(id);
+      if (fileIds.has(id)) {
+        report.warnings.push(
+          sectionId && report.family
+            ? `spec.${id}: ليس من حقول قسم هذا المنتج — حُفظ لكنه لا يظهر في قسم المواصفات بالنموذج / not a field of this product's section; stored but not shown in the form's spec section`
+            : `spec.${id}: المنتج بلا قسم/عائلة قالب، فلا يظهر في قسم المواصفات بالنموذج / the product has no section or template family; stored but not shown in the form's spec section`
+        );
+      }
+      continue;
+    }
+    report.visible_in_form += 1;
+    if (!fileIds.has(id)) continue;
+    const v = doc.spec_fields[id];
+    if (f.options && f.options.length && !f.options.some((o) => o.toLowerCase() === v.toLowerCase())) {
+      report.warnings.push(`spec.${id}: "${v}" ليست من القيم المتاحة (${f.options.join(' / ')}) — حُفظت كما كُتبت / not one of the offered values; stored as written`);
+    } else if (f.type === 'number' && !/^-?\d+(\.\d+)?$/.test(v.trim())) {
+      report.warnings.push(`spec.${id}: "${v}" ليس رقمًا / is not a number; stored as written`);
+    } else if (f.type === 'hex' && !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v.trim())) {
+      report.warnings.push(`spec.${id}: "${v}" ليس #RGB أو #RRGGBB / is not a hex colour; stored as written`);
+    }
   }
+  return report;
 }
 
 interface Analysis {
   parsed: ParsedTemplate;
   refs: ResolvedRefs;
   existing: ProductDoc | null;
+  /** The existing product's relational view (update only). */
+  existingView: ProductRelationsView | null;
   merge: ToDocResult | null;
   doc: ProductDoc | null;
   validation_error: { message: string; code?: string } | null;
+  spec: SpecSheetReport | null;
 }
 
 /** Shared dry-run pipeline: parse → resolve refs → merge → validate.
@@ -605,18 +624,22 @@ async function analyzeTemplate(
   opts: { money: boolean } = { money: true }
 ): Promise<Analysis> {
   const parsed = parseTemplate(text);
-  const a: Analysis = { parsed, refs: {}, existing: null, merge: null, doc: null, validation_error: null };
+  const a: Analysis = {
+    parsed, refs: {}, existing: null, existingView: null, merge: null, doc: null, validation_error: null, spec: null,
+  };
   if (parsed.errors.length > 0) return a;
 
   a.refs = await resolveRefs(db, parsed);
 
   const targetId = target === null ? null : target ?? parsed.header.product_id;
   if (targetId) {
-    a.existing = await loadProductDoc(db, targetId);
-    if (!a.existing) {
+    const loaded = await loadProductDocWithView(db, targetId);
+    if (!loaded) {
       parsed.errors.push({ line: 0, key: 'product_id', message: `product "${targetId}" not found` });
       return a;
     }
+    a.existing = loaded.doc;
+    a.existingView = loaded.view;
   }
 
   const merge = toDocBody(parsed, a.existing, a.refs);
@@ -686,13 +709,27 @@ async function analyzeTemplate(
     if (e instanceof HttpError) a.validation_error = { message: e.message, code: e.code };
     else throw e;
   }
+  if (a.doc) {
+    a.spec = await specSheetReport(db, a.doc, parsed);
+    merge.warnings.push(...a.spec.warnings);
+  }
   return a;
+}
+
+/** The mode the apply will store, so the preview's diff can say it. */
+function plannedInventoryMode(a: Analysis, isUpdate: boolean): string | null {
+  if (!a.doc || !a.merge) return null;
+  const view = a.existingView ?? EMPTY_RELATIONS;
+  const structure = touchesStructure(a.parsed);
+  if (isUpdate && !structure && a.merge.inventory_mode === undefined) return view.inventory_mode;
+  const kept = view.variants.length;
+  return deriveInventoryModeFromDoc(a.doc, view, a.merge.inventory_mode, kept);
 }
 
 function computeDiff(
   before: ProductDoc | null,
   after: ProductDoc,
-  opts: { includeCost?: boolean } = {}
+  opts: { includeCost?: boolean; beforeMode?: string | null; afterMode?: string | null } = {}
 ): Array<{ field: string; before: string | null; after: string | null }> {
   const repr = (v: string | null): string => (v === null ? NULL_TOKEN : v);
   // §11: the diff is built from the SAME entry writer as the export, so it
@@ -701,13 +738,13 @@ function computeDiff(
   const beforeMap = new Map<string, string | null>();
   if (before) {
     beforeMap.set('slug', before.slug);
-    for (const e of docToEntries(before, entryOpts)) beforeMap.set(e.key, e.value);
+    for (const e of docToEntries(before, { ...entryOpts, inventoryMode: opts.beforeMode ?? undefined })) beforeMap.set(e.key, e.value);
   }
   const diff: Array<{ field: string; before: string | null; after: string | null }> = [];
   const seen = new Set<string>();
   const afterEntries: Array<{ key: string; value: string | null }> = [
     { key: 'slug', value: after.slug },
-    ...docToEntries(after, entryOpts),
+    ...docToEntries(after, { ...entryOpts, inventoryMode: opts.afterMode ?? undefined }),
   ];
   for (const e of afterEntries) {
     seen.add(e.key);
@@ -899,7 +936,17 @@ async function previousApply(
  * — the first write is still in flight — we answer 409 honestly rather than
  * inventing a result.
  */
-async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fingerprint: string) {
+async function repeatSubmission(
+  c: Context<AppContext>,
+  adminUserId: string,
+  fingerprint: string,
+  /** What the SAME file said, re-parsed for this request. A retry is exactly
+   *  the case where the admin never saw the first answer, so the keys the
+   *  registry ignored and the fields the merge applied/cleared/preserved are
+   *  echoed rather than answered as empty arrays — «unknown keys are never
+   *  dropped silently» is a rule about the answer, not only about the write. */
+  echo: { unknown_keys: string[]; applied_fields: string[]; cleared_fields: string[]; preserved_fields: string[] }
+) {
   const prior = await previousApply(c.env.DB, adminUserId, fingerprint);
   if (!prior) {
     return c.json(
@@ -913,7 +960,7 @@ async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fin
       409
     );
   }
-  const fresh = await loadProductDoc(c.env.DB, prior.product_id);
+  const stored = await reloadForVerification(c.env.DB, prior.product_id);
   // §11: a resubmitted batch answers with the product; gate it like the rest.
   return c.json(projectForAdmin(c.env, c.get('user'), {
     success: true,
@@ -921,13 +968,16 @@ async function repeatSubmission(c: Context<AppContext>, adminUserId: string, fin
     created: prior.created,
     fingerprint,
     product_id: prior.product_id,
-    product: fresh ? projectAdmin(fresh) : null,
-    applied_fields: [],
-    cleared_fields: [],
-    preserved_fields: [],
+    product: stored ? projectAdmin(stored.document) : null,
+    applied_fields: echo.applied_fields,
+    cleared_fields: echo.cleared_fields,
+    preserved_fields: echo.preserved_fields,
+    unknown_keys: echo.unknown_keys,
     warnings: [
       'هذه الدفعة طُبِّقت مسبقاً بالمحتوى نفسه — لم يُنشأ منتج ثانٍ / this exact batch was already applied; no second product was created',
     ],
+    relations: stored ? relationCounts(stored) : null,
+    mismatches: [],
   }));
 }
 
@@ -1041,13 +1091,19 @@ templateRoutes.get('/example', () => {
 
 templateRoutes.get('/export/:productId', async (c) => {
   const id = c.req.param('productId');
-  const doc = await loadProductDoc(c.env.DB, id);
-  if (!doc) throw notFound('Product not found');
+  const loaded = await loadProductDocWithView(c.env.DB, id);
+  if (!loaded) throw notFound('Product not found');
+  const doc = loaded.doc;
   const opts = await exportOptsFor(c.env.DB, doc);
   // §11, the same gate the CSV export has always applied: an assistant admin
   // downloads the product without its cost, not the whole cost sheet.
   return attachment(
-    exportProduct(doc, { ...opts, includeCost: canViewFinancials(c.env, c.get('user')!) }),
+    exportProduct(doc, {
+      ...opts,
+      // Symmetric with the parser: the file says which level counts the stock.
+      inventoryMode: loaded.view.inventory_mode,
+      includeCost: canViewFinancials(c.env, c.get('user')!),
+    }),
     `levonis-product-${doc.id}.txt`
   );
 });
@@ -1088,7 +1144,17 @@ templateRoutes.post('/parse', async (c) => {
     preserved_fields: a.merge?.preserved_fields ?? [],
     // Merged-vs-existing preview (admin view; parse never writes anything).
     preview: a.doc ? projectAdmin(a.doc) : null,
-    diff: a.doc ? computeDiff(a.existing, a.doc, { includeCost: canViewFinancials(c.env, c.get('user')) }) : [],
+    diff: a.doc
+      ? computeDiff(a.existing, a.doc, {
+          includeCost: canViewFinancials(c.env, c.get('user')),
+          beforeMode: a.existingView?.inventory_mode ?? null,
+          afterMode: plannedInventoryMode(a, !!a.existing),
+        })
+      : [],
+    // What the apply will do with the spec sheet and the stock level — the
+    // check step says it before anything is written.
+    spec_fields: a.spec,
+    inventory_mode: plannedInventoryMode(a, !!a.existing),
   }));
 });
 
@@ -1096,6 +1162,28 @@ templateRoutes.post('/parse', async (c) => {
 
 const APPLY_MODES = ['draft', 'update'] as const;
 const DUPLICATE_CHOICES = ['update_existing', 'create_hidden_draft_new_identity'] as const;
+
+/** The template keys the file actually wrote — the scope of the read-back
+ *  comparison on an update (an omitted key was preserved, and comparing it
+ *  would only echo the preservation). */
+function touchedKeys(merge: ToDocResult): Set<string> {
+  return new Set([...merge.applied_fields, ...merge.cleared_fields]);
+}
+
+/** The read-back block every apply answer carries — counts from the tables
+ *  and the document, never from the file. */
+function readBackBlock(stored: NonNullable<Awaited<ReturnType<typeof reloadForVerification>>>, spec: SpecSheetReport | null, plan: ProductSavePlan | null) {
+  const rel = relationCounts(stored);
+  const req = plan?.relations?.requested ?? null;
+  return {
+    relations: rel,
+    spec_fields: spec ?? { stored: Object.keys(stored.row.spec_fields).length, visible_in_form: 0, outside_section: [], family: null, warnings: [] },
+    images: { requested: req ? req.images.length : null, stored: rel.images },
+    option_groups: { requested: req ? req.groups.length : null, stored: rel.groups },
+    option_values: { requested: req ? req.values.length : null, stored: rel.values },
+    colors: { requested: req ? req.colors.length : null, stored: rel.colors },
+  };
+}
 
 templateRoutes.post('/apply', async (c) => {
   await rateLimit(c, 'tpl_apply', 120, 3600);
@@ -1119,11 +1207,18 @@ templateRoutes.post('/apply', async (c) => {
   // Always re-parse server-side — client-prebuilt documents are never trusted.
   // Update mode follows the template's product_id; draft mode forces a create
   // merge (a stray product_id is ignored — create means a new identity).
-  const money = canViewFinancials(c.env, c.get('user'));
+  const money = canViewFinancials(c.env, adminUser);
   let a = await analyzeTemplate(c.env.DB, text, mode === 'update' ? undefined : null, { money });
   if (a.parsed.errors.length > 0) {
     return c.json(
-      { success: false, error: 'Template has errors — nothing was written', code: 'TEMPLATE_ERRORS', errors: a.parsed.errors },
+      {
+        success: false,
+        error: 'Template has errors — nothing was written',
+        code: 'TEMPLATE_ERRORS',
+        errors: a.parsed.errors,
+        unknown_keys: a.parsed.unknown_keys,
+        warnings: a.parsed.warnings,
+      },
       400
     );
   }
@@ -1178,13 +1273,14 @@ templateRoutes.post('/apply', async (c) => {
   const needsReview = a.merge?.needs_review ?? [];
   if (needsReview.length > 0) {
     return c.json(
-      { success: false, error: 'Template needs review — nothing was written', code: 'NEEDS_REVIEW', needs_review: needsReview },
+      { success: false, error: 'Template needs review — nothing was written', code: 'NEEDS_REVIEW', needs_review: needsReview, unknown_keys: a.parsed.unknown_keys },
       400
     );
   }
   if (a.validation_error) throw new HttpError(400, a.validation_error.message, a.validation_error.code);
   const doc = a.doc!;
-  warnings.push(...(a.merge?.warnings ?? []));
+  const merge = a.merge!;
+  warnings.push(...merge.warnings);
   warnings.push(...priceWarnings(doc));
 
   if (isUpdate) {
@@ -1204,122 +1300,8 @@ templateRoutes.post('/apply', async (c) => {
         409
       );
     }
-    /**
-     * THE STRUCTURE GOES WHERE THE PRODUCT ACTUALLY KEEPS IT.
-     *
-     * This used to throw TXT_CANNOT_WRITE_RELATIONS, because the TXT path
-     * could only write the `products` JSON mirror and nothing reads that once
-     * relational rows exist. Then the export was taught to read those tables —
-     * so the store's own export named options and colours, and applying it
-     * came back refused. Download → edit → upload was impossible for exactly
-     * the products the owner builds in the form.
-     *
-     * Now the parsed document is translated into the SAME wire body the admin
-     * form PUTs and handed to `planRelationsWrite`, the one writer the form
-     * and the CSV importer already share. Its statements join the product
-     * UPDATE in ONE batch, so a product and its options can never half-land.
-     */
-    let relationStmts: D1PreparedStatement[] = [];
-    const structureTouched = STRUCTURE_GROUPS.filter(
-      (g) => (a.parsed.groups[g]?.length ?? 0) > 0 || !!a.parsed.groupClears[g]
-    );
-    const mediaTouched = (a.parsed.groups.images?.length ?? 0) > 0 || !!a.parsed.groupClears.images;
-    const relational = await hasRelationalStructure(c.env.DB, existing.id);
-    if (relational && (structureTouched.length > 0 || mediaTouched)) {
-      const current = await loadProductDocWithView(c.env.DB, existing.id);
-      if (!current) throw notFound('Product not found');
-      const relationBody = relationsBodyFromDoc(doc, current.view);
-      const plan = await planRelationsWrite(
-        c.env.DB,
-        existing.id,
-        relationBody,
-        // §11: an assistant admin who cannot see cost must not be able to
-        // OVERWRITE it either — the writer keeps the stored cost when money
-        // is false, exactly as it does for the form and the CSV importer.
-        { money: canViewFinancials(c.env, adminUser) }
-      );
-      if (!plan.stmts) {
-        throw badRequest(
-          `تعذّر حفظ الخيارات/الألوان/الصور: ${plan.errors.join(' — ')}`,
-          'RELATIONS_VALIDATION'
-        );
-      }
-      relationStmts = plan.stmts;
-      if (current.view.variants.length > 0) {
-        // relationsBodyFromDoc drops a combination whose option or colour the
-        // file no longer contains — the writer would refuse the whole save for
-        // it. Saying "carried unchanged" at the moment some are deleted is the
-        // one thing the message must not do.
-        const kept = (relationBody.variants as unknown[] | undefined)?.length ?? 0;
-        const dropped = current.view.variants.length - kept;
-        warnings.push(
-          dropped > 0
-            ? `${dropped} من التركيبات المسعّرة حُذفت لأن خيارها أو لونها لم يعد موجودًا في الملف` +
-                (kept > 0 ? `، و${kept} نُقلت كما هي.` : '.')
-            : `التركيبات المسعّرة (${kept}) لا يعبّر عنها قالب TXT، فقد نُقلت كما هي دون تغيير.`
-        );
-      }
-    } else if (relational) {
-      // The old warning here claimed the export did not carry options and
-      // colours. It has since — so the honest message is that THIS file left
-      // them out, and that leaving a group out preserves it.
-      warnings.push(
-        'لم يحمل هذا الملف مفاتيح الخيارات أو الألوان أو الصور، فبقيت كما هي؛ ' +
-          'طُبِّقت الحقول الأساسية فقط.'
-      );
-    }
-
     doc.id = existing.id;
     if (!doc.slug) doc.slug = existing.slug; // slug stability (toDocBody enforces allow_slug_change)
-
-    /**
-     * §11 — AN ADMIN WHO CANNOT SEE COST CANNOT OVERWRITE IT EITHER.
-     *
-     * The relational writer was gated the moment it was wired up. The products
-     * UPDATE in the same request was not: it is built from every key of
-     * serializeDoc, product_cost_iqd included, and the scalar loop applies
-     * whatever the file says. So an assistant admin could download a template
-     * with the cost correctly stripped, type `product_cost_iqd=0` into the gap
-     * and destroy the margin — and never see it, because the response is
-     * stripped on the way back.
-     */
-    if (!canViewFinancials(c.env, adminUser)) {
-      if (doc.product_cost_iqd !== existing.product_cost_iqd) {
-        warnings.push(
-          'الكلفة لا تُعدَّل من هذا الحساب — أُبقيت كما هي / cost is not editable by this account; the stored value was kept'
-        );
-      }
-      doc.product_cost_iqd = existing.product_cost_iqd;
-    }
-
-    const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
-    if (!claimed) return repeatSubmission(c, adminUser.id, fingerprint);
-
-    const serialized = serializeDoc(doc);
-    delete (serialized as Record<string, unknown>).id;
-    const cols = Object.keys(serialized);
-    // Explicit-column UPDATE: legacy v1 columns (shipping_methods, features,
-    // membership_prices, brand text, categories, …) are not in the column
-    // map, so they are preserved verbatim.
-    const sql = `UPDATE products SET ${cols.map((k) => `${k} = ?`).join(', ')},
-                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`;
-    try {
-      const productStmt = c.env.DB
-        .prepare(sql)
-        .bind(...cols.map((k) => (serialized as Record<string, unknown>)[k]), doc.id);
-      // ONE batch: the product row and its option tree either both land or
-      // neither does. A product whose price moved but whose options did not
-      // would price the customer wrongly until someone noticed.
-      if (relationStmts.length > 0) await c.env.DB.batch([productStmt, ...relationStmts]);
-      else await productStmt.run();
-    } catch (e) {
-      // The write did not happen — free the fingerprint so a corrected retry
-      // is not mistaken for a double submission.
-      await releaseApplyFingerprint(c.env.DB, fingerprint);
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('UNIQUE') && msg.includes('slug')) throw badRequest('A product with this slug already exists');
-      throw e;
-    }
   } else {
     // Create: status is FORCED to draft — a template import never goes live
     // without an explicit admin publish step.
@@ -1334,64 +1316,208 @@ templateRoutes.post('/apply', async (c) => {
       baseSlug = await uniqueSlug(c.env.DB, baseSlug);
     }
     doc.slug = baseSlug;
+  }
 
-    const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
-    if (!claimed) return repeatSubmission(c, adminUser.id, fingerprint);
+  /**
+   * THE STRUCTURE GOES WHERE THE PRODUCT ACTUALLY KEEPS IT — ALWAYS.
+   *
+   * The parsed document is translated into the SAME wire body the admin form
+   * PUTs and handed to the shared persistence contract, which plans the
+   * option groups, values, colours, links, variants and images beside the
+   * product row. On a create the plan always runs; on an update it runs
+   * whenever the file writes structure or names the stock level — a product
+   * with no rows receiving its first option gets rows (docs/TXT_IMPORT_PARITY.md,
+   * root causes 1 and 2). The old `hasRelationalStructure` gate is gone.
+   */
+  const relationsWanted = !isUpdate || touchesStructure(a.parsed) || merge.inventory_mode !== undefined;
+  const bridge: BridgeDiagnostics = { warnings: [] };
+  const relations = relationsWanted
+    ? relationsBodyFromDoc(doc, a.existingView ?? EMPTY_RELATIONS, { inventoryMode: merge.inventory_mode, diag: bridge })
+    : null;
+  warnings.push(...bridge.warnings);
 
-    const serialized = serializeDoc(doc);
-    const cols = Object.keys(serialized);
-    const sql = `INSERT INTO products (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
-    try {
-      await c.env.DB.prepare(sql).bind(...cols.map((k) => (serialized as Record<string, unknown>)[k])).run();
-    } catch (e) {
-      // Nothing was inserted — release the claim before reporting.
-      await releaseApplyFingerprint(c.env.DB, fingerprint);
-      const msg = e instanceof Error ? e.message : String(e);
+  const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
+  if (!claimed) {
+    return repeatSubmission(c, adminUser.id, fingerprint, {
+      unknown_keys: a.parsed.unknown_keys,
+      applied_fields: merge.applied_fields,
+      cleared_fields: merge.cleared_fields,
+      preserved_fields: merge.preserved_fields,
+    });
+  }
+
+  const refused = async (status: 400 | 409 | 500, payload: Record<string, unknown>) => {
+    await releaseApplyFingerprint(c.env.DB, fingerprint);
+    return c.json({ success: false, unknown_keys: a.parsed.unknown_keys, warnings, ...payload }, status);
+  };
+
+  // ---- plan: row + relations + catalogs + price history + hashtags + translations
+  let plan: ProductSavePlan;
+  try {
+    plan = await planProductSave(c.env.DB, {
+      mode: isUpdate ? 'update' : 'create',
+      doc,
+      // The stored document WITH its relational overlay, so the cost the
+      // §11 gate carries forward and the price history it diffs are the
+      // real rows' numbers, not a stale JSON mirror's.
+      prev: isUpdate ? a.existing : null,
+      relations,
+      catalogIds: a.refs.catalog_ids,
+      actor: { adminId: adminUser.id, money },
+      // The file carries its own Arabic and Kurdish; the translation table
+      // still gets the English-sourced rows the form path writes.
+      translations: translationInputsOf(doc),
+    });
+  } catch (e) {
+    if (e instanceof HttpError) {
+      const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
+      return refused(e.status === 404 ? 400 : (e.status as 400), {
+        code: e.code ?? 'VALIDATION',
+        error: e.message,
+        // The planner names the section it refused (`product` for a duplicate
+        // SKU, `relations` for a row the writer rejects); default to relations
+        // because that is where every other planned refusal comes from.
+        section: typeof e.details?.section === 'string' ? e.details.section : 'relations',
+        field: typeof e.details?.field === 'string' ? e.details.field : (errors[0] ?? null),
+        errors,
+      });
+    }
+    throw e;
+  }
+  warnings.push(...plan.warnings);
+
+  /**
+   * §11 truth in reporting: a cost line an account without financial scope
+   * wrote was carried forward, not applied. It moves from `applied_fields` to
+   * `preserved_fields` so the response never claims a write that the gate
+   * refused (docs/TXT_IMPORT_PARITY.md, root cause 8).
+   */
+  const costHeld = plan.costRefused.includes('product_cost_iqd');
+  const appliedFields = costHeld ? merge.applied_fields.filter((k) => k !== 'product_cost_iqd') : merge.applied_fields;
+  const preservedFields =
+    costHeld && merge.applied_fields.includes('product_cost_iqd')
+      ? [...merge.preserved_fields, 'product_cost_iqd']
+      : merge.preserved_fields;
+
+  // ---- ONE batch: everything lands, or nothing does --------------------
+  try {
+    await saveProductAtomic(c.env.DB, plan, [
+      {
+        action: 'template.apply',
+        detail: {
+          mode,
+          created: !isUpdate,
+          duplicate_choice: duplicateChoice,
+          fingerprint,
+          applied: appliedFields,
+          cleared: merge.cleared_fields,
+          cost_refused: plan.costRefused,
+          unknown_keys: a.parsed.unknown_keys,
+          relations: plan.relations?.summary ?? null,
+        },
+      },
+    ]);
+  } catch (e) {
+    // The write did not happen — free the fingerprint so a corrected retry
+    // is not mistaken for a double submission.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE') && msg.includes('products.sku')) {
+      // The race backstop for the named check in `planProductSave`: two
+      // concurrent writes claiming the same SKU. The loser still learns which
+      // field it was, never «Something went wrong».
+      return refused(400, {
+        code: 'SKU_TAKEN',
+        error: `sku: "${doc.sku}" is already used by another product / رمز المنتج مستخدم في منتج آخر`,
+        section: 'product',
+        field: 'sku',
+        errors: ['sku: already used by another product'],
+      });
+    }
+    if (msg.includes('UNIQUE') && msg.includes('slug')) {
       // UNIQUE(slug) is the last-resort backstop for two concurrent creates
       // that both passed duplicate detection; the loser writes nothing.
-      if (msg.includes('UNIQUE') && msg.includes('slug')) {
-        return c.json(
-          {
-            success: false,
-            error: 'A product with this slug already exists',
-            code: 'DUPLICATE',
-            existing_product_id: (await findDuplicate(c.env.DB, doc.slug, ''))?.id ?? null,
-            choices: DUPLICATE_CHOICES,
-          },
-          409
-        );
-      }
-      throw e;
+      return refused(409, {
+        error: 'A product with this slug already exists',
+        code: 'DUPLICATE',
+        existing_product_id: (await findDuplicate(c.env.DB, doc.slug, ''))?.id ?? null,
+        choices: DUPLICATE_CHOICES,
+      });
     }
+    await releaseApplyFingerprint(c.env.DB, fingerprint);
+    throw e;
   }
 
-  // The product row is written at this point. A catalog-association failure
-  // is reported as a warning and never aborts the audit that follows: the
-  // audit row is what a repeat submission of this batch reads back, so losing
-  // it would strand the fingerprint and turn an honest retry into a 409.
-  if (a.refs.catalog_ids !== undefined) {
-    try {
-      await applyCatalogs(c.env.DB, doc.id, a.refs.catalog_ids);
-    } catch (e) {
-      console.error('template apply: catalog association failed', doc.id, e);
-      warnings.push(
-        'حُفظ المنتج لكن ربط الكتالوجات فشل — راجع تصنيفات المنتج يدوياً / the product was saved but its catalog links failed; check them manually'
-      );
-    }
+  // ---- read back through the form's own endpoints and compare -----------
+  const stored = await reloadForVerification(c.env.DB, doc.id);
+  if (!stored) {
+    return refused(500, { code: 'APPLY_VERIFY_FAILED', error: 'the product could not be read back after the write', section: 'product', field: 'id' });
   }
-
-  // The fingerprint is part of the audit detail: it is how a repeat
-  // submission finds the product the first submission produced.
-  await audit(c.env.DB, adminUser.id, 'template.apply', doc.id, {
-    mode,
-    created: !isUpdate,
-    duplicate_choice: duplicateChoice,
-    fingerprint,
-    applied: a.merge?.applied_fields ?? [],
-    cleared: a.merge?.cleared_fields ?? [],
+  const mismatches: Mismatch[] = verifyApplied(plan, stored, {
+    documentKeys: isUpdate ? touchedKeys(merge) : null,
+    inventoryMode: plan.relations?.mode,
   });
+  const spec = a.spec ? { ...a.spec, stored: Object.keys(stored.row.spec_fields).length } : null;
+  if (mismatches.length > 0) {
+    // Parser success is not import success. The batch is committed, so the
+    // answer says the product exists and names exactly what did not persist.
+    // A fresh create is removed again — nothing half-applied is left behind;
+    // an update is reported as it stands, and the fingerprint is released
+    // so a corrected retry is possible either way.
+    const first = mismatches[0];
+    let rollbackFailed: string | null = null;
+    if (!isUpdate) {
+      // THE ROLLBACK MAY NOT TAKE THE FINGERPRINT WITH IT. If this batch
+      // throws, `refused()` is never reached: the claim stays, and a retry of
+      // the same file answers `already_applied: true` for a product that was
+      // never verified. So it is guarded, the failure is reported, and the
+      // fingerprint is released either way. The relation rows go with the
+      // product through ON DELETE CASCADE (every product-scoped table declares
+      // it, migrations 0018/0048); the hashtag vocabulary rows do not, so the
+      // ones THIS apply registered are named explicitly.
+      try {
+        await c.env.DB.batch([
+          ...plan.hashtagsAdded.map((tag) => c.env.DB.prepare('DELETE FROM hashtags WHERE tag = ?').bind(tag)),
+          c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(doc.id),
+          c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(doc.id),
+        ]);
+      } catch (e) {
+        rollbackFailed = e instanceof Error ? e.message : String(e);
+        console.error('template apply rollback failed', rollbackFailed);
+      }
+    }
+    // The trail must not record an apply of a product that no longer exists.
+    await audit(c.env.DB, adminUser.id, 'template.apply.rolled_back', doc.id, {
+      created: !isUpdate,
+      fingerprint,
+      section: first.section,
+      field: first.key,
+      removed: !isUpdate && rollbackFailed === null,
+      rollback_error: rollbackFailed,
+    }).catch(() => undefined);
+    return refused(500, {
+      ...(rollbackFailed
+        ? {
+            rollback_error:
+              'the new product could not be removed again — delete it by hand / تعذّرت إزالة المنتج الجديد، احذفه يدويًا',
+          }
+        : {}),
+      code: 'APPLY_VERIFY_FAILED',
+      error:
+        `${first.section}: requested ${JSON.stringify(first.requested)}, stored ${JSON.stringify(first.stored)} (${first.key})` +
+        (isUpdate
+          ? ' — the product exists; the sections named did not persist / المنتج موجود لكن الأقسام المذكورة لم تُحفَظ'
+          : ' — the new product was removed again; nothing was left half-applied / أُزيل المنتج الجديد ولم يبقَ شيء نصف محفوظ'),
+      section: first.section,
+      field: first.key,
+      expected: first.requested,
+      stored: first.stored,
+      product_id: isUpdate ? doc.id : null,
+      created: !isUpdate,
+      mismatches,
+      ...(isUpdate ? readBackBlock(stored, spec, plan) : {}),
+    });
+  }
 
-  const fresh = await loadProductDoc(c.env.DB, doc.id);
   // §11: the same gate as the export and /parse — the applied product is the
   // whole document, cost included, and an assistant admin must not read it.
   return c.json(projectForAdmin(c.env, adminUser, {
@@ -1400,11 +1526,18 @@ templateRoutes.post('/apply', async (c) => {
     already_applied: false,
     fingerprint,
     product_id: doc.id,
-    product: fresh ? projectAdmin(fresh) : null,
-    applied_fields: a.merge?.applied_fields ?? [],
-    cleared_fields: a.merge?.cleared_fields ?? [],
-    preserved_fields: a.merge?.preserved_fields ?? [],
+    product: projectAdmin(stored.document),
+    applied_fields: appliedFields,
+    cleared_fields: merge.cleared_fields,
+    preserved_fields: preservedFields,
+    cost_refused: plan.costRefused,
+    unknown_keys: a.parsed.unknown_keys,
     warnings,
+    ...readBackBlock(stored, spec, plan),
+    mismatches: [],
+    price_history_rows: plan.priceHistory.length,
+    hashtags_registered: plan.hashtagsRegistered,
+    translation_review_needed: plan.translations?.review_needed ?? [],
   }));
 });
 
@@ -1418,22 +1551,54 @@ templateRoutes.post('/parse-zip', async (c) => {
   if (!(file instanceof File)) throw badRequest('No ZIP file uploaded (field name: file)');
   if (file.size > MAX_ZIP_BYTES) throw badRequest(`ZIP is too large (max ${Math.round(MAX_ZIP_BYTES / 1024 / 1024)} MB)`);
 
+  /**
+   * NOTHING IS INFLATED BEFORE IT IS JUDGED.
+   *
+   * `file.size` bounds the COMPRESSED bytes at 15 MB; a 15 MB archive of
+   * zeros expands to gigabytes and kills the isolate. fflate's filter runs
+   * against the central directory, so an entry is skipped — never inflated —
+   * when it is not a template, when its UNCOMPRESSED size is beyond what
+   * /parse would accept anyway, or when the archive has already offered more
+   * files than one upload may carry.
+   */
+  const isTemplateName = (n: string) =>
+    !n.endsWith('/') &&
+    !n.includes('__MACOSX') &&
+    !n.split('/').pop()!.startsWith('.') &&
+    n.toLowerCase().endsWith('.txt');
+  const oversized: string[] = [];
+  const skippedNotTxt: string[] = [];
+  let offered = 0;
   let entries: Record<string, Uint8Array>;
   try {
-    entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    entries = unzipSync(new Uint8Array(await file.arrayBuffer()), {
+      filter: (f) => {
+        if (!isTemplateName(f.name)) {
+          if (!f.name.endsWith('/')) skippedNotTxt.push(f.name);
+          return false;
+        }
+        // One UTF-8 character is at least one byte, so a file whose inflated
+        // size exceeds the character limit can never parse.
+        if (f.originalSize > MAX_TEMPLATE_CHARS) {
+          oversized.push(f.name);
+          return false;
+        }
+        offered += 1;
+        return offered <= MAX_ZIP_FILES;
+      },
+    });
   } catch {
     throw badRequest('Could not read the ZIP archive — is it a valid .zip file?');
   }
 
-  const names = Object.keys(entries)
-    .filter((n) => !n.endsWith('/'))
-    .filter((n) => !n.includes('__MACOSX'))
-    .filter((n) => !n.split('/').pop()!.startsWith('.'))
-    .filter((n) => n.toLowerCase().endsWith('.txt'))
-    .sort();
+  const names = Object.keys(entries).filter(isTemplateName).sort();
 
-  const skipped = Object.keys(entries).filter((n) => !n.endsWith('/') && !names.includes(n));
+  const skipped = [...skippedNotTxt, ...oversized];
+  // Entries the filter refused to inflate because the archive had already
+  // offered MAX_ZIP_FILES templates, plus (belt and braces) any surplus that
+  // still arrived.
   const overflow = names.length > MAX_ZIP_FILES ? names.splice(MAX_ZIP_FILES) : [];
+  const overLimit = Math.max(0, offered - MAX_ZIP_FILES);
 
   const decoder = new TextDecoder('utf-8');
   const files: Array<Record<string, unknown>> = [];
@@ -1456,6 +1621,9 @@ templateRoutes.post('/parse-zip', async (c) => {
         needs_review: needsReview,
         validation_error: a.validation_error,
         applied_fields: a.merge?.applied_fields ?? [],
+        // §7.3 — the same pre-flight statement the single-file /parse makes.
+        spec_fields: a.spec,
+        inventory_mode: plannedInventoryMode(a, !!a.existing),
         summary: a.doc ? { name_ar: a.doc.name_ar, name_en: a.doc.name_en, price_iqd: a.doc.price_iqd } : null,
       });
     } catch (e) {
@@ -1480,12 +1648,13 @@ templateRoutes.post('/parse-zip', async (c) => {
     files,
     skipped_entries: skipped,
     skipped_over_limit: overflow,
+    skipped_oversized: oversized,
     counts: {
       parsed: files.length,
       ready: files.filter((f) => f.ready_to_apply === true).length,
       not_ready: files.filter((f) => f.ready_to_apply !== true).length,
       skipped_not_txt: skipped.length,
-      skipped_over_limit: overflow.length,
+      skipped_over_limit: overflow.length + overLimit,
       limit: MAX_ZIP_FILES,
     },
   });

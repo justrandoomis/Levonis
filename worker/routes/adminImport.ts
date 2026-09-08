@@ -83,7 +83,7 @@ import {
   serializeDoc,
   validateProductDoc,
 } from '../lib/productModel';
-import { localizeProductDoc } from '../lib/translate/localizeProduct';
+import { localizeRespectingAuthored } from '../lib/productPersistence';
 import { syncProductTranslations } from '../lib/translate/store';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 
@@ -1087,8 +1087,19 @@ adminImportRoutes.post('/confirm', async (c) => {
       if (isCreate) {
         doc.slug = await uniqueProductSlug(c.env.DB, doc.name_en || key || productId);
       }
-      // §3: English in, Arabic and Kurdish generated locally. No network call.
-      const localized = localizeProductDoc(doc);
+      /**
+       * §3: English in, Arabic and Kurdish generated locally. No network call
+       * — and, since the form save learned it, the copy a HUMAN wrote survives.
+       * `localizeProductDoc` regenerates every ar/ckb slot on every pass, so a
+       * CSV re-import of a TXT-imported product overwrote the Arabic and
+       * Kurdish the file had authored: the same loss root cause 10 removed
+       * from the form path (docs/TXT_IMPORT_PARITY.md). The importer reads the
+       * stored document for the same reason the form does.
+       */
+      const prevRow = isCreate
+        ? null
+        : await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
+      const localized = localizeRespectingAuthored(doc, prevRow ? parseProductRow(prevRow) : null);
       const record = serializeDoc(doc);
 
       const stmts: D1PreparedStatement[] = [];

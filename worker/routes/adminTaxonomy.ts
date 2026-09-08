@@ -31,7 +31,7 @@ adminTaxonomyRoutes.use('*', requireAdmin);
 const TEMPLATE_FAMILIES = ['devices', 'materials'] as const;
 export type TemplateFamily = (typeof TEMPLATE_FAMILIES)[number];
 
-interface CatalogRow {
+export interface CatalogRow {
   id: string;
   parent_id: string | null;
   slug: string;

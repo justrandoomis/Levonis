@@ -17,17 +17,14 @@
 
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, int, str, forbidden , pickFrom } from '../lib/http';
+import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
-import { registerHashtags } from '../lib/hashtags';
 import {
   parseProductRow,
   validateProductDoc,
-  serializeDoc,
   projectAdmin,
   upgradeMedia,
-  PRODUCT_COLUMNS,
 } from '../lib/productModel';
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
@@ -36,15 +33,26 @@ import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '.
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
 import { transportDefaultsFrom } from './products';
-import { localizeProductDoc } from '../lib/translate/localizeProduct';
 import {
   attemptedFinancialWrites,
   canViewFinancials,
   carryStoredCostForward,
   projectForAdmin,
 } from '../lib/adminScope';
-import { syncProductTranslations } from '../lib/translate/store';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import {
+  localizeRespectingAuthored,
+  planProductSave,
+  priceHistoryDeltas as sharedPriceHistoryDeltas,
+  recordPriceHistory,
+  reloadForVerification,
+  saveProductAtomic,
+  type HistoryField,
+  type PriceDelta,
+} from '../lib/productPersistence';
+
+/** Kept under its old name: the diff is now the contract's (productPersistence). */
+export const priceHistoryDeltas = sharedPriceHistoryDeltas;
 
 export const adminProductsRoutes = new Hono<AppContext>();
 
@@ -91,54 +99,6 @@ async function catalogIdsFor(db: D1Database, productId: string): Promise<string[
   return results.map((r) => r.catalog_id);
 }
 
-/**
- * Syncs product_catalogs to exactly `catalogIds`. New associations append at
- * MAX(position)+1 within their catalog (UNIQUE(catalog_id, position) safe).
- * Throws 400 on unknown catalog ids. Returns the final id list.
- */
-async function syncCatalogs(db: D1Database, productId: string, catalogIds: string[]): Promise<string[]> {
-  const wanted = [...new Set(catalogIds.map((s) => s.trim()).filter(Boolean))].slice(0, 50);
-  if (wanted.length) {
-    const ph = wanted.map(() => '?').join(',');
-    const { results } = await db
-      .prepare(`SELECT id FROM catalogs WHERE id IN (${ph})`)
-      .bind(...wanted)
-      .all<{ id: string }>();
-    const known = new Set(results.map((r) => r.id));
-    const missing = wanted.filter((id) => !known.has(id));
-    if (missing.length) throw badRequest(`catalog_ids: unknown catalog "${missing[0]}"`);
-  }
-  const { results: current } = await db
-    .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ?')
-    .bind(productId)
-    .all<{ catalog_id: string }>();
-  const have = new Set(current.map((r) => r.catalog_id));
-  const wantSet = new Set(wanted);
-
-  const stmts: D1PreparedStatement[] = [];
-  for (const cid of have) {
-    if (!wantSet.has(cid)) {
-      stmts.push(
-        db.prepare('DELETE FROM product_catalogs WHERE product_id = ? AND catalog_id = ?').bind(productId, cid)
-      );
-    }
-  }
-  for (const cid of wanted) {
-    if (!have.has(cid)) {
-      stmts.push(
-        db
-          .prepare(
-            `INSERT INTO product_catalogs (product_id, catalog_id, position)
-             VALUES (?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM product_catalogs WHERE catalog_id = ?))`
-          )
-          .bind(productId, cid, cid)
-      );
-    }
-  }
-  if (stmts.length) await db.batch(stmts);
-  return wanted;
-}
-
 /** Fields whose per-language state is tracked. English is the SOURCE. */
 const TRACKED_FIELDS = [
   { key: 'name', en: 'name_en', ar: 'name_ar', ckb: 'name_ckb' },
@@ -166,7 +126,12 @@ function applyTranslationTracking(
   prev: ProductDoc | null,
   review: string[]
 ): void {
-  const storedMeta: TranslationMeta = prev?.translation_meta ?? {};
+  // The localiser already seeded `doc.translation_meta` from the stored one
+  // (and demoted the authored marks whose English source changed), so that is
+  // the starting point; a caller that skipped it starts from the stored meta.
+  const storedMeta: TranslationMeta = Object.keys(doc.translation_meta ?? {}).length
+    ? doc.translation_meta
+    : prev?.translation_meta ?? {};
   const meta: TranslationMeta = {};
   for (const key of Object.keys(storedMeta)) meta[key] = { ...storedMeta[key] };
 
@@ -200,84 +165,6 @@ function applyTranslationTracking(
 
   doc.content_rev = contentRev;
   doc.translation_meta = meta;
-}
-
-// ---------------------------------------------------------------- price history
-
-// 'compare_at' is retired from the product form (mandate §4) but stays a
-// legal value in the table so historic rows remain readable; new rows only
-// ever use these four.
-type HistoryField = 'regular' | 'prime' | 'pro' | 'cost';
-
-interface PriceDelta {
-  variant_key: string; // '' | option:<id> | color:<id>
-  field: HistoryField;
-  old_iqd: number | null;
-  new_iqd: number | null;
-}
-
-/**
- * Monetary-field diff between the stored document and the saved one — one
- * row per changed price (price_history, 0003). Feeds seven-day price
- * protection (§6.8): a drop stays inspectable even after the price moves
- * again. Costs are internal and deliberately NOT recorded here (the table
- * is scoped to selling prices by its CHECK constraint).
- */
-interface PriceFields2 {
-  id: string;
-  regular_price_iqd: number | null;
-  prime_price_iqd: number | null;
-  pro_price_iqd: number | null;
-  cost_iqd: number | null;
-}
-
-export function priceHistoryDeltas(prev: ProductDoc, next: ProductDoc): PriceDelta[] {
-  const out: PriceDelta[] = [];
-  const push = (variantKey: string, field: HistoryField, oldV: number | null, newV: number | null) => {
-    if (oldV !== newV) out.push({ variant_key: variantKey, field, old_iqd: oldV, new_iqd: newV });
-  };
-
-  push('', 'regular', prev.price_iqd, next.price_iqd);
-  push('', 'prime', prev.prime_price_iqd, next.prime_price_iqd);
-  push('', 'pro', prev.pro_price_iqd, next.pro_price_iqd);
-  push('', 'cost', prev.product_cost_iqd, next.product_cost_iqd);
-
-  const diffGroup = (
-    kind: 'option' | 'color',
-    prevItems: PriceFields2[],
-    nextItems: PriceFields2[]
-  ) => {
-    const prevById = new Map(prevItems.map((x) => [x.id, x]));
-    const nextById = new Map(nextItems.map((x) => [x.id, x]));
-    for (const id of new Set([...prevById.keys(), ...nextById.keys()])) {
-      const p = prevById.get(id) ?? null;
-      const n = nextById.get(id) ?? null;
-      push(`${kind}:${id}`, 'regular', p?.regular_price_iqd ?? null, n?.regular_price_iqd ?? null);
-      push(`${kind}:${id}`, 'prime', p?.prime_price_iqd ?? null, n?.prime_price_iqd ?? null);
-      push(`${kind}:${id}`, 'pro', p?.pro_price_iqd ?? null, n?.pro_price_iqd ?? null);
-      push(`${kind}:${id}`, 'cost', p?.cost_iqd ?? null, n?.cost_iqd ?? null);
-    }
-  };
-  diffGroup('option', prev.options, next.options);
-  diffGroup('color', prev.colors, next.colors);
-  return out;
-}
-
-async function recordPriceHistory(
-  db: D1Database,
-  productId: string,
-  actorId: string,
-  deltas: PriceDelta[]
-): Promise<void> {
-  if (deltas.length === 0) return;
-  const stmts = deltas.map((d) =>
-    db
-      .prepare(
-        'INSERT INTO price_history (product_id, variant_key, field, old_iqd, new_iqd, changed_by) VALUES (?, ?, ?, ?, ?, ?)'
-      )
-      .bind(productId, d.variant_key, d.field, d.old_iqd, d.new_iqd, actorId)
-  );
-  await db.batch(stmts);
 }
 
 function brandOut(r: Record<string, unknown>) {
@@ -745,17 +632,17 @@ adminProductsRoutes.patch('/:id/status', async (c) => {
 /** The FULL canonical document + catalog placement — the edit payload. */
 adminProductsRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
-  const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  if (!row) throw notFound('Product not found');
-  const doc = parseProductRow(row);
+  // THE PRODUCT AS IT ACTUALLY IS: the relational overlay, inactive rows
+  // included, so `doc.options/colors/media` and the relations endpoint never
+  // disagree on screen (docs/TXT_IMPORT_PARITY.md §5.3.1). A product with no
+  // relational rows falls through to its JSON columns, exactly as before.
+  const stored = await reloadForVerification(c.env.DB, id);
+  if (!stored) throw notFound('Product not found');
   return c.json({
     success: true,
     // §11: an assistant admin gets the same document with every financial
     // field removed on the SERVER — reading the raw response reveals nothing.
-    product: projectForAdmin(c.env, c.get('user'), {
-      ...projectAdmin(doc),
-      catalog_ids: await catalogIdsFor(c.env.DB, id),
-    }),
+    product: projectForAdmin(c.env, c.get('user'), stored.document),
   });
 });
 
@@ -896,81 +783,69 @@ adminProductsRoutes.post('/', async (c) => {
     doc.slug = await uniqueSlugIn(c.env.DB, 'products', base, null);
   }
 
-  // §3: English in, ar/ckb generated locally. This mutates the doc in place
-  // BEFORE serialization, so the row that gets written already carries the
-  // generated text and the storefront needs no runtime translation.
-  const localized = localizeProductDoc(doc);
+  // §3: English in, ar/ckb generated locally — except the copies a human
+  // wrote (a TXT-imported Arabic description, an approved translation), which
+  // survive as long as their English source is unchanged. Mutates the doc in
+  // place BEFORE serialization, so the row that gets written already carries
+  // the generated text and the storefront needs no runtime translation.
+  const localized = localizeRespectingAuthored(doc, prev);
   applyTranslationTracking(doc, prev, localized.review_needed);
 
-  const record = serializeDoc(doc);
+  // ONE CONTRACT, ONE BATCH. The row, the catalog placement, the price-history
+  // rows, the hashtag vocabulary, the translation rows and — when the client
+  // sends them — the relations all land together or not at all
+  // (worker/lib/productPersistence.ts). A body without `relations` leaves the
+  // relation tables exactly as they are: the form still PUTs them separately.
+  const relations =
+    body.relations && typeof body.relations === 'object' && !Array.isArray(body.relations)
+      ? (body.relations as Record<string, unknown>)
+      : null;
+  let plan;
   try {
-    if (prev) {
-      const cols = PRODUCT_COLUMNS.filter((k) => k !== 'id');
-      await c.env.DB.prepare(
-        `UPDATE products SET ${cols.map((k) => `${k} = ?`).join(', ')},
-                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-          WHERE id = ?`
-      )
-        .bind(...cols.map((k) => record[k] ?? null), doc.id)
-        .run();
-    } else {
-      await c.env.DB.prepare(
-        `INSERT INTO products (${PRODUCT_COLUMNS.join(', ')})
-         VALUES (${PRODUCT_COLUMNS.map(() => '?').join(', ')})`
-      )
-        .bind(...PRODUCT_COLUMNS.map((k) => record[k] ?? null))
-        .run();
+    plan = await planProductSave(c.env.DB, {
+      mode: prev ? 'update' : 'create',
+      doc,
+      prev,
+      relations,
+      catalogIds: Array.isArray(body.catalog_ids)
+        ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+        : undefined,
+      actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+      translations: localized.fields,
+    });
+  } catch (e) {
+    if (e instanceof HttpError && e.code === 'RELATIONS_VALIDATION') {
+      const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
+      return c.json({ success: false, code: 'VALIDATION', errors }, 400);
     }
+    throw e;
+  }
+  try {
+    await saveProductAtomic(c.env.DB, plan, [
+      {
+        action: prev ? 'product_v2.update' : 'product_v2.create',
+        detail: {
+          name_en: doc.name_en,
+          slug: doc.slug,
+          status: doc.status,
+          price_iqd: doc.price_iqd,
+          content_rev: doc.content_rev,
+        },
+      },
+    ]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('UNIQUE') && msg.includes('slug')) throw badRequest('slug: already used by another product', 'SLUG_TAKEN');
+    // The race backstop for the named SKU check in `planProductSave` — the
+    // same answer the TXT path gives, so neither surface says «Something went
+    // wrong» for a duplicate SKU.
+    if (msg.includes('UNIQUE') && msg.includes('products.sku')) {
+      throw badRequest('sku: already used by another product / رمز المنتج مستخدم في منتج آخر', 'SKU_TAKEN');
+    }
     throw e;
   }
-
-  if (Array.isArray(body.catalog_ids)) {
-    await syncCatalogs(
-      c.env.DB,
-      doc.id,
-      (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
-    );
-  }
-  // A hashtag typed by hand in the form becomes a selectable option in the
-  // taxonomy admin, the form's suggestions and the import template.
-  await registerHashtags(c.env.DB, doc.hashtags, newId);
-
-  // Price history (§6.8): every monetary change on an existing product —
-  // base/PRO/compare-at at product, option and color level — is snapshotted
-  // with the prior value, the actor and the change time. The product save
-  // above already stands; a history-write failure is surfaced, never hidden.
-  let priceHistoryWarning: string | null = null;
-  if (prev) {
-    try {
-      await recordPriceHistory(c.env.DB, doc.id, admin.id, priceHistoryDeltas(prev, doc));
-    } catch (e) {
-      console.error('price history write failed for product', doc.id, e instanceof Error ? e.message : String(e));
-      priceHistoryWarning =
-        'The product saved, but its price-history rows could not be written — price protection for this change may need manual review.';
-    }
-  }
-
-  // Store the English sources and their generated copies. A failure here must
-  // not lose the product that already saved, so it degrades to a warning.
-  let translationWarning: string | null = null;
-  try {
-    await syncProductTranslations(c.env.DB, doc.id, localized.fields);
-  } catch (e) {
-    console.error('translation write failed for product', doc.id, e instanceof Error ? e.message : String(e));
-    translationWarning =
-      'The product saved, but its Arabic/Kurdish copies could not be stored — re-save to retry.';
-  }
-
-  await audit(c.env.DB, admin.id, prev ? 'product_v2.update' : 'product_v2.create', doc.id, {
-    name_en: doc.name_en,
-    slug: doc.slug,
-    status: doc.status,
-    price_iqd: doc.price_iqd,
-    content_rev: doc.content_rev,
-  });
+  const translationWarning: string | null = null;
+  const priceHistoryWarning: string | null = null;
 
   // THE BASE PRICE MOVED, BUT NOT EVERYTHING MOVED WITH IT.
   //
@@ -990,13 +865,13 @@ adminProductsRoutes.post('/', async (c) => {
     }
   }
 
-  const fresh = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?')
-    .bind(doc.id)
-    .first<Record<string, unknown>>();
+  const stored = await reloadForVerification(c.env.DB, doc.id);
   return c.json({
     success: true,
     created: !prev,
-    product: projectForAdmin(c.env, admin, { ...projectAdmin(parseProductRow(fresh!)), catalog_ids: await catalogIdsFor(c.env.DB, doc.id) }),
+    product: projectForAdmin(c.env, admin, stored!.document),
+    ...(plan.relations ? { relations: plan.relations.summary } : {}),
+    ...(plan.warnings.length ? { warnings: plan.warnings } : {}),
     ...(pinnedAfterPriceChange ? { pinned_prices: pinnedAfterPriceChange } : {}),
     // Named honestly rather than hidden behind a green tick: these fields kept
     // their English text because the local engine could not translate them
@@ -1209,16 +1084,20 @@ adminProductsRoutes.delete('/:id', async (c) => {
 adminProductsRoutes.put('/:id/catalogs', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
-  const exists = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(id).first();
-  if (!exists) throw notFound('Product not found');
+  const existingRow = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!existingRow) throw notFound('Product not found');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!Array.isArray(body.catalog_ids)) throw badRequest('catalog_ids must be an array of catalog ids');
-  const finalIds = await syncCatalogs(
-    c.env.DB,
-    id,
-    (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
-  );
-  await audit(c.env.DB, admin.id, 'product_v2.catalogs', id, { catalog_ids: finalIds });
+  // The placement alone, through the same contract as every other write.
+  const plan = await planProductSave(c.env.DB, {
+    mode: 'update',
+    doc: null,
+    prev: parseProductRow(existingRow),
+    relations: null,
+    catalogIds: (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
+    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+  });
+  await saveProductAtomic(c.env.DB, plan, [{ action: 'product_v2.catalogs', detail: { catalog_ids: plan.catalogIds ?? [] } }]);
   return c.json({ success: true, catalog_ids: await catalogIdsFor(c.env.DB, id) });
 });
 
