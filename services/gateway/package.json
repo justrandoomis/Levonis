@@ -1,0 +1,16 @@
+{
+  "name": "@levonis/svc-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "levonis-gateway — the only Worker with zone routes: host classification, origin check and security headers (the core's, byte-identical), signed-principal resolution, the capability table, layered rate limiting, request validation, the safe anonymous-GET cache, the Turnstile hook, correlation ids, health, and the routing table that forwards every legacy prefix to the core over a service binding with a kill-switch override.",
+  "dependencies": {
+    "@levonis/contracts": "*",
+    "@levonis/platform-kit": "*",
+    "hono": "^4.9.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  }
+}

@@ -1,0 +1,126 @@
+{
+  // levonis-gateway — the API gateway (`01-TARGET.md` §3, `02-MIGRATION-PLAN.md` 1.5).
+  //
+  // NOTHING HERE IS DEPLOYED BY THIS SLICE. The file exists so the dark deploy
+  // (G1) and, later, the cut-over (G3) are a workflow run rather than a design
+  // exercise. Zone routes are NEVER declared in the repo — they are added to
+  // `levonis-gateway` in the dashboard at G3 and removing them is the rollback
+  // (`tests/leastPrivilege.test.ts` fails on any `routes`/`custom_domains` key).
+  //
+  // Visibility: `workers_dev` and `preview_urls` are declared false in EVERY
+  // environment, the dark gateway included — it serves the dark ZONE (so the
+  // Cache API and merchant hosts are exercised for real) and a version Preview
+  // URL would be a second door into a Worker whose whole job is to be the only
+  // one (`01-TARGET.md` §1.1 "Visibility", §4 item 1).
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+
+  // Non-secret configuration. Every value is filled at deploy time by
+  // `_deploy-worker.yml` (slice 1.9) exactly as the core's are; a name that is
+  // not declared here is a name the deploy-config preservation pass cannot see.
+  "vars": {
+    // The strangler phase this deployment routes for: 1 = every legacy prefix
+    // goes to CORE. Raising it flips the prefixes whose `flipPhase` it reaches
+    // (see src/routes.ts) — a var change, not a code change.
+    "GATEWAY_PHASE": "1",
+    // Until G3 the production gateway answers 403 to anything without a valid
+    // `x-health-probe` (`01-TARGET.md` §3.1).
+    "GATEWAY_LOCKED": "on",
+    // Kill switch: "<prefix>=<TARGET>,…" — flips any prefix back to CORE
+    // without a deploy. KV `FLAGS` takes over when it is provisioned.
+    "ROUTE_OVERRIDES": "",
+    // off | shadow | on — whether the gateway resolves a principal at all
+    // (`01-TARGET.md` §3.2 step 7). `off` while the core still runs
+    // loadSessionUser itself: no second session read per request.
+    "PRINCIPAL_MODE": "off",
+    "PRINCIPAL_SHADOW_RATE": "0",
+    // on | off — the safe anonymous-GET cache (§3.7). Inert on workers.dev.
+    "CACHE_MODE": "off",
+    // Empty in production: the authoritative limiter is IDENTITY.rateLimitHit.
+    // `memory` is dark/local only and never a silent fallback (ADR-016).
+    "RATE_LIMIT_MODE": "",
+    // Which shadow classes enforce. Empty = `ip` and `public-read` only count
+    // and log, which is how they ship (§3.6: two weeks of /24 telemetry first).
+    "RATE_LIMIT_ENFORCE": "",
+    "TURNSTILE_SITEKEY": "",
+    // The PUBLIC half of GATEWAY_SIGNING_KEY (base64url raw Ed25519). Not a
+    // secret — it is what every callee verifies with — but the signer needs
+    // both halves, because WebCrypto cannot derive a public key from a PKCS#8
+    // private import.
+    "GATEWAY_SIGNING_PUBLIC_KEY": "",
+    "APP_ORIGIN": "",
+    "STORE_ROOT_DOMAIN": "",
+    "EXTRA_ALLOWED_ORIGINS": "",
+    "SVC_VERSION": ""
+  },
+
+  // The per-colo first layer (`01-TARGET.md` §3.6). `namespace_id` is a
+  // developer-chosen integer, not a created resource, so these bind with no
+  // provisioning and no token scope; the authoritative counter stays
+  // IDENTITY.rateLimitHit. Limits here are the OUTER bound of the class — the
+  // per-class table in src/limiter.ts is what the request is judged against,
+  // and `tests/rateLimitParity` keeps it no tighter than the core's today.
+  "ratelimits": [
+    { "name": "RL_IP", "namespace_id": "1001", "simple": { "limit": 1200, "period": 60 } },
+    { "name": "RL_PUBLIC_READ", "namespace_id": "1002", "simple": { "limit": 600, "period": 60 } }
+  ],
+
+  // The strangler bindings. CORE is the legacy core (live name
+  // `levonis-staging`, `docs/WORKERS.md` — never renamed); IDENTITY is the
+  // core's named entrypoint (slice 1.6), which is where `resolveSession`,
+  // `rateLimitHit`, `revoke` and `getPublicKeys` live until Phase 9.
+  // The gateway holds NO other binding: ADR-015 keeps its key off every
+  // privileged allowlist, and `tests/leastPrivilege.test.ts` pins the set.
+  "services": [
+    { "binding": "CORE", "service": "levonis-staging" },
+    { "binding": "IDENTITY", "service": "levonis-staging", "entrypoint": "IdentityEntrypoint" }
+  ],
+
+  "env": {
+    // The dark stack (slice 1.5): the dark zone routes `<darkroot>/api/*` and
+    // `<darkroot>/files/*` here, everything else stays on the dark core.
+    "dark": {
+      "name": "levonis-gateway-dark",
+      "workers_dev": false,
+      "preview_urls": false,
+      "observability": { "enabled": true },
+      "vars": {
+        "GATEWAY_PHASE": "1",
+        "GATEWAY_LOCKED": "off",
+        "ROUTE_OVERRIDES": "",
+        "PRINCIPAL_MODE": "off",
+        "PRINCIPAL_SHADOW_RATE": "0",
+        "CACHE_MODE": "on",
+        "RATE_LIMIT_MODE": "",
+        "RATE_LIMIT_ENFORCE": "",
+        "TURNSTILE_SITEKEY": "",
+        "GATEWAY_SIGNING_PUBLIC_KEY": "",
+        "APP_ORIGIN": "",
+        "STORE_ROOT_DOMAIN": "",
+        "EXTRA_ALLOWED_ORIGINS": "",
+        "SVC_VERSION": ""
+      },
+      // DIFFERENT NAMESPACE IDS FROM PRODUCTION. The wrangler schema documents
+      // `namespace_id` only as "the namespace ID for this rate limiter" and
+      // says nothing about its scope; if it is account-scoped rather than
+      // Worker-scoped, dark traffic and the parity corpus would spend the
+      // PRODUCTION gateway's per-colo budget. Separate ids cost nothing and
+      // remove the question — the probe set can then confirm the scope at
+      // leisure rather than as a precondition (ADR-017).
+      "ratelimits": [
+        { "name": "RL_IP", "namespace_id": "2001", "simple": { "limit": 1200, "period": 60 } },
+        { "name": "RL_PUBLIC_READ", "namespace_id": "2002", "simple": { "limit": 600, "period": 60 } }
+      ],
+      "services": [
+        { "binding": "CORE", "service": "levonis-core-dark" },
+        { "binding": "IDENTITY", "service": "levonis-core-dark", "entrypoint": "IdentityEntrypoint" }
+      ]
+    }
+  }
+}

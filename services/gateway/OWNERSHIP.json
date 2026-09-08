@@ -1,0 +1,22 @@
+{
+  "service": "gateway",
+  "owns": [],
+  "reads": [],
+  "calls": [
+    "IDENTITY.resolveSession",
+    "IDENTITY.revoke",
+    "IDENTITY.getPublicKeys",
+    "IDENTITY.rateLimitHit",
+    "CORE.forward"
+  ],
+  "publishes": [],
+  "consumes": ["SessionRevoked.v1", "RoleChanged.v1"],
+  "secrets": ["GATEWAY_SIGNING_KEY", "TURNSTILE_SECRET", "HEALTH_PROBE_TOKEN"],
+  "legacyRoutes": [],
+  "notes": {
+    "sql": "The gateway executes no SQL and owns no table (01-TARGET.md §2.1). `owns` and `reads` are empty on purpose and tests/serviceBoundaries.test.ts fails on the first SQL literal that appears here.",
+    "calls": "Pinned by tests/leastPrivilege.test.ts (ADR-015): no method containing Admin, set, credit, debit, decide or lookupContacts may ever appear — the Worker that parses every byte from the internet must not hold a key on a privileged allowlist. `CORE.forward` is the HTTP forward over the service binding, not an RPC method name. The cross-isolate rate counter lives in Identity (ADR-016), reached only through IDENTITY.rateLimitHit.",
+    "publishes": "Empty until Phase 2. The gateway emits RateLimitHit and TurnstileFailed best-effort (01-TARGET.md §3.6, §3.8), but their subscribers are risk and analytics: declaring them here would require RISK/ANALYTICS service bindings, and binding a Worker that does not exist yet fails the deploy. src/events.ts holds the emitter behind a feature check on the bindings, so turning it on in Phase 2 is a wrangler change.",
+    "consumes": "SessionRevoked and RoleChanged evict the in-isolate principal cache (01-TARGET.md §3.4). deliver() needs no store: an eviction is idempotent, so the gateway keeps no <svc>_processed_events table and no database."
+  }
+}

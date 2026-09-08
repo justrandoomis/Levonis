@@ -1,0 +1,24 @@
+{
+  // LOCAL DEVELOPMENT ONLY — never deployed, never referenced by a workflow.
+  // It carries the dark core's NAME so the gateway's `env.dark` service
+  // bindings resolve to it under multi-config `wrangler dev`:
+  //
+  //   npx wrangler dev -c services/gateway/wrangler.jsonc \
+  //                    -c services/gateway/dev/core-stub/wrangler.jsonc --env dark
+  //
+  // See ../README.md.
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-core-dark",
+  "main": "index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "env": {
+    "dark": {
+      "name": "levonis-core-dark",
+      "workers_dev": false,
+      "preview_urls": false
+    }
+  }
+}
