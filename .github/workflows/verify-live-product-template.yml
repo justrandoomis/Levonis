@@ -229,8 +229,13 @@ jobs:
             // 1. The bug the owner hit: the export loaded the products ROW and
             //    stopped there, so a product whose options, colours and images
             //    live in the relational tables exported as a near-empty file.
-            const i = s.indexOf('async function loadProductDoc(');
-            if (i < 0) no('loadProductDoc is not in the deployed script');
+            // The loader is matched by PREFIX, not by an exact name: it was
+            // renamed to loadProductDocWithView when the single persistence
+            // contract landed, and an exact-name check reported the export as
+            // broken while it was reading the relation tables correctly. What
+            // matters is the body, asserted below.
+            const i = s.indexOf('async function loadProductDoc');
+            if (i < 0) no('no loadProductDoc* loader is in the deployed script');
             else {
               const body = s.slice(i, i + 600);
               if (body.includes('loadRelationsView')) ok('the export reads the relational tables');
