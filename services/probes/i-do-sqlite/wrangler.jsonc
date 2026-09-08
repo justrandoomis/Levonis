@@ -1,0 +1,14 @@
+{
+  // ADR-017 (i) — a SQLite Durable Object class created by the deploy itself.
+  // The `migrations` block below is the whole probe: if the token cannot create
+  // the class, the deploy fails and D22's "deploy-only" claim is false.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-do",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "durable_objects": { "bindings": [{ "name": "PROBE_DO", "class_name": "ProbeCounter" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProbeCounter"] }]
+}

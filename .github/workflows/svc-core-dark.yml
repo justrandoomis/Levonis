@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS levonis-core-dark, WHICH SERVES NO DOMAIN. It is a dark Worker:
+#   it has no zone route and no Custom Domain, and nothing a customer touches
+#   reaches it. Deleting it changes nothing users can see.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# The DARK twin of the monolith (plan slice 1.4): the same code as the live
+# core, with its OWN empty database (levonis-db-dark) and bucket
+# (levonis-files-dark) and the four dark leaf consumers bound. It is what the
+# dark gateway sits in front of and what the event bus publishes from.
+#
+# It is reached on the DARK ZONE (D21), not on workers.dev: env.dark declares
+# workers_dev:false and preview_urls:false, because a Worker holding a seeded
+# copy of the whole product should not also answer on a second, unrouted door.
+# Set `probe_base` to the dark root before running, or the health probe has
+# nothing to look at and says so.
+#
+# NOTHING IS CREATED WITHOUT CONFIRMATION. Deploying a new Worker — and, with
+# "create_resources", creating its database — changes the Cloudflare account,
+# which is an owner-gated action (G1/G2 in docs/architecture/02-MIGRATION-PLAN.md).
+# The work happens in the reusable workflow `_deploy-worker.yml`.
+name: 30 - Deploy DARK levonis-core-dark (serves no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-CORE-DARK to confirm'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (a hard precondition — D1)'
+        type: boolean
+        required: false
+        default: false
+      create_resources:
+        description: 'Create levonis-db-dark if it is missing (an account change)'
+        type: boolean
+        required: false
+        default: false
+      probe_base:
+        description: 'The dark-zone URL this Worker answers on (D21). Empty = no health probe is possible and the run fails saying so'
+        required: false
+        default: ''
+
+concurrency: svc-core-dark
+
+jobs:
+  # A separate job, because a job that calls a reusable workflow cannot also
+  # run a step. The confirmation is checked before anything is reached.
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-CORE-DARK" ] \
+            || { echo "::error::type DEPLOY-CORE-DARK to confirm"; exit 1; }
+          echo "confirmed: deploying levonis-core-dark, which serves no domain"
+
+  deploy:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: core
+      env: dark
+      create_resources: ${{ inputs.create_resources }}
+      paid_plan_confirmed: ${{ inputs.paid_plan_confirmed }}
+      build_spa: true
+      probe_base: ${{ inputs.probe_base }}

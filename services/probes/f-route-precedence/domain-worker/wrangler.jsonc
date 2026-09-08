@@ -1,0 +1,13 @@
+{
+  // ADR-017 (f) — the CUSTOM DOMAIN half. No `routes` key: routing is attached in
+  // the dashboard on the DARK zone (D21) by the owner, and every wrangler file
+  // in this repository is forbidden to declare routes
+  // (`tests/boundariesConfigs.test.ts`, `tests/workflowNaming.test.ts`).
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-domain",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true }
+}

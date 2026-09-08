@@ -1,0 +1,203 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS THE WHOLE DARK STACK, WHICH SERVES NO DOMAIN:
+#   levonis-{audit,analytics,ads,notifications}-dark, levonis-core-dark and
+#   levonis-gateway-dark. Not one of them is levonis-staging or
+#   levonis-studio-staging, and not one of them answers on levonis-iq.com.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# THE DARK STACK, END TO END, FROM A BRANCH (plan slice 1.9; Phase 1 exit).
+#
+# Run it from the branch you want to prove — `workflow_dispatch` deploys the
+# ref the run was started on, which is the point: a slice's dark stack is
+# deployed from its own branch, before it merges.
+#
+# ORDER MATTERS, and it is the plan's: the four leaf consumers first (1.7),
+# then the core that binds them (1.4/1.6 — the Workers upload API rejects a
+# `services` binding whose target Worker does not exist yet), then the gateway
+# that sits in front of the core (1.5). Then it seeds, and then it drives the
+# corpus THROUGH the gateway so what is measured is the path a request will
+# actually take.
+#
+# Nothing live is touched: no route, no DNS, no secret and no binding of
+# levonis-staging or levonis-studio-staging. The dark zone (D21) is a throwaway
+# domain, not the live one.
+name: 36 - Verify DARK stack end to end (deploys DARK Workers — serve no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY-DARK to confirm (this deploys six dark Workers)'
+        required: true
+        default: ''
+      dark_root:
+        description: 'The dark zone root domain (D21) — the stack is reached here, never on workers.dev'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (a hard precondition — D1)'
+        type: boolean
+        required: false
+        default: false
+      create_resources:
+        description: 'Create the *-dark databases and bucket if missing (an account change)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: verify-dark
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "VERIFY-DARK" ] \
+            || { echo "::error::type VERIFY-DARK to confirm"; exit 1; }
+          case "${{ github.event.inputs.dark_root }}" in
+            ""|levonis-iq.com|*.levonis-iq.com)
+              echo "::error::dark_root must be the THROWAWAY dark zone (D21), never the live zone"; exit 1 ;;
+          esac
+          echo "confirmed: deploying the dark stack on ${{ github.event.inputs.dark_root }} from ${{ github.ref_name }}"
+
+  # ------------------------------------------------ the four leaf consumers
+  audit:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with: { service: audit, env: dark, create_resources: '${{ inputs.create_resources }}', paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}' }
+  analytics:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with: { service: analytics, env: dark, create_resources: '${{ inputs.create_resources }}', paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}' }
+  ads:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with: { service: ads, env: dark, create_resources: '${{ inputs.create_resources }}', paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}' }
+  notifications:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with: { service: notifications, env: dark, create_resources: '${{ inputs.create_resources }}', paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}' }
+
+  # ------------------------------- the core, which binds all four of them
+  core:
+    needs: [audit, analytics, ads, notifications]
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: core
+      env: dark
+      build_spa: true
+      create_resources: '${{ inputs.create_resources }}'
+      paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}'
+      probe_base: 'https://${{ inputs.dark_root }}'
+
+  # ------------------------------------------------------------ rebind
+  # THE THIRD DEPLOY OF THE TWO LEAVES THAT BIND THE CORE.
+  #
+  # `services/audit` and `services/analytics` declare
+  # `IDENTITY -> levonis-core-dark#IdentityEntrypoint`, and the leaf jobs run
+  # BEFORE the core exists — the upload API rejects a `services` entry whose
+  # target Worker is absent, so `resolve-ids` strips that binding and the leaf
+  # deploys without it. Nothing later put it back: the two-pass mechanism inside
+  # `_deploy-worker.yml` only closes a cycle whose target the SAME job creates.
+  #
+  # So the order is: leaves (no IDENTITY) -> core -> leaves again (with it).
+  # This stage is that third step, and it is why the leaves' key rings can reach
+  # `IDENTITY.getPublicKeys()` at all.
+  rebind-audit:
+    needs: core
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with: { service: audit, env: dark, paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}' }
+  rebind-analytics:
+    needs: core
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with: { service: analytics, env: dark, paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}' }
+
+  # ------------------------------------ the gateway, in front of the core
+  gateway:
+    needs: [core, rebind-audit, rebind-analytics]
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: gateway
+      env: dark
+      paid_plan_confirmed: '${{ inputs.paid_plan_confirmed }}'
+      probe_base: 'https://${{ inputs.dark_root }}'
+
+  # ------------------------------------------------- seed, then the corpus
+  corpus:
+    needs: gateway
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DARK_ROOT: ${{ github.event.inputs.dark_root }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # The dark database is EMPTY, so the suite that creates its own users,
+      # products and orders is the seed. D4: this is where the api-tests suites
+      # belong, instead of writing test rows into the live customer database.
+      - name: Seed the dark database with the API suite
+        run: |
+          set -e
+          node scripts/api-tests.mjs "https://$DARK_ROOT"
+
+      # THROUGH THE GATEWAY, which is the whole point: the dark zone routes
+      # /api/* and /files/* to levonis-gateway-dark and everything else to
+      # levonis-core-dark, mirroring what production will look like at G3.
+      - name: Drive the event path end to end through the gateway
+        run: node scripts/e2e-dark.mjs --base "https://$DARK_ROOT"
+
+      - name: Merchant hosts, cookie domain and the admin 404 — on a real wildcard
+        run: node scripts/e2e-subdomains.mjs "https://$DARK_ROOT"
+
+      # gateway-parity.mjs and the >=300 request corpus belong to slice 1.5 and
+      # need the dark zone to exist. When the file is not there yet the step
+      # says so instead of quietly passing — a gate that ran nothing is the
+      # failure mode this repository keeps closing.
+      - name: Replay the parity corpus against the gateway and the core
+        run: |
+          if [ -f scripts/gateway-parity.mjs ]; then
+            node scripts/gateway-parity.mjs --gateway "https://$DARK_ROOT" --core "https://$DARK_ROOT"
+          else
+            echo "::warning::scripts/gateway-parity.mjs does not exist yet (slice 1.5 owns it) — parity was NOT proved by this run"
+          fi
+
+      - name: Record what was proved
+        if: always()
+        run: |
+          {
+            echo "### Dark stack on \`$DARK_ROOT\` (branch \`${{ github.ref_name }}\`)"
+            echo ""
+            echo "| Worker | serves |"
+            echo "|---|---|"
+            echo "| levonis-audit-dark | nothing — service binding only |"
+            echo "| levonis-analytics-dark | nothing — service binding only |"
+            echo "| levonis-ads-dark | nothing — service binding only |"
+            echo "| levonis-notifications-dark | nothing — service binding only |"
+            echo "| levonis-core-dark | \`$DARK_ROOT/*\` (dark zone) |"
+            echo "| levonis-gateway-dark | \`$DARK_ROOT/api/*\`, \`$DARK_ROOT/files/*\`, \`*.$DARK_ROOT/api/*\`, \`*.$DARK_ROOT/files/*\` |"
+            echo ""
+            echo "No live route, DNS record, secret or binding was touched."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,14 @@
+{
+  // ADR-017 (a) — can the CI token create a NEW Worker name?
+  // Throwaway. Deleted by `svc-probes.yml` with `cleanup: DELETE-PROBES`.
+  // workers.dev is ON: a probe with no URL cannot be asked anything, and it
+  // holds no data at all. No `routes` — routing is a dashboard fact.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-name",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "SVC_VERSION": "" }
+}

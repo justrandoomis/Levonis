@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS levonis-analytics-dark, WHICH SERVES NO DOMAIN. It is a dark Worker:
+#   it has no zone route and no Custom Domain, and nothing a customer touches
+#   reaches it. Deleting it changes nothing users can see.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# The DARK consumer-owned read models (plan slice 1.7), with their OWN database
+# (levonis-analytics-db-dark). Every field the event catalogue annotates `pii`
+# is dropped before anything is written, which is the property the dark run
+# exists to demonstrate to the owner before G1.
+#
+# NOTHING IS CREATED WITHOUT CONFIRMATION. Deploying a new Worker — and, with
+# "create_resources", creating its database — changes the Cloudflare account,
+# which is an owner-gated action (G1/G2 in docs/architecture/02-MIGRATION-PLAN.md).
+# The work happens in the reusable workflow `_deploy-worker.yml`.
+#
+# ORDER MATTERS. `services/analytics`'s dark env binds
+# `levonis-core-dark#IdentityEntrypoint`, and the Workers upload API rejects a
+# `services` entry whose target Worker does not exist. Run standalone before the
+# dark core exists, this workflow deploys analytics WITHOUT
+# that binding (`scripts/resolve-ids.mjs` strips it and says so) — which is a working Worker
+# whose key ring falls back to `ALLOWED_CALLER_KIDS`, not a failure. Run it
+# again after `svc-core-dark.yml`, or use `verify-dark.yml`, whose `rebind`
+# stage does it for you, to attach the binding.
+name: 33 - Deploy DARK levonis-analytics-dark (serves no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-ANALYTICS-DARK to confirm'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (a hard precondition — D1)'
+        type: boolean
+        required: false
+        default: false
+      create_resources:
+        description: 'Create levonis-analytics-db-dark if it is missing (an account change)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: svc-analytics-dark
+
+jobs:
+  # A separate job, because a job that calls a reusable workflow cannot also
+  # run a step. The confirmation is checked before anything is reached.
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-ANALYTICS-DARK" ] \
+            || { echo "::error::type DEPLOY-ANALYTICS-DARK to confirm"; exit 1; }
+          echo "confirmed: deploying levonis-analytics-dark, which serves no domain"
+
+  deploy:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: analytics
+      env: dark
+      create_resources: ${{ inputs.create_resources }}
+      paid_plan_confirmed: ${{ inputs.paid_plan_confirmed }}

@@ -1,0 +1,76 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS levonis-gateway-dark, WHICH SERVES NO DOMAIN. It is a dark Worker:
+#   it has no zone route and no Custom Domain, and nothing a customer touches
+#   reaches it. Deleting it changes nothing users can see.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# The DARK gateway (plan slice 1.5). It routes the dark zone's /api/* and
+# /files/* to the dark core and is where the parity corpus is replayed. Like
+# the production gateway it declares workers_dev:false and preview_urls:false
+# — the Worker whose whole job is to be the only door must not have a second
+# one — so it is reached on the dark zone and nowhere else.
+#
+# THE PRODUCTION gateway (levonis-gateway) is not deployed by this file. That
+# is plan 3.1, behind its own owner gate, and its six zone routes are added in
+# the dashboard at G3.
+#
+# NOTHING IS CREATED WITHOUT CONFIRMATION. Deploying a new Worker — and, with
+# "create_resources", creating its database — changes the Cloudflare account,
+# which is an owner-gated action (G1/G2 in docs/architecture/02-MIGRATION-PLAN.md).
+# The work happens in the reusable workflow `_deploy-worker.yml`.
+name: 31 - Deploy DARK levonis-gateway-dark (serves no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-GATEWAY-DARK to confirm'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (a hard precondition — D1)'
+        type: boolean
+        required: false
+        default: false
+      create_resources:
+        description: 'Create any missing resource this Worker needs (an account change)'
+        type: boolean
+        required: false
+        default: false
+      probe_base:
+        description: 'The dark-zone URL this Worker answers on (D21). Empty = no health probe is possible and the run fails saying so'
+        required: false
+        default: ''
+
+concurrency: svc-gateway-dark
+
+jobs:
+  # A separate job, because a job that calls a reusable workflow cannot also
+  # run a step. The confirmation is checked before anything is reached.
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-GATEWAY-DARK" ] \
+            || { echo "::error::type DEPLOY-GATEWAY-DARK to confirm"; exit 1; }
+          echo "confirmed: deploying levonis-gateway-dark, which serves no domain"
+
+  deploy:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: gateway
+      env: dark
+      create_resources: ${{ inputs.create_resources }}
+      paid_plan_confirmed: ${{ inputs.paid_plan_confirmed }}
+      probe_base: ${{ inputs.probe_base }}

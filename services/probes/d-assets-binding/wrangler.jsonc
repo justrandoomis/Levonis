@@ -1,0 +1,18 @@
+{
+  // ADR-017 (d) — the asset layer reached THROUGH a binding.
+  // `run_worker_first` is the whole path here: the Worker must run so it can
+  // call ASSETS.fetch itself, which is what a gateway `assets` block would do.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-assets",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/"]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  // ADR-017 (b) — what a per-minute cron actually does on this account.
+  // Throwaway; DELETE IT after the run: 1,440 invocations a day, forever, is
+  // exactly the cost the plan is trying to measure rather than incur.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["* * * * *"] }
+}

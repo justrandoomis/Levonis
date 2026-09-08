@@ -1,0 +1,12 @@
+{
+  // ADR-017 (k) — the hashing side. `levonis-probe-cpu-caller` calls it over a
+  // service binding, which is the shape Phase 3 gives the core.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-cpu",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "PBKDF2_ITERATIONS": "100000" }
+}

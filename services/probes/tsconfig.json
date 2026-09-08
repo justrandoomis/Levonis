@@ -1,0 +1,21 @@
+{
+  // The probes are throwaway Workers, but a probe that does not compile answers
+  // nothing — and the owner runs them once, by hand, at a gate. So they are
+  // typechecked with the same strict settings as every other Worker in the
+  // repository. `scripts/check-workspaces.mjs` picks this file up because the
+  // directory has a tsconfig.json without a package.json (it is deliberately
+  // not an npm workspace: it owns no code anyone imports).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["./**/*.ts"]
+}

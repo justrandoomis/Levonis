@@ -38,6 +38,10 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+// The var-preservation rule now lives in one module, so `_deploy-worker.yml`
+// applies exactly the same rule to every new Worker (02-MIGRATION-PLAN.md
+// §11.6). Behaviour here is unchanged — `tests/preserveVars.test.ts` pins it.
+import { liveVars, mergeVars } from './lib/preserve-vars.mjs';
 
 const CONFIG = new URL('../wrangler.jsonc', import.meta.url);
 const REPO = new URL('..', import.meta.url).pathname;
@@ -194,22 +198,7 @@ for (const db of cfg.d1_databases ?? []) {
 // `wrangler deploy` replaces vars wholesale. Without this step the first
 // dashboard-triggered deploy would clear values that the GitHub workflow set
 // with --var, breaking Google sign-in and e-mail links on a running site.
-async function liveVars(scriptName) {
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (!token || !account) return null;
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/${scriptName}/settings`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  if (!res.ok) return null;
-  const body = await res.json();
-  const out = {};
-  for (const b of body?.result?.bindings ?? []) {
-    if (b?.type === 'plain_text' && typeof b.name === 'string' && typeof b.text === 'string') out[b.name] = b.text;
-  }
-  return out;
-}
+// The rule itself is scripts/lib/preserve-vars.mjs.
 
 cfg.vars ??= {};
 const fromEnv = {
@@ -225,13 +214,11 @@ const fromEnv = {
   STORE_ROOT_DOMAIN: process.env.STORE_ROOT_DOMAIN,
 };
 
-const preserved = [];
-const overridden = [];
 const live = await liveVars(cfg.name).catch(() => null);
 
 // EVERY live name, not only the ones this file happens to declare.
 //
-// This loop used to iterate `Object.keys(cfg.vars)`, which meant a variable
+// The merge used to iterate `Object.keys(cfg.vars)`, which meant a variable
 // present on the running Worker but absent from the committed config was
 // never considered for preservation — and `wrangler deploy` replaces vars
 // wholesale, so it was silently erased. That is exactly the failure this
@@ -240,31 +227,16 @@ const live = await liveVars(cfg.name).catch(() => null);
 // It cost STORE_ROOT_DOMAIN on the live site: set by the GitHub Actions
 // deploy, then dropped ~60 seconds after the next push, taking merchant
 // subdomain resolution with it.
-const names = new Set([...Object.keys(cfg.vars), ...Object.keys(live ?? {})]);
-for (const key of names) {
-  if (fromEnv[key]) {
-    cfg.vars[key] = fromEnv[key];
-    overridden.push(key);
-  } else if (!cfg.vars[key] && live && live[key]) {
-    cfg.vars[key] = live[key];
-    preserved.push(key);
-  }
-}
-for (const [key, value] of Object.entries(fromEnv)) {
-  if (value && cfg.vars[key] === undefined) {
-    cfg.vars[key] = value;
-    overridden.push(key);
-  }
-}
+const merged = mergeVars(cfg.vars, live, fromEnv);
+cfg.vars = merged.vars;
+const { preserved, overridden } = merged;
 
 if (overridden.length) console.log(`  vars from build variables: ${overridden.join(', ')}`);
 if (preserved.length) console.log(`  vars preserved from the live Worker: ${preserved.join(', ')}`);
 if (!live) {
   console.log('  (could not read the live Worker settings — vars come from build variables only)');
 }
-const stillEmpty = Object.entries(cfg.vars)
-  .filter(([, v]) => !v)
-  .map(([k]) => k);
+const stillEmpty = merged.empty;
 if (stillEmpty.length) {
   console.warn(
     `  WARNING: deploying with empty ${stillEmpty.join(', ')}. wrangler replaces vars wholesale, so any ` +

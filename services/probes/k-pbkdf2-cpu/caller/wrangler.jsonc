@@ -1,0 +1,13 @@
+{
+  // ADR-017 (k) — the caller. Two Workers because the question is about the
+  // HOP: one number measured on both sides of it is the evidence.
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-cpu-caller",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "PBKDF2_ITERATIONS": "100000" },
+  "services": [{ "binding": "HASHER", "service": "levonis-probe-cpu", "entrypoint": "HashEntrypoint" }]
+}

@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS levonis-audit-dark, WHICH SERVES NO DOMAIN. It is a dark Worker:
+#   it has no zone route and no Custom Domain, and nothing a customer touches
+#   reaches it. Deleting it changes nothing users can see.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# The DARK hash-chained audit log (plan slice 1.7), with its OWN database
+# (levonis-audit-db-dark) and its own migration stream applied before its code.
+# It consumes events over a service binding and has no route, ever.
+#
+# NOTHING IS CREATED WITHOUT CONFIRMATION. Deploying a new Worker — and, with
+# "create_resources", creating its database — changes the Cloudflare account,
+# which is an owner-gated action (G1/G2 in docs/architecture/02-MIGRATION-PLAN.md).
+# The work happens in the reusable workflow `_deploy-worker.yml`.
+#
+# ORDER MATTERS. `services/audit`'s dark env binds
+# `levonis-core-dark#IdentityEntrypoint`, and the Workers upload API rejects a
+# `services` entry whose target Worker does not exist. Run standalone before the
+# dark core exists, this workflow deploys audit WITHOUT that
+# binding (`scripts/resolve-ids.mjs` strips it and says so) — which is a working Worker
+# whose key ring falls back to `ALLOWED_CALLER_KIDS`, not a failure. Run it
+# again after `svc-core-dark.yml`, or use `verify-dark.yml`, whose `rebind`
+# stage does it for you, to attach the binding.
+name: 32 - Deploy DARK levonis-audit-dark (serves no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-AUDIT-DARK to confirm'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (a hard precondition — D1)'
+        type: boolean
+        required: false
+        default: false
+      create_resources:
+        description: 'Create levonis-audit-db-dark if it is missing (an account change)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: svc-audit-dark
+
+jobs:
+  # A separate job, because a job that calls a reusable workflow cannot also
+  # run a step. The confirmation is checked before anything is reached.
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-AUDIT-DARK" ] \
+            || { echo "::error::type DEPLOY-AUDIT-DARK to confirm"; exit 1; }
+          echo "confirmed: deploying levonis-audit-dark, which serves no domain"
+
+  deploy:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: audit
+      env: dark
+      create_resources: ${{ inputs.create_resources }}
+      paid_plan_confirmed: ${{ inputs.paid_plan_confirmed }}

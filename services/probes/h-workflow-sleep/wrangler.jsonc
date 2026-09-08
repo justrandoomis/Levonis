@@ -1,0 +1,15 @@
+{
+  // ADR-017 (h) — OPTIONAL. Deployed only with the `include_optional` input.
+  // If the account has no Workflows, the deploy fails and that is the answer:
+  // the adapter stays on CronSweepRunner, which is what it was written for.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-workflow",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "workflows": [
+    { "name": "levonis-probe-sleep", "binding": "PROBE_WORKFLOW", "class_name": "ProbeSleepWorkflow", "script_name": "levonis-probe-workflow" }
+  ]
+}

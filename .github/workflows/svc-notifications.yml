@@ -1,0 +1,101 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS levonis-notifications-dark, WHICH SERVES NO DOMAIN. It is a dark Worker:
+#   it has no zone route and no Custom Domain, and nothing a customer touches
+#   reaches it. Deleting it changes nothing users can see.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# The DARK notifications Worker (plan slice 1.7), with its OWN database
+# (levonis-notifications-db-dark). THE MONOLITH KEEPS SENDING: this Worker
+# ships with NOTIFY_DELIVERY off, and a transport whose secret names are absent
+# records `dropped` rather than pretending to have sent. Two Workers sending
+# the same mail is the failure this ordering avoids.
+#
+# A dark run must not be able to mail a real customer, and that is now
+# ENFORCED rather than stated: the dark env sets `EMAIL_ALLOWLIST_REQUIRED=on`,
+# which makes an EMPTY `EMAIL_ALLOWED_RECIPIENTS` mean "mail nobody" instead of
+# "mail everybody", and the guard step below refuses the deploy if the pair
+# ever drifts back. Set `EMAIL_ALLOWED_RECIPIENTS` to real dark addresses when
+# a dark run should actually deliver; provider credentials come from the
+# `NOTIFICATIONS__DARK__<NAME>` repository secrets, never the production ones.
+#
+# NOTHING IS CREATED WITHOUT CONFIRMATION. Deploying a new Worker — and, with
+# "create_resources", creating its database — changes the Cloudflare account,
+# which is an owner-gated action (G1/G2 in docs/architecture/02-MIGRATION-PLAN.md).
+# The work happens in the reusable workflow `_deploy-worker.yml`.
+name: 35 - Deploy DARK levonis-notifications-dark (serves no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-NOTIFICATIONS-DARK to confirm'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (a hard precondition — D1)'
+        type: boolean
+        required: false
+        default: false
+      create_resources:
+        description: 'Create levonis-notifications-db-dark if it is missing (an account change)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: svc-notifications-dark
+
+jobs:
+  # A separate job, because a job that calls a reusable workflow cannot also
+  # run a step. The confirmation is checked before anything is reached.
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-NOTIFICATIONS-DARK" ] \
+            || { echo "::error::type DEPLOY-NOTIFICATIONS-DARK to confirm"; exit 1; }
+          echo "confirmed: deploying levonis-notifications-dark, which serves no domain"
+
+      - uses: actions/checkout@v4
+
+      # THE MAIL GUARD, checked before anything is deployed. Delivery is `on`
+      # in dark, so the only thing standing between a dark run and a real
+      # customer's inbox is the allowlist — and an EMPTY allowlist means
+      # "everyone" unless `EMAIL_ALLOWLIST_REQUIRED` is `on`. Refuse rather
+      # than deploy a Worker whose config says the guard is on while its
+      # semantics say it is off.
+      - name: Refuse a dark deploy that could mail a real address
+        run: |
+          set -e
+          node -e '
+            const { readFileSync } = require("node:fs");
+            const raw = readFileSync("services/notifications/wrangler.jsonc", "utf8")
+              .replace(/^\s*\/\/.*$/gm, "");
+            const cfg = JSON.parse(raw);
+            const vars = cfg.env?.dark?.vars ?? {};
+            const on = (v) => String(v ?? "").trim().toLowerCase() === "on";
+            const allowlist = String(vars.EMAIL_ALLOWED_RECIPIENTS ?? "").trim();
+            if (on(vars.NOTIFY_DELIVERY) && !allowlist && !on(vars.EMAIL_ALLOWLIST_REQUIRED)) {
+              console.error("::error::env.dark has NOTIFY_DELIVERY=on with an EMPTY EMAIL_ALLOWED_RECIPIENTS and EMAIL_ALLOWLIST_REQUIRED not on — that mails EVERYONE. Set one of the two before deploying.");
+              process.exit(1);
+            }
+            console.log("mail guard: dark delivery is bounded (allowlist=" + (allowlist ? "set" : "empty") + ", required=" + (on(vars.EMAIL_ALLOWLIST_REQUIRED) ? "on" : "off") + ")");
+          '
+
+  deploy:
+    needs: confirm
+    uses: ./.github/workflows/_deploy-worker.yml
+    secrets: inherit
+    with:
+      service: notifications
+      env: dark
+      create_resources: ${{ inputs.create_resources }}
+      paid_plan_confirmed: ${{ inputs.paid_plan_confirmed }}

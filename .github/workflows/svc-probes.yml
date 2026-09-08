@@ -1,0 +1,199 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   THIS FILE DEPLOYS levonis-probe-* THROWAWAY WORKERS, WHICH SERVE NO DOMAIN.
+#   They hold no data, bind nothing of the product, and are deleted by this
+#   same workflow. Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# PLATFORM PROBES — ADR-017 (docs/architecture/04-DECISIONS.md), plan slice 1.0.
+#
+# developers.cloudflare.com is unreachable from the build environment, so
+# eleven facts the plan depends on cannot be looked up: whether the CI token
+# can create a new Worker name, what a per-minute cron costs, whether a Worker
+# can bind to its own named entrypoint, whether `ASSETS.fetch` through a
+# binding keeps `_headers` and 304s, the per-invocation subrequest and D1
+# budgets, whether a zone route beats a Custom Domain on the same hostname,
+# what `caches.default` does on a zone route, the Workflow sleep ceiling,
+# whether `wrangler deploy` creates a SQLite Durable Object class, whether
+# `writeDataPoint` creates its dataset, and what PBKDF2 costs under a binding.
+#
+# Each is answered by one tiny Worker under `services/probes/`. This workflow
+# deploys them, curls them, and writes the eleven one-line verdicts into the
+# run's job summary — which is what gets pasted into ADR-017's table. Then it
+# deletes them: leaving eleven Workers (one with a per-minute cron) on the
+# account is not free, and ADR-017 says the probes are throwaway.
+#
+# THIS IS AN OWNER ACTION. Every step here creates something on the Cloudflare
+# account, which is gated (G1). No developer and no automated round runs it.
+name: 29 - Platform probes (DARK throwaway Workers — serve no domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-PROBES to deploy them, or DELETE-PROBES to remove them'
+        required: true
+        default: ''
+      paid_plan_confirmed:
+        description: 'The Workers Paid plan is confirmed in the dashboard (row b — a hard precondition)'
+        type: boolean
+        required: false
+        default: false
+      dark_root:
+        description: 'The dark zone root domain (D21). Rows (f) and (g) are meaningless without it'
+        required: false
+        default: ''
+      dark_db:
+        description: 'A DARK D1 database name to bind for the budget probe, row (e). Leave empty to skip the D1 half. NEVER a live database'
+        required: false
+        default: ''
+      include_optional:
+        description: 'Also deploy the Workflows probe, row (h)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency: platform-probes
+
+jobs:
+  probes:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DARK_ROOT: ${{ github.event.inputs.dark_root }}
+      DARK_DB: ${{ github.event.inputs.dark_db }}
+    steps:
+      - name: Check the confirmation, and refuse a live database outright
+        id: mode
+        run: |
+          set -e
+          case "${{ github.event.inputs.confirm }}" in
+            DEPLOY-PROBES) echo "mode=deploy" >> "$GITHUB_OUTPUT" ;;
+            DELETE-PROBES) echo "mode=delete" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::type DEPLOY-PROBES or DELETE-PROBES to confirm"; exit 1 ;;
+          esac
+          case "$DARK_DB" in
+            ""|*-dark) ;;
+            *) echo "::error::the budget probe may only be pointed at a *-dark database. \"$DARK_DB\" is not one."; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # --------------------------------------------------------------- delete
+      - name: Delete every probe Worker
+        if: steps.mode.outputs.mode == 'delete'
+        run: |
+          set +e
+          for W in levonis-probe-name levonis-probe-cron levonis-probe-selfbind levonis-probe-assets \
+                   levonis-probe-budgets levonis-probe-route levonis-probe-domain levonis-probe-cache \
+                   levonis-probe-do levonis-probe-ae levonis-probe-cpu levonis-probe-cpu-caller \
+                   levonis-probe-workflow; do
+            echo "deleting $W…"
+            npx wrangler delete --name "$W" --force
+          done
+          echo "probes deleted. Remove the dark-zone routes for levonis-probe-route/-domain in the dashboard too." >> "$GITHUB_STEP_SUMMARY"
+
+      # --------------------------------------------------------------- deploy
+      - name: Row (b), first half — the Workers Paid plan
+        if: steps.mode.outputs.mode == 'deploy'
+        id: plan
+        run: |
+          set +e
+          node scripts/assert-paid-plan.mjs ${{ inputs.paid_plan_confirmed && '--confirmed' || '' }} --json > /tmp/plan.json
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat /tmp/plan.json
+
+      - name: Deploy the probes
+        if: steps.mode.outputs.mode == 'deploy'
+        run: |
+          set -e
+          D1_ARG=""
+          if [ -n "$DARK_DB" ]; then
+            ID=$(npx wrangler d1 list --json | jq -r --arg n "$DARK_DB" '.[] | select(.name==$n) | .uuid')
+            [ -n "$ID" ] || { echo "::error::$DARK_DB not found"; exit 1; }
+            echo "::add-mask::$ID"
+            # Bound on the command line, not in the committed config: a probe
+            # that could reach a database by default is not a probe anyone
+            # should run.
+            D1_ARG="--d1 PROBE_DB=$ID"
+          fi
+
+          deploy() { echo "--- $1"; npx wrangler deploy -c "services/probes/$1/wrangler.jsonc" ${2:-}; }
+
+          # (a) is answered by whether this line succeeds at all.
+          deploy a-worker-name
+          deploy b-plan-and-cron
+          # (c) needs the two-step first deploy: it binds to ITSELF, and on the
+          # first pass that Worker does not exist yet.
+          npx wrangler deploy -c services/probes/c-self-binding/wrangler.jsonc --var PROBE_FIRST_PASS:1 || true
+          deploy c-self-binding
+          deploy d-assets-binding
+          deploy e-budgets "$D1_ARG"
+          deploy f-route-precedence/route-worker
+          deploy f-route-precedence/domain-worker
+          deploy g-cache-api
+          deploy i-do-sqlite
+          deploy j-analytics-engine
+          deploy k-pbkdf2-cpu
+          deploy k-pbkdf2-cpu/caller
+          if [ "${{ inputs.include_optional }}" = "true" ]; then deploy h-workflow-sleep; fi
+
+      - name: Collect the verdicts
+        if: steps.mode.outputs.mode == 'deploy'
+        run: |
+          set -e
+          SUB=$(npx wrangler whoami 2>/dev/null | grep -oE '[a-z0-9-]+\.workers\.dev' | head -1 | sed 's/\.workers\.dev//' || true)
+          {
+            echo "## ADR-017 — platform probe verdicts"
+            echo ""
+            echo "| row | answer | verdict |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          ask() {
+            local url="$1"
+            local body
+            body=$(curl -sS --max-time 30 "$url" || echo '{}')
+            echo "$body" | jq -r '"| \(.row // "?") | \(.answer // "unreachable") | \(.verdict // "no answer from '"$url"'") |"' >> "$GITHUB_STEP_SUMMARY"
+            echo "$url -> $body"
+          }
+
+          if [ -n "$SUB" ]; then
+            for W in name cron selfbind assets budgets do ae cpu-caller; do
+              ask "https://levonis-probe-$W.$SUB.workers.dev/"
+            done
+            if [ "${{ inputs.include_optional }}" = "true" ]; then ask "https://levonis-probe-workflow.$SUB.workers.dev/"; fi
+          else
+            echo "| — | inconclusive | could not determine the account's workers.dev subdomain; curl each probe by hand |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # (f) and (g) are only meaningful on the dark ZONE.
+          if [ -n "$DARK_ROOT" ]; then
+            ask "https://probe.$DARK_ROOT/api/precedence"
+            ask "https://anything.$DARK_ROOT/api/precedence"
+            ask "https://probe.$DARK_ROOT/cache"
+          else
+            {
+              echo "| f | not run | no dark zone given. Attach Custom Domain \`probe.<darkroot>\` -> levonis-probe-domain and zone route \`probe.<darkroot>/api/*\` -> levonis-probe-route, plus \`*.<darkroot>/*\` -> levonis-probe-domain and \`*.<darkroot>/api/*\` -> levonis-probe-route, then re-run with dark_root set |"
+              echo "| g | not run | \`caches.default\` is a no-op on workers.dev; this row needs the dark zone |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          {
+            echo ""
+            echo "**Row (b), plan half:** \`$(jq -r '.evidence // "none"' /tmp/plan.json)\` — see the step log."
+            echo ""
+            echo "Copy these lines into ADR-017's table, then re-run this workflow with **cleanup: DELETE-PROBES**."
+          } >> "$GITHUB_STEP_SUMMARY"

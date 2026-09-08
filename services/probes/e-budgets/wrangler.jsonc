@@ -1,0 +1,15 @@
+{
+  // ADR-017 (e) — the per-invocation budgets ADR-005 assumes.
+  // NO d1_databases entry is committed: binding a database here is a decision
+  // the owner makes at run time (`svc-probes.yml` adds `--d1 PROBE_DB=<name>`
+  // for the DARK database only), and a probe that could reach a live database
+  // by default is not a probe anyone should run.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-budgets",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "MAX_SUBREQUESTS": "80", "MAX_STATEMENTS": "400" }
+}

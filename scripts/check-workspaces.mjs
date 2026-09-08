@@ -36,8 +36,31 @@ export function workspaceDirs(root = ROOT) {
   return out;
 }
 
+/**
+ * Directories that are NOT npm workspaces but still hold TypeScript this
+ * repository compiles: a `tsconfig.json` with no `package.json` beside it.
+ * `services/probes` is the one today (ADR-017's throwaway Workers own no code
+ * anyone imports, so making them a package would be a lie), and a probe that
+ * does not compile answers nothing at the gate where it is finally run.
+ */
+export function unlinkedTsProjects(root = ROOT) {
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const out = [];
+  for (const pattern of pkg.workspaces ?? []) {
+    const base = join(root, /^([^*]+)\/\*$/.exec(pattern)[1]);
+    if (!existsSync(base)) continue;
+    for (const name of readdirSync(base).sort()) {
+      const dir = join(base, name);
+      if (!statSync(dir).isDirectory()) continue;
+      if (existsSync(join(dir, 'package.json'))) continue;
+      if (existsSync(join(dir, 'tsconfig.json'))) out.push(dir);
+    }
+  }
+  return out;
+}
+
 if (process.argv.includes('--list')) {
-  for (const d of workspaceDirs()) console.log(d);
+  for (const d of [...workspaceDirs(), ...unlinkedTsProjects()]) console.log(d);
   process.exit(0);
 }
 
@@ -69,6 +92,16 @@ for (const dir of dirs) {
   try {
     execFileSync(TSC, ['--noEmit', '-p', join(dir, 'tsconfig.json')], { cwd: ROOT, stdio: 'inherit' });
     console.log(`check-workspaces: ${rel} typechecks clean`);
+  } catch {
+    console.error(`check-workspaces: ${rel} does not typecheck (see above)`);
+    failed++;
+  }
+}
+for (const dir of unlinkedTsProjects()) {
+  const rel = dir.slice(ROOT.length + 1);
+  try {
+    execFileSync(TSC, ['--noEmit', '-p', join(dir, 'tsconfig.json')], { cwd: ROOT, stdio: 'inherit' });
+    console.log(`check-workspaces: ${rel} typechecks clean (not a package: tsconfig only)`);
   } catch {
     console.error(`check-workspaces: ${rel} does not typecheck (see above)`);
     failed++;

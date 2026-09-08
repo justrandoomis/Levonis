@@ -1,0 +1,341 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+#   Every Worker this file can deploy is a NEW one. None of them serves a
+#   domain, and none of them is levonis-staging or levonis-studio-staging —
+#   scripts/resolve-ids.mjs and scripts/upload-secrets.mjs refuse those two
+#   names outright, and the guard below refuses them again in YAML.
+#   Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# THE REUSABLE SERVICE DEPLOY (02-MIGRATION-PLAN.md §11.6 and §12).
+#
+# One workflow, parameterised by service directory and environment, called by a
+# thin `svc-<name>.yml` per Worker. Everything a new Worker's deploy has to get
+# right lives here once instead of in six copies that drift:
+#
+#   * the gates run first (`npm run check` + `npm run test:unit`), so
+#     boundaries, least privilege, ownership, schemas and naming are proved
+#     before anything is created;
+#   * the Workers Paid precondition (D1) is checked before any resource is
+#     created — there is no Free-plan fallback for this architecture;
+#   * D1 ids are resolved BY NAME, never committed;
+#   * the running Worker's plain-text vars are read back and passed straight
+#     back in, because `wrangler deploy` replaces vars WHOLESALE and that has
+#     already cost this project a live outage (STORE_ROOT_DOMAIN);
+#   * migrations are applied to THAT SERVICE'S OWN database BEFORE its code;
+#   * the two-step first deploy: the upload API rejects a `services` binding
+#     whose target Worker does not exist yet, so the first pass deploys without
+#     those bindings and the second pass adds them back. That is what makes
+#     self-bindings and cycles deployable at all;
+#   * secrets are uploaded BY NAME ONLY, from `<SVC>__<NAME>` repository
+#     secrets, and an unset one is left untouched rather than blanked;
+#   * health is probed, and "could not look" fails the run.
+#
+# Nothing here touches the live Workers, their routes, their DNS or their
+# secrets. Creating the *-dark Workers and their databases is still an owner
+# action: this workflow only runs when a caller passes the confirmation.
+name: _ Reusable — deploy one service Worker (called by svc-*.yml)
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: 'Directory under services/, or "core" for the monolith at the repository root'
+        type: string
+        required: true
+      env:
+        description: 'dark | production'
+        type: string
+        required: true
+      create_resources:
+        description: 'Create the D1 database / R2 bucket this service needs if they are missing (an account change)'
+        type: boolean
+        required: false
+        default: false
+      paid_plan_confirmed:
+        description: 'The owner has confirmed the Workers Paid plan badge in the dashboard'
+        type: boolean
+        required: false
+        default: false
+      build_spa:
+        description: 'Build dist/ first (only the core serves assets)'
+        type: boolean
+        required: false
+        default: false
+      probe_base:
+        description: 'A URL this Worker answers on, for the health probe. Empty = the deep fan-out, or --unbound'
+        type: string
+        required: false
+        default: ''
+      accept_unprobeable:
+        description: 'This Worker is deployed but bound nowhere and has no URL yet; accept a tail-only proof'
+        type: boolean
+        required: false
+        default: false
+      integration:
+        description: 'Optional command to run against the dark stack after the deploy'
+        type: string
+        required: false
+        default: ''
+
+concurrency: svc-deploy-${{ inputs.service }}-${{ inputs.env }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SERVICE: ${{ inputs.service }}
+      TARGET_ENV: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # `npm run check` typechecks studio/ too and FAILS rather than skipping
+      # when that workspace is not installed (scripts/check-studio.mjs), so it
+      # has to be installed here. Separate lockfile; ~20s.
+      - name: Install the Studio workspace (npm run check covers it)
+        working-directory: studio
+        run: npm ci --no-audit --no-fund
+
+      # The gates, before anything is created. `npm run check` runs the
+      # boundaries, least-privilege, ownership, event-schema, edge-parity and
+      # monorepo tests; `npm run test:unit` runs every root and workspace suite,
+      # including this service's own.
+      - name: Typecheck, lint, boundaries and unit tests
+        run: |
+          npm run check
+          npm run test:unit
+
+      # Resolve the facts from the wrangler config itself. The Worker name is
+      # never computed from a pattern in YAML: the names on this account are
+      # inverted and every round that guessed one lost time to it.
+      - name: Resolve what this deploy is about to touch
+        id: target
+        run: |
+          set -e
+          node scripts/worker-name.mjs "$SERVICE" "$TARGET_ENV" --json | tee /tmp/target.json
+          NAME=$(jq -r .name /tmp/target.json)
+          CONFIG=$(jq -r .config /tmp/target.json)
+          DB=$(jq -r '.d1[0].database_name // ""' /tmp/target.json)
+          MIGRATIONS=$(jq -r '.migrations // ""' /tmp/target.json)
+          case "$NAME" in
+            levonis-staging|levonis-studio-staging)
+              echo "::error::$NAME is a LIVE Worker (docs/WORKERS.md). This workflow deploys NEW Workers only; the live paths are workflows 7 and 8."
+              exit 1 ;;
+          esac
+          case "$NAME" in
+            *-staging*)
+              echo "::error::a new Worker name must never contain \"staging\" — on this account that suffix means live (ADR-011)"
+              exit 1 ;;
+          esac
+          {
+            echo "name=$NAME"
+            echo "config=$CONFIG"
+            echo "db=$DB"
+            echo "migrations=$MIGRATIONS"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$TARGET_ENV" = "production" ]; then echo "env_flag=" >> "$GITHUB_OUTPUT"; else echo "env_flag=--env $TARGET_ENV" >> "$GITHUB_OUTPUT"; fi
+          echo "deploying $NAME from $CONFIG (env $TARGET_ENV)"
+
+      # D1: the hard precondition. Refuses to let anything be created on a Free
+      # account, because no part of this architecture has a Free-plan fallback.
+      - name: The Workers Paid plan is a precondition, not a courtesy check
+        run: node scripts/assert-paid-plan.mjs ${{ inputs.paid_plan_confirmed && '--confirmed' || '' }}
+
+      - name: Build the SPA (assets)
+        if: ${{ inputs.build_spa }}
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: npm run build
+
+      # D1 ids by NAME, and (only with create_resources) the database and bucket
+      # created when missing. `stripped` says whether a second deploy pass is
+      # needed for `services` bindings whose target does not exist yet.
+      - name: Resolve resource ids into the config
+        id: ids
+        run: |
+          set -e
+          node scripts/resolve-ids.mjs --service "$SERVICE" --env "$TARGET_ENV" ${{ inputs.create_resources && '--create' || '' }}
+
+      # Read the vars the running Worker has RIGHT NOW. If the read fails the
+      # deploy stops: shipping without them would delete them.
+      - name: Carry the running Worker's vars forward
+        id: vars
+        run: |
+          set -e
+          node scripts/lib/preserve-vars.mjs --worker "${{ steps.target.outputs.name }}" > /tmp/vars.tsv
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            echo "::add-mask::$value"
+          done < /tmp/vars.tsv
+          echo "count=$(wc -l < /tmp/vars.tsv)" >> "$GITHUB_OUTPUT"
+
+      # Migrations BEFORE code, to this service's OWN database. The core's
+      # single stream is migrations/; a service with its own store keeps
+      # services/<name>/migrations/ and it is applied only here.
+      - name: Apply this service's migrations before its code
+        if: ${{ steps.target.outputs.migrations != '' && steps.target.outputs.db != '' }}
+        run: |
+          set -e
+          npx wrangler d1 migrations apply "${{ steps.target.outputs.db }}" --remote \
+            -c "${{ steps.target.outputs.config }}" ${{ steps.target.outputs.env_flag }}
+
+      - name: Deploy, carrying every existing var forward
+        id: deploy
+        run: |
+          set -e
+          ARGS=()
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            ARGS+=(--var "$name:$value")
+          done < /tmp/vars.tsv
+          echo "re-applying ${#ARGS[@]} existing var(s) so none are wiped"
+          npx wrangler deploy -c "${{ steps.target.outputs.config }}" ${{ steps.target.outputs.env_flag }} "${ARGS[@]}" | tee /tmp/deploy.log
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/deploy.log | head -1 || true)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      # THE SECOND PASS. Only when the first one had bindings stripped: the
+      # upload API rejects a `services` entry whose target Worker does not exist
+      # yet, which is what makes a self-binding (levonis-ledger -> levonis-ledger)
+      # and a cycle (Ledger<->Notifications) impossible to deploy in one go.
+      #
+      # `--full` RE-CHECKS THE ACCOUNT. It used to put every stripped binding
+      # back unconditionally, which is right for a self-binding — the target is
+      # the Worker this job just created — and WRONG for the core<->leaf cycle
+      # it was written for: audit and analytics bind `levonis-core-dark`, which
+      # the leaf jobs run BEFORE, so the restore produced a second deploy the
+      # API refused for the same reason as the first, failing the job and
+      # stopping the gated rollout at its first step. A leaf whose target still
+      # does not exist now deploys WITHOUT that binding, and `verify-dark.yml`'s
+      # `rebind` stage re-deploys it once the core is up.
+      - name: Second pass — re-resolve the stripped bindings
+        id: ids2
+        if: ${{ steps.ids.outputs.stripped != '0' }}
+        run: node scripts/resolve-ids.mjs --service "$SERVICE" --env "$TARGET_ENV" --full
+
+      - name: Second pass — redeploy, only if a target now exists
+        if: ${{ steps.ids.outputs.stripped != '0' && steps.ids2.outputs.restored != '0' }}
+        run: |
+          set -e
+          ARGS=()
+          while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] || continue
+            ARGS+=(--var "$name:$value")
+          done < /tmp/vars.tsv
+          npx wrangler deploy -c "${{ steps.target.outputs.config }}" ${{ steps.target.outputs.env_flag }} "${ARGS[@]}"
+
+      # Names only reach the log. Values go in on stdin, never on a command
+      # line; an unset one leaves the Worker's secret untouched.
+      #
+      # EVERY NAME BELOW IS A NAME `services/<svc>/SECRETS.md` DECLARES, spelt
+      # exactly as that file spells it — `upload-secrets.mjs` reads
+      # `<SVC>__<NAME>` and rule 2 makes an absent variable "leave untouched",
+      # so a misspelt key here is not an error, it is a provider that stays
+      # unconfigured for ever while the deploy reports success.
+      # `tests/leastPrivilege.test.ts` holds this block and the SECRETS.md
+      # files together so the pair cannot drift again.
+      #
+      # `<SVC>__DARK__<NAME>` is the DARK-ONLY twin of a credential that
+      # reaches a third party. `upload-secrets.mjs` prefers it for `--env dark`,
+      # so a dark Worker never has to hold the production provider's key to be
+      # deployable — and where the twin is unset, nothing is uploaded and the
+      # adapter runs in SANDBOX, which is the correct dark default.
+      - name: Upload this service's secrets, by name only
+        env:
+          AUDIT__AUDIT_CHAIN_KEY: ${{ secrets.AUDIT__AUDIT_CHAIN_KEY }}
+          AUDIT__AUDIT_SIGNING_KEY: ${{ secrets.AUDIT__AUDIT_SIGNING_KEY }}
+          AUDIT__HEALTH_PROBE_TOKEN: ${{ secrets.AUDIT__HEALTH_PROBE_TOKEN }}
+          ANALYTICS__ANALYTICS_HASH_SALT: ${{ secrets.ANALYTICS__ANALYTICS_HASH_SALT }}
+          ANALYTICS__ANALYTICS_SIGNING_KEY: ${{ secrets.ANALYTICS__ANALYTICS_SIGNING_KEY }}
+          ANALYTICS__HEALTH_PROBE_TOKEN: ${{ secrets.ANALYTICS__HEALTH_PROBE_TOKEN }}
+          ADS__META_CAPI_ACCESS_TOKEN: ${{ secrets.ADS__META_CAPI_ACCESS_TOKEN }}
+          ADS__META_CAPI_DATASET_ID: ${{ secrets.ADS__META_CAPI_DATASET_ID }}
+          ADS__GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.ADS__GOOGLE_ADS_DEVELOPER_TOKEN }}
+          ADS__GOOGLE_ADS_ACCESS_TOKEN: ${{ secrets.ADS__GOOGLE_ADS_ACCESS_TOKEN }}
+          ADS__GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.ADS__GOOGLE_ADS_CUSTOMER_ID }}
+          ADS__GOOGLE_ADS_CONVERSION_ACTION_ID: ${{ secrets.ADS__GOOGLE_ADS_CONVERSION_ACTION_ID }}
+          ADS__TIKTOK_ADS_ACCESS_TOKEN: ${{ secrets.ADS__TIKTOK_ADS_ACCESS_TOKEN }}
+          ADS__TIKTOK_ADS_PIXEL_CODE: ${{ secrets.ADS__TIKTOK_ADS_PIXEL_CODE }}
+          ADS__SNAPCHAT_ADS_ACCESS_TOKEN: ${{ secrets.ADS__SNAPCHAT_ADS_ACCESS_TOKEN }}
+          ADS__SNAPCHAT_ADS_PIXEL_ID: ${{ secrets.ADS__SNAPCHAT_ADS_PIXEL_ID }}
+          ADS__ADS_SIGNING_KEY: ${{ secrets.ADS__ADS_SIGNING_KEY }}
+          ADS__HEALTH_PROBE_TOKEN: ${{ secrets.ADS__HEALTH_PROBE_TOKEN }}
+          ADS__DARK__META_CAPI_ACCESS_TOKEN: ${{ secrets.ADS__DARK__META_CAPI_ACCESS_TOKEN }}
+          ADS__DARK__META_CAPI_DATASET_ID: ${{ secrets.ADS__DARK__META_CAPI_DATASET_ID }}
+          ADS__DARK__GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.ADS__DARK__GOOGLE_ADS_DEVELOPER_TOKEN }}
+          ADS__DARK__GOOGLE_ADS_ACCESS_TOKEN: ${{ secrets.ADS__DARK__GOOGLE_ADS_ACCESS_TOKEN }}
+          ADS__DARK__GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.ADS__DARK__GOOGLE_ADS_CUSTOMER_ID }}
+          ADS__DARK__GOOGLE_ADS_CONVERSION_ACTION_ID: ${{ secrets.ADS__DARK__GOOGLE_ADS_CONVERSION_ACTION_ID }}
+          ADS__DARK__TIKTOK_ADS_ACCESS_TOKEN: ${{ secrets.ADS__DARK__TIKTOK_ADS_ACCESS_TOKEN }}
+          ADS__DARK__TIKTOK_ADS_PIXEL_CODE: ${{ secrets.ADS__DARK__TIKTOK_ADS_PIXEL_CODE }}
+          ADS__DARK__SNAPCHAT_ADS_ACCESS_TOKEN: ${{ secrets.ADS__DARK__SNAPCHAT_ADS_ACCESS_TOKEN }}
+          ADS__DARK__SNAPCHAT_ADS_PIXEL_ID: ${{ secrets.ADS__DARK__SNAPCHAT_ADS_PIXEL_ID }}
+          NOTIFICATIONS__EMAIL_API_KEY: ${{ secrets.NOTIFICATIONS__EMAIL_API_KEY }}
+          NOTIFICATIONS__TELEGRAM_BOT_TOKEN: ${{ secrets.NOTIFICATIONS__TELEGRAM_BOT_TOKEN }}
+          NOTIFICATIONS__TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.NOTIFICATIONS__TELEGRAM_ADMIN_CHAT_ID }}
+          NOTIFICATIONS__TELEGRAM_WEBHOOK_SECRET: ${{ secrets.NOTIFICATIONS__TELEGRAM_WEBHOOK_SECRET }}
+          NOTIFICATIONS__NOTIFICATIONS_SIGNING_KEY: ${{ secrets.NOTIFICATIONS__NOTIFICATIONS_SIGNING_KEY }}
+          NOTIFICATIONS__HEALTH_PROBE_TOKEN: ${{ secrets.NOTIFICATIONS__HEALTH_PROBE_TOKEN }}
+          NOTIFICATIONS__DARK__EMAIL_API_KEY: ${{ secrets.NOTIFICATIONS__DARK__EMAIL_API_KEY }}
+          NOTIFICATIONS__DARK__TELEGRAM_BOT_TOKEN: ${{ secrets.NOTIFICATIONS__DARK__TELEGRAM_BOT_TOKEN }}
+          NOTIFICATIONS__DARK__TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.NOTIFICATIONS__DARK__TELEGRAM_ADMIN_CHAT_ID }}
+          NOTIFICATIONS__DARK__TELEGRAM_WEBHOOK_SECRET: ${{ secrets.NOTIFICATIONS__DARK__TELEGRAM_WEBHOOK_SECRET }}
+          GATEWAY__GATEWAY_SIGNING_KEY: ${{ secrets.GATEWAY__GATEWAY_SIGNING_KEY }}
+          GATEWAY__TURNSTILE_SECRET: ${{ secrets.GATEWAY__TURNSTILE_SECRET }}
+          GATEWAY__HEALTH_PROBE_TOKEN: ${{ secrets.GATEWAY__HEALTH_PROBE_TOKEN }}
+        run: |
+          if [ "$SERVICE" = "core" ]; then
+            echo "core: its secrets are workflow 7's business, never this one's"
+            exit 0
+          fi
+          node scripts/upload-secrets.mjs --service "$SERVICE" --env "$TARGET_ENV"
+
+      # "Could not look" is never "healthy". Either a URL answers, or the deep
+      # fan-out names this service, or the caller says out loud that it is
+      # deployed and bound nowhere yet.
+      - name: Probe health
+        env:
+          HEALTH_PROBE_TOKEN: ${{ secrets.HEALTH_PROBE_TOKEN }}
+        run: |
+          set -e
+          BASE="${{ inputs.probe_base }}"
+          [ -n "$BASE" ] || BASE="${{ steps.deploy.outputs.url }}"
+          if [ -n "$BASE" ]; then
+            node scripts/probe-health.mjs --service "$SERVICE" --env "$TARGET_ENV" --base "$BASE"
+          else
+            node scripts/probe-health.mjs --service "$SERVICE" --env "$TARGET_ENV" --unbound ${{ inputs.accept_unprobeable && '--accept-unprobeable' || '' }}
+          fi
+
+      - name: Integration corpus (dark only)
+        if: ${{ inputs.integration != '' && inputs.env == 'dark' }}
+        env:
+          DARK_BASE_URL: ${{ inputs.probe_base }}
+        run: ${{ inputs.integration }}
+
+      - name: Record what this run deployed
+        if: always()
+        run: |
+          {
+            echo "### ${{ steps.target.outputs.name }} (${{ inputs.env }})"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| config | \`${{ steps.target.outputs.config }}\` |"
+            echo "| database | \`${{ steps.target.outputs.db }}\` |"
+            echo "| migrations | \`${{ steps.target.outputs.migrations }}\` |"
+            echo "| vars carried forward | ${{ steps.vars.outputs.count }} |"
+            echo "| bindings stripped on the first pass | ${{ steps.ids.outputs.stripped }} |"
+            echo "| serves a domain | **no** — dark Workers have no route (docs/WORKERS.md) |"
+          } >> "$GITHUB_STEP_SUMMARY"

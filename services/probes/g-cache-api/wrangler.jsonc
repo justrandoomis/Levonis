@@ -1,0 +1,11 @@
+{
+  // ADR-017 (g) — the Cache API. Must be curled on the DARK ZONE: on
+  // workers.dev `caches.default` is a no-op and the probe says so itself.
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "levonis-probe-cache",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true }
+}
