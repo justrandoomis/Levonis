@@ -40,7 +40,13 @@ test('issuer allowlist per method, replay, expiry and a tampered signature are r
   assert.deepEqual(replay, { ok: false, reason: 'REPLAY' });
   const expired = await verifyHop({ hop, method: 'LedgerEntrypoint.decideDeposit', args, allowedIssuers: ['*'], ring, nonces: new NonceSet(), nowSeconds: NOW + HOP_TTL_S + 10 });
   assert.deepEqual(expired, { ok: false, reason: 'EXPIRED' });
-  const tampered = await verifyHop({ hop: { ...hop, sig: hop.sig.slice(0, -2) + 'AA' }, method: 'LedgerEntrypoint.decideDeposit', args, allowedIssuers: ['*'], ring, nonces: new NonceSet(), nowSeconds: NOW });
+  // Tamper with the FIRST character, never the last. A 64-byte signature is
+  // 86 base64url characters: the last one carries only 2 significant bits, so
+  // 'A' and 'B' there decode to the same 64 bytes and the signature is not
+  // tampered with at all. Editing the tail made this assertion fail on itself
+  // (originally 1 run in 4096, then every run) instead of on a defect.
+  const flipped = (hop.sig[0] === 'A' ? 'B' : 'A') + hop.sig.slice(1);
+  const tampered = await verifyHop({ hop: { ...hop, sig: flipped }, method: 'LedgerEntrypoint.decideDeposit', args, allowedIssuers: ['*'], ring, nonces: new NonceSet(), nowSeconds: NOW });
   assert.deepEqual(tampered, { ok: false, reason: 'BAD_SIGNATURE' });
   assert.deepEqual(await verifyHop({ hop: { iss: 'x' }, method: 'm', args, allowedIssuers: ['*'], ring, nonces, nowSeconds: NOW }), { ok: false, reason: 'MALFORMED' });
 });
