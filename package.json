@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:web": "vite",
-    "build": "node scripts/prepare-deploy-config.mjs && vite build && node scripts/write-asset-headers.mjs",
+    "build": "node scripts/prepare-deploy-config.mjs && vite build && node scripts/write-asset-headers.mjs && node scripts/check-live-markers.mjs",
     "lint": "eslint .",
     "check": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json && tsc --noEmit -p tests/tsconfig.json && eslint . && npm run check:workspaces && npm run check:boundaries && npm run check:studio",
     "check:workspaces": "node scripts/check-workspaces.mjs",

@@ -254,20 +254,36 @@ jobs:
           set -euo pipefail
           fail=0
 
-          # P1. The form resolves an option's price through the SHARED helper.
-          # `rowCells` is the exported name; the provenance line and the
-          # «يرث» reset are its two visible consequences.
-          hit=$(grep -l 'rowCells' /tmp/mods/* 2>/dev/null | head -1 || true)
-          if [ -n "$hit" ]; then
-            echo "  ok   P1 the shared price resolver ships — in $(basename "$hit")"
-          else
-            echo "  FAIL P1 rowCells is not in the served bundle — the form would show «inherit» again"; fail=1
-          fi
+          # P1. EVERY MARKER HERE IS A STRING LITERAL OR AN ATTRIBUTE VALUE,
+          # never an identifier: `rowCells` and friends are renamed by the
+          # minifier, so grepping for them would fail on a bundle that carries
+          # the fix perfectly. Verified against a local `npm run build` before
+          # this check was written.
+          #
+          # The provenance line under each price cell exists only because the
+          # cell resolves through the shared ladder — it has nothing to print
+          # otherwise.
           hit=$(grep -l 'data-price-mode' /tmp/mods/* 2>/dev/null | head -1 || true)
           if [ -n "$hit" ]; then
             echo "  ok   P1 the price provenance line ships — in $(basename "$hit")"
           else
-            echo "  FAIL P1 the provenance line is missing"; fail=1
+            echo "  FAIL P1 the provenance line is missing — the form would show «inherit» again"; fail=1
+          fi
+          # The «يرث» reset button: a cell can only offer to STOP overriding if
+          # it knows it is overriding, which is the resolved mode.
+          hit=$(grep -l 'data-price-inherit' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P1 the return-to-inherit control ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P1 the return-to-inherit control is missing"; fail=1
+          fi
+          # And the member-fallback disclosure: a tier with no price of its own
+          # is charged the regular price, and the cell says so.
+          hit=$(grep -l 'regular-fallback' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P1 the PRIME/PRO fallback disclosure ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P1 the member-fallback disclosure is missing"; fail=1
           fi
 
           # P2 is server-side, so it is proved by the API rather than the
@@ -281,9 +297,7 @@ jobs:
           else
             echo "  FAIL P2 the section-template endpoint answered $code to an anonymous GET"; fail=1
           fi
-          # And the narrowing itself is in the deployed worker's own code.
-          hit=$(grep -l 'groupsForSection' /tmp/mods/* 2>/dev/null | head -1 || true)
-          echo "  note P2 narrowing is server-side; the bundle grep is informational ($( [ -n "$hit" ] && basename "$hit" || echo 'not in client bundle, as expected'))"
+          echo "  note P2 the narrowing itself is server-side; the client only renders whatever groups that endpoint returns"
 
           # P3. A failed image must say so and offer a replacement rather than
           # rendering the browser's broken-file glyph.
@@ -298,6 +312,12 @@ jobs:
             echo "  ok   P3 the broken-primary warning ships — in $(basename "$hit")"
           else
             echo "  FAIL P3 the broken-primary warning is missing"; fail=1
+          fi
+          hit=$(grep -l 'data-image-replace-url' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P3 replace-URL ships, so a failure is repaired and never deleted — in $(basename "$hit")"
+          else
+            echo "  FAIL P3 the replace-URL control is missing"; fail=1
           fi
 
           # P4. The usage-step editor warns before a media-only step is lost.
