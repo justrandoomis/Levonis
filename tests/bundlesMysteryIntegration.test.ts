@@ -402,8 +402,15 @@ test('a bundle walks the whole mandate: composed, listed, gated, carted, reserve
   )!;
   assert.equal(Number(releaseFence.expected), Number(releaseFence.actual));
   assert.deepEqual(reservedEverywhere(raw), before, 'every counter is back exactly where it started');
-  // §17 decision 4, made explicit: a cancellation does NOT free the slot.
+  // §17 decision 4, made explicit: the row is kept, never deleted — and on a
+  // NORMAL bundle the owner ruled that a genuine cancellation gives the slot
+  // back, so it is `released`. A mystery order is the one that never releases
+  // (journey two, and tests/offerRedemptionState.test.ts).
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM offer_redemptions WHERE order_id = ?', orderId), 1);
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM offer_redemptions WHERE order_id = ? AND state = 'released'", orderId),
+    1
+  );
 });
 
 // =====================================================================

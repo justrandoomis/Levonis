@@ -51,6 +51,7 @@ import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusCh
 import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
 import { getSetting } from './settings';
 import { reachedMilestones, revealStampStatement } from './mysteryReveal';
+import { reclaimOrderRedemptionsStatement } from './offers';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -103,7 +104,7 @@ export interface MoveResult {
   /** Honest partial outcomes — the move happened, something beside it did not. */
   notes: string[];
   /** Why a move was refused, when moved === false. */
-  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND';
+  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED';
 }
 
 export interface MoveOptions {
@@ -192,7 +193,31 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     false
   );
   const stamp = revealStampStatement(env.DB, order.id, milestones, nowIso, opts.to);
-  const [flipResult] = await env.DB.batch(stamp ? [flipStatement, stamp] : [flipStatement]);
+  // RE-OPENING FROM CANCELLED. The offer slot the cancellation released comes
+  // back in the SAME batch as the flip (§17 decision 4): if the customer spent
+  // that slot elsewhere meanwhile, `trg_offer_redemption_reclaim` aborts and
+  // the move does not happen either, which is the honest outcome. This is only
+  // a re-claim — a stage move INTO cancelled releases nothing, because it
+  // refunds nothing (it calls returnOrderStock alone, never
+  // cancelledOrderRefundStatements), and the owner's rule frees a slot only
+  // for an order that was genuinely cancelled AND refunded.
+  const reopening = legacyFrom === 'cancelled' && legacyTo !== 'cancelled';
+  const moveStatements = [flipStatement];
+  if (stamp) moveStatements.push(stamp);
+  if (reopening) moveStatements.push(reclaimOrderRedemptionsStatement(env.DB, order.id));
+  let flipResult;
+  try {
+    [flipResult] = await env.DB.batch(moveStatements);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('OFFER_PER_USER_LIMIT') || msg.includes('OFFER_GLOBAL_LIMIT')) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'OFFER_LIMIT_REACHED',
+      };
+    }
+    throw e;
+  }
   const flip = flipResult as unknown as { meta: { changes: number } };
   if (flip.meta.changes === 0) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'RACED' };

@@ -25,6 +25,7 @@
  *    (a concurrent cancel, an admin transition) writes nothing at all.
  */
 import type { Env } from './types';
+import { releaseOrderRedemptionsStatement } from './offers';
 
 /** The order row as both routes hold it (a raw `SELECT *`); only four columns are read. */
 export type CancellableOrderMoney = Record<string, unknown>;
@@ -82,6 +83,12 @@ export function cancelledOrderRefundStatements(
         WHERE order_id = ?2 AND state = 'pending' AND ${ORDER_IS_CANCELLED}`
     ).bind(nowIso, id)
   );
+  // §17 decision 4: a genuinely cancelled order gives its offer slot back —
+  // unless it carries a mystery allocation, in which case it never does. The
+  // statement is fenced on `status = 'cancelled'` exactly like the refunds
+  // above, so a flip that did not land releases nothing.
+  out.push(releaseOrderRedemptionsStatement(env.DB, id, nowIso));
+
   // THE FENCE. `status` is NOT NULL: when the flip did not land, this writes
   // NULL into it and the constraint aborts the whole batch; when it did, the
   // column is rewritten to its own value and nothing changes.

@@ -233,11 +233,18 @@ test('cancellation releases every component in the same batch as the status flip
     row(raw, 'SELECT expected, actual FROM order_reservation_fence WHERE order_id = ? AND kind = ?', orderId, 'release'),
     { expected: 3, actual: 3 }
   );
-  // The redemption row SURVIVES the cancellation — it is not freed, which is
-  // the same rule coupons follow and the rule a reveal-at-'paid' mystery offer
-  // depends on: otherwise a buyer could cancel and re-roll for ever (§7.3,
-  // §17 decision 4).
+  // The redemption row SURVIVES the cancellation as a row — but on a NORMAL
+  // bundle the owner ruled (decision 4) that its slot comes back, so the row
+  // is released rather than deleted. A MYSTERY order never releases: that rule
+  // is what stops a cancel-and-re-roll loop (§7.3), and it is pinned in
+  // tests/offerRedemptionState.test.ts along with the re-open that takes the
+  // slot away again.
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM offer_redemptions WHERE order_id = ?', orderId), 1);
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM offer_redemptions WHERE order_id = ? AND state = 'released'", orderId),
+    1,
+    'a cancelled bundle order gives its offer slot back'
+  );
 });
 
 // ------------------------------------------------------------ the grouping

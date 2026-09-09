@@ -386,7 +386,12 @@ export async function offerLimitAdvice(
 
   if (limits.max_global !== null && limits.max_global !== undefined) {
     const row = await db
-      .prepare('SELECT COALESCE(SUM(qty), 0) AS n FROM offer_redemptions WHERE subject_type = ? AND subject_id = ?')
+      .prepare(
+        // ACTIVE only, exactly as `trg_offer_redemption_limits` counts (0065):
+        // advice that counted released rows would refuse a purchase the
+        // trigger would have allowed.
+        "SELECT COALESCE(SUM(qty), 0) AS n FROM offer_redemptions WHERE subject_type = ? AND subject_id = ? AND state = 'active'"
+      )
       .bind(subject[0], subject[1])
       .first<{ n: number }>();
     if (Number(row?.n ?? 0) + qty > limits.max_global) return { ...base, ok: false, reason: 'GLOBAL_LIMIT_REACHED' };
@@ -394,13 +399,74 @@ export async function offerLimitAdvice(
   if (limits.max_per_user !== null && limits.max_per_user !== undefined && userId) {
     const row = await db
       .prepare(
-        'SELECT COALESCE(SUM(qty), 0) AS n FROM offer_redemptions WHERE subject_type = ? AND subject_id = ? AND user_id = ?'
+        "SELECT COALESCE(SUM(qty), 0) AS n FROM offer_redemptions WHERE subject_type = ? AND subject_id = ? AND user_id = ? AND state = 'active'"
       )
       .bind(subject[0], subject[1], userId)
       .first<{ n: number }>();
     if (Number(row?.n ?? 0) + qty > limits.max_per_user) return { ...base, ok: false, reason: 'PER_USER_LIMIT_REACHED' };
   }
   return base;
+}
+
+/**
+ * THE SLOT COMES BACK ON A GENUINE CANCELLATION — AND NEVER FOR A MYSTERY
+ * (owner decision 4, migration 0065).
+ *
+ * Appended to `cancelledOrderRefundStatements`, so it rides in the SAME batch
+ * as the status flip and the refunds, behind the same `?2` fence: if the flip
+ * did not land, the fence writes NULL into a NOT NULL column and the whole
+ * batch — this statement included — rolls back.
+ *
+ * WHY `NOT EXISTS mystery_allocations` AND NOT "revealed". The owner's rule is
+ * that a revealed mystery never frees its slot, and the only way to make that
+ * STRUCTURAL rather than derived is to exclude every mystery order, revealed
+ * or not. `revealed_at` is stamped by three call sites and the other half of
+ * "revealed" is a pure TypeScript milestone check (`milestoneReached`) that
+ * SQL cannot see — so a SQL predicate on `revealed_at` would free the slot of
+ * an order the customer has, in fact, already seen. Excluding all of them
+ * costs an unrevealed mystery cancel its slot and buys a re-roll path that
+ * cannot exist. That trade is the owner's stated priority.
+ */
+export function releaseOrderRedemptionsStatement(
+  db: D1Database,
+  orderId: string,
+  nowIso: string
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE offer_redemptions
+          SET state = 'released', released_at = ?1
+        WHERE order_id = ?2
+          AND state = 'active'
+          AND EXISTS (SELECT 1 FROM orders o WHERE o.id = ?2 AND o.status = 'cancelled')
+          AND NOT EXISTS (SELECT 1 FROM mystery_allocations a WHERE a.order_id = ?2)`
+    )
+    .bind(nowIso, orderId);
+}
+
+/**
+ * AND IT GOES BACK WHEN THE ORDER IS RE-OPENED. `cancelled` is not terminal:
+ * the admin transition table allows cancelled -> pending/confirmed/processing
+ * and the stage machine allows the same move, so an order whose slot was
+ * released can come back to life. Without this the customer would hold the
+ * goods and the entitlement at once.
+ *
+ * The re-claim is limit-checked by `trg_offer_redemption_reclaim` (0065): if
+ * the freed slot was spent elsewhere in the meantime, the trigger aborts and
+ * takes the re-open batch with it, which is the honest outcome. It is fenced
+ * the other way round from the release — the order must NOT be cancelled any
+ * more — so a re-claim can only ride a batch that actually re-opened it.
+ */
+export function reclaimOrderRedemptionsStatement(db: D1Database, orderId: string): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE offer_redemptions
+          SET state = 'active', released_at = NULL
+        WHERE order_id = ?1
+          AND state = 'released'
+          AND EXISTS (SELECT 1 FROM orders o WHERE o.id = ?1 AND o.status <> 'cancelled')`
+    )
+    .bind(orderId);
 }
 
 /**

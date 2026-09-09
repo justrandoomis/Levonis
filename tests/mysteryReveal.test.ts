@@ -518,8 +518,9 @@ test('a revealed mystery order cannot be self-cancelled, and cancelling frees no
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
   const app = appFor(db);
 
-  // Not yet revealed: the ordinary cancel path still works, and it does NOT
-  // delete the redemption row (§17 decision 4).
+  // Not yet revealed: the ordinary cancel path still works, and it neither
+  // deletes NOR releases the redemption row (§17 decision 4 — a normal bundle
+  // gets its slot back, a mystery never does).
   const before = count(raw, 'SELECT COUNT(*) AS n FROM offer_redemptions WHERE subject_id = ?', 'p_mystery');
   assert.equal(before, 1, 'no redemption row was written for the mystery subject');
 
@@ -533,6 +534,11 @@ test('a revealed mystery order cannot be self-cancelled, and cancelling frees no
   assert.equal(refused.code, 'MYSTERY_REVEALED_NO_CANCEL');
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM orders WHERE id = ? AND status = 'cancelled'", orderId), 0);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM offer_redemptions WHERE subject_id = ?', 'p_mystery'), 1);
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM offer_redemptions WHERE subject_id = ? AND state = 'active'", 'p_mystery'),
+    1,
+    'a mystery slot is never released — this is the re-roll fence'
+  );
 });
 
 test("the 'paid' milestone is crossed by the settlement, not by a stage", async () => {

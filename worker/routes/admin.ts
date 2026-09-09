@@ -13,6 +13,7 @@ import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
@@ -1582,6 +1583,24 @@ adminRoutes.patch('/orders/:id', async (c) => {
       throw e;
     }
     stockNote = stockReturnNote(stock.kind, stock.plan?.applied ?? 0);
+  } else if (from === 'cancelled') {
+    // RE-OPENING. The slot this order released when it was cancelled has to
+    // come back with it (§17 decision 4) — otherwise the customer keeps the
+    // goods AND the entitlement. Flip and re-claim in ONE batch, because a
+    // re-claim the limit trigger refuses must take the re-open with it.
+    try {
+      const res = await c.env.DB.batch([flipStmt, reclaimOrderRedemptionsStatement(c.env.DB, id)]);
+      flipped = res[0]?.meta.changes ?? 0;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('OFFER_PER_USER_LIMIT') || msg.includes('OFFER_GLOBAL_LIMIT')) {
+        throw badRequest(
+          'This order cannot be re-opened: its offer allowance was used again after the cancellation.',
+          'OFFER_LIMIT_REACHED'
+        );
+      }
+      throw e;
+    }
   } else {
     flipped = (await flipStmt.run()).meta.changes;
   }
