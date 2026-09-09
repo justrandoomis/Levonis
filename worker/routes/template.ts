@@ -78,7 +78,8 @@ import {
 import {
   PRODUCT_TYPES,
   groupsForType,
-  fieldsFor,
+  groupsForSection,
+  type SectionRef,
   flatFields,
   isProductType,
   isTemplateFamily,
@@ -564,13 +565,16 @@ async function specSheetReport(db: D1Database, doc: ProductDoc, parsed: ParsedTe
     const family = resolveTemplateFamilies(results).get(sectionId) ?? doc.template_family;
     if (family && isTemplateFamily(family)) {
       report.family = family;
-      const slugs: string[] = [];
+      // Leaf first, ids alongside slugs: `groupsForSection` narrows an FDM
+      // printer to the FDM group, and it can only do that if it is told which
+      // leaf the product is actually filed in.
+      const branch: SectionRef[] = [];
       let cursor = byId.get(sectionId);
       for (let i = 0; i < 20 && cursor; i++) {
-        slugs.push(cursor.slug);
+        branch.push({ id: cursor.id, slug: cursor.slug });
         cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
       }
-      fields = flatFields(fieldsFor(family, slugs));
+      fields = flatFields(groupsForSection(family, branch));
     }
   }
   const known = new Map(fields.map((f) => [f.id, f]));
@@ -798,13 +802,17 @@ async function exportOptsFor(
    */
   let specFieldIds: string[] = [];
   if (doc.template_family === 'devices' || doc.template_family === 'materials') {
-    const sectionIds = [doc.category_id, doc.sub_category_id].filter((x): x is string => !!x);
-    const slugs: string[] = [];
+    // SUB-CATEGORY FIRST. The branch is read leaf-first everywhere else, and
+    // it must be here too: with the parent first, a Resin printer's export
+    // would resolve «الطابعات» before «طابعات Resin» and narrow to nothing —
+    // or, worse, to the wrong technology's columns.
+    const sectionIds = [doc.sub_category_id, doc.category_id].filter((x): x is string => !!x);
+    const branch: SectionRef[] = [];
     for (const id of sectionIds) {
       const row = await db.prepare('SELECT slug FROM catalogs WHERE id = ?').bind(id).first<{ slug: string }>();
-      if (row) slugs.push(row.slug);
+      if (row) branch.push({ id, slug: row.slug });
     }
-    specFieldIds = flatFields(fieldsFor(doc.template_family, slugs)).map((f) => f.id);
+    specFieldIds = flatFields(groupsForSection(doc.template_family, branch)).map((f) => f.id);
   }
   // Slugs, not ids: a file that says `category=printers` is readable, and it
   // re-imports on any environment where that section exists.

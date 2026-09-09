@@ -461,6 +461,87 @@ const TYPE_BY_ID = new Map(PRODUCT_TYPES.map((p) => [p.id, p]));
 const TYPE_BY_SLUG = new Map<string, ProductTypeDef>();
 for (const p of PRODUCT_TYPES) for (const slug of p.sectionSlugs) TYPE_BY_SLUG.set(slug, p);
 
+// ------------------------------------------------- the seeded taxonomy leaves
+//
+// A TYPE IS NOT A TECHNOLOGY, and conflating them is what put eight Resin
+// fields on a Bambu Lab A1. `printer` composes device-common + FDM + Resin
+// because the TYPE covers both machines; the section the product is actually
+// filed in — «طابعات FDM» — is what says which of the two a human should be
+// asked about. `fieldsFor` used the branch only to pick the type and then
+// threw it away, so every printer got the union: 22 + 17 + 8 = 47 fields,
+// eight of them about an LCD an A1 does not have.
+//
+// WHY THE ID AND NOT THE SLUG. Migration 0018 seeds these sections with a
+// PREFERRED slug and two documented fallbacks: if `fdm-printers` is taken it
+// writes `fdm-printers-levo`, and if that is taken too it writes the id
+// itself. The id never moves. So a match is attempted on the id first, and the
+// slug forms 0018 can produce are accepted after it — a store whose taxonomy
+// collided must still get the right fields, and an admin renaming a slug in
+// the taxonomy screen must not silently widen the form back to 47 fields.
+//
+// AN AXIS IS A SET OF SIBLINGS THAT EXCLUDE EACH OTHER. Naming one leaf of an
+// axis drops the others. Naming NONE of them keeps them all, which is the
+// honest answer for a product filed directly under «الطابعات»: the section has
+// not said which technology, so neither do we.
+
+interface SeededLeaf {
+  /** The catalog id migration 0018 writes. Stable; the slug is not. */
+  id: string;
+  /** The slug 0018 PREFERS. `<slug>-levo` and the bare id are its fallbacks. */
+  slug: string;
+  /** The group this leaf selects, '' when the leaf adds no group of its own
+   *  but must still be able to say "not my sibling's". */
+  group: string;
+}
+
+const AXES: Record<string, SeededLeaf[]> = {
+  'printer-technology': [
+    { id: 'cat_printers_fdm', slug: 'fdm-printers', group: 'fdm' },
+    { id: 'cat_printers_resin', slug: 'resin-printers', group: 'resin' },
+  ],
+  'material-technology': [
+    { id: 'cat_materials_fdm', slug: 'fdm-materials', group: 'fdm_mat' },
+    { id: 'cat_materials_resin', slug: 'resin-materials', group: 'resin_mat' },
+  ],
+  // «ملحقات طابعات FDM» declares no group of its own, but it is still the
+  // statement "this is not a Resin accessory" — without the empty entry an FDM
+  // accessory would keep being asked for a wash-station capacity.
+  'accessory-technology': [
+    { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', group: '' },
+    { id: 'cat_pacc_resin', slug: 'resin-printer-accessories', group: 'acc_resin' },
+  ],
+};
+
+/** One section of the branch a product is filed in. */
+export interface SectionRef {
+  id: string;
+  slug: string;
+}
+
+/** Every string 0018 could have written as this leaf's slug. */
+const slugForms = (leaf: SeededLeaf): string[] => [leaf.slug, `${leaf.slug}-levo`, leaf.id];
+
+const namesLeaf = (branch: SectionRef[], leaf: SeededLeaf): boolean =>
+  branch.some((s) => s.id === leaf.id || slugForms(leaf).includes(s.slug));
+
+/**
+ * The group ids this branch EXCLUDES. Empty when the branch names no leaf of
+ * any axis — an unnarrowed section keeps the whole type, as it did before.
+ */
+function excludedGroups(branch: SectionRef[]): Set<string> {
+  const out = new Set<string>();
+  for (const leaves of Object.values(AXES)) {
+    const named = leaves.filter((l) => namesLeaf(branch, l));
+    // Nothing named → no opinion. Everything named (a branch that somehow
+    // walks through both) → also no opinion, rather than an empty form.
+    if (named.length === 0 || named.length === leaves.length) continue;
+    for (const l of leaves) {
+      if (l.group && !named.includes(l)) out.add(l.group);
+    }
+  }
+  return out;
+}
+
 export function isProductType(v: unknown): v is ProductTypeId {
   return typeof v === 'string' && TYPE_BY_ID.has(v as ProductTypeId);
 }
@@ -478,8 +559,30 @@ export function productTypeForSection(
   family: 'devices' | 'materials',
   sectionSlugs: string[]
 ): ProductTypeId {
-  for (const slug of sectionSlugs) {
-    const found = TYPE_BY_SLUG.get(slug);
+  return productTypeForBranch(family, sectionSlugs.map((slug) => ({ id: slug, slug })));
+}
+
+/**
+ * The same answer from a branch that carries IDS as well as slugs — the form
+ * follows the taxonomy the admin actually configured, so renaming a slug does
+ * not silently reclassify a section. Slugs are still consulted, because a
+ * section an admin created by hand has an id we have never seen.
+ */
+export function productTypeForBranch(
+  family: 'devices' | 'materials',
+  branch: SectionRef[]
+): ProductTypeId {
+  for (const section of branch) {
+    // The seeded id first: it is the one thing 0018 guarantees.
+    for (const leaves of Object.values(AXES)) {
+      for (const leaf of leaves) {
+        if (section.id === leaf.id) {
+          const byLeaf = TYPE_BY_SLUG.get(leaf.slug);
+          if (byLeaf) return byLeaf.id;
+        }
+      }
+    }
+    const found = TYPE_BY_SLUG.get(section.slug);
     if (found) return found.id;
   }
   return family === 'devices' ? 'printer' : 'filament';
@@ -489,15 +592,55 @@ export function productTypeForSection(
  *  composed groups may legitimately declare the same field, and a repeated
  *  field would become a repeated column. The first group to claim a field
  *  keeps it, so the more specific group (listed first) wins over the core. */
-export function groupsForType(id: ProductTypeId): TemplateGroup[] {
+function dedupeFields(groups: TemplateGroup[]): TemplateGroup[] {
   const seen = new Set<string>();
   const out: TemplateGroup[] = [];
-  for (const group of productType(id).groups) {
+  for (const group of groups) {
     const fields = group.fields.filter((f) => !seen.has(f.id));
     for (const f of fields) seen.add(f.id);
     if (fields.length) out.push({ ...group, fields });
   }
   return out;
+}
+
+export function groupsForType(id: ProductTypeId): TemplateGroup[] {
+  return dedupeFields(productType(id).groups);
+}
+
+/**
+ * THE GROUPS ONE SECTION SHOULD SHOW — the type, then the branch's narrowing.
+ *
+ * The dedupe runs AFTER the filter, not before, and that ordering is load
+ * bearing: `acc_common` and `PHYSICAL_CORE` both declare `material`, and the
+ * first group to claim a field keeps it. Dropping a group after the dedupe
+ * would take a field with it that a surviving group would happily have
+ * declared.
+ *
+ * NOTHING IS DESTROYED BY THE NARROWING. A value stored under a field this
+ * section no longer declares stays in `spec_fields` — the import merges rather
+ * than replaces (importApply.ts) and the form renders it under «مواصفات محفوظة
+ * خارج قالب هذا القسم» (specIdsOutsideTemplate). A resin spec on a machine
+ * that was once filed as Resin is legacy data, and legacy data is shown as
+ * legacy data rather than deleted or promoted back to a primary field.
+ */
+export function groupsForSection(
+  family: 'devices' | 'materials',
+  branch: SectionRef[]
+): TemplateGroup[] {
+  return narrowGroups(productTypeForBranch(family, branch), branch);
+}
+
+/**
+ * The narrowing ALONE, for a caller that has already decided the type.
+ *
+ * The import panel lets an admin download a sheet for an explicit
+ * `?type=printer` while also naming a section; the section must still be
+ * allowed to drop the Resin columns, but it must NOT be allowed to overrule
+ * the type the admin typed. Splitting the two keeps that honest.
+ */
+export function narrowGroups(type: ProductTypeId, branch: SectionRef[]): TemplateGroup[] {
+  const excluded = excludedGroups(branch);
+  return dedupeFields(productType(type).groups.filter((g) => !excluded.has(g.id)));
 }
 
 /**
@@ -508,7 +651,7 @@ export function groupsForType(id: ProductTypeId): TemplateGroup[] {
  * or in neither.
  */
 export function fieldsFor(family: 'devices' | 'materials', sectionSlugs: string[]): TemplateGroup[] {
-  return groupsForType(productTypeForSection(family, sectionSlugs));
+  return groupsForSection(family, sectionSlugs.map((slug) => ({ id: slug, slug })));
 }
 
 /** Flat field list, in render/column order. */

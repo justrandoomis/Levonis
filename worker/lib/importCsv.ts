@@ -59,6 +59,8 @@ import {
   PRODUCT_TYPES,
   flatFields,
   groupsForType,
+  narrowGroups,
+  type SectionRef,
   productType,
   type ProductTypeId,
   type TemplateField,
@@ -276,14 +278,27 @@ export interface TemplateShape {
   sectionSlugs: string[];
 }
 
-/** The column list for one product type: base columns then its spec columns. */
+/**
+ * The column list for one product type: base columns then its spec columns.
+ *
+ * WITH A BRANCH the columns narrow to the technology that branch names — a
+ * sheet downloaded for «طابعات FDM» carries no `spec.lcd_size`, because the
+ * import sheet and the product form must offer the same fields or an admin
+ * fills a column the form will file under "preserved outside this section".
+ *
+ * WITHOUT ONE the union stands. `GET /template?type=printer` is a request for
+ * "a printer sheet" with no section chosen, and narrowing it to one technology
+ * would be inventing an answer the admin did not give.
+ */
 export function templateShape(
   type: ProductTypeId,
   sectionSlugs: string[] = [],
-  { includeCost = true }: { includeCost?: boolean } = {}
+  { includeCost = true, branch = [] }: { includeCost?: boolean; branch?: SectionRef[] } = {}
 ): TemplateShape {
   const def = productType(type);
-  const specFields = flatFields(groupsForType(type));
+  // The branch narrows within the type; it never re-picks the type, because a
+  // caller passing `?type=` has already made that decision explicitly.
+  const specFields = flatFields(branch.length ? narrowGroups(type, branch) : groupsForType(type));
   const base = BASE_COLUMNS.filter((c) => (includeCost ? true : c !== 'cost_iqd'));
   return {
     columns: [...base, ...specFields.map((f) => `${SPEC_PREFIX}${f.id}`)],

@@ -72,7 +72,8 @@ import {
 import {
   isProductType,
   isTemplateFamily,
-  productTypeForSection,
+  productTypeForBranch,
+  type SectionRef,
   type ProductTypeId,
 } from '../lib/templateFamilies';
 import { loadLookups } from '../lib/lookups';
@@ -167,12 +168,12 @@ function familyMap(rows: CatalogRow[]): Map<string, 'devices' | 'materials' | nu
 
 /** The catalog's own slug plus its ancestors', so a section add-on defined on
  *  a parent still contributes its columns to a child. */
-function branchSlugs(rows: CatalogRow[], id: string): string[] {
+function sectionBranch(rows: CatalogRow[], id: string): SectionRef[] {
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const out: string[] = [];
+  const out: SectionRef[] = [];
   let node = byId.get(id);
   for (let hop = 0; node && hop < 12; hop++) {
-    out.push(node.slug);
+    out.push({ id: node.id, slug: node.slug });
     node = node.parent_id ? byId.get(node.parent_id) : undefined;
   }
   return out;
@@ -204,9 +205,16 @@ async function shapeFor(
       'NO_FAMILY'
     );
   }
-  const slugs = branchSlugs(rows, categoryId);
-  const type = typeOverride ?? productTypeForSection(family!, slugs);
-  return { shape: templateShape(type, slugs, { includeCost }), catalog, rows };
+  const branch = sectionBranch(rows, categoryId);
+  // The type may be overridden by hand; the branch may not override it. It
+  // still narrows WITHIN it, so a sheet for «طابعات FDM» carries no Resin
+  // columns — the same fields the product form will show for that section.
+  const type = typeOverride ?? productTypeForBranch(family!, branch);
+  return {
+    shape: templateShape(type, branch.map((b) => b.slug), { includeCost, branch }),
+    catalog,
+    rows,
+  };
 }
 
 const fileStem = (catalog: CatalogRow, kind: string) =>

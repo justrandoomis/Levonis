@@ -3,7 +3,13 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
 import { newId, } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { FAMILIES, fieldsFor, isTemplateFamily, productTypeForSection } from '../lib/templateFamilies';
+import {
+  FAMILIES,
+  groupsForSection,
+  isTemplateFamily,
+  productTypeForBranch,
+  type SectionRef,
+} from '../lib/templateFamilies';
 import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
 
 /**
@@ -136,13 +142,15 @@ adminTaxonomyRoutes.get('/templates', async (c) => {
   const families = resolveTemplateFamilies(results);
   const family = families.get(categoryId) ?? null;
 
-  // Slugs from this node up to the root, so a sub-section inherits its
-  // parent's add-on fields as well as contributing its own.
+  // This node up to the root — LEAF FIRST, so «طابعات FDM» is read before
+  // «الطابعات» and the technology narrowing sees the specific section before
+  // the general one. Ids travel with the slugs: 0018's slugs have documented
+  // collision fallbacks and an admin may rename one, but the id never moves.
   const byId = new Map(results.map((r) => [r.id, r]));
-  const slugs: string[] = [];
+  const branch: SectionRef[] = [];
   let cursor: CatalogRow | undefined = node;
   for (let i = 0; i < 20 && cursor; i++) {
-    slugs.push(cursor.slug);
+    branch.push({ id: cursor.id, slug: cursor.slug });
     cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
   }
 
@@ -150,9 +158,10 @@ adminTaxonomyRoutes.get('/templates', async (c) => {
     success: true,
     category_id: categoryId,
     template_family: family,
-    product_type: family && isTemplateFamily(family) ? productTypeForSection(family, slugs) : null,
-    groups: family && isTemplateFamily(family) ? fieldsFor(family, slugs) : [],
-    section_slugs: slugs,
+    product_type: family && isTemplateFamily(family) ? productTypeForBranch(family, branch) : null,
+    groups: family && isTemplateFamily(family) ? groupsForSection(family, branch) : [],
+    section_slugs: branch.map((b) => b.slug),
+    section_ids: branch.map((b) => b.id),
   });
 });
 
@@ -172,11 +181,11 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
   // its template is built for — the panel and the form both need to say
   // «هذا القسم طابعة» without a second round trip.
   const byId = new Map(results.map((r) => [r.id, r]));
-  const branch = (id: string): string[] => {
-    const out: string[] = [];
+  const branch = (id: string): SectionRef[] => {
+    const out: SectionRef[] = [];
     let node = byId.get(id);
     for (let hop = 0; node && hop < 12; hop++) {
-      out.push(node.slug);
+      out.push({ id: node.id, slug: node.slug });
       node = node.parent_id ? byId.get(node.parent_id) : undefined;
     }
     return out;
@@ -191,7 +200,7 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
         is_printer_catalog: !!r.is_printer_catalog,
         active: !!r.active,
         effective_template_family: family,
-        product_type: family ? productTypeForSection(family, branch(r.id)) : null,
+        product_type: family ? productTypeForBranch(family, branch(r.id)) : null,
         product_count: countById.get(r.id) ?? 0,
       };
     }),
