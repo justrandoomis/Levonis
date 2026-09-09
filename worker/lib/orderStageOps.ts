@@ -45,11 +45,12 @@ import {
   spreadFor,
   stagesFor,
 } from './orderStages';
-import { deductOrderStock, returnOrderStock } from './orderInventory';
+import { deductOrderStock, returnOrderStock, stockReturnNote } from './orderInventory';
 import { emitEvent, eventsEnabled } from './eventBus';
 import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
 import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
 import { getSetting } from './settings';
+import { reachedMilestones, revealStampStatement } from './mysteryReveal';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -157,21 +158,42 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // sweep and an admin, or two sweeps — leave exactly one winner, and the
   // loser reports RACED instead of writing a second history row for a move
   // that never happened.
-  const flip = await env.DB.prepare(
+  const flipStatement = env.DB.prepare(
     `UPDATE orders
         SET stage = ?, stage_changed_at = ?, stage_source = ?,
             next_stage = ?, next_stage_at = ?, status = ?,
             delivered_at = CASE WHEN ? = 'delivered' THEN COALESCE(NULLIF(delivered_at,''), ?) ELSE delivered_at END,
             updated_at = ?
       WHERE id = ? AND stage = ?`
-  )
-    .bind(
-      opts.to, nowIso, opts.source === 'system' ? 'manual' : opts.source,
-      schedule.next_stage ?? '', schedule.next_stage_at, legacyTo,
-      opts.to, nowIso, nowIso,
-      order.id, from
-    )
-    .run();
+  ).bind(
+    opts.to, nowIso, opts.source === 'system' ? 'manual' : opts.source,
+    schedule.next_stage ?? '', schedule.next_stage_at, legacyTo,
+    opts.to, nowIso, nowIso,
+    order.id, from
+  );
+
+  /**
+   * THE REVEAL STAMP (docs/BUNDLES_MYSTERY.md §8.1), in the SAME transaction
+   * as the flip that earns it — this function is the single writer of
+   * `orders.stage`, so it is the single place a stage-driven milestone can be
+   * crossed, and a stamp written outside the flip could survive a flip that
+   * rolled back.
+   *
+   * `paid: false` on purpose: a stage move establishes nothing about payment.
+   * The `'paid'` milestone is stamped by the checkout batch for a fully
+   * prepaid order and by `POST /api/orders/:id/settlement` for a cash one.
+   *
+   * The stamp's own `WHERE` re-reads `orders.stage` inside the transaction, so
+   * a mover that LOST the race — its flip matched zero rows — stamps nothing,
+   * and `revealed_at IS NULL` makes a winner's stamp idempotent under replay.
+   */
+  const milestones = reachedMilestones(
+    { stage: opts.to, status: legacyTo, shipping_type: order.shipping_type },
+    false
+  );
+  const stamp = revealStampStatement(env.DB, order.id, milestones, nowIso, opts.to);
+  const [flipResult] = await env.DB.batch(stamp ? [flipStatement, stamp] : [flipStatement]);
+  const flip = flipResult as unknown as { meta: { changes: number } };
   if (flip.meta.changes === 0) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'RACED' };
   }
@@ -221,7 +243,8 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     }
   } else if (legacyTo === 'cancelled') {
     const res = await returnOrderStock(env.DB, order.id, opts.changedBy ?? 'system');
-    if (res.kind !== 'none') notes.push(`Stock ${res.kind}d for ${res.applied} row(s).`);
+    const note = stockReturnNote(res.kind, res.applied);
+    if (note) notes.push(note);
   }
 
   return {
@@ -271,7 +294,7 @@ async function emitOrderDelivered(
        FROM order_items oi WHERE oi.order_id = ? LIMIT 200`
   )
     .bind(orderId)
-    .all<{ id: string; product_id: string; qty: number; unit_price_iqd: number; warranty_snapshot: string | null; is_printer: number }>();
+    .all<{ id: string; product_id: string | null; qty: number; unit_price_iqd: number; warranty_snapshot: string | null; is_printer: number }>();
   const cod = Number(orderRow.due_on_delivery_iqd ?? 0);
   await emitEvent(
     env.DB,
@@ -284,7 +307,11 @@ async function emitOrderDelivered(
       delivered_at: deliveredAt,
       items: (results ?? []).map((r) => ({
         order_item_id: String(r.id),
-        product_id: String(r.product_id),
+        // A mystery spool's order_items row stores product_id = NULL by design
+        // (docs/BUNDLES_MYSTERY.md §7.7). `String(null)` wrote the literal
+        // string "null" as a product id — a value no consumer could tell from a
+        // real one, and one the widened `orderItemRef` no longer needs.
+        product_id: String(r.product_id ?? '') || null,
         qty: Math.max(1, Number(r.qty) || 1),
         unit_price_iqd: Math.max(0, Math.round(Number(r.unit_price_iqd) || 0)),
         is_printer: !!Number(r.is_printer),

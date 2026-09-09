@@ -77,8 +77,12 @@ export interface StockResolution {
   /** Units available for sale right now: min(stock - reserved) over targets.
    *  `null` means untracked (no limit is claimed). */
   available: number | null;
-  /** Machine-readable reason when the selection cannot be sold at all. */
-  error: 'VARIANT_NOT_MODELLED' | 'SELECTION_INCOMPLETE' | null;
+  /** Machine-readable reason when the selection cannot be sold at all.
+   *  `resolveStock` itself never returns `COMPONENT_UNAVAILABLE`: it is the
+   *  composition read model's verdict for a bundle component whose member
+   *  product went draft or archived. A stock row can still hold units for a
+   *  product nobody may buy, and nothing else in this union can say so. */
+  error: 'VARIANT_NOT_MODELLED' | 'SELECTION_INCOMPLETE' | 'COMPONENT_UNAVAILABLE' | null;
 }
 
 /** The minimal shape the resolver needs — it never reads the database itself,
@@ -240,6 +244,19 @@ export interface StockMove {
   targets: StockTarget[];
   /** Stable per-line identity: the order item id, an adjustment id, etc. */
   line_id: string;
+  /**
+   * THIS MOVE IS A MYSTERY SPOOL, SO ITS EVENT NAMES NO ORDER (§8.2 rows 9-10).
+   *
+   * Row 9 nulls `OrderCreated.items[].product_id` because "the pick is not an
+   * analytics fact until revealed"; row 10 accepts `InventoryChanged` naming
+   * the real product because it is an internal bus payload. As written the two
+   * contradicted each other: `InventoryChanged` named the drawn product AND the
+   * order it was reserved for, so one join reconstructed exactly what row 9
+   * withheld, from the moment the order committed. The LEDGER row keeps the
+   * real `order_id` — operational traceability is untouched — and only the
+   * event drops it.
+   */
+  mystery?: boolean;
 }
 
 export interface ApplyOptions {
@@ -381,6 +398,25 @@ export interface InventoryPlan extends ApplyResult {
    * the very same batch is delivered at once. Empty while the bus is off.
    */
   eventIds: string[];
+  /**
+   * How many `inventory_ledger` rows this plan's statements will write when
+   * every guard still holds at commit. It is the `expected` side of
+   * `order_reservation_fence` (§3.3): inferring it from `keys.length` would be
+   * the same number today and a silent lie the first time a statement is added
+   * that writes a ledger row without a key in this list.
+   */
+  plannedLedgerRows: number;
+}
+
+/** Bound-parameter safety for every `IN (…)` list this module builds. D1 caps
+ *  parameters per query, and a bundle multiplies the move count without bound
+ *  (§3.1), so the lists are chunked rather than trusted to stay small. */
+export const IN_CHUNK = 50;
+
+export function chunk<T>(xs: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size));
+  return out;
 }
 
 /**
@@ -405,6 +441,20 @@ export interface InventoryPlan extends ApplyResult {
  * ledger row can never claim a movement that did not happen. The UNIQUE index
  * on `idempotency_key` is the final race guard — the loser's INSERT violates
  * it and D1 rolls that caller's whole batch back, counters included.
+ *
+ * DEMAND IS SUMMED PER STOCK ROW, NEVER JUDGED MOVE BY MOVE. Two moves in one
+ * call may resolve to the SAME authoritative row — a bundle holding two spools
+ * of one colour, a bundle beside the bare product it contains, two mystery
+ * spools that drew the same filament. Judging each against the row's full
+ * `available` accepts 2 + 2 units of a row that has 3, so `rejected` comes back
+ * empty, the friendly `CONFLICT_RETRY` never fires, and the sequential guards
+ * fail at commit instead — a permanent, deterministic "a stock level changed"
+ * on a cart nobody is racing. The pre-check therefore walks the moves in order
+ * against a running simulation of each row, so the second move is judged
+ * against what the first one leaves behind. The rows themselves are read in ONE
+ * batched query per table rather than one `SELECT` per candidate move: with a
+ * dozen components on the hottest path in the system, a sequential read scales
+ * latency linearly for no reason.
  */
 export async function planInventory(
   db: D1Database,
@@ -418,50 +468,90 @@ export async function planInventory(
       wanted.push({ key: KEY(opts.kind, opts.operationId, move.line_id, t.scope, t.scope_id), move, target: t });
     }
   }
-  if (wanted.length === 0) return { applied: 0, skipped: 0, rejected: [], keys: [], statements: [], eventIds: [] };
+  if (wanted.length === 0) {
+    return { applied: 0, skipped: 0, rejected: [], keys: [], statements: [], eventIds: [], plannedLedgerRows: 0 };
+  }
 
-  const placeholders = wanted.map(() => '?').join(', ');
-  const { results } = await db
-    .prepare(`SELECT idempotency_key FROM inventory_ledger WHERE idempotency_key IN (${placeholders})`)
-    .bind(...wanted.map((w) => w.key))
-    .all<{ idempotency_key: string }>();
-  const done = new Set(results.map((r) => r.idempotency_key));
+  const done = new Set<string>();
+  for (const part of chunk(
+    wanted.map((w) => w.key),
+    IN_CHUNK
+  )) {
+    const { results } = await db
+      .prepare(`SELECT idempotency_key FROM inventory_ledger WHERE idempotency_key IN (${part.map(() => '?').join(', ')})`)
+      .bind(...part)
+      .all<{ idempotency_key: string }>();
+    for (const r of results) done.add(r.idempotency_key);
+  }
 
   const candidates = wanted.filter((w) => !done.has(w.key));
   const skipped = wanted.length - candidates.length;
-  if (candidates.length === 0) return { applied: 0, skipped, rejected: [], keys: [], statements: [], eventIds: [] };
+  if (candidates.length === 0) {
+    return { applied: 0, skipped, rejected: [], keys: [], statements: [], eventIds: [], plannedLedgerRows: 0 };
+  }
 
-  // Guard pre-check against live values.
+  // ---- one batched read of every row this call touches, keyed (table, id) ---
+  const rowKeyOf = (w: (typeof candidates)[number]) =>
+    `${tableFor(w.target.scope)}#${w.target.scope === 'base' ? w.move.product_id : w.target.scope_id}`;
+  const byTable = new Map<string, Set<string>>();
+  for (const w of candidates) {
+    const table = tableFor(w.target.scope);
+    const id = w.target.scope === 'base' ? w.move.product_id : w.target.scope_id;
+    const set = byTable.get(table);
+    if (set) set.add(id);
+    else byTable.set(table, new Set([id]));
+  }
+  const live = new Map<string, { stock: number | null; reserved: number }>();
+  for (const [table, ids] of byTable) {
+    const reserved = table === 'products' ? 'stock_reserved' : 'reserved';
+    for (const part of chunk([...ids], IN_CHUNK)) {
+      const { results } = await db
+        .prepare(
+          `SELECT id, stock, ${reserved} AS reserved FROM ${table} WHERE id IN (${part.map(() => '?').join(', ')})`
+        )
+        .bind(...part)
+        .all<{ id: string; stock: number | null; reserved: number | null }>();
+      for (const r of results) live.set(`${table}#${r.id}`, { stock: r.stock, reserved: r.reserved ?? 0 });
+    }
+  }
+
+  // ---- guard pre-check, summed per row -------------------------------------
   const rejected: RejectedMove[] = [];
   const fresh: typeof candidates = [];
   // The row as it stood when the guard was evaluated, kept so the event can
   // state stock_after/reserved_after without a second read (03-EVENTS.md §3.4).
+  // For a second move against the same row it is what the first move leaves —
+  // the whole point of the running simulation.
   const before = new Map<string, { stock: number; reserved: number }>();
+  const sim = new Map<string, { stock: number | null; reserved: number }>();
   for (const w of candidates) {
-    const table = tableFor(w.target.scope);
-    const reserved = reservedColumn(w.target.scope);
-    const rowId = w.target.scope === 'base' ? w.move.product_id : w.target.scope_id;
-    const row = await db
-      .prepare(`SELECT stock, ${reserved} AS reserved FROM ${table} WHERE id = ?`)
-      .bind(rowId)
-      .first<{ stock: number | null; reserved: number }>();
+    const key = rowKeyOf(w);
+    const row = live.get(key);
     if (!row) {
       rejected.push({ line_id: w.move.line_id, scope: w.target.scope, scope_id: w.target.scope_id, reason: 'ROW_MISSING' });
       continue;
     }
-    if (!guardHolds(opts.kind, w.move.qty, { stock: row.stock, reserved: row.reserved ?? 0 })) {
+    const cur = sim.get(key) ?? { stock: row.stock, reserved: row.reserved };
+    if (!guardHolds(opts.kind, w.move.qty, { stock: cur.stock, reserved: cur.reserved })) {
       rejected.push({
         line_id: w.move.line_id,
         scope: w.target.scope,
         scope_id: w.target.scope_id,
-        reason: row.stock === null ? 'NOT_TRACKED' : 'INSUFFICIENT_STOCK',
+        reason: cur.stock === null ? 'NOT_TRACKED' : 'INSUFFICIENT_STOCK',
       });
       continue;
     }
-    before.set(w.key, { stock: row.stock ?? 0, reserved: row.reserved ?? 0 });
+    before.set(w.key, { stock: cur.stock ?? 0, reserved: cur.reserved });
+    const moved = stockAfter(opts.kind, w.move.qty, { stock: cur.stock ?? 0, reserved: cur.reserved });
+    // An untracked row stays untracked: `null` is not zero, and turning it into
+    // one here would let a later move in the same call read a stock level the
+    // row does not have.
+    sim.set(key, { stock: cur.stock === null ? null : moved.stock, reserved: moved.reserved });
     fresh.push(w);
   }
-  if (fresh.length === 0) return { applied: 0, skipped, rejected, keys: [], statements: [], eventIds: [] };
+  if (fresh.length === 0) {
+    return { applied: 0, skipped, rejected, keys: [], statements: [], eventIds: [], plannedLedgerRows: 0 };
+  }
 
   const statements: D1PreparedStatement[] = [];
   const eventIds: string[] = [];
@@ -540,7 +630,10 @@ export async function planInventory(
         reserved_after: after.reserved,
         reason: EVENT_REASON[opts.kind],
         op_id: w.key,
-        order_id: opts.orderId ?? null,
+        // §8.2 row 10: a mystery spool's event names the product (it must — it
+        // is the stock truth) but never the order, so no bus consumer can join
+        // it to `OrderCreated` and hold the pick as a per-order fact.
+        order_id: w.move.mystery ? null : (opts.orderId ?? null),
       },
       {
         aggregateId: w.move.product_id,
@@ -554,7 +647,73 @@ export async function planInventory(
     }
   }
 
-  return { applied: fresh.length, skipped, rejected, keys: fresh.map((w) => w.key), statements, eventIds };
+  return {
+    applied: fresh.length,
+    skipped,
+    rejected,
+    keys: fresh.map((w) => w.key),
+    statements,
+    eventIds,
+    plannedLedgerRows: fresh.length,
+  };
+}
+
+/**
+ * THE RESERVATION FENCE (§3.3) — one statement that makes a partial inventory
+ * movement impossible inside the caller's own transaction.
+ *
+ * `planInventory` writes a guarded INSERT and a guarded UPDATE per target. A
+ * guard that stops holding BETWEEN the plan-time read and the commit makes both
+ * match zero rows — without failing the batch. The order would then commit with
+ * a component unreserved; a cancellation would commit with the customer
+ * refunded and the units held for ever. `assertMovesApplied` was written for
+ * this and, until now, had no callers.
+ *
+ * Earlier statements in a D1 batch are visible to later ones, so the COUNT sees
+ * the ledger rows this batch has just written. If any guarded insert matched
+ * zero rows, `actual < expected` and the table's `CHECK (actual = expected)`
+ * rolls the WHOLE batch back — order, wallet spend, points, redemptions and
+ * every other reservation with it. `worker/routes/orders.ts` already maps a
+ * CHECK violation to `CONFLICT_RETRY`, so no catch block changes.
+ *
+ * The upsert is what makes a REPLAY safe: the same operation applied twice
+ * plans zero new rows, recomputes the same `expected`, and rewrites the same
+ * row instead of colliding with its own primary key.
+ */
+export function reservationFenceStatement(
+  db: D1Database,
+  orderId: string,
+  kind: LedgerKind,
+  expected: number
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO order_reservation_fence (order_id, kind, expected, actual)
+       SELECT ?1, ?2, ?3, (SELECT COUNT(*) FROM inventory_ledger
+                            WHERE order_id = ?1 AND kind = ?2)
+       ON CONFLICT(order_id, kind) DO UPDATE SET expected = excluded.expected, actual = excluded.actual`
+    )
+    .bind(orderId, kind, expected);
+}
+
+/**
+ * The fence statement for a plan, with `expected` read rather than assumed:
+ * the rows already recorded for this (order, kind) plus the rows this plan will
+ * write. Reading it is what lets a second return case on one order, or a
+ * cancellation that follows a partial deduction, carry a fence of its own
+ * instead of failing on a count it did not produce.
+ */
+export async function planReservationFence(
+  db: D1Database,
+  orderId: string,
+  kind: LedgerKind,
+  plannedLedgerRows: number
+): Promise<D1PreparedStatement> {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS n FROM inventory_ledger WHERE order_id = ? AND kind = ?')
+    .bind(orderId, kind)
+    .first<{ n: number }>();
+  return reservationFenceStatement(db, orderId, kind, Number(row?.n ?? 0) + Math.max(0, plannedLedgerRows));
 }
 
 /** The table whose stock row moved, as the event catalogue spells it. */

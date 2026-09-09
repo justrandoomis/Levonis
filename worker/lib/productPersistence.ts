@@ -1608,6 +1608,19 @@ export interface ProductWriteIntent {
   hashtags?: boolean;
   /** Record price_history deltas against `prev` (default true on update). */
   priceHistory?: boolean;
+  /**
+   * MAY THIS WRITER CREATE OR EDIT A COMPOSITION ROW (0058, §1.2)?
+   *
+   * A bundle and a mystery offer are `products` rows whose `stock` is NULL for
+   * ever and whose availability is computed from the members' real inventory.
+   * A product form, a TXT template or a CSV import that wrote one would produce
+   * a sellable row with no stock, no components and no price rule — so every
+   * writer is refused here (`COMPOSITION_NOT_ALLOWED`) unless it is the bundles
+   * panel, which sets this flag and supplies the composition in the same plan.
+   * Because every writer goes through `planProductSave`, the guard is inherited
+   * rather than repeated (docs/TXT_IMPORT_PARITY.md §5.1).
+   */
+  allowComposition?: boolean;
 }
 
 export interface ProductSavePlan {
@@ -1682,6 +1695,59 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
   if (intent.mode === 'create' && !doc) throw badRequest('a create needs a document');
   const warnings: string[] = [];
   const statements: D1PreparedStatement[] = [];
+
+  // ---- 0058: composition is a door, not a field --------------------------
+  //
+  // §1.2's pins are applied HERE, in the one function every writer goes
+  // through, rather than in the bundles panel — a pin that lives in a caller is
+  // a pin the next caller forgets. `stock = NULL` is the single most important
+  // invariant in the design: `saleAvailability` reads NULL as "untracked, sell
+  // 99" for an ordinary product, and a bundle row that reached it with a stock
+  // number, an option or a colour of its own would be sold from inventory that
+  // does not exist.
+  const nextComposition = doc?.composition ?? '';
+  const prevComposition = prev?.composition ?? '';
+  if ((nextComposition !== '' || prevComposition !== '') && !intent.allowComposition) {
+    throw new HttpError(
+      400,
+      prevComposition !== ''
+        ? 'هذا المنتج حزمة/عرض عشوائي ويُحرَّر من لوحة الحزم فقط / this product is a bundle or mystery offer and is edited from the bundles panel only'
+        : 'لا يمكن إنشاء حزمة أو عرض عشوائي من هنا / a bundle or mystery offer cannot be created by this writer',
+      'COMPOSITION_NOT_ALLOWED',
+      { errors: [`composition: "${nextComposition || prevComposition}" is not writable here`], section: 'product', field: 'composition' }
+    );
+  }
+  if (doc && prev && nextComposition !== prevComposition) {
+    // Never silently repaired, in either direction: promoting an ordinary
+    // product would strip stock it is holding, and demoting a bundle would
+    // leave a stockless row that reads as "untracked → sell 99" with its
+    // components still pointing at it.
+    throw new HttpError(
+      400,
+      'لا يمكن تحويل منتج عادي إلى حزمة أو العكس / a product cannot be converted into a composition, or back',
+      'COMPOSITION_NOT_ALLOWED',
+      { errors: [`composition: "${prevComposition}" cannot become "${nextComposition}"`], section: 'product', field: 'composition' }
+    );
+  }
+  if (doc && nextComposition !== '') {
+    if (intent.relations && ['groups', 'colors', 'variants'].some((k) => Array.isArray((intent.relations as Record<string, unknown>)[k]) && ((intent.relations as Record<string, unknown>)[k] as unknown[]).length > 0)) {
+      throw new HttpError(
+        400,
+        'الحزمة لا تملك خيارات أو ألوانًا خاصة بها — تنوّعها يعيش في مكوّناتها / a composition row has no options or colours of its own; its variability lives in its components',
+        'COMPOSITION_NOT_ALLOWED',
+        { errors: ['relations: a composition product has no option groups, colours or variants'], section: 'relations' }
+      );
+    }
+    doc.stock = null;              // NEVER stocked — availability is computed
+    doc.low_stock_threshold = null; // a warn level on a row with no stock is a lie
+    doc.options = [];
+    doc.colors = [];
+    // 'bundle' is always sale_types[0], which IS what pins selling_type:
+    // serializeDoc writes `selling_type: sale_types[0]`, so the two cannot
+    // drift. A pre-order bundle keeps 'pre_order' beside it.
+    doc.sale_types = doc.sale_types.includes('pre_order') ? ['bundle', 'pre_order'] : ['bundle'];
+    doc.selling_type = 'bundle';
+  }
 
   // ---- §11: cost is written by financial scope only ----------------------
   const costRefused: string[] = [];
@@ -1821,6 +1887,17 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     }
   }
   statements.push(...relationStatements);
+
+  // `inventory_mode` is not in PRODUCT_COLUMNS (the relations planner owns it),
+  // so a composition row pins it here: 'BASE' is what makes `snapshotFrom`
+  // return an untracked base and `resolveStock` answer `available: null` for
+  // the bundle row itself. `stock_reserved` is deliberately NOT written —
+  // nothing ever reserves against a bundle row.
+  if (doc && nextComposition !== '') {
+    statements.push(
+      db.prepare("UPDATE products SET inventory_mode = 'BASE', stock = NULL WHERE id = ?").bind(productId)
+    );
+  }
 
   // ---- catalog placement --------------------------------------------------
   let catalogIds: string[] | null = null;

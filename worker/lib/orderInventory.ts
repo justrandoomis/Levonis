@@ -24,7 +24,7 @@
  * moves nothing a second time.
  */
 
-import { applyInventory, planInventory, type InventoryPlan, type StockMove } from './inventory';
+import { planInventory, planReservationFence, type InventoryPlan, type LedgerKind, type StockMove } from './inventory';
 
 interface LedgerRow {
   product_id: string;
@@ -64,6 +64,33 @@ async function movesFor(db: D1Database, orderId: string, kind: string): Promise<
   }));
 }
 
+/**
+ * The moves that put ONE returned order line's units back, reconstructed from
+ * the `deduct` rows the confirmation actually wrote.
+ *
+ * `worker/routes/returns.ts` used to do this with
+ * `UPDATE products SET stock = stock + ? WHERE id = ?`, which bypassed
+ * `inventory_ledger` entirely and always credited the BASE row — already wrong
+ * for every OPTION / COLOR / VARIANT_COMBINATION product, and wrong once per
+ * component for a bundle. Replaying the ledger credits the row the units came
+ * off, and only when they were genuinely deducted: a line that was never
+ * deducted has nothing to give back, and inventing the units would be an
+ * inventory forgery signed by a refund.
+ *
+ * `qty` is what the CASE returns, not what the line bought — a partial-qty
+ * return of a multi-unit line gives back exactly what came back.
+ */
+export async function restoreMovesForItem(
+  db: D1Database,
+  orderId: string,
+  orderItemId: string,
+  qty: number
+): Promise<StockMove[]> {
+  if (qty <= 0) return [];
+  const moves = await movesFor(db, orderId, 'deduct');
+  return moves.filter((m) => m.line_id === orderItemId).map((m) => ({ ...m, qty }));
+}
+
 export async function hasLedgerKind(db: D1Database, orderId: string, kind: string): Promise<boolean> {
   const row = await db
     .prepare('SELECT 1 AS x FROM inventory_ledger WHERE order_id = ? AND kind = ? LIMIT 1')
@@ -75,6 +102,10 @@ export async function hasLedgerKind(db: D1Database, orderId: string, kind: strin
 /**
  * Plans the deduction for a confirmed order, for a caller that wants it inside
  * its own transaction. Returns null when the order reserved nothing.
+ *
+ * The plan CARRIES ITS OWN FENCE ROW (§3.3), so a deduction whose guard stopped
+ * holding between the plan and the commit rolls its own batch back instead of
+ * committing a confirmed order over units that were never taken.
  */
 export async function planOrderDeduction(
   db: D1Database,
@@ -83,13 +114,15 @@ export async function planOrderDeduction(
 ): Promise<InventoryPlan | null> {
   const moves = await movesFor(db, orderId, 'reserve');
   if (moves.length === 0) return null;
-  return planInventory(db, moves, {
+  const plan = await planInventory(db, moves, {
     kind: 'deduct',
     operationId: orderId,
     orderId,
     actorUserId,
     reason: 'order confirmed',
   });
+  plan.statements.push(await planReservationFence(db, orderId, 'deduct', plan.plannedLedgerRows));
+  return plan;
 }
 
 /** Deducts the units an order is holding. Idempotent. */
@@ -98,44 +131,79 @@ export async function deductOrderStock(
   orderId: string,
   actorUserId: string | null
 ): Promise<{ applied: number; rejected: number }> {
-  const moves = await movesFor(db, orderId, 'reserve');
-  if (moves.length === 0) return { applied: 0, rejected: 0 };
-  const res = await applyInventory(db, moves, {
-    kind: 'deduct',
-    operationId: orderId,
-    orderId,
-    actorUserId,
-    reason: 'order confirmed',
-  });
-  return { applied: res.applied, rejected: res.rejected.length };
+  const plan = await planOrderDeduction(db, orderId, actorUserId);
+  if (!plan) return { applied: 0, rejected: 0 };
+  if (plan.statements.length) await db.batch(plan.statements);
+  return { applied: plan.applied, rejected: plan.rejected.length };
 }
 
 /**
  * Plans the return of an order's units, for a caller that wants it inside its
  * own transaction (both cancel routes run it in the batch that flips the
  * status and refunds the money, so a cancellation that fails half-way cannot
- * hand units back on an order that is still open). Chooses release or restore
- * from what the ledger actually records, so a cancellation before confirmation
- * frees the hold while one after it adds the units back to stock — never both,
- * never the wrong one. `plan` is null when the order reserved nothing.
+ * hand units back on an order that is still open).
+ *
+ * RELEASE VERSUS RESTORE IS DECIDED PER LEDGER ROW, NOT PER ORDER. The old rule
+ * asked `hasLedgerKind(order, 'deduct')` once and applied the answer to
+ * everything, so a PARTIALLY deducted order — one line confirmed, another
+ * rejected by its guard at confirmation time — tried to restore rows that were
+ * never deducted. Every one of those fails its own guard and matches zero rows:
+ * units held for ever, invisible to every screen. A row with a matching
+ * `deduct` restores; a row without one releases, and an order that needs both
+ * gets both, each with its own fence row.
+ *
+ * `plan` is null when the order reserved nothing.
  */
+export interface OrderReturnPlan {
+  /** 'mixed' = some rows restore and some release (a partial deduction). */
+  kind: 'release' | 'restore' | 'mixed' | 'none';
+  /** Every part's statements, fences included, in one appendable plan. */
+  plan: InventoryPlan | null;
+  parts: Array<{ kind: 'release' | 'restore'; plan: InventoryPlan }>;
+}
+
+/** Line + target identity, the granularity the release/restore choice is made at. */
+const moveSig = (m: StockMove) => `${m.line_id}|${m.targets[0]?.scope ?? ''}|${m.targets[0]?.scope_id ?? ''}`;
+
 export async function planOrderReturn(
   db: D1Database,
   orderId: string,
   actorUserId: string | null
-): Promise<{ kind: 'release' | 'restore' | 'none'; plan: InventoryPlan | null }> {
-  const deducted = await hasLedgerKind(db, orderId, 'deduct');
-  const moves = await movesFor(db, orderId, 'reserve');
-  if (moves.length === 0) return { kind: 'none', plan: null };
-  const kind = deducted ? ('restore' as const) : ('release' as const);
-  const plan = await planInventory(db, moves, {
-    kind,
-    operationId: orderId,
-    orderId,
-    actorUserId,
-    reason: 'order cancelled',
-  });
-  return { kind, plan };
+): Promise<OrderReturnPlan> {
+  const reserved = await movesFor(db, orderId, 'reserve');
+  if (reserved.length === 0) return { kind: 'none', plan: null, parts: [] };
+  const deducted = new Set((await movesFor(db, orderId, 'deduct')).map(moveSig));
+
+  const split: Array<[LedgerKind & ('restore' | 'release'), StockMove[]]> = [
+    ['restore', reserved.filter((m) => deducted.has(moveSig(m)))],
+    ['release', reserved.filter((m) => !deducted.has(moveSig(m)))],
+  ];
+
+  const parts: OrderReturnPlan['parts'] = [];
+  for (const [kind, moves] of split) {
+    if (moves.length === 0) continue;
+    const plan = await planInventory(db, moves, {
+      kind,
+      operationId: orderId,
+      orderId,
+      actorUserId,
+      reason: 'order cancelled',
+    });
+    plan.statements.push(await planReservationFence(db, orderId, kind, plan.plannedLedgerRows));
+    parts.push({ kind, plan });
+  }
+  if (parts.length === 0) return { kind: 'none', plan: null, parts: [] };
+
+  const combined: InventoryPlan = {
+    applied: parts.reduce((n, p) => n + p.plan.applied, 0),
+    skipped: parts.reduce((n, p) => n + p.plan.skipped, 0),
+    rejected: parts.flatMap((p) => p.plan.rejected),
+    keys: parts.flatMap((p) => p.plan.keys),
+    statements: parts.flatMap((p) => p.plan.statements),
+    eventIds: parts.flatMap((p) => p.plan.eventIds),
+    plannedLedgerRows: parts.reduce((n, p) => n + p.plan.plannedLedgerRows, 0),
+  };
+  return { kind: parts.length === 2 ? 'mixed' : parts[0].kind, plan: combined, parts };
 }
 
 /** Puts an order's units back in a batch of its own. Idempotent (see planOrderReturn). */
@@ -143,9 +211,20 @@ export async function returnOrderStock(
   db: D1Database,
   orderId: string,
   actorUserId: string | null
-): Promise<{ kind: 'release' | 'restore' | 'none'; applied: number }> {
+): Promise<{ kind: OrderReturnPlan['kind']; applied: number }> {
   const { kind, plan } = await planOrderReturn(db, orderId, actorUserId);
   if (!plan) return { kind: 'none', applied: 0 };
   if (plan.statements.length) await db.batch(plan.statements);
   return { kind, applied: plan.applied };
+}
+
+/**
+ * The operator-facing sentence for a stock return. A partially deducted order
+ * returns 'mixed', and «Stock mixedd for 3 row(s)» is not a sentence — the two
+ * routes that report this share one wording instead of interpolating a verb.
+ */
+export function stockReturnNote(kind: OrderReturnPlan['kind'], rows: number): string | null {
+  if (kind === 'none') return null;
+  if (kind === 'mixed') return `Stock returned for ${rows} row(s) — some released, some restored.`;
+  return `Stock ${kind}d for ${rows} row(s).`;
 }

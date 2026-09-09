@@ -26,10 +26,27 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'products', 'product_option_groups', 'product_option_values', 'product_colors', 'product_color_option_links',
     'product_variants', 'product_images', 'product_facets', 'product_catalogs', 'product_translations', 'glossary',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
+    // A bundle and a mystery offer ARE `products` rows (docs/BUNDLES_MYSTERY.md §1.2);
+    // their composition is catalogue structure, beside options and colours.
+    'bundle_config', 'bundle_components', 'bundle_component_choices',
+    // A mystery pool is a CURATED SET OF CATALOGUE ROWS with weights, and the
+    // offer that draws from it is a `products` row (docs/BUNDLES_MYSTERY.md
+    // §1.9). Its draw secret is catalogue configuration too — and the one table
+    // no read route joins.
+    'mystery_pools', 'mystery_pool_entries', 'mystery_offers', 'mystery_offer_secrets',
   ]),
   ...owned('commerce', [
     'cart_items', 'orders', 'order_items', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
+    // The buyer's choices behind one bundle cart line, and the fence that makes a
+    // partial inventory movement impossible inside the order's own batch (§1.5, §1.7).
+    'cart_bundle_choices', 'order_reservation_fence',
+    // The one promotion model (§1.8): entity-attached windows, limits and
+    // redemptions, beside the code-entry mechanism `coupons` already here.
+    'offer_windows', 'offer_limits', 'offer_redemptions',
+    // What one order actually drew, frozen, and the candidate list it drew
+    // against — per-order facts, written in the order's own batch (§1.9).
+    'mystery_allocations', 'mystery_draw_audits',
   ]),
   ...owned('fulfilment', ['order_status_history', 'delivery_status_map', 'order_fulfilment']),
   ...owned('ledger', [
@@ -71,7 +88,14 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('config', ['admin_settings', 'feature_flags', 'config_versions']),
   ...owned('audit', ['audit_log', 'audit_events', 'audit_chain_heads']),
-  ...owned('analytics', ['merchant_store_analytics_daily', 'analytics_events', 'analytics_daily_platform', 'analytics_daily_merchant']),
+  ...owned('analytics', [
+    'merchant_store_analytics_daily', 'analytics_events', 'analytics_daily_platform', 'analytics_daily_merchant',
+    // The three composition facts no other table records — a detail-page view,
+    // a successful add, a purchase availability refused (docs/BUNDLES_MYSTERY.md
+    // §1.10, §12). An aggregate counter with no user id and no order id;
+    // everything else on those screens is a query over rows commerce owns.
+    'composition_daily_metrics',
+  ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
   ...owned('files', ['file_objects']),

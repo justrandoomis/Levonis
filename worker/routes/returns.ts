@@ -44,6 +44,12 @@ import { parseProductRow } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { reversePointsForOrder, unitMerchandiseIqd } from '../lib/pointsOps';
+import { planInventory, planReservationFence, chunk, IN_CHUNK } from '../lib/inventory';
+import { restoreMovesForItem } from '../lib/orderInventory';
+import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
+import { mysteryRefusal } from '../lib/mystery/issues';
+import { typeForTransport } from '../lib/shippingType';
+import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -149,14 +155,84 @@ returnRoutes.post('/', async (c) => {
   }
 
   const item = await c.env.DB.prepare(
-    `SELECT oi.id, oi.order_id, oi.qty AS item_qty, oi.name_snapshot,
-            o.user_id, o.status, o.delivered_at
+    `SELECT oi.id, oi.order_id, oi.qty AS item_qty, oi.name_snapshot, oi.bundle_parent_item_id,
+            o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE oi.id = ?`
   )
     .bind(orderItemId)
-    .first<{ id: string; order_id: string; item_qty: number; name_snapshot: string; user_id: string; status: string; delivered_at: string | null }>();
+    .first<{
+      id: string;
+      order_id: string;
+      item_qty: number;
+      name_snapshot: string;
+      bundle_parent_item_id: string | null;
+      user_id: string;
+      status: string;
+      delivered_at: string | null;
+      stage: string | null;
+      shipping_type: string | null;
+    }>();
   if (!item || item.user_id !== user.id) throw notFound('Order item not found');
+
+  // WHOLE-BUNDLE RETURNS ONLY, v1 (§6.4, §17 decision 3). A case names ONE
+  // `order_items` row, and for a bundle that row is a COMPONENT — the row that
+  // carries the real product, the real stock movement and the warranty clock.
+  // A customer returning one part of a bundle they paid one price for is a
+  // policy question the owner has not answered, so it is refused by name
+  // rather than answered here: the screen offers "return the whole bundle",
+  // which posts the PARENT and opens one case per component below.
+  if (item.bundle_parent_item_id) {
+    throw badRequest(
+      'This item was bought as part of a bundle — return the whole bundle instead',
+      'BUNDLE_PARTIAL_RETURN_NOT_ALLOWED',
+      { bundle_parent_item_id: item.bundle_parent_item_id }
+    );
+  }
+  const { results: bundleChildren } = await c.env.DB.prepare(
+    'SELECT id, qty, name_snapshot FROM order_items WHERE bundle_parent_item_id = ? ORDER BY rowid'
+  )
+    .bind(orderItemId)
+    .all<{ id: string; qty: number; name_snapshot: string }>();
+
+  /** One component's share of a whole-bundle return of `qty` parents. The same
+   *  ratio decides the quota check and the case that is written, so the two can
+   *  never disagree. */
+  const childCaseQty = (k: { qty: number }): number =>
+    Math.max(
+      1,
+      Math.min(
+        Number(k.qty) || 1,
+        Math.round(((Number(k.qty) || 1) * qty) / Math.max(1, Number(item.item_qty) || 1))
+      )
+    );
+
+  /**
+   * A RETURN BEFORE THE REVEAL IS REFUSED, NOT LEAKED (§8.2 row 15).
+   *
+   * The return flow lists what is being sent back — for a mystery line that is
+   * the drawn filament — so opening a case before the milestone would publish
+   * the pick through the returns screen, an unauthenticated-looking corner
+   * nobody thinks of as a reveal surface. `MYSTERY_NOT_REVEALED` says so and
+   * names nothing.
+   */
+  if (bundleChildren.length > 0) {
+    const allocations = await loadAllocations(c.env.DB, [item.order_id]);
+    const mine = bundleChildren.flatMap((k) => allocations.get(String(k.id)) ?? []);
+    if (mine.length > 0) {
+      const paid = (await paidOrderIds(c.env.DB, [item.order_id])).has(item.order_id);
+      const facts = {
+        stage: String(item.stage || 'received'),
+        status: String(item.status ?? ''),
+        shipping_type: typeForTransport(
+          String(item.shipping_type ?? '').startsWith('preorder_')
+            ? String(item.shipping_type).slice('preorder_'.length)
+            : ''
+        ),
+      };
+      if (!mine.every((a) => isRevealed(a, facts, paid))) throw mysteryRefusal('MYSTERY_NOT_REVEALED');
+    }
+  }
 
   // Per-unit delivery time when a physical unit is selected; else the order's.
   let deliveredAt = item.delivered_at;
@@ -193,24 +269,91 @@ returnRoutes.post('/', async (c) => {
   }
 
   if (qty > Number(item.item_qty)) throw badRequest(`qty exceeds the ordered quantity (${item.item_qty})`);
-  const used = await c.env.DB.prepare(
-    "SELECT COALESCE(SUM(qty), 0) AS n FROM return_cases WHERE order_item_id = ? AND state <> 'rejected'"
-  )
-    .bind(orderItemId)
-    .first<{ n: number }>();
-  if ((used?.n ?? 0) + qty > Number(item.item_qty)) {
-    throw badRequest('The requested quantity exceeds what remains returnable for this item', 'QTY_EXCEEDED');
+
+  /**
+   * THE RETURNABLE QUOTA IS JUDGED ON THE ROWS THE CASES ARE ACTUALLY OPENED
+   * AGAINST (§6.4, §17 decision 3).
+   *
+   * A whole-bundle return opens one case per COMPONENT, never against the
+   * parent, so a quota read keyed on the parent counted zero for ever and the
+   * same delivered bundle could be refunded — and its stock restored — once per
+   * request for the whole return window: each round priced off
+   * `component_alloc_iqd`, credited under a fresh `wtx_ret_<caseId>` the wallet
+   * idempotency guard never saw before, and restored under a fresh
+   * `operationId = caseId` the ledger's UNIQUE key never saw either. The fence
+   * cannot help: every round is a legitimately planned restore whose expected
+   * equals its actual.
+   *
+   * So the quota is checked per child, against the very ids `caseFor` will
+   * bind, BEFORE the batch — the fan-out stays all-or-nothing. It is also the
+   * shape a later per-component-return flag needs.
+   */
+  const quotaTargets: Array<{ id: string; qty: number }> =
+    bundleChildren.length > 0
+      ? bundleChildren.map((k) => ({ id: String(k.id), qty: childCaseQty(k) }))
+      : [{ id: orderItemId, qty }];
+  const orderedQty = new Map<string, number>(
+    bundleChildren.length > 0
+      ? bundleChildren.map((k) => [String(k.id), Number(k.qty) || 1])
+      : [[orderItemId, Number(item.item_qty)]]
+  );
+  const usedByItem = new Map<string, number>();
+  // Chunked: a legal bundle may carry ~249 components (§3.1), which is more
+  // bound parameters than D1 accepts in one query.
+  for (const part of chunk(quotaTargets.map((t) => t.id), IN_CHUNK)) {
+    const { results } = await c.env.DB.prepare(
+      `SELECT order_item_id AS id, COALESCE(SUM(qty), 0) AS n
+         FROM return_cases
+        WHERE state <> 'rejected' AND order_item_id IN (${part.map(() => '?').join(',')})
+        GROUP BY order_item_id`
+    )
+      .bind(...part)
+      .all<{ id: string; n: number }>();
+    for (const r of results) usedByItem.set(String(r.id), Number(r.n) || 0);
+  }
+  for (const t of quotaTargets) {
+    const cap = orderedQty.get(t.id) ?? 0;
+    if ((usedByItem.get(t.id) ?? 0) + t.qty > cap) {
+      throw badRequest('The requested quantity exceeds what remains returnable for this item', 'QTY_EXCEEDED');
+    }
   }
 
-  const id = newId('ret');
   const nowIso = new Date(now).toISOString();
-  await c.env.DB.prepare(
-    `INSERT INTO return_cases (id, order_id, order_item_id, unit_id, user_id, qty, reason, description,
-       evidence, requested_at, delivered_at_snapshot, within_window, state)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'requested')`
-  )
-    .bind(id, item.order_id, orderItemId, unitId || null, user.id, qty, reason, description, JSON.stringify(evidence), nowIso, deliveredAt)
-    .run();
+  const caseFor = (targetItemId: string, caseQty: number) => {
+    const caseId = newId('ret');
+    return {
+      id: caseId,
+      statement: c.env.DB.prepare(
+        `INSERT INTO return_cases (id, order_id, order_item_id, unit_id, user_id, qty, reason, description,
+           evidence, requested_at, delivered_at_snapshot, within_window, state)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'requested')`
+      ).bind(
+        caseId,
+        item.order_id,
+        targetItemId,
+        targetItemId === orderItemId ? unitId || null : null,
+        user.id,
+        caseQty,
+        reason,
+        description,
+        JSON.stringify(evidence),
+        nowIso,
+        deliveredAt
+      ),
+    };
+  };
+
+  // A BUNDLE OPENS ONE CASE PER COMPONENT, IN ONE BATCH. The parent row is
+  // priced but holds nothing physical, so a case against it could restore no
+  // stock and refund from no allocation; the components are what came in the
+  // box. All of them commit together, so a bundle can never end up half
+  // returned because the second insert failed.
+  const bundleReturn = bundleChildren.length > 0;
+  const cases = bundleReturn
+    ? bundleChildren.map((k) => caseFor(k.id, childCaseQty(k)))
+    : [caseFor(orderItemId, qty)];
+  const id = cases[0].id;
+  await c.env.DB.batch(cases.map((k) => k.statement));
 
   await audit(c.env.DB, user.id, 'return.request', id, { order_id: item.order_id, order_item_id: orderItemId, qty, reason });
   c.executionCtx.waitUntil(
@@ -218,6 +361,29 @@ returnRoutes.post('/', async (c) => {
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM return_cases WHERE id = ?').bind(id).first<ReturnCaseRow>();
+  // A whole-bundle return answers with every case it opened, so the screen can
+  // say "3 cases opened for Bundle X" instead of showing one and hiding two.
+  if (bundleReturn) {
+    // Chunked (§3.1): one placeholder per component, and a legal bundle may
+    // carry ~249 of them — more bound parameters than D1 accepts per query.
+    const rows: ReturnCaseRow[] = [];
+    for (const part of chunk(cases.map((k) => k.id), IN_CHUNK)) {
+      const { results } = await c.env.DB.prepare(
+        // Ordered by insertion, so the cases come back in the order the box was
+        // packed rather than in whatever order the index answered.
+        `SELECT * FROM return_cases WHERE id IN (${part.map(() => '?').join(',')}) ORDER BY rowid`
+      )
+        .bind(...part)
+        .all<ReturnCaseRow>();
+      rows.push(...results);
+    }
+    return c.json({
+      success: true,
+      case: casePublic(row!),
+      bundle: { parent_item_id: orderItemId, name: item.name_snapshot },
+      cases: rows.map((r) => casePublic(r)),
+    });
+  }
   return c.json({ success: true, case: casePublic(row!) });
 });
 
@@ -318,7 +484,9 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
 
   if (to === 'resolved' && resolution === 'refund') {
     const item = await c.env.DB.prepare(
-      'SELECT id, product_id, qty, unit_price_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot FROM order_items WHERE id = ?'
+      `SELECT id, product_id, qty, unit_price_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot,
+              bundle_parent_item_id, component_value_iqd, component_alloc_iqd
+         FROM order_items WHERE id = ?`
     )
       .bind(kase.order_item_id)
       .first<Record<string, unknown>>();
@@ -331,12 +499,29 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       // Refund the paid amount for the returned qty, net of this line's
       // proportional share of order-level discounts. Shipping is NOT
       // refunded (owner decision pending — row 8).
-      const lineGross = (Number(item.unit_price_iqd) || 0) * kase.qty;
+      //
+      // A BUNDLE COMPONENT IS PRICED OFF ITS STORED ALLOCATION, NOT OFF
+      // `unit_price_iqd` (§6.4). §6.2 pins a component's `unit_price_iqd` to 0
+      // — the money is on the parent — so the old formula would refund 0 IQD
+      // for every component case and reverse no points beside it. Substituting
+      // `component_alloc_iqd` naively would OVER-refund instead, because the
+      // formula still has to subtract this line's proportional share of coupon
+      // and points and `Σ component_alloc_iqd` is the parent's GROSS line
+      // total. So the allocation becomes the gross, scaled by the returned
+      // fraction of the row, and everything after it is unchanged.
+      const itemQty = Math.max(1, Number(item.qty) || 1);
+      const storedAlloc = item.component_alloc_iqd === null || item.component_alloc_iqd === undefined
+        ? null
+        : Number(item.component_alloc_iqd) || 0;
+      const caseGross =
+        storedAlloc !== null
+          ? Math.floor((storedAlloc * kase.qty) / itemQty)
+          : (Number(item.unit_price_iqd) || 0) * kase.qty;
       const coupon = safeParse<{ discount_iqd?: number } | null>(order.coupon_snapshot as string | null, null);
       const discounts = (coupon ? Number(coupon.discount_iqd) || 0 : 0) + (Number(order.points_discount_iqd) || 0);
       const base = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
-      const alloc = base > 0 ? Math.floor((discounts * lineGross) / base) : 0;
-      const refundIqd = Math.max(0, lineGross - alloc);
+      const alloc = base > 0 ? Math.floor((discounts * caseGross) / base) : 0;
+      const refundIqd = Math.max(0, caseGross - alloc);
       const rate = Number(order.exchange_rate) || 1400; // the ORDER's historical rate
       const cents = Math.round((refundIqd * 100) / rate);
 
@@ -385,24 +570,49 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
 
       // Proportional purchase-points reversal for the refunded merchandise
       // portion (idempotent per case; never double-reverses).
-      const merchandisePortion = unitMerchandiseIqd({
-        qty: Number(item.qty) || 0,
-        unit_price_iqd: Number(item.unit_price_iqd) || 0,
-        pricing_snapshot: (item.pricing_snapshot as string | null) ?? null,
-        warranty_snapshot: (item.warranty_snapshot as string | null) ?? null,
-        transport_snapshot: (item.transport_snapshot as string | null) ?? null,
-      }) * kase.qty;
+      //
+      // A component is fed THE SAME `caseGross`: `unitMerchandiseIqd` prefers
+      // `pricing_snapshot.applied_iqd`, which §6.2 pins to 0 on a component, so
+      // reading it here would reverse nothing at all for a returned bundle
+      // while the wallet was credited in full.
+      const merchandisePortion =
+        storedAlloc !== null
+          ? caseGross
+          : unitMerchandiseIqd({
+              qty: Number(item.qty) || 0,
+              unit_price_iqd: Number(item.unit_price_iqd) || 0,
+              pricing_snapshot: (item.pricing_snapshot as string | null) ?? null,
+              warranty_snapshot: (item.warranty_snapshot as string | null) ?? null,
+              transport_snapshot: (item.transport_snapshot as string | null) ?? null,
+            }) * kase.qty;
       pointsResult = await reversePointsForOrder(c.env, kase.order_id, `return ${id}`, {
         portionIqd: merchandisePortion,
         sourceRef: id,
       }) as unknown as Record<string, unknown>;
 
       // Inspected-and-approved refund puts the tracked stock back once (the
-      // conditional flip above guarantees this branch runs a single time).
-      if (item.product_id) {
-        await c.env.DB.prepare('UPDATE products SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL')
-          .bind(kase.qty, item.product_id)
-          .run();
+      // conditional flip above guarantees this branch runs a single time) —
+      // THROUGH THE LEDGER, onto the rows the units were actually deducted
+      // from. The raw `UPDATE products SET stock = stock + ?` this replaces
+      // wrote no ledger row, emitted no InventoryChanged, and always credited
+      // the BASE row: already wrong for every OPTION / COLOR /
+      // VARIANT_COMBINATION product. The restore carries its own fence row
+      // (§3.3), so a guard that matched nothing rolls the credit back with it
+      // instead of recording a movement that never happened.
+      const restoreMoves = await restoreMovesForItem(c.env.DB, kase.order_id, kase.order_item_id, kase.qty);
+      if (restoreMoves.length) {
+        const restorePlan = await planInventory(c.env.DB, restoreMoves, {
+          kind: 'restore',
+          operationId: id,
+          orderId: kase.order_id,
+          actorUserId: admin.id,
+          reason: 'return',
+        });
+        restorePlan.statements.push(
+          await planReservationFence(c.env.DB, kase.order_id, 'restore', restorePlan.plannedLedgerRows)
+        );
+        if (restorePlan.statements.length) await c.env.DB.batch(restorePlan.statements);
+        pumpAfter(c.env.DB, restorePlan.eventIds, waitUntilFrom(c));
       }
     }
   }
@@ -421,6 +631,50 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   });
 });
 
+/**
+ * WHICH BUNDLE THIS CASE BELONGS TO, and what else came in the same box (§6.4).
+ *
+ * Staff assessing a returned component need to see "1 of 3 items in Bundle X"
+ * and its siblings, or they are looking at a spool with no idea it arrived as
+ * part of a printer bundle whose other parts may be on their way back too.
+ * Three independent answers to "which physical components belong to this
+ * bundle" are stored; this is the cheapest — one indexed read on
+ * `idx_order_items_bundle_parent`.
+ */
+async function bundleGroupFor(db: D1Database, orderItemId: string) {
+  const parent = await db
+    .prepare(
+      `SELECT p.id, p.name_snapshot, p.qty, p.line_total_iqd
+         FROM order_items c JOIN order_items p ON p.id = c.bundle_parent_item_id
+        WHERE c.id = ?`
+    )
+    .bind(orderItemId)
+    .first<{ id: string; name_snapshot: string; qty: number; line_total_iqd: number }>();
+  if (!parent) return null;
+  const { results: siblings } = await db
+    .prepare(
+      `SELECT id, name_snapshot, option_snapshot, qty, component_alloc_iqd
+         FROM order_items WHERE bundle_parent_item_id = ? ORDER BY rowid`
+    )
+    .bind(parent.id)
+    .all<Record<string, unknown>>();
+  return {
+    parent_item_id: parent.id,
+    name: parent.name_snapshot,
+    qty: parent.qty,
+    line_total_iqd: parent.line_total_iqd,
+    position: siblings.findIndex((k) => String(k.id) === orderItemId) + 1,
+    of: siblings.length,
+    components: siblings.map((k) => ({
+      order_item_id: k.id,
+      name: k.name_snapshot,
+      variant: k.option_snapshot,
+      qty: k.qty,
+      alloc_iqd: k.component_alloc_iqd ?? null,
+    })),
+  };
+}
+
 /** Single case — owner or admin. */
 returnRoutes.get('/:id', async (c) => {
   const user = c.get('user')!;
@@ -432,9 +686,13 @@ returnRoutes.get('/:id', async (c) => {
     .bind(c.req.param('id'))
     .first<ReturnCaseRow>();
   if (!row || (row.user_id !== user.id && user.role !== 'admin')) throw notFound('Return case not found');
+  const bundle = await bundleGroupFor(c.env.DB, row.order_item_id);
   return c.json({
     success: true,
-    case: casePublic(row, { item: { name: row.name_snapshot, image: row.image_snapshot, variant: row.option_snapshot } }),
+    case: casePublic(row, {
+      item: { name: row.name_snapshot, image: row.image_snapshot, variant: row.option_snapshot },
+      ...(bundle ? { bundle } : {}),
+    }),
   });
 });
 
@@ -515,6 +773,38 @@ priceProtectionRoutes.post('/claims', async (c) => {
 
   if (!item.product_id) throw badRequest('This item no longer maps to a product', 'PRODUCT_MISSING');
 
+  // A BUNDLE PARENT IS NOT PRICE-PROTECTED, AND IS TOLD SO (§6.4).
+  // `order_items.option_id` on a parent is the `bx_…` composition key, which
+  // matches no `price_history.variant_key`, so a claim on it could only ever
+  // end in a misleading `NO_ELIGIBLE_DROP` — "we looked and found nothing" for
+  // a comparison that was never possible. The parts ARE covered, individually,
+  // off their own stored `component_value_iqd`.
+  const isBundleParent = await c.env.DB
+    .prepare('SELECT 1 AS x FROM order_items WHERE bundle_parent_item_id = ? LIMIT 1')
+    .bind(orderItemId)
+    .first<{ x: number }>();
+  if (isBundleParent) {
+    throw badRequest(
+      "A bundle is not price-protected as a whole — the bundle's parts are covered individually",
+      'COMPOSITION_NOT_ELIGIBLE'
+    );
+  }
+  // A MYSTERY SPOOL IS NOT PRICE-PROTECTED EITHER, and for a sharper reason:
+  // its `component_value_iqd` is an OFFER-DERIVED share, not the drawn item's
+  // ladder (§6.2), so a comparison against `price_history` is not merely
+  // impossible — answering it at all would reveal what the spool actually is
+  // (§8.2 row 19).
+  const isMysterySpool = await c.env.DB
+    .prepare('SELECT 1 AS x FROM mystery_allocations WHERE order_item_id = ? LIMIT 1')
+    .bind(orderItemId)
+    .first<{ x: number }>();
+  if (isMysterySpool) {
+    throw badRequest(
+      'A mystery offer is not price-protected — its price is the offer price, not the item drawn',
+      'COMPOSITION_NOT_ELIGIBLE'
+    );
+  }
+
   const pending = await c.env.DB.prepare(
     "SELECT 1 AS x FROM price_protection_claims WHERE order_item_id = ? AND state = 'requested' LIMIT 1"
   )
@@ -529,8 +819,37 @@ priceProtectionRoutes.post('/claims', async (c) => {
     null
   );
   const buyerClass: 'pro' | 'regular' = pricing?.applied_tier === 'pro' ? 'pro' : 'regular';
+  // A BUNDLE COMPONENT'S ORIGINAL UNIT PRICE IS ITS SHARE OF WHAT WAS PAID.
+  //
+  // §6.2 pins a component's `pricing_snapshot.applied_iqd` to 0 — the money is
+  // on the parent — so reading that would make `perUnitDrop` 0 and every claim
+  // a misleading `NO_ELIGIBLE_DROP`. But the obvious substitute,
+  // `component_value_iqd`, is the UNDISCOUNTED standalone catalogue value, a
+  // number the customer never paid: on a bundle whose parts are worth 425,000
+  // and which sold for 200,000, a component pinned at 400,000 could be credited
+  // 380,000 — 1.9× what was paid for it and 1.9× the price of the whole order,
+  // with the goods kept. Every other price-protection path compares against
+  // what was actually charged (`pricing_snapshot.applied_iqd`), and this one now
+  // does too: `component_alloc_iqd` is the component's share of the bundle
+  // price, the same stored figure §6.4 already designates as the refund basis,
+  // so a refund and a price-protection credit cannot disagree about what one
+  // component cost. `component_value_iqd` stays in `policy_snapshot` as the
+  // provenance of the comparison, never as its ceiling.
+  const componentQty = Math.max(1, Number(item.qty) || 1);
+  const componentAlloc =
+    item.component_alloc_iqd === null || item.component_alloc_iqd === undefined
+      ? null
+      : Math.max(0, Number(item.component_alloc_iqd) || 0);
+  const componentValue =
+    item.component_value_iqd === null || item.component_value_iqd === undefined
+      ? null
+      : Number(item.component_value_iqd) || 0;
+  const componentPaidUnit =
+    componentAlloc !== null ? Math.floor(componentAlloc / componentQty) : componentValue;
   const originalUnit =
-    pricing && Number.isInteger(pricing.applied_iqd)
+    componentPaidUnit !== null
+      ? componentPaidUnit
+      : pricing && Number.isInteger(pricing.applied_iqd)
       ? (pricing.applied_iqd as number)
       : unitMerchandiseIqd({
           qty: Number(item.qty) || 0,
@@ -624,6 +943,8 @@ priceProtectionRoutes.post('/claims', async (c) => {
     window: { from: windowFrom, to: windowTo },
     current_applied_iqd: currentApplied,
     history_min_iqd: hist?.m ?? null,
+    component_value_iqd: componentValue,
+    component_alloc_iqd: componentAlloc,
     eligible_total_iqd: eligibleTotal,
     prior_credited_iqd: prior,
     computed_eligible_iqd: computed,

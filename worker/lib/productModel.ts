@@ -189,6 +189,22 @@ export interface ProductDoc {
    * owner could type it and nothing happened. null = no compare-at price.
    */
   original_price_iqd: number | null;
+  /**
+   * WHAT THIS ROW IS MADE OF (migration 0058, docs/BUNDLES_MYSTERY.md §1.2).
+   *
+   *   ''        an ordinary catalogue product — every existing row
+   *   'bundle'  a fixed composition, listed in bundle_components
+   *   'mystery' a server-drawn composition, from a mystery pool
+   *
+   * A composition row is a REAL product: it inherits the ar/en/ckb title, the
+   * slug, the cover, the gallery, the status, the display order and the whole
+   * price ladder. What it never has is stock of its own — `stock` is NULL for
+   * ever and availability is computed from the members' real inventory. That
+   * is why every write door pins it (worker/lib/productPersistence.ts) and why
+   * `saleAvailability` fails CLOSED for it rather than reading NULL as
+   * "untracked → sell 99".
+   */
+  composition: '' | 'bundle' | 'mystery';
   /** Legacy scalar, kept as sale_types[0] so pre-0018 readers keep working. */
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
   /** §6: a product may offer several sale types at once. Never empty. */
@@ -368,6 +384,17 @@ function readSpecFields(raw: unknown): Record<string, string> {
     else if (typeof v === 'number' && Number.isFinite(v)) out[k] = String(v);
   }
   return out;
+}
+
+/**
+ * The composition enum, normalised the way `normalizeSaleTypes` normalises its
+ * own (0058 deliberately carries no SQLite CHECK, exactly as `sale_types`
+ * carries none — a future third value must be an ALTER-free change). Anything
+ * unrecognised is '' : an ordinary product, never a half-configured bundle.
+ */
+export function normalizeComposition(raw: unknown): ProductDoc['composition'] {
+  const v = String(raw ?? '').trim().toLowerCase();
+  return v === 'bundle' || v === 'mystery' ? v : '';
 }
 
 /** §6: normalizes the multi-select sale types, always yielding at least one. */
@@ -675,6 +702,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     prime_price_iqd: num(row.prime_price_iqd),
     product_cost_iqd: num(row.product_cost_iqd),
     original_price_iqd: num(row.original_price_iqd),
+    composition: normalizeComposition(row.composition),
     selling_type: row.selling_type === 'pre_order' || row.selling_type === 'bundle' ? row.selling_type : 'direct_sale',
     sale_types: normalizeSaleTypes(row.sale_types, String(row.selling_type ?? 'direct_sale')),
     preorder_transports: upgradeTransports(row.preorder_transports),
@@ -1063,6 +1091,13 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     prime_price_iqd: optionalPrice(body.prime_price_iqd, 'prime_price_iqd'),
     product_cost_iqd: optionalPrice(body.product_cost_iqd, 'product_cost_iqd'),
     original_price_iqd: optionalPrice(body.original_price_iqd, 'original_price_iqd'),
+    // 0058. '' for every ordinary write; a bundle or mystery row can only be
+    // written by a caller that set `allowComposition` on the intent, which
+    // `planProductSave` enforces — so the product form and the TXT template
+    // inherit the refusal with no code of their own. The CSV importer writes
+    // the product row itself (worker/routes/adminImport.ts) and states the same
+    // refusal there.
+    composition: normalizeComposition(body.composition),
     // The legacy scalar tracks the reconciled list, exactly as it has since
     // 0018 — and it can never be 'mixed', which the column's CHECK forbids.
     selling_type: saleTypesForTransport[0] as ProductDoc['selling_type'],
@@ -1137,6 +1172,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     prime_price_iqd: doc.prime_price_iqd,
     product_cost_iqd: doc.product_cost_iqd,
     original_price_iqd: doc.original_price_iqd,
+    composition: doc.composition,
     // Kept in sync with sale_types[0] so every pre-0018 reader still sees a
     // valid scalar; sale_types is the authority.
     selling_type: doc.sale_types[0] ?? doc.selling_type,
@@ -1201,12 +1237,24 @@ const stripCostFields = <T extends PriceFields>(x: T) => {
   return rest as Omit<T, (typeof COST_KEYS)[number]>;
 };
 
+/** The per-level stock counters a coarse projection blanks (§8.2 row 18). */
+const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
+  ({ ...x, stock: null, low_stock_threshold: null }) as T;
+
 /**
  * Public storefront projection — NO cost fields anywhere (product, option,
  * color), no translation bookkeeping, hidden options/colors/labels removed.
  * Selling prices are computed by the caller through the resolver.
+ *
+ * `coarse` is §8.2 row 18: this product is a member of an ACTIVE mystery pool,
+ * so its exact sellable counts are a publication rule, not a display choice.
+ * The suppression lives HERE, in the one projector, rather than beside each
+ * caller — the earlier version nulled only the BASE `stock`, while
+ * `applyRelations` had already overlaid the real `product_option_values.stock`
+ * and `product_colors.stock` onto `options[]` and `colors[]`, so two anonymous
+ * GETs around a confirmation still identified the drawn colour exactly.
  */
-export function projectPublic(doc: ProductDoc) {
+export function projectPublic(doc: ProductDoc, coarse = false) {
   return {
     id: doc.id,
     slug: doc.slug,
@@ -1220,13 +1268,14 @@ export function projectPublic(doc: ProductDoc) {
     price_iqd: doc.price_iqd,
     pro_price_iqd: doc.pro_price_iqd,
     prime_price_iqd: doc.prime_price_iqd,
+    composition: doc.composition,
     selling_type: doc.selling_type,
     sale_types: doc.sale_types,
     preorder_transports: doc.preorder_transports.filter((t) => t.active),
     // A price component (availability premium), not a cost — safe to show.
     direct_surcharge_iqd: doc.direct_surcharge_iqd,
-    stock: doc.stock,
-    low_stock_threshold: doc.low_stock_threshold,
+    stock: coarse ? null : doc.stock,
+    low_stock_threshold: coarse ? null : doc.low_stock_threshold,
     brand_id: doc.brand_id,
     category_id: doc.category_id,
     sub_category_id: doc.sub_category_id,
@@ -1235,8 +1284,14 @@ export function projectPublic(doc: ProductDoc) {
     spec_fields: doc.spec_fields,
     media: doc.media,
     images: doc.media.map((m) => m.url), // legacy string[] compatibility
-    options: doc.options.filter((o) => o.active).map(stripCostFields),
-    colors: doc.colors.filter((c) => c.active).map(stripCostFields),
+    options: doc.options
+      .filter((o) => o.active)
+      .map(stripCostFields)
+      .map((o) => (coarse ? coarseLevel(o) : o)),
+    colors: doc.colors
+      .filter((c) => c.active)
+      .map(stripCostFields)
+      .map((c) => (coarse ? coarseLevel(c) : c)),
     /**
      * The hand-typed groups first, then the family's own filled-in fields
      * (printer specs: maximum acceleration, supported nozzle sizes, build
@@ -1269,7 +1324,7 @@ export function projectPublic(doc: ProductDoc) {
 export const PRODUCT_COLUMNS = [
   'id','slug','status','doc_version','content_rev','name','name_ar','name_ku',
   'description','description_ar','description_ku','price_iqd','pro_price_iqd',
-  'prime_price_iqd','product_cost_iqd','original_price_iqd','selling_type','sale_types','preorder_transports',
+  'prime_price_iqd','product_cost_iqd','original_price_iqd','composition','selling_type','sale_types','preorder_transports',
   'direct_surcharge_iqd','stock','low_stock_threshold','brand_id','category_id','sub_category_id',
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','ops_policy','content_blocks','translation_meta','is_featured',
