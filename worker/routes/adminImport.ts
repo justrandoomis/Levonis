@@ -1099,7 +1099,26 @@ adminImportRoutes.post('/confirm', async (c) => {
       const prevRow = isCreate
         ? null
         : await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
-      const localized = localizeRespectingAuthored(doc, prevRow ? parseProductRow(prevRow) : null);
+      const prevDoc = prevRow ? parseProductRow(prevRow) : null;
+      /**
+       * 0058 — A BUNDLE OR MYSTERY OFFER IS NEVER IMPORTED
+       * (docs/BUNDLES_MYSTERY.md §16, code `COMPOSITION_NOT_ALLOWED`).
+       *
+       * The form and the TXT template inherit this refusal from
+       * `planProductSave`, which is the one writer they both go through. This
+       * importer still writes the product row itself, so it states the rule
+       * explicitly rather than inheriting it — and it must, because
+       * `composition` is part of `PRODUCT_COLUMNS`: an update that did not
+       * refuse would write '' over a bundle's own value and silently demote it
+       * into a stockless ordinary product, which `saleAvailability` would then
+       * read as "untracked → sell 99".
+       */
+      if (doc.composition !== '' || (prevDoc && prevDoc.composition !== '')) {
+        throw new Error(
+          'COMPOSITION_NOT_ALLOWED: a bundle or mystery offer is composed in the bundles panel and cannot be imported'
+        );
+      }
+      const localized = localizeRespectingAuthored(doc, prevDoc);
       const record = serializeDoc(doc);
 
       const stmts: D1PreparedStatement[] = [];

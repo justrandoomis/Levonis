@@ -15,6 +15,7 @@ import {
 } from '../lib/productPersistence';
 import {
   applyInventory,
+  assertMovesApplied,
   isInventoryMode,
   resolveStock,
   type InventorySnapshot,
@@ -292,9 +293,10 @@ adminProductRelationsRoutes.post('/:id/stock/adjust', async (c) => {
     label: scopeId || 'base',
   };
   const operationId = newId('adj');
+  const moves = [{ product_id: productId, qty: Math.abs(delta), line_id: operationId, targets: [target] }];
   const result = await applyInventory(
     c.env.DB,
-    [{ product_id: productId, qty: Math.abs(delta), line_id: operationId, targets: [target] }],
+    moves,
     {
       kind: delta > 0 ? 'adjust_in' : 'adjust_out',
       operationId,
@@ -320,7 +322,24 @@ adminProductRelationsRoutes.post('/:id/stock/adjust', async (c) => {
     );
   }
 
+  // POST-COMMIT ASSERTION (§3.3). An order fences its movement inside its own
+  // transaction; this screen has no batch to fence, so it re-reads instead —
+  // D1 does not fail a zero-row UPDATE, and a guard that stopped holding
+  // between the pre-check and the write would otherwise leave a ledger row
+  // claiming a movement that never happened. Reported, never repaired.
+  const verified = await assertMovesApplied(c.env.DB, moves);
+
   await audit(c.env.DB, admin.id, 'product.stock.adjust', productId, { scope, scope_id: scopeId, delta, reason });
   const snap = await inventorySnapshot(c.env.DB, productId);
-  return c.json({ success: true, applied: result.applied, inventory_mode: snap.inventory_mode });
+  return c.json({
+    success: true,
+    applied: result.applied,
+    inventory_mode: snap.inventory_mode,
+    ...(verified.ok
+      ? {}
+      : {
+          warning: 'The adjustment was recorded but a stock row does not read back as expected — check it before selling.',
+          rows_short: verified.short,
+        }),
+  });
 });

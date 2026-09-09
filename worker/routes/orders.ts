@@ -2,11 +2,59 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, str, int } from '../lib/http';
+import { requireAuth, badRequest, notFound, str, int, HttpError } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
-import { resolveCartLine, pricingContextFrom, publicBreakdown, selectionFromCartRow, refuseIncompleteSelection } from './cart';
+import {
+  resolveCartLine,
+  pricingContextFrom,
+  publicBreakdown,
+  resolveCartBundles,
+  selectionFromCartRow,
+  refuseIncompleteSelection,
+} from './cart';
+import type { ResolvedBundle } from '../lib/bundleRead';
+import { allocateComponentValue } from '../lib/bundleComposition';
+import { applyMysteryToBundles, resolveCartMystery } from '../lib/bundleCart';
+import {
+  drawMysteryLine,
+  refuseMystery,
+  type MysteryContext,
+  type MysteryDraw,
+} from '../lib/mysteryLine';
+import {
+  activePoolProductIds,
+  allocationStatement,
+  drawAuditStatement,
+} from '../lib/mysteryDraw';
+import { mysteryRefusal } from '../lib/mystery/issues';
+import {
+  isRevealed,
+  loadAllocations,
+  mysteryProjection,
+  paidOrderIds,
+  revealStampStatement,
+  type AllocationRow,
+} from '../lib/mysteryReveal';
+
+/** One mystery cart line, resolved and drawn ONCE in the checkout pre-pass and
+ *  read by all three `priceLines` passes and by the quote (§5.3, §7.4). */
+interface MysteryLineResolution {
+  ctx: MysteryContext;
+  draw: MysteryDraw;
+  cartItemId: string;
+}
+import {
+  componentFeeBreakdown,
+  componentFeesIqd,
+  componentVariantLabel,
+  compositionOptionSnapshot,
+  includedComponents,
+  refuseComposition,
+  refusePhysicalLines,
+} from '../lib/bundleCart';
+import { loadOffers, offerEligible, offerKey, offerPriceRefusal, offerRedemptionStatement, subjectOf } from '../lib/offers';
 import {
   allowedPaymentMethods,
   isCod,
@@ -20,7 +68,7 @@ import { printerProductIds } from '../lib/printerIdentity';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { saleAvailability } from './products';
 import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
-import { planInventory, resolveStock } from '../lib/inventory';
+import { planInventory, reservationFenceStatement, resolveStock } from '../lib/inventory';
 import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAfter, waitUntilFrom } from '../lib/eventBus';
 import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted';
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
@@ -188,10 +236,83 @@ function stageProgress(o: Record<string, unknown>, shippingType: ShippingType): 
   return { index: idx < 0 ? 0 : idx + 1, total: path.length };
 }
 
+/**
+ * THE CUSTOMER SEES ONE LINE PER THING THEY BOUGHT (§6.3).
+ *
+ * A bundle's components are real `order_items` rows — they must be, they are
+ * the physical truth the reservation, the return and the warranty clock all key
+ * on — but they are never top-level items in a customer payload: four extra
+ * 0 IQD rows naming the member products would double the item count, break the
+ * "one main item with expandable contents" rule the mandate states, and make
+ * `Σ line` on the screen disagree with the order's own subtotal.
+ */
+export const topLevelItems = (items: Record<string, unknown>[]) =>
+  items.filter((it) => !it.bundle_parent_item_id);
+
+/** The parts of one bundle line, nested under it, from the rows already read —
+ *  never a second query, and never a second price. */
+function bundleBlock(parent: Record<string, unknown>, items: Record<string, unknown>[]) {
+  const kids = items.filter((it) => String(it.bundle_parent_item_id ?? '') === String(parent.id));
+  if (kids.length === 0) return null;
+  const snapshot = safeParse<{ composition?: Record<string, unknown> } | null>(parent.pricing_snapshot, null);
+  const composition = snapshot?.composition ?? null;
+  // A MYSTERY line has no contents to expand — its spools are the physical
+  // truth behind it, not a list the customer chose — so the components array
+  // is empty here exactly as it is in the cart (§5.2, §8.2 row 12). What the
+  // customer may see about the picks comes from `mysteryProjection` and
+  // nothing else.
+  if (composition && composition.kind === 'mystery') {
+    return {
+      kind: 'mystery',
+      component_total_iqd: null,
+      bundle_price_iqd: composition.bundle_price_iqd ?? null,
+      bundle_discount_iqd: null,
+      saving_percent: null,
+      components: [] as Array<Record<string, unknown>>,
+    };
+  }
+  return {
+    kind: composition ? composition.kind : 'bundle',
+    component_total_iqd: composition ? composition.component_total_iqd : null,
+    bundle_price_iqd: composition ? composition.bundle_price_iqd : null,
+    bundle_discount_iqd: composition ? composition.bundle_discount_iqd : null,
+    saving_percent: composition ? composition.saving_percent : null,
+    components: kids.map((k) => ({
+      order_item_id: k.id,
+      product_id: k.product_id,
+      product_slug: (k.product_slug as string | null | undefined) ?? null,
+      name: k.name_snapshot,
+      image: k.image_snapshot,
+      variant: k.option_snapshot,
+      qty: k.qty,
+      /** The component's own share of the bundle price — what a return of it
+       *  refunds (§6.4). Never a second charge: its `line_total_iqd` is 0. */
+      alloc_iqd: k.component_alloc_iqd ?? null,
+      value_iqd: k.component_value_iqd ?? null,
+    })),
+  };
+}
+
+/**
+ * The reveal inputs one order needs. Absent = no mystery block is emitted at
+ * all, which is the safe default: a caller that forgot to load the
+ * allocations shows the customer nothing rather than showing them everything.
+ */
+export interface MysteryView {
+  allocations: Map<string, AllocationRow[]>;
+  /** The orders whose recorded collections cover their total — the `'paid'`
+   *  milestone. A SET, not a boolean: a page of orders holds paid and unpaid
+   *  ones together, and one shared flag would reveal the unpaid ones. */
+  paid: Set<string>;
+  viewer: 'customer' | 'admin';
+  lang?: string;
+}
+
 export function orderPublic(
   o: Record<string, unknown>,
   items: Record<string, unknown>[],
-  snap?: OrderPointsSnapshot
+  snap?: OrderPointsSnapshot,
+  mystery?: MysteryView
 ) {
   const coupon = safeParse<Record<string, unknown> | null>(o.coupon_snapshot, null);
   const shippingType = typeForTransport(
@@ -246,11 +367,34 @@ export function orderPublic(
     updated_at: o.updated_at,
     /** §5: the single money view — every screen reads this, none recomputes. */
     financial: financialSnapshot(o, items, snap),
-    items: items.map((it) => {
+    items: topLevelItems(items).map((it) => {
       const transport = safeParse<{ method?: unknown } | null>(it.transport_snapshot, null);
       const warranty = safeParse<{ plan_id?: unknown } | null>(it.warranty_snapshot, null);
+      const bundle = bundleBlock(it, items);
+      // EVERY MYSTERY ROW LEAVES THROUGH ONE PROJECTION (§8.2), rather than
+      // relying on the NULL `product_id` to do the work. The allocations hang
+      // off the SPOOL rows, so they are gathered under the parent the customer
+      // actually sees.
+      const allocs = mystery
+        ? items
+            .filter((k) => String(k.bundle_parent_item_id ?? '') === String(it.id))
+            .flatMap((k) => mystery.allocations.get(String(k.id)) ?? [])
+        : [];
+      const mysteryBlock = allocs.length
+        ? mysteryProjection(
+            allocs,
+            {
+              order: { stage: String(o.stage || 'received'), status: String(o.status ?? ''), shipping_type: shippingType },
+              paid: mystery!.paid.has(String(o.id)),
+              lang: mystery!.lang,
+            },
+            mystery!.viewer
+          )
+        : null;
       return {
         id: it.id,
+        ...(bundle ? { bundle } : {}),
+        ...(mysteryBlock ? { mystery: mysteryBlock } : {}),
         product_id: it.product_id,
         /** Present when the items were loaded with the products join (the
          *  customer routes); the storefront links to /product/:slug with it. */
@@ -261,7 +405,19 @@ export function orderPublic(
          * selected the bare row gets no field rather than an assumed `false`,
          * because the customer's screen shows the home-delivery note off it.
          */
-        ...(it.is_printer === undefined || it.is_printer === null ? {} : { is_printer: !!Number(it.is_printer) }),
+        ...(it.is_printer === undefined || it.is_printer === null
+          ? {}
+          : {
+              // A bundle's PARENT row is never in a printer catalog itself —
+              // its components are — so the flag is carried up from them, or
+              // the printer delivery note goes silent the moment a printer is
+              // sold inside a bundle (§6.3).
+              is_printer:
+                !!Number(it.is_printer) ||
+                items.some(
+                  (k) => String(k.bundle_parent_item_id ?? '') === String(it.id) && !!Number(k.is_printer)
+                ),
+            }),
         name: it.name_snapshot,
         image: it.image_snapshot,
         variant: it.option_snapshot,
@@ -296,6 +452,62 @@ export function orderPublic(
   };
 }
 
+/**
+ * THE REVEAL INPUTS FOR A SET OF ORDERS — two queries for a whole page, never
+ * one per order.
+ *
+ * Every route that serializes an order goes through this, so no screen can
+ * accidentally omit the projection and show a mystery line as a nameless
+ * zero-price row for ever. An order with no allocation costs one indexed read
+ * and nothing else.
+ */
+/**
+ * Refuses the customer's own cancellation once a mystery pick on the order has
+ * been revealed. Admin cancellation is untouched: an admin cancelling a
+ * revealed order is a support decision, not a re-roll.
+ */
+async function refuseRevealedCancel(
+  db: D1Database,
+  order: Record<string, unknown>,
+  items: Record<string, unknown>[]
+): Promise<void> {
+  const orderId = String(order.id);
+  const allocations = await loadAllocations(db, [orderId]);
+  if (allocations.size === 0) return;
+  const paid = (await paidOrderIds(db, [orderId])).has(orderId);
+  const facts = {
+    stage: String(order.stage || 'received'),
+    status: String(order.status ?? ''),
+    shipping_type: typeForTransport(
+      String(order.shipping_type ?? '').startsWith('preorder_')
+        ? String(order.shipping_type).slice('preorder_'.length)
+        : ''
+    ),
+  };
+  void items;
+  for (const rows of allocations.values()) {
+    for (const a of rows) {
+      if (isRevealed(a, facts, paid)) throw mysteryRefusal('MYSTERY_REVEALED_NO_CANCEL');
+    }
+  }
+}
+
+/** The caller's language for a server-rendered stage label — the same
+ *  `?lang=` the tracking route already reads, defaulted to Arabic. */
+export const langOf = (c: Context<AppContext>): string =>
+  ['ar', 'en', 'ckb'].includes(c.req.query('lang') ?? '') ? c.req.query('lang')! : 'ar';
+
+export async function mysteryViewFor(
+  db: D1Database,
+  orderIds: string[],
+  viewer: 'customer' | 'admin' = 'customer',
+  lang?: string
+): Promise<MysteryView | undefined> {
+  const allocations = await loadAllocations(db, orderIds, { withSlug: viewer === 'admin' });
+  if (allocations.size === 0) return undefined;
+  return { allocations, paid: await paidOrderIds(db, orderIds), viewer, lang };
+}
+
 /** Items with the product's current slug beside the frozen snapshot, and
  *  whether the product is a printer (worker/lib/printerIdentity.ts — the
  *  same catalog flag, as one correlated EXISTS instead of a second round trip). */
@@ -312,9 +524,15 @@ async function loadOrder(db: D1Database, orderId: string) {
   return { order, items };
 }
 
-/** Units the customer sees: sum of quantities, "8 items" on the card. */
+/**
+ * Units the customer sees: sum of quantities, "8 items" on the card.
+ *
+ * A bundle counts ONCE, as the thing the customer bought — its component rows
+ * are the physical truth behind it, not four more things in the basket, and
+ * counting them would make the card say "5 items" for one bundle.
+ */
 function itemCount(items: Record<string, unknown>[]): number {
-  return items.reduce((n, it) => n + (Number(it.qty) || 0), 0);
+  return topLevelItems(items).reduce((n, it) => n + (Number(it.qty) || 0), 0);
 }
 
 // -------------------------------------------------- shipping configuration
@@ -356,6 +574,34 @@ export function shippingConfigFrom(raw: unknown): ShippingConfig {
   };
 }
 
+/**
+ * ONE `order_items` ROW AS THE DATABASE WILL HOLD IT — the reference shape the
+ * `OrderCreated` outbox row publishes.
+ *
+ * It exists so the event and the INSERT cannot drift: a mystery spool's
+ * `product_id` is NULL in both, and `item_kind` says why rather than leaving a
+ * consumer to guess what a null product means.
+ */
+function persistedItemRef(l: ComputedLine, all: ComputedLine[]) {
+  const kind: 'ordinary' | 'bundle_parent' | 'bundle_component' | 'mystery' = l.mystery_spool
+    ? 'mystery'
+    : l.bundle_parent_item_id
+      ? 'bundle_component'
+      : all.some((x) => x.bundle_parent_item_id === l.id)
+        ? 'bundle_parent'
+        : 'ordinary';
+  return {
+    order_item_id: l.id,
+    product_id: l.mystery_spool ? null : l.product_id,
+    qty: l.qty,
+    unit_price_iqd: Math.max(0, Math.round(l.unit)),
+    is_printer: !!l.is_printer,
+    warranty_plan_id: safeParse<{ plan_id?: string } | null>(l.warranty_snapshot, null)?.plan_id ?? null,
+    ops_policy_id: null,
+    item_kind: kind,
+  };
+}
+
 /** products.ops_policy facts the shipping engine needs (explicit config only). */
 function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['size_class']; is_spool: boolean } {
   const o = safeParse<Record<string, unknown>>(
@@ -367,6 +613,444 @@ function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['s
     size_class: sc === 'printer_small' || sc === 'printer_large' || sc === 'ordinary' ? sc : null,
     is_spool: o.is_spool === true,
   };
+}
+
+/**
+ * ONE BUNDLE CART LINE → ONE PRICED PARENT AND ITS COMPONENT LINES (§5.3, §6.2).
+ *
+ * PURE, and deliberately so: `priceLines` runs up to three times per checkout
+ * and `computeCheckout` may then swap the whole priced set, so anything that
+ * read the database here would draw, price or judge differently between the
+ * passes. Everything it needs was resolved once, before `priceLines` existed.
+ *
+ * THE MONEY SITS ON THE PARENT AND THE COMPONENTS ARE ZERO-PRICED, for three
+ * reasons that are each a real defect otherwise:
+ *
+ *  - `Σ line_total_iqd` still equals `orders.subtotal_iqd`, so
+ *    `financialSnapshot`'s legacy recomputation and the invoice totals stay
+ *    consistent with no special case;
+ *  - `unitMerchandiseIqd` prefers `pricing_snapshot.applied_iqd`, so points
+ *    accrue on exactly what was paid — which is why a component's snapshot
+ *    `applied_iqd` is pinned to 0 and the parent's to `bundle_price_iqd`;
+ *  - device units, warranty coverage, return cases and price-protection claims
+ *    all key on `order_items.id`, and the COMPONENT row is the one naming the
+ *    real product — so a printer inside a bundle gets its unit and its warranty
+ *    clock automatically.
+ *
+ * THE PARENT'S SNAPSHOT RUNGS ARE PINNED TO THE FIGURES ACTUALLY CHARGED. In a
+ * derived price mode `resolveUnitPrice`'s `applied_iqd` comes from the
+ * deliberately drift-allowed `products.price_iqd` (§4.3), and everything
+ * downstream reads the snapshot rather than the line: the points reversal on a
+ * refund, `financialSnapshot`'s legacy path and price protection would all use
+ * the stale number.
+ */
+function priceCompositionLine(
+  row: Record<string, unknown>,
+  b: ResolvedBundle | undefined,
+  printerIds: Set<string>,
+  displayName: string,
+  mystery?: MysteryLineResolution
+): { lines: ComputedLine[]; subtotal: number; merchandise: number; shippingItems: ShippingItem[]; physicalLines: number } {
+  const qty = Number(row.qty) || 1;
+  if (!b) throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`, 'OFFER_INACTIVE');
+
+  // THE DOOR, AGAIN, ON THE STORED ROW — never on a client claim. Everything
+  // §6.1 lists: active, the schedule, the tier gate, the price floor, every
+  // stored choice still legal, the shipping type, the transport every
+  // pre-order component offers, an opted-in optional component, the per-order
+  // cap and the composition availability.
+  const transportMethod = String(row.transport_method ?? '');
+  // A mystery line's door is the pool's, and its transport is the mode's: the
+  // components it would otherwise be judged against do not exist.
+  if (mystery) refuseMystery(mystery.ctx, displayName);
+  refuseComposition(b, qty, displayName, mystery ? {} : { transportMethod });
+
+  const included = includedComponents(b);
+  const componentFees = mystery ? 0 : componentFeesIqd(b);
+  const bundlePrice = b.pricing.applied_iqd;
+  const unit = b.pricing.unit_subtotal_iqd + componentFees;
+  const line = unit * qty;
+  const parentId = newId('oi');
+  const basis: 'direct' | 'preorder' = transportMethod ? 'preorder' : 'direct';
+
+  // The parent's snapshot: the composition block plus the rungs as charged.
+  const composition = {
+    kind: b.doc.composition,
+    bundle_product_id: b.doc.id,
+    bundle_name: { ar: b.doc.name_ar, en: b.doc.name_en, ckb: b.doc.name_ckb },
+    component_total_iqd: b.pricing.component_total_iqd,
+    bundle_price_iqd: bundlePrice,
+    bundle_discount_iqd: b.pricing.discount_iqd,
+    saving_percent: b.pricing.saving_percent,
+    price_mode: b.config.price_mode,
+    price_source: b.pricing.source,
+    applied_tier: b.pricing.applied_tier,
+    transport: {
+      method: transportMethod,
+      component_commission_iqd: componentFees,
+      direct_surcharge_iqd: Math.max(0, b.pricing.unit_subtotal_iqd - bundlePrice),
+      components: componentFeeBreakdown(b),
+    },
+    offer: b.window
+      ? {
+          offer_id: b.window.id,
+          subject_type: 'product',
+          subject_id: b.doc.id,
+          required_tiers: b.offer.required_tiers,
+          starts_at: b.window.starts_at,
+          ends_at: b.window.ends_at,
+          price_source: b.pricing.source,
+          offer_price_mode: b.window.offer_price_mode,
+          offer_discount_percent: b.window.discount_percent,
+          offer_applied_iqd: bundlePrice,
+        }
+      : null,
+    items: [] as Array<Record<string, unknown>>,
+    /**
+     * THE MYSTERY BLOCK ON THE PARENT'S SNAPSHOT — customer-safe by
+     * construction. `items` above stays EMPTY for a mystery line: the parent's
+     * whole `pricing_snapshot` is serialized into `orderPublic`'s `pricing`
+     * field, so a single drawn product id written here would defeat every
+     * milestone at once. The pick lives in `mystery_allocations` and reaches
+     * the customer only through `mysteryProjection`.
+     */
+    mystery: mystery
+      ? {
+          spools: mystery.draw.spools.length,
+          spool_qty: mystery.ctx.spool_qty,
+          mode: mystery.draw.mode,
+          reveal_stage: mystery.draw.reveal_stage,
+          family_id: mystery.ctx.family_id,
+        }
+      : null,
+  };
+
+  // LARGEST-REMAINDER allocation of the PARENT's line total across the
+  // components in proportion to their standalone line values, so
+  // `Σ component_alloc_iqd === line_total_iqd` EXACTLY with no rounding left
+  // over. It is stored, never re-derived, and it is what a return refunds.
+  //
+  // FOR A MYSTERY LINE the shares are UNIFORM and OFFER-DERIVED: every spool
+  // is worth the same fraction of what the customer paid, and the drawn
+  // item's own ladder appears nowhere (§6.2, §8.2 row 19). Pricing a spool at
+  // the filament's standalone value would publish its price before the
+  // reveal — a number an attacker reads straight off the invoice.
+  const spools = mystery ? mystery.draw.spools : [];
+  const values = mystery
+    ? spools.map(() => 1)
+    : included.map((k) => Math.max(0, k.unit.applied_iqd) * k.qty_per_bundle * qty);
+  const allocs = allocateComponentValue(line, values);
+
+  const lines: ComputedLine[] = [];
+  const shippingItems: ShippingItem[] = [];
+  spools.forEach((sp, i) => {
+    const cand = sp.candidate;
+    const childId = newId('oi');
+    lines.push({
+      cart_item_id: String(row.cart_item_id),
+      id: childId,
+      // The REAL drawn product: `planInventory` reserves against it and
+      // `inventory_ledger.product_id` must name it. Only the order_items
+      // INSERT binds NULL in its place (§7.7).
+      product_id: cand.product_id,
+      option_value_ids: [],
+      stock_targets: cand.targets,
+      // The OFFER's title and cover, never the filament's — the invoice, the
+      // receipt, the courier payload and every e-mail read this field.
+      name: b.doc.name_en || b.doc.name_ar || b.doc.id,
+      name_ar: b.doc.name_ar,
+      image: b.doc.media[0]?.url ?? '',
+      variant: '',
+      option_id: '',
+      color_id: '',
+      shipping_method_id: '',
+      qty: 1,
+      unit: 0,
+      line: 0,
+      applied_iqd: 0,
+      tracked: cand.available !== null,
+      // NULL, not a redacted object: a snapshot that exists is a snapshot a
+      // future reader fills in.
+      pricing_snapshot: null as unknown as string,
+      warranty_snapshot: null,
+      transport_snapshot: null,
+      breakdown: {
+        applied_iqd: 0,
+        applied_tier: 'regular',
+        regular_iqd: 0,
+        prime_iqd: null,
+        pro_iqd: null,
+        transport: null,
+        direct: null,
+        pricing_basis: basis,
+        warranty: null,
+        unit_subtotal_iqd: 0,
+        price_source: 'offer',
+        errors: [],
+      } as unknown as ReturnType<typeof publicBreakdown>,
+      is_printer: printerIds.has(cand.product_id),
+      pricing_basis: basis,
+      bundle_parent_item_id: parentId,
+      bundle_component_id: '',
+      component_value_iqd: allocs[i] ?? 0,
+      component_alloc_iqd: allocs[i] ?? 0,
+      mystery_spool: {
+        spool_index: sp.spool_index,
+        pool_id: mystery!.draw.pool_id,
+        pool_entry_id: cand.entry_id,
+        sale_mode: mystery!.draw.mode,
+        seed: mystery!.draw.seed,
+        reveal_stage_snapshot: mystery!.draw.reveal_stage,
+        candidates_sha256: mystery!.draw.candidates_sha256,
+        name_snapshot: cand.name_snapshot,
+        image_snapshot: cand.image_snapshot,
+        variant_snapshot: cand.variant_snapshot,
+        option_value_ids: cand.option_value_ids,
+        color_id: cand.color_id,
+      },
+    });
+    /**
+     * A MYSTERY SPOOL SHIPS ON THE OFFER'S OWN FACTS, NOT THE PICK'S (§8.2).
+     *
+     * Feeding the DRAWN candidate's `ops_policy` into the shipping engine put
+     * the pick's size class into `quote.shipping.components[].kind`, which is
+     * published on `POST /api/orders/quote` and then frozen into
+     * `delivery_method_snapshot` and served back on `GET /api/orders/:id` from
+     * the first second — a customer payload reading `printer_large` for an
+     * order whose reveal milestone is 'delivered'. §8.2's table stops at row
+     * 20 and never listed the shipping quote, so nothing caught it.
+     *
+     * Worse, it was a PRE-PURCHASE oracle: the same block is on the quote,
+     * which draws but writes nothing, so a caller could grind quotes and read
+     * a partition of the candidate set off the fee alone. Redacting only the
+     * breakdown would leave that half open, because the FEE is the oracle.
+     *
+     * So the offer row's own `ops_policy` decides — one fact for every spool of
+     * that offer, whatever is drawn. A mystery offer over devices is out of
+     * scope (§17 decision 7), so the pools are filament and the offer's own
+     * `is_spool` is the honest fact; the owner sets it where they set every
+     * other shipping fact.
+     */
+    const facts = shippingFactsFrom(b.row.ops_policy);
+    shippingItems.push({ product_id: String(b.doc.id), qty: 1, size_class: facts.size_class, is_spool: facts.is_spool });
+  });
+  included.forEach((k, i) => {
+    const componentQty = k.qty_per_bundle * qty;
+    const { cost_iqd, ...snapshot } = k.unit;
+    void cost_iqd;
+    // The component's own resolver output, with `applied_iqd` set to 0 AFTER
+    // the cost strip: points accrue on the parent and on the number actually
+    // charged, never a second time on an inflated component total.
+    const componentSnapshot = { ...snapshot, applied_iqd: 0, unit_subtotal_iqd: 0 };
+    lines.push({
+      cart_item_id: String(row.cart_item_id),
+      id: newId('oi'),
+      product_id: k.member_product_id,
+      option_value_ids: k.selection.option_value_ids,
+      stock_targets: k.resolution.targets,
+      name: k.doc.name_en || k.doc.name_ar || k.member_product_id,
+      name_ar: k.doc.name_ar,
+      image: k.doc.media[0]?.url ?? '',
+      variant: componentVariantLabel(k),
+      option_id: k.selection.option_value_ids[0] ?? '',
+      color_id: k.selection.color_id ?? '',
+      shipping_method_id: '',
+      qty: componentQty,
+      unit: 0,
+      line: 0,
+      applied_iqd: 0,
+      tracked: k.resolution.tracked,
+      pricing_snapshot: JSON.stringify(componentSnapshot),
+      warranty_snapshot: null,
+      transport_snapshot: k.unit.transport ? JSON.stringify(k.unit.transport) : null,
+      breakdown: publicBreakdown(k.unit),
+      is_printer: printerIds.has(k.member_product_id),
+      pricing_basis: basis,
+      bundle_parent_item_id: parentId,
+      bundle_component_id: k.component_id,
+      component_value_iqd: Math.max(0, k.unit.applied_iqd),
+      component_alloc_iqd: allocs[i] ?? 0,
+    });
+    // The shipping quote reads the COMPONENTS' own facts, so a bundle holding
+    // a printer reaches the printer freight branch and twelve spools reach the
+    // carton threshold inside the existing `quoteShipping` — a bundle judged on
+    // its own (empty) ops_policy would be quoted as one ordinary parcel.
+    const facts = shippingFactsFrom(k.doc.ops_policy);
+    shippingItems.push({
+      product_id: k.member_product_id,
+      qty: componentQty,
+      size_class: facts.size_class,
+      is_spool: facts.is_spool,
+    });
+    composition.items.push({
+      order_item_id: lines[lines.length - 1].id,
+      component_id: k.component_id,
+      product_id: k.member_product_id,
+      name: k.doc.name_en || k.doc.name_ar || k.member_product_id,
+      variant: componentVariantLabel(k),
+      option_value_ids: k.selection.option_value_ids,
+      color_id: k.selection.color_id ?? '',
+      qty: componentQty,
+      value_iqd: Math.max(0, k.unit.applied_iqd),
+      alloc_iqd: allocs[i] ?? 0,
+      // The component's `order_items.id` is ALSO the ledger `line_id` inside
+      // `inventory_ledger.idempotency_key` — the inventory reservation
+      // reference, with no new column and provably the same value the ledger
+      // holds.
+      reservation_line_id: lines[lines.length - 1].id,
+      optional: k.optional,
+    });
+  });
+
+  const { cost_iqd, ...bundleSnapshot } = b.pricing.resolved;
+  void cost_iqd;
+  const parent: ComputedLine = {
+    cart_item_id: String(row.cart_item_id),
+    id: parentId,
+    product_id: b.doc.id,
+    option_value_ids: [],
+    // The bundle row itself is untracked and holds nothing: the components
+    // carry every stock target, and this empty array is what keeps the parent
+    // out of the `stockMoves` map with no filter of its own.
+    stock_targets: [],
+    name: b.doc.name_en || b.doc.name_ar || b.doc.id,
+    name_ar: b.doc.name_ar,
+    image: b.doc.media[0]?.url ?? '',
+    variant: compositionOptionSnapshot(b),
+    /** The `bx_…` composition key, kept as provenance. Nothing derives a
+     *  selection from it, and price protection refuses a parent claim by name
+     *  rather than comparing it against a `price_history.variant_key` it can
+     *  never match (§6.4). */
+    option_id: String(row.option_id ?? ''),
+    color_id: '',
+    shipping_method_id: '',
+    qty,
+    unit,
+    line,
+    applied_iqd: bundlePrice,
+    tracked: false,
+    pricing_snapshot: JSON.stringify({
+      ...bundleSnapshot,
+      applied_iqd: bundlePrice,
+      regular_iqd: b.pricing.regular_iqd,
+      prime_iqd: b.pricing.prime_iqd,
+      pro_iqd: b.pricing.pro_iqd,
+      unit_subtotal_iqd: unit,
+      applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
+      composition,
+    }),
+    warranty_snapshot: null,
+    transport_snapshot:
+      transportMethod || componentFees > 0
+        ? JSON.stringify({
+            method: transportMethod,
+            commission_iqd: componentFees,
+            waived: false,
+            source: 'components',
+            components: componentFeeBreakdown(b),
+          })
+        : null,
+    breakdown: {
+      ...publicBreakdown(b.pricing.resolved),
+      applied_iqd: bundlePrice,
+      // `ResolvedPrice.applied_tier` is a SHARED type and is deliberately not
+      // widened to carry PLUS (§4.4): the four-value tier lives on the
+      // composition block and on the `display_*` projection only. A PLUS
+      // member is charged the PLUS number here — `applied_iqd` above — and the
+      // composition block is where that rung is named.
+      applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
+      regular_iqd: b.pricing.regular_iqd,
+      prime_iqd: b.pricing.prime_iqd,
+      pro_iqd: b.pricing.pro_iqd,
+      unit_subtotal_iqd: unit,
+    },
+    // A bundle holding a printer must still fire the checkout's printer
+    // delivery note, and the note reads the PARENT line the customer sees.
+    is_printer:
+      included.some((k) => printerIds.has(k.member_product_id)) ||
+      spools.some((sp) => printerIds.has(sp.candidate.product_id)),
+    pricing_basis: basis,
+    bundle_parent_item_id: null,
+    bundle_component_id: null,
+    component_value_iqd: null,
+    component_alloc_iqd: null,
+    mystery_spool: null,
+    /**
+     * THE DISCLOSURE'S OWN TWO FIGURES, ON THE LINE THAT CARRIES THE MONEY.
+     *
+     * `quoteLines` emitted `included[]` with per-part values but neither the
+     * struck component total nor the saving percentage, so the checkout fell
+     * back to the CART line for both — and on a pre-order bundle the quote
+     * re-prices for cash on delivery, which put a cart-basis "bought
+     * separately" figure and a cart-basis "Save X%" badge beside a quote-basis
+     * line total. That is the "two different orders on one screen" the file's
+     * own comment at `src/pages/Checkout.tsx` forbids.
+     */
+    composition_total_iqd: b.pricing.component_total_iqd,
+    composition_saving_percent: b.pricing.saving_percent,
+  };
+
+  return {
+    lines: [parent, ...lines],
+    subtotal: line,
+    // MERCHANDISE IS THE BUNDLE PRICE AND NOTHING ELSE. The components'
+    // commissions and surcharges are real money and ride on the parent's
+    // `unit_subtotal_iqd`, but merchandise never includes a fee — the points
+    // basis, the coupon minimum and the accrual all read it.
+    merchandise: bundlePrice * qty,
+    shippingItems,
+    // THE CONTRACT'S OWN FORMULA (§3.1): `Σ over lines of (components or
+    // spools) × qty`. A bundle writes one `order_items` row per component
+    // whatever its quantity, so this is deliberately CONSERVATIVE for a
+    // bundle and exact for a mystery line, where each spool is its own row —
+    // one ceiling, judged the same way at add-to-cart and at the door, rather
+    // than two that can disagree about the same cart.
+    // A mystery line's spool rows are already one per (spool × qty), so they
+    // are counted once; a bundle writes one row per component whatever its
+    // quantity, so the multiplication there is deliberately conservative.
+    physicalLines: mystery ? lines.length : lines.length * qty,
+  };
+}
+
+/**
+ * AGGREGATED DEMAND PER STOCK ROW, ACROSS EVERY LINE OF THE ORDER (§3.2).
+ *
+ * Two component lines that resolve to one stock row stay two independent
+ * guarded moves — collapsing them would lose the per-`order_item` trail returns
+ * depend on — but their demand is summed before it is judged. Judging each move
+ * against the full `available` independently would let a bundle needing two of
+ * a colour sit beside a bare product needing two more of the same colour with
+ * only three in stock: every per-line check passes, `planInventory` rejects
+ * nothing, and the guards fail at commit with a permanent `CONFLICT_RETRY` on a
+ * cart nobody is racing and no screen can explain.
+ */
+function refuseAggregateDemand(lines: ComputedLine[], poolMemberIds: ReadonlySet<string>): void {
+  const demand = new Map<string, { needed: number; available: number | null; name: string; coarse: boolean }>();
+  for (const l of lines) {
+    for (const t of l.stock_targets) {
+      // BASE stock lives on the product row itself, so its scope_id is '' and
+      // the product id identifies the row — exactly as `planInventory` resolves
+      // it. Keying on the scope alone would merge unrelated rows into one.
+      const key = `${t.scope}:${t.scope_id || l.product_id}`;
+      const available = t.stock === null ? null : Math.max(0, t.stock - Math.max(0, t.reserved));
+      const coarse = poolMemberIds.has(l.product_id);
+      const found = demand.get(key);
+      if (found) {
+        found.needed += l.qty;
+        found.coarse = found.coarse || coarse;
+      } else demand.set(key, { needed: l.qty, available, name: l.name_ar || l.name, coarse });
+    }
+  }
+  for (const [, d] of demand) {
+    if (d.available !== null && d.needed > d.available) {
+      // A MYSTERY-POOL MEMBER'S REFUSAL CARRIES NO COUNT (§8.2 row 18, §15.1
+      // rule 9). Naming the number here would let a buyer binary-search the
+      // exact free stock of one candidate colour, before and after a mystery
+      // purchase, without ever completing an order.
+      if (d.coarse) throw badRequest(`"${d.name}" does not have enough stock for this order`, 'OUT_OF_STOCK');
+      throw badRequest(`Only ${d.available} of "${d.name}" left in stock`, 'OUT_OF_STOCK');
+    }
+  }
 }
 
 // -------------------------------------------------- shared checkout compute
@@ -419,6 +1103,54 @@ interface ComputedLine {
   is_printer: boolean;
   /** Which availability fee priced this line (worker/lib/pricing.ts). */
   pricing_basis: 'direct' | 'preorder';
+  /**
+   * THE FOUR COMPOSITION FIELDS (§1.6, §5.3), and nothing else.
+   *
+   * A bundle produces one PARENT line carrying the money and no stock targets,
+   * and one COMPONENT line per included component carrying the real product,
+   * the real stock targets and a price of zero. Everything downstream — the
+   * `order_items` INSERT, the `stockMoves` map, `orderPublic`, the quote
+   * serializer and the invoice — either reads them or ignores them.
+   */
+  bundle_parent_item_id?: string | null;
+  bundle_component_id?: string | null;
+  /** A component's UNDISCOUNTED standalone value, per unit (§6.2). Price
+   *  protection reads it as `originalUnit`, which is why it is per unit and
+   *  not per line. */
+  component_value_iqd?: number | null;
+  /** This component's share of the PARENT's `line_total_iqd`, by
+   *  largest-remainder allocation, so `Σ alloc === line_total_iqd` exactly.
+   *  Stored, never re-derived, and it is what a return refunds (§6.4). */
+  component_alloc_iqd?: number | null;
+  /** A composition PARENT's struck component total and saving percentage, on
+   *  the same line and the same basis as `line_total_iqd`, so the checkout's
+   *  disclosure never mixes a cart-basis figure with a quote-basis one. */
+  composition_total_iqd?: number | null;
+  composition_saving_percent?: number | null;
+  /**
+   * A MYSTERY SPOOL (§7.7). `product_id` above carries the REAL drawn product
+   * — `planInventory` and the shipping facts need it — and only the
+   * `INSERT INTO order_items` binds NULL in its place, which is what makes
+   * most of §8.2 structural rather than procedural: the `products` join yields
+   * no slug, `GET /api/orders/:id/units` finds nothing, the invoice writes the
+   * offer's name and the courier payload says the offer's name, with no
+   * filtering code at all. The pick itself lives only in
+   * `mystery_allocations`.
+   */
+  mystery_spool?: {
+    spool_index: number;
+    pool_id: string;
+    pool_entry_id: string;
+    sale_mode: string;
+    seed: string;
+    reveal_stage_snapshot: string;
+    candidates_sha256: string;
+    name_snapshot: string;
+    image_snapshot: string;
+    variant_snapshot: string;
+    option_value_ids: string[];
+    color_id: string;
+  } | null;
 }
 
 interface CheckoutComputation {
@@ -451,6 +1183,17 @@ interface CheckoutComputation {
   /** The printer home-delivery note amount (settings), or null when unset. */
   printerNoteIqd: number | null;
   lines: ComputedLine[];
+  /** The composition products in this order — the offer subjects a redemption
+   *  row is written for (§1.8). A bundle and a mystery offer share the subject
+   *  key `('product', productId)` with an ordinary product, which is what makes
+   *  this one promotion model rather than three. */
+  compositionSubjects: Set<string>;
+  /** The mystery lines this checkout drew, keyed by cart item id. Persisted
+   *  only when `allocate` is true — the quote holds the same objects and
+   *  writes none of them (§7.4). */
+  mysteryLines: Map<string, MysteryLineResolution>;
+  /** Whether this computation is allowed to persist its draw. */
+  allocate: boolean;
   productIds: string[];
   subtotal: number; // Σ unit_subtotal × qty (incl. commissions/warranty fees)
   merchandise: number; // Σ applied price × qty (product prices only)
@@ -481,10 +1224,23 @@ interface CheckoutComputation {
   preorderGiftConfig: unknown;
 }
 
+/**
+ * Options the two doors differ by. `allocate` is `false` for
+ * `POST /api/orders/quote` and `true` for `POST /api/orders`: the quote is
+ * READ-ONLY and must never draw a mystery allocation or write a row (§7.4).
+ * It is an explicit flag rather than an inference from the caller, because
+ * "the quote happens not to write anything today" is not a guarantee — a hard
+ * one on top of determinism is.
+ */
+interface CheckoutOptions {
+  allocate: boolean;
+}
+
 async function computeCheckout(
   c: Context<AppContext>,
   user: SessionUser,
-  input: CheckoutInput
+  input: CheckoutInput,
+  options: CheckoutOptions = { allocate: false }
 ): Promise<CheckoutComputation> {
   const address = await c.env.DB.prepare('SELECT * FROM addresses WHERE id = ? AND user_id = ?')
     .bind(input.addressId, user.id)
@@ -530,7 +1286,7 @@ async function computeCheckout(
 
   // Load and price the cart lines server-side.
   let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-                    ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, p.*
+                    ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, ci.draw_salt, p.*
                FROM cart_items ci JOIN products p ON p.id = ci.product_id
               WHERE ci.user_id = ?`;
   const params: unknown[] = [user.id];
@@ -569,7 +1325,91 @@ async function computeCheckout(
   // One batched read of every product's relational structure. Options,
   // colours and the authoritative stock level all come from here — checkout
   // and the storefront cannot disagree because they read the same rows.
-  const [views, printerIds] = await Promise.all([
+  //
+  // THE COMPOSITION PRE-PASS RUNS HERE TOO (§5.3). `priceLines` is a
+  // synchronous pure function over already-loaded rows, and that is
+  // load-bearing: `computeCheckout` calls it up to THREE times (requested
+  // basis, prepaid, cash on delivery) and may then swap the whole priced set.
+  // So every database read a bundle line needs — its components, its stored
+  // choices, its config, its window and its members' stock — happens once,
+  // here, and all three passes then read the same resolution.
+  const compositionRows = rows.filter((r) => String(r.composition ?? '') !== '');
+  /**
+   * SCHEDULED SPECIAL OFFERS ON THE ORDINARY LINES (§9, §12) — read here, in
+   * the pre-pass, for the same reason the composition is: `priceLines` is
+   * synchronous and runs three times.
+   *
+   * The window is the same row a bundle uses, on the same subject key, and
+   * `applyOfferToResolved` is the same function the card called. That is what
+   * makes "the card, the cart and the door quote the offer price" a property
+   * of the code rather than of three call sites agreeing by luck.
+   */
+  const ordinaryRows = rows.filter((r) => String(r.composition ?? '') === '');
+  const offerNow = Date.now();
+  const lineOffers = await loadOffers(c.env.DB, ordinaryRows.map((r) => subjectOf(String(r.id))));
+  /** Which ordinary subjects contributed a live offer price or gate to this
+   *  order — the subjects a redemption row is written for, so `offer_limits`
+   *  works on an ordinary product with no new machinery at all. */
+  const offerSubjects = new Set<string>();
+  const resolveBundlesFor = (basis: PreorderPricing) =>
+    resolveCartBundles(c.env.DB, compositionRows, tierStatus.tier, pricingTierActive, pricingCtx, tierStatus, Date.now(), basis);
+  // ONE RESOLUTION PER PRICING BASIS, and the second one only when a pre-order
+  // cart could actually be priced the other way. The owner's rule is that a
+  // pre-order paid CASH ON DELIVERY follows the direct-sale pricing rules, and
+  // for a bundle the money that changes is its COMPONENTS' transport
+  // commissions — which ride on the parent (§2.2). Resolving only at the
+  // prepaid basis would charge an air-freight commission on an order paying
+  // cash at the door, and `cod_reprices` would tell the customer the price was
+  // the same either way.
+  const bundlesByBasis: Record<PreorderPricing, Map<string, ResolvedBundle>> = {
+    prepaid: await resolveBundlesFor('prepaid'),
+    cod:
+      compositionRows.length && isPreorderCart
+        ? await resolveBundlesFor('cod')
+        : new Map<string, ResolvedBundle>(),
+  };
+  const bundles = bundlesByBasis.prepaid;
+
+  /**
+   * THE MYSTERY PRE-PASS (§5.3, §7.4), beside the composition one and for the
+   * same reason: `priceLines` is synchronous and runs up to three times, so
+   * the candidate query, the seed and the DRAW all happen exactly once, here,
+   * and every pass — and the quote — sees the same filament.
+   *
+   * The draw is a pure function of (the offer's server-held secret, the
+   * server-written `cart_items.draw_salt`, the candidate list, the weights and
+   * the duplicate policy). No value the client chooses is an input, the
+   * checkout idempotency key least of all. `allocate` decides whether the
+   * result is PERSISTED, never whether it is computed — which is how the
+   * quote can price and reserve-check the same spools it will sell while
+   * writing nothing (§7.4).
+   */
+  const mysteryCtxs = await resolveCartMystery(c.env.DB, compositionRows, bundlesByBasis.prepaid, Date.now());
+  applyMysteryToBundles(mysteryCtxs, bundlesByBasis.cod);
+  const mysteryLines = new Map<string, MysteryLineResolution>();
+  for (const row of compositionRows) {
+    const key = String(row.cart_item_id);
+    const ctx = mysteryCtxs.get(key);
+    if (!ctx) continue;
+    mysteryLines.set(key, {
+      ctx,
+      cartItemId: key,
+      draw: await drawMysteryLine(c.env.DB, ctx, {
+        cartItemId: key,
+        drawSalt: String(row.draw_salt ?? ''),
+        qty: Number(row.qty) || 1,
+        label: String(row.name_ar || row.name),
+      }),
+    });
+  }
+  const drawnIds = [...mysteryLines.values()].flatMap((m) => m.draw.spools.map((sp) => sp.candidate.product_id));
+
+  // A bundle's printers are its COMPONENTS' — the parent row is never in a
+  // printer catalog itself — so the member ids join the same one query. Without
+  // them the checkout's printer delivery note would go silent the moment a
+  // printer was sold inside a bundle.
+  const memberIds = [...bundles.values()].flatMap((b) => b.components.map((k) => k.member_product_id));
+  const [views, printerIds, poolMemberIds] = await Promise.all([
     loadRelationsViews(
       c.env.DB,
       rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
@@ -578,7 +1418,19 @@ async function computeCheckout(
     // the quote and the order, the printers-only warranty gate, and the
     // printer's 12-month warranty base. One query for the whole cart; never
     // a fee.
-    printerProductIds(c.env.DB, rows.map((r) => String(r.id))),
+    printerProductIds(c.env.DB, [...rows.map((r) => String(r.id)), ...memberIds, ...drawnIds]),
+    /**
+     * §8.2 ROW 18 AT THE CHECKOUT DOOR.
+     *
+     * The two stock refusals below quote an exact `available` — "Only 7 of
+     * \"X\" left in stock" — and `priceLines` is synchronous, so the pool
+     * membership set is resolved here, once, and passed down beside the tier
+     * context (§14). Without it a buyer could bump a quantity until the
+     * refusal named the count of a candidate's colour row, before and after a
+     * mystery purchase, and read the pick off the difference — with the money
+     * never leaving their wallet.
+     */
+    activePoolProductIds(c.env.DB, [...rows.map((r) => String(r.id)), ...memberIds, ...drawnIds]),
   ]);
 
   interface PricedLines {
@@ -606,13 +1458,60 @@ async function computeCheckout(
     const productIds: string[] = [];
     const lines: ComputedLine[] = [];
     const shippingItems: ShippingItem[] = [];
+    /** Physical `order_items` rows this order would write (§3.1). */
+    let physical = 0;
     for (const row of rows) {
       const displayName = String(row.name_ar || row.name);
+
+      // ---- A COMPOSITION LINE (§5.3, §6.1) --------------------------------
+      // One PARENT line carrying the money and no stock targets, plus one
+      // COMPONENT line per included component carrying the real product, the
+      // real stock targets and a price of zero. Nothing is drawn, read or
+      // awaited here: the pre-pass above already resolved this line, so all
+      // three pricing passes see the same components and the same figures.
+      if (String(row.composition ?? '') !== '') {
+        const resolvedForBasis =
+          preorderPricing === 'cod' && bundlesByBasis.cod.size ? bundlesByBasis.cod : bundlesByBasis.prepaid;
+        const priced = priceCompositionLine(
+          row,
+          resolvedForBasis.get(String(row.cart_item_id)),
+          printerIds,
+          displayName,
+          mysteryLines.get(String(row.cart_item_id))
+        );
+        lines.push(...priced.lines);
+        subtotal += priced.subtotal;
+        merchandise += priced.merchandise;
+        productIds.push(String(row.id));
+        shippingItems.push(...priced.shippingItems);
+        physical += priced.physicalLines;
+        continue;
+      }
+
       if (row.status !== 'active') throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
       const view = views.get(String(row.id));
       const sel = selectionFromCartRow(row);
       const isPrinter = printerIds.has(String(row.id));
-      const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
+      // THE DOOR RE-CHECKS THE OFFER, independently of the list and of the
+      // cart (§15.1 rule 6). A window that expired, was switched off or gates
+      // a tier this buyer does not hold refuses HERE with its own named code
+      // — never silently falls back to the ladder price the customer was not
+      // shown, and never sells a members-only price to a non-member.
+      const offerView = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
+      const offerCheck = offerEligible(tierStatus, offerView, offerNow);
+      // AN ORDINARY PRODUCT OUTLIVES ITS PROMOTIONS. A window that has ended,
+      // has not started or was switched off contributes no price and no
+      // refusal here: the product is still an ordinary catalogue product and
+      // an expired promo must not make it permanently unbuyable. What a LIVE
+      // window can still do is gate who may take its price, and that refusal
+      // is the one this door raises. (A COMPOSITION row is different — there
+      // the window IS the offer, and `refuseComposition` refuses it.)
+      if (offerView?.window && !offerCheck.ok && offerCheck.reason === 'MEMBERSHIP_REQUIRED') {
+        throw new HttpError(403, `"${displayName}" is available to members only`, 'MEMBERSHIP_REQUIRED', {
+          required_tiers: offerCheck.required_tiers,
+        });
+      }
+      const { doc, resolved, variantLabel, selectionErrors, offerId } = resolveCartLine(
         row,
         sel,
         tierStatus.tier,
@@ -620,8 +1519,15 @@ async function computeCheckout(
         pricingCtx,
         view,
         preorderPricing,
-        isPrinter
+        isPrinter,
+        { view: offerView, eligible: offerCheck.ok, nowMs: offerNow }
       );
+      // A window with LIMITS but no price still needs its redemption row, or
+      // `max_per_user` on an ordinary product would never count anything.
+      if (offerView?.window && (offerId || offerView.limits)) offerSubjects.add(String(row.id));
+      if (offerPriceRefusal(resolved.errors)) {
+        throw badRequest(`"${displayName}" is not available right now`, 'OFFER_INACTIVE');
+      }
       if (resolved.errors.length > 0) {
         throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
       }
@@ -648,6 +1554,8 @@ async function computeCheckout(
           optionValueIds: sel.optionValueIds ?? [],
           colorId: sel.colorId || null,
           qty,
+          // §8.2 row 18: the checkout is a customer payload too.
+          coarseStock: poolMemberIds.has(String(row.id)),
           transportDefaults: pricingCtx.transportDefaults,
           inventory: snapshot,
           links: view?.links,
@@ -670,6 +1578,10 @@ async function computeCheckout(
         throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
       }
       if (stockRes.available !== null && stockRes.available < qty) {
+        // Count-free for a mystery-pool member (§8.2 row 18).
+        if (poolMemberIds.has(String(row.id))) {
+          throw badRequest(`"${displayName}" does not have enough stock for this order`, 'OUT_OF_STOCK');
+        }
         throw badRequest(`Only ${stockRes.available} of "${displayName}" left in stock`, 'OUT_OF_STOCK');
       }
       const unit = resolved.unit_subtotal_iqd;
@@ -687,6 +1599,27 @@ async function computeCheckout(
       // after the cart that produced it is gone.
       const { cost_iqd, ...pricingSnapshot } = resolved;
       void cost_iqd;
+      /**
+       * WHICH OFFER PRODUCED THIS PRICE, frozen (§12). Without the id and its
+       * figures on the row, "why was this line 40,000 when the product is
+       * 50,000" is unanswerable the moment the window is edited or deleted —
+       * and an offer window is a mutable row an admin will edit.
+       */
+      const offerSnapshot =
+        offerId && offerView?.window
+          ? {
+              offer_id: offerId,
+              subject_type: 'product',
+              subject_id: String(row.id),
+              required_tiers: offerView.window.required_tiers,
+              starts_at: offerView.window.starts_at,
+              ends_at: offerView.window.ends_at,
+              offer_price_mode: offerView.window.offer_price_mode,
+              offer_discount_percent: offerView.window.discount_percent,
+              offer_applied_iqd: resolved.applied_iqd,
+              price_source: 'offer',
+            }
+          : null;
       lines.push({
         cart_item_id: String(row.cart_item_id),
         id: newId('oi'),
@@ -705,7 +1638,7 @@ async function computeCheckout(
         line,
         applied_iqd: resolved.applied_iqd,
         tracked: stockRes.tracked,
-        pricing_snapshot: JSON.stringify(pricingSnapshot),
+        pricing_snapshot: JSON.stringify(offerSnapshot ? { ...pricingSnapshot, offer: offerSnapshot } : pricingSnapshot),
         warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
         transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
         breakdown: publicBreakdown(resolved),
@@ -713,6 +1646,21 @@ async function computeCheckout(
         pricing_basis: resolved.pricing_basis,
       });
     }
+    // THE PHYSICAL-LINE CEILING (§3.1) — a door refusal naming the limit, not a
+    // clamp. `max_qty_per_order` reaches 99, so one order could otherwise ask
+    // one D1 batch for thousands of `order_items` and inventory statements and
+    // meet an opaque bound-parameter error instead of a sentence.
+    refusePhysicalLines(physical + lines.filter((l) => !l.bundle_parent_item_id).length);
+
+    // AGGREGATED DEMAND PER STOCK ROW, ACROSS EVERY LINE (§3.2). Two lines that
+    // resolve to one row stay two independent guarded moves — the per-item
+    // trail returns depend on — but their demand is SUMMED before it is judged.
+    // Without this a bundle and a bare product of the same colour pass every
+    // per-line check, `planInventory` rejects nothing, and the sequential
+    // guards fail at commit: a permanent, deterministic "a stock level changed"
+    // on a cart nobody is racing.
+    refuseAggregateDemand(lines, poolMemberIds);
+
     return {
       lines,
       subtotal,
@@ -946,6 +1894,9 @@ async function computeCheckout(
     prepaidByWallet,
     printerNoteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
     lines: priced.lines,
+    compositionSubjects: new Set([...compositionRows.map((r) => String(r.id)), ...offerSubjects]),
+    mysteryLines,
+    allocate: options.allocate === true,
     productIds: priced.productIds,
     subtotal: priced.subtotal,
     merchandise: priced.merchandise,
@@ -1075,9 +2026,10 @@ orderRoutes.get('/', async (c) => {
       else itemsByOrder.set(key, [it]);
     }
   }
+  const mysteryView = await mysteryViewFor(c.env.DB, ids, 'customer', langOf(c));
   const out = orders.map((o) => {
     const items = itemsByOrder.get(String(o.id)) ?? [];
-    return { ...orderPublic(o, items, snaps.get(String(o.id))), item_count: itemCount(items) };
+    return { ...orderPublic(o, items, snaps.get(String(o.id)), mysteryView), item_count: itemCount(items) };
   });
   return c.json({
     success: true,
@@ -1105,12 +2057,81 @@ orderRoutes.get('/counts', async (c) => {
  * needs_config flags, points/wallet previews and the required policy list.
  * Read-only: nothing is reserved, charged or recorded.
  */
+/**
+ * THE QUOTE'S LINES — ONE PER CART LINE, WITH A BUNDLE'S PARTS NESTED (§6.3).
+ *
+ * `POST /api/orders/quote` never touches `order_items`, so the audit of every
+ * `ORDER_ITEMS_SELECT` consumer misses it — and `priceLines` pushes one
+ * component `ComputedLine` per component into this same array, each carrying
+ * the PARENT's `cart_item_id`. The checkout screen maps `quote.lines` 1:1 with
+ * `key={l.cart_item_id}`, so a four-component bundle would render the bundle
+ * plus four extra 0 IQD rows under four duplicate React keys, naming the member
+ * products, on the last screen before payment.
+ *
+ * `is_printer` is carried up onto the parent by `priceCompositionLine`, so the
+ * printer delivery note still fires for a printer bought inside a bundle.
+ */
+function quoteLines(lines: ComputedLine[]) {
+  const children = new Map<string, ComputedLine[]>();
+  for (const l of lines) {
+    if (!l.bundle_parent_item_id) continue;
+    const arr = children.get(l.bundle_parent_item_id);
+    if (arr) arr.push(l);
+    else children.set(l.bundle_parent_item_id, [l]);
+  }
+  return lines
+    .filter((l) => !l.bundle_parent_item_id)
+    .map((l) => {
+      const kids = children.get(l.id) ?? [];
+      return {
+        cart_item_id: l.cart_item_id,
+        product_id: l.product_id,
+        /** A mystery line says how many spools and nothing else — the quote is
+         *  a CUSTOMER payload and §8.2 row 20 puts it on the leak list. */
+        ...(kids.some((k) => k.mystery_spool) ? { mystery: { revealed: false, spools: kids.length } } : {}),
+        name: l.name,
+        name_ar: l.name_ar,
+        variant: l.variant,
+        qty: l.qty,
+        unit_price_iqd: l.unit,
+        line_total_iqd: l.line,
+        is_printer: l.is_printer,
+        breakdown: l.breakdown,
+        ...(kids.length
+          ? {
+              // The two figures the disclosure struck through and badged. On
+              // the QUOTE's basis, beside the quote's own line total.
+              component_total_iqd: l.composition_total_iqd ?? null,
+              saving_percent: l.composition_saving_percent ?? null,
+              /** The bundle's parts, for the checkout's expandable disclosure.
+               *  Never a top-level line, never a second price. */
+              included: kids.map((k) => ({
+                // THE DRAWN PRODUCT IS NOT PUBLISHED HERE (§8.2 row 20). The
+                // spool's `ComputedLine.product_id` carries the real product
+                // because `planInventory` needs it; the quote is the customer's
+                // last screen before payment and gets the same NULL the
+                // `order_items` row will be written with.
+                product_id: k.mystery_spool ? null : k.product_id,
+                name: k.name,
+                name_ar: k.name_ar,
+                variant: k.variant,
+                qty: k.qty,
+                value_iqd: k.component_value_iqd ?? 0,
+              })),
+            }
+          : {}),
+      };
+    });
+}
+
 orderRoutes.post('/quote', async (c) => {
   await rateLimit(c, 'order_quote', 60, 300);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const input = checkoutInputFrom(body, false);
-  const comp = await computeCheckout(c, user, input);
+  // READ-ONLY: `allocate: false` — the quote prices and reports availability,
+  // and nothing is drawn and nothing is written (§7.4).
+  const comp = await computeCheckout(c, user, input, { allocate: false });
 
   const blockers: string[] = [];
   if (comp.shipping.needs_config.length > 0) blockers.push('SHIPPING_NEEDS_CONFIG');
@@ -1124,18 +2145,7 @@ orderRoutes.post('/quote', async (c) => {
        * method actually chosen, so the summary must render them — not the
        * cart's numbers — the moment a quote exists.
        */
-      lines: comp.lines.map((l) => ({
-        cart_item_id: l.cart_item_id,
-        product_id: l.product_id,
-        name: l.name,
-        name_ar: l.name_ar,
-        variant: l.variant,
-        qty: l.qty,
-        unit_price_iqd: l.unit,
-        line_total_iqd: l.line,
-        is_printer: l.is_printer,
-        breakdown: l.breakdown,
-      })),
+      lines: quoteLines(comp.lines),
       merchandise_iqd: comp.merchandise,
       subtotal_iqd: comp.subtotal,
       /** §1: the journey this cart is on — unchanged by how it is paid. */
@@ -1246,13 +2256,13 @@ orderRoutes.post('/', async (c) => {
     const snaps = await getOrderPointsSnapshots(c.env, [existing.id]);
     return c.json({
       success: true,
-      order: orderPublic(data.order, data.items, snaps.get(existing.id)),
+      order: orderPublic(data.order, data.items, snaps.get(existing.id), await mysteryViewFor(c.env.DB, [existing.id], 'customer', langOf(c))),
       invoice_no: inv?.invoice_no ?? null,
       replay: true,
     });
   }
 
-  const comp = await computeCheckout(c, user, input);
+  const comp = await computeCheckout(c, user, input, { allocate: true });
 
   // Honest blocker (§6.3): an unpriced fee component (printer size mapping /
   // carton fee not configured by the owner yet) can NEVER be silently waived
@@ -1385,23 +2395,110 @@ orderRoutes.post('/', async (c) => {
     );
   }
 
+  // ONE `offer_redemptions` ROW PER (SUBJECT, ORDER), with `qty` SUMMED across
+  // every line of that subject in this order (§1.8, §3.1 step 3) — never one
+  // row per line. An order may legitimately hold two lines of one bundle (two
+  // different colour choices, §5.1), and a second INSERT would hit
+  // `UNIQUE (subject_type, subject_id, order_id)` and abort the batch with a
+  // message the catch block does not map: a permanent generic failure on a cart
+  // that could never succeed. The read-time count is advice; the BEFORE INSERT
+  // trigger on this table is the decision, inside this same transaction.
+  const redemptions = new Map<string, number>();
+  for (const it of comp.lines) {
+    if (it.bundle_parent_item_id) continue; // a component redeems nothing of its own
+    if (!comp.compositionSubjects.has(it.product_id)) continue;
+    redemptions.set(it.product_id, (redemptions.get(it.product_id) ?? 0) + it.qty);
+  }
+  for (const [productId, qty] of redemptions) {
+    stmts.push(offerRedemptionStatement(c.env.DB, subjectOf(productId), user.id, orderId, qty));
+  }
+
   for (const it of comp.lines) {
     stmts.push(
       c.env.DB.prepare(
         `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
-           pricing_snapshot, warranty_snapshot, transport_snapshot)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           pricing_snapshot, warranty_snapshot, transport_snapshot,
+           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        it.id, orderId, it.product_id, it.name, it.image, it.variant,
+        it.id, orderId,
+        // §7.7: a MYSTERY SPOOL binds NULL here on purpose. It is the single
+        // choice that removes the largest class of reveal leak — the
+        // `ORDER_ITEMS_SELECT` join to `products` yields no slug,
+        // `GET /api/orders/:id/units` finds nothing to join, the invoice and
+        // the courier payload say the offer's name — with no filtering code at
+        // all. `ComputedLine.product_id` still carries the real product, which
+        // is what `planInventory` reserves against below.
+        it.mystery_spool ? null : it.product_id,
+        it.name, it.image, it.variant,
         it.option_id, JSON.stringify(it.option_value_ids), it.color_id, it.shipping_method_id,
         it.qty, it.unit, it.line,
-        it.pricing_snapshot, it.warranty_snapshot, it.transport_snapshot
+        // …and `pricing_snapshot = null`, never the drawn item's ladder
+        // (§6.2, §8.2 row 19). The share it was worth is on
+        // `component_value_iqd`, offer-derived.
+        it.mystery_spool ? null : it.pricing_snapshot,
+        it.warranty_snapshot, it.transport_snapshot,
+        it.bundle_parent_item_id ?? null, it.bundle_component_id ?? null,
+        it.component_value_iqd ?? null, it.component_alloc_iqd ?? null
       )
     );
+    // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and
+    // never a post-response write. `PRIMARY KEY (order_item_id, spool_index)`
+    // is the replay fence: a replay that somehow re-entered this path collides
+    // and aborts the whole batch (§7.4).
+    if (it.mystery_spool && comp.allocate) {
+      stmts.push(
+        allocationStatement(c.env.DB, {
+          order_item_id: it.id,
+          spool_index: it.mystery_spool.spool_index,
+          order_id: orderId,
+          offer_product_id: String(
+            comp.lines.find((l) => l.id === it.bundle_parent_item_id)?.product_id ?? it.product_id
+          ),
+          pool_id: it.mystery_spool.pool_id,
+          candidate: {
+            entry_id: it.mystery_spool.pool_entry_id,
+            product_id: it.product_id,
+            option_value_ids: it.mystery_spool.option_value_ids,
+            color_id: it.mystery_spool.color_id,
+            family_id: '',
+            weight: 0,
+            available: null,
+            targets: [],
+            name_snapshot: it.mystery_spool.name_snapshot,
+            image_snapshot: it.mystery_spool.image_snapshot,
+            variant_snapshot: it.mystery_spool.variant_snapshot,
+          },
+          sale_mode: it.mystery_spool.sale_mode as 'direct' | 'preorder',
+          seed: it.mystery_spool.seed,
+          reveal_stage_snapshot: it.mystery_spool.reveal_stage_snapshot,
+          candidates_sha256: it.mystery_spool.candidates_sha256,
+        })
+      );
+    }
     // Stock moves through the inventory ledger AFTER this batch commits (see
     // below): it needs its own idempotency-keyed batch so a retry of the whole
     // checkout is a no-op rather than a second deduction.
+  }
+
+  // ONE `mystery_draw_audits` ROW PER LINE (never per spool): the candidate
+  // list and the weights the draw actually ran against, so `(seed,
+  // candidates, weightedIndex)` reproduces the winner years later. Nothing
+  // about a randomised money mechanism can be audited without it.
+  if (comp.allocate) {
+    for (const [cartItemId, m] of comp.mysteryLines) {
+      stmts.push(
+        drawAuditStatement(c.env.DB, {
+          order_id: orderId,
+          offer_product_id: m.ctx.offer_product_id,
+          cart_item_id: cartItemId,
+          pool_id: m.draw.pool_id,
+          canonical: m.draw.canonical,
+          sha256: m.draw.candidates_sha256,
+        })
+      );
+    }
   }
 
   // §4.4 points redemption: RESERVE and COMMIT inside this one batch. There is
@@ -1467,6 +2564,16 @@ orderRoutes.post('/', async (c) => {
   });
   stmts.push(...accrualStmts);
 
+  // A FULLY PREPAID ORDER IS PAID THE INSTANT IT EXISTS — its purchase
+  // settlement is written in this very batch — so a reveal-at-`'paid'` offer
+  // is stamped here rather than waiting for a collection that will never be
+  // recorded. It rides after the allocation INSERTs, in the same transaction,
+  // so it can never stamp a row that did not commit.
+  if (comp.allocate && settledAtPurchase) {
+    const stamp = revealStampStatement(c.env.DB, orderId, ['paid'], now);
+    if (stamp) stmts.push(stamp);
+  }
+
   // §11.5 settlement ledger: what was actually PREPAID at purchase. A COD
   // balance is recorded as outstanding, never as collected — the order is
   // "paid" only when a collection is recorded later.
@@ -1498,9 +2605,15 @@ orderRoutes.post('/', async (c) => {
       qty: it.qty,
       line_id: it.id,
       targets: it.stock_targets,
+      // §8.2 row 10: this move's `InventoryChanged` names the drawn product,
+      // as it must, but not the order it belongs to — otherwise one join
+      // against `OrderCreated` hands a bus consumer exactly the per-order fact
+      // row 9 withheld.
+      mystery: !!it.mystery_spool,
     }));
   /** The `InventoryChanged` ids this batch commits, delivered with the order's. */
   const inventoryEventIds: string[] = [];
+  let plannedReserveRows = 0;
   if (stockMoves.length > 0) {
     const reservePlan = await planInventory(c.env.DB, stockMoves, {
       kind: 'reserve',
@@ -1520,7 +2633,17 @@ orderRoutes.post('/', async (c) => {
     // frees its units instead of permanently consuming them.
     stmts.push(...reservePlan.statements);
     inventoryEventIds.push(...reservePlan.eventIds);
+    plannedReserveRows = reservePlan.plannedLedgerRows;
   }
+  // THE RESERVATION FENCE (§3.3) — the last inventory statement of the batch,
+  // for EVERY order, not only one holding a bundle. `planInventory`'s guards
+  // are conditional: one that stops holding between the plan-time read and the
+  // commit matches zero rows and the batch still commits, leaving an order
+  // whose stock was never held. The fence counts the ledger rows this batch
+  // actually wrote and its CHECK rolls everything back — order, wallet spend,
+  // points and all — when the count is short. A line with nothing to reserve
+  // (a pre-order, an untracked product) fences at expected = 0, which passes.
+  stmts.push(reservationFenceStatement(c.env.DB, orderId, 'reserve', plannedReserveRows));
 
   // `OrderCreated` (03-EVENTS.md §3.7) — the outbox row rides in the ORDER'S
   // OWN BATCH, so the event exists if and only if the order does. References
@@ -1538,15 +2661,13 @@ orderRoutes.post('/', async (c) => {
       merchant_id: null,
       store_id: null,
       payment_state: comp.walletUsdCents > 0 ? 'authorized' : 'cod',
-      items: comp.lines.map((l) => ({
-        order_item_id: l.id,
-        product_id: l.product_id,
-        qty: l.qty,
-        unit_price_iqd: Math.max(0, Math.round(l.unit)),
-        is_printer: !!l.is_printer,
-        warranty_plan_id: safeParse<{ plan_id?: string } | null>(l.warranty_snapshot, null)?.plan_id ?? null,
-        ops_policy_id: null,
-      })),
+      // WHAT THE DATABASE WILL HOLD, not what the cart computed (§7.7). The
+      // NULL a mystery spool's row is bound with is applied here through the
+      // SAME helper the INSERT above uses, so the bus can never publish a
+      // drawn product id the `order_items` row does not carry — and the event
+      // can never silently vanish, which is what binding a bare null against
+      // the old non-nullable `orderItemRef` would have caused.
+      items: comp.lines.map((l) => persistedItemRef(l, comp.lines)),
       totals: {
         merchandise_iqd: Math.max(0, comp.merchandise),
         delivery_iqd: Math.max(0, shippingTotal),
@@ -1583,7 +2704,11 @@ orderRoutes.post('/', async (c) => {
       if (replay) {
         const d = (await loadOrder(c.env.DB, replay.id))!;
         const snaps = await getOrderPointsSnapshots(c.env, [replay.id]);
-        return c.json({ success: true, order: orderPublic(d.order, d.items, snaps.get(replay.id)), replay: true });
+        return c.json({
+          success: true,
+          order: orderPublic(d.order, d.items, snaps.get(replay.id), await mysteryViewFor(c.env.DB, [replay.id], 'customer', langOf(c))),
+          replay: true,
+        });
       }
     }
     if (msg.includes('COUPON_PER_USER_LIMIT')) {
@@ -1591,6 +2716,15 @@ orderRoutes.post('/', async (c) => {
     }
     if (msg.includes('COUPON_GLOBAL_LIMIT')) {
       throw badRequest('Coupon could not be applied (GLOBAL_LIMIT_REACHED)', 'GLOBAL_LIMIT_REACHED');
+    }
+    // The offer limits of §1.8. The read-time count is advice; this trigger is
+    // the decision, and its ABORT rolls the whole checkout back — the same
+    // two-layer contract the coupon limits above already follow.
+    if (msg.includes('OFFER_PER_USER_LIMIT')) {
+      throw badRequest('You have already used this offer the maximum number of times (PER_USER_LIMIT_REACHED)', 'PER_USER_LIMIT_REACHED');
+    }
+    if (msg.includes('OFFER_GLOBAL_LIMIT')) {
+      throw badRequest('This offer has reached its limit (GLOBAL_LIMIT_REACHED)', 'GLOBAL_LIMIT_REACHED');
     }
     if (msg.includes('CHECK')) {
       throw badRequest('Order could not be placed: a balance or stock level changed. Please review your cart and try again.', 'CONFLICT_RETRY');
@@ -1651,14 +2785,14 @@ orderRoutes.post('/', async (c) => {
   c.executionCtx.waitUntil(
     notifyAdmins(
       c.env,
-      `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${comp.lines.length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\nDue on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`
+      `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\nDue on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`
     )
   );
   const data = (await loadOrder(c.env.DB, orderId))!;
   const snaps = await getOrderPointsSnapshots(c.env, [orderId]);
   return c.json({
     success: true,
-    order: orderPublic(data.order, data.items, snaps.get(orderId)),
+    order: orderPublic(data.order, data.items, snaps.get(orderId), await mysteryViewFor(c.env.DB, [orderId], 'customer', langOf(c))),
     invoice_no: invoice?.invoiceNo ?? null,
     shipping_quote: comp.shipping,
   });
@@ -1681,7 +2815,7 @@ orderRoutes.get('/:id', async (c) => {
   return c.json({
     success: true,
     order: {
-      ...orderPublic(data.order, data.items, snaps.get(id)),
+      ...orderPublic(data.order, data.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
       item_count: itemCount(data.items),
       invoice: invoice ?? null,
       // The two verbs the detail screen offers, decided here so the page
@@ -1844,6 +2978,16 @@ orderRoutes.post('/:id/cancel', async (c) => {
   if (data.order.status !== 'pending') {
     throw badRequest('Only pending orders can be cancelled — please contact support');
   }
+  /**
+   * A REVEALED MYSTERY ORDER CANNOT BE SELF-CANCELLED (§7.3, §15.3).
+   *
+   * A reveal-at-`'paid'` offer is bought, revealed, and — without this — could
+   * be cancelled and re-rolled until the expensive filament came up. The
+   * redemption slot is deliberately NOT freed by a cancellation either (§17
+   * decision 4), so the two together close the re-roll: the draw has been
+   * shown, and it stands.
+   */
+  await refuseRevealedCancel(c.env.DB, data.order, data.items);
 
   const now = new Date().toISOString();
   const walletCents = Number(data.order.wallet_applied_usd_cents) || 0;
@@ -1886,7 +3030,10 @@ orderRoutes.post('/:id/cancel', async (c) => {
   });
   const after = (await loadOrder(c.env.DB, id))!;
   const snaps = await getOrderPointsSnapshots(c.env, [id]);
-  return c.json({ success: true, order: orderPublic(after.order, after.items, snaps.get(id)) });
+  return c.json({
+    success: true,
+    order: orderPublic(after.order, after.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
+  });
 });
 
 /**
@@ -1938,6 +3085,17 @@ orderRoutes.post('/:id/settlement', async (c) => {
     duplicate: result.duplicate, collected_iqd: result.collected_iqd, fully_settled: result.fully_settled,
   });
 
+  // THE `'paid'` MILESTONE (§8.1). Recording the collection is the only thing
+  // that makes a cash-on-delivery order paid, so it is the only thing that can
+  // cross this milestone for one. `revealed_at IS NULL` makes it idempotent
+  // under a replayed courier callback, and the derivation would answer the
+  // same either way — the stamp is what FREEZES it, so a later refund or an
+  // edit of the offer cannot un-tell the customer what they bought.
+  if (result.fully_settled) {
+    const stamp = revealStampStatement(c.env.DB, id, ['paid'], new Date().toISOString());
+    if (stamp) await stamp.run();
+  }
+
   // Opportunistic release on the settlement EVENT (a server event, never a
   // page open). Fully idempotent and identical to what the durable job does,
   // so a day-9 collection does not wait for the next cron tick.
@@ -1956,6 +3114,6 @@ orderRoutes.post('/:id/settlement', async (c) => {
       fully_settled: result.fully_settled,
     },
     points_released: release ? { released: release.awarded, points: release.points, reason: release.reason ?? null } : null,
-    order: orderPublic(data.order, data.items, snaps.get(id)),
+    order: orderPublic(data.order, data.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
   });
 });

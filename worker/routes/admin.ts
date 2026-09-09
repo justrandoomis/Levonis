@@ -11,7 +11,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
-import { deductOrderStock, planOrderReturn } from '../lib/orderInventory';
+import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
@@ -21,7 +21,7 @@ import { walletTxPublic } from '../lib/wallet';
 import { productPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
-import { orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
+import { mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
 import {
@@ -667,8 +667,12 @@ adminRoutes.get('/orders', async (c) => {
     for (const it of items) byOrder.get(String(it.order_id))?.push(it);
   }
 
+  // ADMINS SEE THE PICK THROUGHOUT (§8.2). It is operational access — the
+  // list is the screen staff scan before opening one — and the projection
+  // marks each one `pending_customer_reveal` until the customer's milestone.
+  const adminMystery = await mysteryViewFor(c.env.DB, ids, 'admin');
   const out = results.map((o) => ({
-    ...orderPublic(o, byOrder.get(String(o.id)) ?? []),
+    ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery),
     email: o.email,
     username: o.username,
     user_id: o.user_id,
@@ -772,7 +776,7 @@ adminRoutes.get('/orders/:id', async (c) => {
   return c.json({
     success: true,
     order: {
-      ...orderPublic(o, items, snaps.get(id)),
+      ...orderPublic(o, items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'admin')),
       admin_note: o.admin_note ?? '',
       customer: {
         id: o.user_id,
@@ -1033,13 +1037,33 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
       address: String(address.address ?? ''),
       landmark: String(address.landmark ?? ''),
       notes: String(address.notes ?? ''),
-      lines: (items ?? []).map((it) => ({
-        name: String(it.name_snapshot ?? ''),
-        variant: String(it.option_snapshot ?? ''),
-        qty: Number(it.qty) || 0,
-        unit_iqd: Number(it.unit_price_iqd) || 0,
-        line_iqd: Number(it.line_total_iqd) || 0,
-      })),
+      // PRICED LINES ONLY, with a bundle's parts listed under it. The
+      // components carry `unit_price_iqd = 0` by design (the money is on the
+      // parent), so printing them as receipt lines would put four 0 IQD rows
+      // naming the member products on the customer's paper copy (§6.3).
+      lines: (items ?? [])
+        .filter((it) => !it.bundle_parent_item_id)
+        .map((it) => {
+          const kids = (items ?? []).filter(
+            (k) => String(k.bundle_parent_item_id ?? '') === String(it.id)
+          );
+          return {
+            name: String(it.name_snapshot ?? ''),
+            variant: String(it.option_snapshot ?? ''),
+            qty: Number(it.qty) || 0,
+            unit_iqd: Number(it.unit_price_iqd) || 0,
+            line_iqd: Number(it.line_total_iqd) || 0,
+            ...(kids.length
+              ? {
+                  included: kids.map((k) => ({
+                    name: String(k.name_snapshot ?? ''),
+                    variant: String(k.option_snapshot ?? ''),
+                    qty: Number(k.qty) || 0,
+                  })),
+                }
+              : {}),
+          };
+        }),
       // Only the adjustments this order actually carried. A zero row is
       // filtered by the renderer, so an order with no coupon prints no
       // coupon line rather than "coupon: 0".
@@ -1222,7 +1246,11 @@ adminRoutes.get('/labels', async (c) => {
   const counts = new Map<string, number>();
   if (orderIds.length) {
     const { results: rows } = await c.env.DB.prepare(
-      `SELECT order_id, SUM(qty) AS n FROM order_items WHERE order_id IN (${orderIds.map(() => '?').join(',')}) GROUP BY order_id`
+      // A bundle counts ONCE — its component rows are the physical truth behind
+      // it, not four more things on the label (docs/BUNDLES_MYSTERY.md §6.3).
+      `SELECT order_id, SUM(qty) AS n FROM order_items
+        WHERE order_id IN (${orderIds.map(() => '?').join(',')}) AND bundle_parent_item_id IS NULL
+        GROUP BY order_id`
     ).bind(...orderIds).all<{ order_id: string; n: number }>();
     for (const r of rows ?? []) counts.set(String(r.order_id), Number(r.n) || 0);
   }
@@ -1366,8 +1394,12 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
     });
   }
   const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
+  // THE COURIER GETS THE PARENT NAME AND THE PHYSICAL COUNT (§6.3). A courier
+  // is a third party: they carry one box holding one bundle, and listing its
+  // member products would tell them what is inside it — and would double the
+  // count on the waybill.
   const { results: items } = await c.env.DB.prepare(
-    'SELECT name_snapshot, qty FROM order_items WHERE order_id = ?'
+    'SELECT name_snapshot, qty FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL'
   ).bind(id).all<{ name_snapshot: string; qty: number }>();
 
   const res = await driver.createShipment({
@@ -1549,7 +1581,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
       if (again && again.status !== from) throw badRequest('The order changed while you were editing — reload and retry');
       throw e;
     }
-    if (stock.kind !== 'none') stockNote = `Stock ${stock.kind}d for ${stock.plan?.applied ?? 0} row(s).`;
+    stockNote = stockReturnNote(stock.kind, stock.plan?.applied ?? 0);
   } else {
     flipped = (await flipStmt.run()).meta.changes;
   }
@@ -1568,11 +1600,27 @@ adminRoutes.patch('/orders/:id', async (c) => {
   const wasDeducted = STOCK_DEDUCTED_STATES.has(from);
   const nowDeducted = STOCK_DEDUCTED_STATES.has(next);
   if (!wasDeducted && nowDeducted) {
-    const res = await deductOrderStock(c.env.DB, id, adminUser.id);
-    if (res.rejected > 0) {
-      // The status already flipped. Saying so is the honest outcome: the order
-      // IS confirmed, and the stock needs a human.
-      stockNote = `Stock could not be deducted for ${res.rejected} line(s) — check the product's stock before shipping.`;
+    // THE FENCE ABORT IS AN OPERATOR NOTE, NOT A 500 (§3.3).
+    //
+    // `deductOrderStock` runs in its own batch after the status flip has
+    // already committed, and `planOrderDeduction` appends a fence row to it. A
+    // guard that held at plan time but broke at commit — a concurrent
+    // `adjust_out`, a racing cancellation — makes the fence's CHECK abort that
+    // batch, which is correct: nothing partial commits. But the throw used to
+    // escape the route, so the admin saw a generic 500 for a transition that
+    // had in fact succeeded, and a retry took the `wasDeducted` branch and
+    // never attempted the deduction again. The same note the `rejected` branch
+    // produces is the honest answer in both cases: the order IS confirmed, and
+    // the stock needs a human. The un-deducted lines stay findable in one
+    // indexed read — `reserve` ledger rows on this order with no matching
+    // `deduct`.
+    try {
+      const res = await deductOrderStock(c.env.DB, id, adminUser.id);
+      if (res.rejected > 0) {
+        stockNote = `Stock could not be deducted for ${res.rejected} line(s) — check the product's stock before shipping.`;
+      }
+    } catch {
+      stockNote = "Stock could not be deducted for this order — check the product's stock before shipping.";
     }
   }
 

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { cartShippingType, typeForTransport } from '../lib/shippingType';
+import { cartShippingType, typeForTransport, type ShippingType } from '../lib/shippingType';
 import {
   cartSellerScope,
   sellerConflict,
@@ -12,7 +12,7 @@ import {
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, conflict, notFound, int, str, oneOf } from '../lib/http';
+import { requireAuth, badRequest, conflict, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
@@ -55,7 +55,48 @@ import {
   type ResolvedPrice,
   type Tier,
 } from '../lib/pricing';
-import { pricingTierContext } from '../lib/entitlements';
+import { pricingTierContext, type TierStatus } from '../lib/entitlements';
+import { applyOfferToResolved, loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from '../lib/offers';
+import { compositionKey, loadBundleComponents, type BundleComponentRow } from '../lib/bundleComposition';
+import {
+  resolveCompositionLines,
+  compositionMaxQty,
+  type ComponentChoice,
+  type CompositionLineInput,
+  type ResolvedBundle,
+} from '../lib/bundleRead';
+import {
+  applyMysteryToBundles,
+  cartChoiceStatements,
+  cartCompositionBlock,
+  componentFeesIqd,
+  keyInput,
+  loadCartChoices,
+  loadCompositionRows,
+  mysteryFamilyOf,
+  mysteryKeyInput,
+  parseBundleChoices,
+  physicalLines,
+  refuseComposition,
+  refusePhysicalLines,
+  resolveCartMystery,
+  resolveChoiceSet,
+  resolveLineTransport,
+} from '../lib/bundleCart';
+import {
+  mysteryPhysicalLines,
+  refuseMystery,
+  resolveMysteryLines,
+  type MysteryContext,
+} from '../lib/mysteryLine';
+import { activePoolProductIds } from '../lib/mysteryDraw';
+import { randomSeedHex } from '../lib/farm/rng';
+import { bumpMetric, metricStatement } from '../lib/compositionAnalytics';
+
+/** The refusal codes that mean "there is not enough of it", and only those.
+ *  A membership lock or a closed window is not a stock problem and must not
+ *  be counted as one (§12). */
+const OOS_REFUSALS = new Set(['OUT_OF_STOCK', 'QTY_UNAVAILABLE', 'MYSTERY_NO_ELIGIBLE_STOCK', 'BUNDLE_OPTIONAL_UNAVAILABLE']);
 import { supportEligibleProductIds } from '../lib/membershipOps';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { pricedPlans, refuseNonPrinterWarranty } from '../lib/warrantyPlans';
@@ -72,10 +113,14 @@ export const CART_WARRANTY_CONFLICT = 'CART_WARRANTY_CONFLICT';
  * customer's default address: an active PRO whose default address is not the
  * approved one sees the surcharge here exactly as the door will charge it.
  */
-async function cartTier(c: Context<AppContext>): Promise<{ tier: Tier; active: boolean }> {
+async function cartTier(c: Context<AppContext>): Promise<{ tier: Tier; active: boolean; status: TierStatus }> {
   const user = c.get('user')!;
   const ctx = await pricingTierContext(c.env.DB, user.id);
-  return { tier: ctx.tierStatus.tier, active: ctx.pricingTierActive };
+  // The whole TierStatus rides along because `offerEligible` (§9) needs the
+  // tier, whether it is active AND which benefits an admin restriction case
+  // has paused — and `getTierStatus` performs two writes per call, so it is
+  // resolved once per request and passed down, never once per line (§14).
+  return { tier: ctx.tierStatus.tier, active: ctx.pricingTierActive, status: ctx.tierStatus };
 }
 
 /**
@@ -171,8 +216,16 @@ export function resolveCartLine(
   ctx: PricingContext,
   view?: ProductRelationsView,
   preorderPricing: PreorderPricing = 'prepaid',
-  isPrinter = false
-): { doc: ProductDoc; resolved: ResolvedPrice; variantLabel: string; selectionErrors: string[] } {
+  isPrinter = false,
+  /**
+   * A SCHEDULED SPECIAL OFFER ON THIS ORDINARY PRODUCT (§4.6, §9). The card,
+   * this line and the checkout door all price it through the same
+   * `resolveOfferPrice`, so a live window cannot quote one number on the grid
+   * and another in the cart. Eligibility is judged by the caller, which is the
+   * only place that holds the viewer's membership.
+   */
+  offer?: { view: OfferView | null; eligible: boolean; nowMs: number }
+): { doc: ProductDoc; resolved: ResolvedPrice; variantLabel: string; selectionErrors: string[]; offerId: string | null } {
   // Options and colours come from the relational tables when the product has
   // them (migration 0022 gave every existing product its rows), so the cart
   // prices exactly what the storefront showed.
@@ -225,7 +278,21 @@ export function resolveCartLine(
     const col = doc.colors.find((x: { id: string }) => x.id === sel.colorId);
     labels.push(col ? col.name_en || col.name_ar || col.id : sel.colorId);
   }
-  return { doc, resolved, variantLabel: labels.join(' / '), selectionErrors };
+  const withOffer =
+    offer && offer.eligible && (doc.composition ?? '') === ''
+      ? applyOfferToResolved(resolved, offer.view, tier, tierActive, offer.nowMs)
+      : { resolved, offer_id: offer?.view?.window?.id ?? null, source: 'ladder' as const, plus_iqd: null };
+
+  return {
+    doc,
+    resolved: withOffer.resolved,
+    variantLabel: labels.join(' / '),
+    selectionErrors,
+    // The offer this line was priced under, frozen into the order snapshot by
+    // the checkout so "which offer produced this price" is answerable years
+    // later (§12).
+    offerId: withOffer.source === 'offer' ? withOffer.offer_id : null,
+  };
 }
 
 /** Public per-line breakdown — cost fields NEVER cross this boundary. */
@@ -258,7 +325,36 @@ const stripCost = <T extends { cost_iqd: number | null }>(x: T) => {
   return rest;
 };
 
+/** §8.2 row 18 at option-value and colour level: a pool member's per-level
+ *  counters are not published, in the cart any more than in the catalogue. */
+const coarseLevel = <T extends Record<string, unknown>>(x: T, coarse: boolean): T =>
+  coarse ? ({ ...x, stock: null, low_stock_threshold: null } as T) : x;
+
+/**
+ * The selection one cart row carries — and an EMPTY one for a composition row.
+ *
+ * A bundle line stores its `compositionKey` in `option_id` for line identity
+ * (§5.1), and that key is line identity and NOTHING ELSE. Blanking `optionId`
+ * alone is not sufficient: this function returns
+ * `optionValueIds: ids.length ? ids : legacy ? [legacy] : []`, so a composition
+ * row — `option_value_ids = '[]'`, `option_id = 'bx_…'` — would carry
+ * `optionValueIds: ['bx_…']` anyway, `resolveCartLine` would rebuild
+ * `optionId: valueIds[0]` from it, and BOTH `resolveUnitPrice` and
+ * `saleAvailability` would push `OPTION_NOT_FOUND` — the first turning every
+ * bundle checkout into a 400 VALIDATION, the second making
+ * `refuseIncompleteSelection` throw the nonsense "Choose a colour before adding
+ * this item (OPTION_NOT_FOUND)".
+ *
+ * It is decided HERE, from `products.composition`, rather than at each caller:
+ * the one function that derives a selection from a row is the one place that
+ * knows the row is a composition, and `products.composition` rides on every
+ * cart and checkout SELECT (`p.*`) for exactly this purpose.
+ */
 export function selectionFromCartRow(row: Record<string, unknown>): CartSelection {
+  const transportMethod = String(row.transport_method ?? '');
+  if (String(row.composition ?? '') !== '') {
+    return { optionId: '', optionValueIds: [], colorId: '', transportMethod, warrantyPlanId: '' };
+  }
   const stored = safeParse<unknown[]>(String(row.option_value_ids ?? '[]'), []);
   const ids = stored.filter((x): x is string => typeof x === 'string' && !!x);
   const legacy = String(row.option_id ?? '');
@@ -266,8 +362,135 @@ export function selectionFromCartRow(row: Record<string, unknown>): CartSelectio
     optionId: legacy,
     optionValueIds: ids.length ? ids : legacy ? [legacy] : [],
     colorId: String(row.color_id ?? ''),
-    transportMethod: String(row.transport_method ?? ''),
+    transportMethod,
     warrantyPlanId: String(row.warranty_plan_id ?? ''),
+  };
+}
+
+// ----------------------------------------------------------- bundle lines
+
+/**
+ * Every composition line in the cart, resolved against the buyer's OWN stored
+ * choices, in three reads for the whole cart.
+ *
+ * Keyed by `cart_items.id` and not by product id, deliberately: two lines of
+ * one bundle with different colours are two independent answers (§5.1), and a
+ * map keyed by product would price one of them with the other's components.
+ */
+export async function resolveCartBundles(
+  db: D1Database,
+  rows: Record<string, unknown>[],
+  tier: Tier,
+  tierActive: boolean,
+  ctx: PricingContext,
+  status: TierStatus | null,
+  nowMs = Date.now(),
+  /** How the customer pays, when the caller knows. The cart never does — it
+   *  prices every pre-order line as prepaid and lets the checkout quote be the
+   *  authority the moment a payment method is chosen. */
+  preorderPricing: PreorderPricing = 'prepaid'
+): Promise<Map<string, ResolvedBundle>> {
+  if (rows.length === 0) return new Map();
+  const [joined, choices] = await Promise.all([
+    loadCompositionRows(db, rows.map((r) => String(r.id))),
+    loadCartChoices(db, rows.map((r) => String(r.cart_item_id))),
+  ]);
+  const lines: CompositionLineInput[] = [];
+  for (const r of rows) {
+    const row = joined.get(String(r.id));
+    if (row) lines.push({ key: String(r.cart_item_id), row, choices: choices.get(String(r.cart_item_id)) });
+  }
+  return resolveCompositionLines(db, lines, {
+    tier,
+    tierActive,
+    proPolicy: ctx.proPolicy,
+    transportDefaults: ctx.transportDefaults,
+    status,
+    nowMs,
+    preorderPricing,
+  });
+}
+
+/**
+ * ONE MAIN ITEM WITH EXPANDABLE CONTENTS (§5.2, case 10).
+ *
+ * The components live under `composition.components` and are never top-level
+ * `items[]` entries, so the cart's own totals and the coupon merchandise sum
+ * cannot double-count them. The unit price is the bundle's own — merchandise
+ * plus the fees the components' journeys really cost (§2.2) — and every figure
+ * on it is the server's.
+ */
+function compositionCartItem(
+  row: Record<string, unknown>,
+  b: ResolvedBundle,
+  printerIds: Set<string>,
+  mystery?: MysteryContext,
+  /** The customer's own language, for the ONE server-rendered sentence a
+   *  mystery line carries — the reveal milestone in words (§13.3). */
+  lang = 'ar'
+) {
+  const unit = b.pricing.unit_subtotal_iqd + componentFeesIqd(b);
+  const qty = Number(row.qty) || 1;
+  return {
+    id: row.cart_item_id,
+    kind: b.doc.composition === 'mystery' ? 'mystery' : 'bundle',
+    productId: b.doc.id,
+    slug: b.doc.slug,
+    name: b.doc.name_en,
+    name_ar: b.doc.name_ar,
+    name_ku: b.doc.name_ckb,
+    image: b.doc.media[0]?.url ?? '',
+    qty,
+    // Line identity, echoed as it is stored. Nothing derives a selection from
+    // it — `selectionFromCartRow` returns an empty selection for this row.
+    option_id: row.option_id,
+    color_id: '',
+    transport_method: row.transport_method ?? '',
+    warranty_plan_id: '',
+    shipping_method_id: '',
+    selling_type: b.doc.selling_type,
+    variantLabel: '',
+    support_gift_eligible: false,
+    /** True when any COMPONENT is a printer: the note belongs on the line the
+     *  customer sees, and the parent row carries no catalog of its own. */
+    is_printer: b.components.some((k) => k.included && printerIds.has(k.member_product_id)),
+    cod_reprices: false,
+    unit_price_iqd: unit,
+    // The same shape an ordinary line carries — `publicBreakdown`, with the
+    // figures actually charged written over the resolver's. `applied_tier`
+    // stays inside the shared three-value union: the PLUS rung is
+    // offer-scoped and is named on the composition block, never on a field
+    // every other line in the cart also carries (§4.4).
+    breakdown: {
+      ...publicBreakdown(b.pricing.resolved),
+      applied_iqd: b.pricing.applied_iqd,
+      applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
+      regular_iqd: b.pricing.regular_iqd,
+      prime_iqd: b.pricing.prime_iqd,
+      pro_iqd: b.pricing.pro_iqd,
+      unit_subtotal_iqd: unit,
+      price_source: b.pricing.source,
+      errors: b.pricing.errors,
+    },
+    stock: null,
+    composition: cartCompositionBlock(b, mystery, lang),
+    availability: {
+      mode: b.availability.state === 'sold_out' ? 'unavailable' : 'available',
+      reason: b.availability.state === 'sold_out' ? 'OUT_OF_STOCK' : null,
+      state: b.availability.state,
+      scope: 'composition',
+      max_qty: compositionMaxQty(b),
+      shipping_type: b.availability.shipping_type,
+      modes: b.availability.modes,
+    },
+    selection_errors: b.components.flatMap((k) => k.choice_errors),
+    option_value_ids: [],
+    relations: null,
+    options: [],
+    colors: [],
+    warranty_plans: [],
+    preorder_transports: [],
+    shipping_methods: [],
   };
 }
 
@@ -275,7 +498,7 @@ export function selectionFromCartRow(row: Record<string, unknown>): CartSelectio
 
 async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
-  const [{ tier, active: tierActive }, ctx] = await Promise.all([
+  const [{ tier, active: tierActive, status }, ctx] = await Promise.all([
     cartTier(c),
     loadPricingContext(c.env.DB),
   ]);
@@ -292,11 +515,27 @@ async function loadCart(c: Context<AppContext>) {
   // flag. One extra query for the whole cart, never per line, and it feeds
   // no price anywhere.
   const activeIds = results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''));
-  const [eligibleIds, printerIds] = await Promise.all([
+  const [eligibleIds, printerIds, poolMemberIds] = await Promise.all([
     supportEligibleProductIds(c.env.DB, activeIds),
     // Which lines are printers (owner's catalog flag), so the cart can show
     // the home-delivery note beside them. Informational — never a price.
     printerProductIds(c.env.DB, activeIds),
+    /**
+     * §8.2 ROW 18 IS A PUBLICATION RULE, NOT A CATALOGUE-ROUTE RULE.
+     *
+     * `coarseStock` was threaded only through `worker/routes/products.ts`,
+     * while `GET /api/cart` reads the same four stock tables and published
+     * `stock: 9` and `availability.stock.available: 9` for a pool member. Since
+     * `reserve` bumps `stock_reserved` inside the order's own batch, a buyer
+     * could snapshot the candidates through their own cart before and after
+     * checkout and read the drawn product AND the spool count off the delta —
+     * defeating every milestone including 'paid', the one §17 decision 10
+     * promises is deliverable even if coarse counts are rejected.
+     *
+     * One indexed read for the whole cart (`idx_mystery_entries_product`),
+     * resolved once and passed down beside the tier context (§14).
+     */
+    activePoolProductIds(c.env.DB, activeIds),
   ]);
 
   // One batched read of every product's relational structure — never N+1.
@@ -305,12 +544,56 @@ async function loadCart(c: Context<AppContext>) {
     results.filter((r) => r.status === 'active').map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
   );
 
+  // THE COMPOSITION LINES, RESOLVED IN ONE PASS FOR THE WHOLE CART (§5.2).
+  // The bundle rows are re-read with `bundle_config` and `offer_windows`
+  // joined on, their stored choices come back in one chunked query, and the
+  // resolution runs through the SAME functions the card, the detail page and
+  // the door use — so no screen can quote a different price or a different
+  // state from another. A cart with no bundle in it costs nothing extra.
+  const compositionRows = results.filter((r) => r.status === 'active' && String(r.composition ?? '') !== '');
+  const resolvedBundles = await resolveCartBundles(c.env.DB, compositionRows, tier, tierActive, ctx, status);
+  // THE MYSTERY PRE-PASS (§7): one candidate query per pool for the whole
+  // cart, and the pool's verdict written over each mystery line's (empty)
+  // component availability.
+  const mysteryCtxs = await resolveCartMystery(c.env.DB, compositionRows, resolvedBundles);
+  // Scheduled special offers on the ORDINARY lines — one chunked read for the
+  // whole cart. The same `offer_windows` row a bundle uses, on the same
+  // subject key, resolved by the same function the card and the door use.
+  const lineOffers = await loadOffers(
+    c.env.DB,
+    results.filter((r) => r.status === 'active' && String(r.composition ?? '') === '').map((r) => subjectOf(String(r.id)))
+  );
+  const nowMs = Date.now();
+  // A bundle's printers are its COMPONENTS' — the parent row is never in a
+  // printer catalog itself — so the home-delivery note fires for a printer
+  // bought inside a bundle exactly as it does for one bought alone. One extra
+  // query, and only when the cart actually holds a composition line.
+  const bundlePrinterIds = resolvedBundles.size
+    ? await printerProductIds(
+        c.env.DB,
+        [...resolvedBundles.values()].flatMap((b) => b.components.map((k) => k.member_product_id))
+      )
+    : new Set<string>();
+
   const items = [];
   for (const row of results) {
     if (row.status !== 'active') continue; // hidden products drop out of the cart view
+    const composition = String(row.composition ?? '');
+    if (composition !== '') {
+      const b = resolvedBundles.get(String(row.cart_item_id));
+      if (!b) continue; // the composition rows vanished under us; nothing honest to render
+      items.push(
+        compositionCartItem(row, b, bundlePrinterIds, mysteryCtxs.get(String(row.cart_item_id)), user.locale ?? 'ar')
+      );
+      continue;
+    }
     const view = views.get(String(row.id));
     const sel = selectionFromCartRow(row);
     const isPrinter = printerIds.has(String(row.id ?? ''));
+    const coarseStock = poolMemberIds.has(String(row.id ?? ''));
+    const offerView = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
+    const offerCheck = offerEligible(status, offerView, nowMs);
+    const offerInput = { view: offerView, eligible: offerCheck.ok, nowMs };
     const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
       row,
       sel,
@@ -319,13 +602,14 @@ async function loadCart(c: Context<AppContext>) {
       ctx,
       view,
       'prepaid',
-      isPrinter
+      isPrinter,
+      offerInput
     );
     // Would cash on delivery change THIS line's price? Only when the product
     // carries a direct premium this customer pays — the same rule the checkout
     // applies — so the cart explains the cash rule only where it bites.
     const codReprices = sel.transportMethod
-      ? resolveCartLine(row, sel, tier, tierActive, ctx, view, 'cod', isPrinter).resolved.unit_subtotal_iqd !==
+      ? resolveCartLine(row, sel, tier, tierActive, ctx, view, 'cod', isPrinter, offerInput).resolved.unit_subtotal_iqd !==
         resolved.unit_subtotal_iqd
       : false;
     // What this exact line can actually be sold as, from the authoritative
@@ -334,6 +618,7 @@ async function loadCart(c: Context<AppContext>) {
       optionValueIds: sel.optionValueIds ?? [],
       colorId: sel.colorId || null,
       qty: Number(row.qty) || 1,
+      coarseStock,
       transportDefaults: ctx.transportDefaults,
       inventory: view
         ? snapshotFrom(view, {
@@ -376,14 +661,16 @@ async function loadCart(c: Context<AppContext>) {
       unit_price_iqd: resolved.unit_subtotal_iqd,
       breakdown: publicBreakdown(resolved),
       // Legacy field: the base row. `availability.stock` is the authoritative
-      // figure for THIS selection.
-      stock: row.stock,
+      // figure for THIS selection. Null for a mystery-pool member — the cart
+      // is a customer payload like any other (§8.2 row 18).
+      stock: coarseStock ? null : row.stock,
+      low_stock_threshold: coarseStock ? null : ((row.low_stock_threshold as number | null) ?? null),
       availability,
       selection_errors: selectionErrors,
       option_value_ids: sel.optionValueIds ?? [],
-      relations: publicRelations(view ?? EMPTY_RELATIONS),
-      options: doc.options.filter((o) => o.active).map(stripCost),
-      colors: doc.colors.filter((col) => col.active).map(stripCost),
+      relations: publicRelations(view ?? EMPTY_RELATIONS, coarseStock),
+      options: doc.options.filter((o) => o.active).map(stripCost).map((o) => coarseLevel(o, coarseStock)),
+      colors: doc.colors.filter((col) => col.active).map(stripCost).map((col) => coarseLevel(col, coarseStock)),
       // The extended-warranty options for THIS line, each with its fee already
       // resolved against the line's regular price (a percent plan) and the
       // total it yields — what the cart's "Extended Warranty" disclosure
@@ -465,9 +752,240 @@ cartRoutes.get('/', async (c) => {
   return c.json({ success: true, items, tier, tierActive, shipping_type: shippingType });
 });
 
+/**
+ * ONE SHIPPING TYPE PER CART, and ONE SELLER PER CART — the two rules every
+ * add path obeys, held in one function so a bundle line cannot slip past
+ * either of them.
+ *
+ * Direct, air, sea and land are four different journeys with four different
+ * timelines and four different tracking paths, and a basket holding two of
+ * them has no honest delivery date to show. The first item decides; a mismatch
+ * is refused with both types named, so the client can offer the only two real
+ * ways out (empty the cart and start this type, or keep what is there).
+ *
+ * `replaceCart: true` is that first choice arriving as one request: the caller
+ * has already confirmed, and doing it in a single call means a cart can never
+ * be left emptied with nothing added because the second request failed.
+ */
+async function enforceCartScope(
+  c: Context<AppContext>,
+  incomingType: ShippingType,
+  replaceCart: boolean
+): Promise<void> {
+  const user = c.get('user')!;
+  const { results: existingLines } = await c.env.DB
+    .prepare('SELECT transport_method, seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
+    .bind(user.id)
+    .all<{ transport_method: string; seller_type: string; merchant_id: string | null; store_id: string | null }>();
+  const currentType = cartShippingType(existingLines);
+
+  // This is a Levonis product; if the cart is currently a merchant's, the two
+  // cannot settle as one order — different fulfilment, different commission,
+  // different party responsible. Refused the same way whether or not the
+  // client showed the customer a dialogue first.
+  const sellerClash = sellerConflict(existingLines as SellerLine[], PLATFORM_SCOPE);
+  if (sellerClash && !replaceCart) {
+    const shop = sellerClash.current.merchant_id
+      ? await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
+          .bind(sellerClash.current.merchant_id)
+          .first<{ name: string }>()
+      : null;
+    throw badRequest(
+      'Your cart holds items from another store. Empty it to shop from LEVONIS.',
+      CART_SELLER_CONFLICT,
+      conflictDetails(sellerClash, { current: shop?.name ?? null, incoming: 'LEVONIS' })
+    );
+  }
+  if (sellerClash && replaceCart) {
+    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+    return;
+  }
+
+  if (currentType !== null && currentType !== incomingType) {
+    if (!replaceCart) {
+      throw badRequest(
+        'Your cart holds items with a different shipping type. It must be emptied to add this one.',
+        'CART_SHIPPING_CONFLICT',
+        { cart_shipping_type: currentType, incoming_shipping_type: incomingType }
+      );
+    }
+    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+  }
+}
+
 function parseTransportMethod(v: unknown): string {
   if (v === undefined || v === null || v === '') return '';
   return oneOf(v, 'transportMethod', ['air', 'sea', 'land'] as const);
+}
+
+/**
+ * ADD ONE BUNDLE LINE (§5.1, §5.2, §6.1).
+ *
+ * The client sends the bundle's product id, a quantity, a transport method for
+ * a pre-order bundle and — only where the admin allows a choice — a
+ * `bundleChoices[]` array of ids. A price, a component total, a saving, a
+ * discount, a stock number, a membership flag, a composition key, the component
+ * LIST, a pool, a weight or a drawn item in that body is IGNORED: none of them
+ * is read here, and the server owns every one of them.
+ *
+ * The line is an ORDINARY `cart_items` row whose `option_id` carries the
+ * server-computed `compositionKey`, so the partial unique index
+ * `idx_cart_levonis_line` and the `ON CONFLICT(...)` upsert are untouched — the
+ * exact operation migrations/0032_cart_line_identity.sql exists because of.
+ * Two bundles with different colours are two lines; two with identical choices
+ * merge into one line at qty 2.
+ *
+ * The upsert and the `cart_bundle_choices` rows go in ONE batch, so a line can
+ * never exist without the composition that explains it.
+ */
+async function addCompositionLine(
+  c: Context<AppContext>,
+  product: Record<string, unknown>,
+  qty: number,
+  transportMethod: string,
+  body: Record<string, unknown>
+) {
+  const user = c.get('user')!;
+  const productId = String(product.id);
+  const label = String(product.name_ar || product.name || productId);
+
+  const isMystery = String(product.composition) === 'mystery';
+
+  /**
+   * §7.5 AND §15.1 RULE 9: THE COMPOSITION DOORS ARE RATE-LIMITED PER USER.
+   *
+   * Both sections record the residual enumeration risk as an ACCEPTED BOUND on
+   * the basis that this limiter exists — and it did not. `POST /api/cart/items`
+   * and `PATCH /api/cart/items/:id` were unlimited, and removing a mystery line
+   * and re-adding it writes a fresh `randomSeedHex()` and therefore a fresh
+   * draw. On its own that is harmless; combined with any availability oracle it
+   * turned a deterministic seed into a free, unbounded grinder for a favourable
+   * roll, which is exactly the property §7.3 says the seed alone cannot
+   * protect. The bound is the one the contract names, under the name it names.
+   */
+  await rateLimit(c, 'composition_quote', 60, 300);
+
+  const [{ tier, active: tierActive, status }, ctx, loaded] = await Promise.all([
+    cartTier(c),
+    loadPricingContext(c.env.DB),
+    loadBundleComponents(c.env.DB, [productId]),
+  ]);
+  const components: BundleComponentRow[] = loaded.byBundle.get(productId) ?? [];
+  // A MYSTERY offer has no components by design — its contents are drawn, not
+  // composed — so the empty list is a fault only for a bundle.
+  if (components.length === 0 && !isMystery) {
+    throw badRequest(`"${label}" is not available right now`, 'OFFER_INACTIVE');
+  }
+
+  // The complete choice set — the admin's pins plus the customer's picks,
+  // refused rather than guessed at where one is missing or not permitted. A
+  // mystery line has nothing to choose: `bundleChoices` on it is ignored, not
+  // echoed (§5.2).
+  const choices = isMystery
+    ? new Map<string, ComponentChoice>()
+    : resolveChoiceSet(components, parseBundleChoices(body.bundleChoices), label);
+
+  const joined = await loadCompositionRows(c.env.DB, [productId]);
+  const row = joined.get(productId);
+  if (!row) throw notFound('Product not found or unavailable');
+  const resolvedMap = await resolveCompositionLines(
+    c.env.DB,
+    [{ key: productId, row, choices }],
+    { tier, tierActive, proPolicy: ctx.proPolicy, transportDefaults: ctx.transportDefaults, status, nowMs: Date.now() }
+  );
+
+  // THE MYSTERY PRE-PASS (§7). The pool's verdict replaces the (empty)
+  // component list's, so the ONE availability every screen reads is the
+  // eligible pool's — the same function the admin preview uses.
+  let mysteryCtx: MysteryContext | null = null;
+  let familyId = '';
+  if (isMystery) {
+    const ctxs = await resolveMysteryLines(
+      c.env.DB,
+      [
+        {
+          key: productId,
+          bundle: resolvedMap.get(productId)!,
+          familyId: str(body.mysteryFamilyId, 'mysteryFamilyId', { max: 60, required: false }),
+          transportMethod,
+          requestedMode: typeof body.mysteryMode === 'string' ? body.mysteryMode : null,
+        },
+      ],
+      Date.now()
+    );
+    applyMysteryToBundles(ctxs, resolvedMap);
+    mysteryCtx = ctxs.get(productId) ?? null;
+    familyId = mysteryCtx?.family_id ?? '';
+  }
+  const b = resolvedMap.get(productId)!;
+
+  // THE DOOR. Everything §6.1 lists, on the server's own resolution: the
+  // offer, the schedule, the tier, the price floor, the choices, the shipping
+  // type, an opted-in optional component, the per-order cap and the stock.
+  const method = isMystery
+    ? mysteryCtx?.mode === 'preorder'
+      ? transportMethod || 'air'
+      : ''
+    : resolveLineTransport(b, transportMethod, label);
+  try {
+    if (mysteryCtx) refuseMystery(mysteryCtx, label);
+    refuseComposition(b, qty, label, isMystery ? {} : { transportMethod: method });
+    refusePhysicalLines(mysteryCtx ? mysteryPhysicalLines(mysteryCtx, qty) : physicalLines(b, qty));
+  } catch (e) {
+    // §12's `oos_blocks`: the one fact no table records — that availability
+    // refused a purchase. Counted only for a genuine availability refusal, so
+    // a membership lock or a schedule does not inflate a stock figure, and
+    // never allowed to change the refusal the customer receives.
+    if (e instanceof HttpError && OOS_REFUSALS.has(e.code ?? '')) {
+      await bumpMetric(c.env.DB, productId, 'oos_blocks');
+    }
+    throw e;
+  }
+
+  await enforceCartScope(c, typeForTransport(method), body.replaceCart === true);
+
+  const key = compositionKey(isMystery ? mysteryKeyInput(familyId) : keyInput(choices));
+
+  // A MERGE IS AN ADD, AND THE CAP APPLIES TO WHAT THE LINE WILL HOLD. Two
+  // adds of the same bundle land on one line (identical choices ⇒ identical
+  // key), so the cap is judged against the merged quantity and refused with
+  // the number — never clamped afterwards, which would silently rewrite the
+  // one number the customer is touching.
+  const merged = await c.env.DB
+    .prepare(
+      `SELECT id, qty FROM cart_items
+        WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = '' AND shipping_method_id = ''`
+    )
+    .bind(user.id, productId, key)
+    .first<{ id: string; qty: number }>();
+  if (merged) refuseComposition(b, (Number(merged.qty) || 0) + qty, label);
+
+  const lineId = newId('ci');
+  // `draw_salt` is written by the SERVER when a mystery line is created and
+  // rewritten never (§1.5): it is the only variable input to the draw seed, and
+  // it exists so that no value the client chooses — least of all the checkout
+  // idempotency key — can be ground for a favourable roll.
+  const salt = isMystery ? randomSeedHex() : '';
+  const addMetric = metricStatement(c.env.DB, productId, 'adds');
+
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                               shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
+       VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?, ?)
+       ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+         WHERE product_id IS NOT NULL
+       DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+                     transport_method = excluded.transport_method`
+    ).bind(lineId, user.id, productId, key, JSON.stringify(familyId ? [familyId] : []), method, qty, salt),
+    ...cartChoiceStatements(c.env.DB, user.id, productId, key, choices),
+    // §12's `adds`, in the SAME batch as the line it counts — so a counted add
+    // is an add that happened, and a tap costs no extra round trip.
+    ...(addMetric ? [addMetric] : []),
+  ]);
+
+  const { items, tier: t, tierActive: ta } = await loadCart(c);
+  return c.json({ success: true, items, tier: t, tierActive: ta });
 }
 
 cartRoutes.post('/items', async (c) => {
@@ -494,16 +1012,39 @@ cartRoutes.post('/items', async (c) => {
     .first<Record<string, unknown>>();
   if (!product) throw notFound('Product not found or unavailable');
 
-  const [{ tier, active: tierActive }, ctx, views, isPrinter] = await Promise.all([
+  // A COMPOSITION ROW TAKES ITS OWN DOOR (§5). It has no options, no colours,
+  // no warranty plan and no stock of its own, so none of the ordinary
+  // resolution below applies to it — and every figure it needs comes from the
+  // same resolution pass the card and the detail page ran.
+  if (String(product.composition ?? '') !== '') {
+    return await addCompositionLine(c, product, qty, transportMethod, body);
+  }
+
+  const [{ tier, active: tierActive, status: addStatus }, ctx, views, isPrinter, addOffers] = await Promise.all([
     cartTier(c),
     loadPricingContext(c.env.DB),
     loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
     // The owner's catalog flag decides whether an extended warranty may ride
     // on this line at all — "this system applies to printers only".
     warrantyPlanId ? isPrinterProduct(c.env.DB, productId) : Promise.resolve(false),
+    loadOffers(c.env.DB, [subjectOf(productId)]),
   ]);
   refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
   const view = views.get(productId);
+  // ADD-TO-CART RE-CHECKS THE OFFER INDEPENDENTLY (§15.1 rule 6). A window
+  // that ended, was switched off or gates a tier this buyer does not hold
+  // refuses here rather than letting the line sit in a cart the checkout will
+  // reject with a different sentence.
+  const addNow = Date.now();
+  const addOfferView = addOffers.get(offerKey(subjectOf(productId))) ?? null;
+  const addOfferCheck = offerEligible(addStatus, addOfferView, addNow);
+  // Only a LIVE window can refuse: an ordinary product outlives its
+  // promotions, and an expired one must not make it permanently unbuyable.
+  if (addOfferView?.window && !addOfferCheck.ok && addOfferCheck.reason === 'MEMBERSHIP_REQUIRED') {
+    throw new HttpError(403, `"${String(product.name_ar || product.name)}" is available to members only`, 'MEMBERSHIP_REQUIRED', {
+      required_tiers: addOfferCheck.required_tiers,
+    });
+  }
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
     { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
@@ -512,8 +1053,12 @@ cartRoutes.post('/items', async (c) => {
     ctx,
     view,
     'prepaid',
-    isPrinter
+    isPrinter,
+    { view: addOfferView, eligible: addOfferCheck.ok, nowMs: addNow }
   );
+  if (offerPriceRefusal(resolved.errors)) {
+    throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
+  }
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
@@ -524,10 +1069,19 @@ cartRoutes.post('/items', async (c) => {
 
   // Stock comes from the authoritative level for THIS selection — an
   // exhausted colour blocks the add even when the base row is full.
+  //
+  // AND IT IS COARSE FOR A MYSTERY-POOL MEMBER (§8.2 row 18). The refusals
+  // below quote `availability.stock.available`, so an add-to-cart of qty 99
+  // was an oracle on its own: "Only 7 left" for one candidate and "Only 9
+  // left" for the rest names the drawn colour without buying anything. The
+  // coarse branch returns `available: null`, so both refusals take their
+  // existing count-free path with no new branch.
+  const coarseStock = (await activePoolProductIds(c.env.DB, [String(product.id)])).size > 0;
   const availability = saleAvailability(doc, {
     optionValueIds,
     colorId: colorId || null,
     qty,
+    coarseStock,
     transportDefaults: ctx.transportDefaults,
     inventory: view
       ? snapshotFrom(view, {
@@ -563,59 +1117,10 @@ cartRoutes.post('/items', async (c) => {
     );
   }
 
-  // ONE SHIPPING TYPE PER CART, checked before anything is written.
-  //
-  // Direct, air, sea and land are four different journeys with four different
-  // timelines and four different tracking paths — a basket holding two of them
-  // has no honest delivery date to show. The first item decides; a mismatch is
-  // refused with both types named, so the client can offer the only two real
-  // ways out (empty the cart and start this type, or keep what is there).
-  //
-  // `replaceCart: true` is that first choice arriving as one request: the
-  // caller has already confirmed, and doing it in a single call means a cart
-  // can never be left emptied with nothing added because the second request
-  // failed.
-  const incomingType = typeForTransport(transportMethod);
-  const { results: existingLines } = await c.env.DB
-    .prepare('SELECT transport_method, seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
-    .bind(user.id)
-    .all<{ transport_method: string; seller_type: string; merchant_id: string | null; store_id: string | null }>();
-  const currentType = cartShippingType(existingLines);
-  const replaceCart = body.replaceCart === true;
-
-  // ONE SELLER PER CART (§14). This is a Levonis product; if the cart is
-  // currently a merchant's, the two cannot settle as one order — different
-  // fulfilment, different commission, different party responsible. Checked
-  // before any pricing work, and refused the same way whether or not the
-  // client showed the customer a dialogue first.
-  const sellerClash = sellerConflict(existingLines as SellerLine[], PLATFORM_SCOPE);
-  if (sellerClash && !replaceCart) {
-    const shop = sellerClash.current.merchant_id
-      ? await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
-          .bind(sellerClash.current.merchant_id)
-          .first<{ name: string }>()
-      : null;
-    throw badRequest(
-      'Your cart holds items from another store. Empty it to shop from LEVONIS.',
-      CART_SELLER_CONFLICT,
-      conflictDetails(sellerClash, { current: shop?.name ?? null, incoming: 'LEVONIS' })
-    );
-  }
-  if (sellerClash && replaceCart) {
-    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
-    existingLines.length = 0;
-  }
-
-  if (currentType !== null && currentType !== incomingType) {
-    if (!replaceCart) {
-      throw badRequest(
-        'Your cart holds items with a different shipping type. It must be emptied to add this one.',
-        'CART_SHIPPING_CONFLICT',
-        { cart_shipping_type: currentType, incoming_shipping_type: incomingType }
-      );
-    }
-    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
-  }
+  // ONE SHIPPING TYPE PER CART and ONE SELLER PER CART, checked before
+  // anything is written — the same two rules, in the same function, for an
+  // ordinary product and for a bundle.
+  await enforceCartScope(c, typeForTransport(transportMethod), body.replaceCart === true);
 
   // shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
   // pricing is entirely resolver-driven now.
@@ -695,6 +1200,139 @@ cartRoutes.post('/items', async (c) => {
   return c.json({ success: true, items, tier: t, tierActive: ta });
 });
 
+/**
+ * EDIT ONE BUNDLE LINE — a quantity, or a different set of choices (§10).
+ *
+ * A quantity above `min(max_bundles, max_qty_per_order, 99)` is REFUSED with
+ * `BUNDLE_QTY_LIMIT` naming the number, never silently clamped: the cart
+ * already refuses a quantity rather than rewriting the one number the customer
+ * is touching, and the composition availability exposes `max_qty` so the
+ * stepper disables at the limit before they get there.
+ *
+ * A CHOICE EDIT RECOMPUTES THE LINE IDENTITY, which may merge this line into
+ * another one that already holds the same choices — and the response says so
+ * (`merged_into`), rather than leaving the customer with two lines they cannot
+ * tell apart or one that silently swallowed the other.
+ */
+async function patchCompositionLine(
+  c: Context<AppContext>,
+  existing: Record<string, unknown>,
+  product: Record<string, unknown>,
+  body: Record<string, unknown>
+) {
+  const user = c.get('user')!;
+  const id = String(existing.id);
+  const productId = String(product.id);
+  const label = String(product.name_ar || product.name || productId);
+  const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: 99 }) : Number(existing.qty) || 1;
+
+  // §7.5 / §15.1 rule 9 — the same per-user bound as the add and the quote.
+  await rateLimit(c, 'composition_quote', 60, 300);
+
+  const [{ tier, active: tierActive, status }, ctx, loaded, storedChoices] = await Promise.all([
+    cartTier(c),
+    loadPricingContext(c.env.DB),
+    loadBundleComponents(c.env.DB, [productId]),
+    loadCartChoices(c.env.DB, [id]),
+  ]);
+  const isMystery = String(product.composition) === 'mystery';
+  const components: BundleComponentRow[] = loaded.byBundle.get(productId) ?? [];
+  if (components.length === 0 && !isMystery) throw badRequest(`"${label}" is not available right now`, 'OFFER_INACTIVE');
+
+  // An edit that names no choices keeps the ones the line already holds; one
+  // that names them is re-validated from scratch against the admin's rows.
+  // A mystery line has nothing to edit but its quantity.
+  const editing = !isMystery && body.bundleChoices !== undefined;
+  const choices = isMystery
+    ? new Map<string, ComponentChoice>()
+    : editing
+      ? resolveChoiceSet(components, parseBundleChoices(body.bundleChoices), label)
+      : restoreChoiceSet(components, storedChoices.get(id));
+
+  const joined = await loadCompositionRows(c.env.DB, [productId]);
+  const row = joined.get(productId);
+  if (!row) throw notFound('Cart item not found');
+  const resolvedMap = await resolveCompositionLines(
+    c.env.DB,
+    [{ key: productId, row, choices }],
+    { tier, tierActive, proPolicy: ctx.proPolicy, transportDefaults: ctx.transportDefaults, status, nowMs: Date.now() }
+  );
+  const method = String(existing.transport_method ?? '');
+  let mysteryCtx: MysteryContext | null = null;
+  if (isMystery) {
+    const ctxs = await resolveMysteryLines(
+      c.env.DB,
+      [{ key: productId, bundle: resolvedMap.get(productId)!, familyId: mysteryFamilyOf(existing), transportMethod: method }],
+      Date.now()
+    );
+    applyMysteryToBundles(ctxs, resolvedMap);
+    mysteryCtx = ctxs.get(productId) ?? null;
+  }
+  const b = resolvedMap.get(productId)!;
+  if (mysteryCtx) refuseMystery(mysteryCtx, label);
+  refuseComposition(b, qty, label, isMystery ? {} : { transportMethod: method });
+  refusePhysicalLines(mysteryCtx ? mysteryPhysicalLines(mysteryCtx, qty) : physicalLines(b, qty));
+
+  const key = isMystery
+    ? compositionKey(mysteryKeyInput(mysteryFamilyOf(existing)))
+    : compositionKey(keyInput(choices));
+  const currentKey = String(existing.option_id ?? '');
+  let mergedInto: string | null = null;
+  if (key !== currentKey) {
+    const twin = await c.env.DB
+      .prepare(
+        `SELECT id, qty FROM cart_items
+          WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = '' AND shipping_method_id = '' AND id <> ?`
+      )
+      .bind(user.id, productId, key, id)
+      .first<{ id: string; qty: number }>();
+    if (twin) {
+      // The same bundle with the same choices is the same line. The two are
+      // merged rather than left as two rows that render identically, and the
+      // merged quantity is judged against the cap like any other add.
+      const total = Math.min(99, (Number(twin.qty) || 0) + qty);
+      refuseComposition(b, total, label);
+      mergedInto = twin.id;
+      await c.env.DB.batch([
+        c.env.DB.prepare('UPDATE cart_items SET qty = ? WHERE id = ? AND user_id = ?').bind(total, twin.id, user.id),
+        c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?').bind(id, user.id),
+        ...cartChoiceStatements(c.env.DB, user.id, productId, key, choices),
+      ]);
+      const cart = await loadCart(c);
+      return c.json({ success: true, items: cart.items, tier: cart.tier, tierActive: cart.tierActive, merged_into: mergedInto });
+    }
+  }
+
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE cart_items SET qty = ?, option_id = ? WHERE id = ? AND user_id = ?').bind(qty, key, id, user.id),
+    ...cartChoiceStatements(c.env.DB, user.id, productId, key, choices),
+  ]);
+
+  const { items, tier: t, tierActive: ta } = await loadCart(c);
+  return c.json({ success: true, items, tier: t, tierActive: ta });
+}
+
+/** The stored choices, re-checked against the components as they are TODAY. A
+ *  component the admin pinned or removed since the line was written makes the
+ *  stored row illegal, and it is refused by name rather than carried on. */
+function restoreChoiceSet(
+  components: BundleComponentRow[],
+  stored: Map<string, ComponentChoice> | undefined
+): Map<string, ComponentChoice> {
+  const submitted = components
+    .filter((c) => c.customer_picks_option || c.customer_picks_color || c.optional)
+    .map((c) => {
+      const ch = stored?.get(c.id);
+      return {
+        componentId: c.id,
+        optionValueIds: c.customer_picks_option ? (ch?.option_value_ids ?? []) : [],
+        colorId: c.customer_picks_color ? (ch?.color_id ?? '') : '',
+        included: ch ? ch.included : true,
+      };
+    });
+  return resolveChoiceSet(components, submitted, '');
+}
+
 cartRoutes.patch('/items/:id', async (c) => {
   const user = c.get('user')!;
   const id = c.req.param('id');
@@ -704,6 +1342,13 @@ cartRoutes.patch('/items/:id', async (c) => {
     .bind(id, user.id)
     .first<Record<string, unknown>>();
   if (!existing) throw notFound('Cart item not found');
+
+  const lineProduct = await c.env.DB.prepare('SELECT id, name, name_ar, composition FROM products WHERE id = ?')
+    .bind(existing.product_id)
+    .first<Record<string, unknown>>();
+  if (lineProduct && String(lineProduct.composition ?? '') !== '') {
+    return await patchCompositionLine(c, existing, lineProduct, body);
+  }
 
   const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: 99 }) : (existing.qty as number);
   const optionId =
@@ -778,6 +1423,9 @@ cartRoutes.patch('/items/:id', async (c) => {
     'prepaid',
     isPrinter
   );
+  if (offerPriceRefusal(resolved.errors)) {
+    throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
+  }
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
@@ -785,10 +1433,14 @@ cartRoutes.patch('/items/:id', async (c) => {
     throw badRequest(`Invalid selection: ${selectionErrors.join(', ')}`, 'VALIDATION');
   }
 
+  // §8.2 row 18, on the PATCH door as well: "Only N left" from a qty bump is
+  // the same oracle the add path carried.
+  const coarseStock = (await activePoolProductIds(c.env.DB, [String(existing.product_id)])).size > 0;
   const availability = saleAvailability(doc, {
     optionValueIds,
     colorId: colorId || null,
     qty,
+    coarseStock,
     transportDefaults: ctx.transportDefaults,
     inventory: view
       ? snapshotFrom(view, {

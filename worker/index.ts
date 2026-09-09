@@ -48,7 +48,20 @@ import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
 import { communityFavoriteRoutes } from './routes/communityFavorites';
 import { adminCommunityRoutes } from './routes/adminCommunity';
-import { bundlesRoutes, adminBundlesRoutes } from './routes/bundles';
+import { bundlesRoutes } from './routes/bundles';
+// The bundles PANEL is its own router (docs/BUNDLES_MYSTERY.md §11): a bundle
+// is a `products` row now, so the admin side rides productPersistence rather
+// than the legacy `bundles` table the public route still reads.
+import { adminBundlesRoutes } from './routes/adminBundles';
+// The mystery panel is its OWN router with its OWN `.use('*', requireAdmin)`
+// (docs/BUNDLES_MYSTERY.md §10): requireMainHost below is a HOST check and
+// never a role check, so a mount without that guard would expose pool weights
+// and the eligible-stock preview to any signed-in customer.
+import { adminMysteryRoutes } from './routes/mystery';
+// The special-offers panel and the composition analytics screens, each its own
+// router with its own `.use('*', requireAdmin)` for the same reason.
+import { adminOffersRoutes } from './routes/offers';
+import { adminCompositionAnalyticsRoutes } from './routes/bundles';
 import { farmRoutes } from './routes/farm';
 import { farmAdminRoutes } from './routes/farmAdmin';
 import { configureEventBus } from './lib/eventBus';
@@ -122,6 +135,9 @@ app.route('/api/products', productRoutes);
 // nothing there can ever shadow it. Same for its admin CRUD below.
 app.route('/api/bundles', bundlesRoutes);
 app.route('/api/admin/bundles', adminBundlesRoutes);
+app.route('/api/admin/mystery', adminMysteryRoutes);
+app.route('/api/admin/offers', adminOffersRoutes);
+app.route('/api/admin/analytics', adminCompositionAnalyticsRoutes);
 app.route('/api/home', homeRoutes);
 app.route('/api/cart', cartRoutes);
 app.route('/api/orders', orderRoutes);

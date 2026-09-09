@@ -1,290 +1,265 @@
 /**
- * Bundles — admin-composed groups of catalog products, a members-only
- * section (owner's mandate: «اعداد واضافه منفصله حيث يختار مجموعه من منتجات
- * الموقع ويضعها في بندل واحد … وهذه الميزه تظهر لمشتركين فقط البلس
- * والبريميوم والبرو»).
+ * BUNDLES AND MYSTERY OFFERS — the public read path.
+ * docs/BUNDLES_MYSTERY.md §9 (eligibility), §10 (API), §13 (storefront),
+ * §14 (payloads and caching).
  *
- * Model decisions, deliberate:
- *  - A bundle has NO price of its own. Its storefront total is the LIVE sum
- *    of its members' tier-resolved display prices (the same resolver that
- *    prices checkout), so what the section advertises can never drift from
- *    what the cart actually charges. A stored bundle price would be a second
- *    source of truth that goes stale the day one member's price changes.
- *  - Visibility is enforced HERE, server-side, through the exclusiveSections
- *    entitlement (PLUS + PRIME + PRO, honouring support-restriction gates) —
- *    not by hiding a link in the client. A non-member gets `entitled: false`
- *    and an EMPTY list (200, not 403) so the page can render its lock state
- *    without an error path.
- *  - Admin CRUD replaces the whole item set on every save — the form always
- *    posts what it shows, so there is no partial-update drift.
+ * A bundle is a `products` row carrying `composition <> ''`. It has no stock
+ * of its own (its availability is the scarcest component, computed live) and,
+ * in the two derived price modes, no price of its own either. Everything this
+ * file serves therefore comes out of ONE resolution pass
+ * (`worker/lib/bundleRead.ts`) that the cart, the quote and the checkout will
+ * run too — so the card, the detail page and the door cannot quote different
+ * numbers.
+ *
+ * FOUR THINGS THIS FILE IS RESPONSIBLE FOR, AND EACH OF THEM IS A HAZARD IF
+ * IT IS NOT HELD HERE.
+ *
+ * 1. THE RESPONSE KEYS OF MIGRATION 0034 SURVIVE: `{ entitled, signed_in,
+ *    bundles[] }`. A client deployed before this feature keeps working, and
+ *    `entitled` keeps its old meaning — "this viewer holds a paid membership"
+ *    — so the page's lock panel and its subscribe path are unchanged. What
+ *    changed is that the list is no longer EMPTY for a non-member: gating is
+ *    now per offer (§9), and an ungated bundle is public, guests included.
+ *
+ * 2. A LOCKED CARD IS A 200 WITH AN ALLOW-LIST, NEVER A 403 AND NEVER A PRICE
+ *    THE CALLER CANNOT PAY. `worker/lib/bundleRead.ts` BUILDS the locked
+ *    payload from a fixed short list of keys rather than deleting fields from
+ *    a full one, because deletion is how the next field added to the card
+ *    leaks.
+ *
+ * 3. NO INVENTORY AND NO POOL DEFINITION REACHES THE BROWSER. The listing
+ *    carries a coarse state and at most three main items; `blocking[]`, every
+ *    per-row count, every weight and every pool row stay on the server.
+ *
+ * 4. THE COOKIE HAZARD IN THE EDGE CACHE (§14). The session cookie is scoped
+ *    to `.levonis-iq.com`, so it rides EVERY request to this route. "Keyed
+ *    without a cookie" alone would let a member and a stranger share one entry
+ *    and serve whichever body landed there first to the other — an entitled
+ *    member's tier prices and unlocked composition to anonymous visitors, or
+ *    the locked anonymous body to members. So the presence of the cookie is
+ *    read FIRST, and a request carrying one is never cacheable.
+ *
+ * The composition admin lives in its own router (`worker/routes/adminBundles.ts`).
+ * The legacy `bundles` / `bundle_items` CRUD that used to sit at the bottom of
+ * this file is GONE: §1.11 freezes those two tables as read-only history and
+ * says nothing writes them after migration 0059, and its router was already
+ * unmounted — `worker/index.ts` binds `/api/admin/bundles` to the composition
+ * panel. Leaving it would have kept a second export named `adminBundlesRoutes`
+ * in the tree and a live write path into the frozen tables.
  */
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
-import { newId } from '../lib/crypto';
-import { audit } from '../lib/audit';
-import { getTierStatus, benefits } from '../lib/entitlements';
-import { loadRelationsViews } from '../lib/productOverlay';
-import { pricingCtx, publicWithDisplayPrice } from './products';
-
-interface BundleRow {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  active: number;
-  sort: number;
-  created_at: number;
-  updated_at: number;
-}
-
-interface BundleItemRow {
-  bundle_id: string;
-  product_id: string;
-  qty: number;
-  sort: number;
-}
-
-/** The slice of the public card shape the bundle grid actually renders. */
-function itemCard(full: Record<string, unknown>) {
-  return {
-    id: full.id,
-    slug: full.slug,
-    name: full.name,
-    images: full.images,
-    price_iqd: full.price_iqd,
-    display_price_iqd: full.display_price_iqd,
-    display_regular_iqd: full.display_regular_iqd,
-    display_applied_tier: full.display_applied_tier,
-    display_prime_iqd: full.display_prime_iqd,
-    display_pro_iqd: full.display_pro_iqd,
-    display_from: full.display_from,
-  };
-}
+import { requireAdmin, notFound, str, int } from '../lib/http';
+import { rateLimit } from '../lib/ratelimit';
+import { bumpMetric, bundleAnalytics, mysteryAnalytics } from '../lib/compositionAnalytics';
+import { benefits } from '../lib/entitlements';
+import { SESSION_COOKIE_NAME } from '../lib/session';
+import { COMPOSITION_COLUMNS, COMPOSITION_FROM } from '../lib/bundleRead';
+import {
+  compositionCard,
+  compositionDetail,
+  pricingCtx,
+  resolveCompositionPageWithMystery,
+} from './products';
 
 // ---------------------------------------------------------------- public
 
 export const bundlesRoutes = new Hono<AppContext>();
 
+/**
+ * READ THE SESSION FIRST, THEN DECIDE WHETHER THIS BODY MAY BE SHARED (§14).
+ *
+ * The check is on the raw COOKIE, not on `c.get('user')`: an expired or
+ * revoked session cookie still resolves to no user, but the response was still
+ * computed for a request that carried one, and a cache keyed on the URL alone
+ * would hand that body to the next caller. `Vary: Cookie` on the public
+ * variant is what keeps a cache that does honour it from mixing the two.
+ */
+function cacheHeaders(c: Context<AppContext>): void {
+  const cookie = c.req.header('Cookie') ?? '';
+  const carriesSession = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=`).test(cookie);
+  if (carriesSession) {
+    c.header('Cache-Control', 'private, no-store');
+    return;
+  }
+  c.header('Cache-Control', 'public, max-age=60');
+  c.header('Vary', 'Cookie');
+}
+
+const LIST_LIMIT_MAX = 48;
+
+/**
+ * GET /api/bundles — the storefront grid, the featured rail and the search box.
+ *
+ * `search` and `category_id` mirror `GET /api/products` exactly, `family` reads
+ * `template_family` and `featured=1` reads the `is_featured` column a
+ * composition row already inherits, so the page gets search, a category facet
+ * and a featured rail with no new machinery and no new index.
+ *
+ * ONE PAGE COSTS FOUR READS whatever its size (§14): this query, the
+ * components with their allow-lists, the member products, and one relations
+ * pass over those members.
+ */
 bundlesRoutes.get('/', async (c) => {
+  const q = c.req.query();
+  const kind = str(q.kind, 'kind', { max: 20, required: false });
+  const search = str(q.search, 'search', { max: 100, required: false });
+  const categoryId = str(q.category_id, 'category_id', { max: 60, required: false });
+  const family = str(q.family, 'family', { max: 60, required: false });
+  const featured = q.featured === '1' || q.featured === 'true';
+  const limit = int(q.limit, 'limit', { min: 1, max: LIST_LIMIT_MAX, def: 24 });
+  const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
+
   const user = c.get('user');
-  const status = user ? await getTierStatus(c.env.DB, user.id) : null;
-  const entitled = !!status && benefits.exclusiveSections(status);
-  if (!entitled) {
-    // The lock screen needs to know WHY (signed out vs free tier), nothing else.
-    return c.json({ entitled: false, signed_in: !!user, bundles: [] });
+  const params: unknown[] = [];
+  let where = "p.status = 'active'";
+  if (kind === 'bundle' || kind === 'mystery') {
+    where += ' AND p.composition = ?';
+    params.push(kind);
+  } else {
+    where += " AND p.composition <> ''";
   }
+  if (search) {
+    where += ' AND (p.name LIKE ? OR p.name_ar LIKE ? OR p.name_ku LIKE ? OR p.description LIKE ?)';
+    const like = `%${search}%`;
+    params.push(like, like, like, like);
+  }
+  if (categoryId) {
+    where += ' AND (p.subcategory_id = ? OR p.id IN (SELECT product_id FROM product_catalogs WHERE catalog_id = ?))';
+    params.push(categoryId, categoryId);
+  }
+  if (family) {
+    where += ' AND p.template_family = ?';
+    params.push(family);
+  }
+  if (featured) where += ' AND p.is_featured = 1';
 
-  const bundles = (
-    await c.env.DB.prepare('SELECT * FROM bundles WHERE active = 1 ORDER BY sort, created_at DESC').all<BundleRow>()
-  ).results;
-  if (bundles.length === 0) return c.json({ entitled: true, signed_in: true, bundles: [] });
+  const [{ results }, ctx] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT ${COMPOSITION_COLUMNS} ${COMPOSITION_FROM}
+        WHERE ${where}
+        ORDER BY p.display_order ASC, p.created_at DESC
+        LIMIT ? OFFSET ?`
+    )
+      .bind(...params, limit, offset)
+      .all<Record<string, unknown>>(),
+    pricingCtx(c),
+  ]);
 
-  const items = (
-    await c.env.DB.prepare(
-      `SELECT bi.* FROM bundle_items bi JOIN bundles b ON b.id = bi.bundle_id WHERE b.active = 1`
-    ).all<BundleItemRow>()
-  ).results;
+  cacheHeaders(c);
+  // `entitled` keeps its 0034 meaning — the viewer holds a paid membership —
+  // so the page's lock panel and its subscribe path read the same field they
+  // always did. It no longer decides whether the LIST is populated.
+  const entitled = !!ctx.tierStatus && benefits.exclusiveSections(ctx.tierStatus);
+  if (results.length === 0) return c.json({ entitled, signed_in: !!user, bundles: [] });
 
-  const productIds = [...new Set(items.map((i) => i.product_id))];
-  const rows = productIds.length
-    ? (
-        await c.env.DB.prepare(
-          `SELECT * FROM products WHERE status = 'active' AND id IN (${productIds.map(() => '?').join(',')})`
-        )
-          .bind(...productIds)
-          .all<Record<string, unknown>>()
-      ).results
-    : [];
+  const { resolved } = await resolveCompositionPageWithMystery(c.env.DB, results, ctx);
+  const bundles = results
+    .map((r) => resolved.get(String(r.id)))
+    .filter((b): b is NonNullable<typeof b> => !!b)
+    // A composition row with no components advertises nothing anyone can buy;
+    // the admin panel is where it is finished, not the storefront.
+    .filter((b) => b.availability.state !== 'unconfigured')
+    /**
+     * AN OFFER THE OWNER SWITCHED OFF IS NOT A CARD (§2.1, and the comment
+     * beside the state that produces it).
+     *
+     * `bundleAvailability` sets `state = 'ended'` for `offer_windows.active = 0`
+     * and its own comment says "the listing filters it out entirely" — which
+     * this filter did not do. The storefront rendered an "Offer ended" card,
+     * WITH a price, for something the owner had explicitly turned off,
+     * indefinitely. An offer whose WINDOW merely expired keeps its card and its
+     * countdown: that is a fact about a real offer, and §13.3 lists `ended` as
+     * one of the eight card states for exactly that case. So the test is
+     * the offer WINDOW's own `active` flag — the one thing the owner toggled —
+     * rather than a state that a derived price below its floor also produces
+     * (§4.3 wants that one to stay on the grid showing its unavailable state).
+     */
+    .filter((b) => !b.window || b.window.active)
+    .map((b) => compositionCard(b, ctx));
+
+  return c.json({ entitled, signed_in: !!user, bundles });
+});
+
+/**
+ * GET /api/bundles/:slug — one offer, resolved by the same pass.
+ *
+ * A locked viewer gets the §9 allow-list with a 200, not a 403: the page
+ * renders an honest lock and the purchase doors refuse independently.
+ */
+bundlesRoutes.get('/:slug', async (c) => {
+  const slug = c.req.param('slug');
   const ctx = await pricingCtx(c);
-  const views = await loadRelationsViews(
-    c.env.DB,
-    rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
-  );
-  const cards = new Map<string, ReturnType<typeof itemCard>>();
-  for (const row of rows) {
-    cards.set(String(row.id), itemCard(publicWithDisplayPrice(row, ctx, views.get(String(row.id)))));
-  }
+  const bundle = await compositionDetail(c.env.DB, slug, ctx);
+  cacheHeaders(c);
+  if (!bundle) throw notFound('bundle');
+  return c.json({ success: true, bundle });
+});
 
-  const payload = bundles
-    .map((b) => {
-      const members = items
-        .filter((i) => i.bundle_id === b.id)
-        .sort((x, y) => x.sort - y.sort)
-        .map((i) => ({ qty: i.qty, product: cards.get(i.product_id) ?? null }))
-        // A member product that went draft/hidden simply drops out of the
-        // display — the bundle never advertises something that can't be bought.
-        .filter((m) => m.product !== null) as Array<{ qty: number; product: ReturnType<typeof itemCard> }>;
-      let total = 0;
-      let regular = 0;
-      let from = false;
-      for (const m of members) {
-        total += Number(m.product.display_price_iqd ?? m.product.price_iqd ?? 0) * m.qty;
-        regular += Number(m.product.display_regular_iqd ?? m.product.price_iqd ?? 0) * m.qty;
-        if (m.product.display_from) from = true;
-      }
-      return {
-        id: b.id,
-        name: b.name,
-        description: b.description,
-        image: b.image,
-        sort: b.sort,
-        items: members,
-        total_display_iqd: total,
-        total_regular_iqd: regular,
-        total_from: from,
-      };
-    })
-    // An empty bundle (or one whose members all went inactive) is not shown.
-    .filter((b) => b.items.length > 0);
-
-  return c.json({ entitled: true, signed_in: true, bundles: payload });
+/**
+ * POST /api/bundles/:productId/view — the ONE counter §12 keeps, because
+ * nothing else records that a detail page was looked at.
+ *
+ * SESSION-REQUIRED, deliberately. An anonymous caller falls back to an IP
+ * bucket that Iraqi carriers NAT heavily, which would both undercount real
+ * customers and let anyone inflate the denominator of the only conversion
+ * figure the owner reads. So `views` counts SIGNED-IN views, the conversion
+ * figure is labelled as being over signed-in views, and neither is ever an
+ * input to a price, a limit or an eligibility decision.
+ *
+ * The subject is VALIDATED to be a real `composition <> ''` row before the
+ * upsert, so arbitrary product ids — or arbitrary strings — cannot be seeded
+ * into `composition_daily_metrics`.
+ */
+bundlesRoutes.post('/:productId/view', async (c) => {
+  const user = c.get('user');
+  if (!user) throw notFound('bundle');
+  await rateLimit(c, 'bundle_view', 60, 300);
+  const productId = str(c.req.param('productId'), 'productId', { min: 1, max: 60 });
+  const row = await c.env.DB
+    .prepare("SELECT id FROM products WHERE id = ? AND status = 'active' AND composition <> ''")
+    .bind(productId)
+    .first<{ id: string }>();
+  if (!row) throw notFound('bundle');
+  await bumpMetric(c.env.DB, String(row.id), 'views');
+  // Fire-and-forget by contract: the body says nothing the page needs, and a
+  // counter must never be something a page waits on.
+  return c.json({ success: true });
 });
 
 // ---------------------------------------------------------------- admin
 
-export const adminBundlesRoutes = new Hono<AppContext>();
-adminBundlesRoutes.use('*', requireAdmin);
+/**
+ * §12's two screens, under `/api/admin/analytics`, with THEIR OWN
+ * `requireAdmin`. `requireMainHost` is a HOST check and never a role check, so
+ * a router mounted without its own guard is an open admin API guarded only by
+ * hostname (§10, §15.1 rule 10).
+ */
+export const adminCompositionAnalyticsRoutes = new Hono<AppContext>();
+adminCompositionAnalyticsRoutes.use('*', requireAdmin);
 
-async function readItems(body: Record<string, unknown>): Promise<Array<{ product_id: string; qty: number }>> {
-  const raw = Array.isArray(body.items) ? body.items : [];
-  if (raw.length === 0) throw badRequest('items', 'a bundle needs at least one product');
-  if (raw.length > 50) throw badRequest('items', 'at most 50 products per bundle');
-  const seen = new Set<string>();
-  const out: Array<{ product_id: string; qty: number }> = [];
-  for (const it of raw) {
-    const o = it as Record<string, unknown>;
-    const pid = str(o.product_id, 'items.product_id', { min: 1, max: 80, required: true });
-    if (seen.has(pid)) throw badRequest('items', `product ${pid} appears twice`);
-    seen.add(pid);
-    const qty = int(o.qty, 'items.qty', { min: 1, max: 99, def: 1 });
-    out.push({ product_id: pid, qty });
-  }
-  return out;
-}
+const range = (c: Context<AppContext>) => ({
+  from: str(c.req.query('from'), 'from', { max: 10, required: false }) || undefined,
+  to: str(c.req.query('to'), 'to', { max: 10, required: false }) || undefined,
+});
 
-async function assertProductsExist(db: D1Database, items: Array<{ product_id: string }>) {
-  const ids = items.map((i) => i.product_id);
-  const rows = (
-    await db
-      .prepare(`SELECT id FROM products WHERE id IN (${ids.map(() => '?').join(',')})`)
-      .bind(...ids)
-      .all<{ id: string }>()
-  ).results;
-  const found = new Set(rows.map((r) => r.id));
-  const missing = ids.filter((id) => !found.has(id));
-  if (missing.length) throw badRequest('items', `unknown product ids: ${missing.join(', ')}`);
-}
-
-async function bundleWithItems(db: D1Database, id: string) {
-  const row = await db.prepare('SELECT * FROM bundles WHERE id = ?').bind(id).first<BundleRow>();
-  if (!row) return null;
-  const items = (
-    await db.prepare('SELECT * FROM bundle_items WHERE bundle_id = ? ORDER BY sort').bind(id).all<BundleItemRow>()
-  ).results;
-  return { ...row, items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })) };
-}
-
-adminBundlesRoutes.get('/', async (c) => {
-  const bundles = (
-    await c.env.DB.prepare('SELECT * FROM bundles ORDER BY sort, created_at DESC').all<BundleRow>()
-  ).results;
-  const items = (
-    await c.env.DB.prepare('SELECT * FROM bundle_items ORDER BY sort').all<BundleItemRow>()
-  ).results;
-  // Names for the admin list — drafts included: the admin composes ahead of
-  // publishing, and the storefront route filters to active on its own.
-  const ids = [...new Set(items.map((i) => i.product_id))];
-  const names = ids.length
-    ? (
-        await c.env.DB.prepare(`SELECT id, name, status, images FROM products WHERE id IN (${ids.map(() => '?').join(',')})`)
-          .bind(...ids)
-          .all<{ id: string; name: string; status: string; images: string }>()
-      ).results
-    : [];
-  const nameMap = new Map(names.map((n) => [n.id, n]));
+adminCompositionAnalyticsRoutes.get('/bundles', async (c) => {
+  const { rows, totals } = await bundleAnalytics(c.env.DB, range(c));
   return c.json({
-    bundles: bundles.map((b) => ({
-      ...b,
-      items: items
-        .filter((i) => i.bundle_id === b.id)
-        .map((i) => {
-          const p = nameMap.get(i.product_id);
-          let image = '';
-          if (p) {
-            try {
-              const arr = JSON.parse(p.images || '[]');
-              const first = Array.isArray(arr) ? arr[0] : null;
-              image = typeof first === 'string' ? first : (first && typeof first.url === 'string' ? first.url : '');
-            } catch { /* legacy images JSON is display-only here */ }
-          }
-          return { product_id: i.product_id, qty: i.qty, name: p?.name ?? i.product_id, status: p?.status ?? 'missing', image };
-        }),
-    })),
+    success: true,
+    rows,
+    totals,
+    // The label travels with the figure so no screen can present it as a
+    // conversion over all traffic (§12).
+    conversion_basis: 'signed_in_views',
   });
 });
 
-async function writeBundle(c: Context<AppContext>, id: string, isNew: boolean) {
-  const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!body) throw badRequest('body', 'invalid JSON');
-  const name = str(body.name, 'name', { min: 1, max: 200, required: true });
-  const description = str(body.description ?? '', 'description', { max: 2000 });
-  const image = str(body.image ?? '', 'image', { max: 1000 });
-  const active = body.active === false ? 0 : 1;
-  const sort = int(body.sort, 'sort', { min: 0, max: 100000, def: 0 });
-  const items = await readItems(body);
-  await assertProductsExist(c.env.DB, items);
-  const now = Date.now();
-
-  const statements = [
-    isNew
-      ? c.env.DB.prepare(
-          'INSERT INTO bundles (id, name, description, image, active, sort, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(id, name, description, image, active, sort, now, now)
-      : c.env.DB.prepare(
-          'UPDATE bundles SET name = ?, description = ?, image = ?, active = ?, sort = ?, updated_at = ? WHERE id = ?'
-        ).bind(name, description, image, active, sort, now, id),
-    c.env.DB.prepare('DELETE FROM bundle_items WHERE bundle_id = ?').bind(id),
-    ...items.map((it, i) =>
-      c.env.DB.prepare('INSERT INTO bundle_items (bundle_id, product_id, qty, sort) VALUES (?, ?, ?, ?)').bind(
-        id,
-        it.product_id,
-        it.qty,
-        i
-      )
-    ),
-  ];
-  await c.env.DB.batch(statements);
-
-  const admin = c.get('user')!;
-  await audit(c.env.DB, admin.id, isNew ? 'bundle.create' : 'bundle.update', id, {
-    name,
-    items: items.length,
-    active: !!active,
-  });
-  return c.json({ ok: true, bundle: await bundleWithItems(c.env.DB, id) });
-}
-
-adminBundlesRoutes.post('/', async (c) => writeBundle(c, newId('bnd'), true));
-
-adminBundlesRoutes.put('/:id', async (c) => {
-  const id = c.req.param('id');
-  const exists = await c.env.DB.prepare('SELECT id FROM bundles WHERE id = ?').bind(id).first();
-  if (!exists) throw notFound('bundle');
-  return writeBundle(c, id, false);
-});
-
-adminBundlesRoutes.delete('/:id', async (c) => {
-  const id = c.req.param('id');
-  const row = await c.env.DB.prepare('SELECT * FROM bundles WHERE id = ?').bind(id).first<BundleRow>();
-  if (!row) throw notFound('bundle');
-  await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM bundle_items WHERE bundle_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM bundles WHERE id = ?').bind(id),
-  ]);
-  const admin = c.get('user')!;
-  await audit(c.env.DB, admin.id, 'bundle.delete', id, { name: row.name });
-  return c.json({ ok: true });
+adminCompositionAnalyticsRoutes.get('/mystery', async (c) => {
+  // Read entirely through `mystery_allocation_stats`, whose projection carries
+  // no order id and no user id — the guarantee is structural, not a promise
+  // that every future reader will omit the right columns.
+  return c.json({ success: true, ...(await mysteryAnalytics(c.env.DB, range(c))) });
 });
