@@ -234,10 +234,23 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
   assert.ok(lines.includes(`  Strict-Transport-Security: ${STRICT_TRANSPORT_SECURITY}`));
   for (const [k, v] of Object.entries(STATIC_SECURITY_HEADERS)) assert.ok(lines.includes(`  ${k}: ${v}`), k);
 
-  // …and the build actually writes it, on every build, after vite.
+  // …and the build actually writes it, on every build, AFTER vite — vite
+  // empties dist/, so a headers file written before it would be deleted by the
+  // build that was supposed to carry it. That ORDER is what this pins.
+  //
+  // It is deliberately not anchored to the end of the script any more: steps
+  // that only READ dist/ may follow (check-live-markers.mjs verifies that the
+  // strings the live verification greps for survived minification). A step
+  // that WROTE to dist after this point would be the real hazard, and the
+  // ordering assertion below is what would catch it moving.
   const { readFileSync } = await import('node:fs');
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-  assert.match(pkg.scripts.build, /vite build && node scripts\/write-asset-headers\.mjs$/);
+  assert.match(pkg.scripts.build, /vite build && node scripts\/write-asset-headers\.mjs(\s|$|&)/);
+  const steps = pkg.scripts.build.split('&&').map((x) => x.trim());
+  assert.ok(
+    steps.indexOf('vite build') < steps.indexOf('node scripts/write-asset-headers.mjs'),
+    'the headers file must be written after vite empties dist/'
+  );
   const wrangler = readFileSync('wrangler.jsonc', 'utf8');
   assert.match(wrangler, /"run_worker_first":\s*\["\/api\/\*",\s*"\/files\/\*"\]/,
     'if the Worker starts running first for pages, revisit whether _headers is still the right layer');
