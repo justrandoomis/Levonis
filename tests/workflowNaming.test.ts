@@ -559,3 +559,48 @@ test('no wrangler config anywhere in the repository declares routes or custom do
     assert.ok(!/"custom_domains"\s*:/.test(bare), `${rel} now declares custom_domains`);
   }
 });
+
+/**
+ * A live check that greps the served bundle must read the WHOLE module graph.
+ *
+ * WHY THIS EXISTS. Vite names only the entry modules in index.html; every
+ * lazily loaded screen is named from inside another chunk, and those names
+ * nest. When the bundles work landed, AdminProducts moved one hop further
+ * out and the admin product form ended up THREE hops from the entry — so the
+ * one-hop crawl these workflows used read 60 of the 93 served modules and
+ * reported the shipped «Sub-section» field as missing (workflow 22, run 7).
+ *
+ * The one-hop crawl lies in both directions: a shipped marker reads as
+ * "missing", and a marker still shipped in a deeper chunk reads as "gone" —
+ * which is worse, because that is the shape of every negative assertion these
+ * workflows make. So the crawl is now one shared script that walks the graph
+ * until it stops growing, and this test is what stops a one-hop copy coming
+ * back.
+ */
+test('every live check that greps served modules uses the transitive crawler', () => {
+  const crawler = readFileSync(new URL('../../scripts/live-modules.sh', dir), 'utf8');
+  // The property that matters is transitivity: a frontier that is refilled
+  // from what each fetched chunk names, looped until it is empty.
+  assert.match(crawler, /while \[ -s \/tmp\/mods-frontier \]/, 'the crawler does not loop over a frontier');
+  assert.match(crawler, /sort -u \/tmp\/mods-next > \/tmp\/mods-frontier/, 'the crawler never refills its frontier');
+
+  const files = readdirSync(dir).filter((f) => f.startsWith('verify-live-') && f.endsWith('.yml'));
+  assert.ok(files.length >= 9, `expected the live verification workflows, found ${files.length}`);
+
+  for (const file of files) {
+    const text = read(file);
+    if (!text.includes('/tmp/mods')) continue;
+    assert.match(
+      text,
+      /bash scripts\/live-modules\.sh "\$APEX"/,
+      `${file} reads served modules without the shared transitive crawler`,
+    );
+    // The one-hop shape: fetch the entries, then fetch what they name, and stop.
+    assert.ok(
+      !/for a in \$entries; do/.test(text),
+      `${file} still carries a one-hop module crawl`,
+    );
+    // The script is in the repo, so the job has to check the repo out.
+    assert.match(text, /actions\/checkout/, `${file} calls the crawler without checking the repo out`);
+  }
+});

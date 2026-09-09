@@ -93,27 +93,12 @@ jobs:
         id: bundle
         run: |
           set -euo pipefail
-          html=$(curl -s --compressed --max-time 25 "$APEX/")
-          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
-          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
-          mkdir -p /tmp/mods
-          all=""
-          for a in $entries; do
-            f=/tmp/mods/$(basename "$a")
-            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
-            all="$all $f"
-            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
-              [ -f "/tmp/mods/$c" ] && continue
-              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
-              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
-            done
-          done
-          echo "  modules read: $(echo $all | wc -w)"
+          bash scripts/live-modules.sh "$APEX" "/"
           fail=0
           # Written to FILES, never piped into grep: `grep -q` stops at the
           # first match, the writer takes SIGPIPE, and `pipefail` then reads a
           # successful match as a failed pipeline.
-          hit=$(grep -l '/auth' $all 2>/dev/null | head -1 || true)
+          hit=$(grep -l '/auth' /tmp/mods/* 2>/dev/null | head -1 || true)
           if [ -n "$hit" ]; then echo "  ok   the sign-in destination is in the bundle — in $(basename "$hit")";
           else echo "  FAIL no served module references the sign-in route"; fail=1; fi
           exit $fail

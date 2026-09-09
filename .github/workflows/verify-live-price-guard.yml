@@ -65,30 +65,13 @@ jobs:
         id: bundle
         run: |
           set -euo pipefail
-          # --compressed on EVERY fetch: the edge serves these gzipped, and a
-          # grep over compressed bytes finds nothing and calls it a miss.
-          html=$(curl -s --compressed --max-time 25 "$APEX/admin")
-          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
-          [ -n "$entries" ] || { echo "  FAIL /admin served no JS module"; exit 1; }
-          mkdir -p /tmp/mods
-          all=""
-          for a in $entries; do
-            f=/tmp/mods/$(basename "$a")
-            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
-            all="$all $f"
-            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
-              [ -f "/tmp/mods/$c" ] && continue
-              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
-              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
-            done
-          done
-          echo "  modules read: $(echo $all | wc -w)"
+          bash scripts/live-modules.sh "$APEX" "/admin"
           fail=0
           # Written to FILES, never piped into grep: `grep -q` stops at the
           # first match, the writer takes SIGPIPE, and `pipefail` then reads a
           # successful match as a failed pipeline.
           want() {
-            hit=$(grep -l "$1" $all 2>/dev/null | head -1 || true)
+            hit=$(grep -l "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
             if [ -n "$hit" ]; then echo "  ok   $2 — in $(basename "$hit")";
             else echo "  FAIL $2 — no served module contains $1"; fail=1; fi
           }

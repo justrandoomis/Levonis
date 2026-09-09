@@ -125,32 +125,8 @@ jobs:
         id: bundle
         run: |
           set -euo pipefail
-          # --compressed on EVERY fetch: the edge serves these gzipped, and a
-          # grep over compressed bytes finds nothing and calls it a miss.
-          html=$(curl -s --compressed --max-time 25 "$APEX/admin")
-          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
-          if [ -z "$entries" ]; then
-            echo "  FAIL /admin served no JS module. First 400 bytes:"
-            printf '%s' "$html" | head -c 400
-            exit 1
-          fi
-          mkdir -p /tmp/mods
-          # The page names only its ENTRY. The product form and the import
-          # panel are lazy chunks, referenced by name from inside that entry,
-          # so the entry has to be read to find out what else to fetch.
-          all=""
-          for a in $entries; do
-            f=/tmp/mods/$(basename "$a")
-            curl -s --compressed --max-time 60 -o "$f" "$APEX$a"
-            all="$all $f"
-            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "$f" | sort -u); do
-              [ -f "/tmp/mods/$c" ] && continue
-              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
-              if [ "$code" = "200" ]; then all="$all /tmp/mods/$c"; else rm -f "/tmp/mods/$c"; fi
-            done
-          done
-          echo "  modules read: $(echo $all | wc -w)"
-          for f in $all; do echo "    $(basename "$f") ($(wc -c < "$f") bytes)"; done
+          bash scripts/live-modules.sh "$APEX" "/admin"
+          for f in /tmp/mods/*; do echo "    $(basename "$f") ($(wc -c < "$f") bytes)"; done
           fail=0
           # Written to FILES, never piped into grep: `grep -q` stops at the
           # first match, the writer takes SIGPIPE, and `pipefail` then reads a
@@ -160,7 +136,7 @@ jobs:
             # [ ] * & — as a regex `[&_tr>*:last-child]` is a bracket
             # expression matching ONE character, so an unanchored grep would
             # report a miss on a bundle that carries the class verbatim.
-            hit=$(grep -lF "$1" $all 2>/dev/null | head -1 || true)
+            hit=$(grep -lF "$1" /tmp/mods/* 2>/dev/null | head -1 || true)
             if [ -n "$hit" ]; then
               echo "  ok   $2 — in $(basename "$hit")"
             else

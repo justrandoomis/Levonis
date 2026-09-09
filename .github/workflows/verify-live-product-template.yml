@@ -65,19 +65,7 @@ jobs:
         id: fetch
         run: |
           set -euo pipefail
-          html=$(curl -s --compressed --max-time 25 "$APEX/")
-          entries=$(printf '%s' "$html" | grep -oE '/assets/[A-Za-z0-9_.-]+\.js' | sort -u)
-          [ -n "$entries" ] || { echo "  FAIL / served no JS module"; exit 1; }
-          mkdir -p /tmp/mods
-          for a in $entries; do
-            curl -s --compressed --max-time 60 -o "/tmp/mods/$(basename "$a")" "$APEX$a"
-            for c in $(grep -oE '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js' "/tmp/mods/$(basename "$a")" | sort -u); do
-              [ -f "/tmp/mods/$c" ] && continue
-              code=$(curl -s --compressed --max-time 60 -o "/tmp/mods/$c" -w '%{http_code}' "$APEX/assets/$c" || echo 000)
-              [ "$code" = "200" ] || rm -f "/tmp/mods/$c"
-            done
-          done
-          echo "  modules read: $(ls /tmp/mods | wc -l)"
+          bash scripts/live-modules.sh "$APEX" "/"
           ls /tmp/mods > /tmp/module-list.txt
 
       - name: The shipped product form dropped the filters block
