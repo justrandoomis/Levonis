@@ -123,7 +123,7 @@ export interface MoveOptions {
   now?: string;
 }
 
-function newHistoryId(orderId: string, at: string): string {
+export function newHistoryId(orderId: string, at: string): string {
   // Deterministic enough to be greppable, unique enough for a primary key:
   // two moves of the same order in the same millisecond are not a thing the
   // conditional UPDATE below allows.
@@ -262,12 +262,16 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   const wasDeducted = STOCK_DEDUCTED_STATES.has(legacyFrom);
   const nowDeducted = STOCK_DEDUCTED_STATES.has(legacyTo);
   if (!wasDeducted && nowDeducted) {
-    const res = await deductOrderStock(env.DB, order.id, opts.changedBy ?? 'system');
+    // NULL, never the string 'system': `inventory_ledger.actor_user_id` is a
+    // foreign key to `users` and no such user exists, so an automatic move
+    // with no `changedBy` would abort on the FK. Found by the expiry sweep's
+    // tests, which hit exactly this on their first run.
+    const res = await deductOrderStock(env.DB, order.id, opts.changedBy || null);
     if (res.rejected > 0) {
       notes.push(`Stock could not be deducted for ${res.rejected} line(s) — check the product's stock before shipping.`);
     }
   } else if (legacyTo === 'cancelled') {
-    const res = await returnOrderStock(env.DB, order.id, opts.changedBy ?? 'system');
+    const res = await returnOrderStock(env.DB, order.id, opts.changedBy || null);
     const note = stockReturnNote(res.kind, res.applied);
     if (note) notes.push(note);
   }

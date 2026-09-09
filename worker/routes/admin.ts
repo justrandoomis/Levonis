@@ -14,6 +14,7 @@ import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent'
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
+import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
@@ -1932,6 +1933,16 @@ adminRoutes.put('/settings/:key', async (c) => {
       label_ar: str(g.label_ar, 'label_ar', { max: 200, required: false }),
       qty,
     };
+  } else if (key === 'orderExpiryConfig') {
+    // WHEN AN ABANDONED CHECKOUT LETS GO (owner decision 5). Validated by the
+    // SAME function the sweep reads with, on the way IN — so a value that
+    // survives here is exactly the value the clock will use. A TTL below the
+    // cron's own 15-minute cadence is raised to 15 rather than stored as a
+    // number the job could never honour.
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw badRequest('orderExpiryConfig must be an object');
+    }
+    value = resolveOrderExpiry(value);
   } else if (key === 'shippingPolicy') {
     // THE GLOBAL SHIPPING RULES, normalized by the SAME function the checkout
     // reads them with. Anything the engine cannot use is dropped here rather

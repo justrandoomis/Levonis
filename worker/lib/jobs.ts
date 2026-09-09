@@ -12,6 +12,9 @@ import type { SweepReport } from './orderStageOps';
 import { alwaseetDriver } from './delivery/alwaseet';
 import { sweepDeliveryStatuses } from './delivery/sync';
 import { getSetting } from './settings';
+import { sweepExpiredOrders } from './orderExpirySweep';
+import type { OrderExpiryReport } from './orderExpirySweep';
+import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
 
 /**
@@ -60,6 +63,7 @@ export interface DurableJobsReport {
    * only thing that ever advances an order on the clock is this sweep.
    */
   order_stages: SweepReport;
+  order_expiry: OrderExpiryReport;
   /**
    * Local-courier status sync. Separate from order_stages because it is the
    * only thing allowed to move an order to "في الطريق إليك" or "تم التوصيل":
@@ -93,6 +97,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     wallet_reconciliation: { anomalies: 0, sums_match: true, committed_holds_without_debit: 0 },
     support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
+    order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     bnpl_overdue: 'disabled',
     errors: [],
@@ -233,6 +238,21 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   //     courier's API, which is exactly what the owner specified.
   await step('order_stages', async () => {
     report.order_stages = await sweepDueStages(env, 200, nowIso);
+  });
+
+  // 11b. Abandoned checkouts let go of the stock they were holding (owner
+  //      decision 5). AFTER the stage sweep, so an order the clock is about to
+  //      promote is judged at its current stage, and reported as unconfigured
+  //      — not as an error — while the owner has not turned it on, exactly as
+  //      delivery_sync reports an unset courier. The selection refuses
+  //      anything paid, confirmed, collected, humanly moved, revealed or owned
+  //      by a merchant store; see orderExpirySweep.ts for the four layers.
+  await step('order_expiry', async () => {
+    report.order_expiry = await sweepExpiredOrders(
+      env,
+      resolveOrderExpiry(await getSetting(env.DB, 'orderExpiryConfig')),
+      nowIso
+    );
   });
 
   // 12. Ask the local courier what happened to the shipments we handed them.

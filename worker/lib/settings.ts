@@ -188,6 +188,15 @@ export const SETTING_DEFAULTS = {
   // (DEFAULT_STAGE_DURATIONS) and this stays {} until an owner overrides
   // something — an empty object means "use the defaults", not "wait zero".
   orderStageDurations: {} as Record<string, number>,
+  // WHEN AN ABANDONED CHECKOUT LETS GO OF ITS STOCK (owner decision 5).
+  // Ships OFF and at zero: until an owner turns it on, nothing is expired and
+  // the behaviour is identical to before the feature existed. The shape and
+  // the clamps live in worker/lib/orderExpiry.ts, and the admin route
+  // validates through the same function the sweep reads with. Internal ops
+  // policy — deliberately NOT in PUBLIC_SETTING_KEYS.
+  orderExpiryConfig: { enabled: false, ttl_minutes: 0, batch_limit: 100 } as {
+    enabled: boolean; ttl_minutes: number; batch_limit: number;
+  },
   /**
    * The local courier's wire format — endpoint paths and the map from our
    * field names to theirs. NOT credentials: those are Worker secrets
