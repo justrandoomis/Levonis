@@ -140,6 +140,29 @@ export function UsageGuideSection({
                 </button>
               </div>
 
+              {/*
+                A STEP WITH NO TITLE AND NO BODY IS DROPPED ON SAVE.
+                `upgradeUsageGuide` (worker/lib/productModel.ts) keeps a step
+                only when it has one or the other — a rule worth keeping, since
+                a blank row would otherwise render as an empty card on the
+                product page. What was wrong is that the FORM never said so, so
+                an admin could upload three photos and a video, save, and find
+                the whole step gone with a 200 and no word.
+                The filter is not widened: the step is not the media, and
+                keeping a titleless card would move the problem to the
+                storefront. The form warns instead, while there is still
+                something to type.
+              */}
+              {!st.title.trim() && !st.body.trim() && (st.images.length > 0 || st.video_url || st.link_url) && (
+                <p
+                  className="mb-2 rounded border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[10px] text-amber-300 leading-snug"
+                  data-usage-step-warning={st.id}
+                >
+                  هذه الخطوة تحمل وسائط بلا عنوان ولا وصف — لن تُحفَظ. أضف عنوانًا أو وصفًا حتى لا تضيع الصور والفيديو.
+                  <span className="text-zinc-500"> A step with neither a title nor a description is not saved.</span>
+                </p>
+              )}
+
               <Grid cols={2}>
                 <Field ar="العنوان" en="Title" span>
                   <TextInput

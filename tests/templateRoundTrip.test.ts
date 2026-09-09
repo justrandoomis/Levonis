@@ -627,7 +627,13 @@ test('the setup & usage guide round-trips: official link, steps, photos, video, 
   const text = exportProduct(doc, { includeCost: true });
   assert.match(text, /^usage_official_url=https:\/\/wiki\.bambulab\.com\/en\/a1$/m);
   assert.match(text, /^usage_steps\.1\.kind=setup$/m);
-  assert.match(text, /^usage_steps\.1\.images=https:\/\/img\.example\/1\.jpg,https:\/\/img\.example\/2\.jpg$/m);
+  // SPACE-separated, not comma-separated. A comma is a legal character in a URL
+  // path — a Cloudinary transform reads `/upload/w_400,h_300/a.jpg` — so the
+  // old bare-comma join split one working image into two broken ones on every
+  // trip. A bare space cannot occur inside a valid URL, so this join is
+  // unambiguous; the reader still accepts a comma before a new address, which
+  // is what keeps every file written before the change readable.
+  assert.match(text, /^usage_steps\.1\.images=https:\/\/img\.example\/1\.jpg https:\/\/img\.example\/2\.jpg$/m);
   assert.match(text, /^usage_steps\.2\.title=First print$/m);
   const parsed = parseTemplate(text);
   assert.deepEqual(parsed.errors, []);

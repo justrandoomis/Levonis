@@ -49,7 +49,8 @@ export type TemplateFieldType =
   | 'percent' // 0.01..100 with at most two decimals (e.g. 7.5) — a fee expressed as a share of the price
   | 'bool'   // true/false
   | 'enum'   // one of enumValues
-  | 'csv'    // comma-separated list
+  | 'csv'    // comma-separated list of TOKENS (slugs, ids, hashtags)
+  | 'urls'   // a list of ADDRESSES — see the coercion, commas are not enough
   | 'hex'    // #RRGGBB or empty
   | 'ref';   // reference resolved via DB (brand / catalog slug or id)
 
@@ -390,7 +391,7 @@ const GROUP_SPECS: GroupSpec[] = [
       f('kind', 'enum', 'usage', 'setup (تركيب) | usage (استخدام)', { required: true, enumValues: ['setup', 'usage'] as const }),
       f('title', 'string', 'usage', 'عنوان الخطوة (حتى 200 حرف) — step title'),
       f('body', 'text', 'usage', 'شرح الخطوة (حتى 2000 حرف؛ heredoc للأسطر المتعددة) — step body'),
-      f('images', 'csv', 'usage', 'حتى 6 روابط صور مفصولة بفواصل — up to six image URLs'),
+      f('images', 'urls', 'usage', 'حتى 6 روابط صور — افصل بينها بمسافة (الفاصلة مقبولة أيضًا قبل رابط جديد). الفاصلة داخل الرابط نفسه لا تكسره. — up to six image URLs, space-separated'),
       f('video_url', 'string', 'usage', 'رابط فيديو (ملف مباشر أو صفحة YouTube/Vimeo) أو فارغ'),
       f('link_url', 'string', 'usage', 'رابط الوثيقة الرسمية لهذه الخطوة أو فارغ'),
     ],
@@ -485,7 +486,7 @@ function coerce(
     if (spec.type === 'bool' || spec.type === 'enum') {
       return err(`${CLEAR_TOKEN} is not allowed for ${spec.type} fields — set an explicit value`);
     }
-    if (spec.type === 'csv') return { value: [], clear: true, line };
+    if (spec.type === 'csv' || spec.type === 'urls') return { value: [], clear: true, line };
     return { value: '', clear: true, line };
   }
   switch (spec.type) {
@@ -550,6 +551,32 @@ function coerce(
     case 'csv': {
       if (raw === '') return { value: [], clear: false, line };
       const items = raw.split(',').map((x) => x.trim()).filter(Boolean);
+      return { value: items, clear: false, line };
+    }
+    /**
+     * A LIST OF ADDRESSES IS NOT A LIST OF TOKENS, and splitting one on every
+     * comma corrupts it.
+     *
+     * `usage_steps.N.images` is the only list of URLs the template carries, and
+     * it was a plain `csv`. A comma is a legal character in a URL path, and
+     * vendor CDNs use it constantly — a Cloudinary transform reads
+     * `.../upload/w_400,h_300/a.jpg`. Splitting there turned ONE working image
+     * into two broken ones, on export as well as on import, and the round trip
+     * multiplied them every time.
+     *
+     * The split is therefore URL-AWARE: whitespace always separates (a bare
+     * space cannot appear inside a valid URL), and a comma separates ONLY when
+     * what follows it starts a new address — `http://`, `https://` or a
+     * site-relative `/`. That reads every file already written with the old
+     * bare-comma join, and leaves `w_400,h_300` alone. Export now joins with a
+     * space, which is unambiguous from here on.
+     */
+    case 'urls': {
+      if (raw === '') return { value: [], clear: false, line };
+      const items = raw
+        .split(/\s+|,(?=\s*(?:https?:\/\/|\/))/i)
+        .map((x) => x.trim().replace(/,$/, ''))
+        .filter(Boolean);
       return { value: items, clear: false, line };
     }
   }
@@ -1141,7 +1168,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.kind`, st.kind);
     push(`${p}.title`, st.title);
     push(`${p}.body`, st.body);
-    push(`${p}.images`, st.images.join(','));
+    // A SPACE, not a comma: a bare space cannot appear inside a valid URL, so
+    // this join is unambiguous no matter what the address contains.
+    push(`${p}.images`, st.images.join(' '));
     push(`${p}.video_url`, st.video_url);
     push(`${p}.link_url`, st.link_url);
   });
@@ -1560,7 +1589,7 @@ function applyItemField(target: LooseItem, spec: FieldSpec, pf: ParsedField): vo
   }
   if (pf.clear) {
     if (spec.type === 'iqd' || spec.type === 'int') target[key] = null;
-    else if (spec.type === 'csv') target[key] = [];
+    else if (spec.type === 'csv' || spec.type === 'urls') target[key] = [];
     else target[key] = '';
     return;
   }
