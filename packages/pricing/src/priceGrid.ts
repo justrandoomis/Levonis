@@ -317,7 +317,7 @@ function step(
   return inherited;
 }
 
-function cellOf(row: PriceFields | null, field: Field, inherited: number | null, regularHere: number | null, regularDelta = 0): Cell {
+export function cellOf(row: PriceFields | null, field: Field, inherited: number | null, regularHere: number | null, regularDelta = 0): Cell {
   const col = COLUMN_OF[field];
   const mode = row ? priceMode(row, col) : 'inherit';
   // For a member cell, "what inheriting would land on" is the value beneath
@@ -334,6 +334,64 @@ function cellOf(row: PriceFields | null, field: Field, inherited: number | null,
     effective: step(inherited, row, field, regularHere, regularDelta),
     inherited: landing,
   };
+}
+
+/**
+ * ONE ROW'S FOUR CELLS, RESOLVED — the helper the admin EDITOR needs.
+ *
+ * WHY IT EXISTS. `buildGrid` already turns a whole product into resolved
+ * cells, but the product form edits one option or colour at a time and had no
+ * way to ask "what does this row actually charge?". So it rendered the four
+ * `*_price_iqd` scalars raw, and a row whose price is stored as an ADJUSTMENT
+ * — which is the shape `normalizeCheapestBase` deliberately writes, and the
+ * shape the storefront charges from correctly — has `regular_price_iqd = null`
+ * and therefore rendered as «inherit» while the customer was being charged
+ * base + adjustment. The price was never missing; the form was reading the
+ * wrong half of the pair.
+ *
+ * IT ADDS NO ARITHMETIC. The mode comes from `priceMode`, the regular and cost
+ * ladders from `step`, the member ladder from `memberAtRung`, and the final
+ * word from `clampMemberLadder` via `clampCells` — the same four functions
+ * `buildGrid` and the checkout resolver use. A second implementation of the
+ * ladder in the form is exactly the drift this exists to prevent.
+ *
+ * `beneath` is what this row inherits: the product base for an option, and the
+ * OPTION's resolved values for a colour that hangs under one.
+ */
+function ladderCells(row: PriceFields | null, beneath: Record<Field, number | null>): Record<Field, Cell> {
+  // The regular rung first, because a member cell's carried value and a member
+  // adjustment's anchor are both measured from this row's regular surcharge —
+  // the same order `pickMember` imposes on the resolver.
+  const regular = step(beneath.regular, row, 'regular', null);
+  const regularBeneath = beneath.regular ?? 0;
+  const regularDelta = (regular ?? regularBeneath) - regularBeneath;
+  const cells = {} as Record<Field, Cell>;
+  for (const f of FIELDS) cells[f] = cellOf(row, f, beneath[f], regular, regularDelta);
+  return cells;
+}
+
+export function rowCells(row: PriceFields | null, beneath: Record<Field, number | null>): Record<Field, Cell> {
+  const cells = ladderCells(row, beneath);
+  clampCells(cells);
+  return cells;
+}
+
+/**
+ * THE SAME ROW, UNCLAMPED — what the NEXT rung down inherits.
+ *
+ * The distinction is not cosmetic. `clampMemberLadder` is the resolver's last
+ * word on the line the customer actually picked (pricing.ts): the walk down the
+ * ladder is unclamped, and `buildGrid` copies the RAW `effective` into
+ * `optionEffective` for exactly this reason. Handing a colour its parent
+ * option's CLAMPED prices would make the form charge a different number from
+ * the checkout whenever an option's PRIME sits above its regular price before
+ * the colour's own surcharge is added.
+ */
+export function rowLadder(row: PriceFields | null, beneath: Record<Field, number | null>): Record<Field, number | null> {
+  const cells = ladderCells(row, beneath);
+  const out = {} as Record<Field, number | null>;
+  for (const f of FIELDS) out[f] = cells[f].effective;
+  return out;
 }
 
 /**

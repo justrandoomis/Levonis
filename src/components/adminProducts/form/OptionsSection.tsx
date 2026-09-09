@@ -41,18 +41,35 @@ import {
   localId,
   type FormColor,
   type FormGroup,
+  type FormPrices,
   type FormValue,
   type RelationsState,
 } from './model';
+// The SAME resolver the storefront and Quick Edit use — never a second copy of
+// the ladder. `Field` is already a form component here, so the pricing type
+// comes in as `GridField`.
+import {
+  rowCells,
+  rowLadder,
+  COLUMN_OF,
+  type Cell,
+  type Field as GridField,
+} from '../../../../worker/lib/priceGrid';
+import { ADJUST_OF, type PriceFields } from '../../../../worker/lib/pricing';
 
 export function OptionsSection({
   rel,
   setRel,
+  base,
   canSeeCost,
   errors,
 }: {
   rel: RelationsState;
   setRel: (fn: (r: RelationsState) => RelationsState) => void;
+  /** The product's own four prices — what an option inherits when it carries
+   *  none of its own. Without it every option row would read «inherit» with no
+   *  number beside it, which is the defect this section's price cells fix. */
+  base: Record<GridField, number | null>;
   canSeeCost: boolean;
   errors: Record<string, string>;
 }) {
@@ -172,6 +189,28 @@ export function OptionsSection({
       images: r.images.map((i) => (i.color_id === id ? { ...i, color_id: null } : i)),
     }));
 
+  /**
+   * WHAT A COLOUR INHERITS. The resolver's ladder is base → option → colour
+   * (pricing.ts `pick`), so a colour's own price is measured over the OPTION
+   * the customer picked — not over the base. A colour linked to exactly one
+   * option therefore resolves under that option's own prices; a colour linked
+   * to several has no single answer (its effective price genuinely differs per
+   * option) and a universal colour has no option at all, so both fall back to
+   * the base. That is the same rule the Quick Edit grid applies —
+   * `option_id: linked.length === 1 ? linked[0] : null`
+   * (worker/routes/adminPriceGrid.ts) — so the two screens agree about every
+   * number they show for the same colour.
+   */
+  const beneathColor = (c: FormColor): Record<GridField, number | null> => {
+    if (c.option_value_ids.length !== 1) return base;
+    const parent = rel.groups.flatMap((g) => g.values).find((v) => v.id === c.option_value_ids[0]);
+    if (!parent) return base;
+    // `rowLadder`, not `rowCells`: the UNCLAMPED values, exactly as `buildGrid`
+    // carries them down. `clampMemberLadder` is the resolver's last word on the
+    // line the customer picked, not on what the next rung inherits.
+    return rowLadder(parent as PriceFields, base);
+  };
+
   const toggleLink = (colorId: string, valueId: string) =>
     setRelAuto((r) => ({
       ...r,
@@ -287,6 +326,7 @@ export function OptionsSection({
                       </Field>
                       <PriceCells
                         prices={v}
+                        beneath={base}
                         canSeeCost={canSeeCost}
                         onChange={(patch) => patchValue(g.id, v.id, patch)}
                       />
@@ -373,7 +413,12 @@ export function OptionsSection({
                     placeholder="بدون / none"
                   />
                 </Field>
-                <PriceCells prices={c} canSeeCost={canSeeCost} onChange={(patch) => patchColor(c.id, patch)} />
+                <PriceCells
+                  prices={c}
+                  beneath={beneathColor(c)}
+                  canSeeCost={canSeeCost}
+                  onChange={(patch) => patchColor(c.id, patch)}
+                />
                 <Field ar="مفعّل" en="Active">
                   <Toggle
                     checked={c.active}
@@ -469,31 +514,129 @@ function AutoStockNote({ rel }: { rel: RelationsState }) {
   );
 }
 
-/** The four prices, at any level. Cost is admin-financial only (§5, §11). */
+/**
+ * THE FOUR PRICES, SHOWING WHAT THIS ROW ACTUALLY CHARGES.
+ *
+ * WHY THIS IS NOT FOUR `Money` INPUTS ANY MORE. A price may be stored as a
+ * FIXED number or as an ADJUSTMENT over the value beneath — the base+adjustment
+ * shape `normalizeCheapestBase` deliberately writes so the product's own price
+ * is the cheapest sellable one. In that shape `regular_price_iqd` is NULL and
+ * `regular_adjust_iqd` holds the delta, so reading the four `*_price_iqd`
+ * scalars raw showed «inherit» on a row the storefront was charging 899,000
+ * for. The price was never missing; the form was reading the wrong half.
+ *
+ * The effective number now comes from `rowCells`, which is the SAME `priceMode`
+ * / `step` / `memberAtRung` / `clampMemberLadder` chain the checkout resolver
+ * and the Quick Edit grid use — not a second implementation that could drift.
+ *
+ * EDITING. What is shown is what is edited: typing a number pins it as a fixed
+ * price for this row AND clears the adjustment beside it, so a fixed price and
+ * an adjustment can never both be set (`pick` would silently ignore the
+ * adjustment, and clearing the cell later would resurrect an ancient delta).
+ * Clearing the input returns the row to inherit — both halves null.
+ *
+ * THE BOX ALWAYS HOLDS THE RESOLVED NUMBER, in every one of the three modes,
+ * because "what will this row charge?" is the question the admin is asking and
+ * an empty box was the whole defect. What distinguishes the modes is the line
+ * BENEATH the box, which names the provenance of the number above it — and the
+ * «يرث» button, which is how a pinned row goes back to following its parent
+ * without the admin having to guess that blanking the field means that.
+ */
+function PriceCell({
+  label_ar,
+  label_en,
+  tip,
+  cell,
+  onCommit,
+}: {
+  label_ar: string;
+  label_en: string;
+  tip?: string;
+  cell: Cell;
+  onCommit: (v: number | null) => void;
+}) {
+  const fmt = (n: number | null) => (n === null ? '—' : new Intl.NumberFormat('en-US').format(n));
+  return (
+    <Field ar={label_ar} en={label_en} tip={tip}>
+      <Money
+        value={cell.effective}
+        onChange={onCommit}
+        placeholder={cell.inherited === null ? 'يرث / inherit' : `يرث ${fmt(cell.inherited)}`}
+      />
+      {/* THE PROVENANCE LINE. Never hidden, and never guessed: `cell.mode` is
+          `priceMode`'s answer for this exact row, so the sentence under the box
+          is the same fact the resolver acts on. */}
+      <div className="mt-1 flex items-center justify-between gap-2 min-w-0">
+        {cell.mode === 'adjust' && cell.adjust !== null ? (
+          <p className="text-[10px] text-amber-500/80 truncate" data-price-mode="adjust">
+            {cell.adjust >= 0 ? '+' : '−'}
+            {fmt(Math.abs(cell.adjust))} فوق {fmt(cell.inherited)}
+          </p>
+        ) : cell.mode === 'fixed' ? (
+          <p className="text-[10px] text-zinc-400 truncate" data-price-mode="fixed">
+            سعر ثابت لهذا الصف
+          </p>
+        ) : (
+          // Inherit, and the number in the box came from somewhere: say where,
+          // so an untouched cell showing 885,000 is not mistaken for a pinned
+          // one. A member cell inherits the value beneath PLUS this row's
+          // regular surcharge — which is why an option with no PRIME price of
+          // its own still shows a PRIME number, and why that number is right.
+          <p className="text-[10px] text-zinc-500 truncate" data-price-mode="inherit">
+            {cell.effective === null ? 'لا سعر — يرث ولا شيء فوقه' : `موروث: ${fmt(cell.effective)}`}
+          </p>
+        )}
+        {/* Returning to inheritance is a BUTTON, not a blanked field. Blanking
+            works too (both halves go null), but an admin should not have to
+            discover that. */}
+        {cell.mode !== 'inherit' && (
+          <button
+            type="button"
+            onClick={() => onCommit(null)}
+            className="shrink-0 text-[10px] text-zinc-500 hover:text-zinc-200 underline underline-offset-2"
+            data-price-inherit
+            title="امسح سعر هذا الصف ليتبع ما فوقه"
+          >
+            يرث
+          </button>
+        )}
+      </div>
+    </Field>
+  );
+}
+
 function PriceCells({
   prices,
+  beneath,
   canSeeCost,
   onChange,
 }: {
-  prices: { regular_price_iqd: number | null; prime_price_iqd: number | null; pro_price_iqd: number | null; cost_iqd: number | null };
+  prices: FormPrices;
+  /** What this row inherits: the product base for an option, the option's own
+   *  resolved prices for a colour that hangs under one. */
+  beneath: Record<GridField, number | null>;
   canSeeCost: boolean;
-  onChange: (patch: Partial<{ regular_price_iqd: number | null; prime_price_iqd: number | null; pro_price_iqd: number | null; cost_iqd: number | null }>) => void;
+  onChange: (patch: Partial<FormPrices>) => void;
 }) {
+  const cells = rowCells(prices as PriceFields, beneath);
+  /** One typed number pins the pair: fixed set, adjustment cleared. */
+  const commit = (field: GridField) => (v: number | null) => {
+    const col = COLUMN_OF[field];
+    onChange({ [col]: v, [ADJUST_OF[col]]: null } as Partial<FormPrices>);
+  };
   return (
     <>
-      <Field ar="السعر" en="Regular" hint="فارغ = سعر المنتج">
-        <Money value={prices.regular_price_iqd} onChange={(v) => onChange({ regular_price_iqd: v })} />
-      </Field>
-      <Field ar="PRIME" en="PRIME">
-        <Money value={prices.prime_price_iqd} onChange={(v) => onChange({ prime_price_iqd: v })} />
-      </Field>
-      <Field ar="PRO" en="PRO">
-        <Money value={prices.pro_price_iqd} onChange={(v) => onChange({ pro_price_iqd: v })} />
-      </Field>
+      <PriceCell label_ar="السعر" label_en="Regular" cell={cells.regular} onCommit={commit('regular')} />
+      <PriceCell label_ar="PRIME" label_en="PRIME" cell={cells.prime} onCommit={commit('prime')} />
+      <PriceCell label_ar="PRO" label_en="PRO" cell={cells.pro} onCommit={commit('pro')} />
       {canSeeCost && (
-        <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن.">
-          <Money value={prices.cost_iqd} onChange={(v) => onChange({ cost_iqd: v })} />
-        </Field>
+        <PriceCell
+          label_ar="التكلفة"
+          label_en="Cost"
+          tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن."
+          cell={cells.cost}
+          onCommit={commit('cost')}
+        />
       )}
     </>
   );

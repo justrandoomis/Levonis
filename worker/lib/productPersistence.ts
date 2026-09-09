@@ -111,16 +111,39 @@ const nullableSigned = (v: unknown, field: string, max = 1_000_000_000): number 
   return v;
 };
 
+/**
+ * A FIXED PRICE AND AN ADJUSTMENT CANNOT BOTH BE STORED ON ONE FIELD.
+ *
+ * `priceMode` (packages/pricing) answers 'fixed' the moment `*_price_iqd` is
+ * non-null, so an adjustment stored beside it is not a second opinion — it is
+ * dead data the resolver ignores. It stays dangerous precisely because it is
+ * ignored: the day someone clears the fixed price to make the row inherit
+ * again, the forgotten delta wakes up and the row silently charges the base
+ * plus an amount nobody typed.
+ *
+ * So the pair is collapsed on the way IN, where both writers pass: the product
+ * form's relations save and the TXT/CSV import both reach the database through
+ * `readPrices`. Dropping the twin changes NO price today (the fixed value
+ * already won) and removes the one that could change a price tomorrow.
+ */
+function collapse(price: number | null, adjust: number | null): number | null {
+  return price === null ? adjust : null;
+}
+
 function readPrices(o: Record<string, unknown>, where: string): PriceInput {
+  const regular_price_iqd = nullableInt(o.regular_price_iqd, `${where}.regular_price_iqd`);
+  const prime_price_iqd = nullableInt(o.prime_price_iqd, `${where}.prime_price_iqd`);
+  const pro_price_iqd = nullableInt(o.pro_price_iqd, `${where}.pro_price_iqd`);
+  const cost_iqd = nullableInt(o.cost_iqd, `${where}.cost_iqd`);
   return {
-    regular_price_iqd: nullableInt(o.regular_price_iqd, `${where}.regular_price_iqd`),
-    prime_price_iqd: nullableInt(o.prime_price_iqd, `${where}.prime_price_iqd`),
-    pro_price_iqd: nullableInt(o.pro_price_iqd, `${where}.pro_price_iqd`),
-    cost_iqd: nullableInt(o.cost_iqd, `${where}.cost_iqd`),
-    regular_adjust_iqd: nullableSigned(o.regular_adjust_iqd, `${where}.regular_adjust_iqd`),
-    prime_adjust_iqd: nullableSigned(o.prime_adjust_iqd, `${where}.prime_adjust_iqd`),
-    pro_adjust_iqd: nullableSigned(o.pro_adjust_iqd, `${where}.pro_adjust_iqd`),
-    cost_adjust_iqd: nullableSigned(o.cost_adjust_iqd, `${where}.cost_adjust_iqd`),
+    regular_price_iqd,
+    prime_price_iqd,
+    pro_price_iqd,
+    cost_iqd,
+    regular_adjust_iqd: collapse(regular_price_iqd, nullableSigned(o.regular_adjust_iqd, `${where}.regular_adjust_iqd`)),
+    prime_adjust_iqd: collapse(prime_price_iqd, nullableSigned(o.prime_adjust_iqd, `${where}.prime_adjust_iqd`)),
+    pro_adjust_iqd: collapse(pro_price_iqd, nullableSigned(o.pro_adjust_iqd, `${where}.pro_adjust_iqd`)),
+    cost_adjust_iqd: collapse(cost_iqd, nullableSigned(o.cost_adjust_iqd, `${where}.cost_adjust_iqd`)),
   };
 }
 

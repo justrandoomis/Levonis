@@ -1320,7 +1320,21 @@ export default function ProductForm({
         error={showErrors && Object.keys(errors).some((k) => k.startsWith('group') || k.startsWith('value') || k.startsWith('color') || k.startsWith('variant') || k === 'inventory_mode')}
         {...section(5)}
       >
-        <OptionsSection rel={rel} setRel={setRel} canSeeCost={canSeeCost} errors={showErrors ? errors : {}} />
+        <OptionsSection
+          rel={rel}
+          setRel={setRel}
+          // LIVE, not the loaded document: an admin who raises the base price in
+          // section 4 must see every inheriting option's price move with it
+          // before they save, not after a reload.
+          base={{
+            regular: doc.price_iqd,
+            prime: doc.prime_price_iqd,
+            pro: doc.pro_price_iqd,
+            cost: doc.product_cost_iqd,
+          }}
+          canSeeCost={canSeeCost}
+          errors={showErrors ? errors : {}}
+        />
       </SectionCard>
 
       {/* 6 ───────────────────────────────────────────────────────── images */}
