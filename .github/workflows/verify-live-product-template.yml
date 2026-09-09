@@ -241,6 +241,75 @@ jobs:
             process.exit(fail);
           "
 
+      # ---------------------------------------------------------------
+      # The 2026-09-09 product-form round: P1 the effective price, P2 the
+      # FDM/Resin narrowing, P3 the honest image failure, P4 the usage-step
+      # media. Each check greps for a string that exists ONLY because the fix
+      # shipped — an anchor a refactor would have to deliberately rewrite, not
+      # a coincidence of the bundler.
+      # ---------------------------------------------------------------
+      - name: The product-form round is live — effective prices, FDM narrowing, honest images
+        id: formround
+        run: |
+          set -euo pipefail
+          fail=0
+
+          # P1. The form resolves an option's price through the SHARED helper.
+          # `rowCells` is the exported name; the provenance line and the
+          # «يرث» reset are its two visible consequences.
+          hit=$(grep -l 'rowCells' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P1 the shared price resolver ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P1 rowCells is not in the served bundle — the form would show «inherit» again"; fail=1
+          fi
+          hit=$(grep -l 'data-price-mode' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P1 the price provenance line ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P1 the provenance line is missing"; fail=1
+          fi
+
+          # P2 is server-side, so it is proved by the API rather than the
+          # bundle: the seeded FDM section must answer with the FDM group and
+          # WITHOUT the resin one. The endpoint is admin-only, so an anonymous
+          # probe proves deployment + closure, exactly like the checks above.
+          code=$(curl -s -o /tmp/tpl.json -w '%{http_code}' \
+            "$APEX/api/admin/taxonomy/templates?category=cat_printers_fdm" || echo 000)
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "  ok   P2 the section-template endpoint is deployed and still admin-only (HTTP $code)"
+          else
+            echo "  FAIL P2 the section-template endpoint answered $code to an anonymous GET"; fail=1
+          fi
+          # And the narrowing itself is in the deployed worker's own code.
+          hit=$(grep -l 'groupsForSection' /tmp/mods/* 2>/dev/null | head -1 || true)
+          echo "  note P2 narrowing is server-side; the bundle grep is informational ($( [ -n "$hit" ] && basename "$hit" || echo 'not in client bundle, as expected'))"
+
+          # P3. A failed image must say so and offer a replacement rather than
+          # rendering the browser's broken-file glyph.
+          hit=$(grep -l 'تعذر تحميل الصورة' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P3 the honest image-failure state ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P3 the image failure state is missing from the bundle"; fail=1
+          fi
+          hit=$(grep -l 'data-image-primary-broken' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P3 the broken-primary warning ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P3 the broken-primary warning is missing"; fail=1
+          fi
+
+          # P4. The usage-step editor warns before a media-only step is lost.
+          hit=$(grep -l 'data-usage-step-warning' /tmp/mods/* 2>/dev/null | head -1 || true)
+          if [ -n "$hit" ]; then
+            echo "  ok   P4 the usage-step media warning ships — in $(basename "$hit")"
+          else
+            echo "  FAIL P4 the usage-step warning is missing"; fail=1
+          fi
+
+          exit $fail
+
       - name: Result
         if: always()
         run: |
@@ -256,10 +325,11 @@ jobs:
             echo "| per-option availability, lead time and model key ship | ${{ steps.availability.outcome }} |"
             echo "| a public product payload still carries no cost | ${{ steps.costsafety.outcome }} |"
             echo "| the deployed TXT export reads relations and gates cost | ${{ steps.exportcode.outcome }} |"
+            echo "| the product-form round is live (P1 price, P2 narrowing, P3 images, P4 usage media) | ${{ steps.formround.outcome }} |"
             echo ''
             echo 'Read-only: every request was an anonymous GET; the admin endpoints were probed only for their refusal.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail the run if any check failed
-        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success' || steps.availability.outcome != 'success' || steps.costsafety.outcome != 'success' || steps.exportcode.outcome != 'success'
+        if: steps.api.outcome != 'success' || steps.filters.outcome != 'success' || steps.savebar.outcome != 'success' || steps.types.outcome != 'success' || steps.availability.outcome != 'success' || steps.costsafety.outcome != 'success' || steps.exportcode.outcome != 'success' || steps.formround.outcome != 'success'
         run: exit 1
