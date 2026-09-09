@@ -1,0 +1,42 @@
+-- ---------------------------------------------------------------------------
+-- 0064 — the checkout idempotency key becomes unique PER USER.
+-- Owner decision 11 (docs/BUNDLES_MYSTERY.md §17). Applied by workflow 7
+-- BEFORE the code that writes the new column (two-PR rule, 02-MIGRATION-PLAN).
+-- ---------------------------------------------------------------------------
+-- THE DEFECT. `orders.idempotency_key` is globally UNIQUE (0001_init.sql:156)
+-- while every lookup that reads it is scoped by user — `WHERE idempotency_key
+-- = ? AND user_id = ?` at both checkout replay sites. So a key already spent
+-- by ANOTHER account makes the INSERT fail, makes the replay lookup find
+-- nothing, and drops the request into a generic "Order could not be placed",
+-- for ever, for a key the attacker chooses. The client mints the key
+-- (src/lib/api.ts newIdempotencyKey), so it is attacker-controlled input in a
+-- globally-unique column: one account can permanently deny another's checkout.
+--
+-- WHY A NEW COLUMN AND NOT A REBUILT CONSTRAINT. The UNIQUE is declared inline
+-- in `CREATE TABLE orders`, so SQLite materialises it as `sqlite_autoindex_
+-- orders_2`, and an autoindex behind a UNIQUE constraint CANNOT be dropped
+-- (`DROP INDEX` on it is refused by name). Removing it means rebuilding
+-- `orders` — and `orders` is the root of a 38-table foreign-key closure whose
+-- children cascade-delete on DROP, inside a migration D1 runs in ONE
+-- transaction where `PRAGMA foreign_keys = OFF` is a documented no-op. 0018
+-- refused to rebuild `users` for exactly this reason (0018:18-27). A rebuild
+-- here is not a small migration; it is surgery on every order the store has
+-- ever taken, to change one index. So the guarantee is delivered the way 0056
+-- delivered the ledger keys: a new column plus a PARTIAL unique index.
+--
+-- ADDITIVE AND UNUSED ON ARRIVAL. `client_idempotency_key` is NOT NULL
+-- DEFAULT '', so every existing order backfills to '' ("written before the
+-- column existed") and no row is read, rewritten or deleted. The index is
+-- PARTIAL — `WHERE client_idempotency_key <> ''` — so today's rows, all '',
+-- do not collide with each other; uniqueness begins the moment a writer
+-- supplies a key. The legacy column and its global UNIQUE stay exactly as they
+-- are, holding every historical value; the new writers bind NULL there, and
+-- SQLite permits unlimited NULLs in a UNIQUE column.
+--
+-- WHAT THE INDEX GUARANTEES. (user_id, client_idempotency_key) unique: the
+-- same user retrying with the same key still collides and still replays their
+-- own order; a different user carrying the identical key inserts cleanly.
+ALTER TABLE orders ADD COLUMN client_idempotency_key TEXT NOT NULL DEFAULT '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_user_idempotency
+  ON orders(user_id, client_idempotency_key) WHERE client_idempotency_key <> '';

@@ -220,9 +220,13 @@ storeOrderRoutes.post('/', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
 
+  // Per user, both columns (0064): `client_idempotency_key` is where this
+  // route now stores the key and is unique per user; `idempotency_key` is the
+  // legacy globally-unique column, still holding keys written before the
+  // migration, so a retry in flight across the deploy still replays.
   const replay = await c.env.DB.prepare(
-    'SELECT id FROM orders WHERE idempotency_key = ? AND user_id = ?'
-  ).bind(idempotencyKey, user.id).first<{ id: string }>();
+    'SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
+  ).bind(user.id, idempotencyKey).first<{ id: string }>();
   if (replay) {
     const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(replay.id).first();
     return c.json({ success: true, order, replay: true });
@@ -249,9 +253,14 @@ storeOrderRoutes.post('/', async (c) => {
     const hold = await createPurchaseHold(c.env.DB, {
       userId: user.id,
       amountCents: walletCents,
-      eventKey: `store-order:${idempotencyKey}`,
+      // SERVER-MINTED, never the client's key. `wallet_holds.event_key` is
+      // global, so a key another account had already spent would refuse this
+      // buyer's hold — the same cross-user denial 0064 closes on `orders`.
+      // The hold is created before the order id exists, so the key is the
+      // user plus their key, which is exactly the pair 0064 makes unique.
+      eventKey: `store-order:${user.id}:${idempotencyKey}`,
       refType: 'store_order',
-      refId: idempotencyKey,
+      refId: `${user.id}:${idempotencyKey}`,
       note: `Order from ${cart.store_name}`,
     });
     if (!hold.ok) {
@@ -274,7 +283,7 @@ storeOrderRoutes.post('/', async (c) => {
          (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
           payment_method_id, subtotal_iqd, shipping_iqd, exchange_rate, total_iqd,
           due_on_delivery_iqd, wallet_applied_iqd, wallet_applied_usd_cents,
-          idempotency_key, created_at, updated_at,
+          client_idempotency_key, created_at, updated_at,
           seller_type, merchant_id, store_id, origin,
           commission_percent_x100, platform_fee_iqd, merchant_receivable_iqd,
           stage, stage_changed_at, coupon_code, coupon_discount_iqd)
@@ -335,7 +344,11 @@ storeOrderRoutes.post('/', async (c) => {
       `INSERT INTO merchant_payout_ledger
          (id, merchant_id, kind, amount_iqd, state, order_id, note, idempotency_key)
        VALUES (?,?,'sale_credit',?,'pending',?,'store sale',?)`
-    ).bind(newId('pay'), cart.merchant_id, split.merchant_receivable_iqd, orderId, `sale:${idempotencyKey}`)
+    // `merchant_payout_ledger.idempotency_key` is GLOBALLY unique, so binding
+    // the client's key here reproduced the very defect 0064 fixes — and in a
+    // batch with no catch, so it surfaced as a bare 500. The order id is
+    // server-minted and already unique per sale.
+    ).bind(newId('pay'), cart.merchant_id, split.merchant_receivable_iqd, orderId, `sale:${orderId}`)
   );
   stmts.push(c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id));
 
@@ -361,7 +374,29 @@ storeOrderRoutes.post('/', async (c) => {
     );
   }
 
-  await c.env.DB.batch(stmts);
+  // The hold taken above deliberately SURVIVES a failed batch: the key is
+  // deterministic per user and checkout key, so the buyer's retry reuses that
+  // same reservation instead of taking a second one out of their balance
+  // (tests/walletHoldSettlement.test.ts pins it). This catch therefore does not
+  // release it — it only answers a retry whose order already committed.
+  try {
+    await c.env.DB.batch(stmts);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // The same-user retry: their own order already exists, so replay it
+    // rather than reporting a failure for work that succeeded.
+    if (msg.includes('UNIQUE') && (msg.includes('orders.idempotency_key') || msg.includes('orders.client_idempotency_key'))) {
+      const again = await c.env.DB.prepare(
+        'SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
+      ).bind(user.id, idempotencyKey).first<{ id: string }>();
+      if (again) {
+        const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(again.id).first();
+        return c.json({ success: true, order, replay: true });
+      }
+      throw conflict('This checkout key was already used. Start the checkout again.', 'IDEMPOTENCY_KEY_REUSED');
+    }
+    throw e;
+  }
 
   await audit(c.env.DB, user.id, 'community.store_order_created', orderId, {
     store: cart.store_id,

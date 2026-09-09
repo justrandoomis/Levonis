@@ -88,6 +88,14 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The items in this bundle do not share one shipping method.',
     ckb: 'پارچەکانی ئەم پاکێجە یەک شێوازی گەیاندنیان نییە.',
   },
+  // The checkout key. Globally unique before migration 0064, per-user after
+  // it: a key another account had spent used to fail this account's checkout
+  // with an untranslatable "please try again" it could never escape.
+  IDEMPOTENCY_KEY_REUSED: {
+    ar: 'انتهت صلاحية جلسة الدفع هذه. ارجع إلى السلة وابدأ الدفع من جديد.',
+    en: 'This checkout session has expired. Go back to the cart and start the checkout again.',
+    ckb: 'ئەم دانیشتنی پارەدانە بەسەرچووە. بگەڕێوە بۆ سەبەتەکە و پارەدان لە سەرەتاوە دەست پێ بکەوە.',
+  },
   BUNDLE_PARTIAL_RETURN_NOT_ALLOWED: {
     ar: 'يمكن إرجاع الحزمة كاملة فقط، وليس قطعة منها.',
     en: 'A bundle can only be returned whole, not one part of it.',

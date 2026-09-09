@@ -41,6 +41,7 @@ const CUSTOMER_FACING = [
   'MYSTERY_MODE_NOT_AVAILABLE',
   'MYSTERY_NOT_REVEALED',
   'MYSTERY_REVEALED_NO_CANCEL',
+  'IDEMPOTENCY_KEY_REUSED',
 ] as const;
 
 test('every customer-facing refusal code has an ar, an en AND a ckb sentence', () => {

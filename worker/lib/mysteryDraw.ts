@@ -46,9 +46,11 @@
  *
  * 6. THE ALLOCATION IS PERMANENT. It is written in the order's own batch, fenced
  *    by `PRIMARY KEY (order_item_id, spool_index)`, and nothing ever updates
- *    `product_id` or `color_id`. Combined with the deterministic seed and
- *    `orders.idempotency_key UNIQUE`, a refresh, a retry, a double tap and a
- *    webhook replay cannot produce a different filament.
+ *    `product_id` or `color_id`. Combined with the deterministic seed and the
+ *    per-user checkout key (`orders.client_idempotency_key`, unique with
+ *    `user_id` since migration 0064 — it was the globally-unique
+ *    `orders.idempotency_key` when this was written), a refresh, a retry, a
+ *    double tap and a webhook replay cannot produce a different filament.
  *
  * This module is the ONLY file in the repository that names
  * `mystery_offer_secrets`; `tests/compositionSchema.test.ts` fails if that ever

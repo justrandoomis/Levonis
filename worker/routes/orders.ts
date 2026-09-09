@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, str, int, HttpError } from '../lib/http';
+import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
@@ -2245,8 +2245,16 @@ orderRoutes.post('/', async (c) => {
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
 
   // Idempotent replay: return the already-created order.
-  const existing = await c.env.DB.prepare('SELECT id FROM orders WHERE idempotency_key = ? AND user_id = ?')
-    .bind(idempotencyKey, user.id)
+  //
+  // Both arms on purpose (0064). `client_idempotency_key` is where every new
+  // order stores the key and is unique PER USER; `idempotency_key` is the
+  // legacy globally-unique column, still holding every key written before the
+  // migration — so a retry that was in flight across the deploy still replays
+  // its own order instead of being told it never happened.
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
+  )
+    .bind(user.id, idempotencyKey)
     .first<{ id: string }>();
   if (existing) {
     const data = (await loadOrder(c.env.DB, existing.id))!;
@@ -2359,7 +2367,7 @@ orderRoutes.post('/', async (c) => {
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
          payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
-         wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, idempotency_key,
+         wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, client_idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
          support_snapshot, shipping_type, membership_gift, referral_delivery_waived, created_at, updated_at)
        VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -2697,9 +2705,18 @@ orderRoutes.post('/', async (c) => {
     await c.env.DB.batch(stmts);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('UNIQUE') && msg.includes('idempotency_key')) {
-      const replay = await c.env.DB.prepare('SELECT id FROM orders WHERE idempotency_key = ? AND user_id = ?')
-        .bind(idempotencyKey, user.id)
+    // The ORDERS key, and nothing else. `inventory_ledger.idempotency_key` is
+    // in this very batch (the reservation rows) and is also globally UNIQUE,
+    // so a bare `includes('idempotency_key')` catches a concurrent stock loss
+    // — which this route deliberately answers with CONFLICT_RETRY — and would
+    // report it as key reuse. Both order messages name the table: the legacy
+    // column raises `orders.idempotency_key`, the per-user index raises
+    // `orders.user_id, orders.client_idempotency_key`.
+    if (msg.includes('UNIQUE') && (msg.includes('orders.idempotency_key') || msg.includes('orders.client_idempotency_key'))) {
+      const replay = await c.env.DB.prepare(
+        'SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
+      )
+        .bind(user.id, idempotencyKey)
         .first<{ id: string }>();
       if (replay) {
         const d = (await loadOrder(c.env.DB, replay.id))!;
@@ -2710,6 +2727,15 @@ orderRoutes.post('/', async (c) => {
           replay: true,
         });
       }
+      // The orders key collided and this user has no such order. Before 0064
+      // that meant another account had spent the key and the request fell
+      // through to a generic "please try again" it could never escape. It
+      // should now be unreachable — which is exactly why it says so out loud
+      // instead of hiding in the generic branch.
+      throw conflict(
+        'This checkout key was already used. Start the checkout again.',
+        'IDEMPOTENCY_KEY_REUSED'
+      );
     }
     if (msg.includes('COUPON_PER_USER_LIMIT')) {
       throw badRequest('Coupon could not be applied (PER_USER_LIMIT_REACHED)', 'PER_USER_LIMIT_REACHED');
