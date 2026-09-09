@@ -3,6 +3,8 @@ import { Home, Users, MessageCircle, ShoppingCart, User } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { api } from '../lib/api';
+import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
 
 /**
  * Routes on which the floating bottom nav does not render. Exported so the
@@ -38,6 +40,35 @@ export default function BottomNav() {
   const { t } = useLanguage();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
+  /**
+   * THE CART BADGE. Adding a product used to change nothing anywhere in the
+   * chrome, so the only way to learn whether a tap had worked was to open the
+   * cart. The number comes from the shared store (src/lib/cartCount.ts), which
+   * every cart response writes to, so the badge is the server's count and
+   * never an optimistic guess.
+   */
+  const cartCount = React.useSyncExternalStore(cartCountStore.subscribe, cartCountStore.snapshot, () => null);
+
+  // One small request, once, and only for someone who can have a cart. A
+  // failure is silent by design: a missing badge is a badge that is merely
+  // absent, while a wrong one is a lie about the customer's basket.
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setCartCount(null);
+      return;
+    }
+    if (cartCountStore.snapshot() !== null) return;
+    let cancelled = false;
+    api
+      .get<{ items: Array<{ qty?: number | null }> }>('/api/cart')
+      .then((d) => {
+        if (!cancelled) setCartCount(countCartItems(d.items ?? []));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const navItems = [
     { icon: Users, label: t('community'), path: '/community' },
@@ -60,21 +91,35 @@ export default function BottomNav() {
 
   const renderItem = (item: (typeof navItems)[number]) => {
     const isActive = location.pathname === item.path;
+    const badge = item.path === '/cart' && cartCount ? cartCount : 0;
     return (
       <Link
         key={item.path}
         to={linkTarget(item.path)}
-        aria-label={item.label}
+        aria-label={badge > 0 ? `${item.label} (${badge})` : item.label}
         aria-current={isActive ? 'page' : undefined}
         className={`flex flex-col items-center justify-center flex-1 h-full rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95 ${
           isActive ? 'bg-olive/20 text-gold shadow-sm' : 'text-zinc-500 hover:text-gold'
         }`}
       >
-        <item.icon
-          className={`w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mb-0.5 sm:mb-1 ${isActive ? 'text-gold' : ''}`}
-          strokeWidth={isActive ? 2.5 : 2}
-          aria-hidden="true"
-        />
+        <span className="relative">
+          <item.icon
+            className={`w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mb-0.5 sm:mb-1 ${isActive ? 'text-gold' : ''}`}
+            strokeWidth={isActive ? 2.5 : 2}
+            aria-hidden="true"
+          />
+          {badge > 0 ? (
+            // Absolutely positioned so appearing and changing never moves the
+            // tab, and the label is already on the link — the pill itself is
+            // decorative.
+            <span
+              aria-hidden="true"
+              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-gold text-black text-[10px] font-black leading-[16px] text-center tabular-nums"
+            >
+              {badge > 99 ? '99+' : badge}
+            </span>
+          ) : null}
+        </span>
         <span className={`text-[9px] sm:text-[11px] font-medium whitespace-nowrap ${isActive ? 'text-gold font-bold' : ''}`}>{item.label}</span>
       </Link>
     );

@@ -11,6 +11,26 @@
 
 @import "tailwindcss";
 
+/*
+  THE ONE HTML ELEMENT THAT REFUSES TO SHRINK.
+
+  Browsers give <fieldset> a UA `min-inline-size: min-content` — the only
+  element with such a floor — and Tailwind's preflight does not reset it. So a
+  fieldset containing any `white-space: nowrap` run (every `truncate` label) is
+  forced WIDER than its containing block, and the whole page scrolls sideways
+  on a 360px phone. That is what made the extended-warranty panel "break on
+  mobile" while the identical option and colour panels did not: theirs happen
+  to cap the label's width, and its did not.
+
+  The UA `margin-inline: 2px` goes with it: it made every fieldset sit two
+  pixels narrower on each side than the plain <div> price block stacked
+  directly above it, so a column of panels was subtly out of alignment.
+*/
+fieldset {
+  min-inline-size: 0;
+  margin-inline: 0;
+}
+
 html, body, #root {
   background-color: #000;
   color: #fff;

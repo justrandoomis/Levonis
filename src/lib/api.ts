@@ -34,7 +34,31 @@ export function isNotConfigured(e: unknown): boolean {
   return e instanceof ApiError && e.status === 503;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/**
+ * PER-REQUEST CONTROL: a caller may cancel, and every request has a deadline.
+ *
+ * Without a deadline a request that never settles never rejects, and any UI
+ * whose "loading" flag is owned by the promise stays loading forever with no
+ * error and no retry — which is exactly how the product page came to sit in
+ * «يجري تحديث السعر…» after a mobile network handover. A timeout turns a hang
+ * into an ordinary failure the UI already knows how to show and retry.
+ */
+export interface RequestOptions {
+  /** The caller's own cancellation — a React effect cleanup, typically. */
+  signal?: AbortSignal;
+  /** Deadline in ms. Defaults to DEFAULT_TIMEOUT_MS; 0 disables it. */
+  timeoutMs?: number;
+}
+
+/**
+ * Long enough that a slow Iraqi mobile round trip completes, short enough that
+ * a dead connection surfaces as an error while the customer is still looking
+ * at the screen. Uploads pass their own (or 0) — a large file legitimately
+ * takes longer than any page interaction.
+ */
+const DEFAULT_TIMEOUT_MS = 20000;
+
+async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
   const init: RequestInit = { method, credentials: 'same-origin', headers: {} };
   if (body !== undefined && !(body instanceof FormData)) {
     init.headers = { 'Content-Type': 'application/json' };
@@ -42,11 +66,32 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } else if (body instanceof FormData) {
     init.body = body;
   }
+  const controller = new AbortController();
+  init.signal = controller.signal;
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let timedOut = false;
+  const timer =
+    timeoutMs > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, timeoutMs)
+      : null;
+  const onCallerAbort = () => controller.abort();
+  opts?.signal?.addEventListener('abort', onCallerAbort);
   let res: Response;
   try {
     res = await fetch(path, init);
   } catch {
+    // A caller-cancelled request is not a failure to report: the effect that
+    // started it has already moved on, and its own cleanup owns the state.
+    // A DEADLINE, though, is a real failure the customer must be able to see
+    // and retry — so it travels as the ordinary network error.
+    if (opts?.signal?.aborted && !timedOut) throw new ApiError(0, 'Request cancelled', 'ABORTED');
     throw new ApiError(0, 'Network error — check your connection and try again');
+  } finally {
+    if (timer) clearTimeout(timer);
+    opts?.signal?.removeEventListener('abort', onCallerAbort);
   }
   let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
   try {
@@ -67,12 +112,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
-  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
-  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  get: <T>(path: string, opts?: RequestOptions) => request<T>('GET', path, undefined, opts),
+  post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('POST', path, body, opts),
+  put: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PUT', path, body, opts),
+  patch: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PATCH', path, body, opts),
+  delete: <T>(path: string, opts?: RequestOptions) => request<T>('DELETE', path, undefined, opts),
 };
+
+/** True for a request the CALLER cancelled — never worth showing to anyone. */
+export function isAborted(e: unknown): boolean {
+  return e instanceof ApiError && e.code === 'ABORTED';
+}
 
 // ---------------------------------------------------------------- types
 

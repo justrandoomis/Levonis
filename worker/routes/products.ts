@@ -697,6 +697,158 @@ export function productPublic(
 }
 
 /**
+ * EVERY PRICE THE CUSTOMER CAN REACH IN ONE TAP, RESOLVED ONCE, ON THE SERVER.
+ *
+ * THE DEFECT THIS CLOSES. The product page had exactly one source for a price:
+ * `POST /api/products/:slug/quote`, behind a 220 ms debounce. So every touch of
+ * an option or a colour cost a debounce plus a network round trip before the
+ * figure could change — and while that was in flight the page had nothing to
+ * show. On an Iraqi mobile connection that is most of a second of «يجري تحديث
+ * السعر…» on every single tap of the control whose entire job is to set the
+ * price.
+ *
+ * WHY THE ANSWER IS HERE AND NOT IN THE BROWSER. The obvious fix is to run the
+ * resolver client-side. It is the wrong one. `applyOfferToResolved` can replace
+ * the whole ladder while a scheduled window is live (§9), `offerEligible` gates
+ * that window on a membership the browser cannot verify, and `proPolicy` is a
+ * store setting that is deliberately not public. A browser resolver would be
+ * right until the day an offer went live and then quietly disagree with the
+ * checkout — the page/cart/door split §15.4 case 9 exists to prevent.
+ *
+ * So the server answers all of them at once, with the code that already prices
+ * the door, and the page reads the answer. `publicWithDisplayPrice` ALREADY
+ * walks base + every option + every colour on this same request (that loop is
+ * where `display_price_iqd` and `display_from` come from) and throws away
+ * everything but the minimum and the maximum. This keeps the numbers.
+ *
+ * COST. `resolveUnitPrice` is a pure function over a document already in
+ * memory: no D1 query, no await, no I/O. The extra work is the COMBINATIONS —
+ * bounded by `MAX_LEVELS` below — and the payload, which is three integers per
+ * reachable selection.
+ *
+ * WHAT A LEVEL PRICE MEANS. It is the selection priced with NO transport and
+ * NO extended-warranty plan: the state the page opens in, and the one it is in
+ * for all but the last tap before checkout. When a transport or a plan IS
+ * chosen the quote's `unit_subtotal_iqd` is the authority and the page marks
+ * the level figure provisional until it lands. `applied_iqd` is never
+ * provisional — a transport does not move the ladder.
+ */
+
+/** One selection's prices, as the door would charge them today. */
+export interface PriceLevel {
+  /** The unit ladder price at the viewer's tier, offer applied. */
+  applied_iqd: number;
+  /** The same selection's regular price — the member strikethrough. */
+  regular_iqd: number;
+  /** applied + the direct-sale premium: what the page multiplies by quantity. */
+  unit_subtotal_iqd: number;
+  /** Which rung won — the page's PRO/PRIME badge, never inferred in the browser. */
+  applied_tier: ResolvedPrice['applied_tier'];
+}
+
+export interface PriceLevels {
+  base: PriceLevel;
+  /** By option id. */
+  option: Record<string, PriceLevel>;
+  /** By colour id. */
+  color: Record<string, PriceLevel>;
+  /** By `optionId + '|' + colorId` — the page's own selection key. */
+  combo: Record<string, PriceLevel>;
+  /**
+   * FALSE when the combination grid was too large to publish and only the
+   * single-level prices are here. The page must not present a combination
+   * price as final while this is false — it waits for the quote, exactly as
+   * it did before this field existed. Honest by construction: a missing key
+   * and a wrong key are not the same thing.
+   */
+  complete: boolean;
+}
+
+/**
+ * The ceiling on published selections. A catalogue with 12 options and 12
+ * colours reaches 144 combinations, ~9 KB of JSON — still cheap against the
+ * round trip it removes. Past this the payload stops paying for itself and
+ * the page falls back to the quote for combinations only; base, option and
+ * colour prices are always published, because those are what the first tap
+ * reaches.
+ */
+const MAX_LEVELS = 240;
+
+/**
+ * Resolve one selection exactly as `publicWithDisplayPrice` and the quote do —
+ * same resolver, same context, same offer rule, same eligibility check.
+ *
+ * `isPrinter` is deliberately not threaded: it feeds `effectiveBaseMonths` for
+ * warranty totals only (packages/pricing/src/pricing.ts:721) and cannot move a
+ * unit price, and no level here carries a warranty plan.
+ */
+function levelPrice(
+  doc: ProductDoc,
+  ctx: PricingCtx,
+  offer: OfferView | null | undefined,
+  optionId: string | null,
+  colorId: string | null,
+  now: number
+): PriceLevel {
+  let r = resolveUnitPrice({
+    product: doc,
+    optionId,
+    colorId,
+    tier: ctx.tier,
+    tierActive: ctx.tierActive,
+    proPolicy: ctx.proPolicy,
+    transportDefaults: ctx.transportDefaults,
+  });
+  if (offer && (doc.composition ?? '') === '' && offerEligible(ctx.tierStatus, offer, now).ok) {
+    r = applyOfferToResolved(r, offer, ctx.tier, ctx.tierActive, now).resolved;
+  }
+  return {
+    applied_iqd: r.applied_iqd,
+    regular_iqd: r.regular_iqd,
+    unit_subtotal_iqd: r.unit_subtotal_iqd,
+    applied_tier: r.applied_tier,
+  };
+}
+
+/**
+ * Every selection the choosers can reach, priced. Pure and synchronous.
+ *
+ * A colour that is sold with only some options contributes only those pairs —
+ * `option_ids` is the link the relational rows carry, and an empty/absent one
+ * means the colour is offered with every option.
+ */
+export function priceLevels(
+  doc: ProductDoc,
+  ctx: PricingCtx,
+  offer: OfferView | null | undefined,
+  now: number
+): PriceLevels {
+  const options = doc.options.filter((o) => o.active !== false);
+  const colors = doc.colors.filter((c) => c.active !== false);
+  const at = (optionId: string | null, colorId: string | null) =>
+    levelPrice(doc, ctx, offer, optionId, colorId, now);
+
+  const option: Record<string, PriceLevel> = {};
+  for (const o of options) option[o.id] = at(o.id, null);
+  const color: Record<string, PriceLevel> = {};
+  for (const c of colors) color[c.id] = at(null, c.id);
+
+  const pairs: Array<[string, string]> = [];
+  for (const o of options) {
+    for (const c of colors) {
+      const links = c.option_ids && c.option_ids.length > 0 ? c.option_ids : c.option_id ? [c.option_id] : [];
+      if (links.length > 0 && !links.includes(o.id)) continue;
+      pairs.push([o.id, c.id]);
+    }
+  }
+  const complete = 1 + options.length + colors.length + pairs.length <= MAX_LEVELS;
+  const combo: Record<string, PriceLevel> = {};
+  if (complete) for (const [o, c] of pairs) combo[`${o}|${c}`] = at(o, c);
+
+  return { base: at(null, null), option, color, combo, complete };
+}
+
+/**
  * Public shape + the viewer-tier resolved display price.
  *
  * THE CARD PRICE IS THE CHEAPEST WAY TO BUY THE PRODUCT, not the base row's
@@ -1238,14 +1390,11 @@ productRoutes.get('/:slug', async (c) => {
     // colour. A product that is in no pool costs one empty query and the
     // payload is byte-identical to today's.
     const poolMember = (await activePoolProductIds(c.env.DB, [String(row.id)])).size > 0;
-    const out = publicWithDisplayPrice(
-      row,
-      ctx,
-      relations,
-      undefined,
-      (await loadOffers(c.env.DB, [subjectOf(String(row.id))])).get(offerKey(subjectOf(String(row.id)))),
-      poolMember
-    );
+    // Hoisted out of the call below: the SAME window has to price the display
+    // block and the per-selection levels, or the page would paint an offer
+    // price on the card and a ladder price the moment a variant was tapped.
+    const offer = (await loadOffers(c.env.DB, [subjectOf(String(row.id))])).get(offerKey(subjectOf(String(row.id))));
+    const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
     // A fact about the product, not a price: the storefront renders the
     // home-delivery note beside a printer's price block from this flag.
     out.is_printer = isPrinter;
@@ -1289,6 +1438,10 @@ productRoutes.get('/:slug', async (c) => {
       // images. Null when the product has no relational rows at all.
       relations: publicRelations(relations, poolMember),
       pricing: publicQuote(resolved), // base-selection resolver result, cost-free
+      // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
+      // The page paints the exact figure on the same frame as the tap, and the
+      // debounced quote becomes a confirmation rather than a prerequisite.
+      price_levels: priceLevels(doc, ctx, offer, Date.now()),
       // The final price of every way to get the BASE selection (the quote
       // re-computes them per selection) — the page's fulfilment pills and
       // transport rows read these, and compute nothing.

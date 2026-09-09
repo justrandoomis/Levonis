@@ -46,6 +46,7 @@ import {
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench,
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import { setCartCount, countCartItems } from '../lib/cartCount';
 import ReviewSection from '../components/reviews/ReviewSection';
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
@@ -286,7 +287,14 @@ interface ProductDetail {
     }>;
   };
   merchant?: { id: string; name: string; verified: boolean };
+  /** The CHEAPEST way to buy this product, resolved at the viewer's tier —
+   *  the same number the card showed. Never `price_iqd`, which is the base
+   *  row and may be a price nobody is charged. */
   display_price_iqd?: number;
+  /** True only when the variants GENUINELY differ in price; the server proved
+   *  it by resolving every one of them. This is what «يبدأ من» is allowed to
+   *  key off — the page must never infer it from not having a quote yet. */
+  display_from?: boolean;
 }
 
 /** The relational structure (worker publicRelations): per-level sellable
@@ -367,8 +375,38 @@ interface ViewerTier {
   pro_benefits_context?: boolean;
 }
 
+/**
+ * ONE SELECTION'S PRICE, AS THE SERVER RESOLVED IT ON THE PAGE REQUEST
+ * (worker/routes/products.ts `priceLevels`). Not a hint and not an estimate —
+ * the same resolver, the same membership context and the same live offer that
+ * price the door, run for every selection the choosers can reach, so a tap can
+ * paint the exact figure on its own frame instead of waiting for a round trip.
+ */
+interface PriceLevel {
+  applied_iqd: number;
+  regular_iqd: number;
+  unit_subtotal_iqd: number;
+  applied_tier: 'regular' | 'pro' | 'prime';
+}
+
+interface PriceLevels {
+  base: PriceLevel;
+  option: Record<string, PriceLevel>;
+  color: Record<string, PriceLevel>;
+  /** Keyed `optionId|colorId`. Empty when `complete` is false. */
+  combo: Record<string, PriceLevel>;
+  /** False = the combination grid was too large to publish; a combination
+   *  price is then genuinely unknown until the quote lands, and the page says
+   *  so rather than guessing. */
+  complete: boolean;
+}
+
 interface DetailResponse {
   product: ProductDetail;
+  /** The BASE selection's quote, already resolved by the server on this very
+   *  request. The page used to discard it and re-ask for it over the network. */
+  pricing?: Omit<Quote, 'qty' | 'line_total_iqd'>;
+  price_levels?: PriceLevels;
   source: ProductSource;
   favorite: boolean;
   relations?: RelationsPayload | null;
@@ -553,6 +591,20 @@ export default function Product() {
   // the fallback, so the chooser is never empty for a printer.
   const [quotedPlans, setQuotedPlans] = useState<WarrantyPlanItem[] | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  /**
+   * WHICH SELECTION THE QUOTE IN HAND ACTUALLY ANSWERS.
+   *
+   * `quote` alone cannot say: while a new selection's request is in flight the
+   * previous selection's quote is still the value of the variable. Recording
+   * the key it was fetched for is what lets the page show a figure and be
+   * honest about whether it is the confirmed one — instead of the old
+   * all-or-nothing gate that blanked the price on every tap.
+   */
+  const [quotedFor, setQuotedFor] = useState<string | null>(null);
+  const [priceLevels, setPriceLevels] = useState<PriceLevels | null>(null);
+  /** The extended-warranty disclosure. Closed by default because "no
+   *  extension" is already the correct answer for most buyers. */
+  const [warrantyOpen, setWarrantyOpen] = useState(false);
   const [quoteError, setQuoteError] = useState<unknown>(null);
   const [quoteToken, setQuoteToken] = useState(0);
 
@@ -616,12 +668,24 @@ export default function Product() {
         setDetailModes(data.pricing_modes ?? null);
         setQuotedModes(null);
         setLiveAvailability(null);
-        setQuote(null);
         setQuotedPlans(null);
         setQuoteError(null);
+        setPriceLevels(data.price_levels ?? null);
+        // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
+        // result for the base selection, computed on this request; seeding the
+        // quote with it means the page opens with a real, final figure instead
+        // of «يبدأ من» plus a round trip. `quotedFor` is set to the base key so
+        // the moment a variant IS chosen the page knows this quote no longer
+        // answers the question.
+        setQuote(data.pricing ? { ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd } : null);
+        setQuotedFor(data.pricing ? '|||' : null);
+        // A quote left in flight by the PREVIOUS product must not leave this
+        // one looking like it is still resolving.
+        setQuoteLoading(false);
         setGalleryIndex(0);
         setQty(1);
         setWarrantyPlanId('');
+        setWarrantyOpen(false);
         setActionError('');
         setNotice('');
         setWantPreorder(false);
@@ -657,45 +721,81 @@ export default function Product() {
     // honours the server's composition redirect (§10).
   }, [slug, retryToken, navigate]);
 
-  // Live server quote for the CURRENT selection. Debounced, stale-guarded, and
-  // the only source of the displayed price/fees.
-  const selectionKey = `${optionId}|${colorId}|${transportMethod}|${warrantyPlanId}|${qty}`;
+  /**
+   * THE SELECTION THE PRICE DEPENDS ON — AND QUANTITY IS NOT PART OF IT.
+   *
+   * Quantity provably cannot move a unit price: the worker resolves the unit
+   * without ever seeing `qty` and then multiplies (worker/routes/products.ts,
+   * `line_total_iqd: resolved.unit_subtotal_iqd * qty`). Keeping `qty` in this
+   * key meant every tap of the + button spent a debounce and a round trip to
+   * perform a multiplication the browser can do in a nanosecond — and, because
+   * the old gate hid the price for the whole of that window, the figure the
+   * customer was reading vanished each time they asked for one more.
+   */
+  const priceKey = `${optionId}|${colorId}|${transportMethod}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
     let cancelled = false;
-    // Mark the price stale for the WHOLE debounce + request window, so the
-    // previous selection's figure is never presented as this one's final
-    // price for the 220ms before the request even starts.
+    const ac = new AbortController();
+    // The price on screen is NOT hidden while this runs — it is marked
+    // pending. `quotedFor` is what says whether it answers the current
+    // selection; this flag only says a confirmation is on its way.
     setQuoteLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await api.post<QuoteResponse>(`/api/products/${productSlug}/quote`, {
-          qty,
-          optionId: optionId || undefined,
-          colorId: colorId || undefined,
-          transportMethod: transportMethod || undefined,
-          warrantyPlanId: warrantyPlanId || undefined,
-        });
+        const res = await api.post<QuoteResponse>(
+          `/api/products/${productSlug}/quote`,
+          {
+            qty: 1,
+            optionId: optionId || undefined,
+            colorId: colorId || undefined,
+            transportMethod: transportMethod || undefined,
+            warrantyPlanId: warrantyPlanId || undefined,
+          },
+          // A superseded or abandoned quote is dropped at the socket instead of
+          // being left to hold a connection open behind the next one, and the
+          // client's deadline turns a hang into an error the page can retry.
+          { signal: ac.signal, timeoutMs: 12000 }
+        );
         if (cancelled) return;
         setQuote(res.quote);
+        setQuotedFor(priceKey);
         setLiveAvailability(res.availability);
         if (Array.isArray(res.warranty_plans)) setQuotedPlans(res.warranty_plans);
         if (res.pricing_modes) setQuotedModes(res.pricing_modes);
         setQuoteError(null);
       } catch (err) {
         if (cancelled) return;
-        setQuote(null);
+        // The previous quote is deliberately KEPT. It no longer answers this
+        // selection — `quotedFor` already says so — and holding it lets the
+        // page keep showing the last real number beside the error instead of
+        // an empty box.
+        setQuotedFor(null);
         setQuoteError(err);
       } finally {
         if (!cancelled) setQuoteLoading(false);
       }
-    }, 220);
+    }, 140);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      ac.abort();
     };
-  }, [productSlug, source, selectionKey, optionId, colorId, transportMethod, warrantyPlanId, qty, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, colorId, transportMethod, warrantyPlanId, quoteToken]);
+
+  /**
+   * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
+   * to stay on screen until the next add or a navigation, so it sat under the
+   * button as a permanent claim about something that happened a minute ago —
+   * and, worse, kept the CTA reading «تمت الإضافة». Three seconds is long
+   * enough to read and short enough that the control returns to its real job.
+   */
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(''), 3000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const availability = liveAvailability ?? baseAvailability;
 
@@ -717,10 +817,13 @@ export default function Product() {
     setGalleryIndex(0);
   }, [optionId, colorId]);
 
+  // ONE default, used by both. These disagreed (1 here, 99 in the clamp), so
+  // before availability arrived the + button was dead while the effect would
+  // have allowed 99.
   const maxQty = Math.max(1, availability?.stock.max_qty ?? 1);
   useEffect(() => {
-    setQty((q) => Math.min(Math.max(1, q), Math.max(1, availability?.stock.max_qty ?? 99)));
-  }, [availability?.stock.max_qty]);
+    setQty((q) => Math.min(Math.max(1, q), maxQty));
+  }, [maxQty]);
 
   // §3.3 — a product share link carries ?ref=<username>. Capturing it HERE is
   // what makes an arriving support code visible in the cart later; the ref is
@@ -816,9 +919,12 @@ export default function Product() {
         if (replaceCart) body.replaceCart = true;
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
         // Success is claimed ONLY after the server returns the saved cart.
-        const count = data.items.reduce((n, it) => n + it.qty, 0);
+        const count = countCartItems(data.items);
         setShippingConflict(null);
         setNotice(`${s.added} (${count})`);
+        // The nav badge is the one piece of confirmation visible from anywhere
+        // on the page, including from the bottom of a long product.
+        setCartCount(count);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
@@ -987,6 +1093,20 @@ export default function Product() {
   // each option is the server's.
   const warrantyPlans = quotedPlans ?? product.warranty_plans ?? [];
   const warrantyBase = product.warranty_base_months ?? warrantyPlans.find((w) => typeof w.base_months === 'number')?.base_months ?? null;
+  /**
+   * WHAT THE COLLAPSED WARRANTY HEADER SAYS. A disclosure that hides the
+   * answer is worse than one that is always open, so the header carries the
+   * current choice: the chosen plan's own headline, or "no extension".
+   */
+  const warrantySummary = (() => {
+    const chosen = warrantyPlans.find((w) => w.id === warrantyPlanId);
+    if (!chosen) return s.noWarranty;
+    const label =
+      chosen.duration_kind === 'extension'
+        ? s.extendedPlan(monthsLabel(chosen.duration_months, lang))
+        : pick(lang as Lang, chosen.title_ar, chosen.title_en, chosen.title_ckb) || chosen.id;
+    return `${label} · +${formatIqd(chosen.fee_iqd)}`;
+  })();
   const specGroups = (product.spec_groups ?? []).filter((g) => (g.rows ?? []).length > 0);
   const legacySpecs = product.specifications ?? [];
   const descriptionImages = product.description_images ?? [];
@@ -1008,15 +1128,82 @@ export default function Product() {
 
   const mode = availability?.mode ?? (source === 'community' ? 'unavailable' : 'direct_sale');
   const selectionComplete = availability ? availability.selection.complete : true;
-  const quoteErrors = quote?.errors ?? [];
-  const priceIsAuthoritative = !!quote && quoteErrors.length === 0 && selectionComplete && !quoteLoading;
-  const unitPrice = priceIsAuthoritative ? quote!.unit_subtotal_iqd : null;
-  const lineTotal = priceIsAuthoritative ? quote!.line_total_iqd : null;
+  /**
+   * THE QUOTE IN HAND ANSWERS THE SELECTION ON SCREEN. Anything else is a
+   * previous selection's answer — still a real number, but not this one's.
+   */
+  const quoteFresh = !!quote && quotedFor === priceKey;
+  const quoteErrors = quoteFresh ? (quote!.errors ?? []) : [];
+
+  /**
+   * THE SERVER'S PRICE FOR THIS SELECTION, FROM THE PAGE REQUEST.
+   *
+   * `price_levels` was resolved for every reachable option, colour and pair on
+   * the same request that delivered the page, so a tap has the exact figure
+   * already in memory. It carries no transport commission and no warranty fee
+   * — those are chosen separately and only the quote knows them — which is
+   * what `levelIsFinal` below is for.
+   */
+  // Three map lookups — cheaper than the hook that would memoize them, and
+  // this sits below the page's early return where a hook cannot go.
+  const levelPrice: PriceLevel | null = (() => {
+    const L = priceLevels;
+    if (!L) return null;
+    if (optionId && colorId) return L.complete ? (L.combo[`${optionId}|${colorId}`] ?? null) : null;
+    if (optionId) return L.option[optionId] ?? null;
+    if (colorId) return L.color[colorId] ?? null;
+    return L.base;
+  })();
+  const levelIsFinal = !transportMethod && !warrantyPlanId;
+
+  /**
+   * WHAT THE PAGE PAINTS — and it never paints nothing when it knows something.
+   *
+   * The confirmed quote first; failing that the server's level price, which is
+   * the same resolver's answer to the same question minus the two fees the
+   * customer has not chosen. `settled` is the only thing that decides whether
+   * the figure is presented as final or as still confirming; it is NOT allowed
+   * to decide whether a figure appears at all. That inversion — hiding a known
+   * price behind a loading flag — was the whole of the "stuck on updating
+   * price" report.
+   */
+  const shownPrice: { unit: number; regular: number; applied: number; tier: 'regular' | 'pro' | 'prime'; settled: boolean } | null =
+    quoteFresh && quoteErrors.length === 0
+      ? {
+          unit: quote!.unit_subtotal_iqd,
+          regular: quote!.regular_iqd,
+          applied: quote!.applied_iqd,
+          tier: quote!.applied_tier,
+          settled: true,
+        }
+      : levelPrice
+        ? {
+            unit: levelPrice.unit_subtotal_iqd,
+            regular: levelPrice.regular_iqd,
+            applied: levelPrice.applied_iqd,
+            tier: levelPrice.applied_tier,
+            settled: levelIsFinal && !quoteLoading && quoteErrors.length === 0,
+          }
+        : null;
+  /** A figure is on screen but the server has not confirmed THIS selection. */
+  const priceIsPending = !!shownPrice && !shownPrice.settled;
+
+  /**
+   * THE BUY GATE IS UNCHANGED IN SUBSTANCE: a line may be added only when the
+   * server has quoted this exact selection without errors. What changed is
+   * that it no longer depends on quantity, so the button stops flickering
+   * disabled every time someone asks for a second unit.
+   */
+  const priceIsAuthoritative = quoteFresh && quoteErrors.length === 0 && selectionComplete;
+  const unitPrice = shownPrice?.unit ?? null;
+  // The worker's own arithmetic (`unit_subtotal_iqd * qty`), done here so the
+  // stepper is instant.
+  const lineTotal = unitPrice === null ? null : unitPrice * qty;
   const isPro = viewerTier?.tier === 'pro' && viewerTier.active;
   // The PRO price FOR THIS SELECTION, from the server quote: an option or
   // colour surcharge is paid by every tier, so the product-level number is
   // only right for the base selection.
-  const proPrice = quote && quoteErrors.length === 0 ? (quote.pro_iqd ?? null) : (product.pro_price_iqd ?? null);
+  const proPrice = quoteFresh && quoteErrors.length === 0 ? (quote!.pro_iqd ?? null) : (product.pro_price_iqd ?? null);
 
   const blockingCodes: string[] = [
     ...(availability?.selection.errors ?? []),
@@ -1076,14 +1263,27 @@ export default function Product() {
   // ------------------------------------------------------------ sub-renders
   const priceBlock = (
     <div className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
-      {priceIsAuthoritative ? (
+      {shownPrice ? (
         <>
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <span className="text-white font-black text-2xl sm:text-3xl tabular-nums">{formatIqd(unitPrice!)}</span>
-            {quote!.applied_tier === 'pro' || quote!.applied_tier === 'prime' ? (
+            {/*
+              THE FIGURE NEVER LEAVES THE SCREEN. While the server confirms a
+              new selection it dims and reports itself busy to assistive tech —
+              it does not disappear and it is not replaced by a sentence. Only
+              opacity animates, so nothing reflows.
+            */}
+            <span
+              aria-busy={priceIsPending || undefined}
+              className={`text-white font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
+                priceIsPending ? 'opacity-55' : 'opacity-100'
+              }`}
+            >
+              {formatIqd(unitPrice!)}
+            </span>
+            {shownPrice.tier === 'pro' || shownPrice.tier === 'prime' ? (
               <span className="inline-flex items-center gap-1.5 bg-gold text-black px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide">
                 <Star aria-hidden="true" className="w-3 h-3 fill-black" />
-                {quote!.applied_tier === 'pro' ? s.proApplied : s.primeApplied}
+                {shownPrice.tier === 'pro' ? s.proApplied : s.primeApplied}
               </span>
             ) : (
               <span className="text-zinc-400 text-[12px] font-bold">{s.regularPrice}</span>
@@ -1091,8 +1291,8 @@ export default function Product() {
           </div>
           {/* §4: no compare-at. The regular price is struck through only when
               the member's own resolved price is genuinely lower. */}
-          {quote!.applied_iqd < quote!.regular_iqd ? (
-            <div className="text-zinc-500 text-sm line-through mt-1 tabular-nums">{formatIqd(quote!.regular_iqd)}</div>
+          {shownPrice.applied < shownPrice.regular ? (
+            <div className="text-zinc-500 text-sm line-through mt-1 tabular-nums">{formatIqd(shownPrice.regular)}</div>
           ) : null}
           {qty > 1 ? (
             <div className="text-zinc-400 text-[13px] mt-2">
@@ -1102,13 +1302,23 @@ export default function Product() {
         </>
       ) : (
         <>
+          {/*
+            NOTHING IS KNOWN YET — the only state in which the page may hedge.
+            «يبدأ من» appears only when the SERVER proved the variants differ
+            (`display_from`, resolved across every level) and nothing has been
+            chosen yet, and the number beside it is `display_price_iqd`: the
+            cheapest way to buy the product at this viewer's tier — the same
+            figure on the card they tapped — never the raw base row.
+          */}
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-zinc-400 text-[12px] font-bold">{s.from}</span>
-            <span className="text-white font-bold text-xl tabular-nums opacity-80">{formatIqd(product.price_iqd)}</span>
+            {product.display_from && !optionId && !colorId ? (
+              <span className="text-zinc-400 text-[12px] font-bold">{s.from}</span>
+            ) : null}
+            <span className="text-white font-bold text-xl tabular-nums opacity-80">
+              {formatIqd(product.display_price_iqd ?? product.price_iqd)}
+            </span>
           </div>
-          <p className="text-zinc-400 text-[13px] mt-2">
-            {quoteLoading ? s.updatingPrice : s.priceUnavailable}
-          </p>
+          <p className="text-zinc-400 text-[13px] mt-2">{quoteLoading ? s.updatingPrice : s.priceUnavailable}</p>
         </>
       )}
 
@@ -1491,81 +1701,119 @@ export default function Product() {
           facts out. A plan can be chosen here or later in the cart, and only
           before the order is placed — the policy link says the rest. */}
       {warrantyPlans.length > 0 ? (
-        <fieldset className="rounded-2xl border border-gold/25 bg-gold/[0.04] p-4" data-extended-warranty>
-          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
-            <ShieldCheck aria-hidden="true" className="w-4 h-4 text-gold" />
-            {s.warranty}
-          </legend>
-          <p className="mt-1 text-[12px] text-zinc-400 leading-relaxed">
-            {warrantyBase !== null ? s.warrantyIntro(monthsLabel(warrantyBase, lang)) : s.warrantyIntroNoBase}
-          </p>
-          <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label={s.warranty}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={!warrantyPlanId}
-              onClick={() => setWarrantyPlanId('')}
-              className={`min-h-[44px] px-3 rounded-xl border text-sm text-start transition-colors press-scale ${
-                !warrantyPlanId
-                  ? 'border-gold bg-gold/15 text-gold font-bold'
-                  : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-              }`}
-            >
-              {s.noWarranty}
-            </button>
-            {warrantyPlans.map((w) => {
-              const selected = warrantyPlanId === w.id;
-              const extension = w.duration_kind === 'extension';
-              const headline = extension
-                ? s.extendedPlan(monthsLabel(w.duration_months, lang))
-                : pick(lang as Lang, w.title_ar, w.title_en, w.title_ckb) || w.id;
-              const total = typeof w.total_months === 'number' ? w.total_months : null;
-              return (
+        /*
+          AN OPTIONAL UPSELL, SIZED LIKE ONE.
+
+          It used to render permanently expanded — an intro paragraph plus one
+          full-width row per plan plus a "no extension" row — inside a gold
+          panel that was the loudest surface on a black page. On a phone that
+          is roughly 290px of a question the customer has not asked, sitting
+          ABOVE the description they came for, and whose default answer ("no
+          extension") is already the correct one.
+
+          So it is a disclosure now, in the house zinc that every sibling
+          panel uses, and the header states the current choice — closed does
+          not mean unanswered. The gold is spent on the one thing that is
+          actually a decision: the plan that is selected.
+        */
+        <fieldset className="min-w-0 rounded-2xl border border-zinc-800/70 bg-zinc-900/40 overflow-hidden" data-extended-warranty>
+          <button
+            type="button"
+            onClick={() => setWarrantyOpen((o) => !o)}
+            aria-expanded={warrantyOpen}
+            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-start hover:bg-white/[0.03] transition-colors [touch-action:manipulation]"
+          >
+            <span className="min-w-0 flex items-center gap-2">
+              <ShieldCheck aria-hidden="true" className="w-4 h-4 text-gold shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-white font-bold text-[14px]">{s.warranty}</span>
+                <span className={`block text-[12px] truncate ${warrantyPlanId ? 'text-gold' : 'text-zinc-500'}`}>
+                  {warrantySummary}
+                </span>
+              </span>
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={`w-5 h-5 text-zinc-400 shrink-0 transition-transform duration-200 ${warrantyOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {warrantyOpen ? (
+            <div className="px-4 pb-4">
+              <p className="text-[12px] text-zinc-400 leading-relaxed">
+                {warrantyBase !== null ? s.warrantyIntro(monthsLabel(warrantyBase, lang)) : s.warrantyIntroNoBase}
+              </p>
+              <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label={s.warranty}>
                 <button
-                  key={w.id}
                   type="button"
                   role="radio"
-                  aria-checked={selected}
-                  data-warranty-plan={w.id}
-                  onClick={() => setWarrantyPlanId(selected ? '' : w.id)}
-                  className={`min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-sm text-start transition-colors press-scale ${
-                    selected
-                      ? 'border-gold bg-gold/15 text-gold font-bold'
-                      : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
+                  aria-checked={!warrantyPlanId}
+                  onClick={() => setWarrantyPlanId('')}
+                  className={`min-h-[44px] px-3 rounded-xl border text-sm text-start transition-colors press-scale ${
+                    !warrantyPlanId
+                      ? 'border-gold/60 bg-gold/10 text-gold font-bold'
+                      : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-600'
                   }`}
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate">
-                      <span dir="ltr" className="tabular-nums">{headline}</span>
-                      {total !== null ? (
-                        <span className={`ms-1.5 text-[12px] font-normal ${selected ? 'text-gold/80' : 'text-zinc-400'}`}>
-                          {/* The arrow follows the reading direction: from the
-                              extension to the total in both scripts. */}
-                          {dir === 'rtl' ? '←' : '→'} {s.extendedTotal(monthsLabel(total, lang))}
-                        </span>
-                      ) : null}
-                    </span>
-                    {!extension ? (
-                      <span className="block text-[12px] text-zinc-400">
-                        {monthsLabel(w.duration_months, lang)} · {s.total}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="tabular-nums text-[13px] shrink-0" aria-busy={quoteLoading || undefined}>
-                    +{formatIqd(w.fee_iqd)}
-                  </span>
+                  {s.noWarranty}
                 </button>
-              );
-            })}
-          </div>
-          <Link
-            to="/policies/extended_warranty"
-            className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
-            data-warranty-policy-link
-          >
-            <FileText aria-hidden="true" className="w-3.5 h-3.5" />
-            {s.warrantyPolicy}
-          </Link>
+                {warrantyPlans.map((w) => {
+                  const selected = warrantyPlanId === w.id;
+                  const extension = w.duration_kind === 'extension';
+                  const headline = extension
+                    ? s.extendedPlan(monthsLabel(w.duration_months, lang))
+                    : pick(lang as Lang, w.title_ar, w.title_en, w.title_ckb) || w.id;
+                  const total = typeof w.total_months === 'number' ? w.total_months : null;
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      data-warranty-plan={w.id}
+                      onClick={() => setWarrantyPlanId(selected ? '' : w.id)}
+                      className={`min-h-[44px] px-3 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-start transition-colors press-scale ${
+                        selected
+                          ? 'border-gold/60 bg-gold/10 text-gold font-bold'
+                          : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-600'
+                      }`}
+                    >
+                      {/* `flex-1 min-w-0` and NO nowrap: the label is what
+                          gives way when the row runs out of room, and it wraps
+                          instead of forcing the panel wider than the screen. */}
+                      <span className="flex-1 min-w-0">
+                        <span className="block">
+                          <span dir="ltr" className="tabular-nums">{headline}</span>
+                          {total !== null ? (
+                            <span className={`ms-1.5 text-[12px] font-normal ${selected ? 'text-gold/80' : 'text-zinc-400'}`}>
+                              {/* The arrow follows the reading direction: from the
+                                  extension to the total in both scripts. */}
+                              {dir === 'rtl' ? '←' : '→'} {s.extendedTotal(monthsLabel(total, lang))}
+                            </span>
+                          ) : null}
+                        </span>
+                        {!extension ? (
+                          <span className="block text-[12px] text-zinc-400">
+                            {monthsLabel(w.duration_months, lang)} · {s.total}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="tabular-nums text-[13px] shrink-0 ms-auto" aria-busy={quoteLoading || undefined}>
+                        +{formatIqd(w.fee_iqd)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Link
+                to="/policies/extended_warranty"
+                className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                data-warranty-policy-link
+              >
+                <FileText aria-hidden="true" className="w-3.5 h-3.5" />
+                {s.warrantyPolicy}
+              </Link>
+            </div>
+          ) : null}
         </fieldset>
       ) : null}
     </>
@@ -1597,6 +1845,43 @@ export default function Product() {
       </div>
     </div>
   );
+
+  /**
+   * THE SAME STEPPER, SIZED FOR THE BAR.
+   *
+   * `qtyControl` above is a full-width labelled row; it lives in the stacked
+   * panel, which on a phone sits above the description — so a customer reading
+   * the reviews and reaching for the fixed bar had no way to change quantity
+   * without scrolling back. This is the bar's own copy: 44px targets (the
+   * floor for a reliable tap), no label, and it never appears when there is
+   * only one unit to be had.
+   */
+  const barStepper =
+    maxQty > 1 ? (
+      <div className="flex items-center rounded-xl border border-zinc-800 bg-zinc-900/70 shrink-0">
+        <button
+          type="button"
+          aria-label={s.decrease}
+          onClick={() => setQty((q) => Math.max(1, q - 1))}
+          disabled={qty <= 1}
+          className="w-11 h-11 flex items-center justify-center rounded-s-xl text-zinc-200 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+        >
+          <Minus aria-hidden="true" className="w-4 h-4" />
+        </button>
+        <span className="w-8 text-center text-white font-bold text-sm tabular-nums" aria-live="polite">
+          {qty}
+        </span>
+        <button
+          type="button"
+          aria-label={s.increase}
+          onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+          disabled={qty >= maxQty}
+          className="w-11 h-11 flex items-center justify-center rounded-e-xl text-zinc-200 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+        >
+          <Plus aria-hidden="true" className="w-4 h-4" />
+        </button>
+      </div>
+    ) : null;
 
   const statusMessages = (
     <div className="space-y-2" aria-live="polite">
@@ -1646,13 +1931,19 @@ export default function Product() {
     </div>
   );
 
+  // The line landed in the cart, and the button says so for a moment before
+  // returning to its resting label — the feedback belongs on the control that
+  // was pressed, not only in a panel somewhere above the fold.
+  const justAdded = !!notice;
   const buyButtonLabel = !isAuthenticated
     ? s.signInToBuy
     : addingToCart
       ? s.adding
-      : mode === 'unavailable'
-        ? s.unavailable
-        : s.addToCart;
+      : justAdded
+        ? s.added
+        : mode === 'unavailable'
+          ? s.unavailable
+          : s.addToCart;
 
   const buyButton = (
     <button
@@ -1660,9 +1951,13 @@ export default function Product() {
       data-testid="product-cta"
       onClick={handleAddToCart}
       disabled={addingToCart || (isAuthenticated && !canBuy)}
-      className="w-full min-h-[52px] rounded-2xl bg-gold text-black font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-all active:scale-[0.99]"
+      className="w-full min-h-[52px] rounded-2xl bg-gold text-black font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,transform] duration-150 active:scale-[0.985] [touch-action:manipulation]"
     >
-      <ShoppingCart aria-hidden="true" className="w-5 h-5" />
+      {justAdded ? (
+        <Check aria-hidden="true" className="w-5 h-5" />
+      ) : (
+        <ShoppingCart aria-hidden="true" className="w-5 h-5" />
+      )}
       {buyButtonLabel}
     </button>
   );
@@ -1706,11 +2001,20 @@ export default function Product() {
           area). BottomNav does not render on /product/*, so this is the only
           reserved space and nothing is covered. */}
       <div className="mx-auto w-full max-w-[1240px] px-4 pt-2 pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8 lg:items-start">
+        {/*
+          THE LEFT COLUMN NEEDED A CEILING. With a single `minmax(0,1fr)` track
+          against a fixed 400px panel inside a 1240px shell, the content side
+          was 776px at every viewport from 1240px up — a 776×460 letterbox
+          holding a square photo with 158px of empty black on each side, and
+          text lines running past 110 characters. The extra width now goes to
+          the panel and to the gutter instead of all to the gallery, and the
+          grid centres rather than stretching.
+        */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,660px)_420px] lg:gap-8 xl:gap-10 lg:justify-center lg:items-start">
           {/* -------------------------------------------------- left column */}
           <div className="min-w-0">
             <section aria-label={s.gallery}>
-              <div className="relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[460px] rounded-2xl border border-zinc-800/70 bg-zinc-950 overflow-hidden">
+              <div className="relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-zinc-800/70 bg-zinc-950 overflow-hidden">
                 <SafeImage
                   key={activeMedia?.url || 'empty'}
                   src={activeMedia?.url}
@@ -1822,7 +2126,9 @@ export default function Product() {
             </div>
 
             {/* Content sections */}
-            <div className="mt-6 space-y-3">
+            {/* A reading measure, independent of the gallery: 68 characters
+                is a comfortable line, and the sections below are prose. */}
+            <div className="mt-6 space-y-3 max-w-[68ch]">
               <Section title={s.description} icon={<FileText aria-hidden="true" className="w-5 h-5 text-zinc-400" />} defaultOpen>
                 {description ? (
                   <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{description}</p>
@@ -2037,14 +2343,46 @@ export default function Product() {
 
       {/* ------------------------------------------------ phone purchase bar */}
       <div data-testid="product-buybar" className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-black/95 backdrop-blur-xl border-t border-zinc-800 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto w-full max-w-[640px] flex items-center gap-3">
-          <div className="min-w-0">
+        {/*
+          THE CONFIRMATION LIVES WHERE THE TAP HAPPENED. On a phone the CTA is
+          this fixed bar while the status panel is hundreds of pixels above the
+          fold, so a customer who added from here previously got no visible
+          answer at all.
+        */}
+        {notice ? (
+          <div
+            role="status"
+            className="mx-auto w-full max-w-[640px] mb-2 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[13px] text-emerald-300"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <Check aria-hidden="true" className="w-4 h-4 shrink-0" />
+              <span className="truncate">{notice}</span>
+            </span>
+            <Link to="/cart" className="font-bold underline underline-offset-2 shrink-0">
+              {s.viewCart}
+            </Link>
+          </div>
+        ) : null}
+        <div className="mx-auto w-full max-w-[640px] flex items-center gap-2.5">
+          {/*
+            A FIXED FOOTPRINT. This cell used to be auto-sized, so its width
+            followed whichever string it held — a number, «يجري تحديث السعر…»,
+            or an em dash — and the `flex-1` CTA beside it visibly grew and
+            shrank on every quote. Reserving the space keeps the bar still.
+          */}
+          <div className="min-w-0 basis-[7.5rem] shrink-0">
             <div className="text-[11px] text-zinc-500">{s.price}</div>
-            <div className="text-white font-black text-[15px] tabular-nums truncate">
-              {priceIsAuthoritative ? formatIqd(lineTotal!) : quoteLoading ? s.updatingPrice : '—'}
+            <div
+              aria-busy={priceIsPending || undefined}
+              className={`text-white font-black text-[15px] tabular-nums truncate transition-opacity duration-200 ${
+                priceIsPending ? 'opacity-55' : 'opacity-100'
+              }`}
+            >
+              {lineTotal !== null ? formatIqd(lineTotal) : '—'}
             </div>
           </div>
-          <div className="flex-1">{buyButton}</div>
+          {barStepper}
+          <div className="flex-1 min-w-0">{buyButton}</div>
         </div>
       </div>
 
