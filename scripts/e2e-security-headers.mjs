@@ -17,6 +17,15 @@
  *     "Content Security Policy" reports. One violation fails the run; a page
  *     that renders no text fails the run.
  *
+ *     Only ENFORCED violations count. Chromium prefixes a report-only one
+ *     with "[Report Only]", and those come from other people's policies: the
+ *     Google sign-in iframe carries a report-only frame-ancestors 'self',
+ *     which our origin necessarily "violates" by framing it — nothing is
+ *     blocked, sign-in works, and this site serves no report-only policy of
+ *     its own (securityPolicy.ts emits one enforced header, with
+ *     frame-ancestors 'none'). They are printed as notes rather than
+ *     dropped, so a report-only policy that ever does become ours is visible.
+ *
  *   BASE_URL=https://levonis-iq.com node scripts/e2e-security-headers.mjs
  */
 import { createRequire } from 'node:module';
@@ -24,6 +33,8 @@ const require2 = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require2('playwright')); }
 catch { ({ chromium } = require2('/opt/node22/lib/node_modules/playwright/index.js')); }
+
+import { classifyCspConsoleLine } from './lib/csp-console.mjs';
 
 const BASE = (process.env.BASE_URL || 'http://127.0.0.1:8789').replace(/\/$/, '');
 const PAGES = ['/', '/auth', '/products', '/community', '/warranty', '/cart'];
@@ -91,9 +102,14 @@ async function main() {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, locale: 'ar-IQ' });
   const page = await ctx.newPage();
   const violations = [];
+  const notes = [];
   page.on('console', (m) => {
     const t = m.text();
-    if (/Content Security Policy|Refused to (load|execute|apply|connect|frame|display)/i.test(t)) violations.push(`${page.url()} :: ${t.slice(0, 200)}`);
+    const kind = classifyCspConsoleLine(t);
+    if (!kind) return;
+    const line = `${page.url()} :: ${t.slice(0, 200)}`;
+    if (kind === 'report-only') notes.push(line);
+    else violations.push(line);
   });
   for (const p of PAGES) {
     const before = violations.length;
@@ -104,6 +120,10 @@ async function main() {
     check(`${p} raises no policy violation`, violations.length === before, violations.slice(before).join(' | '));
   }
   await browser.close();
+  if (notes.length) {
+    console.log('\n  report-only reports, from policies this site does not serve:');
+    for (const n of notes) console.log(`    note ${n}`);
+  }
 
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed) { console.log(failures.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
