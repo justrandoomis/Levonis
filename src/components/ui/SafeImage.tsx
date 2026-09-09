@@ -28,6 +28,7 @@ export default function SafeImage({
   fallbackClassName = 'text-zinc-600',
   fallbackIconClassName = 'w-6 h-6',
   referrerPolicy = 'no-referrer',
+  onStatus,
 }: {
   src?: string | null;
   alt?: string;
@@ -42,6 +43,15 @@ export default function SafeImage({
   fallbackClassName?: string;
   fallbackIconClassName?: string;
   referrerPolicy?: React.HTMLAttributeReferrerPolicy;
+  /**
+   * Told whenever this image settles, so a PARENT can act on the fact that a
+   * picture is broken. The admin image grid uses it to notice that the primary
+   * image no longer loads while a healthy one sits beside it — a thing the
+   * customer would see on the product page and the admin would not.
+   *
+   * It reports, it does not repair: nothing here mutates a caller's state.
+   */
+  onStatus?: (status: 'loading' | 'loaded' | 'error', src: string) => void;
 }) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
@@ -61,6 +71,16 @@ export default function SafeImage({
     const el = imgRef.current;
     if (el && el.complete && el.naturalWidth > 0) setStatus('loaded');
   }, [cleanSrc, attempt]);
+
+  // Reported from an effect rather than from the DOM handlers, so a parent
+  // that re-renders on the news cannot re-enter setState during React's own
+  // event dispatch, and so the cached-image path above reports too.
+  useEffect(() => {
+    onStatus?.(status, cleanSrc);
+    // `onStatus` is deliberately not a dependency: a caller passing an inline
+    // arrow would otherwise fire this on every render of the parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, cleanSrc]);
 
   const retry = (e: React.MouseEvent) => {
     // Cards are often wrapped in a <Link>; retrying must not navigate.

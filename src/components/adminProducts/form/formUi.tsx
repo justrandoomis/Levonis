@@ -21,6 +21,7 @@
 import React, { useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ImagePlus, Info, RefreshCw, X } from 'lucide-react';
 import { uploadFile } from '../../../lib/api';
+import SafeImage from '../../ui/SafeImage';
 
 /** 40px control (the §12 floor), 13px text, never wider than its track. */
 export const field =
@@ -511,7 +512,18 @@ export function ImgSlot({
       />
       {url ? (
         <span className="relative block w-10 h-10">
-          <img src={url} alt={label} className="w-10 h-10 rounded-lg object-cover border border-zinc-700" />
+          {/* SafeImage, not a bare <img>: an option thumbnail whose host stops
+              answering shows an explicit "failed" glyph with a retry, instead
+              of the browser's broken-file icon that reads as "no image set". */}
+          <SafeImage
+            src={url}
+            alt={label}
+            aspect="auto"
+            fit="cover"
+            className="w-10 h-10 rounded-lg border border-zinc-700"
+            bgClassName="bg-zinc-900"
+            fallbackIconClassName="w-3.5 h-3.5"
+          />
           <button
             type="button"
             aria-label={`\u0625\u0632\u0627\u0644\u0629 ${label}`}

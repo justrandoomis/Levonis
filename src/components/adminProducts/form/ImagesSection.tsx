@@ -16,11 +16,13 @@
  *     what the admin sees is what is stored.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
-import { Star, Trash2, Upload, ArrowUp, ArrowDown, Link2, RefreshCw } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Star, Trash2, Upload, ArrowUp, ArrowDown, Link2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { uploadFile, api, ApiError } from '../../../lib/api';
 import { Banner, Field, Select, TextInput, btnGhost, btnPrimary, iconBtn } from './formUi';
 import { localId, type FormImage, type RelationsState } from './model';
+import SafeImage from '../../ui/SafeImage';
+import { classifyImageUrl, primaryRepair } from '../../../lib/imageUrl';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
@@ -48,6 +50,33 @@ export function ImagesSection({
   const [urlNote, setUrlNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragFrom = useRef<number | null>(null);
+
+  /**
+   * WHICH PICTURES ACTUALLY LOADED. Two sets, not one tri-state, because "has
+   * not loaded" and "failed" are different facts: images are lazy, so an image
+   * far down the grid has reported nothing at all and must never be offered as
+   * the healthy replacement for a broken primary.
+   *
+   * Nothing here is saved. It is the browser's report on what a customer would
+   * see, held for the length of this editing session only.
+   */
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
+  const [loaded, setLoaded] = useState<ReadonlySet<string>>(() => new Set());
+  /** The id whose URL is being replaced by hand, and the text being typed. */
+  const [editingUrl, setEditingUrl] = useState<{ id: string; text: string } | null>(null);
+
+  const noteStatus = useCallback((id: string, status: 'loading' | 'loaded' | 'error') => {
+    const add = (set: ReadonlySet<string>, keep: boolean) => {
+      const has = set.has(id);
+      if (has === keep) return set;
+      const next = new Set(set);
+      if (keep) next.add(id);
+      else next.delete(id);
+      return next;
+    };
+    setFailed((f) => add(f, status === 'error'));
+    setLoaded((l) => add(l, status === 'loaded'));
+  }, []);
 
   const addImage = useCallback(
     (url: string, extra?: { alt?: string; source_url?: string; width?: number | null; height?: number | null }) =>
@@ -124,11 +153,29 @@ export function ImagesSection({
    * exactly like one typed here by hand. Anything else is still refused.
    */
   const ingestUrls = async () => {
-    const urls = urlText
+    const typed = urlText
       .split(/[\s,]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (urls.length === 0) return;
+    if (typed.length === 0) return;
+
+    // A STRING IS NOT AN ADDRESS. Refused here, by name, so «صورة» or a
+    // Windows path is answered immediately instead of travelling to the server
+    // to come back as a generic failure. This checks only what the admin has
+    // JUST typed — it is never a reason to refuse saving a product whose
+    // stored images were written long ago.
+    const bad = typed
+      .map((u) => ({ u, verdict: classifyImageUrl(u) }))
+      .filter((x) => !x.verdict.ok || x.verdict.kind !== 'absolute');
+    const urls = typed.filter((u) => !bad.some((b) => b.u === u));
+    if (urls.length === 0) {
+      setUrlNote(
+        bad.length === 1
+          ? `${bad[0].u}: ${bad[0].verdict.reason ?? 'يلزم رابط كامل يبدأ بـ https://'}`
+          : `${bad.length} روابط غير صالحة — يلزم رابط كامل يبدأ بـ https://`
+      );
+      return;
+    }
     setUrlBusy(true);
     setUrlNote(null);
     try {
@@ -145,24 +192,29 @@ export function ImagesSection({
       }>('/api/admin/media/ingest', { urls });
       let ok = 0;
       let fromPages = 0;
-      const failed: string[] = [];
+      // NOT named `failed`: that is the set of image ids whose <img> broke, and
+      // shadowing it here is how a rename becomes a silent bug.
+      const rejected: string[] = [];
       for (const r of res.results) {
         if (r.status === 'stored' && r.url) {
           addImage(r.url, { alt: r.alt, source_url: r.from_page ? r.source_url : undefined });
           ok += 1;
           if (r.from_page) fromPages += 1;
         } else {
-          failed.push(`${r.source_url}: ${r.reason ?? 'failed'}`);
+          rejected.push(`${r.source_url}: ${r.reason ?? 'failed'}`);
         }
       }
       setUrlText('');
       // Saying how many came from a page matters: pasting one link and getting
       // eight pictures is surprising unless the screen says why.
       const pageNote = fromPages > 0 ? ` (${fromPages} من صفحة المنتج)` : '';
+      // The ones refused before sending are counted too — silently dropping
+      // them would make «أضيفت 2» look like the whole answer to a paste of 3.
+      const refused = [...rejected, ...bad.map((b) => `${b.u}: ${b.verdict.reason ?? 'رابط غير صالح'}`)];
       setUrlNote(
-        failed.length === 0
+        refused.length === 0
           ? `تمت إضافة ${ok} صورة${pageNote}`
-          : `أضيفت ${ok}${pageNote}، وفشلت ${failed.length}: ${failed.slice(0, 2).join(' | ')}`
+          : `أضيفت ${ok}${pageNote}، وفشلت ${refused.length}: ${refused.slice(0, 2).join(' | ')}`
       );
     } catch (e) {
       setUrlNote(e instanceof ApiError ? e.message : 'تعذّر جلب الصور');
@@ -230,9 +282,41 @@ export function ImagesSection({
       ),
     }));
 
+  /**
+   * THE PRIMARY IS WHAT THE STOREFRONT LEADS WITH. If it stops loading while a
+   * healthy picture sits beside it, every customer sees a broken box on the
+   * product page and nobody in the admin sees anything at all.
+   *
+   * This NAMES that state and offers the one-click fix; it does not perform it.
+   * Silently moving the star on load would mean an admin opens a product,
+   * touches nothing, and leaves with unsaved changes — and a save nobody asked
+   * for is worse than a warning nobody missed.
+   */
+  const repair = useMemo(() => primaryRepair(rel.images, failed, loaded), [rel.images, failed, loaded]);
+
   return (
     <div className="min-w-0">
       {errors.images && <Banner kind="error">{errors.images}</Banner>}
+
+      {repair.needed && (
+        <div
+          className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 flex flex-wrap items-center gap-2"
+          data-image-primary-broken
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />
+          <p className="text-[11px] text-amber-200 flex-1 min-w-[200px] leading-snug">
+            الصورة الرئيسية لا تُحمَّل — وهذا ما سيراه الزبون في صفحة المنتج. توجد صورة أخرى تعمل.
+            <span className="text-zinc-500"> The primary image is not loading.</span>
+          </p>
+          <button
+            type="button"
+            className={btnPrimary}
+            onClick={() => repair.healthyId && setPrimary(repair.healthyId)}
+          >
+            <Star className="w-3 h-3" /> اجعل الصورة السليمة رئيسية
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mb-3 min-w-0">
         <button type="button" className={btnPrimary} onClick={() => inputRef.current?.click()}>
@@ -351,13 +435,24 @@ export function ImagesSection({
               } bg-zinc-900/60`}
             >
               <div className="relative aspect-square bg-black/40">
-                {/* object-contain: the stored original is never cropped (§8). */}
-                <img
+                {/*
+                  SafeImage, not a bare <img>: a picture whose host stops
+                  answering must SAY so and offer a retry, instead of showing
+                  the browser's broken-file glyph and leaving the admin to
+                  guess whether the record is wrong or the network is. It also
+                  reports what it saw, which is what lets the banner above
+                  notice a broken PRIMARY. object-contain keeps §8's promise
+                  that the stored original is never cropped.
+                */}
+                <SafeImage
                   src={img.url}
                   alt={img.alt_en || ''}
-                  loading="lazy"
-                  className="w-full h-full object-contain"
-                  referrerPolicy="no-referrer"
+                  aspect="auto"
+                  fit="contain"
+                  className="w-full h-full"
+                  bgClassName="bg-transparent"
+                  fallbackClassName="text-zinc-500 gap-1"
+                  onStatus={(st) => noteStatus(img.id, st)}
                 />
                 {img.is_primary && (
                   <span className="absolute top-1 start-1 bg-[#6B46FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
@@ -400,6 +495,71 @@ export function ImagesSection({
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
+                {/*
+                  THE ADDRESS, AND HOW TO CHANGE IT. A hotlink that stops
+                  working is not a reason to delete the record — the alt text,
+                  the option link and the sort order are all still right, and
+                  only the address is wrong. So a failed image offers to
+                  REPLACE its URL, and deleting stays the explicit, confirmed
+                  action it already was.
+                */}
+                {failed.has(img.id) && (
+                  <div className="rounded border border-amber-500/40 bg-amber-500/5 p-1.5 space-y-1" data-image-failed={img.id}>
+                    <p className="text-[10px] text-amber-300 leading-snug">
+                      تعذّر تحميل هذه الصورة. قد يكون المضيف يمنع الروابط الخارجية مؤقتًا — لا تُحذف تلقائيًا.
+                    </p>
+                    <p className="text-[9px] text-zinc-500 break-all" dir="ltr" title={img.url}>
+                      {img.url}
+                    </p>
+                    {editingUrl?.id === img.id ? (
+                      <div className="space-y-1">
+                        <TextInput
+                          value={editingUrl.text}
+                          dir="ltr"
+                          onChange={(e) => setEditingUrl({ id: img.id, text: e.target.value })}
+                          placeholder="https://…"
+                          aria-label="رابط بديل"
+                        />
+                        {(() => {
+                          const verdict = classifyImageUrl(editingUrl.text);
+                          return (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                className={btnPrimary}
+                                disabled={!verdict.ok}
+                                onClick={() => {
+                                  patch(img.id, { url: editingUrl.text.trim() });
+                                  // A new address is a new load: forget the old
+                                  // verdict so the card is not stuck as failed.
+                                  noteStatus(img.id, 'loading');
+                                  setEditingUrl(null);
+                                }}
+                              >
+                                استبدال
+                              </button>
+                              <button type="button" className={btnGhost} onClick={() => setEditingUrl(null)}>
+                                إلغاء
+                              </button>
+                              {!verdict.ok && editingUrl.text.trim() !== '' && (
+                                <span className="text-[9px] text-red-400 truncate">{verdict.reason}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={btnGhost}
+                        data-image-replace-url={img.id}
+                        onClick={() => setEditingUrl({ id: img.id, text: img.url })}
+                      >
+                        <Link2 className="w-3 h-3" /> استبدال الرابط
+                      </button>
+                    )}
+                  </div>
+                )}
                 <TextInput
                   value={img.alt_en}
                   onChange={(e) => patch(img.id, { alt_en: e.target.value })}
