@@ -1,13 +1,69 @@
 <!doctype html>
-<html lang="en">
+<!--
+  THE SHELL IS THE FIRST FRAME THE CUSTOMER SEES.
+
+  Everything here runs before a single byte of React. Four of the five lines
+  below exist because, without them, the first thing a visitor on an Iraqi
+  mobile connection saw was a WHITE PAGE — on a store whose every screen is
+  black — for as long as the entry bundle took to parse.
+
+  lang="ar" dir="rtl"  The store is Arabic-first. `LanguageContext` rewrites
+                       both at runtime for a visitor who has chosen English or
+                       Kurdish, but the DEFAULT has to be right, because the
+                       first paint happens before that effect runs: with
+                       lang="en" the browser picked Latin line-breaking and
+                       Latin font fallbacks for Arabic text, and a screen
+                       reader announced the page in the wrong language.
+
+  color-scheme: dark   Tells the browser the page is dark BEFORE any CSS
+                       loads, so the scrollbar, the form controls and the
+                       canvas start dark instead of flashing white.
+
+  theme-color          Paints the mobile browser's own chrome — the address
+                       bar and the status area — the same near-black as the
+                       page, so the app does not sit in a light frame.
+
+  the inline background  The one style rule that must not wait for a
+                       stylesheet. `index.css` is a separate request; until it
+                       arrives the page is whatever the browser decided, and
+                       on a dark site that is a full-screen white flash.
+
+  THE FONT IS FETCHED FROM HERE, NOT FROM `@import` INSIDE index.css.
+  A CSS `@import` of a remote stylesheet is discovered only AFTER index.css has
+  been downloaded and parsed, and it blocks rendering while it resolves. That
+  made three serialised round trips before any text could paint: index.css →
+  the Google stylesheet → the font file. As a <link> in the head, the request
+  starts in the same instant as the stylesheet's, and `preconnect` warms the
+  TLS handshake to the font host while that is still in flight.
+-->
+<html lang="ar" dir="rtl" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Levonis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <title>LEVONIS</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      300..900, not 200..1000. The store uses light through black and nothing
+      outside that range (grep: font-light … font-black), and a variable font's
+      payload scales with the axis it carries.
+    -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@300..900&display=swap"
+    />
+
+    <style>
+      /* Before the stylesheet, before React. Kills the white flash. */
+      html, body { background-color: #000; margin: 0; }
+      /* The shell's own placeholder: a black page, not a blank white one. */
+      #root { min-height: 100dvh; background-color: #000; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

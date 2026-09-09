@@ -61,8 +61,80 @@ const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
  * kind of "loading".
  */
 const RouteFallback = () => (
-  <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>
+  <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
+    <span className="sr-only">…</span>
+  </div>
 );
+
+// -------------------------------------------------------------- prefetching
+
+
+/**
+ * A LAZY ROUTE THAT CAN BE FETCHED BEFORE IT IS NEEDED.
+ *
+ * `React.lazy` gives a component that downloads its chunk on first render —
+ * which is the moment the user is already waiting. This wraps the same loader
+ * so the chunk can also be requested EARLY, from idle time, and memoises the
+ * promise so asking twice costs one request.
+ *
+ * The result is the best half of both: nothing extra in the entry bundle, and
+ * nothing to wait for at the tap.
+ */
+function prefetchable<P extends object>(load: () => Promise<{ default: React.ComponentType<P> }>) {
+  let started: Promise<{ default: React.ComponentType<P> }> | null = null;
+  const once = () => (started ??= load());
+  const Comp = React.lazy(once);
+  (Comp as unknown as { preload: () => void }).preload = () => {
+    void once().catch(() => {
+      // A prefetch that fails is not an error the customer should ever see:
+      // the route will simply fetch again, and report properly, when it is
+      // actually rendered. Swallowing it here also stops an unhandled
+      // rejection from a flaky network becoming a console error on every load.
+      started = null;
+    });
+  };
+  return Comp;
+}
+
+const preload = (c: unknown) => (c as { preload?: () => void }).preload?.();
+
+/**
+ * WHEN THE FIRST SCREEN IS DONE, FETCH WHERE THE CUSTOMER IS GOING NEXT.
+ *
+ * `requestIdleCallback` is the whole point: it runs only once the browser has
+ * nothing more urgent to do, so this can never compete with the first paint,
+ * the font, or the home page's own data. Safari has no `requestIdleCallback`,
+ * hence the timeout fallback — deliberately long, for the same reason.
+ *
+ * The ORDER is the journey: a visitor looks at the catalogue, opens a product,
+ * adds it, then checks out. The address book comes last because it is only
+ * reached from checkout.
+ */
+function useIdlePrefetch() {
+  React.useEffect(() => {
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      for (const route of [Products, Product, Cart, Addresses]) preload(route);
+    };
+    const w = window as typeof window & {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      cancelIdleCallback?: (h: number) => void;
+    };
+    if (typeof w.requestIdleCallback === 'function') {
+      const handle = w.requestIdleCallback(run, { timeout: 3000 });
+      return () => {
+        cancelled = true;
+        w.cancelIdleCallback?.(handle);
+      };
+    }
+    const t = setTimeout(run, 1500);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, []);
+}
 import { LanguageProvider } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -70,23 +142,49 @@ import { Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import BottomNav, { isBottomNavHidden } from './components/BottomNav';
 import Home from './pages/Home';
-import Products from './pages/Products';
-import Product from './pages/Product';
 
-import Profile from './pages/Profile';
-import Orders from './pages/Orders';
-import OrderDetail from './pages/OrderDetail';
-import Cart from './pages/Cart';
-import Community from './pages/Community';
-import CommunityStorePage from './pages/CommunityStorePage';
-import FollowedStores from './pages/FollowedStores';
-import SavedProducts from './pages/SavedProducts';
-import EditProfile from './pages/EditProfile';
-import Settings from './pages/Settings';
-import Addresses from './pages/Addresses';
-import Subscription from './pages/Subscription';
-import Auth from './pages/Auth';
-import Welcome from './pages/Welcome';
+/**
+ * THE STOREFRONT'S OWN PAGES ARE LAZY TOO — AND PREFETCHED (see `prefetchable`).
+ *
+ * `Product` (2,119 lines), `Cart` (1,749) and `Addresses` (575) were EAGER
+ * imports, so the product page, the cart and the address book were downloaded,
+ * parsed and executed by every visitor who opened the home page and never went
+ * near any of them. Together with the account surfaces below that is the bulk
+ * of a 942 KB entry chunk, on a store whose customers arrive on 3G.
+ *
+ * LAZY ALONE WOULD BE A TRADE, NOT A WIN: it moves the cost from "everyone,
+ * up front" to "you, at the moment you tap", which on a slow connection is the
+ * worse half of the deal — a spinner between the product card and the product.
+ * So each of these is `prefetchable`: the chunk is fetched during the browser's
+ * IDLE time after the first screen has painted, long before the tap. By the
+ * time a finger moves, the code is already in the HTTP cache and the navigation
+ * is a synchronous render.
+ *
+ * `Home` stays eager. It IS the first paint; deferring it would only add a
+ * round trip to the one route that can never benefit from one.
+ */
+const Products = prefetchable(() => import('./pages/Products'));
+const Product = prefetchable(() => import('./pages/Product'));
+const Cart = prefetchable(() => import('./pages/Cart'));
+const Addresses = prefetchable(() => import('./pages/Addresses'));
+const Auth = prefetchable(() => import('./pages/Auth'));
+
+/**
+ * The account and community surfaces. None of them is on the path from
+ * arriving to buying, so none of them is prefetched either — they arrive when
+ * their route does.
+ */
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Orders = React.lazy(() => import('./pages/Orders'));
+const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
+const Community = React.lazy(() => import('./pages/Community'));
+const CommunityStorePage = React.lazy(() => import('./pages/CommunityStorePage'));
+const FollowedStores = React.lazy(() => import('./pages/FollowedStores'));
+const SavedProducts = React.lazy(() => import('./pages/SavedProducts'));
+const EditProfile = React.lazy(() => import('./pages/EditProfile'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const Subscription = React.lazy(() => import('./pages/Subscription'));
+const Welcome = React.lazy(() => import('./pages/Welcome'));
 import CompleteProfileSheet from './components/profile/CompleteProfileSheet';
 /**
  * THE GAMES SURFACE IS ITS OWN CHUNK. The Printer Farm (its isometric room,
@@ -103,9 +201,9 @@ const GameProfile = React.lazy(() => import('./pages/games/GameProfile'));
 const GameRedeem = React.lazy(() => import('./pages/games/GameRedeem'));
 import FarmSkeleton, { GamesPageSkeleton } from './pages/farm/FarmSkeleton';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
-import Policies from './pages/Policies';
-import Support from './pages/Support';
-import MyGifts from './components/reviews/MyGifts';
+const Policies = React.lazy(() => import('./pages/Policies'));
+const Support = React.lazy(() => import('./pages/Support'));
+const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -169,14 +267,15 @@ function StorefrontApp() {
 function AppContent() {
   const location = useLocation();
   const { store, resolved, unknownStore } = useStore();
+  // Fetch the catalogue, the product page, the cart and the address book once
+  // the browser is idle, so a tap on a product card renders synchronously.
+  useIdlePrefetch();
 
   // Hold the first paint until the host question is answered. It is a single
   // request and it decides which application this is — rendering the main
   // site first and swapping to a storefront would flash the wrong brand at
   // someone who opened a merchant's link.
-  if (!resolved) {
-    return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
-  }
+  if (!resolved) return <RouteFallback />;
   if (store || unknownStore) return <StorefrontApp />;
   // Lower-cased on BOTH sides: react-router matches a path case-insensitively,
   // so /Points reaches the router while a case-sensitive test here would send

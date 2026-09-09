@@ -41,17 +41,24 @@ const DIST = join(ROOT, 'dist');
 const ASSETS = join(DIST, 'assets');
 
 const KB = 1024;
-/** §10: the entry chunk. */
-const ENTRY_BUDGET = 350 * KB;
+/**
+ * §10 set 350 KB. The entry measured 258 KB gzip while `Product` (2,119 lines),
+ * `Cart` (1,749), `Addresses`, `Auth` and every account surface were EAGER
+ * imports — under budget, and still most of the application in the first byte.
+ * Making them lazy (with an idle prefetch, so the tap stays instant) took it to
+ * 60 KB, and the budget is re-cut to 120 KB: comfortable headroom for ordinary
+ * work, tight enough that re-eagering a page is caught the same day.
+ */
+const ENTRY_BUDGET = 120 * KB;
 /** §10: any single route chunk. */
 const CHUNK_BUDGET = 250 * KB;
 /**
- * The entry plus everything it statically imports. §10 does not name this
- * number, so it is set here with headroom over what the slice measured
- * (406 KB gzip) — big enough that ordinary work does not trip it, small enough
- * that moving a lazy-only library into the eager closure does.
+ * The entry plus everything it statically imports — what a browser must
+ * download before it can render ANYTHING. It measured 406 KB gzip when this
+ * budget was first written and 185 KB after the storefront's own pages were
+ * split out; 240 KB leaves room to work without leaving room to undo it.
  */
-const INITIAL_BUDGET = 470 * KB;
+const INITIAL_BUDGET = 240 * KB;
 /** Every stylesheet together; the entry's is the one downloaded before first paint. */
 const CSS_BUDGET = 60 * KB;
 
@@ -170,6 +177,14 @@ test('the split really happened: every page and panel §10 names has a chunk of 
   // The routes §10 lists, plus the admin panels of src/pages/Admin.tsx.
   for (const name of [
     'Admin', 'MerchantDashboardPage', 'Wallet', 'Checkout', 'StoreCheckout', 'Requests',
+    // THE STOREFRONT'S OWN PAGES. Each was an eager import, and together they
+    // were the bulk of a 942 KB entry chunk. They are lazy AND prefetched on
+    // idle (src/App.tsx `prefetchable` / `useIdlePrefetch`), so nothing about
+    // the tap got slower — but a regression that re-eagers one would put it
+    // back in every first visit, so each is named here.
+    'Product', 'Products', 'Cart', 'Addresses', 'Auth',
+    'Profile', 'Orders', 'OrderDetail', 'Settings', 'Subscription',
+    'Community', 'SavedProducts', 'Policies', 'Support',
     // The bundles surface: `Bundles` was EAGER and sat in the entry chunk of
     // every first visit; `BundleDetail` arrives with its route. Both are named
     // here so a regression that re-eagers either one fails loudly.

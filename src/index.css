@@ -1,5 +1,13 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap');
+/* THE FONT IS LINKED FROM index.html, NOT IMPORTED HERE.
+
+   A CSS `@import` of a remote stylesheet is discovered only after THIS file has
+   been downloaded and parsed, and it blocks rendering while it resolves — three
+   serialised round trips (index.css → Google's stylesheet → the font file)
+   before a single word of Arabic could paint. As a <link> in the document head
+   the request starts alongside this stylesheet's, with `preconnect` already
+   warming the handshake. Same font, same `display=swap`, one round trip
+   instead of three. */
 
 @import "tailwindcss";
 
