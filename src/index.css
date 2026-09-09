@@ -407,6 +407,28 @@ html:lang(ckb) .leading-tight {
   flex: 0 0 auto;
   height: calc(76px + max(1rem, env(safe-area-inset-bottom)));
 }
+
+/*
+  HOW MUCH OF THE BOTTOM EDGE THE FLOATING NAV OWNS — one number, so a page
+  with its own bottom bar can sit ABOVE it instead of guessing.
+
+  The cart guessed: `bottom-[80px] sm:bottom-[100px]`, which put its summary
+  bar inside the nav's black gradient scrim (the scrim extends 28px past the
+  pills) and, on any device with a safe-area inset, underneath the pills
+  themselves. That is the "tilted and unstable" bar — its lower edge faded to
+  black asymmetrically, and part of it was simply covered.
+
+  60px / 72px is the pill height (BottomNav), the max() mirrors the nav's own
+  bottom offset, and 28px is the scrim's overhang.
+*/
+:root {
+  --nav-stack: calc(60px + max(1rem, env(safe-area-inset-bottom)) + 28px);
+}
+@media (min-width: 640px) {
+  :root {
+    --nav-stack: calc(72px + max(1.5rem, env(safe-area-inset-bottom)) + 28px);
+  }
+}
 @media (min-width: 640px) {
   .nav-clearance {
     height: calc(88px + max(1.5rem, env(safe-area-inset-bottom)));

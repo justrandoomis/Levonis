@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLanguage } from '../LanguageContext';
 import {
-  ArrowLeft, ArrowRight, Trash2, ChevronRight, ChevronDown, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
+  ArrowLeft, ArrowRight, ChevronRight, ChevronDown, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
   ShieldCheck, FileText, Sparkles,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
@@ -210,6 +210,10 @@ function typeForTransport(method: unknown): ShippingType {
   return method === 'air' ? 'preorder_air' : method === 'sea' ? 'preorder_sea' : method === 'land' ? 'preorder_land' : 'direct';
 }
 
+/** A composition line in one of these states cannot be sold; recreated per
+ *  render before, which defeated every memo below it. */
+const BLOCKING_STATES = new Set(['sold_out', 'ended', 'upcoming', 'locked', 'unconfigured']);
+
 export default function Cart() {
   const navigate = useNavigate();
   const { t, lang, dir, loc } = useLanguage();
@@ -250,7 +254,25 @@ export default function Cart() {
   // A quantity tap or a delete is a write followed by a read. A refresh that
   // lands between the two would paint the pre-write cart back over the
   // customer's own change, so the wake is held for the length of the action.
-  const actionBusyRef = useRef(false);
+  /**
+   * HOW MANY CART WRITES ARE IN FLIGHT — a COUNTER, not a flag.
+   *
+   * As a boolean, two overlapping actions (a delete finishing while a quantity
+   * PATCH is still open) had the first one to finish clear the flag for both,
+   * so the revalidation effect at :409 could fire against a cart that was
+   * still being written.
+   */
+  const actionBusyRef = useRef(0);
+  /**
+   * THE LATEST QUANTITY REQUEST PER LINE.
+   *
+   * Tapping + three times fires three PATCHes with no ordering guarantee, and
+   * each one answers with the WHOLE cart. An earlier response landing last
+   * rewrote the number backwards under the customer's finger. Every request
+   * takes a ticket; a response whose ticket is no longer the latest for its
+   * line is discarded.
+   */
+  const qtySeqRef = useRef(new Map<string, number>());
 
   // Modals state
   const [variantModalOpen, setVariantModalOpen] = useState(false);
@@ -357,7 +379,12 @@ export default function Cart() {
 
   const loadCart = useCallback(async (opts?: { silent?: boolean }) => {
     try {
-      const data = await api.get<{ items: CartItem[] }>('/api/cart');
+      const data = await api.get<{ items: CartItem[]; scope?: { seller_type?: string } | null }>('/api/cart');
+      // The scope now rides on the cart itself, so the page knows which of the
+      // two cart screens to render in the same tick it knows the items —
+      // no second round trip, and no platform-cart flash before a merchant
+      // cart swaps in.
+      setMerchantScope(data.scope?.seller_type === 'merchant');
       applyItems(data.items || [], { detectPriceChange: !!opts?.silent });
       setError('');
       setLoadError(null);
@@ -406,22 +433,11 @@ export default function Cart() {
       !variantSaving &&
       !shippingSaving &&
       warrantySavingId === null &&
-      !actionBusyRef.current,
+      actionBusyRef.current === 0,
     minIntervalMs: 8_000,
     // For the customer who simply leaves the cart in front of them.
     pollWhileVisibleMs: 60_000,
   });
-
-  useEffect(() => {
-    let alive = true;
-    api
-      .get<{ scope: { seller_type?: string } | null }>('/api/cart/scope')
-      .then((d) => alive && setMerchantScope(d.scope?.seller_type === 'merchant'))
-      .catch(() => alive && setMerchantScope(false));
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   // A ?ref= that lands on the cart URL itself is captured here; a product
   // link captures its own on the product page. Neither one ever REPLACES an
@@ -444,11 +460,16 @@ export default function Cart() {
     const refs = [supportState.current?.ref, supportState.conflict?.ref].filter((r): r is string => !!r);
     if (refs.length === 0) return;
     let cancelled = false;
+    // AT MOST TWO REFS, RESOLVED TOGETHER. Serially, the conflict code waited
+    // on the current code's whole round trip before its own started, so the
+    // "which of these two?" prompt appeared one full RTT later than it needed
+    // to. They are independent lookups; nothing about the second depends on
+    // the first.
     (async () => {
-      for (const ref of refs) {
+      setSupportResolving(true);
+      await Promise.all(refs.map(async (ref) => {
         const key = ref.toLowerCase();
-        if (supportNames[key] || supportRefErrors[key]) continue;
-        setSupportResolving(true);
+        if (supportNames[key] || supportRefErrors[key]) return;
         try {
           const res = await api.get<{ ref: string; username: string | null; display_name: string }>(
             `/api/referrals/support/resolve?ref=${encodeURIComponent(ref)}`
@@ -466,10 +487,9 @@ export default function Cart() {
                   ? 'network'
                   : 'unknown';
           setSupportRefErrors((prev) => ({ ...prev, [key]: kind }));
-        } finally {
-          if (!cancelled) setSupportResolving(false);
         }
-      }
+      }));
+      if (!cancelled) setSupportResolving(false);
     })();
     return () => {
       cancelled = true;
@@ -490,7 +510,6 @@ export default function Cart() {
    *  completely normal with the checkout button enabled, because the only
    *  blocker check read `availability.selection.complete`, a key the
    *  composition availability block does not carry. */
-  const BLOCKING_STATES = new Set(['sold_out', 'ended', 'upcoming', 'locked', 'unconfigured']);
   const lineBlocked = (item: CartItem): boolean =>
     !!item.composition && BLOCKING_STATES.has(item.composition.availability_state);
 
@@ -509,20 +528,26 @@ export default function Cart() {
     if (newQty === item.qty) return;
     // Optimistic update, reconciled with the server's returned cart.
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, qty: newQty } : i)));
-    actionBusyRef.current = true;
+    const seq = (qtySeqRef.current.get(item.id) ?? 0) + 1;
+    qtySeqRef.current.set(item.id, seq);
+    actionBusyRef.current += 1;
     try {
       const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { qty: newQty });
+      // A response that a newer tap has already superseded is thrown away
+      // rather than allowed to rewrite the line backwards.
+      if (qtySeqRef.current.get(item.id) !== seq) return;
       applyItems(data.items || []);
     } catch (err) {
+      if (qtySeqRef.current.get(item.id) !== seq) return;
       setError(cartRefusal(err, 'Failed to update quantity'));
       loadCart();
     } finally {
-      actionBusyRef.current = false;
+      actionBusyRef.current -= 1;
     }
   };
 
   const deleteItem = async (item: CartItem) => {
-    actionBusyRef.current = true;
+    actionBusyRef.current += 1;
     try {
       const data = await api.delete<{ items: CartItem[] }>(`/api/cart/items/${item.id}`);
       applyItems(data.items || []);
@@ -530,7 +555,7 @@ export default function Cart() {
       setError(cartRefusal(err, 'Failed to remove item'));
       loadCart();
     } finally {
-      actionBusyRef.current = false;
+      actionBusyRef.current -= 1;
     }
   };
 
@@ -632,7 +657,7 @@ export default function Cart() {
       delete next[item.id];
       return next;
     });
-    actionBusyRef.current = true;
+    actionBusyRef.current += 1;
     try {
       const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { warrantyPlanId: planId });
       applyItems(data.items || []);
@@ -649,7 +674,7 @@ export default function Cart() {
     } finally {
       setWarrantySavingId(null);
       setWarrantyPendingPlan('');
-      actionBusyRef.current = false;
+      actionBusyRef.current -= 1;
     }
   };
 
@@ -777,25 +802,38 @@ export default function Cart() {
   if (merchantScope) return <MerchantCartView />;
 
   return (
-    <div className="w-full pt-16 pb-48 text-zinc-300 min-h-screen bg-black flex flex-col font-sans">
+    // `min-h-dvh`, not `min-h-screen`: on mobile `100vh` is the tall viewport
+    // including the browser chrome, so a `100vh` floor inside a `100dvh` shell
+    // manufactured a screenful of empty scroll range at the bottom of every
+    // short page. The bottom padding clears the summary bar (≈76px) and the
+    // safe area, and nothing more — `pb-48` (192px) was reserving room for a
+    // nav that is no longer on this route.
+    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+92px)] text-zinc-300 min-h-dvh bg-black flex flex-col font-sans">
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-black backdrop-blur-xl border-b border-zinc-900 px-4 py-4 flex items-center justify-between">
+      {/* `backdrop-blur-xl` behind a fully opaque `bg-black` was a compositing
+          layer blurring nothing. Translucent, like the product page's bar, so
+          content passing underneath actually frosts. */}
+      <div className="fixed inset-x-0 top-0 z-40 bg-black/85 backdrop-blur-xl border-b border-zinc-900 px-4 py-4 flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="p-1 hover:text-white transition-colors">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>
         <h1 className="text-white font-bold text-[17px]">
-          {t('cart' as any) || (dir === 'rtl' ? 'السلة' : 'Cart')}
+          {t('cart' as any) || loc('السلة', 'Cart', 'سەبەتە')}
         </h1>
         <button
           onClick={() => navigate('/profile')}
           className="text-[15px] text-zinc-300 hover:text-white font-medium"
         >
-          {dir === 'rtl' ? 'المفضلة' : 'Favorites'}
+          {loc('المفضلة', 'Favorites', 'دڵخوازەکان')}
         </button>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto bg-[#050505]">
+      {/* A plain column. This declared `overflow-y-auto` inside the app's own
+          scroll container while its flex parent had an indefinite height, so
+          it never actually scrolled — dead weight that disabled scroll
+          anchoring and would silently break any `position: sticky` child. */}
+      <div className="flex-1">
         {error && (
           <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between gap-3">
             <span>{error}</span>
@@ -804,7 +842,11 @@ export default function Cart() {
         )}
 
         {loading ? (
-          <div className="mt-3">
+          // The skeleton owns the screen while it is the screen. Without a
+          // height of its own it was a 200px block on an otherwise empty page,
+          // so where it appeared depended entirely on the scroll offset the
+          // previous route left behind.
+          <div className="min-h-[60dvh] pt-3">
             <CartSkeleton rows={3} />
           </div>
         ) : loadError != null ? (
@@ -812,23 +854,23 @@ export default function Cart() {
             <ErrorState error={loadError} onRetry={retryLoadCart} next="/cart" />
           </div>
         ) : items.length === 0 ? (
-          <div className="mx-4 mt-6 text-center py-16 text-zinc-500 bg-[#0a0a0a] rounded-xl border border-zinc-900/50 flex flex-col items-center gap-4">
+          <div className="mx-4 mt-6 text-center py-16 text-zinc-500 bg-zinc-900/40 rounded-2xl border border-zinc-800/70 flex flex-col items-center gap-4">
             <ShoppingCart className="w-10 h-10 text-zinc-700" />
-            <p>{dir === 'rtl' ? 'سلتك فارغة' : 'Your cart is empty.'}</p>
+            <p>{loc('سلتك فارغة', 'Your cart is empty.', 'سەبەتەکەت بەتاڵە.')}</p>
             <button
               onClick={() => navigate('/products')}
-              className="bg-[#ef233c] hover:bg-[#d90429] text-white font-bold py-2 px-6 rounded-lg text-sm transition-colors"
+              className="bg-gold text-black font-black min-h-[44px] px-6 rounded-xl text-sm hover:brightness-110 transition-[filter] duration-150"
             >
-              {dir === 'rtl' ? 'تسوق الآن' : 'Shop now'}
+              {loc('تسوق الآن', 'Shop now', 'ئێستا بکڕە')}
             </button>
           </div>
         ) : (
         <>
-        <div className="bg-[#0a0a0a] border-y border-zinc-900/50 pb-4">
+        <div className="bg-zinc-900/40 border-y border-zinc-800/70 pb-4">
           {/* Group Header */}
           <div className="px-4 py-3 flex items-center gap-2">
             <span className="text-zinc-300 text-[15px] font-medium">
-              {dir === 'rtl' ? 'شحن بواسطة ليفو' : 'Shipped by Levo'}
+              {loc('شحن بواسطة ليفو', 'Shipped by Levo', 'گەیاندن لەلایەن لیڤۆ')}
             </span>
           </div>
 
@@ -847,17 +889,31 @@ export default function Cart() {
             // an option or colour (a row written before the cart enforced it).
             const incomplete = item.availability?.selection ? !item.availability.selection.complete : false;
             return (
-              <div key={item.id} className="px-4 py-2 flex gap-3">
-                {/* Checkbox */}
-                <div className="pt-8 shrink-0" onClick={() => toggleSelect(item.id)}>
-                  <div className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
-                    selected
-                      ? 'bg-[#ef233c] border-[#ef233c]'
-                      : 'border-zinc-500 hover:border-zinc-400'
-                  }`}>
-                    {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-                  </div>
-                </div>
+              // A hairline between rows: the list had no separation at all, so
+              // three products read as one dense block. `last:` keeps the
+              // group's own bottom edge clean.
+              <div key={item.id} className="px-4 py-4 flex gap-3 border-b border-white/[0.06] last:border-b-0">
+                {/* A 22px dot inside a 44px target: the dot is the design, the
+                    target is what a thumb actually hits. It was a bare <div>
+                    with an onClick — unreachable by keyboard and silent to a
+                    screen reader. */}
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={selected}
+                  aria-label={itemName(item)}
+                  onClick={() => toggleSelect(item.id)}
+                  className="shrink-0 w-11 min-h-[44px] pt-6 flex items-start justify-center -ms-2 [touch-action:manipulation]"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors ${
+                      selected ? 'bg-gold border-gold' : 'border-zinc-600'
+                    }`}
+                  >
+                    {selected && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />}
+                  </span>
+                </button>
 
                 {/* Product Image */}
                 <div
@@ -869,9 +925,14 @@ export default function Cart() {
                     alt={itemName(item)}
                     aspect="auto"
                     className="w-full h-full"
-                    bgClassName="bg-white"
-                    imgClassName="mix-blend-multiply"
-                    fallbackClassName="text-zinc-500"
+                    /* The only pure-white surface in the entire app sat here,
+                       as a 100×100 plate on a near-black page — and
+                       `mix-blend-multiply` existed to hide the white edges of
+                       product cutouts against it. A neutral dark plate needs
+                       neither, and it is what every other image surface in the
+                       app already uses. */
+                    bgClassName="bg-zinc-900"
+                    fallbackClassName="text-zinc-600"
                   />
                 </div>
 
@@ -892,7 +953,7 @@ export default function Cart() {
                           <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-zinc-300'}`}>
                             {incomplete
                               ? loc('اختر الخيار أولًا', 'Choose an option first', 'سەرەتا هەڵبژاردەیەک هەڵبژێرە')
-                              : item.variantLabel || (dir === 'rtl' ? 'اختر الخيارات' : 'Choose options')}
+                              : item.variantLabel || loc('اختر الخيارات', 'Choose options', 'هەڵبژاردنەکان دیاری بکە')}
                           </span>
                           <ChevronRight className="w-3 h-3 text-zinc-500" />
                         </button>
@@ -923,11 +984,11 @@ export default function Cart() {
                   </div>
 
                   <div className="flex items-baseline gap-1.5 mb-2 mt-1">
-                    <span className="text-[#ef233c] font-bold text-[17px]">{formatIqd(item.unit_price_iqd)}</span>
+                    <span className="text-white font-bold text-[17px] tabular-nums">{formatIqd(item.unit_price_iqd)}</span>
                     {hasSale && (
                       <>
                         <span className="text-zinc-500 text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
-                        <span className="text-[#ef233c] text-[12px]">-{discountPct}%</span>
+                        <span className="text-gold text-[12px] font-bold tabular-nums">−{discountPct}%</span>
                       </>
                     )}
                   </div>
@@ -1136,7 +1197,7 @@ export default function Cart() {
                   {movedPrices.has(item.id) && (
                     <p
                       className={`mb-2 -mt-1 text-[11.5px] font-semibold ${
-                        movedPrices.get(item.id)!.to > movedPrices.get(item.id)!.from ? 'text-amber-300' : 'text-emerald-300'
+                        movedPrices.get(item.id)!.to > movedPrices.get(item.id)!.from ? 'text-amber-300' : 'text-gold'
                       }`}
                       data-price-moved={item.id}
                     >
@@ -1173,23 +1234,40 @@ export default function Cart() {
                           clamp changed nothing. `BUNDLE_QTY_LIMIT` is
                           translated and wired, and could never be reached from
                           the UI. */}
-                      <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded">
-                        <button onClick={() => updateQuantity(item, -1)} className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                          {item.qty <= 1 ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                        </button>
-                        <span className="w-8 text-center text-[14px] font-medium text-zinc-200 border-x border-zinc-800 py-1">{item.qty}</span>
+                      {/* 28×28px before — every control in this row was under
+                          the 44px floor the same file uses in four other
+                          places. The minus no longer doubles as a delete: the
+                          Delete button beside it is the one removal path, so a
+                          mis-tap at qty 1 can no longer empty a line. */}
+                      <div className="flex items-center rounded-xl border border-zinc-800 bg-zinc-900/70 overflow-hidden">
                         <button
+                          type="button"
+                          aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
+                          onClick={() => updateQuantity(item, -1)}
+                          disabled={item.qty <= 1}
+                          className="w-11 h-11 flex items-center justify-center text-zinc-300 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+                        >
+                          <Minus aria-hidden="true" className="w-4 h-4" />
+                        </button>
+                        <span
+                          aria-live="polite"
+                          className="w-9 h-11 flex items-center justify-center text-[15px] font-bold text-white tabular-nums border-x border-zinc-800"
+                        >
+                          {item.qty}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
                           onClick={() => updateQuantity(item, 1)}
                           disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
-                          aria-disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
-                          className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                          className="w-11 h-11 flex items-center justify-center text-zinc-300 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus aria-hidden="true" className="w-4 h-4" />
                         </button>
                       </div>
                       {item.composition ? (
                         item.qty >= item.composition.max_qty && (
-                          <span className="text-[#ef233c] text-[12px]">
+                          <span className="text-amber-300/90 text-[12px]">
                             {loc(
                               `الحد الأقصى ${item.composition.max_qty} لكل طلب`,
                               `At most ${item.composition.max_qty} per order`,
@@ -1200,14 +1278,18 @@ export default function Cart() {
                       ) : (
                         item.stock !== null &&
                         item.stock < 10 && (
-                          <span className="text-[#ef233c] text-[12px]">
-                            {dir === 'rtl' ? `متبقي ${item.stock} فقط` : `Only ${item.stock} left`}
+                          <span className="text-amber-300/90 text-[12px]">
+                            {loc(`متبقي ${item.stock} فقط`, `Only ${item.stock} left`, `تەنها ${item.stock} ماوە`)}
                           </span>
                         )
                       )}
                     </div>
-                    <button onClick={() => deleteItem(item)} className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-[13px] font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">
-                      {dir === 'rtl' ? 'حذف' : 'Delete'}
+                    <button
+                      type="button"
+                      onClick={() => deleteItem(item)}
+                      className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/70 text-[13px] font-medium text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors [touch-action:manipulation]"
+                    >
+                      {loc('حذف', 'Delete', 'سڕینەوە')}
                     </button>
                   </div>
                 </div>
@@ -1217,15 +1299,15 @@ export default function Cart() {
         </div>
 
         {/* Deals Row */}
-        <div className="mt-2 bg-[#0a0a0a] border-y border-zinc-900/50 flex flex-col">
+        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 flex flex-col">
           <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-zinc-900/30 transition-colors">
             <div className="flex items-center gap-2">
               <svg viewBox="0 0 24 24" className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
-              <span className="text-zinc-200 text-[15px] font-bold">{dir === 'rtl' ? 'العروض والخصومات' : 'Deals & Discounts'}</span>
+              <span className="text-zinc-200 text-[15px] font-bold">{loc('العروض والخصومات', 'Deals & Discounts', 'ئۆفەر و داشکاندن')}</span>
               {(usePoints && pointsDiscount > 0) && (
-                <span className="bg-[#ef233c]/10 text-[#ef233c] text-[11px] font-medium px-1.5 py-0.5 rounded">{dir === 'rtl' ? 'تم التطبيق' : 'Applied'}</span>
+                <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded">{loc('تم التطبيق', 'Applied', 'جێبەجێ کرا')}</span>
               )}
             </div>
             <ChevronRight className={`w-4 h-4 text-zinc-500 transition-transform ${dealsExpanded ? 'rotate-90' : ''}`} />
@@ -1233,18 +1315,61 @@ export default function Cart() {
 
           {dealsExpanded && (
             <div className="px-4 pb-4 pt-1 animate-in slide-in-from-top-2 fade-in duration-200">
-              <p className="text-zinc-400 text-sm mb-3">{dir === 'rtl' ? 'استخدم نقاطك للحصول على خصم' : 'Use your points for a discount'}</p>
-              <div className="flex flex-col gap-2 mb-4">
-                <label className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${usePoints ? 'border-emerald-500 bg-emerald-500/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'}`}>
-                  <div className="flex items-center gap-3">
-                    <input type="checkbox" className="w-5 h-5 accent-emerald-500" checked={usePoints} onChange={() => setUsePoints(!usePoints)} disabled={pointBalance === 0} />
-                    <div>
-                      <p className={`font-bold ${usePoints ? 'text-emerald-400' : 'text-zinc-300'}`}>{dir === 'rtl' ? 'استخدام النقاط' : 'Use Points'}</p>
-                      <p className="text-xs text-zinc-400">
-                        {dir === 'rtl' ? `رصيدك: ${pointBalance.toLocaleString()} نقطة = ${pointBalance.toLocaleString()} د.ع` : `Balance: ${pointBalance.toLocaleString()} pts = ${pointBalance.toLocaleString()} IQD`}
-                      </p>
-                    </div>
-                  </div>
+              <p className="text-zinc-400 text-sm mb-3">{loc('استخدم نقاطك للحصول على خصم', 'Use your points for a discount', 'خاڵەکانت بۆ داشکاندن بەکاربهێنە')}</p>
+              {/*
+                POINTS — a switch, not a lit-up card.
+
+                This was an emerald-bordered panel with an emerald-tinted fill,
+                an emerald system checkbox and emerald bold text, on a page
+                whose only other accent is gold. Four emerald signals for one
+                boolean is the "AI-generated" look the owner named: colour used
+                as decoration rather than as meaning.
+
+                Now it reads like the rest of the store. The row is a quiet
+                surface; the SWITCH is the only thing that lights, in the gold
+                that means "a benefit is in force" everywhere else — the same
+                gold as the PRO badge and the savings line.
+              */}
+              <div className="mb-4">
+                <label
+                  className={`flex items-center justify-between gap-3 min-h-[56px] px-3 rounded-xl border transition-colors ${
+                    pointBalance === 0
+                      ? 'border-zinc-800/60 bg-zinc-900/30 opacity-60'
+                      : 'border-zinc-800 bg-zinc-900/50 cursor-pointer hover:border-zinc-600'
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="block font-bold text-zinc-200 text-[14px]">
+                      {loc('استخدام النقاط', 'Use Points', 'بەکارهێنانی خاڵ')}
+                    </span>
+                    <span className="block text-xs text-zinc-400 tabular-nums">
+                      {loc(`رصيدك: ${pointBalance.toLocaleString()} نقطة = ${pointBalance.toLocaleString()} د.ع`, `Balance: ${pointBalance.toLocaleString()} pts = ${pointBalance.toLocaleString()} IQD`, `باڵانست: ${pointBalance.toLocaleString()} خاڵ = ${pointBalance.toLocaleString()} د.ع`)}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={usePoints}
+                    onChange={() => setUsePoints(!usePoints)}
+                    disabled={pointBalance === 0}
+                  />
+                  {/*
+                    The knob is a CHILD of the track, not a sibling of the
+                    input, so `peer-checked:` cannot reach it directly (the
+                    peer variant compiles to a sibling combinator). The nested
+                    `[&>span]` selector is what carries the state inward.
+
+                    It travels on `inset-inline-start` rather than a translate
+                    so the switch reads correctly in Arabic and Kurdish without
+                    a second, mirrored rule — and it is the only property that
+                    moves, on a 22px dot.
+                  */}
+                  <span
+                    aria-hidden="true"
+                    className="relative shrink-0 w-[46px] h-[28px] rounded-full bg-zinc-700 transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black"
+                  >
+                    <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-white transition-[inset-inline-start] duration-200 ease-out" />
+                  </span>
                 </label>
               </div>
 
@@ -1260,7 +1385,7 @@ export default function Cart() {
             §3.3: separate from the discount coupon and from points, shown
             automatically when a share link brought one, removable for good,
             enterable by hand, and with ZERO effect on any amount below. */}
-        <div className="mt-2 bg-[#0a0a0a] border-y border-zinc-900/50 flex flex-col">
+        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 flex flex-col">
           <button
             type="button"
             onClick={() => setSupportOpen((v) => !v)}
@@ -1272,7 +1397,7 @@ export default function Cart() {
               <HeartHandshake className="w-5 h-5 text-zinc-400 shrink-0" aria-hidden="true" />
               <span className="text-zinc-200 text-[15px] font-bold">{sc.title}</span>
               {activeSupportRef && currentInfo && (
-                <span className="bg-emerald-500/10 text-emerald-400 text-[11px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+                <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
                   @{currentInfo.username || activeSupportRef}
                 </span>
               )}
@@ -1366,7 +1491,7 @@ export default function Cart() {
                   <p className="text-[11.5px] text-zinc-500 mt-1.5">{sc.eligibleLine}</p>
                 )}
                 <div className="flex items-center justify-between gap-2 mt-2">
-                  <span className="text-[11.5px] text-emerald-400">{sc.noPriceEffect}</span>
+                  <span className="text-[11.5px] text-zinc-400">{sc.noPriceEffect}</span>
                   <button
                     type="button"
                     onClick={dropSupportRef}
@@ -1419,27 +1544,27 @@ export default function Cart() {
         </div>
 
         {/* Summary Details */}
-        <div className="mt-2 bg-[#0a0a0a] border-y border-zinc-900/50 p-4 mb-20 flex flex-col gap-3">
-          <h3 className="text-white font-bold text-[16px] mb-1">{dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}</h3>
+        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 p-4 mb-4 flex flex-col gap-3">
+          <h3 className="text-white font-bold text-[16px] mb-1">{loc('ملخص الطلب', 'Order Summary', 'کورتەی داواکاری')}</h3>
 
           <div className="flex justify-between items-center">
-            <span className="text-zinc-400 text-[14px]">{dir === 'rtl' ? 'المجموع الفرعي' : 'Subtotal'}</span>
+            <span className="text-zinc-400 text-[14px]">{loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشی')}</span>
             <span className="text-zinc-200 text-[14px] font-medium">{formatIqd(totalOriginalPrice)}</span>
           </div>
 
           {discounts > 0 && (
-            <div className="flex justify-between items-center text-[#ef233c]">
+            <div className="flex justify-between items-center text-gold/90">
               <div className="flex items-center gap-1">
-                <span className="text-[14px]">{dir === 'rtl' ? 'خصم ليفو' : 'Levo Discount'}</span>
+                <span className="text-[14px]">{loc('خصم ليفو', 'Levo Discount', 'داشکاندنی لیڤۆ')}</span>
               </div>
               <span className="text-[14px] font-medium">- {formatIqd(discounts)}</span>
             </div>
           )}
 
           {pointsDiscount > 0 && (
-            <div className="flex justify-between items-center text-emerald-400">
+            <div className="flex justify-between items-center text-gold/90">
               <div className="flex items-center gap-1">
-                <span className="text-[14px]">{dir === 'rtl' ? 'خصم النقاط' : 'Points Discount'}</span>
+                <span className="text-[14px]">{loc('خصم النقاط', 'Points Discount', 'داشکاندنی خاڵ')}</span>
               </div>
               <span className="text-[14px] font-medium">- {formatIqd(pointsDiscount)}</span>
             </div>
@@ -1447,11 +1572,11 @@ export default function Cart() {
 
           <div className="flex justify-between items-center">
             <span className="text-zinc-400 text-[14px]">
-              {dir === 'rtl' ? 'التوصيل (يُحدد عند الدفع)' : 'Shipping (final at checkout)'}
+              {loc('التوصيل (يُحدد عند الدفع)', 'Shipping (final at checkout)', 'گەیاندن (لە کاتی پارەدان دیاری دەکرێت)')}
             </span>
             <span className="text-zinc-200 text-[14px] font-medium">
               {shipping === 0 ? (
-                <span className="text-green-500">{dir === 'rtl' ? 'مجاني' : 'Free'}</span>
+                <span className="text-gold">{loc('مجاني', 'Free', 'بەخۆڕایی')}</span>
               ) : (
                 formatIqd(shipping)
               )}
@@ -1461,7 +1586,7 @@ export default function Cart() {
           <div className="h-[1px] w-full bg-zinc-800/50 my-1"></div>
 
           <div className="flex justify-between items-center">
-            <span className="text-white font-bold text-[15px]">{dir === 'rtl' ? 'المجموع الكلي' : 'Total'}</span>
+            <span className="text-white font-bold text-[15px]">{loc('المجموع الكلي', 'Total', 'کۆی گشتی')}</span>
             <span className="text-white font-bold text-[17px]">{formatIqd(total)}</span>
           </div>
         </div>
@@ -1469,60 +1594,101 @@ export default function Cart() {
         )}
       </div>
 
-      {/* Sticky Bottom Bar */}
+      {/*
+        THE SUMMARY BAR — the one element on this page that must never move.
+
+        THREE THINGS WERE WRONG WITH IT.
+
+        1. It was OVER-CONSTRAINED: `left-2 right-2 md:left-1/2
+           md:-translate-x-1/2 md:w-full md:max-w-md`. `right-2` carried no
+           breakpoint prefix, so at md+ the element specified left, right AND
+           width at once. CSS resolves that by dropping one edge — `right` in
+           LTR, `left` in RTL — so the bar was centred in English and roughly
+           184px off centre in Arabic, the store's primary language. It is
+           centred here by `inset-x-0` plus `mx-auto`, which is symmetric and
+           therefore identical in both scripts, and uses no transform.
+
+        2. It SAT INSIDE THE NAV. At `bottom-[80px] z-40` it floated within the
+           bottom nav's black gradient scrim (`z-[120]`, and the scrim overhangs
+           the pills by 28px), so its lower edge faded to black — and on any
+           device with a safe-area inset the pills covered part of it outright.
+           `--nav-stack` (index.css) is now the one number for how much of the
+           bottom edge the nav owns, and this clears it.
+
+        3. It CHANGED HEIGHT while being used, because the savings line mounted
+           and unmounted as items were ticked. Fixed row height below.
+      */}
       {!loading && items.length > 0 && (
-      <div className="fixed bottom-[80px] sm:bottom-[100px] left-2 right-2 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-md bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 px-3 py-3 z-40 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-        <div className="w-full flex items-center justify-between gap-2">
+        <div
+          data-testid="cart-summary-bar"
+          className="fixed inset-x-3 bottom-[var(--nav-stack)] md:inset-x-0 md:mx-auto md:w-auto md:max-w-md z-[130] rounded-2xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.55)] px-4 py-3"
+        >
+          {/* A FIXED ROW HEIGHT. The savings line used to mount and unmount as
+              items were ticked, so the bar grew and shrank while being used. */}
+          <div className="w-full min-h-[48px] flex items-center justify-between gap-3">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={allSelected}
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 shrink-0 min-h-[44px] -ms-1 ps-1 pe-1 rounded-lg [touch-action:manipulation]"
+            >
+              <span
+                aria-hidden="true"
+                className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors ${
+                  allSelected ? 'bg-gold border-gold' : 'border-zinc-600'
+                }`}
+              >
+                {allSelected && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />}
+              </span>
+              <span className="text-zinc-300 text-[14px] whitespace-nowrap">
+                {loc('الكل', 'All', 'هەموو')}
+              </span>
+            </button>
 
-          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={toggleSelectAll}>
-            <div className={`w-5 h-5 sm:w-[22px] sm:h-[22px] rounded-full border flex items-center justify-center transition-colors ${
-              allSelected
-                ? 'bg-[#ef233c] border-[#ef233c]'
-                : 'border-zinc-500'
-            }`}>
-              {allSelected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+            <div className="flex flex-col items-end flex-1 min-w-0 pe-1">
+              <span className="text-white font-bold text-[17px] tabular-nums truncate w-full text-end">
+                {formatIqd(total)}
+              </span>
+              {/* Always present, only sometimes visible — the row cannot
+                  change the bar's height by appearing. */}
+              <span
+                className={`text-[11px] tabular-nums whitespace-nowrap ${
+                  discounts > 0 ? 'text-gold/80' : 'invisible'
+                }`}
+              >
+                {loc('وفّرت', 'Saved', 'پاشەکەوتت کرد')} {formatIqd(discounts)}
+              </span>
             </div>
-            <span className="text-zinc-300 text-[13px] sm:text-[14px] whitespace-nowrap">{dir === 'rtl' ? 'الكل' : 'All'}</span>
-          </div>
 
-          <div className="flex flex-col items-end flex-1 overflow-hidden pr-2">
-            <div className="flex items-baseline gap-1.5 w-full justify-end">
-              <span className="text-white font-bold text-[15px] sm:text-[17px] whitespace-nowrap truncate">{formatIqd(total)}</span>
-            </div>
-            {discounts > 0 && (
-              <div className="flex items-center gap-1 text-[#ef233c] text-[10px] sm:text-[11px] whitespace-nowrap">
-                <span>{dir === 'rtl' ? 'توفير' : 'Saved'} {discounts.toLocaleString()}</span>
-              </div>
-            )}
+            <button
+              data-testid="cart-checkout"
+              type="button"
+              onClick={() =>
+                navigate('/checkout', {
+                  // supportRef is an ATTRIBUTION, not a price input: checkout
+                  // forwards it as `supportCode`, the server resolves it and
+                  // freezes it into orders.support_snapshot. Only a code the
+                  // server already resolved for this buyer is carried.
+                  state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
+                })
+              }
+              className="bg-gold text-black font-black min-h-[48px] px-5 rounded-xl text-[15px] tabular-nums shrink-0 whitespace-nowrap hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,opacity] duration-150 active:scale-[0.985] [touch-action:manipulation]"
+              disabled={
+                selectedCount === 0 ||
+                // The server refuses an incomplete line at checkout; say so here
+                // instead of letting the button fail a page later.
+                items.some((i) => selectedIds.has(i.id) && i.availability?.selection && !i.availability.selection.complete) ||
+                // A composition line whose server-sent state says it cannot be
+                // sold blocks the button too — a `sold_out` or `ended` bundle
+                // used to look completely normal here.
+                items.some((i) => selectedIds.has(i.id) && lineBlocked(i))
+              }
+            >
+              {loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')} ({selectedCount})
+            </button>
           </div>
-
-          <button
-            data-testid="cart-checkout"
-            onClick={() =>
-              navigate('/checkout', {
-                // supportRef is an ATTRIBUTION, not a price input: checkout
-                // forwards it as `supportCode`, the server resolves it and
-                // freezes it into orders.support_snapshot. Only a code the
-                // server already resolved for this buyer is carried.
-                state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
-              })
-            }
-            className="bg-[#ef233c] hover:bg-[#d90429] text-white font-bold py-2 sm:py-2.5 px-3 sm:px-5 rounded-lg text-[13px] sm:text-[15px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
-            disabled={
-              selectedCount === 0 ||
-              // The server refuses an incomplete line at checkout; say so here
-              // instead of letting the button fail a page later.
-              items.some((i) => selectedIds.has(i.id) && i.availability?.selection && !i.availability.selection.complete) ||
-              // A composition line whose server-sent state says it cannot be
-              // sold blocks the button too — a `sold_out` or `ended` bundle
-              // used to look completely normal here.
-              items.some((i) => selectedIds.has(i.id) && lineBlocked(i))
-            }
-          >
-            {dir === 'rtl' ? `إتمام الطلب (${selectedCount})` : `Checkout (${selectedCount})`}
-          </button>
         </div>
-      </div>
       )}
 
       {/* ------------------------------------------------------ variant sheet
@@ -1559,7 +1725,7 @@ export default function Cart() {
       <Sheet
         open={variantModalOpen && !!variantView}
         onClose={() => setVariantModalOpen(false)}
-        label={dir === 'rtl' ? 'اختر الخيارات' : 'Choose options'}
+        label={loc('اختر الخيارات', 'Choose options', 'هەڵبژاردنەکان دیاری بکە')}
         z={60}
         dismissOnScrim={false}
         testId="cart-variant-sheet"
@@ -1580,9 +1746,9 @@ export default function Cart() {
                   <div className="w-20 h-20 rounded-lg bg-zinc-800" />
                 )}
                 <div>
-                  <p className="text-[#ef233c] font-bold text-lg">{formatIqd(variantView.unit_price_iqd)}</p>
+                  <p className="text-white font-bold text-lg tabular-nums">{formatIqd(variantView.unit_price_iqd)}</p>
                   {variantView.stock !== null && (
-                    <p className="text-sm text-zinc-400">{dir === 'rtl' ? 'المخزون' : 'Stock'}: {variantView.stock}</p>
+                    <p className="text-sm text-zinc-400">{loc('المخزون', 'Stock', 'کۆگا')}: {variantView.stock}</p>
                   )}
                 </div>
               </div>
@@ -1593,7 +1759,7 @@ export default function Cart() {
 
             {(variantView.colors ?? []).length > 0 && (
               <div>
-                <p className="text-white font-bold mb-2">{dir === 'rtl' ? 'اللون' : 'Color'}</p>
+                <p className="text-white font-bold mb-2">{loc('اللون', 'Color', 'ڕەنگ')}</p>
                 <div className="flex gap-2 flex-wrap">
                   {(variantView.colors ?? []).map((c) => {
                     // §7: colour and option names are English only.
@@ -1603,7 +1769,7 @@ export default function Cart() {
                       <button
                         key={c.id}
                         onClick={() => setPendingColorId(active ? '' : c.id)}
-                        className={`px-4 py-2 rounded-lg border text-sm flex items-center gap-2 ${active ? 'border-[#ef233c] text-[#ef233c] bg-[#ef233c]/10' : 'border-zinc-700 text-zinc-300 bg-zinc-800'}`}
+                        className={`px-4 py-2 rounded-lg border text-sm flex items-center gap-2 ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
                       >
                         <span
                           className="w-3.5 h-3.5 rounded-full border border-zinc-600 inline-block"
@@ -1619,7 +1785,7 @@ export default function Cart() {
 
             {(variantView.options ?? []).length > 0 && (
               <div>
-                <p className="text-white font-bold mb-2">{dir === 'rtl' ? 'الخيارات' : 'Options'}</p>
+                <p className="text-white font-bold mb-2">{loc('الخيارات', 'Options', 'هەڵبژاردنەکان')}</p>
                 <div className="flex gap-2 flex-wrap">
                   {(variantView.options ?? []).map((o) => {
                     const oName = o.name || o.id;
@@ -1628,7 +1794,7 @@ export default function Cart() {
                       <button
                         key={o.id}
                         onClick={() => setPendingOptionId(active ? '' : o.id)}
-                        className={`px-4 py-2 rounded-lg border text-sm ${active ? 'border-[#ef233c] text-[#ef233c] bg-[#ef233c]/10' : 'border-zinc-700 text-zinc-300 bg-zinc-800'}`}
+                        className={`px-4 py-2 rounded-lg border text-sm ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
                       >
                         {oName}
                         {typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${formatIqd(o.price_iqd)}` : ''}
@@ -1646,10 +1812,10 @@ export default function Cart() {
             <button
               onClick={confirmVariant}
               disabled={variantSaving}
-              className="w-full mt-4 bg-[#ef233c] text-white font-bold py-3 rounded-xl hover:bg-[#d90429] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full mt-4 bg-gold text-black font-black min-h-[48px] rounded-xl hover:brightness-110 transition-[filter] duration-150 disabled:opacity-45 flex items-center justify-center gap-2"
             >
               {variantSaving && <Spinner size="xs" delayMs={0} decorative />}
-              {variantSaving ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : (dir === 'rtl' ? 'تأكيد' : 'Confirm')}
+              {variantSaving ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('تأكيد', 'Confirm', 'دڵنیاکردنەوە')}
             </button>
           </div>
         )}
@@ -1688,8 +1854,8 @@ export default function Cart() {
           <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 id="cart-shipping-sheet-title" className="text-white font-bold text-[17px]">{dir === 'rtl' ? 'طريقة الشحن' : 'Shipping Method'}</h3>
-                <p className="text-zinc-400 text-sm mt-1">{dir === 'rtl' ? 'اختر طريقة الشحن المفضلة لهذا المنتج' : 'Choose your preferred shipping method for this item'}</p>
+                <h3 id="cart-shipping-sheet-title" className="text-white font-bold text-[17px]">{loc('طريقة الشحن', 'Shipping Method', 'شێوازی گەیاندن')}</h3>
+                <p className="text-zinc-400 text-sm mt-1">{loc('اختر طريقة الشحن المفضلة لهذا المنتج', 'Choose your preferred shipping method for this item', 'شێوازی گەیاندنی دڵخوازت بۆ ئەم بەرهەمە دیاری بکە')}</p>
               </div>
               <button onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
                 <X className="w-5 h-5" />
@@ -1719,23 +1885,23 @@ export default function Cart() {
                     // already retired.
                     onClick={() => shippingItem && chooseShipping(shippingItem, sm.id)}
                     disabled={shippingSaving}
-                    className={`flex items-start justify-between p-4 rounded-xl border transition-all text-left w-full disabled:opacity-60 ${active ? 'border-[#ef233c] bg-[#ef233c]/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'}`}
+                    className={`flex items-start justify-between p-4 rounded-xl border transition-all text-left w-full disabled:opacity-60 ${active ? 'border-gold/60 bg-gold/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600'}`}
                   >
                     <div className="flex-1">
-                      <p className={`font-bold text-[15px] ${active ? 'text-[#ef233c]' : 'text-zinc-200'}`}>
+                      <p className={`font-bold text-[15px] ${active ? 'text-gold' : 'text-zinc-200'}`}>
                         {title}
                       </p>
                       {desc && (
                         <p className="text-zinc-500 text-xs mt-1">{desc}</p>
                       )}
                       {typeof sm.price_iqd === 'number' && sm.price_iqd > 0 && (
-                        <p className={`text-[13px] mt-1.5 font-bold ${active ? 'text-[#ef233c]' : 'text-zinc-300'}`}>
+                        <p className={`text-[13px] mt-1.5 font-bold ${active ? 'text-gold' : 'text-zinc-300'}`}>
                           {formatIqd(sm.price_iqd)}
                         </p>
                       )}
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${active ? 'border-[#ef233c]' : 'border-zinc-600'}`}>
-                      {active && <div className="w-2.5 h-2.5 rounded-full bg-[#ef233c]"></div>}
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${active ? 'border-gold' : 'border-zinc-600'}`}>
+                      {active && <div className="w-2.5 h-2.5 rounded-full bg-gold" />}
                     </div>
                   </button>
                 );

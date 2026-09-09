@@ -749,7 +749,24 @@ cartRoutes.get('/', async (c) => {
   // the customer discovers it by being refused. null = empty, so any type may
   // still be started.
   const shippingType = cartShippingType(items as Array<{ transport_method?: unknown }>);
-  return c.json({ success: true, items, tier, tierActive, shipping_type: shippingType });
+  // WHOSE CART THIS IS, answered from the rows already in hand.
+  //
+  // The page used to ask `/cart/scope` in a second request — the same table,
+  // the same user, for columns this handler had already read — and could not
+  // decide which cart screen to render until it landed. That is a whole extra
+  // round trip on the critical path, and a visible two-stage flash for a
+  // merchant cart: the platform cart rendered first, then swapped.
+  //
+  // `/cart/scope` stays exactly as it is: it also resolves the STORE, which
+  // this response has no business carrying.
+  return c.json({
+    success: true,
+    items,
+    tier,
+    tierActive,
+    shipping_type: shippingType,
+    scope: cartSellerScope(items as unknown as SellerLine[]),
+  });
 });
 
 /**

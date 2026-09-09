@@ -266,6 +266,27 @@ function StorefrontApp() {
 
 function AppContent() {
   const location = useLocation();
+
+  /**
+   * A NEW PAGE STARTS AT ITS TOP.
+   *
+   * The app scrolls inside `#main-scroll-container`, not the window, and
+   * nothing in the app ever reset it — so a route change kept the previous
+   * page's scroll offset. Tapping the cart from halfway down a long product
+   * landed on a cart that was already scrolled to its own bottom, which on a
+   * page showing three skeleton rows meant landing on empty black with the
+   * loading state above the fold. That is what "the loading indicator appears
+   * at the very bottom" was. The one `window.scrollTo` in the codebase
+   * (Policies.tsx) targets the window and has always been a no-op here.
+   *
+   * A hash link is the one navigation that legitimately wants an offset, so
+   * it is left alone.
+   */
+  React.useEffect(() => {
+    if (location.hash) return;
+    document.getElementById('main-scroll-container')?.scrollTo({ top: 0 });
+  }, [location.pathname, location.hash]);
+
   const { store, resolved, unknownStore } = useStore();
   // Fetch the catalogue, the product page, the cart and the address book once
   // the browser is idle, so a tap on a product card renders synchronously.
@@ -395,6 +416,7 @@ function AppContent() {
   // /referrals, /wallet and the home page. A spacer is content, and content is
   // always scrolled to.
   const navHidden = isBottomNavHidden(location.pathname);
+
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
