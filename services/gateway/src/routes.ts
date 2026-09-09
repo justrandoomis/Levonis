@@ -99,6 +99,17 @@ export const ROUTES: readonly RouteRule[] = [
 
   // -------------------------------------------------------- catalog (admin)
   { prefix: '/api/admin/bundles', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  // The mystery pools, their weights and the eligible-stock preview: catalogue
+  // configuration, and its own mount because its own router carries its own
+  // requireAdmin (docs/BUNDLES_MYSTERY.md §10).
+  { prefix: '/api/admin/mystery', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  // Windows, tiers, limits and the offer price for ANY subject — one promotion
+  // model, so it sits with the coupons/offers owner rather than with the
+  // catalogue (docs/BUNDLES_MYSTERY.md §9, §10).
+  { prefix: '/api/admin/offers', hosts: 'main', owner: 'COMMERCE', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  // The composition and mystery read models: aggregates only, no order id and
+  // no user id, so they belong to Analytics (§12).
+  { prefix: '/api/admin/analytics', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/products-v2', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/products', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/taxonomy', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },

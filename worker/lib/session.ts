@@ -4,7 +4,12 @@ import type { AppContext, SessionUser } from './types';
 import { randomToken, sha256Hex } from './crypto';
 import { rootDomainFrom, sessionCookieDomain } from './hosts';
 
-const COOKIE_NAME = 'levonis_session';
+/** The session cookie's name. Exported because the caching rule of §14 has to
+ *  ask "does this request carry a session?" BEFORE the session is resolved —
+ *  a shared cache entry written for a signed-in member would be served to
+ *  strangers, and a second literal of this name would drift from this one. */
+export const SESSION_COOKIE_NAME = 'levonis_session';
+const COOKIE_NAME = SESSION_COOKIE_NAME;
 const SESSION_TTL_DAYS = 14;
 
 /**

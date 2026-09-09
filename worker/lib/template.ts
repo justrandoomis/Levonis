@@ -921,7 +921,20 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   // would say 'direct_sale' and a re-import of the store's own export would
   // quietly halve the product. The importer expands it back, and the options'
   // own availability types are the authority either way.
-  push('selling_type', isMixed(doc.sale_types) ? 'mixed' : doc.selling_type);
+  //
+  // A COMPOSITION ROW IS THE ONE EXCEPTION (docs/BUNDLES_MYSTERY.md §1.2). Its
+  // `sale_types` are pinned to `["bundle"]` or `["bundle","pre_order"]`, and
+  // `isMixed` reads the second of those as mixed — so a pre-order bundle would
+  // export `selling_type: mixed`, a value that describes no bundle and that
+  // the parser would expand into a direct-sale product. It exports `bundle`.
+  // Nothing reads the value back either way: `planProductSave` refuses every
+  // writer but the bundles panel for a composition row
+  // (`COMPOSITION_NOT_ALLOWED`), so the template and the CSV importer cannot
+  // apply one at all.
+  push(
+    'selling_type',
+    doc.composition !== '' ? 'bundle' : isMixed(doc.sale_types) ? 'mixed' : doc.selling_type
+  );
   push('stock', numStr(doc.stock));
   push('low_stock_threshold', numStr(doc.low_stock_threshold));
   if (opts.inventoryMode !== undefined) push('inventory_mode', opts.inventoryMode ?? '');

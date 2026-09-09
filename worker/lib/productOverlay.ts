@@ -489,8 +489,16 @@ export function snapshotFrom(
  * The public shape of the relational structure: groups with their values,
  * colours with their real link lists, modelled combinations and bound images.
  * Cost NEVER crosses this boundary, at any level.
+ *
+ * `coarse` is §8.2 row 18: for a product in an ACTIVE mystery pool the EXACT
+ * `available` is suppressed at option-value and colour level and replaced by a
+ * coarse `stock_state`. Publishing exact counts here is the one channel the
+ * "use the real inventory" rule creates, and two anonymous GETs around a
+ * purchase would otherwise defeat every reveal milestone after `'paid'`
+ * deterministically. Admins read the exact counts through
+ * `adminRelations`, which this function is not.
  */
-export function publicRelations(view: ProductRelationsView) {
+export function publicRelations(view: ProductRelationsView, coarse = false) {
   if (!view.has_relations) return null;
   const linksByColor = new Map<string, ColorLinkRow[]>();
   for (const l of view.links) {
@@ -502,8 +510,22 @@ export function publicRelations(view: ProductRelationsView) {
   // never the raw counters. NULL = untracked at that level. Meaningful only
   // when inventory_mode makes that level authoritative — the client gates
   // its chips on the mode this same payload carries.
-  const availableOf = (stock: number | null, reserved: number | null | undefined) =>
+  const exactAvailable = (stock: number | null, reserved: number | null | undefined) =>
     stock === null ? null : Math.max(0, stock - (reserved ?? 0));
+  const availableOf = (stock: number | null, reserved: number | null | undefined) =>
+    coarse ? null : exactAvailable(stock, reserved);
+  /** in_stock / low / sold_out — the only stock fact a pool member publishes.
+   *  `null` when the level is untracked, exactly as `available` would be. */
+  const stateOf = (
+    stock: number | null,
+    reserved: number | null | undefined,
+    low: number | null | undefined
+  ): string | null => {
+    const n = exactAvailable(stock, reserved);
+    if (n === null) return null;
+    if (n <= 0) return 'sold_out';
+    return low !== null && low !== undefined && n <= low ? 'low' : 'in_stock';
+  };
   return {
     inventory_mode: view.inventory_mode,
     option_groups: view.groups
@@ -520,6 +542,7 @@ export function publicRelations(view: ProductRelationsView) {
             image: v.image,
             sort: v.sort,
             available: availableOf(v.stock, v.reserved),
+            ...(coarse ? { stock_state: stateOf(v.stock, v.reserved, v.low_stock_threshold) } : {}),
             regular_price_iqd: v.regular_price_iqd,
             prime_price_iqd: v.prime_price_iqd,
             pro_price_iqd: v.pro_price_iqd,
@@ -540,6 +563,7 @@ export function publicRelations(view: ProductRelationsView) {
           option_value_id: l.option_value_id,
         })),
         available: availableOf(x.stock, x.reserved),
+        ...(coarse ? { stock_state: stateOf(x.stock, x.reserved, x.low_stock_threshold) } : {}),
         regular_price_iqd: x.regular_price_iqd,
         prime_price_iqd: x.prime_price_iqd,
         pro_price_iqd: x.pro_price_iqd,

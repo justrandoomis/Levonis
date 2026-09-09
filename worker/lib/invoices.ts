@@ -54,6 +54,8 @@ interface OrderRow {
 interface OrderItemRow {
   id: string;
   product_id: string | null;
+  /** Set on a bundle COMPONENT row: the priced parent it belongs under. */
+  bundle_parent_item_id?: string | null;
   name_snapshot: string;
   option_snapshot: string;
   qty: number;
@@ -102,6 +104,34 @@ export interface InvoiceSnapshotV1 {
     payment_status: InvoicePaymentStatus;
   };
   correction?: { reason: string; corrected_by: string; supersedes_invoice_no: string };
+}
+
+/**
+ * PRICED LINES ONLY, WITH A BUNDLE'S PARTS NESTED UNDER IT (§6.3).
+ *
+ * A bundle's component rows carry `unit_price_iqd = 0` by design — the money is
+ * on the parent — so emitting them as invoice lines would print four 0 IQD rows
+ * naming the member products on a document the customer downloads, and any
+ * reader summing the lines would still get the right total for the wrong
+ * reason. They become an `included[]` list under the parent instead.
+ */
+function invoiceLines(items: OrderItemRow[]): InvoiceSnapshotV1['lines'] {
+  return items
+    .filter((it) => !it.bundle_parent_item_id)
+    .map((it) => {
+      const kids = items.filter((k) => String(k.bundle_parent_item_id ?? '') === it.id);
+      const line = lineFromItem(it);
+      return kids.length
+        ? {
+            ...line,
+            included: kids.map((k) => ({
+              name: k.name_snapshot,
+              variant: k.option_snapshot || '',
+              qty: Number(k.qty) || 0,
+            })),
+          }
+        : line;
+    });
 }
 
 function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
@@ -162,7 +192,7 @@ async function loadOrderData(
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<OrderRow>();
   if (!order) return null;
   const { results: items } = await env.DB.prepare(
-    'SELECT id, product_id, name_snapshot, option_snapshot, qty, unit_price_iqd, line_total_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot FROM order_items WHERE order_id = ?'
+    'SELECT id, product_id, name_snapshot, option_snapshot, qty, unit_price_iqd, line_total_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot, bundle_parent_item_id FROM order_items WHERE order_id = ?'
   )
     .bind(orderId)
     .all<OrderItemRow>();
@@ -194,7 +224,7 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
       address: String(address.address ?? ''),
       landmark: String(address.landmark ?? ''),
     },
-    lines: items.map(lineFromItem),
+    lines: invoiceLines(items),
     totals: {
       subtotal_iqd: Number(order.subtotal_iqd) || 0,
       delivery_fee_iqd: Number(order.shipping_iqd) || 0,

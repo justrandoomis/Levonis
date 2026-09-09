@@ -449,6 +449,14 @@ export interface InvoiceEmailLine {
   direct_surcharge_iqd?: number;
   warranty_fee_iqd: number; // per-unit warranty extension fee (0 = none)
   warranty_label: string;
+  /**
+   * A BUNDLE'S PARTS, listed UNDER the priced line rather than beside it
+   * (docs/BUNDLES_MYSTERY.md §6.3). They are real order items — the physical
+   * truth a return and a warranty clock key on — but they carry no price, so
+   * listing them as invoice lines of their own would make `Σ lines` disagree
+   * with the invoice's own subtotal. Absent on an ordinary line.
+   */
+  included?: Array<{ name: string; variant: string; qty: number }>;
 }
 
 export interface InvoiceEmailData {

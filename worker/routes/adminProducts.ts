@@ -40,6 +40,7 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
   localizeRespectingAuthored,
   planProductSave,
@@ -60,8 +61,10 @@ adminProductsRoutes.use('*', requireAdmin);
 
 // ---------------------------------------------------------------- helpers
 
-/** Same charset the v1 admin used: latin + digits + Arabic block, dash-joined. */
-function slugToken(input: unknown): string {
+/** Same charset the v1 admin used: latin + digits + Arabic block, dash-joined.
+ *  Exported so the bundles panel derives a slug through the SAME rule rather
+ *  than a second one that would drift. */
+export function slugToken(input: unknown): string {
   return String(input ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9؀-ۿ]+/g, '-')
@@ -71,7 +74,7 @@ function slugToken(input: unknown): string {
 
 type SluggedTable = 'products' | 'brands' | 'catalogs';
 
-async function uniqueSlugIn(
+export async function uniqueSlugIn(
   db: D1Database,
   table: SluggedTable,
   base: string,
@@ -468,6 +471,7 @@ adminProductsRoutes.get('/', async (c) => {
     c.env.DB.prepare(
       `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd, stock,
               stock_reserved, low_stock_threshold, is_featured, brand_id, images, created_at, updated_at, doc_version,
+              composition,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
                         WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold
@@ -503,6 +507,10 @@ adminProductsRoutes.get('/', async (c) => {
         low_stock_threshold: (r.low_stock_threshold as number | null) ?? null,
         sold: Number(r.sold ?? 0),
         is_featured: !!r.is_featured,
+        // '' on every ordinary product; 'bundle' / 'mystery' on a composition
+        // row, so the grid BADGES it and sends the admin to the bundles panel
+        // instead of opening an editor that will refuse (COMPOSITION_PRODUCT).
+        composition: String(r.composition ?? ''),
         brand_id: (r.brand_id as string | null) ?? null,
         image: primary?.url ?? '',
         created_at: (r.created_at as string | null) ?? null,
@@ -638,6 +646,12 @@ adminProductsRoutes.get('/:id', async (c) => {
   // relational rows falls through to its JSON columns, exactly as before.
   const stored = await reloadForVerification(c.env.DB, id);
   if (!stored) throw notFound('Product not found');
+  // A BUNDLE IS NOT EDITED HERE (docs/BUNDLES_MYSTERY.md §16). Its stock is
+  // NULL by design, it has no options or colours of its own, and its price
+  // rule lives in `bundle_config` — an editor that opened it would show a
+  // product with no stock and then be refused by `planProductSave` on save.
+  // The 409 names the panel that owns it instead.
+  if (stored.row.composition !== '') throw compositionConflict(id, stored.row.slug);
   return c.json({
     success: true,
     // §11: an assistant admin gets the same document with every financial
@@ -715,6 +729,11 @@ adminProductsRoutes.post('/', async (c) => {
           .first<Record<string, unknown>>()
       : null;
   const prev = existingRow ? parseProductRow(existingRow) : null;
+  // The same door as the GET above, on the write side: a composition row is
+  // created and edited by the bundles panel alone. `planProductSave` refuses
+  // it too (COMPOSITION_NOT_ALLOWED) — this answer is the one that can name
+  // the panel and the slug.
+  if (prev && prev.composition !== '') throw compositionConflict(prev.id, prev.slug);
 
   const doc = validateProductDoc(body);
 
@@ -1051,6 +1070,23 @@ adminProductsRoutes.delete('/:id', async (c) => {
     .bind(id)
     .first<Record<string, unknown>>();
   if (!row) throw notFound('Product not found');
+
+  // A MEMBER OF A BUNDLE IS NEVER DELETED SILENTLY.
+  // `bundle_components.member_product_id` is ON DELETE RESTRICT on purpose, so
+  // the raw delete below would fail on a foreign key with a message no admin
+  // can read. This names the bundles instead — one indexed read through
+  // idx_bundle_components_member.
+  const usedBy = await bundlesUsing(c.env.DB, id);
+  if (usedBy.length) {
+    throw new HttpError(
+      409,
+      `هذا المنتج مكوّن في ${usedBy.length} حزمة / this product is a component of ${usedBy.length} bundle(s): ${usedBy
+        .map((b) => b.name)
+        .join(', ')}`,
+      'COMPOSITION_PRODUCT',
+      { bundles: usedBy }
+    );
+  }
 
   const ref = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM order_items WHERE product_id = ?')
     .bind(id)

@@ -33,6 +33,14 @@ export interface ReceiptLine {
   qty: number;
   unit_iqd: number;
   line_iqd: number;
+  /**
+   * A bundle's parts, printed UNDER the priced line rather than as lines of
+   * their own (docs/BUNDLES_MYSTERY.md §6.3). The components carry no price —
+   * the money is on the parent — so printing them as rows would put 0 IQD lines
+   * on the customer's paper copy and make the printed lines disagree with the
+   * printed subtotal.
+   */
+  included?: Array<{ name: string; variant: string; qty: number }>;
 }
 
 export interface ReceiptMoneyRow {
@@ -261,7 +269,14 @@ export function renderPurchaseReceipt(
       (l) =>
         `<tr><td>${escapeHtml(l.name)}${
           l.variant ? `<br><span style="font-size:10px">${escapeHtml(l.variant)}</span>` : ''
-        }</td>` +
+        }${(l.included ?? [])
+          .map(
+            (k) =>
+              `<br><span style="font-size:10px">· ${escapeHtml(k.name)}${
+                k.variant ? ` — ${escapeHtml(k.variant)}` : ''
+              } ×${k.qty}</span>`
+          )
+          .join('')}</td>` +
         `<td style="text-align:center" class="ltr">${l.qty}</td>` +
         `<td style="text-align:end" class="ltr">${escapeHtml(iqd(l.line_iqd))}</td></tr>`
     )
@@ -570,6 +585,9 @@ export function escposReceipt(data: PurchaseReceiptData, charsPerLine = 48): str
   for (const l of data.lines) {
     out += `${l.name.slice(0, charsPerLine)}\n`;
     out += pair(`  x${l.qty}`, iqd(l.line_iqd));
+    for (const k of l.included ?? []) {
+      out += `  - ${`${k.name}${k.variant ? ` ${k.variant}` : ''} x${k.qty}`.slice(0, charsPerLine - 4)}\n`;
+    }
   }
   out += `${rule}\n`;
   out += pair('Subtotal', iqd(data.subtotal_iqd));
