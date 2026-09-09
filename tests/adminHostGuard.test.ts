@@ -127,6 +127,38 @@ test('discovery finds the whole admin surface, including the seven off-prefix mo
   assert.ok(paths.includes('/api/translate'), 'misc /translate (requireAdmin inline) must be discovered');
   assert.ok(paths.includes('/api/invoices/:id/revise'), 'invoices revise (requireAdmin inline) must be discovered');
   assert.ok(ADMIN_PATHS.length >= 150, `only ${ADMIN_PATHS.length} admin routes discovered — the parser regressed`);
+
+  // The bundles panel is its own router with its own `.use('*', requireAdmin)`
+  // (docs/BUNDLES_MYSTERY.md §10): `requireMainHost` is a HOST check and never
+  // a role check, so a new mount without its own guard would be an open admin
+  // API. Naming its routes here means the two assertions below actually cover
+  // them rather than passing vacuously if the mount is ever renamed away.
+  for (const path of [
+    '/api/admin/bundles',
+    '/api/admin/bundles/:productId',
+    '/api/admin/bundles/:productId/preview',
+    '/api/admin/bundles/:productId/status',
+    '/api/admin/bundles/:productId/duplicate',
+    '/api/admin/bundles/reorder',
+    // The mystery panel, the special-offers panel and the composition
+    // analytics screens are three MORE routers, each with its own
+    // `.use('*', requireAdmin)`. They are named for the same reason: a mount
+    // renamed away would make the two assertions below pass vacuously, and
+    // pool weights, an eligible-stock preview, an offer's tier gate and a
+    // revenue screen are exactly what an open admin API would hand out.
+    '/api/admin/mystery/pools',
+    '/api/admin/mystery/pools/:id',
+    '/api/admin/mystery/pools/:id/entries',
+    '/api/admin/mystery/pools/:id/eligible',
+    '/api/admin/mystery/offers',
+    '/api/admin/mystery/offers/:productId',
+    '/api/admin/offers',
+    '/api/admin/offers/:productId',
+    '/api/admin/analytics/bundles',
+    '/api/admin/analytics/mystery',
+  ]) {
+    assert.ok(paths.includes(path), `the ${path.split('/')[3]} panel route ${path} was not discovered`);
+  }
 });
 
 test(`every admin route (${ADMIN_PATHS.length}) does not exist on a merchant host, even with a platform admin's own session`, async () => {

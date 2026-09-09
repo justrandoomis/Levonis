@@ -217,3 +217,31 @@ test('carryStoredCostForward nulls a cost that has no stored counterpart', () =>
   assert.equal(doc.options[0].cost_iqd, null);
   assert.equal(doc.colors[0].cost_iqd, null);
 });
+
+
+// ------------------------------------------- §11.4: the composition preview
+
+test('a bundle preview loses component cost for an assistant and keeps every operational figure', () => {
+  // §11.4: cost and margin are financial; a pool weight, a probability and an
+  // availability count are OPERATIONAL and stay visible to an assistant admin.
+  // The preview is shaped exactly as `worker/routes/adminBundles.ts` sends it.
+  const preview = {
+    component_total_iqd: 945000,
+    bundle_price_iqd: 850000,
+    saving_percent: 10,
+    availability: { state: 'in_stock', max_bundles: 3, blocking: [] },
+    components: [
+      { component_id: 'bc_1', name: 'Printer', qty_per_bundle: 1, unit_iqd: 900000, available: 5, cost_iqd: 700000 },
+      { component_id: 'bc_2', name: 'Spool', qty_per_bundle: 2, unit_iqd: 20000, available: 6, cost_iqd: 12000 },
+    ],
+  };
+  const owner = projectForAdmin(env, user({ role: 'admin', email: 'owner@levonis-iq.com' }), preview);
+  assert.equal(owner.components[0].cost_iqd, 700000, 'the owner sees component cost');
+
+  const assistant = projectForAdmin(env, user({ role: 'admin', admin_scope: 'assistant' }), preview);
+  assert.equal(JSON.stringify(assistant).includes('cost_iqd'), false, 'an assistant never sees a component cost');
+  assert.equal(JSON.stringify(assistant).includes('700000'), false, 'nor the figure itself');
+  assert.equal(assistant.availability.max_bundles, 3, 'availability is operational, not financial');
+  assert.equal(assistant.saving_percent, 10, 'the saving the customer is offered is not a cost');
+  assert.equal(assistant.components[0].unit_iqd, 900000, 'the price a customer pays is not a cost either');
+});

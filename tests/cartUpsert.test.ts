@@ -220,3 +220,101 @@ test('the conflict target 0030 left behind really does fail against this schema'
     'the pre-0032 conflict target unexpectedly resolved — this test no longer proves anything'
   );
 });
+
+// ------------------------------------------------ composition lines (0058)
+
+/**
+ * A BUNDLE LINE IS AN ORDINARY `cart_items` ROW, and that is the whole point
+ * of §5.1: it satisfies the same table CHECK, the same
+ * `UNIQUE (user_id, product_id, community_product_id, option_id, color_id,
+ * shipping_method_id)`, the same partial index `idx_cart_levonis_line` and the
+ * same `ON CONFLICT(...)` upsert — with NO index change and NO table rebuild.
+ *
+ * That is why the composition key rides in `option_id` rather than in a column
+ * of its own: a new column inside that unique tuple would have rebuilt the
+ * partial index, which is the exact operation migration 0032 exists because of
+ * and which took add-to-cart to a 500 the last time it happened.
+ *
+ * `draw_salt` is the one column 0058 adds, and it is deliberately OUTSIDE the
+ * tuple, so `ALTER TABLE … ADD COLUMN` does not touch the index at all.
+ */
+const BUNDLE_ADD = `
+  INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                          shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
+  VALUES (?, ?, ?, ?, '[]', '', '', ?, '', ?, ?)
+  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+    WHERE product_id IS NOT NULL
+  DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+                transport_method = excluded.transport_method`;
+
+const addBundleLine = (raw: DatabaseSync, id: string, key: string, qty = 1, salt = '') =>
+  raw.prepare(BUNDLE_ADD).run(id, 'u1', 'pb1', key, '', qty, salt);
+
+const withBundle = () => {
+  const raw = db();
+  raw.exec(`
+    INSERT INTO products (id, slug, name, price_iqd, status, stock, composition, selling_type)
+      VALUES ('pb1','starter-bundle','Starter Bundle',400000,'active',NULL,'bundle','bundle');
+  `);
+  return raw;
+};
+
+test('a bundle line upserts through the SAME index, and the same key merges', () => {
+  const raw = withBundle();
+  addBundleLine(raw, 'cb1', 'bx_1111111111111111', 1);
+  addBundleLine(raw, 'cb2', 'bx_1111111111111111', 1);
+  const r = rows(raw);
+  assert.equal(r.length, 1, 'identical composition keys are one line');
+  assert.equal(r[0].qty, 2);
+  assert.equal(r[0].option_id, 'bx_1111111111111111');
+  assert.equal(r[0].option_value_ids, '[]', 'the key is line identity, never a selection');
+});
+
+test('two different composition keys are two lines, exactly like two options are', () => {
+  const raw = withBundle();
+  addBundleLine(raw, 'cb1', 'bx_1111111111111111', 1);
+  addBundleLine(raw, 'cb2', 'bx_2222222222222222', 1);
+  assert.equal(rows(raw).length, 2);
+});
+
+test('a bundle line and an ordinary line of the same customer never collide', () => {
+  const raw = withBundle();
+  addLevonis(raw, 'ci1', 1);
+  addBundleLine(raw, 'cb1', 'bx_1111111111111111', 1);
+  const r = rows(raw);
+  assert.equal(r.length, 2);
+  assert.deepEqual(r.map((x) => String(x.product_id)).sort(), ['p1', 'pb1']);
+});
+
+test('0058 added ONLY draw_salt to cart_items, and it is outside the unique tuple', () => {
+  const raw = db();
+  const cols = (raw.prepare('PRAGMA table_info(cart_items)').all() as Array<{ name: string }>).map((c) => c.name);
+  assert.ok(cols.includes('draw_salt'), 'draw_salt is missing');
+  // The tuple the partial unique index is built on — unchanged.
+  const idx = (raw.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_cart_levonis_line'").get() as {
+    sql: string;
+  }).sql;
+  assert.ok(!idx.includes('draw_salt'), 'draw_salt must not be inside idx_cart_levonis_line');
+  assert.ok(!idx.includes('composition_key'), 'the composition key rides in option_id, not a new column');
+  for (const part of ['user_id', 'product_id', 'option_id', 'color_id', 'shipping_method_id']) {
+    assert.ok(idx.includes(part), `${part} left the line-identity index`);
+  }
+});
+
+test('cart_bundle_choices cascade with the line they belong to', () => {
+  const raw = withBundle();
+  raw.exec(`
+    INSERT INTO bundle_components (id,bundle_product_id,member_product_id,qty) VALUES ('bc_1','pb1','p1',1);
+  `);
+  addBundleLine(raw, 'cb1', 'bx_1111111111111111', 1);
+  raw
+    .prepare("INSERT INTO cart_bundle_choices (cart_item_id, component_id, option_value_ids, color_id, included) VALUES ('cb1','bc_1','[]','',1)")
+    .run();
+  assert.equal((raw.prepare('SELECT COUNT(*) AS n FROM cart_bundle_choices').get() as { n: number }).n, 1);
+  raw.prepare("DELETE FROM cart_items WHERE id = 'cb1'").run();
+  assert.equal(
+    (raw.prepare('SELECT COUNT(*) AS n FROM cart_bundle_choices').get() as { n: number }).n,
+    0,
+    'a removed cart line must not leave its composition behind'
+  );
+});

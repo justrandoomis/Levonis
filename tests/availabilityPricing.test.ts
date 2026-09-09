@@ -132,8 +132,11 @@ const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
 
 // The storefront's pricing context (worker/routes/products.ts): `tierActive` is
 // what the resolver is told, `membershipActive`/`proContext` what the viewer is.
-const freeCtx = { tier: 'free' as const, tierActive: false, membershipActive: false, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [] };
-const primeCtx = { tier: 'prime' as const, tierActive: true, membershipActive: true, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [] };
+// `tierStatus` is the membership itself, resolved once per request so the
+// offer-eligibility check (docs/BUNDLES_MYSTERY.md §9) never re-reads it per
+// card. It plays no part in PRICING, so it is null in both of these fixtures.
+const freeCtx = { tier: 'free' as const, tierActive: false, membershipActive: false, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null };
+const primeCtx = { tier: 'prime' as const, tierActive: true, membershipActive: true, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null };
 
 test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»', () => {
   const out = publicWithDisplayPrice(row(), freeCtx);

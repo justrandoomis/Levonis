@@ -644,6 +644,15 @@ from a second client-side comparison. Precedence, evaluated top down:
 `ending_soon` → `low` → `in_stock` → `member_exclusive` decorates any live state
 for an entitled viewer of a gated offer.
 
+**`ended` has two causes and the listing distinguishes them.** A window that has
+merely EXPIRED is a fact about a real offer and keeps its card and its countdown
+— §13.3 lists `ended` as one of the eight card states for exactly that. An offer
+the owner switched OFF (`offer_windows.active = 0`) is not a card at all: the
+listing filters it on the window's own `active` flag, which is the one thing the
+owner toggled. Filtering on the STATE would have caught the derived-price-below-
+floor case too, and §4.3 wants that one to stay on the grid showing its
+unavailable state.
+
 `low` has an explicit rule, because a composition row has no
 `low_stock_threshold` of its own and inventing one in the panel is exactly the
 silent repair the mandate forbids: **`low` is true when the blocking component's
@@ -871,7 +880,14 @@ Three rules, all tested by a maximal legal order in
 
 * **`Σ over lines of (components or spools) × qty ≤ MAX_PHYSICAL_LINES` (250)**,
   refused with `COMPOSITION_TOO_LARGE` naming the limit. It is a checkout-door
-  refusal, not a clamp.
+  refusal, not a clamp. **What that bounds is ROWS, and the derived statement
+  count is ~5× it**: each physical line costs its `order_items` INSERT plus its
+  guarded ledger INSERT and guarded counter UPDATE, and a mystery spool adds a
+  `mystery_allocations` INSERT on top — so the worst legal order reaches roughly
+  1,200 statements in the one batch, measured at 1,209. The figure is written
+  beside the constant so that anyone adding a per-line statement can see it is
+  adding ~250 to that number, and `tests/bundleBatchLimits.test.ts` holds the
+  derived bound.
 * **`spool_qty × max_qty_per_order ≤ MAX_PHYSICAL_LINES` is refused at offer
   save**, so the customer never meets the door limit on a legal configuration.
 * **Every `IN (…)` list this feature adds is chunked** to a documented safe size
@@ -1100,6 +1116,27 @@ intent. So there are two floors:
   admin gets the loud `DERIVED_PRICE_BELOW_FLOOR` warning. A component that went
   free, or a member product temporarily priced at 0, therefore stops the sale
   instead of dragging the bundle to zero with no admin action at all.
+
+**AND BOTH FLOORS APPLY TO AN `offer_windows` PRICE, NOT ONLY TO
+`bundle_config.price_mode`.** As first written they lived on the derived branch
+alone, while §4.6 makes a live window the **sole** price source when it is set —
+so `offer_price_mode='fixed'` with `offer_price_iqd = 0`, or a `discount_iqd`
+with one zero too many, sold any product **or bundle** for 0 IQD merchandise,
+passed every gate, accrued no points and produced no warning. `Math.max(0, …)`
+is what made it silent: it turned an impossible price into a free one. So:
+
+* **at save**, `offer_price_mode='fixed'` with `offer_price_iqd < 1` is refused
+  with `OFFER_PRICE_BELOW_FLOOR`, and `discount_iqd >= the subject's current
+  regular price` with `BUNDLE_DISCOUNT_EXCEEDS_TOTAL` — both in the ISSUES table
+  of `worker/routes/offers.ts`, verbatim and trilingual;
+* **at read and at checkout**, `resolveOfferPrice` returns `errors:
+  ['DERIVED_PRICE_BELOW_FLOOR', 'OFFER_INACTIVE']` and contributes **no price**
+  when the window's own price falls below the floor — `bundle_config.min_price_iqd`
+  for a composition subject, 1 for an ordinary product. `applyOfferToResolved`
+  pushes those into `ResolvedPrice.errors`, and every purchase door already
+  refuses on a non-empty `errors`; `refuseComposition` already refuses on
+  `OFFER_INACTIVE`. Nothing is ever sold at 0 IQD because an admin typed one
+  zero too many.
 
 ### 4.4 The PLUS rung *(from first-class)*
 
@@ -1638,6 +1675,20 @@ and every inventory replay.
   refused with `BUNDLE_PARTIAL_RETURN_NOT_ALLOWED`; the UI offers "return the
   whole bundle", which opens one case per component. Per-component returns become
   a config flag in a later slice; the data is already there.
+* **The returnable quota is judged on the rows the cases are opened against.**
+  A whole-bundle return opens its cases against the CHILD rows, never against the
+  parent, so a quota read keyed on the parent counts zero for ever: the same
+  delivered bundle could otherwise be re-POSTed for the whole 7-day window, each
+  round opening a fresh full set of component cases, each priced off
+  `component_alloc_iqd`, each credited under a `wtx_ret_<caseId>` the wallet's
+  idempotency guard has never seen, and each restoring stock under a fresh
+  `operationId = caseId` the ledger's UNIQUE key has never seen either — three
+  rounds on one 400,000 IQD bundle refunding 1,200,000 IQD and turning one
+  ordered printer into +3 stock. The reservation fence cannot help: every round
+  is a legitimately planned restore whose `expected` equals its `actual`. So the
+  check is **per child**, against the very ids the fan-out will bind, and it runs
+  BEFORE the batch so the fan-out stays all-or-nothing. It is also the shape a
+  later per-component-return flag needs (§17 decision 3).
 * **The refund basis is explicit, and it is NET** — this is a change to
   `worker/routes/returns.ts`'s arithmetic, listed in §16. Today a case is priced
   `lineGross = unit_price_iqd × kase.qty` then `refundIqd = lineGross − alloc`
@@ -1670,12 +1721,29 @@ and every inventory replay.
   inside the idempotency key.
 * **Price protection**: two silent kills had to be fixed for the sentence below
   to be true, and both are in §16 as changes to `worker/routes/returns.ts`.
-  * On a **component**, `originalUnit` is read from the stored
-    `component_value_iqd`, not from `pricing_snapshot.applied_iqd` — which §6.2
-    pins to 0, making `perUnitDrop = max(0, 0 − observed) = 0` and every claim a
-    misleading `NO_ELIGIBLE_DROP`. The price-history `variantKeys`
-    (`worker/routes/returns.ts:583-590`) are built from the **component's** real
-    `option_id` / `color_id`, which is what they already are on a component row.
+  * On a **component**, `originalUnit` is **the component's share of what was
+    paid** — `floor(component_alloc_iqd / qty)` — never
+    `pricing_snapshot.applied_iqd` (§6.2 pins it to 0, making
+    `perUnitDrop = max(0, 0 − observed) = 0` and every claim a misleading
+    `NO_ELIGIBLE_DROP`) and never `component_value_iqd`.
+
+    **This corrects an earlier version of this section, which named
+    `component_value_iqd` and produced an over-credit.** That column is the
+    component's UNDISCOUNTED standalone catalogue value, a number the customer
+    never paid: on a bundle whose parts are worth 425,000 and which sold for
+    200,000, a component pinned at 400,000 would be credited 380,000 when its
+    catalogue price fell to 20,000 — 1.9× what was paid for it, 1.9× the price of
+    the whole order, with the goods kept, and `priorCreditedIqd` caps only the
+    repeats and not the size of the first claim. Every other price-protection
+    path compares against what was actually charged, and this one now does too.
+    `component_alloc_iqd` is the same stored figure this section already makes
+    the refund basis, so a refund and a price-protection credit cannot disagree
+    about what one component cost. `component_value_iqd` stays in
+    `policy_snapshot` as the provenance of the comparison, never as its ceiling.
+
+    The price-history `variantKeys` (`worker/routes/returns.ts`) are built from
+    the **component's** real `option_id` / `color_id`, which is what they already
+    are on a component row.
   * On the **parent**, `order_items.option_id` is the `bx_…` composition key,
     which matches no `price_history.variant_key`, so a bundle-level claim can
     only ever end in `NO_ELIGIBLE_DROP`. It is refused explicitly with
@@ -1874,9 +1942,17 @@ cannot commit.
   inventory, and composing with the public availability channel (§8.2 row 18) to
   shrink the candidate set to near certainty *before* buying. The count lives in
   the **admin preview** and in the save-time `POOL_TOO_SMALL_FOR_FORBID` warning
-  only. The composition quote and add-to-cart paths are rate-limited per user
-  (`rateLimit(c, 'composition_quote', …)`), and the residual enumeration risk is
-  recorded in §15.1 as a known accepted bound rather than left to be discovered.
+  only. The composition quote and add-to-cart paths are rate-limited per user —
+  `rateLimit(c, 'composition_quote', 60, 300)` on **`POST /api/cart/items`,
+  `PATCH /api/cart/items/:id` and the composition branch of
+  `POST /api/products/:slug/quote`, all three**, since removing a mystery line
+  and re-adding it writes a fresh `randomSeedHex()` and therefore a fresh draw.
+  On its own that is harmless; combined with any availability oracle it turns a
+  deterministic seed into a free, unbounded grinder for a favourable roll, which
+  is exactly the property §7.3 says the seed alone cannot protect. The residual
+  enumeration risk is recorded in §15.1 as a known accepted bound **on the basis
+  that this limiter exists**, so the doors it must cover are enumerated here
+  rather than assumed.
 
 ### 7.6 Direct versus pre-order
 
@@ -2011,9 +2087,18 @@ edit as well as the stage move.
 ### 8.2 Every leak surface, and what it does before reveal
 
 Before reveal, a customer-facing payload may carry **only**
-`{ mystery: { revealed: false, spools: 2, reveal_at: 'delivered' } }`. Not a
-product id, not a name, not a slug, not an image URL, not an R2 key, not a colour
-hex, not a stock delta, not a weight, not a pool id.
+`{ mystery: { revealed: false, spools: 2, reveal_at: 'delivered',
+reveal_stage_label: '…', sale_mode: 'direct' } }`. Not a product id, not a name,
+not a slug, not an image URL, not an R2 key, not a colour hex, not a stock delta,
+not a weight, not a pool id.
+
+`reveal_stage_label` is the milestone in the viewer's own language, rendered by
+the server's existing `stageLabel` so no screen keeps a second stage table, and
+`sale_mode` is the mode the buyer themselves chose. Neither identifies the pick,
+and both are legitimately useful to the storefront — but the allow-list is the
+checklist §15.4 case 15 tests against, so they are NAMED here rather than left as
+two fields that happen to be harmless. `tests/mysteryReveal.test.ts` pins the
+pre-reveal key set positively, so a field added beside them fails.
 
 | # | surface | file | why it is safe |
 |---|---|---|---|
@@ -2026,7 +2111,7 @@ hex, not a stock delta, not a weight, not a pool id.
 | 7 | the courier `itemsSummary` | `worker/routes/admin.ts` | offer title × qty; the courier is a third party |
 | 8 | the admin Telegram message | `worker/routes/orders.ts` | counts only; it is an external service |
 | 9 | the `OrderCreated` outbox event | `worker/routes/orders.ts` | `items[].product_id` is null for a mystery line; the pick is not an analytics fact until revealed |
-| 10 | `InventoryChanged` | `worker/lib/inventory.ts` | names the real product — it **must**, it is the stock truth — and is an **internal bus payload only**, never customer-visible |
+| 10 | `InventoryChanged` | `worker/lib/inventory.ts` | names the real product — it **must**, it is the stock truth — and is an **internal bus payload only**, never customer-visible. **Its `order_id` is `null` for a mystery spool**: row 9 nulls `OrderCreated.items[].product_id` because "the pick is not an analytics fact until revealed", so leaving the order id here would let any bus consumer reconstruct exactly that with one join, from the moment the order commits. The `inventory_ledger` row keeps the real `order_id`, so operational traceability is untouched |
 | 11 | the inventory ledger and the admin stock screen | `worker/routes/adminProductRelations.ts` | admin-only; authorised operational access by design |
 | 12 | the cart payload | `worker/routes/cart.ts` | `composition.components = []` for a mystery line, always |
 | 13 | availability numbers | `publicRelations`, `saleAvailability` | a mystery offer reports a coarse state only — `in_stock`/`low`/`sold_out` — never a candidate count |
@@ -2037,6 +2122,24 @@ hex, not a stock delta, not a weight, not a pool id.
 | 18 | **the MEMBER product's own public availability** | `worker/lib/productOverlay.ts:505-546`, `worker/routes/products.ts:569, 944-960` | **the one channel the "use real inventory" rule creates, and the only one not downstream of something already closed.** See below |
 | 19 | the component `pricing_snapshot` and `component_value_iqd` | `worker/routes/orders.ts:273, 302` | a mystery component persists `pricing_snapshot = null` and an offer-derived share, never the drawn item's ladder (§6.2) |
 | 20 | the checkout **quote** lines | `worker/routes/orders.ts:1127-1138` | components are nested as `included[]`, never top-level (§6.3) |
+| 21 | **the shipping quote and the frozen `delivery_method_snapshot`** | `worker/routes/orders.ts` | a mystery spool's shipping facts come from **the OFFER's own `ops_policy`**, never the drawn candidate's. See below |
+
+**Row 21 in full.** The shipping engine was fed the DRAWN candidate's real
+`ops_policy`, and the resulting breakdown is published verbatim:
+`quote.shipping.components = [{kind:'printer_large', fee_iqd:25000, units:1}]`.
+That breakdown is then frozen into `delivery_method_snapshot` and served back on
+`GET /api/orders/:id` from the first second — a customer payload naming the
+pick's size class for an order whose milestone is `'delivered'`. Any pool that is
+not perfectly homogeneous in `size_class` / `is_spool` leaked a partition of the
+candidate set. And it was a **pre-purchase oracle**: the same block is on
+`POST /api/orders/quote`, which draws but writes nothing, so a caller could grind
+quotes and read the partition off the fee alone without buying anything.
+
+Redacting only the breakdown would leave that half open, because **the FEE is the
+oracle**. So the offer row's own `ops_policy` decides — one fact for every spool
+of that offer, whatever is drawn. A mystery offer over devices is out of scope
+(§17 decision 7), so the pools are filament and the offer's own `is_spool` is the
+honest fact; the owner sets it where they set every other shipping fact.
 
 **Row 18 in full, because it defeats four of the five milestones on its own.**
 Levonis publishes *exact* sellable counts per option value and per colour to
@@ -2052,7 +2155,39 @@ downstream of a channel that is already open.
 product with an active `mystery_pool_entries` row, exact `available` is
 suppressed in `publicRelations` and in `saleAvailability`'s stock block at base,
 option-value **and** colour level — the customer sees `in_stock` / `low` /
-`sold_out` and a clamped `max_qty`, and admins keep the exact counts. The pool
+`sold_out` and a clamped `max_qty`, and admins keep the exact counts.
+
+**"Publication rule" means EVERY surface that reads the four stock tables, not
+the anonymous catalogue routes.** Three corrections, each of which reopened the
+channel on its own:
+
+* **The coarse projection blanks the PER-LEVEL counters too.** `projectPublic`
+  emits `product.options[]` and `product.colors[]`, and `applyRelations` overlays
+  the raw `product_option_values.stock` / `product_colors.stock` onto them.
+  Nulling only the base `stock` left two anonymous GETs around a **confirmation**
+  identifying the drawn colour exactly, because `deduct` decrements `stock`
+  itself. The suppression therefore lives inside `projectPublic`, which takes a
+  `coarse` argument, rather than beside each caller.
+* **`GET /api/cart` and every cart and checkout refusal obey it.** They read the
+  same four tables, and `reserve` bumps `stock_reserved` inside the order's own
+  batch — so a buyer could snapshot the candidates through their OWN cart before
+  and after checking out and read the pick and the spool count off the delta,
+  defeating every milestone including `'paid'`, the one §17 decision 10 promises
+  is deliverable even if coarse counts are rejected. `activePoolProductIds` is
+  resolved once per cart and once per checkout (§14) and threaded into every
+  `saleAvailability` call and into the cart line's own `stock`, `options[]`,
+  `colors[]` and `publicRelations`. The refusal sentences degrade to their
+  existing count-free branches — `saleAvailability`'s coarse branch returns
+  `available: null`, so `Only N left` and `Only N of "X" left in stock` take the
+  paths they already had, with no new branch.
+* **A MYSTERY OFFER'S OWN `availability` BLOCK CARRIES NO COUNT EITHER** (row 13,
+  and §10's "coarse availability state only, no counts"). `publicAvailability`
+  correctly drops every count from the `composition` block, but the `availability`
+  block beside it published `on_hand` / `available` = `floor(Σ eligible available
+  ÷ spool_qty)` — the live sellable supply of the whole eligible pool, to an
+  anonymous caller, with `max-age=60`, moving with every mystery purchase.
+  `max_qty` stays, because §10 requires it so the stepper disables at the limit
+  and it is already clamped by `bundle_config.max_qty_per_order`. The pool
 membership set is one indexed read per request
 (`idx_mystery_entries_product`), resolved once and passed down beside
 `pricingTierContext` (§14). §15.4 case 15 adds a **differential** assertion:
@@ -2182,7 +2317,21 @@ export function offerRedemptionStatement(db: D1Database, subject: [string, strin
   `display_pro_iqd`, `display_applied_tier`, `composition.*` (including
   `component_total_iqd`, `saving_percent` and `main_items[]`), every availability
   count and every offer price figure. §15.4 case 9 asserts the **stripped key
-  list**, not the absence of one number. The purchase endpoints re-check and
+  list**, not the absence of one number.
+
+  **And it is a property of the SUBJECT, not of `GET /api/bundles/:slug`.**
+  `GET /api/products?type=bundle`, the `search` branch and
+  `POST /api/products/:slug/quote` all resolve the same composition rows, and
+  serializing them through `publicWithDisplayPrice` published `price_iqd`,
+  `prime_price_iqd`, `pro_price_iqd`, `display_price_iqd`, `display_prime_iqd`
+  and `display_pro_iqd` for a GATED offer to a viewer who may not buy it — the
+  last two being the keys this section names in as many words. All three doors
+  now serialize a composition row through `resolveCompositionPageWithMystery` +
+  `compositionCard` / `compositionDetailBody`, the one builder
+  `GET /api/bundles` already used, so a locked row comes back as `lockedCard`
+  wherever it appears. The quote answers a locked viewer with `quote: null` and
+  the lock: the lock IS the answer, and pricing it would be the disagreement.
+  §15.4 case 9 asserts the stripped key list against **every** door. The purchase endpoints re-check and
   refuse with `MEMBERSHIP_REQUIRED`. The 200-with-a-lock convention is the
   existing one (`worker/routes/bundles.ts:74-78`), so the page renders an honest
   lock instead of an error path.
@@ -2211,7 +2360,7 @@ missing field means *absent*, never an assumed `false`.
 |---|---|
 | `GET /api/bundles?kind=bundle\|mystery&search&category_id&family&featured&limit&offset` | `{ entitled, signed_in, bundles: BundleCard[] }` — **the 0034 response keys are preserved**. `BundleCard` adds `product_slug`, the `display_*` price block, `composition { component_total_iqd, saving_percent, availability_state, main_items[≤3] }`, `offer { offer_id, required_tiers, starts_at, ends_at }`, `locked`. `search` and `category_id` mirror `GET /api/products` exactly — same normalisation, same index — and `featured=1` reads the `is_featured` column §1.2 already inherits, so the storefront gets search, a category facet and a featured rail with no new machinery. A locked card is the §9 allow-list. **Coarse availability state only, no counts** |
 | `GET /api/bundles/:slug` | `{ bundle: BundleDetail }` — components with names, images, variant labels, `qty_per_bundle`, `optional`, `editable`, per-component coarse state, and the allowed choices for editable ones; plus `availability`, `pricing_modes`, `offer`, `viewer_tier`. For a mystery offer: `{ mystery: { spool_qty, families[], modes[], reveal_stage, odds? } }` and **never a pool** |
-| `GET /api/products?type=bundle` | the existing filter (`worker/routes/products.ts`), now returning composition products |
+| `GET /api/products?type=bundle` | the existing filter (`worker/routes/products.ts`), now returning composition products — serialized by `compositionCard`, **not** by `publicWithDisplayPrice`, so a gated row is the §9 allow-list here exactly as it is on `GET /api/bundles`. The card carries `product_slug`, which is how a grid knows to link to `/bundles/<slug>` rather than to the ordinary product renderer |
 | `GET /api/products/:slug` | for a composition slug, returns the bundle payload plus `redirect: '/bundles/<slug>'`, so an old link works |
 
 The default `GET /api/products` listing gains `AND composition = ''` so bundles do
@@ -2222,7 +2371,7 @@ still finds them, deliberately.
 
 | route | change |
 |---|---|
-| `POST /api/products/:slug/quote` | accepts `bundleChoices[]` / `mysteryFamilyId` / `mysteryMode`; returns the composition block. **Never draws an allocation** |
+| `POST /api/products/:slug/quote` | accepts `bundleChoices[]` / `mysteryFamilyId` / `mysteryMode`; returns the composition block, built by `compositionDetailBody` — the same builder `GET /api/bundles/:slug` uses, so it honours the §9 lock and re-checks eligibility like every other door (§6.1). Rate-limited as `composition_quote` (§7.5). **Never draws an allocation** |
 | `POST /api/cart/items` | accepts the §5.2 body; refuses with the §15 codes |
 | `PATCH /api/cart/items/:id` | a `qty` above `min(max_bundles, max_qty_per_order, 99)` is **refused** with `BUNDLE_QTY_LIMIT` naming the number — never silently clamped, matching `worker/routes/cart.ts:557-563`, which refuses with `QTY_UNAVAILABLE` and "Only N left" rather than rewriting the one number the customer is touching. The composition availability exposes `max_qty` so the stepper disables at the limit, the same shape `availability.stock.max_qty` already has. A choice edit rewrites `cart_bundle_choices` and recomputes `option_id`, which may merge the line — the response says so |
 | `GET /api/cart` | the grouped payload of §5.2 |
@@ -2483,8 +2632,20 @@ produced by `bundleAvailability`'s `CompositionState` union (§2.1) — includin
 `low`, which has an explicit rule there rather than a threshold invented in the
 panel — so the card, the detail page, the cart and the door cannot disagree.
 
-Product, option and colour **names stay English in every language**; the bundle's
-own title is owner-authored ar/en/ckb via `name` / `name_ar` / `name_ku`. Page
+Product, option and colour **names stay English in every language** — and are
+rendered with `dir="ltr"`, as every other product name in the app is, or a latin
+name and its `×2` suffix are bidi-reordered inside an Arabic panel. The bundle's
+own title is owner-authored ar/en/ckb via `name` / `name_ar` / `name_ku`.
+
+**The cart line says how many AND when.** A mystery line carries
+`composition.mystery.reveal_stage_label`, rendered by the server's own
+`stageLabel` — never a second stage table in the browser — so the one screen
+where the customer is committing to a purchase whose contents are hidden is not
+the screen that tells them the least about it.
+
+**The countdown's day part is `daysLeftLabel(days, lang)`, not `Nd`.** A latin
+unit suffix inside «يبدأ خلال …» is exactly the mixed-script sentence §13.3
+forbids; the clock stays isolated in its `<bdi dir="ltr">`. Page
 copy lives in a page-local `STRINGS = {ar, en, ckb}` const, **not** in
 `src/translations.ts` (which every visitor downloads as `vendor-i18n`). No
 `letter-spacing` on Arabic text.
@@ -2630,6 +2791,7 @@ shipping_method_id)` tuple, so `idx_cart_levonis_line` is never rebuilt.
 | `BUNDLE_OPTIONAL_UNAVAILABLE` | 400 | an optional component the buyer opted into cannot be satisfied — never a silent drop (§2.2) |
 | `BUNDLE_DISCOUNT_EXCEEDS_TOTAL` | 400 | admin save: `discount_iqd >= the component total` |
 | `OFFER_PRICE_CONFLICT` | 400 | admin save: a window price and a non-`fixed` `bundle_config.price_mode` on one subject |
+| `OFFER_PRICE_BELOW_FLOOR` | 400 | admin save: `offer_price_mode='fixed'` with `offer_price_iqd < 1` — one typed zero too many must not publish a free offer (§4.3). Admin-facing, so it carries no customer string |
 | `COMPOSITION_MAX_REQUIRED` | — | not an HTTP code: `saleAvailability`'s fail-closed reason when a composition row reaches it with no `compositionMax` (§2.4) |
 | `COMPOSITION_TOO_LARGE` | 400 | physical lines per order above `MAX_PHYSICAL_LINES` (§3.1) |
 | `COMPOSITION_NOT_ELIGIBLE` | 400 | a price-protection claim on a bundle parent or a mystery line (§6.4) |
@@ -2752,6 +2914,17 @@ Honest inventory. Nothing outside this list changes shape.
 | `src/lib/api.ts` | `composition` on `CartItem`, `bundle` / `mystery` on `ApiOrderItem` |
 | `src/components/AdminBundles.tsx` | rebuilt at `src/components/adminBundles/AdminBundles.tsx`, same chunk name |
 | `tests/bundleBudget.test.ts` | the new chunk names |
+
+Five further files left the "not changed" side of this list during the fix pass,
+and each departure is a finding rather than a convenience: `worker/routes/admin.ts`
+(the deduction fence abort became an operator note rather than a 500),
+`worker/lib/productModel.ts` (`projectPublic` takes the `coarse` flag, so §8.2
+row 18's suppression lives in ONE projector instead of beside each caller),
+`worker/lib/mysteryLine.ts` (the reveal milestone in words, from the server's own
+`stageLabel`), `worker/lib/inventory.ts` (`StockMove.mystery`, so a spool's
+`InventoryChanged` names no order) and `src/pages/Product.tsx` /
+`src/pages/Products.tsx` (the composition redirect and the card link, without
+which a bundle found by search opens the renderer that has nothing to show it).
 
 **Not changed at all**: `packages/pricing/src/pricing.ts`,
 `packages/pricing/src/shippingType.ts`, `packages/pricing/src/paymentPolicy.ts`,

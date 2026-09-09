@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { ApiError } from '../src/lib/api';
 import { classifyError } from '../src/components/ui/AsyncStates';
 
@@ -44,4 +45,51 @@ test('unknown throwables fall back to a generic error, never a crash', () => {
   assert.equal(classifyError('string throw'), 'error');
   assert.equal(classifyError(undefined), 'error');
   assert.equal(classifyError(null), 'error');
+});
+
+/**
+ * THE PAGES THAT MUST USE THIS SYSTEM RATHER THAN THEIR OWN.
+ *
+ * `classifyError` above proves the mapping; these prove it is REACHED. The
+ * bundles pages replaced a hand-rolled `animate-spin` div and a red error
+ * paragraph — markup that renders a 401 as "no bundles" and a 404 as a red
+ * error box, which is precisely the conflation the rest of this file forbids.
+ * A source assertion is the honest test here: there is no DOM in this suite,
+ * and the failure mode is a page reintroducing its own states, not a function
+ * returning the wrong string.
+ */
+const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('the bundles pages render AsyncStates and skeletons, never a hand-rolled spinner or error div', () => {
+  for (const page of ['src/pages/Bundles.tsx', 'src/pages/BundleDetail.tsx']) {
+    const src = source(page);
+    assert.match(src, /from '\.\.\/components\/ui\/AsyncStates'/, `${page} does not use AsyncStates`);
+    assert.match(src, /<ErrorState\b/, `${page} does not render ErrorState`);
+    assert.match(src, /from '\.\.\/components\/ui\/Skeleton'/, `${page} does not use the shared skeletons`);
+    assert.equal(
+      /animate-spin/.test(src),
+      false,
+      `${page} still hand-rolls a spinner instead of using a skeleton or Spinner`
+    );
+    assert.equal(
+      /text-red-400/.test(src),
+      false,
+      `${page} still hand-rolls an error paragraph instead of ErrorState`
+    );
+  }
+});
+
+test('the bundles grid renders an EmptyState for "no matches" — never for a failed fetch', () => {
+  const src = source('src/pages/Bundles.tsx');
+  assert.match(src, /<EmptyState\b/);
+  // The error branch must be tested BEFORE the empty branch, or a network
+  // failure renders as "no bundles match".
+  assert.ok(
+    src.indexOf('<ErrorState') < src.indexOf('<EmptyState'),
+    'the empty state is checked before the error state, so a failed fetch reads as "no bundles"'
+  );
+});
+
+test('the bundle detail carries a sign-in return path, so a 401 lands back on the offer', () => {
+  assert.match(source('src/pages/BundleDetail.tsx'), /next=\{`\/bundles\/\$\{slug\}`\}/);
 });

@@ -124,7 +124,12 @@ test('the initial payload — the entry plus everything it STATICALLY imports �
   // The libraries that must NEVER be in the eager closure. Each is reached
   // from exactly one lazy route, and each of them being here at some point is
   // what this assertion is remembering.
-  for (const lazyOnly of ['vendor-charts', 'vendor-qr', 'vendor-webgl']) {
+  // `Bundles` and `BundleDetail` are here because `Bundles` USED to be an
+  // eager import in src/App.tsx, and the home shelf that renders the same card
+  // is deliberately its own lazy chunk for the same reason: importing the
+  // bundle card from the eager home page would put the card, the countdown,
+  // the offer badge and the tier metadata back into every first visit.
+  for (const lazyOnly of ['vendor-charts', 'vendor-qr', 'vendor-webgl', 'Bundles', 'BundleDetail', 'BundlesShelf']) {
     const found = [...seen].find((f) => f.startsWith(`${lazyOnly}-`));
     assert.equal(
       found,
@@ -141,11 +146,22 @@ test('the split really happened: every page and panel §10 names has a chunk of 
   // The routes §10 lists, plus the admin panels of src/pages/Admin.tsx.
   for (const name of [
     'Admin', 'MerchantDashboardPage', 'Wallet', 'Checkout', 'StoreCheckout', 'Requests',
+    // The bundles surface: `Bundles` was EAGER and sat in the entry chunk of
+    // every first visit; `BundleDetail` arrives with its route. Both are named
+    // here so a regression that re-eagers either one fails loudly.
+    'Bundles', 'BundleDetail',
     'Chat', 'Chats', 'Warranty', 'WarrantyVerify', 'Invest', 'InvestAdmin', 'Tools', 'Rewards', 'Referrals',
     'AdminProducts', 'AdminBundles', 'AdminTaxonomy', 'AdminWarranties', 'AdminAds', 'AdminHomeSettings',
     'AdminOverview', 'AdminUsers', 'AdminWalletRequests', 'AdminWalletSettings', 'AdminStoreSettings',
     'AdminSerials', 'AdminReviews', 'AdminKyc', 'AdminMemberships', 'AdminCoupons', 'AdminDelivery',
     'AdminCommunity', 'AdminFarmConfig',
+    // §11.1 tab 4 and §14's bundle budget: the special-offers panel is its own
+    // lazy chunk, so an owner who never opens it downloads none of it.
+    'AdminOffers',
+    // §11.1 tabs 2 and 3, plan slice 8. Both are lazy for the same reason, and
+    // both are named here so a regression that drops either tab — leaving the
+    // seventeen `/api/admin/mystery` routes with no UI again — fails loudly.
+    'AdminMystery', 'AdminMysteryPools',
     // the manualChunks groups
     'vendor-react', 'vendor-motion', 'vendor-charts', 'vendor-phone', 'vendor-qr', 'vendor-i18n', 'vendor-webgl',
   ]) {

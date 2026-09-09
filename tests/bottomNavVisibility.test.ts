@@ -13,6 +13,8 @@ test('nav is hidden on immersive/detail routes', () => {
   assert.equal(isBottomNavHidden('/product/x5z7e8'), true);
   assert.equal(isBottomNavHidden('/chat/2'), true);
   assert.equal(isBottomNavHidden('/chat/abc-def'), true);
+  // A bundle's detail page carries the product page's sticky purchase bar.
+  assert.equal(isBottomNavHidden('/bundles/starter-kit'), true);
 });
 
 test('nav is visible on the main tab routes', () => {
@@ -23,6 +25,8 @@ test('nav is visible on the main tab routes', () => {
   assert.equal(isBottomNavHidden('/profile'), false);
   assert.equal(isBottomNavHidden('/orders'), false);
   assert.equal(isBottomNavHidden('/products'), false);
+  // The bundles GRID is a tab-level list, like /products — only the detail hides.
+  assert.equal(isBottomNavHidden('/bundles'), false);
 });
 
 test('prefix rules match only real sub-routes, not sibling routes', () => {
@@ -33,4 +37,6 @@ test('prefix rules match only real sub-routes, not sibling routes', () => {
   // Bare '/product' and '/chat' without a trailing segment are not detail pages.
   assert.equal(isBottomNavHidden('/product'), false);
   assert.equal(isBottomNavHidden('/chat'), false);
+  // '/bundles' (grid) must not be swallowed by the '/bundles/' prefix rule.
+  assert.equal(isBottomNavHidden('/bundles'), false);
 });

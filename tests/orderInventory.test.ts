@@ -22,8 +22,20 @@ function freshDb(): { db: D1Database; raw: DatabaseSync } {
     raw.exec(readFileSync(join(ROOT, 'migrations', f), 'utf8'));
   }
   // inventory_ledger.actor_user_id is a real foreign key, so the actor has to
-  // exist — exactly as it does in the routes.
+  // exist — exactly as it does in the routes. `order_reservation_fence.order_id`
+  // (migration 0058) is one too, so the orders these moves are keyed to have to
+  // exist for the same reason: the fence row rides in the same batch as the
+  // movement it proves.
   raw.prepare('INSERT INTO users (id, email) VALUES (?,?)').run('admin', 'admin@example.com');
+  for (const id of ['ORD-1', 'ORD-2']) {
+    raw
+      .prepare(
+        `INSERT INTO orders (id, user_id, address_snapshot, delivery_method_id, delivery_method_snapshot,
+                             payment_method_id, subtotal_iqd, exchange_rate, total_iqd, due_on_delivery_iqd)
+         VALUES (?, 'admin', '{}', 'dm', '{}', 'cod', 0, 1400, 0, 0)`
+      )
+      .run(id);
+  }
   raw
     .prepare('INSERT INTO products (id, slug, name, price_iqd, stock) VALUES (?,?,?,?,?)')
     .run('prd_1', 'p-1', 'Printer', 100000, 10);
