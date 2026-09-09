@@ -22,21 +22,34 @@
 -- refused to rebuild `users` for exactly this reason (0018:18-27). A rebuild
 -- here is not a small migration; it is surgery on every order the store has
 -- ever taken, to change one index. So the guarantee is delivered the way 0056
--- delivered the ledger keys: a new column plus a PARTIAL unique index.
+-- delivered the ledger keys: a new column plus its own unique index.
 --
--- ADDITIVE AND UNUSED ON ARRIVAL. `client_idempotency_key` is NOT NULL
--- DEFAULT '', so every existing order backfills to '' ("written before the
--- column existed") and no row is read, rewritten or deleted. The index is
--- PARTIAL — `WHERE client_idempotency_key <> ''` — so today's rows, all '',
--- do not collide with each other; uniqueness begins the moment a writer
--- supplies a key. The legacy column and its global UNIQUE stay exactly as they
--- are, holding every historical value; the new writers bind NULL there, and
--- SQLite permits unlimited NULLs in a UNIQUE column.
+-- ADDITIVE AND UNUSED ON ARRIVAL. `client_idempotency_key` is NULLABLE, so
+-- every existing order keeps NULL ("written before the column existed") and no
+-- row is read, rewritten or deleted. The legacy column and its global UNIQUE
+-- stay exactly as they are, holding every historical value; the new writers
+-- bind NULL there, and SQLite permits unlimited NULLs in a UNIQUE column.
+--
+-- NULLABLE RATHER THAN NOT NULL DEFAULT '' — AND THAT IS A READ-PATH
+-- DECISION, NOT A STYLE ONE. The first draft of this migration used `NOT NULL
+-- DEFAULT ''` with a PARTIAL unique index (`WHERE client_idempotency_key <>
+-- ''`) so that today's rows, all '', would not collide. It is a correct
+-- constraint and a useless index: SQLite only uses a partial index when the
+-- query's WHERE provably implies the index's WHERE, and `client_idempotency_key
+-- = ?` cannot imply `<> ''` for a bound parameter. EXPLAIN QUERY PLAN on this
+-- exact schema confirms it — the replay lookup fell back to
+-- `SEARCH orders USING INDEX idx_orders_user_created (user_id=?)`, i.e. a walk
+-- of every order that customer has ever placed, on every checkout, twice.
+-- NULL solves both halves at once: SQLite treats NULLs as DISTINCT in a unique
+-- index, so unlimited legacy rows per user are fine WITHOUT a partial
+-- predicate, and the plain index is then usable — the same query plans as
+-- `MULTI-INDEX OR / SEARCH orders USING INDEX idx_orders_user_idempotency
+-- (user_id=? AND client_idempotency_key=?)`, a seek.
 --
 -- WHAT THE INDEX GUARANTEES. (user_id, client_idempotency_key) unique: the
 -- same user retrying with the same key still collides and still replays their
 -- own order; a different user carrying the identical key inserts cleanly.
-ALTER TABLE orders ADD COLUMN client_idempotency_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE orders ADD COLUMN client_idempotency_key TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_user_idempotency
-  ON orders(user_id, client_idempotency_key) WHERE client_idempotency_key <> '';
+  ON orders(user_id, client_idempotency_key);

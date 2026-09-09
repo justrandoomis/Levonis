@@ -325,6 +325,22 @@ returnRoutes.post('/', async (c) => {
       ? bundleChildren.map((k) => [String(k.id), Number(k.qty) || 1])
       : [[orderItemId, Number(item.item_qty)]]
   );
+  /**
+   * WHAT ACTUALLY SPENDS A ROW'S RETURN QUOTA.
+   *
+   * A case that ended in a REFUND consumed the row: the goods went back and
+   * the money came back, so that unit is not returnable again. A case resolved
+   * as `repair` or `replacement` — the two warranty remedies the component
+   * defect carve-out of decision 3 exists to reach — moved no money and
+   * returned no goods; the customer still owns the unit. `declined` returned
+   * nothing either. Counting those would let ONE fault report spend the
+   * bundle's return right for ever: report a crushed spool on day 2, have it
+   * replaced on day 3, and the whole-bundle return on day 4 is refused because
+   * that child's quota reads as spent.
+   *
+   * An OPEN case (resolution IS NULL) still holds its quota, because it may
+   * yet end in a refund — that is a reservation, not a consumption.
+   */
   const usedByItem = new Map<string, number>();
   // Chunked: a legal bundle may carry ~249 components (§3.1), which is more
   // bound parameters than D1 accepts in one query.
@@ -332,7 +348,9 @@ returnRoutes.post('/', async (c) => {
     const { results } = await c.env.DB.prepare(
       `SELECT order_item_id AS id, COALESCE(SUM(qty), 0) AS n
          FROM return_cases
-        WHERE state <> 'rejected' AND order_item_id IN (${part.map(() => '?').join(',')})
+        WHERE state <> 'rejected'
+          AND (resolution IS NULL OR resolution = 'refund')
+          AND order_item_id IN (${part.map(() => '?').join(',')})
         GROUP BY order_item_id`
     )
       .bind(...part)
@@ -353,8 +371,11 @@ returnRoutes.post('/', async (c) => {
     //                       exceeded. Name the part instead.
     if (bundleChildren.length > 0 && overCap.length < quotaTargets.length) {
       const part = bundleChildren.find((k) => String(k.id) === overCap[0].id);
+      // Say what is true and nothing more. The old sentence promised the rest
+      // "can still be returned individually", which the reason gate refuses
+      // for a commercial return — the carve-out is for FAULTS only.
       throw badRequest(
-        `One part of this bundle already has an open case (${part?.name_snapshot ?? overCap[0].id}) — the rest can still be returned individually once it is resolved`,
+        `One part of this bundle (${part?.name_snapshot ?? overCap[0].id}) has already been claimed, so the bundle can no longer be returned as a whole. A fault on any remaining part can still be reported on its own.`,
         'BUNDLE_COMPONENT_ALREADY_CLAIMED',
         { order_item_id: overCap[0].id }
       );

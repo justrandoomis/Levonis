@@ -179,7 +179,7 @@ test('a concurrent stock loss is still CONFLICT_RETRY, not mistaken for key reus
 
 // --------------------------------------------------------------- the schema
 
-test('the per-user index exists, is partial, and lets the legacy column keep its history', () => {
+test('the per-user index exists, is usable as a read path, and lets the legacy column keep its history', () => {
   const raw: DatabaseSync = seedCatalogue();
   const idx = row<{ sql: string }>(
     raw,
@@ -188,7 +188,38 @@ test('the per-user index exists, is partial, and lets the legacy column keep its
   assert.ok(idx, 'migration 0064 did not create the per-user index');
   assert.match(idx!.sql, /user_id/, 'the index is not scoped by user');
   assert.match(idx!.sql, /client_idempotency_key/);
-  assert.match(idx!.sql, /WHERE\s+client_idempotency_key\s*<>\s*''/, 'the index must be PARTIAL, or every pre-0064 row collides');
+  // NOT PARTIAL, deliberately. SQLite only uses a partial index when the
+  // query's WHERE provably implies the index's WHERE, and `= ?` cannot imply
+  // `<> ''` for a bound parameter — a partial index here would be a correct
+  // constraint that no lookup could ever use. The column is nullable instead,
+  // and SQLite treats NULLs as distinct, so legacy rows still cannot collide.
+  assert.ok(!/\bWHERE\b/i.test(idx!.sql), 'a partial index cannot serve the replay lookup');
+
+  // The guarantee that replaces the partial predicate: two legacy rows for the
+  // same customer, both with no key, do not collide.
+  for (const id of ['ORD-L1', 'ORD-L2']) {
+    raw
+      .prepare(
+        `INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,
+                             payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd)
+         VALUES (?,'buyer','pending','{}','standard','{}','cash',1,1500,1,1)`
+      )
+      .run(id);
+  }
+
+  // And the lookup the routes actually run is a SEEK, not a walk of this
+  // customer's whole order history.
+  const plan = raw
+    .prepare(
+      'EXPLAIN QUERY PLAN SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
+    )
+    .all() as Array<{ detail: string }>;
+  const detail = plan.map((r) => r.detail).join(' | ');
+  assert.match(
+    detail,
+    /idx_orders_user_idempotency \(user_id=\? AND client_idempotency_key=\?\)/,
+    `the replay lookup does not use the per-user index: ${detail}`
+  );
 
   // The legacy column and its global UNIQUE are untouched: rows written before
   // the migration keep their key and stay replayable.
@@ -199,13 +230,13 @@ test('the per-user index exists, is partial, and lets the legacy column keep its
        VALUES ('ORD-LEGACY','buyer','pending','{}','standard','{}','cash',1,1500,1,1,'legacy-key')`
     )
     .run();
-  const legacy = row<{ client_idempotency_key: string; idempotency_key: string }>(
+  const legacy = row<{ client_idempotency_key: string | null; idempotency_key: string }>(
     raw,
     'SELECT client_idempotency_key, idempotency_key FROM orders WHERE id = ?',
     'ORD-LEGACY'
   )!;
   assert.equal(legacy.idempotency_key, 'legacy-key');
-  assert.equal(legacy.client_idempotency_key, '', 'the new column backfills to empty, never to the legacy key');
+  assert.equal(legacy.client_idempotency_key, null, 'the new column stays NULL, never a copy of the legacy key');
 });
 
 test('a pre-0064 order still replays for its own owner after the deploy', async () => {

@@ -1502,6 +1502,16 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   if (!res.moved) {
     if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
     if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
+    // The re-claim trigger refused (§17 decision 4). The transition itself is
+    // legal, so ILLEGAL_STAGE_MOVE would send staff hunting a nonexistent
+    // transition bug — and the sibling status route already answers this exact
+    // situation correctly, so the two admin doors must not disagree.
+    if (res.reason === 'OFFER_LIMIT_REACHED') {
+      throw badRequest(
+        'This order cannot be re-opened: its offer allowance was used again after the cancellation.',
+        'OFFER_LIMIT_REACHED'
+      );
+    }
     throw badRequest(`Cannot move this order from "${res.from}" to "${to}"`, 'ILLEGAL_STAGE_MOVE', {
       from: res.from,
       to,

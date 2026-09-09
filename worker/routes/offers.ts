@@ -163,8 +163,17 @@ adminOffersRoutes.get('/', async (c) => {
       `SELECT w.*, l.max_per_user AS max_per_user, l.max_global AS max_global,
               p.name AS product_name, p.slug AS product_slug, COALESCE(p.composition,'') AS composition,
               p.status AS product_status,
+              -- ACTIVE only, because that is what the limit counts since 0065.
+              -- Summing released rows too made an offer read as sold out while
+              -- the trigger was still selling it.
               (SELECT COALESCE(SUM(r.qty), 0) FROM offer_redemptions r
-                WHERE r.subject_type = w.subject_type AND r.subject_id = w.subject_id) AS redeemed
+                WHERE r.subject_type = w.subject_type AND r.subject_id = w.subject_id
+                  AND r.state = 'active') AS redeemed,
+              -- Kept beside it rather than hidden: a released slot is real
+              -- history, and an owner comparing sales with redemptions needs it.
+              (SELECT COALESCE(SUM(r.qty), 0) FROM offer_redemptions r
+                WHERE r.subject_type = w.subject_type AND r.subject_id = w.subject_id
+                  AND r.state = 'released') AS released
          FROM offer_windows w
          LEFT JOIN offer_limits l ON l.subject_type = w.subject_type AND l.subject_id = w.subject_id
          LEFT JOIN products p ON p.id = w.subject_id
@@ -187,6 +196,7 @@ adminOffersRoutes.get('/', async (c) => {
         status: r.product_status ?? '',
       },
       redeemed: Number(r.redeemed ?? 0),
+      released: Number(r.released ?? 0),
       schedule_state: scheduleState(
         (r.starts_at as string | null) ?? null,
         (r.ends_at as string | null) ?? null,
@@ -238,15 +248,20 @@ adminOffersRoutes.get('/:productId', async (c) => {
       .bind(productId)
       .first<Record<string, unknown>>(),
     c.env.DB
-      .prepare("SELECT COALESCE(SUM(qty), 0) AS n FROM offer_redemptions WHERE subject_type = 'product' AND subject_id = ?")
+      .prepare(
+        `SELECT COALESCE(SUM(CASE WHEN state = 'active' THEN qty ELSE 0 END), 0) AS n,
+                COALESCE(SUM(CASE WHEN state = 'released' THEN qty ELSE 0 END), 0) AS released
+           FROM offer_redemptions WHERE subject_type = 'product' AND subject_id = ?`
+      )
       .bind(productId)
-      .first<{ n: number }>(),
+      .first<{ n: number; released: number }>(),
   ]);
   return c.json({
     success: true,
     product,
     offer: w ? { ...windowView({ ...w, ...(l ?? {}) }) } : null,
     redeemed: Number(redeemed?.n ?? 0),
+    released: Number(redeemed?.released ?? 0),
     schedule_state: w
       ? scheduleState((w.starts_at as string | null) ?? null, (w.ends_at as string | null) ?? null, Date.now())
       : null,

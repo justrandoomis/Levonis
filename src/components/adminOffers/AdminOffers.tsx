@@ -75,6 +75,7 @@ const STRINGS = {
     maxPerUser: 'حد لكل عميل',
     maxGlobal: 'حد إجمالي',
     redeemed: 'استُخدم',
+    released: 'أُعيد',
     productId: 'معرّف المنتج',
     add: 'عرض جديد',
     kindAll: 'الكل',
@@ -114,6 +115,7 @@ const STRINGS = {
     maxPerUser: 'Per customer',
     maxGlobal: 'Total',
     redeemed: 'Redeemed',
+    released: 'Released',
     productId: 'Product id',
     add: 'New offer',
     kindAll: 'All',
@@ -153,6 +155,7 @@ const STRINGS = {
     maxPerUser: 'بۆ هەر کڕیارێک',
     maxGlobal: 'کۆی گشتی',
     redeemed: 'بەکارهێنراوە',
+    released: 'گەڕێندراوەتەوە',
     productId: 'ناسنامەی بەرهەم',
     add: 'ئۆفەری نوێ',
     kindAll: 'هەموو',
@@ -183,6 +186,11 @@ interface OfferRow {
   updated_at: string | null;
   product: { id: string; name: string; slug: string; composition: string; status: string };
   redeemed: number;
+  /** Slots given back by a genuine cancellation (§17 decision 4). They no
+   *  longer count against the limit, so they are shown apart rather than
+   *  folded into `redeemed` — which is what made an offer read as sold out
+   *  while it was still selling. */
+  released?: number;
   schedule_state: 'upcoming' | 'live' | 'ended';
 }
 
@@ -212,6 +220,7 @@ const blank = (subjectId: string): OfferRow => ({
   updated_at: null,
   product: { id: subjectId, name: '', slug: '', composition: '', status: '' },
   redeemed: 0,
+  released: 0,
   schedule_state: 'live',
 });
 
@@ -446,6 +455,11 @@ export default function AdminOffers() {
                 )}
                 <span>
                   {s.redeemed}: <bdi dir="ltr" className="tabular-nums">{o.redeemed}</bdi>
+                  {(o.released ?? 0) > 0 && (
+                    <span className="text-zinc-500">
+                      {' '}· {s.released}: <bdi dir="ltr" className="tabular-nums">{o.released}</bdi>
+                    </span>
+                  )}
                 </span>
               </div>
             </button>

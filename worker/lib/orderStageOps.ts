@@ -155,22 +155,33 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   const durations = resolveDurations(await getSetting(env.DB, 'orderStageDurations'));
   const schedule = scheduleFrom(opts.to, order.shipping_type, durations, nowIso, spreadFor(order.id));
 
-  // Conditional on the stage we read. Two movers arriving together — the
-  // sweep and an admin, or two sweeps — leave exactly one winner, and the
-  // loser reports RACED instead of writing a second history row for a move
-  // that never happened.
+  // Conditional on BOTH the stage AND the status we read. Two movers arriving
+  // together — the sweep and an admin, or two sweeps — leave exactly one
+  // winner, and the loser reports RACED instead of writing a second history
+  // row for a move that never happened.
+  //
+  // THE STATUS HALF IS NOT DECORATION. Every cancellation path — the
+  // customer's, the admin's and the expiry sweep's — flips `status` to
+  // 'cancelled' and leaves `stage` exactly where it was, so a flip fenced on
+  // the stage alone still matches an order that was cancelled a millisecond
+  // ago: the admin's confirm lands on a refunded, stock-released order and
+  // resurrects it, `reopening` is false because it was computed from the
+  // stale row, so the offer slot released by the cancel is never re-claimed,
+  // and `deductOrderStock` then runs against units that were already released
+  // — eating another order's reservation where one exists. Fencing on the
+  // status the caller actually read collapses all of that into a clean RACED.
   const flipStatement = env.DB.prepare(
     `UPDATE orders
         SET stage = ?, stage_changed_at = ?, stage_source = ?,
             next_stage = ?, next_stage_at = ?, status = ?,
             delivered_at = CASE WHEN ? = 'delivered' THEN COALESCE(NULLIF(delivered_at,''), ?) ELSE delivered_at END,
             updated_at = ?
-      WHERE id = ? AND stage = ?`
+      WHERE id = ? AND stage = ? AND status = ?`
   ).bind(
     opts.to, nowIso, opts.source === 'system' ? 'manual' : opts.source,
     schedule.next_stage ?? '', schedule.next_stage_at, legacyTo,
     opts.to, nowIso, nowIso,
-    order.id, from
+    order.id, from, legacyFrom
   );
 
   /**

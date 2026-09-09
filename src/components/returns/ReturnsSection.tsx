@@ -298,6 +298,16 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
   };
   const anyRequestable = order.items.some((it) => itemWindow(it.id).state !== 'closed');
 
+  /** How many units of this row exist — whether it is a line or a part of one. */
+  const maxQtyFor = (itemId: string): number => {
+    const top = order.items.find((i) => i.id === itemId);
+    if (top) return Number(top.qty) || 1;
+    const part = order.items
+      .flatMap((i) => i.bundle?.components ?? [])
+      .find((k) => k.order_item_id === itemId);
+    return Number(part?.qty) || 1;
+  };
+
   const startForm = (itemId: string, component = false) => {
     setForm({ itemId, qty: 1, reason: 'defective', description: '', evidence: [], component });
     setSubmitError('');
@@ -535,10 +545,14 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                     onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
                     className="w-full bg-black border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
                   >
-                    {Array.from(
-                      { length: Math.max(1, order.items.find((i) => i.id === form.itemId)?.qty ?? 1) },
-                      (_, i) => i + 1
-                    ).map((n) => (
+                    {/* The row being claimed is a top-level item OR a bundle
+                        component, and components are never in `order.items` —
+                        they are nested under `bundle.components[]`. Looking
+                        only at `order.items` made every per-part fault form
+                        offer a single unit, so a customer with three broken
+                        spools could file for one and was never told the other
+                        two could be claimed. */}
+                    {Array.from({ length: Math.max(1, maxQtyFor(form.itemId)) }, (_, i) => i + 1).map((n) => (
                       <option key={n} value={n}>{n}</option>
                     ))}
                   </select>

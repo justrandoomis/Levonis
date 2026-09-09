@@ -191,3 +191,69 @@ test('the app offers the per-part claim, or the carve-out is unreachable from a 
   const strings = readFileSync(new URL('../src/lib/refusalStrings.ts', import.meta.url), 'utf8');
   assert.match(strings, /BUNDLE_COMPONENT_ALREADY_CLAIMED/, 'the new refusal has no customer sentence');
 });
+
+/**
+ * A REPAIRED PART DOES NOT SPEND THE BUNDLE'S RETURN RIGHT.
+ *
+ * The carve-out let a case be opened directly against a child, and the quota
+ * query counted every case that was not `rejected` — including one resolved as
+ * `repair` or `replacement`, which moves no money and returns no goods. So a
+ * customer who reported a crushed spool on day 2 and had it replaced on day 3
+ * could never return the 400,000 IQD bundle on day 4: that child's quota read
+ * as spent, and the commercial reason gate refuses the child on its own. The
+ * fault report cost them their refund right.
+ */
+test('a component case resolved as repair or replacement leaves the whole-bundle return open', async () => {
+  for (const resolution of ['repair', 'replacement', 'declined'] as const) {
+    const raw = seedCatalogue();
+    standardBundle(raw);
+    const { db, orderId } = await deliveredBundle(raw);
+    const rows = itemsOf(raw, orderId);
+    const spool = rows.find((r) => r.product_id === 'p_pla')!;
+    const parent = rows.find((r) => r.bundle_parent_item_id === null)!;
+
+    const claim = await json(
+      await post(appFor(db), '/api/returns', { orderItemId: spool.id, qty: 2, reason: 'defective' })
+    );
+    assert.equal(claim.success, true, JSON.stringify(claim));
+    // Staff resolve it without money or goods moving.
+    raw
+      .prepare("UPDATE return_cases SET state = 'resolved', resolution = ? WHERE id = ?")
+      .run(resolution, String(claim.case.id));
+
+    const whole = await json(
+      await post(appFor(db), '/api/returns', { orderItemId: parent.id, qty: 1, reason: 'not_as_described' })
+    );
+    assert.equal(
+      whole.success,
+      true,
+      `a ${resolution} must not consume the bundle's return right: ${JSON.stringify(whole)}`
+    );
+  }
+});
+
+test('a component case that was REFUNDED does consume it, and the refusal says so honestly', async () => {
+  const raw = seedCatalogue();
+  standardBundle(raw);
+  const { db, orderId } = await deliveredBundle(raw);
+  const rows = itemsOf(raw, orderId);
+  const spool = rows.find((r) => r.product_id === 'p_pla')!;
+  const parent = rows.find((r) => r.bundle_parent_item_id === null)!;
+
+  const claim = await json(
+    await post(appFor(db), '/api/returns', { orderItemId: spool.id, qty: 2, reason: 'defective' })
+  );
+  raw.prepare("UPDATE return_cases SET state = 'resolved', resolution = 'refund' WHERE id = ?").run(String(claim.case.id));
+
+  const whole = await json(
+    await post(appFor(db), '/api/returns', { orderItemId: parent.id, qty: 1, reason: 'not_as_described' })
+  );
+  assert.equal(whole.code, 'BUNDLE_COMPONENT_ALREADY_CLAIMED', JSON.stringify(whole));
+  // The old sentence promised the rest "can still be returned individually",
+  // which the commercial reason gate refuses. It must not promise that.
+  assert.ok(
+    !/still be returned individually/.test(String(whole.error)),
+    `the refusal promises something the reason gate refuses: ${whole.error}`
+  );
+  assert.match(String(whole.error), /fault/i, 'it says what CAN still be done');
+});

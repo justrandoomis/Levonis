@@ -21,7 +21,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, stubApp, post, json, row, count, type StubUser } from './fixtures/app';
+import { asD1, failingD1, stubApp, post, json, row, count, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { sweepExpiredOrders } from '../worker/lib/orderExpirySweep';
@@ -276,4 +276,64 @@ test('batch_limit bounds one run, and the rest wait for the next', async () => {
   assert.equal(first.cancelled, 2, 'exactly the batch limit');
   const second = await sweepExpiredOrders(envOf(db), { enabled: true, ttl_minutes: 60, batch_limit: 2 }, NOW);
   assert.equal(second.cancelled, 1, 'the remainder on the next run');
+});
+
+/**
+ * THE RACE THE FOUR LAYERS DID NOT COVER.
+ *
+ * Every cancel path — the customer's, the admin's and this sweep — flips
+ * `status` and leaves `stage` where it was. `moveOrderStage`'s flip was fenced
+ * on the STAGE alone, so an admin who tapped "confirm" a millisecond before the
+ * cron committed still matched: the confirm landed on an order that had just
+ * been refunded and had its stock released, and because `reopening` was
+ * computed from the row read BEFORE the cancel, the offer slot the cancel
+ * released was never re-claimed — the customer kept a live confirmed order AND
+ * the entitlement. `deductOrderStock` then ran against units already released.
+ *
+ * The flip is fenced on the status it read as well now, so the losing mover
+ * reports RACED and writes nothing.
+ */
+test('a stage move that lost the race to a cancellation writes nothing', async () => {
+  const raw = seedCatalogue();
+  await abandonedOrder(raw);
+  const { failing, db } = failingD1(raw);
+  const orderId = row<{ id: string }>(raw, 'SELECT id FROM orders LIMIT 1')!.id;
+  const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
+
+  // THE EXACT INTERLEAVING. moveOrderStage reads the order (pending /
+  // received) and builds its flip; the cancellation commits in the gap before
+  // that flip runs. The cancel touches `status` and leaves `stage` alone — so
+  // a flip fenced on the stage alone would still match.
+  failing.beforeBatch = (stmts) => {
+    if (!stmts.some((s) => s.sql.includes('UPDATE orders'))) return;
+    failing.beforeBatch = null;
+    raw.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(orderId);
+  };
+
+  const moved = await moveOrderStage(env, { orderId, to: 'confirmed', source: 'manual', changedBy: 'boss' });
+  assert.equal(moved.moved, false, 'the stale confirm must not resurrect a cancelled, refunded order');
+  assert.equal(moved.reason, 'RACED');
+  assert.equal(orderOf(raw, orderId).status, 'cancelled', 'and the order stays cancelled');
+  assert.equal(orderOf(raw, orderId).stage, 'received', 'nothing was written at all');
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM inventory_ledger WHERE order_id = ? AND kind = 'deduct'", orderId),
+    0,
+    'no deduct ran against units that were already released'
+  );
+});
+
+test('but a DELIBERATE re-open from cancelled still works, and reclaims the slot', async () => {
+  const raw = seedCatalogue();
+  const { db, orderId } = await abandonedOrder(raw);
+  const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
+
+  await sweepExpiredOrders(envOf(db), ON, NOW);
+  assert.equal(orderOf(raw, orderId).status, 'cancelled');
+
+  // The admin reads the CURRENT row (status cancelled) and moves it forward:
+  // legacyFrom is 'cancelled', the fence matches, and this is the re-open the
+  // stage machine is allowed to do.
+  const moved = await moveOrderStage(env, { orderId, to: 'confirmed', source: 'manual', changedBy: 'boss' });
+  assert.equal(moved.moved, true, JSON.stringify(moved));
+  assert.equal(orderOf(raw, orderId).status, 'confirmed');
 });
