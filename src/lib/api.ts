@@ -441,6 +441,17 @@ export interface ApiAddress {
   notes: string;
   is_default: number;
   created_at: string;
+  /**
+   * PRO/KYC AWARENESS the server computes for this exact screen
+   * (worker/routes/addresses.ts: "so the UI/checkout can explain
+   * eligibility"). Both were being computed on every read and thrown away by
+   * every client — so a PRO could edit the address backing their approved
+   * snapshot, the server would detect the divergence, and nothing said a word.
+   */
+  backs_approved_snapshot?: boolean;
+  /** null = this row does not back the snapshot; false = it did and no longer
+   *  matches it. */
+  matches_approved_snapshot?: boolean | null;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';

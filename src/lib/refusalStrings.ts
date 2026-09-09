@@ -146,6 +146,20 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'An order whose contents have been revealed cannot be cancelled — contact support.',
     ckb: 'داواکارییەک کە ناوەڕۆکی ئاشکرا بووە هەڵناوەشێتەوە — پەیوەندی بە پشتگیری بکە.',
   },
+
+  // ---- delivery address ---------------------------------------------------
+  // Both are raised by `worker/routes/addresses.ts` and reach the customer
+  // inside a form they are filling in, so each says what to change.
+  INVALID_PHONE: {
+    ar: 'رقم الهاتف غير صحيح. اكتب رقمًا يمكن للمندوب الاتصال به، مثال: 07701234567.',
+    en: 'That phone number is not valid. Enter a number the courier can call, e.g. 07701234567.',
+    ckb: 'ژمارەی تەلەفۆن دروست نییە. ژمارەیەک بنووسە کە گەیێنەر بتوانێت پەیوەندی پێوە بکات، نموونە: 07701234567.',
+  },
+  GOVERNORATE_REQUIRED: {
+    ar: 'اختر المحافظة — التوصيل يُوجَّه على أساسها.',
+    en: 'Choose a governorate — delivery is routed by it.',
+    ckb: 'پارێزگا هەڵبژێرە — گەیاندن بەپێی ئەو ئاڕاستە دەکرێت.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

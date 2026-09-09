@@ -13,6 +13,7 @@ import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 import Note from '../components/ui/Note';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
+import AddressForm from '../components/address/AddressForm';
 import { apiRefusal } from '../lib/refusalStrings';
 
 /**
@@ -290,6 +291,20 @@ export default function Checkout() {
   const idempotencyKeyRef = useRef(newIdempotencyKey());
 
   const handleBack = () => navigate(-1);
+
+  /**
+   * ADDING AN ADDRESS NO LONGER EJECTS THE CUSTOMER FROM CHECKOUT.
+   *
+   * The button used to `navigate('/addresses')` — a bare push, no state, no
+   * `next`. That unmounted this whole screen, so the delivery method, the
+   * payment method, the coupon, the protected-delivery tick, the wallet toggle
+   * and the policy acceptance were all discarded; and on return the mount
+   * effect re-selected the OLD default, so the address they had just gone away
+   * to create was not even the one being shipped to. The form is rendered here
+   * instead, and its `onSaved` selects the new address — the pattern the
+   * merchant checkout already used one file over.
+   */
+  const [addingAddress, setAddingAddress] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -860,16 +875,38 @@ export default function Checkout() {
                   </p>
                 </label>
               ))}
-              <button
-                onClick={() => navigate('/addresses')}
-                className="relative p-4 rounded-xl border border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-white/20 transition-all flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-white min-h-[100px]"
-              >
-                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
-                  <Plus className="w-4 h-4" strokeWidth={1.5} />
-                </div>
-                <span className="text-xs font-normal">{dir === 'rtl' ? 'إضافة عنوان جديد' : 'Add New Address'}</span>
-              </button>
+              {!addingAddress ? (
+                <button
+                  type="button"
+                  onClick={() => setAddingAddress(true)}
+                  className="relative p-4 rounded-xl border border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-white/20 transition-colors flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-white min-h-[100px] [touch-action:manipulation]"
+                >
+                  <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                    <Plus aria-hidden="true" className="w-4 h-4" strokeWidth={1.5} />
+                  </span>
+                  <span className="text-xs font-normal">
+                    {loc('إضافة عنوان جديد', 'Add a new address', 'زیادکردنی ناونیشانی نوێ')}
+                  </span>
+                </button>
+              ) : null}
             </div>
+            {addingAddress ? (
+              <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+                <AddressForm
+                  dense
+                  defaultWhenFirst={addresses.length === 0}
+                  onCancel={() => setAddingAddress(false)}
+                  onSaved={async (id) => {
+                    // Re-read, then select the address that was just created —
+                    // the step whose absence was the whole defect.
+                    const d = await api.get<{ addresses: ApiAddress[] }>('/api/addresses');
+                    setAddresses(d.addresses || []);
+                    setSelectedAddressId(id);
+                    setAddingAddress(false);
+                  }}
+                />
+              </div>
+            ) : null}
             {addresses.length === 0 && (
               <p className="text-xs text-amber-400/80 mt-3 font-light flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.5} />

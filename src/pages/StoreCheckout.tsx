@@ -22,11 +22,11 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError, type ApiAddress } from '../lib/api';
 import { storeCheckoutApi, iqd, type StoreQuote } from '../lib/merchant';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
-import { GOVERNORATES } from '../lib/governorates';
+import AddressForm from '../components/address/AddressForm';
 import { useStore } from '../StoreContext';
 
 export default function StoreCheckout() {
-  const { loc, lang, dir } = useLanguage();
+  const { loc, dir } = useLanguage();
   const navigate = useNavigate();
   const { store: hostStore } = useStore();
 
@@ -217,9 +217,9 @@ export default function StoreCheckout() {
               {addresses === null ? (
                 <Loader2 className="w-4 h-4 text-gold animate-spin" />
               ) : addingAddress ? (
-                <NewAddressForm
-                  lang={lang}
-                  loc={loc}
+                <AddressForm
+                  dense
+                  defaultWhenFirst
                   onSaved={async (id) => {
                     setAddingAddress(false);
                     const d = await api.get<{ addresses: ApiAddress[] }>('/api/addresses');
@@ -394,86 +394,15 @@ export default function StoreCheckout() {
   );
 }
 
-/** The courier's questions, nothing more. */
-function NewAddressForm({
-  lang,
-  loc,
-  onSaved,
-  onCancel,
-}: {
-  lang: string;
-  loc: (ar: string, en: string, ckb?: string) => string;
-  onSaved: (id: string) => void;
-  onCancel: () => void;
-}) {
-  const [f, setF] = useState({ label: '', name: '', phone: '', governorate: '', area: '', address: '' });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  async function save() {
-    setBusy(true);
-    setError('');
-    try {
-      const r = await api.post<{ id: string }>('/api/addresses', {
-        label: f.label || loc('عنواني', 'My address', 'ناونیشانم'),
-        name: f.name,
-        phone: f.phone,
-        governorate: f.governorate,
-        area: f.area,
-        address: f.address,
-        isDefault: true,
-      });
-      onSaved(r.id);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'error');
-      setBusy(false);
-    }
-  }
-
-  const input =
-    'w-full h-10 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] outline-none focus:border-gold/40';
-
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <input className={input} placeholder={loc('الاسم', 'Name', 'ناو')} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <input className={input} dir="ltr" placeholder={loc('الهاتف', 'Phone', 'تەلەفۆن')} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <select
-          className={input}
-          value={f.governorate}
-          onChange={(e) => setF({ ...f, governorate: e.target.value })}
-        >
-          <option value="">{loc('المحافظة', 'Governorate', 'پارێزگا')}</option>
-          {GOVERNORATES.map((g) => (
-            <option key={g.id} value={g.id}>
-              {lang === 'ckb' ? g.ckb : lang === 'en' ? g.en : g.ar}
-            </option>
-          ))}
-        </select>
-        <input className={input} placeholder={loc('المنطقة', 'Area', 'ناوچە')} value={f.area} onChange={(e) => setF({ ...f, area: e.target.value })} />
-      </div>
-      <input
-        className={input}
-        placeholder={loc('العنوان بالتفصيل', 'Full address', 'ناونیشان بە وردی')}
-        value={f.address}
-        onChange={(e) => setF({ ...f, address: e.target.value })}
-      />
-      {error && <p className="text-red-400 text-[11.5px]">{error}</p>}
-      <div className="flex gap-2">
-        <button
-          onClick={save}
-          disabled={busy || f.name.length < 2 || f.phone.length < 7 || f.address.length < 5}
-          className="flex-1 h-10 rounded-xl bg-olive text-white text-[12.5px] font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"
-        >
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          {loc('حفظ العنوان', 'Save address', 'پاشەکەوت')}
-        </button>
-        <button onClick={onCancel} className="h-10 px-4 rounded-xl border border-white/10 text-zinc-400 text-[12.5px] font-bold">
-          {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
-        </button>
-      </div>
-    </div>
-  );
-}
+/*
+ * `NewAddressForm` LIVED HERE. It is now
+ * `src/components/address/AddressForm.tsx`, shared with the platform checkout
+ * and the address book.
+ *
+ * It was the third address form in the app, and the three agreed on nothing:
+ * this one posted a raw phone with no country and let the governorate stay
+ * empty, the address book prepended a literal `'+964-'` to whatever was typed,
+ * and the platform checkout had no form at all — it pushed `/addresses` and
+ * discarded every other choice the customer had made. One form, one set of
+ * required fields, one contract with the server.
+ */

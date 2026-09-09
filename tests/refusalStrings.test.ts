@@ -100,7 +100,16 @@ test('refusalText answers in the asked language and NEVER returns the bare code'
 test('every code the table translates is one the server can actually emit', () => {
   // The other half of the drift: a sentence for a code no route throws is dead
   // weight that reads as coverage. Every key is grepped for in the worker.
-  const sources = ['worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/returns.ts', 'worker/lib/bundleCart.ts', 'worker/lib/offers.ts']
+  const sources = [
+    'worker/routes/cart.ts',
+    'worker/routes/orders.ts',
+    'worker/routes/returns.ts',
+    // The address book refuses on the money path too: a parcel with an
+    // undialable number or no governorate is a delivery that fails.
+    'worker/routes/addresses.ts',
+    'worker/lib/bundleCart.ts',
+    'worker/lib/offers.ts',
+  ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');
   const mystery = ['worker/lib/mysteryDraw.ts', 'worker/routes/mystery.ts', 'worker/lib/mysteryReveal.ts']
@@ -138,6 +147,10 @@ test('every code the table translates is one the server can actually emit', () =
 const DOORS = [
   'src/pages/Cart.tsx',
   'src/pages/Checkout.tsx',
+  // The address form raises INVALID_PHONE and GOVERNORATE_REQUIRED, and both
+  // land inside a form the customer is filling in — the one place an English
+  // sentence is least excusable.
+  'src/pages/Addresses.tsx',
   'src/pages/BundleDetail.tsx',
   'src/components/orders/CancelOrderSheet.tsx',
   'src/components/returns/ReturnsSection.tsx',

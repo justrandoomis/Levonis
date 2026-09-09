@@ -1,26 +1,81 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, MapPin, Edit2, Trash2, CheckCircle, User } from 'lucide-react';
+/**
+ * THE ADDRESS BOOK.
+ *
+ * WHAT WAS WRONG WITH IT, in the order a customer would hit it.
+ *
+ * 1. IT WAS IN ENGLISH. Roughly twenty hardcoded English strings — 'My
+ *    Addresses', 'Add address', 'Edit', 'Delete', 'Set Default', 'Recipient
+ *    details', the delete confirmation — rendered inside an RTL box on an
+ *    Arabic-first store. The only translated block was the governorate group
+ *    added later. Every string here is `loc(ar, en, ckb)` now, and every
+ *    physical direction class (`right-0`, `ml-auto`, `-ml-2`, `rounded-bl-xl`)
+ *    is logical, so the layout mirrors instead of pointing the wrong way.
+ *
+ * 2. THE SAVE BUTTON WAS INVISIBLE. `bg-olive/20 text-olive` — olive is
+ *    #1B2010, a near-black green — measures 1.16:1 against this page's ground.
+ *    WCAG asks 4.5:1 for text. The primary action of the screen could not be
+ *    read. It is the house gold CTA now, like every other primary action.
+ *
+ * 3. THE PHONE WAS NEVER VALIDATED. `'+964-' + typed`, with the only check
+ *    being non-empty, and the result copied straight onto the courier's
+ *    shipment request. It also made editing impossible for any number not
+ *    already `+964`-prefixed: the prefix was stripped only on an exact match
+ *    and then re-added unconditionally, so a stored `+13105551234` round-tripped
+ *    to `+964-+13105551234` and was rejected every single time. Both halves now
+ *    live in `AddressForm`, and the server normalises through libphonenumber.
+ *
+ * 4. THE 'MAP' WAS A HOTLINKED IMGUR PHOTO — the only external image in the
+ *    entire repository, `aria-hidden`, with no fallback and no function: there
+ *    is no map picker, no geocoding and no coordinates anywhere near it. If
+ *    imgur ever expires the id, its "image removed" graphic renders inside the
+ *    form. Deleted; the card now shows the governorate that was actually
+ *    chosen, which is information rather than decoration.
+ *
+ * 5. THE SERVER'S PRO/KYC ANSWER WAS DISCARDED. `backs_approved_snapshot` and
+ *    `matches_approved_snapshot` are computed on every read specifically so
+ *    this screen can explain eligibility. Both are shown now.
+ *
+ * 6. DOUBLE-TAPPING DELETE OR SET-DEFAULT fired twice; the second answered
+ *    'Address not found'. Both are guarded.
+ */
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Plus, MapPin, Edit2, Trash2, CheckCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { api, ApiAddress } from '../lib/api';
+import { apiRefusal } from '../lib/refusalStrings';
 import { useLanguage } from '../LanguageContext';
 import { GOVERNORATES } from '../lib/governorates';
 import { Overlay } from '../components/ui/Overlay';
+import AddressForm from '../components/address/AddressForm';
 
 export default function Addresses() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, isLoaded } = useAuth();
-  const { loc, lang } = useLanguage();
+  const { loc, lang, dir } = useLanguage();
 
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [listError, setListError] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<ApiAddress | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [formError, setFormError] = useState('');
   const [actionError, setActionError] = useState('');
+  /** One write at a time. A second tap on Delete used to fire a second request
+   *  and report 'Address not found' for a deletion that had just succeeded. */
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  /**
+   * WHERE TO GO BACK TO, AND WHAT TO TELL IT.
+   *
+   * A checkout that sends someone here to add an address needs the id that was
+   * created — otherwise the customer returns to a checkout that re-selects the
+   * OLD default and ships to the wrong place. Both checkouts now embed the form
+   * instead, so this is the fallback path for any caller that still routes;
+   * honouring it costs one line and closes the loop either way.
+   */
+  const routeNext = (location.state as { next?: string } | null)?.next ?? '';
 
   // The Delete button of the row being asked about. The confirmation is a
   // question about ONE address out of a list of otherwise identical cards, and
@@ -31,29 +86,17 @@ export default function Addresses() {
   // synchronously, before the render that opens the window reads it.
   const deleteAnchor = useRef<HTMLElement | null>(null);
 
-  // Form states
-  const [formLabel, setFormLabel] = useState('');
-  const [formAddress, setFormAddress] = useState('');
-  const [formLandmark, setFormLandmark] = useState('');
-  const [formName, setFormName] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  // 0026: the parts a courier's form asks for, kept separate so the admin can
-  // copy each one on its own instead of editing a paste on every order.
-  const [formGovernorate, setFormGovernorate] = useState('');
-  const [formArea, setFormArea] = useState('');
-  const [formNotes, setFormNotes] = useState('');
-
   const loadAddresses = useCallback(async () => {
     setListError('');
     try {
       const data = await api.get<{ addresses: ApiAddress[] }>('/api/addresses');
       setAddresses(data.addresses);
-    } catch (err: any) {
-      setListError(err?.message || 'Failed to load addresses');
+    } catch (err) {
+      setListError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', loc('تعذّر تحميل العناوين', 'Could not load your addresses', 'نەتوانرا ناونیشانەکان بار بکرێن')));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [lang, loc]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -64,196 +107,230 @@ export default function Addresses() {
     loadAddresses();
   }, [isLoaded, isAuthenticated, loadAddresses]);
 
-  const handleOpenAdd = () => {
+  const openAdd = () => {
     setEditingAddress(null);
-    setFormLabel('');
-    setFormAddress('');
-    setFormLandmark('');
-    setFormName('');
-    setFormPhone('');
-    setFormGovernorate('');
-    setFormArea('');
-    setFormNotes('');
-    setFormError('');
-    setShowAddModal(true);
+    setEditorOpen(true);
   };
 
-  const handleOpenEdit = (addr: ApiAddress) => {
+  const openEdit = (addr: ApiAddress) => {
     setEditingAddress(addr);
-    setFormLabel(addr.label);
-    setFormAddress(addr.address);
-    setFormLandmark(addr.landmark || '');
-    setFormName(addr.name);
-    setFormPhone(addr.phone.replace(/^\+964-?/, ''));
-    setFormGovernorate(addr.governorate || '');
-    setFormArea(addr.area || '');
-    setFormNotes(addr.notes || '');
-    setFormError('');
-    setShowAddModal(true);
+    setEditorOpen(true);
   };
 
-  const handleSave = async () => {
-    if (isSaving) return;
-    setFormError('');
-    if (!formName.trim() || !formPhone.trim() || !formLabel.trim() || !formAddress.trim()) {
-      setFormError(loc('الاسم والرقم واسم العنوان والعنوان مطلوبة', 'Name, phone, label and address are required', 'ناو و ژمارە و ناونیشان پێویستن'));
-      return;
-    }
-    // The governorate is required for a NEW address: dispatch routes on it,
-    // and a parcel without one is a phone call. An address saved before this
-    // existed can still be edited without adding one, so nobody is locked out
-    // of fixing a typo in their own phone number.
-    if (!editingAddress && !formGovernorate) {
-      setFormError(loc('اختر المحافظة', 'Choose a governorate', 'پارێزگا هەڵبژێرە'));
-      return;
-    }
-    const body = {
-      label: formLabel.trim(),
-      name: formName.trim(),
-      phone: '+964-' + formPhone.trim(),
-      address: formAddress.trim(),
-      landmark: formLandmark.trim(),
-      governorate: formGovernorate,
-      area: formArea.trim(),
-      notes: formNotes.trim(),
-      isDefault: editingAddress ? editingAddress.is_default === 1 : addresses.length === 0,
-    };
-    setIsSaving(true);
-    try {
-      if (editingAddress) {
-        await api.put(`/api/addresses/${editingAddress.id}`, body);
-      } else {
-        await api.post('/api/addresses', body);
-      }
-      await loadAddresses();
-      setShowAddModal(false);
-    } catch (err: any) {
-      setFormError(err?.message || 'Failed to save address');
-    } finally {
-      setIsSaving(false);
-    }
+  const handleSaved = async (id: string) => {
+    setEditorOpen(false);
+    await loadAddresses();
+    if (routeNext) navigate(routeNext, { state: { addressId: id }, replace: true });
   };
 
   const handleDelete = async () => {
-    if (!deleteConfirmId) return;
+    if (!deleteConfirmId || busyId) return;
+    const id = deleteConfirmId;
     setActionError('');
+    setBusyId(id);
+    setDeleteConfirmId(null);
     try {
-      await api.delete(`/api/addresses/${deleteConfirmId}`);
+      await api.delete(`/api/addresses/${id}`);
       await loadAddresses();
-    } catch (err: any) {
-      setActionError(err?.message || 'Failed to delete address');
+    } catch (err) {
+      setActionError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', loc('تعذّر حذف العنوان', 'Could not delete the address', 'نەتوانرا ناونیشان بسڕدرێتەوە')));
     } finally {
-      setDeleteConfirmId(null);
+      setBusyId(null);
     }
   };
 
   const handleSetDefault = async (id: string) => {
+    if (busyId) return;
     setActionError('');
+    setBusyId(id);
     try {
       await api.post(`/api/addresses/${id}/default`);
       await loadAddresses();
-    } catch (err: any) {
-      setActionError(err?.message || 'Failed to set default address');
+    } catch (err) {
+      setActionError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', loc('تعذّر تعيين العنوان الافتراضي', 'Could not set the default address', 'نەتوانرا بکرێتە ناونیشانی بنەڕەت')));
+    } finally {
+      setBusyId(null);
     }
   };
 
+  /** The chosen governorate's name in the reader's language, or the raw stored
+   *  value when it predates the closed list — never blank, never guessed. */
+  const governorateName = (id: string) => {
+    if (!id) return '';
+    const g = GOVERNORATES.find((x) => x.id === id);
+    if (!g) return id;
+    return lang === 'en' ? g.en : lang === 'ckb' ? g.ckb : g.ar;
+  };
+
+  const Back = dir === 'rtl' ? ChevronRight : ChevronLeft;
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white w-full font-sans flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-10 border-b border-zinc-900">
+    <div className="min-h-dvh bg-black text-white w-full font-sans flex flex-col">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 bg-black/85 backdrop-blur-xl z-10 border-b border-zinc-900">
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors"
+          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors [touch-action:manipulation]"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <Back aria-hidden="true" className="w-6 h-6" />
         </button>
-        <h1 className="text-[17px] font-bold">My Addresses</h1>
-        <div className="w-10 h-10"></div>
+        <h1 className="text-[17px] font-bold">{loc('عناويني', 'My addresses', 'ناونیشانەکانم')}</h1>
+        <div className="w-11" />
       </div>
 
-      <div className="p-4 flex-1">
+      <div className="flex-1 px-4 py-4 mx-auto w-full max-w-[560px]">
         {!isAuthenticated && isLoaded ? (
           <div className="text-center py-16 text-zinc-500">
-            <MapPin className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">Sign in to manage your addresses</p>
-            <button onClick={() => navigate('/auth')} className="mt-4 px-6 py-2 bg-olive/20 text-gold rounded-full font-bold text-sm">
-              Sign in
+            <MapPin aria-hidden="true" className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="font-medium">{loc('سجّل الدخول لإدارة عناوينك', 'Sign in to manage your addresses', 'بچۆ ژوورەوە بۆ بەڕێوەبردنی ناونیشانەکانت')}</p>
+            <button
+              type="button"
+              onClick={() => navigate('/auth?next=%2Faddresses')}
+              className="mt-4 min-h-[44px] px-6 rounded-xl bg-gold text-black font-black text-sm hover:brightness-110 transition-[filter]"
+            >
+              {loc('تسجيل الدخول', 'Sign in', 'چوونەژوورەوە')}
             </button>
           </div>
         ) : (
           <>
             <button
-              onClick={handleOpenAdd}
-              className="w-full bg-olive/10 border border-olive/30 hover:bg-olive/20 text-gold rounded-2xl p-4 flex items-center justify-center gap-2 font-bold transition-colors shadow-sm mb-6"
+              type="button"
+              onClick={openAdd}
+              className="w-full min-h-[52px] rounded-2xl border border-zinc-800 bg-zinc-900/40 text-gold flex items-center justify-center gap-2 font-bold hover:border-gold/40 hover:bg-gold/[0.06] transition-colors mb-5 [touch-action:manipulation]"
             >
-              <Plus className="w-5 h-5" />
-              Add address
+              <Plus aria-hidden="true" className="w-5 h-5" />
+              {loc('إضافة عنوان', 'Add an address', 'زیادکردنی ناونیشان')}
             </button>
 
-            {actionError && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mb-4">
+            {actionError ? (
+              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300 mb-4">
                 {actionError}
-              </div>
-            )}
-            {listError && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mb-4">
+              </p>
+            ) : null}
+            {listError ? (
+              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300 mb-4">
                 {listError}
-              </div>
-            )}
+              </p>
+            ) : null}
 
             {isLoading ? (
-              <div className="flex justify-center py-16">
-                <div className="w-8 h-8 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
+              // A skeleton of the real cards, at the top of the column where the
+              // cards will be — not a spinner floating in an empty page.
+              <div className="space-y-3" aria-busy="true">
+                {[0, 1].map((i) => (
+                  <div key={i} className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+                    <div className="h-4 w-28 rounded bg-zinc-800 animate-pulse" />
+                    <div className="h-3 w-full rounded bg-zinc-800/70 animate-pulse mt-3" />
+                    <div className="h-3 w-2/3 rounded bg-zinc-800/70 animate-pulse mt-2" />
+                  </div>
+                ))}
               </div>
             ) : addresses.length === 0 && !listError ? (
               <div className="text-center py-12 text-zinc-500">
-                <MapPin className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="font-medium">No saved addresses yet</p>
-                <p className="text-sm mt-1">Add your first delivery address above.</p>
+                <MapPin aria-hidden="true" className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                <p className="font-medium text-zinc-300">{loc('لا توجد عناوين محفوظة', 'No saved addresses yet', 'هێشتا هیچ ناونیشانێک پاشەکەوت نەکراوە')}</p>
+                <p className="text-sm mt-1">{loc('أضف عنوان التوصيل الأول من الزر أعلاه.', 'Add your first delivery address with the button above.', 'یەکەم ناونیشانی گەیاندن بە دوگمەی سەرەوە زیاد بکە.')}</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {addresses.map((addr) => (
-                  <div key={addr.id} className={`bg-zinc-900 border ${addr.is_default ? 'border-gold/50' : 'border-zinc-800'} rounded-3xl p-5 relative overflow-hidden transition-colors`}>
-                    {addr.is_default === 1 && (
-                      <div className="absolute top-0 right-0 bg-gold/20 text-gold text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">
-                        Default
-                      </div>
-                    )}
-                    <div className="flex gap-4">
-                      <div className="mt-1">
-                        <MapPin className={`w-6 h-6 ${addr.is_default ? 'text-gold' : 'text-zinc-400'}`} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold mb-1">{addr.label}</h3>
-                        <p className="text-zinc-400 text-sm leading-relaxed mb-3">
-                          {addr.address}
-                          {addr.landmark && <><br/>Landmark: {addr.landmark}</>}
-                        </p>
-                        <p className="text-sm font-medium text-zinc-300">
-                          Phone number: <span className="font-bold">{addr.phone}</span>
-                        </p>
-
-                        <div className="flex items-center flex-wrap gap-2 mt-4 pt-4 border-t border-zinc-800/50">
-                          <button onClick={() => handleOpenEdit(addr)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/50 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 text-[11px] font-bold uppercase tracking-wider transition-colors">
-                            <Edit2 className="w-3.5 h-3.5" />
-                            Edit
-                          </button>
-                          <button onClick={(e) => { deleteAnchor.current = e.currentTarget; setDeleteConfirmId(addr.id); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-zinc-400 text-[11px] font-bold uppercase tracking-wider transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Delete
-                          </button>
-                          {addr.is_default !== 1 && (
-                            <button onClick={() => handleSetDefault(addr.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/50 hover:bg-gold/10 hover:text-gold hover:border-gold/30 text-zinc-400 text-[11px] font-bold uppercase tracking-wider transition-colors ml-auto">
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              Set Default
-                            </button>
-                          )}
+              <div className="space-y-3">
+                {addresses.map((addr) => {
+                  const isDefault = addr.is_default === 1;
+                  const diverged = addr.matches_approved_snapshot === false;
+                  return (
+                    <div
+                      key={addr.id}
+                      className={`rounded-2xl border p-4 transition-colors ${
+                        isDefault ? 'border-gold/40 bg-gold/[0.04]' : 'border-zinc-800/70 bg-zinc-900/40'
+                      } ${busyId === addr.id ? 'opacity-60' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="font-bold text-[16px] text-white truncate">{addr.label}</h2>
+                          {/* The three fields the courier actually routes on,
+                              which the old card hid entirely. */}
+                          <p className="text-[12px] text-zinc-500 mt-0.5">
+                            {[governorateName(addr.governorate), addr.area].filter(Boolean).join(' · ') ||
+                              loc('لم تُحدَّد المحافظة', 'No governorate set', 'پارێزگا دیاری نەکراوە')}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {isDefault ? (
+                            <span className="rounded-lg bg-gold/15 text-gold text-[10px] font-black px-2 py-1 uppercase tracking-wider">
+                              {loc('افتراضي', 'Default', 'بنەڕەت')}
+                            </span>
+                          ) : null}
+                          {addr.backs_approved_snapshot ? (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 text-zinc-300 text-[10px] font-bold px-2 py-1">
+                              <ShieldCheck aria-hidden="true" className="w-3 h-3" />
+                              {loc('العنوان المعتمد', 'Approved address', 'ناونیشانی پەسەندکراو')}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
+
+                      <p className="text-zinc-400 text-[13.5px] leading-relaxed mt-2.5">{addr.address}</p>
+                      {addr.landmark ? (
+                        <p className="text-zinc-500 text-[12.5px] mt-1">
+                          {loc('نقطة دالة', 'Landmark', 'نیشانە')}: {addr.landmark}
+                        </p>
+                      ) : null}
+                      <p className="text-[13px] text-zinc-300 mt-1.5">
+                        {addr.name} ·{' '}
+                        {/* An LTR number inside RTL prose without isolation
+                            reorders around the punctuation beside it. */}
+                        <span dir="ltr" className="font-bold tabular-nums">
+                          {addr.phone}
+                        </span>
+                      </p>
+
+                      {diverged ? (
+                        <p className="mt-2.5 flex items-start gap-1.5 rounded-xl border-s-2 border-amber-500/60 bg-amber-500/[0.06] px-3 py-2 text-[12px] text-amber-200">
+                          <AlertTriangle aria-hidden="true" className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          {loc(
+                            'هذا العنوان لم يعد مطابقًا للعنوان المعتمد لعضوية PRO.',
+                            'This address no longer matches your approved PRO address.',
+                            'ئەم ناونیشانە چیتر لەگەڵ ناونیشانی پەسەندکراوی PRO یەک ناگرێتەوە.'
+                          )}
+                        </p>
+                      ) : null}
+
+                      <div className="flex items-center flex-wrap gap-2 mt-3.5 pt-3.5 border-t border-white/[0.06]">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(addr)}
+                          className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-300 text-[12px] font-bold hover:text-white hover:border-zinc-600 transition-colors [touch-action:manipulation]"
+                        >
+                          <Edit2 aria-hidden="true" className="w-3.5 h-3.5" />
+                          {loc('تعديل', 'Edit', 'دەستکاری')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId !== null}
+                          onClick={(e) => {
+                            deleteAnchor.current = e.currentTarget;
+                            setDeleteConfirmId(addr.id);
+                          }}
+                          className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 text-[12px] font-bold hover:text-red-300 hover:border-red-500/40 disabled:opacity-40 transition-colors [touch-action:manipulation]"
+                        >
+                          <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
+                          {loc('حذف', 'Delete', 'سڕینەوە')}
+                        </button>
+                        {!isDefault ? (
+                          <button
+                            type="button"
+                            disabled={busyId !== null}
+                            onClick={() => handleSetDefault(addr.id)}
+                            className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 text-[12px] font-bold hover:text-gold hover:border-gold/40 disabled:opacity-40 transition-colors ms-auto [touch-action:manipulation]"
+                          >
+                            <CheckCircle aria-hidden="true" className="w-3.5 h-3.5" />
+                            {loc('اجعله الافتراضي', 'Set as default', 'بیکە بە بنەڕەت')}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
@@ -261,14 +338,6 @@ export default function Addresses() {
       </div>
 
       {/* DELETE CONFIRMATION — a centred question that has to be answered.
-
-          It used to be a `fixed inset-0` div that appeared with Tailwind's
-          `zoom-in-95` keyframe and, when the id was cleared, simply stopped
-          existing: a full arrival and no departure at all. A keyframe is also
-          uninterruptible — someone who taps Delete and immediately reaches for
-          Cancel has to wait out an animation that has stopped meaning anything.
-          The primitive's spring animates from the panel's live value, so the
-          trip back starts from wherever the window actually got to.
 
           `Overlay`, not `Sheet`. This is a question with exactly two answers,
           both of them on screen. A sheet's drag-to-dismiss would invent a third
@@ -278,17 +347,13 @@ export default function Addresses() {
           `anchor` is the row's own Delete button (captured on press), so the
           question grows out of the control that raised it. With several
           near-identical address cards stacked up, that origin is the only
-          indication of WHICH address is at stake — the copy says "this
-          address" and never names it.
+          indication of WHICH address is at stake.
 
-          dismissOnEscape AND dismissOnScrim are both false. This is not the
-          primitive being made stubborn: the old markup had no scrim handler and
-          no key listener, so neither gesture closed it before, and the thing
-          being confirmed is explicitly irreversible. A destructive question is
-          answered, not dodged — Cancel is the way out, and it is one tap away.
+          dismissOnEscape AND dismissOnScrim are both false: the thing being
+          confirmed is irreversible, and Cancel is one tap away.
 
-          z={60} preserves the old `z-[60]`, deliberately above the editor's
-          z-50 so a deletion confirmed with the editor open still sits on top. */}
+          z={60} sits above the editor's z-50 so a deletion confirmed with the
+          editor open still renders on top. */}
       <Overlay
         open={!!deleteConfirmId}
         onClose={() => setDeleteConfirmId(null)}
@@ -300,275 +365,92 @@ export default function Addresses() {
         testId="address-delete-confirm"
         panelClassName="w-full max-w-sm"
       >
-        {/* The old panel's own padding, moved inside: the primitive owns the
-            material, the border and the rounding, the caller owns the inset. */}
         <div className="p-6">
-          <h2 id="delete-address-title" className="text-xl font-bold mb-2">Delete Address</h2>
-          <p className="text-zinc-400 mb-6">Are you sure you want to delete this address? This action cannot be undone.</p>
+          <h2 id="delete-address-title" className="text-xl font-bold mb-2">
+            {loc('حذف العنوان', 'Delete address', 'سڕینەوەی ناونیشان')}
+          </h2>
+          <p className="text-zinc-400 mb-6 text-[14px] leading-relaxed">
+            {loc(
+              'سيُحذف هذا العنوان نهائيًا ولا يمكن التراجع.',
+              'This address will be removed permanently. This cannot be undone.',
+              'ئەم ناونیشانە بە یەکجاری دەسڕدرێتەوە و ناگەڕێتەوە.'
+            )}
+          </p>
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => setDeleteConfirmId(null)}
-              className="flex-1 py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-colors"
+              className="flex-1 min-h-[48px] rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-colors"
             >
-              Cancel
+              {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
             </button>
             <button
+              type="button"
               onClick={handleDelete}
-              className="flex-1 py-3.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors shadow-lg shadow-red-500/20"
+              className="flex-1 min-h-[48px] rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors"
             >
-              Delete
+              {loc('حذف', 'Delete', 'سڕینەوە')}
             </button>
           </div>
         </div>
       </Overlay>
 
-      {/* ADD / EDIT ADDRESS — a full-bleed editing task that rises from the
-          bottom edge and goes back down the same way.
+      {/* ADD / EDIT — a full-bleed editing task that rises from the bottom edge
+          and goes back down the same way.
 
-          It used to be `fixed inset-0` with `slide-in-from-bottom-full`: it
-          slid up once, and then on close it was unmounted mid-screen and simply
-          ceased to be. So the window had exactly half a life — it came from
-          somewhere and returned to nowhere, which is the spatial contract
-          broken in the one place a person is most likely to reopen it (they
-          save an address, notice a typo, and tap Edit again). `placement="bottom"`
-          keeps the direction the old keyframe established, and now the exit
-          retraces it.
+          `Overlay`, not `Sheet`, even though it arrives from the bottom. A
+          `Sheet` is draggable, and this is a scrolling form: a downward drag
+          started over the fields is the gesture for reading the rest of it, and
+          giving that gesture a second meaning ("throw the whole thing away")
+          would put a half-typed address one clumsy swipe from oblivion.
 
-          `Overlay`, not `Sheet`, even though it arrives from the bottom edge.
-          A `Sheet` is draggable, and this window is a long scrolling form: a
-          downward drag started over the fields is the gesture for reading the
-          rest of the form, and handing that same gesture a second meaning
-          ("throw the whole thing away") would put a half-typed address one
-          clumsy swipe from oblivion. The grabber would also land on top of the
-          sticky header and its back button. This window is left the way it was
-          entered: the back chevron, Save, or Escape.
+          No `anchor`: a window that covers the screen has no visible
+          relationship to the 44px button that opened it, and the two triggers
+          (Add, and every row's Edit) would each claim a different origin for
+          the same window.
 
-          No `anchor`. A window that covers the entire screen has no visible
-          relationship to the 40px button that opened it — scaling a full-bleed
-          surface out of one corner reads as a glitch, not as provenance. A
-          full-screen task belongs to the edge it comes from, and the two
-          triggers (Add, and every row's Edit) would each claim a different
-          origin for the same window anyway.
-
-          `solid`. The primitive's default material is tinted glass, but every
-          surface in here — the sticky translucent header, the `zinc-800/50`
-          input fields, the map card — is drawn assuming an opaque page ground
-          underneath. Over glass, the address cards of the list behind would
-          show through the very fields being typed into. So the editor supplies
-          the old `bg-[#0a0a0a]` and keeps the arrival, the exit and the
-          reduced-motion cross-fade that the primitive provides regardless.
-
-          dismissOnScrim={false}: there was no backdrop to click before (the old
-          window was opaque and covered everything), and a stray tap beside the
-          panel on a wide screen must not discard a form someone is filling in.
-          Escape now closes it, which the primitive owns — there was no key
-          listener here to remove.
-
-          z={50} is the old `z-50`, unchanged. */}
+          `solid`, because the fields are drawn assuming an opaque ground —
+          over glass the address cards behind would show through the very boxes
+          being typed into. */}
       <Overlay
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
         labelledBy="address-editor-title"
         placement="bottom"
         dismissOnScrim={false}
         solid
         z={50}
         testId="address-editor"
-        panelClassName="w-full sm:max-w-xl h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-[#0a0a0a]"
+        panelClassName="w-full sm:max-w-lg h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-black"
       >
-          <div className="flex items-center p-4 sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-10 border-b border-zinc-900">
-            <button
-              onClick={() => setShowAddModal(false)}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors -ml-2"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-            <h1 id="address-editor-title" className="text-[19px] font-bold ml-1">Delivery details</h1>
-          </div>
+        <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-black/85 backdrop-blur-xl z-10 border-b border-zinc-900">
+          <button
+            type="button"
+            onClick={() => setEditorOpen(false)}
+            aria-label={loc('إغلاق', 'Close', 'داخستن')}
+            className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors [touch-action:manipulation]"
+          >
+            <Back aria-hidden="true" className="w-6 h-6" />
+          </button>
+          <h2 id="address-editor-title" className="text-[17px] font-bold ms-1">
+            {editingAddress
+              ? loc('تعديل العنوان', 'Edit address', 'دەستکاری ناونیشان')
+              : loc('عنوان جديد', 'New address', 'ناونیشانی نوێ')}
+          </h2>
+        </div>
 
-          {/* min-h-0 because this is now a flex child of a panel with a real
-              height rather than of a viewport-sized div: without it the column
-              would refuse to shrink and the scroll would move to the page. */}
-          <div className="flex-1 min-h-0 overflow-y-auto pb-24">
-            <div className="p-4">
-              {/* Location Card (map image is decorative only) */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden mb-8">
-                <div className="h-[150px] bg-zinc-800 relative w-full overflow-hidden">
-                  <img referrerPolicy="no-referrer" src="https://i.imgur.com/5J32z6S.jpeg" alt="" aria-hidden="true" className="w-full h-full object-cover opacity-40 pointer-events-none" />
-                </div>
-
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin className="w-5 h-5 text-zinc-400 shrink-0" />
-                    <input
-                      type="text"
-                      value={formLabel}
-                      onChange={e => setFormLabel(e.target.value)}
-                      placeholder="Label — e.g. Home, Work"
-                      className="bg-transparent border-none focus:outline-none font-bold text-[17px] text-white w-full placeholder-zinc-600"
-                    />
-                  </div>
-
-                  {/* Governorate and area are their OWN fields, not part of
-                      the free-text line: dispatch routes on the governorate,
-                      and the admin copies each into a separate box on the
-                      courier's form. */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2 mt-2">
-                    <div>
-                      <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
-                        {loc('المحافظة', 'Governorate', 'پارێزگا')}<span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formGovernorate}
-                        onChange={e => setFormGovernorate(e.target.value)}
-                        className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 min-h-[44px] text-white text-sm w-full outline-none transition-colors"
-                      >
-                        <option value="">{loc('اختر المحافظة', 'Choose a governorate', 'پارێزگا هەڵبژێرە')}</option>
-                        {GOVERNORATES.map(g => (
-                          <option key={g.id} value={g.id}>
-                            {lang === 'en' ? g.en : lang === 'ckb' ? g.ckb : g.ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
-                        {loc('المنطقة', 'Area', 'ناوچە')}
-                      </label>
-                      <input
-                        type="text"
-                        value={formArea}
-                        onChange={e => setFormArea(e.target.value)}
-                        placeholder={loc('مثال: الكرادة', 'e.g. Karrada', 'نموونە: کەڕادە')}
-                        className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 min-h-[44px] text-white text-sm w-full outline-none transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-2 mt-2">
-                    <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
-                      {loc('تفاصيل العنوان', 'Street and details', 'وردەکاری ناونیشان')}<span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={formAddress}
-                      onChange={e => setFormAddress(e.target.value)}
-                      placeholder={loc('الحي، الشارع، رقم الدار…', 'District, street, house number…', 'گەڕەک، شەقام، ژمارەی ماڵ…')}
-                      rows={2}
-                      className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 py-2 text-white text-sm w-full outline-none transition-colors resize-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-3 mt-2 min-h-[44px]">
-                    <MapPin className="w-5 h-5 text-zinc-400 shrink-0 opacity-70" />
-                    <input
-                      type="text"
-                      placeholder={loc('أقرب نقطة دالة (اختياري)', 'Nearest landmark (optional)', 'نزیکترین نیشانە (ئارەزوومەندانە)')}
-                      value={formLandmark}
-                      onChange={e => setFormLandmark(e.target.value)}
-                      className="bg-transparent border-none focus:outline-none text-white text-[14px] w-full placeholder-zinc-500"
-                    />
-                  </div>
-
-                  <div className="mt-2">
-                    <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
-                      {loc('ملاحظات للمندوب', 'Notes for the courier', 'تێبینی بۆ گەیێنەر')}
-                    </label>
-                    <textarea
-                      value={formNotes}
-                      onChange={e => setFormNotes(e.target.value)}
-                      placeholder={loc('مثال: اتصل قبل الوصول', 'e.g. call before arriving', 'نموونە: پێش هاتن پەیوەندی بکە')}
-                      rows={2}
-                      className="bg-zinc-800/50 border border-zinc-700/50 focus:border-gold/50 rounded-xl px-3 py-2 text-white text-sm w-full outline-none transition-colors resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Recipient Details Section */}
-              <div className="flex items-center justify-between mb-5 px-1">
-                <h2 className="text-[17px] font-bold">Recipient details</h2>
-                <button
-                  onClick={() => { setFormName(''); setFormPhone(''); }}
-                  className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-[12px] font-bold hover:bg-red-500/20 transition-colors"
-                >
-                  Clear details
-                </button>
-              </div>
-
-              <div className="space-y-6 px-1">
-                <div className="relative border-b border-zinc-800 pb-2">
-                  <label className="text-[12px] text-zinc-400 mb-1 block">Recipient's name<span className="text-red-500">*</span></label>
-                  <div className="flex items-center justify-between">
-                    <input
-                      type="text"
-                      value={formName}
-                      onChange={e => setFormName(e.target.value)}
-                      placeholder="Full name"
-                      className="bg-transparent border-none focus:outline-none text-white text-[17px] font-medium w-full placeholder-zinc-700"
-                    />
-                    <div className="w-6 h-6 rounded-md bg-olive/20 text-olive flex items-center justify-center shrink-0">
-                      <User className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative border-b border-zinc-800 pb-2">
-                  <label className="text-[12px] text-zinc-400 mb-2 block">Phone number<span className="text-red-500">*</span></label>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 bg-zinc-800 px-3 py-1.5 rounded-full border border-zinc-700 shrink-0">
-                      <span className="text-sm">🇮🇶</span>
-                      <span className="text-[13px] font-bold">+964</span>
-                    </div>
-                    <input
-                      type="tel"
-                      value={formPhone}
-                      onChange={e => setFormPhone(e.target.value)}
-                      placeholder="7700000000"
-                      className="bg-transparent border-none focus:outline-none text-white text-[17px] font-medium w-full placeholder-zinc-700"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {formError && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mt-6">
-                  {formError}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between mt-8 mb-4 px-1">
-                <div className="flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-zinc-400" />
-                  <span className="font-bold text-[15px]">{editingAddress ? 'Update this saved address?' : 'Save this address?'}</span>
-                </div>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="px-5 py-2 bg-olive/20 text-olive rounded-full text-[13px] font-bold disabled:opacity-50"
-                >
-                  {isSaving ? 'Saving…' : editingAddress ? 'Update' : 'Save'}
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-          {/* `absolute inset-x-0`, not `fixed left-0 right-0`. The panel is an
-              animated (transformed and filtered) element, which makes it the
-              containing block for fixed descendants anyway — so `fixed` here
-              was already lying about what it did. Stating it as absolute ties
-              the bar to the panel it belongs to, which is what keeps it the
-              width of the window rather than the width of the screen once the
-              panel stops being full-bleed on a wide viewport. */}
-          <div className="absolute inset-x-0 bottom-0 p-4 bg-[#0a0a0a]/90 backdrop-blur-md pb-8">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="w-full bg-olive hover:bg-olive-light text-white py-4 rounded-full font-bold text-[16px] shadow-lg shadow-olive/10 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {isSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
+        {/* min-h-0 because this is a flex child of a panel with a real height:
+            without it the column refuses to shrink and the scroll moves to the
+            page behind. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <AddressForm
+            key={editingAddress?.id ?? 'new'}
+            initial={editingAddress}
+            defaultWhenFirst={addresses.length === 0}
+            onSaved={handleSaved}
+            onCancel={() => setEditorOpen(false)}
+          />
+        </div>
       </Overlay>
     </div>
   );

@@ -4,16 +4,35 @@ import { requireAuth, notFound, str, badRequest } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { addressMatchesSnapshot, getApprovedAddress } from './kyc';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
+import { normalizePhone } from '../lib/phone';
 
 export const addressRoutes = new Hono<AppContext>();
 addressRoutes.use('*', requireAuth);
 
-const PHONE_RE = /^\+?[0-9\s-]{7,20}$/;
-
 function validateAddress(body: Record<string, unknown>) {
   const name = str(body.name, 'name', { min: 2, max: 100 });
-  const phone = str(body.phone, 'phone', { min: 7, max: 20 });
-  if (!PHONE_RE.test(phone)) throw badRequest('Invalid phone number');
+  /**
+   * THE NUMBER A COURIER WILL DIAL, VALIDATED THE WAY EVERY OTHER NUMBER ON
+   * THIS PLATFORM IS.
+   *
+   * This used to be `/^\+?[0-9\s-]{7,20}$/` — a shape check, not a validation
+   * — while the client blindly prepended `'+964-'`. Between them they accepted
+   * `+964-0770 123 4567` (a bogus leading zero, a hyphen and spaces, stored
+   * verbatim) and `+964-12345678` (not a routable Iraqi number at all), and
+   * `worker/routes/admin.ts` copies whatever is stored straight onto the
+   * shipment request. A parcel with an undialable number is a parcel that
+   * comes back.
+   *
+   * `normalizePhone` is the platform's own validator — libphonenumber
+   * metadata, the same function `auth.ts` and `telegram.ts` use — so an
+   * address now holds E.164 and only E.164, and a number from outside Iraq is
+   * accepted on its own numbering plan rather than mangled into one.
+   *
+   * The code travels so the client can say it in the customer's language;
+   * `INVALID_PHONE` is already in the shared refusal table.
+   */
+  const phone = normalizePhone(str(body.phone, 'phone', { min: 5, max: 32 }));
+  if (!phone) throw badRequest('Invalid phone number', 'INVALID_PHONE');
   const address = str(body.address, 'address', { min: 5, max: 300 });
   const label = str(body.label, 'label', { min: 1, max: 40 });
   const landmark = str(body.landmark, 'landmark', { max: 200, required: false });
@@ -23,7 +42,7 @@ function validateAddress(body: Record<string, unknown>) {
   // The governorate is a closed list — free text there is the admin's problem
   // on every order, since dispatch routes on it.
   const governorate = normalizeGovernorate(body.governorate);
-  if (body.governorate && !governorate) throw badRequest('Unknown governorate');
+  if (!governorate) throw badRequest('Governorate is required', 'GOVERNORATE_REQUIRED');
   const area = str(body.area, 'area', { max: 120, required: false });
   const notes = str(body.notes, 'notes', { max: 500, required: false });
   return { name, phone, address, label, landmark, governorate, area, notes };
