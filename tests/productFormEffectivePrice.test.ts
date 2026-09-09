@@ -21,7 +21,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { rowCells, rowLadder, buildGrid, type GridProductInput } from '../worker/lib/priceGrid';
+import {
+  rowCells,
+  rowLadder,
+  buildGrid,
+  chargedAt,
+  fallsBackToRegular,
+  type GridProductInput,
+} from '../worker/lib/priceGrid';
 import { resolveUnitPrice, priceMode, type PricingProduct, type PriceFields } from '../worker/lib/pricing';
 import { freshDb, asD1, stubApp, get, json, row, type App } from './fixtures/app';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
@@ -374,7 +381,9 @@ test('OptionsSection resolves through the shared helper and never re-implements 
   const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
 
   assert.match(src, /rowCells\(prices as PriceFields, beneath\)/, 'the cells come from the shared resolver');
-  assert.match(src, /value=\{cell\.effective\}/, 'the box holds the RESOLVED number, not the stored scalar');
+  // The box holds what the tier is CHARGED, which is `cell.effective` plus the
+  // resolver's member fallback — see `chargedAt` and the test below it.
+  assert.match(src, /value=\{charged\}/, 'the box holds the RESOLVED number, not the stored scalar');
   assert.match(src, /beneath=\{base\}/, 'an option is measured over the product base');
   assert.match(src, /beneath=\{beneathColor\(c\)\}/, 'a colour is measured over its option');
   assert.match(src, /rowLadder\(parent as PriceFields, base\)/, 'and it inherits the option UNCLAMPED');
@@ -404,4 +413,110 @@ test('ProductForm feeds the section the LIVE base price, not the loaded one', ()
   // the ladder were fed from it, raising the base in section 4 would leave every
   // inheriting option showing yesterday's number until the page was reloaded.
   assert.ok(!/regular: loadedBasePrice/.test(src), 'the ladder must follow the live edit');
+});
+
+
+// ==================== the exhaustive cross-check against the real resolver
+//
+// The four numbered tests above pin the owner's own product. This one asks the
+// broader question they stand for — *does the editor ever show a number the
+// till would not charge?* — over every shape crossed with every base, and it
+// is how the defect below was found rather than argued about.
+//
+// THE DEFECT IT CAUGHT. `Cell.effective` is null for a member cell whose row
+// states no price for that tier. That is correct for the ladder, and
+// `previewBulk` depends on it — null is how "this row has no PRO price of its
+// own" stays distinguishable from "its PRO price happens to equal the regular
+// one", and folding them together would make a bulk «raise PRO by 10,000» pin
+// a PRO number onto every row that never had one.
+//
+// But it is NOT what the customer pays. `resolveUnitPrice` falls back:
+//   `if (isPro && proIqd !== null) …` — when it IS null, the member is charged
+// `regularIqd`. Most products leave `prime_price_iqd` and `pro_price_iqd` null
+// at the base, so on most products EVERY member cell resolved to null while a
+// PLUS customer was being charged the full regular price. Rendering that as an
+// empty box is the same defect this whole round is about.
+//
+// So the ladder keeps its null and the editor asks `chargedAt`.
+
+const SHAPES: Array<{ name: string; row: PriceFields }> = [
+  { name: 'adjust only', row: { regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, regular_adjust_iqd: 174_000 } },
+  { name: 'fixed only', row: { regular_price_iqd: 899_000, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null } },
+  { name: 'negative adjustment', row: { regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, regular_adjust_iqd: -100_000 } },
+  { name: 'PRIME pinned over an adjusted regular', row: { regular_price_iqd: null, prime_price_iqd: 800_000, pro_price_iqd: null, cost_iqd: null, regular_adjust_iqd: 174_000 } },
+  { name: 'PRO above the regular price', row: { regular_price_iqd: 100_000, prime_price_iqd: null, pro_price_iqd: 500_000, cost_iqd: null } },
+  { name: 'PRIME below PRO', row: { regular_price_iqd: 900_000, prime_price_iqd: 600_000, pro_price_iqd: 700_000, cost_iqd: null } },
+  { name: 'a member adjustment', row: { regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, prime_adjust_iqd: -20_000 } },
+  { name: 'nothing at all', row: { regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null } },
+];
+
+const BASES: Array<{ name: string; base: Record<'regular' | 'prime' | 'pro' | 'cost', number | null> }> = [
+  { name: 'full member ladder', base: { regular: 725_000, prime: 711_000, pro: 625_000, cost: 435_938 } },
+  { name: 'NO member prices (the common product)', base: { regular: 725_000, prime: null, pro: null, cost: null } },
+  { name: 'PRIME only', base: { regular: 725_000, prime: 700_000, pro: null, cost: null } },
+  { name: 'PRO only', base: { regular: 725_000, prime: null, pro: 600_000, cost: null } },
+  { name: 'a free product', base: { regular: 0, prime: null, pro: null, cost: null } },
+];
+
+test('the editor never shows a number the till would not charge — every shape × every base', () => {
+  const mismatches: string[] = [];
+  for (const b of BASES) {
+    for (const s of SHAPES) {
+      const product: PricingProduct = {
+        price_iqd: b.base.regular ?? 0,
+        prime_price_iqd: b.base.prime,
+        pro_price_iqd: b.base.pro,
+        product_cost_iqd: b.base.cost,
+        selling_type: 'direct_sale',
+        sale_types: ['direct_sale'],
+        options: [
+          { id: 'o', name_ar: 'o', name_en: 'o', name_ckb: 'o', image: '', order: 0, active: true, ...s.row },
+        ] as PricingProduct['options'],
+        colors: [],
+        preorder_transports: [],
+        warranty_plans: [],
+      };
+      const cells = rowCells(s.row, b.base);
+      for (const [tier, field] of [['free', 'regular'], ['prime', 'prime'], ['pro', 'pro']] as const) {
+        const charged = resolveUnitPrice({ product, optionId: 'o', tier, tierActive: tier !== 'free' }).applied_iqd;
+        const shown = chargedAt(cells, field);
+        if (charged !== shown) {
+          mismatches.push(`[${b.name}] [${s.name}] ${tier}: the till charges ${charged}, the form shows ${shown}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(mismatches, [], `${mismatches.length} of ${BASES.length * SHAPES.length * 3} combinations disagree`);
+});
+
+test('a member tier with no price of its own is shown the regular price, and told why', () => {
+  // The exact case the cross-check caught. A product with no PRIME price:
+  // a PLUS customer pays the full 899,000, so that is what the cell shows.
+  const cells = rowCells(A1_COMBO, { regular: 725_000, prime: null, pro: null, cost: null });
+  assert.equal(cells.prime.effective, null, 'the LADDER still says "this row states no PRIME price"');
+  assert.equal(chargedAt(cells, 'prime'), 899_000, 'but the EDITOR shows what a PLUS member is charged');
+  assert.equal(fallsBackToRegular(cells, 'prime'), true, 'and flags it, so it does not read as a discount');
+  assert.equal(fallsBackToRegular(cells, 'pro'), true);
+  // Regular and cost never fall back — there is nothing above them to fall to.
+  assert.equal(fallsBackToRegular(cells, 'regular'), false);
+  assert.equal(fallsBackToRegular(cells, 'cost'), false);
+  assert.equal(chargedAt(cells, 'cost'), null, 'an unknown cost stays unknown, never 0 and never the price');
+});
+
+test('the ladder keeps its null, so a bulk edit still cannot pin a price nobody set', () => {
+  // The reason `chargedAt` is a separate function and not a change to
+  // `Cell.effective`. previewBulk reads `cell.effective` to decide whether a
+  // row HAS a value to move; if the fallback lived there, «raise PRO by
+  // 10,000» would silently give a PRO price to every row that never had one.
+  const cells = rowCells(A1_COMBO, { regular: 725_000, prime: null, pro: null, cost: null });
+  assert.equal(cells.pro.effective, null);
+  assert.equal(cells.pro.inherited, null);
+});
+
+test('the form renders the charged number, not the raw ladder value', () => {
+  const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
+  assert.match(src, /value=\{charged\}/, 'the box holds what the tier is charged');
+  assert.match(src, /charged: chargedAt\(cells, field\)/);
+  assert.match(src, /viaRegular: fallsBackToRegular\(cells, field\)/);
+  assert.match(src, /data-price-mode=\{viaRegular \? 'regular-fallback' : 'inherit'\}/, 'and says which it is');
 });

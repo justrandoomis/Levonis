@@ -51,6 +51,8 @@ import {
 import {
   rowCells,
   rowLadder,
+  chargedAt,
+  fallsBackToRegular,
   COLUMN_OF,
   type Cell,
   type Field as GridField,
@@ -547,21 +549,30 @@ function PriceCell({
   label_en,
   tip,
   cell,
+  charged,
+  viaRegular,
   onCommit,
 }: {
   label_ar: string;
   label_en: string;
   tip?: string;
   cell: Cell;
+  /** What this tier is ACTUALLY charged — `chargedAt`, which includes the
+   *  resolver's own fallback for a member tier that has no price anywhere. */
+  charged: number | null;
+  /** True when that number is the regular price standing in for a tier with
+   *  no price of its own. Shown, never implied. */
+  viaRegular: boolean;
   onCommit: (v: number | null) => void;
 }) {
   const fmt = (n: number | null) => (n === null ? '—' : new Intl.NumberFormat('en-US').format(n));
+  const landing = cell.inherited ?? (viaRegular ? charged : null);
   return (
     <Field ar={label_ar} en={label_en} tip={tip}>
       <Money
-        value={cell.effective}
+        value={charged}
         onChange={onCommit}
-        placeholder={cell.inherited === null ? 'يرث / inherit' : `يرث ${fmt(cell.inherited)}`}
+        placeholder={landing === null ? 'يرث / inherit' : `يرث ${fmt(landing)}`}
       />
       {/* THE PROVENANCE LINE. Never hidden, and never guessed: `cell.mode` is
           `priceMode`'s answer for this exact row, so the sentence under the box
@@ -582,8 +593,18 @@ function PriceCell({
           // one. A member cell inherits the value beneath PLUS this row's
           // regular surcharge — which is why an option with no PRIME price of
           // its own still shows a PRIME number, and why that number is right.
-          <p className="text-[10px] text-zinc-500 truncate" data-price-mode="inherit">
-            {cell.effective === null ? 'لا سعر — يرث ولا شيء فوقه' : `موروث: ${fmt(cell.effective)}`}
+          //
+          // `viaRegular` is the OTHER case, and it is the common one: the
+          // product states no PRIME/PRO price at all, so the resolver charges
+          // that member the regular price. The box shows what they pay and this
+          // line says why, because an unexplained equal number reads as a bug
+          // and an empty box reads as "free".
+          <p className="text-[10px] text-zinc-500 truncate" data-price-mode={viaRegular ? 'regular-fallback' : 'inherit'}>
+            {viaRegular
+              ? `بلا سعر لهذه الفئة — تُحاسب بسعر البيع ${fmt(charged)}`
+              : charged === null
+                ? 'لا سعر — يرث ولا شيء فوقه'
+                : `موروث: ${fmt(charged)}`}
           </p>
         )}
         {/* Returning to inheritance is a BUTTON, not a blanked field. Blanking
@@ -624,18 +645,23 @@ function PriceCells({
     const col = COLUMN_OF[field];
     onChange({ [col]: v, [ADJUST_OF[col]]: null } as Partial<FormPrices>);
   };
+  const cellProps = (field: GridField) => ({
+    cell: cells[field],
+    charged: chargedAt(cells, field),
+    viaRegular: fallsBackToRegular(cells, field),
+    onCommit: commit(field),
+  });
   return (
     <>
-      <PriceCell label_ar="السعر" label_en="Regular" cell={cells.regular} onCommit={commit('regular')} />
-      <PriceCell label_ar="PRIME" label_en="PRIME" cell={cells.prime} onCommit={commit('prime')} />
-      <PriceCell label_ar="PRO" label_en="PRO" cell={cells.pro} onCommit={commit('pro')} />
+      <PriceCell label_ar="السعر" label_en="Regular" {...cellProps('regular')} />
+      <PriceCell label_ar="PRIME" label_en="PRIME" {...cellProps('prime')} />
+      <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
       {canSeeCost && (
         <PriceCell
           label_ar="التكلفة"
           label_en="Cost"
           tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن."
-          cell={cells.cost}
-          onCommit={commit('cost')}
+          {...cellProps('cost')}
         />
       )}
     </>

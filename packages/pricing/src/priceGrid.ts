@@ -377,6 +377,40 @@ export function rowCells(row: PriceFields | null, beneath: Record<Field, number 
 }
 
 /**
+ * WHAT A TIER ACTUALLY PAYS ON THIS ROW — the editor's question, answered the
+ * way `resolveUnitPrice` answers it.
+ *
+ * A MEMBER CELL RESOLVING TO NULL DOES NOT MEAN "NO PRICE". It means this row
+ * states no price for that tier, and the resolver's own fallback then charges
+ * the member the REGULAR price (pricing.ts: `if (isPro && proIqd !== null)` —
+ * when it IS null, `appliedIqd` stays `regularIqd`). Most products have
+ * `prime_price_iqd` and `pro_price_iqd` null at the base, so this is the common
+ * case, not the corner: on those products every member cell resolves to null
+ * while a PLUS customer is charged the full regular price.
+ *
+ * Rendering that as an empty box is the same defect the whole round is about —
+ * a cell that says nothing about a price the customer is really paying.
+ *
+ * WHY THIS IS A SEPARATE FUNCTION AND NOT A CHANGE TO `Cell.effective`.
+ * `effective` is consumed by `previewBulk` and `previewCopy`, where null is
+ * load-bearing: it is how "this row has no PRO price of its own" is
+ * distinguished from "its PRO price is the regular one", and folding the two
+ * together would make a bulk «raise PRO by 10,000» pin a PRO number onto every
+ * row that never had one. So the ladder keeps its null and the EDITOR asks
+ * this instead.
+ */
+export function chargedAt(cells: Record<Field, Cell>, field: Field): number | null {
+  if (field === 'prime' || field === 'pro') return cells[field].effective ?? cells.regular.effective;
+  return cells[field].effective;
+}
+
+/** True when this member cell's number is the regular price standing in for a
+ *  tier that has none — so the UI can SAY that rather than imply a discount. */
+export function fallsBackToRegular(cells: Record<Field, Cell>, field: Field): boolean {
+  return (field === 'prime' || field === 'pro') && cells[field].effective === null && cells.regular.effective !== null;
+}
+
+/**
  * THE SAME ROW, UNCLAMPED — what the NEXT rung down inherits.
  *
  * The distinction is not cosmetic. `clampMemberLadder` is the resolver's last
