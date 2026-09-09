@@ -5,6 +5,8 @@ import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api, formatIqd } from '../lib/api';
 import Note from '../components/ui/Note';
+import BundleContents from '../components/bundles/BundleContents';
+import MysteryReveal from '../components/offers/MysteryReveal';
 import type { ApiOrder, OrderTrackingPublic, OrderUnitPublic } from '../lib/api';
 import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { classifyError, ErrorState, NotFoundState } from '../components/ui/AsyncStates';
@@ -424,6 +426,34 @@ export default function OrderDetail() {
                             </div>
                             <p className="text-[13.5px] text-white font-bold tabular-nums shrink-0">{formatIqd(it.line_total_iqd)}</p>
                           </div>
+
+                          {/* A bundle is ONE item here too, with its parts
+                              unfolding underneath (§6.3). Each part's figure is
+                              its own share of what was paid — the components
+                              are priced at 0 on the order, because the money is
+                              on this line. */}
+                          {it.bundle && it.bundle.components.length > 0 && (
+                            <BundleContents
+                              className="mt-3"
+                              componentTotalIqd={it.bundle.component_total_iqd}
+                              savingPercent={it.bundle.saving_percent}
+                              lines={it.bundle.components.map((k) => ({
+                                key: k.order_item_id,
+                                name: k.name,
+                                variant: k.variant,
+                                qty: k.qty,
+                                value_iqd: k.alloc_iqd,
+                              }))}
+                            />
+                          )}
+
+                          {/* THE MYSTERY LINE (§8). Pre-reveal it says when,
+                              never what; post-reveal it renders the frozen
+                              allocation snapshots. The verdict is the
+                              server's — this screen has no reveal logic. */}
+                          {it.mystery && (
+                            <MysteryReveal mystery={it.mystery} cover={it.image} viewer="customer" />
+                          )}
 
                           {showPrinterNote && (
                             <Note tone="gold" compact animate={false} icon={<Truck className="w-3.5 h-3.5" aria-hidden />} className="mt-3" testId="order-printer-note">

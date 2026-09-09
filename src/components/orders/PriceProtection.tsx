@@ -16,6 +16,7 @@ import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import Spinner from '../ui/Spinner';
 import { asLang, daysLeftLabel, formatDate } from './format';
+import { apiRefusal } from '../../lib/refusalStrings';
 
 interface Claim {
   id: string;
@@ -120,7 +121,7 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
       await api.post('/api/price-protection/claims', { orderItemId });
       await load();
     } catch (e) {
-      setErrors((prev) => ({ ...prev, [orderItemId]: e instanceof Error ? e.message : s.loadError }));
+      setErrors((prev) => ({ ...prev, [orderItemId]: apiRefusal(e, asLang(lang), s.loadError) }));
     } finally {
       setBusyItem(null);
     }

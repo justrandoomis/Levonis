@@ -42,6 +42,17 @@ const Tools = React.lazy(() => import('./pages/Tools'));
 const Wallet = React.lazy(() => import('./pages/Wallet'));
 const Rewards = React.lazy(() => import('./pages/Rewards'));
 const Referrals = React.lazy(() => import('./pages/Referrals'));
+/**
+ * THE BUNDLES SURFACE IS ITS OWN CHUNK (docs/BUNDLES_MYSTERY.md §14).
+ *
+ * `Bundles` was an EAGER import, so its page, its countdown, its skeletons and
+ * its trilingual copy sat in the entry chunk of every first visit — including
+ * for the visitors who never open it. Moving it here shrinks the entry, and
+ * `BundleDetail` (which the grid links to) arrives with the route rather than
+ * with the storefront. `tests/bundleBudget.test.ts` pins both chunks.
+ */
+const Bundles = React.lazy(() => import('./pages/Bundles'));
+const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
 
 /**
  * The one fallback every lazy route shares. It is the same markup the two
@@ -61,7 +72,6 @@ import BottomNav, { isBottomNavHidden } from './components/BottomNav';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import Product from './pages/Product';
-import Bundles from './pages/Bundles';
 
 import Profile from './pages/Profile';
 import Orders from './pages/Orders';
@@ -359,6 +369,7 @@ function AppContent() {
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
           <Route path="/bundles" element={<Bundles />} />
+          <Route path="/bundles/:slug" element={<BundleDetail />} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
           <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
           <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />

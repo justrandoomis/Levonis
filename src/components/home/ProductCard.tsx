@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
+import OfferBadge from '../ui/OfferBadge';
+import Countdown from '../ui/Countdown';
 
 /**
  * The home product card — presentation only; every price shown here is the
@@ -39,8 +41,20 @@ export default function ProductCard({ p, widthClass = 'w-[160px]' }: { p: ApiPro
           className="w-full h-full group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:transition-none"
         />
         {hasSale && (
-          <span className="absolute top-2 end-2 bg-rose-600/95 text-white text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-md">
-            SALE
+          <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>
+        )}
+        {/* A SCHEDULED SPECIAL OFFER, on an ORDINARY card (§12, §13.2). The
+            countdown is DECORATION — the API still refuses an expired offer —
+            and the price beside it is already the server's offer price, so
+            nothing here computes a discount. One shared 1 Hz ticker drives
+            every card on the page. */}
+        {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
+          <span className="absolute bottom-2 start-2 rounded-md bg-black/70 px-1.5 py-0.5 backdrop-blur-sm">
+            <Countdown
+              target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
+              kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
+              className="text-[10px] text-zinc-200"
+            />
           </span>
         )}
       </div>

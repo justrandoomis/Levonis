@@ -12,6 +12,8 @@ import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotenc
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 import Note from '../components/ui/Note';
+import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
+import { apiRefusal } from '../lib/refusalStrings';
 
 /**
  * The refusal codes validateCoupon can produce. A quote that fails with one
@@ -50,6 +52,23 @@ interface CheckoutQuoteLineDto {
   unit_price_iqd: number;
   line_total_iqd: number;
   is_printer: boolean;
+  /**
+   * A BUNDLE'S PARTS, NESTED UNDER THE PRICED LINE (docs/BUNDLES_MYSTERY.md
+   * §6.3). They are never quote lines of their own: this screen maps
+   * `quote.lines` 1:1 with `key={l.cart_item_id}`, so a four-component bundle
+   * arriving as five lines would render four extra 0 IQD rows naming the member
+   * products under four duplicate React keys, on the last screen before
+   * payment. `is_printer` is carried up onto the parent by the server so the
+   * printer delivery note below still fires for a printer inside a bundle.
+   */
+  included?: Array<{ product_id: string | null; name: string; name_ar: string; variant: string; qty: number; value_iqd: number }>;
+  /** The disclosure's struck total and saving badge, on THIS line's basis —
+   *  so the review screen never mixes a cart-basis figure with a quote-basis
+   *  one on a pre-order bundle the quote re-priced. */
+  component_total_iqd?: number | null;
+  saving_percent?: number | null;
+  /** A MYSTERY line says how many spools and nothing else (§8.2 row 20). */
+  mystery?: { revealed: boolean; spools: number } | null;
   breakdown?: {
     applied_iqd: number;
     unit_subtotal_iqd: number;
@@ -204,7 +223,7 @@ const DEFAULT_OFFERED_PAYMENT_IDS = ['wallet', 'cash'];
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { lang, dir } = useLanguage();
+  const { lang, dir, loc } = useLanguage();
   const {
     checkoutDeliveryMethods,
     checkoutPaymentMethods,
@@ -292,7 +311,7 @@ export default function Checkout() {
         const preferred = addrs.find((a) => a.is_default) ?? addrs[0];
         if (preferred) setSelectedAddressId(preferred.id);
       } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load checkout');
+        if (!cancelled) setLoadError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', 'Failed to load checkout'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -408,13 +427,13 @@ export default function Checkout() {
         // failure and is reported as one.
         const code = err instanceof ApiError ? err.code ?? '' : '';
         if (couponCode && COUPON_FAILURES.has(code)) {
-          setCouponError(err instanceof Error ? err.message : '');
+          setCouponError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', ''));
           setCouponCode('');
           storePromo('');
           return;
         }
         setQuote(null);
-        setQuoteError(err instanceof Error ? err.message : 'quote failed');
+        setQuoteError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', 'quote failed'));
       })
       .finally(() => {
         if (seq === quoteSeqRef.current) setQuoteLoading(false);
@@ -449,17 +468,56 @@ export default function Checkout() {
   const cartSubtotal = items.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
   const total = quote ? quote.subtotal_iqd : cartSubtotal;
   const cartById = new Map(items.map((i) => [i.id, i] as const));
-  const summaryLines: Array<{ key: string; image: string; name: string; variant: string; qty: number; lineTotal: number; isPrinter: boolean }> =
+  const summaryLines: Array<{
+    key: string;
+    image: string;
+    name: string;
+    variant: string;
+    qty: number;
+    lineTotal: number;
+    isPrinter: boolean;
+    /** A bundle's parts, for the same disclosure the cart uses. */
+    included?: BundleContentLine[];
+    componentTotalIqd?: number | null;
+    savingPercent?: number | null;
+    mysterySpools?: number | null;
+  }> =
     quote
-      ? quote.lines.map((l) => ({
-          key: l.cart_item_id,
-          image: cartById.get(l.cart_item_id)?.image ?? '',
-          name: l.name,
-          variant: l.variant,
-          qty: l.qty,
-          lineTotal: l.line_total_iqd,
-          isPrinter: l.is_printer,
-        }))
+      ? quote.lines.map((l) => {
+          const cartLine = cartById.get(l.cart_item_id);
+          return {
+            key: l.cart_item_id,
+            image: cartLine?.image ?? '',
+            name: l.name,
+            variant: l.variant,
+            qty: l.qty,
+            lineTotal: l.line_total_iqd,
+            isPrinter: l.is_printer,
+            // A MYSTERY line's parts are spools whose contents are not told
+            // yet, so there is nothing to disclose and — since they all carry
+            // the offer's own name and a null product id — nothing that would
+            // even produce distinct React keys.
+            included: l.mystery
+              ? []
+              : (l.included ?? []).map((k, n) => ({
+                  key: `${l.cart_item_id}:${k.product_id ?? n}`,
+                  name: k.name,
+                  name_ar: k.name_ar,
+                  variant: k.variant,
+                  qty: k.qty,
+                  value_iqd: k.value_iqd,
+                })),
+            // ONE BASIS PER SCREEN. The struck "bought separately" figure and
+            // the saving badge come from the QUOTE, beside the quote's own line
+            // total — reading them off the cart line put a cart-basis number
+            // next to a quote-basis one on a pre-order bundle the quote had
+            // re-priced for cash on delivery. The cart is only the fallback for
+            // a payload that predates these two fields.
+            componentTotalIqd: l.component_total_iqd ?? cartLine?.composition?.component_total_iqd ?? null,
+            savingPercent: l.saving_percent ?? cartLine?.composition?.saving_percent ?? null,
+            mysterySpools: l.mystery ? l.mystery.spools : (cartLine?.composition?.mystery?.spool_qty ?? null),
+          };
+        })
       : items.map((i) => ({
           key: i.id,
           // §3/§12: the product name is English in every language and is never translated.
@@ -469,6 +527,18 @@ export default function Checkout() {
           qty: i.qty,
           lineTotal: i.unit_price_iqd * i.qty,
           isPrinter: i.is_printer === true,
+          included: (i.composition?.components ?? [])
+            .filter((k) => k.included)
+            .map((k) => ({
+              key: k.component_id,
+              name: k.product.name,
+              name_ar: k.product.name_ar,
+              variant: k.variant,
+              qty: k.qty_per_bundle,
+              value_iqd: k.value_iqd,
+            })),
+          componentTotalIqd: i.composition?.component_total_iqd ?? null,
+          savingPercent: i.composition?.saving_percent ?? null,
         }));
   // A pre-order cart: which pricing rule is in force, said once, in one line,
   // and ONLY when there is something to say. Read from the quote, never
@@ -571,7 +641,17 @@ export default function Checkout() {
         navigate('/auth');
         return;
       }
-      const msg = err instanceof Error ? err.message : 'Order could not be placed. Please try again.';
+      /**
+       * THE LAST SCREEN BEFORE PAYMENT SPEAKS THE CUSTOMER'S LANGUAGE (§15.3).
+       *
+       * `HttpError` carries one untranslated sentence, and this branch rendered
+       * it verbatim — so an Arabic or Sorani customer read English prose
+       * wrapped around an Arabic product name, with the machine code in
+       * parentheses and no bidi isolation, at the highest-stakes moment in the
+       * app. `apiRefusal` decodes the CODE from the trilingual table and falls
+       * back to the server's sentence only for codes that already had one.
+       */
+      const msg = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', 'Order could not be placed. Please try again.');
       if (err instanceof ApiError && err.code === 'INSUFFICIENT_BALANCE') {
         setSubmitError(dir === 'rtl' ? `الرصيد غير كافٍ للدفع المقدم المطلوب — ${msg}` : msg);
       } else if (err instanceof ApiError && err.code === 'POLICY_ACCEPTANCE_REQUIRED') {
@@ -930,6 +1010,23 @@ export default function Checkout() {
                       <p className="text-xs text-zinc-500 mb-1.5 font-light">{line.variant}</p>
                     )}
                     <span className="text-sm font-medium text-white tabular-nums">{formatIqd(line.lineTotal)}</span>
+                    {line.mysterySpools ? (
+                      <p className="mt-1 text-[11.5px] text-zinc-400">
+                        {loc(
+                          `${line.mysterySpools} قطعة عشوائية — يُكشف المحتوى لاحقًا`,
+                          `${line.mysterySpools} random item(s) — revealed later`,
+                          `${line.mysterySpools} دانەی هەڕەمەکی — دواتر ئاشکرا دەکرێت`
+                        )}
+                      </p>
+                    ) : null}
+                    {line.included && line.included.length > 0 && (
+                      <BundleContents
+                        className="mt-2"
+                        lines={line.included}
+                        componentTotalIqd={line.componentTotalIqd ?? null}
+                        savingPercent={line.savingPercent ?? null}
+                      />
+                    )}
                   </div>
                 </div>
             ))}

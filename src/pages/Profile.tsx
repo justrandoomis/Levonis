@@ -44,10 +44,37 @@ interface MembershipMine {
   launch: { launch_at: string | null; activated: boolean };
 }
 
+/**
+ * The subset of a `/api/bundles` card this shelf reads. The full card is
+ * documented in docs/BUNDLES_MYSTERY.md §10; a LOCKED one is the §9 allow-list
+ * and carries no `display_price_iqd` at all.
+ */
+interface BundleShelfCard {
+  id: string;
+  product_slug?: string;
+  name: string;
+  image: string;
+  locked?: boolean;
+  display_price_iqd?: number | null;
+  display_regular_iqd?: number | null;
+}
+
+/** The price to show, or null — never a rendered 0, which is what reading a
+ *  field the payload no longer carries produces. */
+const bundleShelfPrice = (b: BundleShelfCard): number | null => {
+  const price = b.display_price_iqd ?? b.display_regular_iqd;
+  return typeof price === 'number' && price > 0 ? price : null;
+};
+
 export default function Profile() {
   const [suggestedProducts, setSuggestedProducts] = useState<ApiProduct[]>([]);
-  // Bundle ENTITIES from /api/bundles (members-only; the server gates).
-  const [bundles, setBundles] = useState<Array<{ id: string; name: string; image: string; total_display_iqd: number; items: Array<{ qty: number; product: { images?: string[] } }> }>>([]);
+  // Bundle cards from /api/bundles. The card shape changed with the
+  // composition model (docs/BUNDLES_MYSTERY.md §10): the listing is light on
+  // purpose and carries the `display_*` price block, `product_slug` and a
+  // coarse state — never a `total_display_iqd` and never the component list.
+  // A LOCKED card carries only `display_regular_iqd`, and only when the offer
+  // allows a teaser, so the price is optional here and is not rendered as 0.
+  const [bundles, setBundles] = useState<BundleShelfCard[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [orderCounts, setOrderCounts] = useState<Record<string, number>>({});
@@ -112,7 +139,7 @@ export default function Profile() {
     // route re-checks the entitlement, this only skips a pointless call.
     if (!planActive) { setBundles([]); return; }
     api
-      .get<{ entitled: boolean; bundles: Array<{ id: string; name: string; image: string; total_display_iqd: number; items: Array<{ qty: number; product: { images?: string[] } }> }> }>('/api/bundles')
+      .get<{ entitled: boolean; bundles: BundleShelfCard[] }>('/api/bundles')
       .then((res) => setBundles(res.entitled ? (res.bundles || []).slice(0, 4) : []))
       .catch(() => setBundles([]));
   }, [planActive]);
@@ -552,16 +579,18 @@ export default function Profile() {
             </div>
             <div className="flex gap-2.5 overflow-x-auto hide-scrollbar pb-1">
               {bundles.length > 0 ? bundles.map((bundle) => (
-                <button key={bundle.id} type="button" onClick={() => navigate('/bundles')} className="min-w-[85px] w-[85px] bg-[#fff0f2] dark:bg-[#331118] border border-[#ffb3c1] dark:border-[#801a2c] rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+                <button key={bundle.id} type="button" onClick={() => navigate(bundle.product_slug ? `/bundles/${bundle.product_slug}` : '/bundles')} className="min-w-[85px] w-[85px] bg-[#fff0f2] dark:bg-[#331118] border border-[#ffb3c1] dark:border-[#801a2c] rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
                   <div className="w-full aspect-square bg-zinc-200 dark:bg-zinc-800 rounded mb-1.5 overflow-hidden">
-                    {(bundle.image || bundle.items?.[0]?.product?.images?.[0]) && (
-                      <img referrerPolicy="no-referrer" src={bundle.image || bundle.items[0].product.images![0]} alt={bundle.name} className="w-full h-full object-cover" />
+                    {bundle.image && (
+                      <img referrerPolicy="no-referrer" src={bundle.image} alt={bundle.name} className="w-full h-full object-cover" />
                     )}
                   </div>
                   <span className="text-[9px] font-bold text-black dark:text-white line-clamp-2 leading-tight mb-1">{bundle.name}</span>
-                  <div className="text-[#ff0036] font-bold flex items-baseline gap-0.5 mt-auto">
-                    <span className="text-[12px] leading-none">{formatIqd(bundle.total_display_iqd || 0)}</span>
-                  </div>
+                  {bundleShelfPrice(bundle) !== null && (
+                    <div className="text-[#ff0036] font-bold flex items-baseline gap-0.5 mt-auto">
+                      <span className="text-[12px] leading-none">{formatIqd(bundleShelfPrice(bundle)!)}</span>
+                    </div>
+                  )}
                 </button>
               )) : (
                 <div className="text-[11px] text-zinc-500 py-4 w-full text-center">

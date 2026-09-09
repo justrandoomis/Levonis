@@ -9,6 +9,7 @@ import Spinner from '../ui/Spinner';
 import { Overlay } from '../ui/Overlay';
 import { ErrorState } from '../ui/AsyncStates';
 import CopyField from './CopyField';
+import MysteryReveal from '../offers/MysteryReveal';
 import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
 
@@ -403,6 +404,35 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                             {units.some((u) => u.serial) &&
                               ` — ${units.map((u) => u.serial).filter(Boolean).join(', ')}`}
                           </p>
+                        )}
+                        {/* THE BOX, AS THE PERSON PACKING IT SEES IT
+                            (docs/BUNDLES_MYSTERY.md §6.3). A bundle's parts are
+                            grouped UNDER their parent rather than listed as N
+                            ungrouped zero-price rows: this is the screen staff
+                            read while packing, and "one bundle" plus an
+                            indented parts list is what is actually in the
+                            carton. */}
+                        {it.bundle && it.bundle.components.length > 0 && (
+                          <ul className="mt-2 border-s-2 border-zinc-700 ps-3 space-y-1" data-order-bundle={it.id}>
+                            {it.bundle.components.map((k) => (
+                              <li key={k.order_item_id} className="text-[12px] text-zinc-300 flex items-baseline gap-2">
+                                <span className="font-bold text-white tabular-nums shrink-0">×{k.qty}</span>
+                                <span className="min-w-0 truncate">
+                                  {k.name}
+                                  {k.variant && <span className="text-olive-light"> · {k.variant}</span>}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {/* THE PICK, ON THE SCREEN STAFF READ WHEN PACKING
+                            (§8.2). Admins see it from the first second, with a
+                            "not yet revealed to the customer" chip — an
+                            allocation that reached the API and stopped there
+                            would leave the justification for admin access
+                            unimplemented. */}
+                        {it.mystery && (
+                          <MysteryReveal mystery={it.mystery} cover={it.image} viewer="admin" />
                         )}
                       </div>
                       <div className="shrink-0 self-center text-2xl font-black text-white tabular-nums">

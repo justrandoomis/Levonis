@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, uploadFile } from '../lib/api';
-import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle } from 'lucide-react';
+import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package } from 'lucide-react';
 import AdminAds from './AdminAds';
 
 interface HomeSection {
@@ -89,6 +89,7 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   categories: LayoutTemplate,
   discounts_offers: Tag,
   top_brands: Star,
+  bundles: Package,
 };
 
 const INITIAL_SECTIONS: HomeSection[] = [
@@ -99,6 +100,12 @@ const INITIAL_SECTIONS: HomeSection[] = [
   { id: 'categories', titleEn: 'Main & Sub Categories', titleAr: 'الأقسام الرئيسية والفرعية', isVisible: true },
   { id: 'discounts_offers', titleEn: 'Discounts & Offers under categories', titleAr: 'القسم لخصومات المنتجات والعروض تحت الأقسام', isVisible: true },
   { id: 'top_brands', titleEn: 'Top Brands Section', titleAr: 'قسم top brands', isVisible: true },
+  // Registering the shelf in src/pages/Home.tsx is NOT enough: `orderOf` and
+  // `sectionVisible` read settings.homeSections, which mergeSections builds
+  // from this list. A section id missing here is pinned to the bottom of the
+  // home page for ever, cannot be hidden, and never appears in the admin's
+  // drag-to-reorder list (docs/BUNDLES_MYSTERY.md §13.2).
+  { id: 'bundles', titleEn: 'Bundles & Offers Shelf', titleAr: 'رف الباقات والعروض', isVisible: true },
 ];
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';

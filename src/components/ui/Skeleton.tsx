@@ -168,3 +168,81 @@ export function CartSkeleton({ rows = 3 }: { rows?: number }) {
     </SkeletonGroup>
   );
 }
+
+/**
+ * Mirrors the bundle card (src/pages/Bundles.tsx): square cover, two title
+ * lines, the included-items strip, and TWO price lines — the bundle price and
+ * the struck component total beneath it. A one-line price skeleton under a
+ * two-line price block is a jump on every card in the grid.
+ */
+export function BundleCardSkeleton({ className = '' }: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col ${className}`}
+    >
+      <div className="aspect-square bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+      <div className="p-3 flex flex-col flex-1 gap-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-2/3" />
+        <div className="flex gap-1.5 pt-1">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="w-8 h-8 rounded-lg" />
+          ))}
+        </div>
+        <div className="mt-auto pt-2 flex flex-col gap-1.5">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Mirrors the bundle grid layout of src/pages/Bundles.tsx. */
+export function BundleGridSkeleton({
+  count = 6,
+  className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4',
+}: {
+  count?: number;
+  className?: string;
+}) {
+  return (
+    <SkeletonGroup className={className}>
+      {Array.from({ length: count }, (_, i) => (
+        <BundleCardSkeleton key={i} />
+      ))}
+    </SkeletonGroup>
+  );
+}
+
+/**
+ * Mirrors the bundle detail page: hero, title, price block, the "what is
+ * inside" list (four component rows) and the sticky purchase bar's height.
+ */
+export function BundleDetailSkeleton() {
+  return (
+    <SkeletonGroup className="w-full">
+      <div aria-hidden="true" className="h-64 sm:h-80 bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-4 w-1/3" />
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 space-y-2">
+          <Skeleton className="h-7 w-32" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="flex items-center gap-3 bg-zinc-900/40 border border-zinc-800/50 rounded-xl p-3">
+              <Skeleton className="w-12 h-12 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </SkeletonGroup>
+  );
+}

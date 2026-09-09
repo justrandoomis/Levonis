@@ -118,6 +118,40 @@ export interface ApiUser {
 export interface ApiProduct {
   id: string;
   slug: string;
+  /**
+   * A SCHEDULED SPECIAL OFFER on this product (docs/BUNDLES_MYSTERY.md §9,
+   * §12) — the same `offer_windows` row a bundle uses, on the same subject.
+   * Present only when one exists; a missing field means ABSENT, never an
+   * assumed `false`. While the window is `live` and the viewer is eligible,
+   * the `display_*` block above it already carries the OFFER price, so a card
+   * renders the countdown and the badge and computes nothing.
+   */
+  offer?: {
+    offer_id: string | null;
+    required_tiers: string[];
+    starts_at: string | null;
+    ends_at: string | null;
+    /** Present on an ordinary product's card; a bundle card's offer block
+     *  carries the schedule alone and its state lives in
+     *  `composition.availability_state`. */
+    schedule_state?: 'upcoming' | 'live' | 'ended';
+    price_source?: 'ladder' | 'offer';
+    locked?: boolean;
+  } | null;
+  /** The offer's PLUS rung, offer-scoped only (§4.4). */
+  display_plus_iqd?: number | null;
+  /**
+   * A COMPOSITION CARD CARRIES ITS OWN SLUG KEY (§10).
+   *
+   * `GET /api/products?type=bundle` and the search branch serialize a
+   * composition row through the SAME builder `GET /api/bundles` uses, so a
+   * bundle or a mystery offer arrives as a `BundleCard` — locked or not — and
+   * `product_slug` is the field that identifies one. A grid reads it to link to
+   * `/bundles/<slug>`, where the row can actually be bought; the ordinary
+   * product renderer has nothing to show for a composition row (no components,
+   * no saving line, `stock: null`, `options: []`).
+   */
+  product_slug?: string;
   status?: string;
   name: string;
   name_ar: string;
@@ -139,7 +173,11 @@ export interface ApiProduct {
    *  CHEAPEST way to buy the product — the minimum tier-resolved price
    *  across the base row and every active option/colour. */
   display_price_iqd?: number;
-  display_applied_tier?: 'regular' | 'pro' | 'prime';
+  /** 'plus' is emitted for COMPOSITION rows only (a bundle or a mystery
+   *  offer): the shared price resolver has three rungs and no PLUS, so a PLUS
+   *  member would be shown the regular price on every card and then charged
+   *  the PLUS price at the door. No ordinary product row ever carries it. */
+  display_applied_tier?: 'regular' | 'plus' | 'pro' | 'prime';
   display_regular_iqd?: number;
   /** Cheapest explicit PRIME / PRO price across levels; null = none exists.
    *  Feed the card's faint tier-teaser lines. */
@@ -268,6 +306,74 @@ export interface CartItem {
   options: ApiProduct['options'];
   colors: ApiProduct['colors'];
   shipping_methods: ApiProduct['shipping_methods'];
+  /** 'bundle' / 'mystery' for a composition line; absent on an ordinary one. */
+  kind?: 'bundle' | 'mystery';
+  /**
+   * THE BUNDLE, AS ONE LINE WITH ITS CONTENTS (docs/BUNDLES_MYSTERY.md §5.2).
+   *
+   * The components live ONLY here: they are never top-level `items[]` entries,
+   * so the cart's own totals and the coupon basis cannot double-count them.
+   * Every figure is the server's — the browser classifies nothing and computes
+   * nothing — and each component's `value_iqd` is its STANDALONE value, while
+   * the discount is stated once, on the bundle.
+   */
+  composition?: CartComposition;
+}
+
+/** One component of a bundle cart line, as the customer may see it. */
+export interface CartComponentView {
+  component_id: string;
+  product_id: string;
+  product: { slug: string; name: string; name_ar: string; image: string };
+  variant: string;
+  qty_per_bundle: number;
+  optional: boolean;
+  included: boolean;
+  editable: { option: boolean; color: boolean };
+  /** The component's STANDALONE value — never a discounted share. */
+  value_iqd: number;
+  availability: { state: string };
+  choices: Array<{ dim: 'option_value' | 'color'; id: string; name: string }>;
+}
+
+export interface CartComposition {
+  kind: string;
+  component_total_iqd: number;
+  bundle_price_iqd: number;
+  discount_iqd: number;
+  saving_percent: number;
+  /** 'plus' exists only on a composition row (§4.4): the offer-scoped rung the
+   *  shared product ladder does not have. */
+  applied_tier: 'regular' | 'plus' | 'prime' | 'pro';
+  price_source: 'ladder' | 'derived' | 'offer';
+  max_bundles: number | null;
+  max_qty: number;
+  max_qty_per_order: number;
+  availability_state: string;
+  shipping_type: string;
+  modes: string[];
+  /** Always `[]` for a mystery line, before AND after the reveal (§8.2). */
+  components: CartComponentView[];
+  /**
+   * A MYSTERY LINE'S ONLY DISCLOSURE (§5.2): how many spools, which mode, the
+   * family the buyer narrowed to, and WHEN the contents are revealed. No pool,
+   * no candidate, no weight, no product ever crosses this boundary — `odds`
+   * appears only when the admin switched disclosure on, and even then it is
+   * aggregated by family and names nothing.
+   */
+  mystery?: {
+    spool_qty: number;
+    modes: string[];
+    families: string[];
+    family_id: string;
+    customer_picks_family: boolean;
+    reveal_stage: string;
+    /** The milestone IN WORDS, rendered by the server's own `stageLabel` —
+     *  never a second stage table in the browser (§9, §13.2). */
+    reveal_stage_label?: string;
+    mode: string | null;
+    odds?: Array<{ family_id: string; percent: number }>;
+  };
 }
 
 export interface ApiAddress {
@@ -362,6 +468,62 @@ export interface ApiOrderItem {
    *  loaded the item — never assumed when absent. */
   is_printer?: boolean;
   selection?: OrderItemSelection;
+  /**
+   * THE BUNDLE'S PARTS, NESTED UNDER THE PRICED LINE (§6.3). Present only on a
+   * bundle parent; the component rows are never top-level items, because four
+   * extra 0 IQD rows naming the member products would double the item count and
+   * make the screen's line sum disagree with the order's own subtotal.
+   */
+  bundle?: {
+    kind: string;
+    component_total_iqd: number | null;
+    bundle_price_iqd: number | null;
+    bundle_discount_iqd: number | null;
+    saving_percent: number | null;
+    components: Array<{
+      order_item_id: string;
+      product_id: string | null;
+      product_slug?: string | null;
+      name: string;
+      image: string;
+      variant: string;
+      qty: number;
+      /** This component's share of the bundle price — what a return refunds. */
+      alloc_iqd: number | null;
+      /** Its undiscounted standalone value, frozen at checkout. */
+      value_iqd: number | null;
+    }>;
+  } | null;
+  /**
+   * A MYSTERY LINE'S REVEAL STATE (docs/BUNDLES_MYSTERY.md §8.2).
+   *
+   * Before the milestone the server sends `{ revealed: false, spools,
+   * reveal_at }` and NOTHING else — `picks` is ABSENT, not empty, so a
+   * component that reads it optionally cannot render a placeholder that hints
+   * at what is coming. After the milestone the picks arrive from the frozen
+   * allocation snapshots. An admin payload carries them throughout, with
+   * `pending_customer_reveal` marking the ones the customer has not seen.
+   */
+  mystery?: {
+    revealed: boolean;
+    spools: number;
+    reveal_at: string;
+    /** Rendered from the SERVER's `stageLabel`, never a second client table. */
+    reveal_stage_label?: string;
+    revealed_at?: string | null;
+    sale_mode?: string;
+    pending_customer_reveal?: boolean;
+    picks?: Array<{
+      spool_index: number;
+      product_id: string;
+      product_slug?: string | null;
+      name: string;
+      image: string;
+      variant: string;
+      color_id: string;
+      option_value_ids: string[];
+    }>;
+  } | null;
 }
 
 /** Stages reached out of the path's length — the card's progress hairline. */

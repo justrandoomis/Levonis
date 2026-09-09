@@ -11,8 +11,13 @@ import { formatIqd, type ApiProduct } from '../lib/api';
  * tier math, so a spoofed local state can't change a shown price.
  *
  * The owner's display rules:
- *  - non-member (or PLUS, which has no price tier): bold regular price, and
- *    under it — faint — the PRIME and PRO prices when they exist;
+ *  - non-member: bold regular price, and under it — faint — the PRIME and PRO
+ *    prices when they exist;
+ *  - PLUS member on a BUNDLE or MYSTERY offer: bold PLUS price. That rung is
+ *    offer-scoped (docs/BUNDLES_MYSTERY.md §4.4) and no ordinary product emits
+ *    it — but without this branch a PLUS member is shown the regular price on
+ *    the grid, the home shelf and search, and is then charged the PLUS price in
+ *    the cart and at the door;
  *  - PRIME member: bold PRIME price (strikethrough regular beside it), faint
  *    PRO price under it;
  *  - PRO member: the PRO price alone.
@@ -30,7 +35,10 @@ export default function CardPrice({ p, compact = false }: { p: ApiProduct; compa
   const from = !!p.display_from;
 
   const teasers: Array<{ label: string; price: number }> = [];
-  if (appliedTier === 'regular') {
+  // A PLUS viewer is already on the offer-scoped PLUS rung, so PRIME and PRO
+  // are teased only when they are genuinely cheaper than what they are paying
+  // — the same rule the regular branch follows, not a second one.
+  if (appliedTier === 'regular' || appliedTier === 'plus') {
     if (typeof p.display_prime_iqd === 'number' && p.display_prime_iqd < main)
       teasers.push({ label: 'PRIME', price: p.display_prime_iqd });
     if (typeof p.display_pro_iqd === 'number' && p.display_pro_iqd < main)

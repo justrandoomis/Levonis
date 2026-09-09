@@ -1,6 +1,6 @@
 import AnimatedItem from '../components/AnimatedItem';
 import { useRail } from '../lib/useRail';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { PackageSearch } from 'lucide-react';
 import { api, ApiProduct, PublicSettings, HomeTaxon } from '../lib/api';
@@ -10,6 +10,14 @@ import ProductCard from '../components/home/ProductCard';
 import SectionHeader from '../components/home/SectionHeader';
 import Marquee from '../components/home/Marquee';
 import { ItemStrip, CategoryChips, BrandMarquee } from '../components/home/Strips';
+/**
+ * THE BUNDLES SHELF IS LAZY (docs/BUNDLES_MYSTERY.md §14). This page is the
+ * storefront's first paint, so importing the bundle card — and with it the
+ * countdown, the offer badge and the tier metadata — would put all of them
+ * into the entry chunk of every first visit and undo the split that moving
+ * `Bundles` off the eager list just achieved.
+ */
+const BundlesShelf = React.lazy(() => import('../components/home/BundlesShelf'));
 import Spinner from '../components/ui/Spinner';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
@@ -247,6 +255,23 @@ export default function Home() {
                   </div>
                 </section>
               ) : null,
+          },
+          {
+            id: 'bundles',
+            order: orderOf('bundles'),
+            // Registered in INITIAL_SECTIONS + SECTION_ICONS as well
+            // (src/components/AdminHomeSettings.tsx): a section id missing from
+            // those gets orderOf = MAX_SAFE_INTEGER — pinned to the bottom of
+            // the page for ever — sectionVisible = true (impossible to hide)
+            // and no row in the admin's drag-to-reorder list.
+            //
+            // The shelf renders null until it has cards, so an unconfigured
+            // section costs no space; the fallback is null for the same reason.
+            node: sectionVisible('bundles') ? (
+              <Suspense key="bundles" fallback={null}>
+                <BundlesShelf />
+              </Suspense>
+            ) : null,
           },
           {
             id: 'second_banner',

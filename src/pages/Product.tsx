@@ -376,6 +376,9 @@ interface DetailResponse {
   /** The ways to buy the BASE selection, priced by the server. */
   pricing_modes?: PricingModes;
   viewer_tier?: ViewerTier;
+  /** §10: a composition slug answers with the canonical location beside its
+   *  payload, so an old `/product/<bundle>` link still works. */
+  redirect?: string;
 }
 
 interface QuoteResponse {
@@ -593,6 +596,17 @@ export default function Product() {
       try {
         const data = await api.get<DetailResponse>(`/api/products/${slug}`);
         if (cancelled) return;
+        // THE SERVER'S REDIRECT IS HONOURED (§10). A composition slug resolves
+        // here — a bundle is a real `products` row — and the server answers
+        // with the composition payload plus `redirect: '/bundles/<slug>'`.
+        // Ignoring it left this renderer holding a bundle payload: no
+        // components, no saving line, `stock: null`, `options: []`. The
+        // navigation REPLACES the entry so Back does not bounce between the
+        // two routes.
+        if (data.redirect) {
+          navigate(data.redirect, { replace: true });
+          return;
+        }
         setProduct(data.product);
         setSource(data.source);
         setFavorite(data.favorite);
@@ -639,7 +653,9 @@ export default function Product() {
     return () => {
       cancelled = true;
     };
-  }, [slug, retryToken]);
+    // `navigate` is stable across renders; it is listed because the load now
+    // honours the server's composition redirect (§10).
+  }, [slug, retryToken, navigate]);
 
   // Live server quote for the CURRENT selection. Debounced, stale-guarded, and
   // the only source of the displayed price/fees.

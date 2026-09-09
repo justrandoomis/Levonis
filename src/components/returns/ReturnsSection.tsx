@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw, AlertCircle, Camera, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
-import { api, ApiError, ApiOrder, formatIqd, uploadFile } from '../../lib/api';
+import { api, ApiOrder, formatIqd, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import { daysLeftLabel, formatDate } from '../orders/format';
+import { asLang, daysLeftLabel, formatDate } from '../orders/format';
+import { apiRefusal } from '../../lib/refusalStrings';
 
 /**
  * Returns section for ONE order (final-phase §6.2) — wired into the Orders
@@ -296,7 +297,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
       const { key } = await uploadFile(file, 'receipt');
       setForm((f) => (f ? { ...f, evidence: [...f.evidence, key].slice(0, 6) } : f));
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'upload failed');
+      setSubmitError(apiRefusal(err, asLang(lang), 'upload failed'));
     } finally {
       setUploadBusy(false);
     }
@@ -317,7 +318,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
       setForm(null);
       await load(); // show the persisted case — no success UI before the server confirms
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'failed');
+      setSubmitError(apiRefusal(err, asLang(lang), 'failed'));
     } finally {
       setSubmitBusy(false);
     }

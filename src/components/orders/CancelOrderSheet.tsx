@@ -12,6 +12,7 @@ import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
 import Spinner from '../ui/Spinner';
 import { asLang } from './format';
+import { apiRefusal } from '../../lib/refusalStrings';
 
 const STRINGS = {
   ar: {
@@ -75,7 +76,10 @@ export default function CancelOrderSheet({
       const res = await api.post<{ order: ApiOrder }>(`/api/orders/${encodeURIComponent(orderId)}/cancel`);
       onCancelled(res.order);
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : s.failed);
+      // §15.3: the code is decoded into the customer's own language.
+      // `MYSTERY_REVEALED_NO_CANCEL` used to arrive here as three languages
+      // concatenated onto one line, whichever one the customer had chosen.
+      setError(apiRefusal(e, asLang(lang), s.failed));
       setBusy(false);
     }
   };

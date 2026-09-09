@@ -15,6 +15,9 @@ export function isBottomNavHidden(pathname: string): boolean {
     pathname === '/admin' ||
     pathname === '/edit-profile' ||
     pathname.startsWith('/product/') ||
+    // A bundle's detail page uses the product page's sticky bottom purchase
+    // bar, and two floating bars stacked on a phone hide each other.
+    pathname.startsWith('/bundles/') ||
     pathname.startsWith('/chat/')
   );
 }

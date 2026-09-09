@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import DashboardLayout from '../components/DashboardLayout';
@@ -26,7 +26,21 @@ const AdminCoupons = React.lazy(() => import('../components/adminCoupons/AdminCo
 const AdminDelivery = React.lazy(() => import('../components/adminDelivery/AdminDelivery'));
 const AdminCommunity = React.lazy(() => import('../components/adminCommunity/AdminCommunity'));
 const AdminProducts = React.lazy(() => import('../components/AdminProducts'));
-const AdminBundles = React.lazy(() => import('../components/AdminBundles'));
+// The bundles panel moved to its own folder when a bundle became a real
+// products row (docs/BUNDLES_MYSTERY.md §11.1). The chunk NAME is unchanged —
+// tests/bundleBudget.test.ts pins it — because the file name is unchanged.
+const AdminBundles = React.lazy(() => import('../components/adminBundles/AdminBundles'));
+// §11.1 tab 4: windows, tiers, limits and the offer price for ANY subject —
+// the one promotion model, with its own chunk (§14 bundle budget).
+const AdminOffers = React.lazy(() => import('../components/adminOffers/AdminOffers'));
+// §11.1 tabs 2 and 3. Seventeen admin routes under `/api/admin/mystery` had no
+// UI at all: an owner could not create a mystery offer (the bundles panel pins
+// `kind` to 'bundle' on create), could not set a spool count, a pool, a
+// duplicate policy or a reveal milestone, and the two warnings the mandate
+// quotes word for word — POOL_ZERO_WEIGHT and POOL_TOO_SMALL_FOR_FORBID —
+// were computed and could never render to a human.
+const AdminMystery = React.lazy(() => import('../components/adminMystery/AdminMystery'));
+const AdminMysteryPools = React.lazy(() => import('../components/adminMystery/AdminMysteryPools'));
 const AdminTaxonomy = React.lazy(() => import('../components/adminTaxonomy/AdminTaxonomy'));
 const AdminWarranties = React.lazy(() => import('../components/adminWarranty/AdminWarranties'));
 const AdminAds = React.lazy(() => import('../components/AdminAds'));
@@ -61,6 +75,9 @@ type AdminTab =
   | 'orders'
   | 'products'
   | 'bundles'
+  | 'mystery'
+  | 'mystery_pools'
+  | 'offers'
   | 'taxonomy'
   | 'warranties'
   | 'home_settings'
@@ -487,6 +504,8 @@ export default function Admin() {
     { id: 'wallet_requests', icon: Bell, label: 'Wallet Requests' },
     { id: 'products', icon: Package, label: t('adminProducts') },
     { id: 'bundles', icon: Boxes, label: dir === 'rtl' ? 'الباقات' : 'Bundles' },
+    { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان') },
+    { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن') },
     { id: 'taxonomy', icon: Tag, label: dir === 'rtl' ? 'التصنيفات' : 'Taxonomy' },
     { id: 'warranties', icon: ShieldCheck, label: dir === 'rtl' ? 'الضمانات' : 'Warranties' },
     { id: 'home_settings', icon: LayoutList, label: dir === 'rtl' ? 'اعدادات الرئيسية' : 'Home Settings' },
@@ -499,6 +518,7 @@ export default function Admin() {
     { id: 'kyc', icon: ShieldCheck, label: dir === 'rtl' ? 'التحقق والعناوين' : 'KYC & Addresses' },
     { id: 'memberships', icon: Crown, label: dir === 'rtl' ? 'الأعضاء والدعم' : 'Members & Support' },
     { id: 'coupons', icon: Ticket, label: dir === 'rtl' ? 'أكواد الخصم' : 'Promo codes' },
+    { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان') },
     { id: 'delivery', icon: Truck, label: dir === 'rtl' ? 'التوصيل المحلي' : 'Local delivery' },
     { id: 'community', icon: Store, label: dir === 'rtl' ? 'مجتمع ليفو' : 'Levo Community' },
     { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر') },
@@ -528,6 +548,9 @@ export default function Admin() {
         )}
 
         {activeTab === 'bundles' && <AdminBundles />}
+        {activeTab === 'mystery' && <AdminMystery />}
+        {activeTab === 'mystery_pools' && <AdminMysteryPools />}
+        {activeTab === 'offers' && <AdminOffers />}
         {activeTab === 'taxonomy' && <AdminTaxonomy />}
         {activeTab === 'warranties' && <AdminWarranties />}
         {activeTab === 'ads' && (

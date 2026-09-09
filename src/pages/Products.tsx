@@ -8,6 +8,8 @@ import SafeImage from '../components/ui/SafeImage';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import CardPrice from '../components/CardPrice';
+import OfferBadge from '../components/ui/OfferBadge';
+import Countdown from '../components/ui/Countdown';
 
 export default function Products() {
   const { t, dir, loc } = useLanguage();
@@ -105,7 +107,18 @@ export default function Products() {
               const hasSale = displayPrice < regularPrice;
 
               return (
-                <Link to={`/product/${p.slug || p.id}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
+                // A COMPOSITION ROW LINKS TO WHERE IT CAN BE BOUGHT (§10).
+                // `worker/routes/products.ts` deliberately keeps bundles in the
+                // SEARCH branch, and its own comment says "the card links to
+                // /bundles/<slug>". It did not: every card pointed at the
+                // ordinary product renderer, which for a bundle has no
+                // component list, no saving line, no state chip, `stock: null`
+                // and a purchase control whose selection state is meaningless.
+                <Link
+                  to={p.product_slug ? `/bundles/${p.product_slug}` : `/product/${p.slug || p.id}`}
+                  key={p.id}
+                  className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors"
+                >
                   <div className="relative aspect-square overflow-hidden bg-black">
                     <SafeImage
                       src={firstImage}
@@ -113,10 +126,24 @@ export default function Products() {
                       aspect="auto"
                       className="w-full h-full group-hover:scale-105 transition-transform duration-500"
                     />
-                    {hasSale && (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                        Sale
-                      </div>
+                    {/* ONE badge for one meaning (§13.2). The second,
+                        differently styled SALE pill that used to live here is
+                        retired: a product card, a bundle card and a bundle page
+                        now wear the same one, and its letter-spacing is
+                        conditional on latin content so «وفّر ٢٤٪» is not
+                        rendered as disconnected glyphs. */}
+                    {hasSale && <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>}
+                    {/* A scheduled special offer, on an ordinary card (§12).
+                        Decoration only — the API still refuses an expired
+                        offer — and one shared 1 Hz ticker drives the grid. */}
+                    {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
+                      <span className="absolute bottom-2 start-2 rounded-md bg-black/70 px-1.5 py-0.5 backdrop-blur-sm">
+                        <Countdown
+                          target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
+                          kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
+                          className="text-[10px] text-zinc-200"
+                        />
+                      </span>
                     )}
                   </div>
                   <div className="p-3 flex flex-col flex-1">

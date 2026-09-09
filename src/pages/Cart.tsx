@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useLanguage } from '../LanguageContext';
 import {
   ArrowLeft, ArrowRight, Trash2, ChevronRight, ChevronDown, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
-  ShieldCheck, FileText,
+  ShieldCheck, FileText, Sparkles,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useMotion } from '../lib/motion';
@@ -17,6 +17,8 @@ import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField from '../components/PromoCodeField';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
+import BundleContents from '../components/bundles/BundleContents';
+import { apiRefusal } from '../lib/refusalStrings';
 import { CartSkeleton } from '../components/ui/Skeleton';
 import { ErrorState } from '../components/ui/AsyncStates';
 import { Sheet } from '../components/ui/Overlay';
@@ -339,6 +341,20 @@ export default function Cart() {
     knownIdsRef.current = existing;
   }, []);
 
+  /**
+   * A refusal the customer can read, in their own language.
+   *
+   * `HttpError` carries one untranslated sentence, and this screen used to
+   * render it verbatim — so a new server code arrived as English prose, or as
+   * the bare identifier itself. `refusalText` answers from the trilingual table
+   * (`src/lib/refusalStrings.ts`) for the codes it owns and falls back to the
+   * server's own sentence for every code that already had one.
+   */
+  const cartRefusal = useCallback(
+    (err: unknown, fallback: string): string => apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback),
+    [lang]
+  );
+
   const loadCart = useCallback(async (opts?: { silent?: boolean }) => {
     try {
       const data = await api.get<{ items: CartItem[] }>('/api/cart');
@@ -356,12 +372,12 @@ export default function Cart() {
         setLoadError(err);
       } else {
         // The page already has content — keep it visible, show a banner.
-        setError(err instanceof Error ? err.message : 'Failed to load cart');
+        setError(cartRefusal(err, 'Failed to load cart'));
       }
     } finally {
       setLoading(false);
     }
-  }, [applyItems]);
+  }, [applyItems, cartRefusal]);
 
   const retryLoadCart = useCallback(() => {
     setLoading(true);
@@ -463,7 +479,26 @@ export default function Cart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supportKey, supportRetry]);
 
-  const clampQty = (item: CartItem, q: number) => Math.max(1, Math.min(99, Math.min(q, item.stock ?? 99)));
+  /** The per-line ceiling the SERVER published: a composition row's `max_qty`
+   *  (the scarcest component and the offer's per-order cap, §2.4), or an
+   *  ordinary row's `stock`. `null` = unbounded. */
+  const lineCap = (item: CartItem): number | null =>
+    item.composition ? item.composition.max_qty : (item.stock ?? null);
+
+  /** A composition line the server will refuse at the door — `sold_out`,
+   *  `ended`, `upcoming` or `locked`. It used to sit in the cart looking
+   *  completely normal with the checkout button enabled, because the only
+   *  blocker check read `availability.selection.complete`, a key the
+   *  composition availability block does not carry. */
+  const BLOCKING_STATES = new Set(['sold_out', 'ended', 'upcoming', 'locked', 'unconfigured']);
+  const lineBlocked = (item: CartItem): boolean =>
+    !!item.composition && BLOCKING_STATES.has(item.composition.availability_state);
+
+  const clampQty = (item: CartItem, q: number) =>
+    // A composition line is bounded by the server's own `max_qty` — the
+    // scarcest component and the offer's per-order cap — not by a `stock`
+    // column a bundle deliberately does not have (§2.4).
+    Math.max(1, Math.min(99, Math.min(q, item.composition ? item.composition.max_qty : (item.stock ?? 99))));
 
   const updateQuantity = async (item: CartItem, delta: number) => {
     if (item.qty + delta < 1) {
@@ -479,7 +514,7 @@ export default function Cart() {
       const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { qty: newQty });
       applyItems(data.items || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update quantity');
+      setError(cartRefusal(err, 'Failed to update quantity'));
       loadCart();
     } finally {
       actionBusyRef.current = false;
@@ -492,7 +527,7 @@ export default function Cart() {
       const data = await api.delete<{ items: CartItem[] }>(`/api/cart/items/${item.id}`);
       applyItems(data.items || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove item');
+      setError(cartRefusal(err, 'Failed to remove item'));
       loadCart();
     } finally {
       actionBusyRef.current = false;
@@ -539,7 +574,7 @@ export default function Cart() {
       applyItems(data.items || []);
       setVariantModalOpen(false);
     } catch (err) {
-      setVariantError(err instanceof Error ? err.message : 'Failed to update variant');
+      setVariantError(cartRefusal(err, 'Failed to update variant'));
     } finally {
       setVariantSaving(false);
     }
@@ -562,7 +597,7 @@ export default function Cart() {
       applyItems(data.items || []);
       setShippingModalOpen(false);
     } catch (err) {
-      setShippingError(err instanceof Error ? err.message : 'Failed to update shipping method');
+      setShippingError(cartRefusal(err, 'Failed to update shipping method'));
     } finally {
       setShippingSaving(false);
     }
@@ -897,6 +932,58 @@ export default function Cart() {
                     )}
                   </div>
 
+                  {/* A BUNDLE IS ONE LINE WITH ITS CONTENTS UNDERNEATH
+                      (docs/BUNDLES_MYSTERY.md §5.2). The parts are never
+                      separate cart rows: the totals above already count the
+                      bundle once, and the per-part figure below is that part's
+                      STANDALONE value, labelled as such by the disclosure. */}
+                  {/* A MYSTERY LINE HAS NO CONTENTS TO EXPAND, by design: its
+                      spools are drawn at checkout and the pick is not told
+                      before its milestone (§8.2 row 12). What it can honestly
+                      say is how many, and when. */}
+                  {item.composition?.mystery && (
+                    <p
+                      className="mb-2 flex items-center gap-1.5 text-[11.5px] text-zinc-400"
+                      data-cart-mystery={item.id}
+                    >
+                      <Sparkles className="w-3 h-3 shrink-0 text-gold" aria-hidden="true" />
+                      {/* HOW MANY, AND WHEN. The comment above promised both
+                          and only the count was rendered, so the cart — the
+                          screen where the customer is committing to a purchase
+                          whose contents are hidden — told them the least about
+                          it. The milestone is the SERVER's own sentence from
+                          `stageLabel`, never a second stage table here. */}
+                      <span className="truncate">
+                        {loc(
+                          `${item.composition.mystery.spool_qty} قطعة عشوائية`,
+                          `${item.composition.mystery.spool_qty} random item(s)`,
+                          `${item.composition.mystery.spool_qty} دانەی هەڕەمەکی`
+                        )}
+                        {item.composition.mystery.reveal_stage_label
+                          ? ` — ${loc('يُكشف', 'revealed', 'ئاشکرا دەبێت')} ${item.composition.mystery.reveal_stage_label}`
+                          : ''}
+                      </span>
+                    </p>
+                  )}
+
+                  {item.composition && (
+                    <BundleContents
+                      className="mb-2"
+                      componentTotalIqd={item.composition.component_total_iqd}
+                      savingPercent={item.composition.saving_percent}
+                      lines={item.composition.components.map((k) => ({
+                        key: k.component_id,
+                        name: k.product.name,
+                        name_ar: k.product.name_ar,
+                        variant: k.variant,
+                        qty: k.qty_per_bundle,
+                        value_iqd: k.value_iqd,
+                        optional: k.optional,
+                        included: k.included,
+                      }))}
+                    />
+                  )}
+
                   {/* The fee line: the unit price above already INCLUDES the
                       chosen extension, so this names the part of it that is
                       warranty — the resolver's dinar, never re-computed. */}
@@ -1076,19 +1163,47 @@ export default function Cart() {
 
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-3">
+                      {/* THE CAP IS THE SERVER'S, AND THE STEPPER DISABLES AT IT
+                          (§10). A composition line's `stock` is NULL for ever by
+                          design (§1.2), so the scarcity line below could never
+                          fire for a bundle however scarce its blocking
+                          component was — and tapping '+' at `max_qty` silently
+                          did nothing at all, because `clampQty` clamped to the
+                          same number and `updateQuantity` returned when the
+                          clamp changed nothing. `BUNDLE_QTY_LIMIT` is
+                          translated and wired, and could never be reached from
+                          the UI. */}
                       <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded">
                         <button onClick={() => updateQuantity(item, -1)} className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                           {item.qty <= 1 ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
                         </button>
                         <span className="w-8 text-center text-[14px] font-medium text-zinc-200 border-x border-zinc-800 py-1">{item.qty}</span>
-                        <button onClick={() => updateQuantity(item, 1)} className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <button
+                          onClick={() => updateQuantity(item, 1)}
+                          disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
+                          aria-disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
+                          className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
                           <Plus className="w-4 h-4" />
                         </button>
                       </div>
-                      {item.stock !== null && item.stock < 10 && (
-                        <span className="text-[#ef233c] text-[12px]">
-                          {dir === 'rtl' ? `متبقي ${item.stock} فقط` : `Only ${item.stock} left`}
-                        </span>
+                      {item.composition ? (
+                        item.qty >= item.composition.max_qty && (
+                          <span className="text-[#ef233c] text-[12px]">
+                            {loc(
+                              `الحد الأقصى ${item.composition.max_qty} لكل طلب`,
+                              `At most ${item.composition.max_qty} per order`,
+                              `زۆرترین ${item.composition.max_qty} بۆ هەر داواکارییەک`
+                            )}
+                          </span>
+                        )
+                      ) : (
+                        item.stock !== null &&
+                        item.stock < 10 && (
+                          <span className="text-[#ef233c] text-[12px]">
+                            {dir === 'rtl' ? `متبقي ${item.stock} فقط` : `Only ${item.stock} left`}
+                          </span>
+                        )
                       )}
                     </div>
                     <button onClick={() => deleteItem(item)} className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-[13px] font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">
@@ -1397,7 +1512,11 @@ export default function Cart() {
               selectedCount === 0 ||
               // The server refuses an incomplete line at checkout; say so here
               // instead of letting the button fail a page later.
-              items.some((i) => selectedIds.has(i.id) && i.availability?.selection && !i.availability.selection.complete)
+              items.some((i) => selectedIds.has(i.id) && i.availability?.selection && !i.availability.selection.complete) ||
+              // A composition line whose server-sent state says it cannot be
+              // sold blocks the button too — a `sold_out` or `ended` bundle
+              // used to look completely normal here.
+              items.some((i) => selectedIds.has(i.id) && lineBlocked(i))
             }
           >
             {dir === 'rtl' ? `إتمام الطلب (${selectedCount})` : `Checkout (${selectedCount})`}
