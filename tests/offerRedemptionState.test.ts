@@ -64,7 +64,7 @@ async function boughtBundle(raw: DatabaseSync, maxPerUser: number | null = 1) {
 }
 
 /** One mystery box, one per customer, bought once. */
-async function boughtMystery(raw: DatabaseSync, revealStage = 'delivered') {
+async function boughtMystery(raw: DatabaseSync, revealStage: 'paid' | 'confirmed' | 'preparing' | 'shipped' | 'delivered' = 'delivered') {
   seedMysteryPool(raw);
   const id = addMysteryOffer(raw, { revealStage });
   raw
