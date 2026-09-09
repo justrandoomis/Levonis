@@ -5,6 +5,13 @@
  * they are one rule each, testable without a browser, and identical everywhere
  * they are asked.
  *
+ * SCOPE, STATED PLAINLY. This is the ADMIN EDITOR's rule, and it runs in the
+ * browser. The server still accepts any string into `product_images.url`
+ * (`productPersistence`, a length-capped TEXT column), so what is closed here
+ * is the path a human types — not the column. Anything rendered from that
+ * column still goes through `SafeImage`, which fails visibly rather than
+ * silently.
+ *
  * THE FIRST DEFECT. Anything non-empty was treated as a URL. `img.url` is a
  * TEXT column and the form only ever checked that the string had length, so
  * «صورة» typed into the URL box, a Windows path, or a `javascript:` scheme all
@@ -46,7 +53,10 @@ export function classifyImageUrl(raw: unknown): UrlVerdict {
 
   // A site-relative path is how an uploaded R2 object is stored and served.
   if (s.startsWith('/')) {
-    if (s.startsWith('//')) {
+    // `//host/x` is protocol-relative — and so is `/\host/x`, which browsers
+    // resolve identically for http(s). Refusing one and accepting the other
+    // would leave the stated rule with a hole.
+    if (s.startsWith('//') || s.startsWith('/\\')) {
       return { kind: 'invalid', ok: false, reason: 'رابط بلا بروتوكول — اكتب https://' };
     }
     return { kind: s.startsWith('/api/') || s.startsWith('/media/') ? 'r2' : 'relative', ok: true };

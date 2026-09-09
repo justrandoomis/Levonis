@@ -208,3 +208,46 @@ test('the ingest route states, and keeps, its four limits', () => {
   // an HTML error page, and storing that would put a page in the R2 bucket.
   assert.match(src, /magic bytes/i);
 });
+
+
+// ================ the adversarial review's image findings (5, 6, 10)
+
+test('the paste box splits a URL list the way the TXT template does', () => {
+  const src = readFileSync(
+    new URL('../src/components/adminProducts/form/ImagesSection.tsx', import.meta.url),
+    'utf8'
+  );
+  // It used to be `urlText.split(/[\s,]+/)`, which turned one Cloudinary
+  // transform into a truncated URL plus two bogus refusals shown to the admin.
+  assert.match(src, /splitUrlList\(urlText\)/);
+  assert.ok(!/\[\\s,\]\+/.test(src), 'the comma split is back');
+});
+
+test('confirming an UNCHANGED url does not mark a still-broken image healthy', () => {
+  const src = readFileSync(
+    new URL('../src/components/adminProducts/form/ImagesSection.tsx', import.meta.url),
+    'utf8'
+  );
+  // The replace panel is seeded with the current URL. Clicking «استبدال»
+  // without editing used to clear the failed flag while SafeImage's own status
+  // stayed 'error' — the card kept saying «تعذر تحميل الصورة» while the warning
+  // and the broken-primary banner quietly vanished.
+  assert.match(src, /if \(next !== img\.url\) \{/, 'only a DIFFERENT address is a new load');
+  assert.match(src, /noteStatus\(img\.id, 'loading'\);/);
+});
+
+test('a protocol-relative address is refused in both of its spellings', () => {
+  // Browsers resolve `/\\host/x` exactly like `//host/x` for http(s), so
+  // refusing one and accepting the other left the stated rule with a hole.
+  assert.equal(classifyImageUrl('//evil.example/x.jpg').ok, false);
+  assert.equal(classifyImageUrl('/\\evil.example/x.jpg').ok, false);
+  assert.match(classifyImageUrl('/\\evil.example/x.jpg').reason ?? '', /بلا بروتوكول/);
+  // An ordinary site-relative path is still fine.
+  assert.equal(classifyImageUrl('/api/media/a.jpg').ok, true);
+});
+
+test('the helper states its own scope — this is the editor, not the column', () => {
+  const src = readFileSync(new URL('../src/lib/imageUrl.ts', import.meta.url), 'utf8');
+  assert.match(src, /SCOPE, STATED PLAINLY/, 'a client-only rule that reads as a server guarantee is worse than none');
+  assert.match(src, /the server still accepts any string|The server still accepts any string/i);
+});

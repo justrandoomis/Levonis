@@ -19,6 +19,7 @@ import { newId } from './crypto';
 import { localizableSlots } from './translationSlots';
 import { isMixed } from './availability';
 import { normalizeCheapestBase } from './cheapestBase';
+import { splitUrlList } from './urlList';
 import { buildGrid, COLUMN_OF, FIELDS, type Field } from './priceGrid';
 import type {
   ProductDoc,
@@ -555,29 +556,13 @@ function coerce(
     }
     /**
      * A LIST OF ADDRESSES IS NOT A LIST OF TOKENS, and splitting one on every
-     * comma corrupts it.
-     *
-     * `usage_steps.N.images` is the only list of URLs the template carries, and
-     * it was a plain `csv`. A comma is a legal character in a URL path, and
-     * vendor CDNs use it constantly — a Cloudinary transform reads
-     * `.../upload/w_400,h_300/a.jpg`. Splitting there turned ONE working image
-     * into two broken ones, on export as well as on import, and the round trip
-     * multiplied them every time.
-     *
-     * The split is therefore URL-AWARE: whitespace always separates (a bare
-     * space cannot appear inside a valid URL), and a comma separates ONLY when
-     * what follows it starts a new address — `http://`, `https://` or a
-     * site-relative `/`. That reads every file already written with the old
-     * bare-comma join, and leaves `w_400,h_300` alone. Export now joins with a
-     * space, which is unambiguous from here on.
+     * comma corrupts it. The rule — and the reasons — live in
+     * `worker/lib/urlList.ts`, shared with the admin image box, which had the
+     * identical bug for the identical reason.
      */
     case 'urls': {
       if (raw === '') return { value: [], clear: false, line };
-      const items = raw
-        .split(/\s+|,(?=\s*(?:https?:\/\/|\/))/i)
-        .map((x) => x.trim().replace(/,$/, ''))
-        .filter(Boolean);
-      return { value: items, clear: false, line };
+      return { value: splitUrlList(raw), clear: false, line };
     }
   }
 }

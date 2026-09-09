@@ -20,7 +20,7 @@
  * admin — and the server refuses to write it either way (§11).
  */
 
-import React from 'react';
+import React, { useId } from 'react';
 import { Trash2, GripVertical } from 'lucide-react';
 import {
   Field,
@@ -51,13 +51,12 @@ import {
 import {
   rowCells,
   rowLadder,
-  chargedAt,
-  fallsBackToRegular,
+  rowCharges,
   COLUMN_OF,
   type Cell,
   type Field as GridField,
 } from '../../../../worker/lib/priceGrid';
-import { ADJUST_OF, type PriceFields } from '../../../../worker/lib/pricing';
+import { ADJUST_OF, type PriceFields, type PriceKey } from '../../../../worker/lib/pricing';
 
 export function OptionsSection({
   rel,
@@ -192,25 +191,43 @@ export function OptionsSection({
     }));
 
   /**
-   * WHAT A COLOUR INHERITS. The resolver's ladder is base → option → colour
-   * (pricing.ts `pick`), so a colour's own price is measured over the OPTION
-   * the customer picked — not over the base. A colour linked to exactly one
-   * option therefore resolves under that option's own prices; a colour linked
-   * to several has no single answer (its effective price genuinely differs per
-   * option) and a universal colour has no option at all, so both fall back to
-   * the base. That is the same rule the Quick Edit grid applies —
-   * `option_id: linked.length === 1 ? linked[0] : null`
-   * (worker/routes/adminPriceGrid.ts) — so the two screens agree about every
-   * number they show for the same colour.
+   * WHAT A COLOUR INHERITS, AND WHEN THERE IS NO SINGLE ANSWER.
+   *
+   * The resolver's ladder is base → option → colour (pricing.ts `pick`), so a
+   * colour's own price is measured over the OPTION the customer picked — not
+   * over the base. A colour linked to exactly one option therefore resolves
+   * under that option.
+   *
+   * A colour linked to SEVERAL has no single price, and that is the honest
+   * answer rather than a defect to paper over: the same «+5,000» colour costs
+   * 730,000 under the base model and 904,000 under the Combo. Falling back to
+   * the base — which is what this did, matching `adminPriceGrid.ts` — showed a
+   * number the customer can never be charged. It now resolves under the FIRST
+   * linked option (a price that is really charged for a real combination) and
+   * the row SAYS the number moves with the option, naming the range.
    */
+  const optionById = new Map(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v] as const)));
+
   const beneathColor = (c: FormColor): Record<GridField, number | null> => {
-    if (c.option_value_ids.length !== 1) return base;
-    const parent = rel.groups.flatMap((g) => g.values).find((v) => v.id === c.option_value_ids[0]);
+    const parent = c.option_value_ids.map((id) => optionById.get(id)).find(Boolean);
     if (!parent) return base;
     // `rowLadder`, not `rowCells`: the UNCLAMPED values, exactly as `buildGrid`
     // carries them down. `clampMemberLadder` is the resolver's last word on the
     // line the customer picked, not on what the next rung inherits.
     return rowLadder(parent as PriceFields, base);
+  };
+
+  /** The distinct regular prices this colour takes across its linked options. */
+  const colorSpread = (c: FormColor): number[] => {
+    if (c.option_value_ids.length < 2) return [];
+    const seen = new Set<number>();
+    for (const id of c.option_value_ids) {
+      const parent = optionById.get(id);
+      if (!parent) continue;
+      const under = rowCharges(c as PriceFields, rowLadder(parent as PriceFields, base), 'color').regular.charged;
+      if (under !== null) seen.add(under);
+    }
+    return [...seen].sort((a, b) => a - b);
   };
 
   const toggleLink = (colorId: string, valueId: string) =>
@@ -329,6 +346,7 @@ export function OptionsSection({
                       <PriceCells
                         prices={v}
                         beneath={base}
+                        level="option"
                         canSeeCost={canSeeCost}
                         onChange={(patch) => patchValue(g.id, v.id, patch)}
                       />
@@ -418,8 +436,10 @@ export function OptionsSection({
                 <PriceCells
                   prices={c}
                   beneath={beneathColor(c)}
+                  level="color"
                   canSeeCost={canSeeCost}
                   onChange={(patch) => patchColor(c.id, patch)}
+                  spread={colorSpread(c)}
                 />
                 <Field ar="مفعّل" en="Active">
                   <Toggle
@@ -567,9 +587,20 @@ function PriceCell({
 }) {
   const fmt = (n: number | null) => (n === null ? '—' : new Intl.NumberFormat('en-US').format(n));
   const landing = cell.inherited ?? (viaRegular ? charged : null);
+  /**
+   * WIRED BY HAND, because `Field` cannot do it here. `Field` clones its
+   * generated id onto its child only when that child is a SINGLE element
+   * (`React.isValidElement(children)`); this cell has two — the input and the
+   * provenance line — so `children` is an array, no clone happens, and the
+   * `<label htmlFor>` would point at an element that does not exist. That is
+   * three or four inputs per option value and per colour with no accessible
+   * name and a label that does not focus them.
+   */
+  const inputId = useId();
   return (
-    <Field ar={label_ar} en={label_en} tip={tip}>
+    <Field ar={label_ar} en={label_en} tip={tip} htmlFor={inputId}>
       <Money
+        id={inputId}
         value={charged}
         onChange={onCommit}
         placeholder={landing === null ? 'يرث / inherit' : `يرث ${fmt(landing)}`}
@@ -629,6 +660,8 @@ function PriceCell({
 function PriceCells({
   prices,
   beneath,
+  level,
+  spread,
   canSeeCost,
   onChange,
 }: {
@@ -636,10 +669,25 @@ function PriceCells({
   /** What this row inherits: the product base for an option, the option's own
    *  resolved prices for a colour that hangs under one. */
   beneath: Record<GridField, number | null>;
+  /**
+   * WHICH RUNG THIS ROW IS. Not decoration: the resolver carries a member price
+   * through the colour rung even when no colour is picked, and that carry
+   * erases a value of zero or less. An option's PRIME of 0 is therefore charged
+   * as the regular price, while a COLOUR's PRIME of 0 is charged as 0 — the
+   * colour is the last rung and nothing carries it further.
+   */
+  level: 'option' | 'color';
+  /** Colours only: the distinct prices this row takes across the options it is
+   *  linked to. More than one means the number shown is one of several. */
+  spread?: number[];
   canSeeCost: boolean;
   onChange: (patch: Partial<FormPrices>) => void;
 }) {
   const cells = rowCells(prices as PriceFields, beneath);
+  // The MODE, the adjustment and the inherited value come from the cells; the
+  // NUMBER a customer is charged comes from `rowCharges`, which walks the same
+  // rungs the resolver walks and in the same order.
+  const charges = rowCharges(prices as PriceFields, beneath, level);
   /** One typed number pins the pair: fixed set, adjustment cleared. */
   const commit = (field: GridField) => (v: number | null) => {
     const col = COLUMN_OF[field];
@@ -647,12 +695,31 @@ function PriceCells({
   };
   const cellProps = (field: GridField) => ({
     cell: cells[field],
-    charged: chargedAt(cells, field),
-    viaRegular: fallsBackToRegular(cells, field),
+    charged: charges[field].charged,
+    viaRegular: charges[field].viaRegular,
     onCommit: commit(field),
   });
+  const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n);
   return (
     <>
+      {/*
+        A COLOUR LINKED TO SEVERAL OPTIONS HAS NO SINGLE PRICE. The same
+        «+5,000» costs 730,000 under the base model and 904,000 under the
+        Combo, because the resolver measures a colour over the OPTION the
+        customer picked. The cells below show it under the first linked option
+        — a price that is really charged for a real combination — and this says
+        the number moves, with the range, instead of letting one of several
+        read as the answer.
+      */}
+      {spread && spread.length > 1 && (
+        <p
+          className="col-span-full text-[10px] text-amber-400/90 leading-snug -mb-1"
+          data-color-price-spread
+        >
+          هذا اللون مرتبط بعدة خيارات، وسعره يتغيّر معها: من {fmt(spread[0])} إلى {fmt(spread[spread.length - 1])}.
+          الأرقام أدناه محسوبة على أول خيار مرتبط.
+        </p>
+      )}
       <PriceCell label_ar="السعر" label_en="Regular" {...cellProps('regular')} />
       <PriceCell label_ar="PRIME" label_en="PRIME" {...cellProps('prime')} />
       <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
@@ -739,6 +806,22 @@ function VariantsEditor({
     });
   };
 
+  /**
+   * A combination price, written as the ONE canonical half.
+   *
+   * `priceMode` answers 'fixed' the moment `*_price_iqd` is set, so an
+   * adjustment stored beside it is dead data the resolver ignores — right up
+   * until someone clears the fixed price and a delta nobody typed wakes up.
+   * The server collapses the pair on write (productPersistence `readPrices`);
+   * clearing it here means the admin sees what was actually stored instead of
+   * having their adjustment dropped behind a 200.
+   */
+  const setVariantPrice = (id: string, key: PriceKey, value: number | null) =>
+    setRel((r) => ({
+      ...r,
+      variants: r.variants.map((x) => (x.id === id ? { ...x, [key]: value, [ADJUST_OF[key]]: null } : x)),
+    }));
+
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -788,32 +871,22 @@ function VariantsEditor({
                       }
                     />
                   </td>
-                  {(['regular_price_iqd', 'prime_price_iqd', 'pro_price_iqd'] as const).map((k) => (
-                    <td key={k} className="py-1.5 pe-2">
-                      <Money
-                        value={v[k]}
-                        onChange={(n) =>
-                          setRel((r) => ({
-                            ...r,
-                            variants: r.variants.map((x) => (x.id === v.id ? { ...x, [k]: n } : x)),
-                          }))
-                        }
-                      />
-                    </td>
-                  ))}
-                  {canSeeCost && (
-                    <td className="py-1.5 pe-2">
-                      <Money
-                        value={v.cost_iqd}
-                        onChange={(n) =>
-                          setRel((r) => ({
-                            ...r,
-                            variants: r.variants.map((x) => (x.id === v.id ? { ...x, cost_iqd: n } : x)),
-                          }))
-                        }
-                      />
-                    </td>
-                  )}
+                  {/*
+                    ONE TYPED NUMBER PINS THE PAIR here too. A combination row
+                    can carry a 0044 adjustment (a TXT import or a Quick Edit
+                    can write one), and writing only the fixed half left a
+                    contradiction behind — silently resolved at the server by
+                    dropping the admin's stored adjustment. `setVariantPrice`
+                    clears the twin in the same patch, exactly as `PriceCells`
+                    does for options and colours.
+                  */}
+                  {(['regular_price_iqd', 'prime_price_iqd', 'pro_price_iqd', 'cost_iqd'] as const)
+                    .filter((k) => k !== 'cost_iqd' || canSeeCost)
+                    .map((k) => (
+                      <td key={k} className="py-1.5 pe-2">
+                        <Money value={v[k]} onChange={(n) => setVariantPrice(v.id, k, n)} />
+                      </td>
+                    ))}
                 </tr>
               ))}
             </tbody>

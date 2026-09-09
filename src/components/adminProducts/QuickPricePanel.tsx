@@ -66,6 +66,10 @@ interface Row {
   hex: string;
   stock: number | null;
   cells: Partial<Record<Field, Cell>>;
+  /** What each tier is CHARGED — see `rowCharges`. Optional so a response from
+   *  a worker deployed before this field existed degrades to the raw ladder
+   *  value rather than crashing the panel. */
+  charges?: Partial<Record<Field, { charged: number | null; viaRegular: boolean }>>;
   profit: { cost_iqd: number | null; price_iqd: number | null; profit_iqd: number | null; margin_percent: number | null };
 }
 
@@ -1040,6 +1044,8 @@ function CellEditor({
     });
   };
 
+  const charge = row.charges?.[field] ?? { charged: cell.effective, viaRegular: false };
+
   const placeholder =
     mode === 'inherit'
       ? cell.inherited === null
@@ -1072,9 +1078,23 @@ function CellEditor({
           <ModeChip label={t.adjust} active={mode === 'adjust'} onClick={() => setMode('adjust')} cellKey={key} mode="adjust" />
         )}
         <ModeChip label={t.fixed} active={mode === 'fixed'} onClick={() => setMode('fixed')} cellKey={key} mode="fixed" />
-        {mode !== 'fixed' && cell.effective !== null && (
-          <span className="text-[10.5px] text-[var(--ap-text-3)] ms-auto" dir="ltr" data-qp-effective={key}>
-            = {formatIqd(cell.effective)}
+        {/*
+          WHAT THE CUSTOMER IS CHARGED, not the raw ladder value. `row.charges`
+          walks the same rungs the resolver walks, in the same order — including
+          the colour rung it walks even with no colour chosen, which erases a
+          member price of zero or less and sends that tier back to the regular
+          price. Reading `cell.effective` here showed «= 0» on a row the till
+          charges the full price for.
+        */}
+        {mode !== 'fixed' && charge.charged !== null && (
+          <span
+            className="text-[10.5px] text-[var(--ap-text-3)] ms-auto"
+            dir="ltr"
+            data-qp-effective={key}
+            data-qp-via-regular={charge.viaRegular ? '1' : '0'}
+            title={charge.viaRegular ? 'لا سعر لهذه الفئة — تُحاسب بسعر البيع' : undefined}
+          >
+            = {formatIqd(charge.charged)}
           </span>
         )}
       </div>

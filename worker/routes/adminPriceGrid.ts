@@ -526,9 +526,15 @@ function projectGrid(env: Env, user: SessionUser | null | undefined, rows: GridR
   return rows.map((r) => {
     const cells = { ...r.cells } as Partial<GridRow['cells']>;
     delete cells.cost;
+    // `charges` carries the same four numbers as `cells`, so the §11 cost gate
+    // has to strip it there too — adding a field beside a redacted one and
+    // forgetting to redact it is how a cost reaches an assistant admin.
+    const charges = { ...r.charges } as Partial<GridRow['charges']>;
+    delete charges.cost;
     return {
       ...r,
       cells,
+      charges,
       profit: { cost_iqd: null, price_iqd: r.profit.price_iqd, profit_iqd: null, margin_percent: null },
     };
   });

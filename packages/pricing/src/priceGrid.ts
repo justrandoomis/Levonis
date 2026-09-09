@@ -246,6 +246,15 @@ export interface GridRow {
   hex: string;
   stock: number | null;
   cells: Record<Field, Cell>;
+  /**
+   * What each tier is actually CHARGED on this row — `rowCharges`, which walks
+   * the rungs the resolver walks in the order it walks them.
+   *
+   * Additive, and deliberately beside `cells` rather than inside it: the bulk
+   * and copy previews read `cells[f].effective` and depend on its raw null, so
+   * the display gets its own answer instead of the ladder losing information.
+   */
+  charges: Record<Field, RowCharge>;
   profit: Profit;
 }
 
@@ -399,15 +408,86 @@ export function rowCells(row: PriceFields | null, beneath: Record<Field, number 
  * row that never had one. So the ladder keeps its null and the EDITOR asks
  * this instead.
  */
-export function chargedAt(cells: Record<Field, Cell>, field: Field): number | null {
-  if (field === 'prime' || field === 'pro') return cells[field].effective ?? cells.regular.effective;
-  return cells[field].effective;
+export interface RowCharge {
+  /** What this tier is actually charged on this row. */
+  charged: number | null;
+  /** True when that number is the REGULAR price standing in for a tier that has
+   *  none — so the UI can say so instead of implying a discount. */
+  viaRegular: boolean;
 }
 
-/** True when this member cell's number is the regular price standing in for a
- *  tier that has none — so the UI can SAY that rather than imply a discount. */
-export function fallsBackToRegular(cells: Record<Field, Cell>, field: Field): boolean {
-  return (field === 'prime' || field === 'pro') && cells[field].effective === null && cells.regular.effective !== null;
+/**
+ * WHAT EACH TIER ACTUALLY PAYS ON THIS ROW — the editor's question, answered in
+ * the resolver's own order: walk the rungs UNCLAMPED, clamp once at the end,
+ * then fall back to the regular price for a tier that still has none.
+ *
+ * THE ORDER IS THE WHOLE POINT, and getting it wrong is not theoretical: a
+ * first version of this clamped first and then carried, and a 600,000-case
+ * sweep against `resolveUnitPrice` still disagreed on four shapes. In all four
+ * the clamp had raised a PRIME of 0 up to the row's PRO price *before* the
+ * carry could erase it, so the form showed a member price the till replaces
+ * with the full regular one. `resolveUnitPrice` walks, then clamps
+ * (pricing.ts: `clampMemberLadder` runs once, after `pickMember`), then falls
+ * back — and so does this.
+ *
+ * TWO RULES OF THE ENGINE ARE BORROWED, NOT RESTATED:
+ *
+ *  1. THE EXTRA RUNG. `resolveUnitPrice` walks base → option → COLOUR for a
+ *     member price, and it walks the colour rung even when the customer picked
+ *     no colour (`pickMember`, `row = null`). That carry is not a no-op:
+ *     `memberAtRung` treats a carried value of zero or less as NO MEMBER PRICE
+ *     (`inherited + regularDelta > 0 ? … : null`). So a PRIME of exactly 0 on
+ *     an OPTION is erased on the way to the till and the member pays the
+ *     regular price — while the same 0 on a COLOUR is charged as 0, because the
+ *     colour is the last rung and nothing carries it further. That is why
+ *     `level` is a required part of the question and not a detail.
+ *     A 0 is reachable: `Money` treats it as a real price on purpose, and a
+ *     reduction can land on it.
+ *
+ *  2. THE FALLBACK. A member price of null means the tier pays the regular
+ *     price (`if (isPro && proIqd !== null)` — when it is null, `appliedIqd`
+ *     stays `regularIqd`). Most products carry no base PRIME or PRO at all, so
+ *     this is the common case rather than the corner.
+ *
+ * `Cell.effective` deliberately keeps its raw null through all of this:
+ * `previewBulk` reads it to decide whether a row HAS a value to move, and
+ * folding "no PRO price" together with "a PRO price equal to the regular one"
+ * would make a bulk «raise PRO by 10,000» pin a PRO number onto every row that
+ * never had one.
+ */
+export function rowCharges(
+  row: PriceFields | null,
+  beneath: Record<Field, number | null>,
+  level: Level = 'option'
+): Record<Field, RowCharge> {
+  const raw = ladderCells(row, beneath);
+  const regular = raw.regular.effective;
+
+  const settle = (f: 'prime' | 'pro'): number | null =>
+    level === 'color'
+      ? raw[f].effective
+      : memberAtRung({
+          inherited: raw[f].effective,
+          regularDelta: 0,
+          regularHere: regular,
+          row: null,
+          field: COLUMN_OF[f] as 'prime_price_iqd' | 'pro_price_iqd',
+        });
+
+  const settled = { prime: settle('prime'), pro: settle('pro') };
+  const clamped = regular === null ? settled : clampMemberLadder(regular, settled.prime, settled.pro);
+
+  const member = (v: number | null): RowCharge => ({
+    charged: v ?? regular,
+    viaRegular: v === null && regular !== null,
+  });
+  return {
+    regular: { charged: regular, viaRegular: false },
+    prime: member(clamped.prime),
+    pro: member(clamped.pro),
+    // A cost nobody recorded stays unknown. It is never 0 and never the price.
+    cost: { charged: raw.cost.effective, viaRegular: false },
+  };
 }
 
 /**
@@ -470,6 +550,7 @@ export function buildGrid(p: GridProductInput): GridRow[] {
     };
   }
   clampCells(baseCells);
+  const baseBeneath = { regular: baseOf('regular'), prime: baseOf('prime'), pro: baseOf('pro'), cost: baseOf('cost') };
   rows.push({
     level: 'product',
     id: '',
@@ -483,6 +564,7 @@ export function buildGrid(p: GridProductInput): GridRow[] {
     hex: '',
     stock: null,
     cells: baseCells,
+    charges: rowCharges(null, baseBeneath, 'option'),
     profit: profitOf(baseCells.regular.effective, baseCells.cost.effective),
   });
 
@@ -519,6 +601,7 @@ export function buildGrid(p: GridProductInput): GridRow[] {
       hex: '',
       stock: o.stock ?? null,
       cells,
+      charges: rowCharges(o, baseBeneath, 'option'),
       profit: profitOf(cells.regular.effective, cells.cost.effective),
     });
   }
@@ -547,6 +630,7 @@ export function buildGrid(p: GridProductInput): GridRow[] {
       option_id: c.option_id ?? '',
       hex: (c.hex ?? '').trim(),
       stock: c.stock ?? null,
+      charges: rowCharges(c, { regular: inheritedOf('regular'), prime: inheritedOf('prime'), pro: inheritedOf('pro'), cost: inheritedOf('cost') }, 'color'),
       cells,
       profit: profitOf(cells.regular.effective, cells.cost.effective),
     });

@@ -193,14 +193,31 @@ test('a sheet asked for by TYPE alone keeps the union — no section was chosen'
 });
 
 test('a section narrows within an explicitly requested type, and never overrules it', () => {
-  // The admin asked for a `parts` sheet while standing in the FDM printers
-  // section. The type they typed wins; the branch still drops what it can.
-  const narrowed = narrowGroups('parts', FDM_BRANCH);
-  assert.ok(narrowed.length > 0);
+  // The admin asked for a `parts` sheet while standing in a section of that
+  // type. The TYPE they typed wins — the branch may not re-pick it — but the
+  // branch still drops what it can WITHIN it.
+  //
+  // The branch has to be one the type's own axis knows about, or the assertion
+  // is vacuous: `FDM_BRANCH` excludes only the `resin` group, which `parts`
+  // does not contain, so pairing those two would pass identically if
+  // `narrowGroups` ignored its branch entirely.
+  const fdmAccessory: SectionRef[] = [
+    { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories' },
+    { id: 'cat_pacc', slug: 'printer-accessories' },
+  ];
+  const full = groupsForType('parts');
+  const narrowed = narrowGroups('parts', fdmAccessory);
+  assert.ok(narrowed.length < full.length, 'the branch narrowed something');
+  assert.ok(full.some((g) => g.id === 'acc_resin'), 'the type carries the resin-accessory group');
+  assert.ok(!narrowed.some((g) => g.id === 'acc_resin'), 'and naming the FDM leaf drops it');
+  assert.ok(!flatFields(narrowed).some((f) => f.id === 'capacity'));
+
+  // The type is still `parts`, not the `printer` the branch's siblings imply.
+  const resinPrinterBranch: SectionRef[] = [{ id: 'cat_printers_resin', slug: 'resin-printers' }];
   assert.deepEqual(
-    narrowed.map((g) => g.id),
-    groupsForType('parts').map((g) => g.id),
-    'the printer axis says nothing about the parts type'
+    narrowGroups('parts', resinPrinterBranch).map((g) => g.id),
+    full.map((g) => g.id),
+    'a printer-axis branch says nothing about the parts type, and never re-picks it'
   );
 });
 

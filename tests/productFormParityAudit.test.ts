@@ -15,6 +15,12 @@
  * stays current by construction: a field added to the template next month joins
  * the audit with no edit here.
  *
+ * ONE KNOWN BLIND SPOT, STATED RATHER THAN HIDDEN. `product_variants` (the
+ * combinations table: stock and four price columns, all editable in the form)
+ * has no group in the TXT template, so it appears in no export key and the
+ * diff below cannot see it. `tests/productSaveParity.test.ts` covers the
+ * variant rows through the database instead.
+ *
  * WHAT SEPARATES THIS FROM ITS NEIGHBOURS:
  *   tests/templateApplyParity.test.ts  judges the DATABASE after a TXT apply.
  *   tests/templateParity.test.ts       judges the FORM STATE after a TXT apply,
@@ -34,7 +40,12 @@ import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { adminTaxonomyRoutes } from '../worker/routes/adminTaxonomy';
 import { toEditorDoc } from '../src/components/adminProducts/types';
-import { hydrateRelations, relationsToWire, type RelationsResponse } from '../src/components/adminProducts/form/model';
+import {
+  hydrateRelations,
+  relationsToWire,
+  type RelationsResponse,
+  type RelationsState,
+} from '../src/components/adminProducts/form/model';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -78,6 +89,28 @@ function entries(text: string): Map<string, string> {
     out.set(t.slice(0, i), t.slice(i + 1));
   }
   return out;
+}
+
+/**
+ * THE BODY `ProductForm.save` ACTUALLY POSTS.
+ *
+ * It strips `options`, `colors` and `media` from the document on purpose: they
+ * are derived copies of the structure with no editor of their own, and the
+ * server rebuilds the product's JSON mirror from the ROWS the same request
+ * writes. Sending the copy the form happened to be holding is how a deleted
+ * option came back on the next read (ProductForm.tsx, and the regression is
+ * pinned in tests/productSaveParity.test.ts).
+ *
+ * The audit builds it the same way rather than posting the whole document,
+ * because the difference is exactly where a mirror-rebuild regression would
+ * live — and a test that posts something the form never posts cannot see one.
+ */
+function savePayload(doc: Record<string, unknown>, rel: RelationsState, stamp: string) {
+  const { options: _o, colors: _c, media: _m, ...docFields } = doc;
+  void _o;
+  void _c;
+  void _m;
+  return { ...docFields, status: 'draft', relations: relationsToWire(rel), expected_updated_at: stamp };
 }
 
 /** Exactly the two GETs the form issues, through exactly its two transforms. */
@@ -281,12 +314,7 @@ test('§5 AUDIT — TXT create → ProductForm save → reload changes nothing, 
   // ONE call, through the client transforms, with the optimistic-lock stamp.
   const { doc, rel } = await formState(app, id);
   const saved = await json(
-    await post(app, '/api/admin/products-v2', {
-      ...doc,
-      status: 'draft',
-      relations: relationsToWire(rel),
-      expected_updated_at: stamp(raw, id),
-    })
+    await post(app, '/api/admin/products-v2', savePayload(doc as unknown as Record<string, unknown>, rel, stamp(raw, id)))
   );
   assert.equal(saved.success, true, JSON.stringify(saved));
 
@@ -393,12 +421,7 @@ test('§5 AUDIT — a SECOND save is still a no-op, so nothing drifts one hop at
   const saveOnce = async () => {
     const { doc, rel } = await formState(app, id);
     const res = await json(
-      await post(app, '/api/admin/products-v2', {
-        ...doc,
-        status: 'draft',
-        relations: relationsToWire(rel),
-        expected_updated_at: stamp(raw, id),
-      })
+      await post(app, '/api/admin/products-v2', savePayload(doc as unknown as Record<string, unknown>, rel, stamp(raw, id)))
     );
     assert.equal(res.success, true, JSON.stringify(res));
   };

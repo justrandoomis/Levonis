@@ -23,6 +23,7 @@ import { Banner, Field, Select, TextInput, btnGhost, btnPrimary, iconBtn } from 
 import { localId, type FormImage, type RelationsState } from './model';
 import SafeImage from '../../ui/SafeImage';
 import { classifyImageUrl, primaryRepair } from '../../../lib/imageUrl';
+import { splitUrlList } from '../../../../worker/lib/urlList';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
@@ -153,10 +154,11 @@ export function ImagesSection({
    * exactly like one typed here by hand. Anything else is still refused.
    */
   const ingestUrls = async () => {
-    const typed = urlText
-      .split(/[\s,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // THE SAME SPLITTER THE TXT TEMPLATE USES. Splitting on every comma broke
+    // exactly one thing here: a Cloudinary transform
+    // (`/upload/w_800,h_600,c_fill/a1.jpg`) became one truncated URL plus two
+    // bogus refusals shown to the admin.
+    const typed = splitUrlList(urlText);
     if (typed.length === 0) return;
 
     // A STRING IS NOT AN ADDRESS. Refused here, by name, so «صورة» or a
@@ -528,11 +530,19 @@ export function ImagesSection({
                                 type="button"
                                 className={btnPrimary}
                                 disabled={!verdict.ok}
-                                onClick={() => {
-                                  patch(img.id, { url: editingUrl.text.trim() });
-                                  // A new address is a new load: forget the old
-                                  // verdict so the card is not stuck as failed.
-                                  noteStatus(img.id, 'loading');
+                                  onClick={() => {
+                                  const next = editingUrl.text.trim();
+                                  // ONLY A DIFFERENT ADDRESS IS A NEW LOAD.
+                                  // Confirming the pre-filled URL unchanged
+                                  // used to clear the failed flag while
+                                  // SafeImage's own status stayed 'error': the
+                                  // card kept showing «تعذر تحميل الصورة»
+                                  // while the warning and the broken-primary
+                                  // banner quietly disappeared.
+                                  if (next !== img.url) {
+                                    patch(img.id, { url: next });
+                                    noteStatus(img.id, 'loading');
+                                  }
                                   setEditingUrl(null);
                                 }}
                               >
