@@ -21,7 +21,7 @@
     "deploy:production": "node scripts/set-deploy-ids.mjs --env production && wrangler deploy --env=\"\"",
     "db:migrate:local": "wrangler d1 migrations apply levonis-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply levonis-db --remote",
-    "test:unit": "tsx --test tests/*.test.ts && npm run test:workspaces",
+    "test:unit": "node scripts/test-all.mjs",
     "test:workspaces": "node scripts/test-workspaces.mjs"
   },
   "dependencies": {

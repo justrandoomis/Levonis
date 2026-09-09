@@ -28,9 +28,10 @@
  * repository keeps closing (`scripts/check-studio.mjs`,
  * `scripts/test-workspaces.mjs`).
  */
-import { test } from 'node:test';
+import { before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,10 +82,33 @@ test('the static-import parser counts a static import and never a dynamic one', 
   assert.equal(entryFromHtml('<script type="module" crossorigin src="/assets/index-abc.js"></script>'), 'index-abc.js');
 });
 
-test('dist/ exists — this suite measures the real build, and refuses to pass without one', () => {
+/**
+ * This suite measures the REAL build, so it builds one when there is none
+ * rather than passing on nothing or failing on a checkout.
+ *
+ * It used to assert `existsSync(ASSETS)` and stop. That reads as strict, and
+ * locally it is: a developer always has a `dist/` lying about. But `dist/` is
+ * gitignored, and both deploy workflows run this gate BEFORE their build step,
+ * so on a clean checkout the assertion could only ever fail — five red tests
+ * that said nothing about the bundle, and, because `test:unit` chained with
+ * `&&`, they took every workspace suite down with them. The local pass was no
+ * better than the CI failure: it measured whatever artifact happened to be on
+ * disk, possibly from another commit.
+ *
+ * Building here costs a few seconds exactly once, when `dist/assets` is
+ * absent, and makes the number honest in both places.
+ */
+before(() => {
+  if (existsSync(ASSETS)) return;
+  execFileSync('npx', ['vite', 'build'], { cwd: ROOT, stdio: 'inherit' });
+  assert.ok(existsSync(ASSETS), 'vite build produced no dist/assets');
+});
+
+test('dist/ exists — this suite measures a real build, never an empty directory', () => {
+  assert.ok(existsSync(ASSETS), 'dist/assets is missing even after a build');
   assert.ok(
-    existsSync(ASSETS),
-    'dist/assets is missing. Run `npm run build` first: a budget that passes because nothing was built proves nothing.'
+    readdirSync(ASSETS).some((f) => f.endsWith('.js')),
+    'dist/assets holds no JavaScript — a budget over an empty directory proves nothing'
   );
 });
 

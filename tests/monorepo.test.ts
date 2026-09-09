@@ -24,7 +24,21 @@ test('root workspaces and per-package manifests', () => {
   const pkg = JSON.parse(read('package.json')) as { workspaces?: string[]; scripts: Record<string, string> };
   assert.deepEqual(pkg.workspaces, ['packages/*', 'services/*']);
   assert.match(pkg.scripts.check, /check:workspaces/);
-  assert.match(pkg.scripts['test:unit'], /test:workspaces/);
+  // The guarantee is that `test:unit` RUNS the workspace suites, not that it
+  // spells them. It used to be `tsx --test tests/*.test.ts && npm run
+  // test:workspaces`, whose `&&` let one red root test hide every workspace
+  // suite — the deploy that failed on five assertions never ran a single
+  // workspace test. The runner it now names runs both and aggregates, so the
+  // assertion follows the indirection one hop instead of pinning the old text.
+  const unit = pkg.scripts['test:unit'];
+  const runner = /node (scripts\/[\w.-]+\.mjs)/.exec(unit);
+  if (runner) {
+    assert.ok(existsSync(join(ROOT, runner[1])), `test:unit names ${runner[1]}, which does not exist`);
+    assert.match(read(runner[1]), /test-workspaces/, `${runner[1]} must run the workspace suites`);
+    assert.match(read(runner[1]), /tests\/\*\.test\.ts/, `${runner[1]} must run the root suite`);
+  } else {
+    assert.match(unit, /test:workspaces/);
+  }
   for (const name of readdirSync(join(ROOT, 'packages'))) {
     const dir = join(ROOT, 'packages', name);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string; private: boolean; exports?: unknown };
