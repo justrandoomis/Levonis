@@ -96,10 +96,18 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This checkout session has expired. Go back to the cart and start the checkout again.',
     ckb: 'ئەم دانیشتنی پارەدانە بەسەرچووە. بگەڕێوە بۆ سەبەتەکە و پارەدان لە سەرەتاوە دەست پێ بکەوە.',
   },
+  // The refusal is COMMERCIAL only (owner decision 3): a change of mind about
+  // one part of a bundle is refused, a faulty part is not — so the sentence
+  // has to say both, or a customer with a broken spool reads "no" and stops.
   BUNDLE_PARTIAL_RETURN_NOT_ALLOWED: {
-    ar: 'يمكن إرجاع الحزمة كاملة فقط، وليس قطعة منها.',
-    en: 'A bundle can only be returned whole, not one part of it.',
-    ckb: 'پاکێج تەنها بە تەواوی دەگەڕێتەوە، نەک یەک پارچەی.',
+    ar: 'يمكن إرجاع الحزمة كاملة فقط. أمّا القطعة المعطوبة فيمكن المطالبة بها وحدها.',
+    en: 'A bundle can only be returned whole. A faulty part can be claimed on its own.',
+    ckb: 'پاکێج تەنها بە تەواوی دەگەڕێتەوە. بەڵام پارچەی تێکچووی دەکرێت بە تەنها داوا بکرێت.',
+  },
+  BUNDLE_COMPONENT_ALREADY_CLAIMED: {
+    ar: 'إحدى قطع هذه الحزمة عليها طلب مفتوح — أكمِله أولًا ثم أعد المحاولة.',
+    en: 'One part of this bundle already has an open case — finish that one first, then try again.',
+    ckb: 'یەکێک لە پارچەکانی ئەم پاکێجە داواکاریەکی کراوەی هەیە — سەرەتا ئەوە تەواو بکە.',
   },
   COMPOSITION_TOO_LARGE: {
     ar: 'هذا الطلب يحتوي على قطع أكثر مما يمكن معالجته — قسّمه إلى طلبين.',

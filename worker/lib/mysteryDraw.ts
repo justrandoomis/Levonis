@@ -111,6 +111,29 @@ export interface MysteryConfig {
   max_qty_per_order: number;
 }
 
+/**
+ * CAN THE WHEEL ACTUALLY LAND ON THIS CANDIDATE? (owner decision 8.)
+ *
+ * Weight 0 is excluded and kept only for history (§1.9); a candidate whose
+ * tracked stock is already 0 cannot be drawn either — `drawSpools` seeds each
+ * slot with `remaining` and drops a slot the moment it reaches zero.
+ *
+ * It is exported because the ODDS have to be computed over exactly this set.
+ * The owner's rule is that a published probability is the probability the
+ * server will honour, so the disclosure and the wheel share one predicate
+ * rather than two functions that happen to agree today.
+ *
+ * NOTE the asymmetry it makes visible: `loadCandidates` deliberately admits a
+ * pre-order candidate at zero free stock (a pre-order is not shipped from the
+ * shelf), while the wheel drops it. Making the odds match the WHEEL is the
+ * conservative reading — nothing a customer is told can exceed what they can
+ * actually receive — and it changes no draw. Whether the wheel should instead
+ * treat a pre-order candidate as unbounded is a separate owner decision.
+ */
+export function isDrawable(c: { weight: number; available: number | null }): boolean {
+  return c.weight > 0 && (c.available === null || c.available > 0);
+}
+
 export interface MysteryCandidate {
   entry_id: string;
   product_id: string;
@@ -592,7 +615,7 @@ export function drawSpools(input: {
   // drops it; the wheel drops it again, so no caller can hand a zero-weight
   // entry a silent weight of one.
   let wheel: Slot[] = input.candidates
-    .filter((c) => c.weight > 0)
+    .filter(isDrawable)
     .map((c) => ({
       candidate: c,
       weight: c.weight,

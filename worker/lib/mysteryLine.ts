@@ -35,6 +35,7 @@ import {
   poolSupply,
   resolveMysteryMode,
   seedForLine,
+  isDrawable,
   type DrawnSpool,
   type MysteryCandidate,
   type MysteryOffer,
@@ -397,10 +398,15 @@ const PAID_LABEL = {
  * the half that is an oracle.
  */
 export function familyOdds(candidates: MysteryCandidate[]): Array<{ family_id: string; percent: number }> {
-  const total = candidates.reduce((n, c) => n + Math.max(0, c.weight), 0);
+  // OVER THE DRAWABLE SET, NOT EVERY ROW IN THE POOL (owner decision 8). The
+  // wheel seeds itself with `isDrawable` and this is the same predicate, so a
+  // family the server can no longer land on stops being advertised instead of
+  // being published at a share it will never pay out.
+  const drawable = candidates.filter(isDrawable);
+  const total = drawable.reduce((n, c) => n + Math.max(0, c.weight), 0);
   if (total <= 0) return [];
   const byFamily = new Map<string, number>();
-  for (const c of candidates) {
+  for (const c of drawable) {
     byFamily.set(c.family_id, (byFamily.get(c.family_id) ?? 0) + Math.max(0, c.weight));
   }
   return [...byFamily.entries()]

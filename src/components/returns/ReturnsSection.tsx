@@ -22,6 +22,14 @@ const STATES = ['requested', 'assessment', 'approved', 'collection', 'received',
 
 const REASONS = ['defective', 'manufacturing_fault', 'not_as_described', 'wrong_product', 'shipping_damage'] as const;
 type Reason = (typeof REASONS)[number];
+/**
+ * The reasons a SINGLE PART of a bundle may be claimed on (owner decision 3).
+ * A change of mind about one part is refused by the server — a bundle is
+ * returned whole — but a fault is not a change of mind, so the picker offers
+ * exactly what the server will accept rather than letting the customer choose
+ * a reason and then be told no.
+ */
+const COMPONENT_REASONS: readonly Reason[] = ['defective', 'manufacturing_fault', 'shipping_damage'];
 
 interface ReturnCaseDto {
   id: string;
@@ -57,6 +65,8 @@ const STRINGS = {
     itemClosed: 'انتهت نافذة الإرجاع لهذا المنتج.',
     daysLeft: (n: number) => `${daysLeftLabel(n, 'ar')} لطلب الإرجاع`,
     request: 'طلب إرجاع',
+    faultyPartHint: 'قطعة معطوبة من الحزمة؟ طالِب بها وحدها:',
+    reportFault: 'إبلاغ عن عطل',
     loading: 'جارٍ التحميل…',
     loadError: 'تعذّر تحميل حالات الإرجاع.',
     retry: 'إعادة المحاولة',
@@ -109,6 +119,8 @@ const STRINGS = {
     itemClosed: 'The return window for this item has closed.',
     daysLeft: (n: number) => `${daysLeftLabel(n, 'en')} to request a return`,
     request: 'Request return',
+    faultyPartHint: 'A faulty part of the bundle? Claim it on its own:',
+    reportFault: 'Report a fault',
     loading: 'Loading…',
     loadError: 'Could not load return cases.',
     retry: 'Retry',
@@ -161,6 +173,8 @@ const STRINGS = {
     itemClosed: 'ماوەی گەڕاندنەوە بۆ ئەم کاڵایە تەواو بووە.',
     daysLeft: (n: number) => `${daysLeftLabel(n, 'ckb')} بۆ داوای گەڕاندنەوە`,
     request: 'داوای گەڕاندنەوە',
+    faultyPartHint: 'پارچەیەکی تێکچووی پاکێجەکە؟ بە تەنها داوای بکە:',
+    reportFault: 'ڕاپۆرتی تێکچوون',
     loading: 'بارکردن…',
     loadError: 'حاڵەتەکانی گەڕاندنەوە بارنەکران.',
     retry: 'هەوڵدانەوە',
@@ -215,6 +229,8 @@ interface FormState {
   reason: Reason;
   description: string;
   evidence: string[]; // private receipt keys
+  /** True when the form is claiming ONE PART of a bundle, not a whole line. */
+  component: boolean;
 }
 
 /** Days left in the 7-day window from a delivery time; null when unknown. */
@@ -282,8 +298,8 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
   };
   const anyRequestable = order.items.some((it) => itemWindow(it.id).state !== 'closed');
 
-  const startForm = (itemId: string) => {
-    setForm({ itemId, qty: 1, reason: 'defective', description: '', evidence: [] });
+  const startForm = (itemId: string, component = false) => {
+    setForm({ itemId, qty: 1, reason: 'defective', description: '', evidence: [], component });
     setSubmitError('');
   };
 
@@ -446,31 +462,61 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
             <div className="space-y-2">
               {order.items.map((it) => {
                 const w = itemWindow(it.id);
+                // A BUNDLE'S PARTS GET THEIR OWN FAULT BUTTON (owner decision 3).
+                // The whole-bundle button above is the commercial return; a
+                // broken part is claimed on its own, and the components are
+                // nested under the priced line — never top-level items — so
+                // without this row nothing in the app could ever post a
+                // component id, and the carve-out would be unreachable.
+                const parts = w.state !== 'closed' ? (it.bundle?.components ?? []) : [];
                 return (
-                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="flex items-center justify-between gap-3 rounded-lg bg-[#050505] border border-white/5 p-3">
-                    <div className="min-w-0 flex items-center gap-3">
-                      {it.image ? (
-                        <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-white/5 shrink-0" />
-                      ) : (
-                        <div className="w-9 h-9 rounded bg-zinc-900 shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-xs text-white truncate">{it.name}</p>
-                        <p className="text-[10px] text-zinc-500">× {it.qty} · {formatIqd(it.line_total_iqd)}</p>
-                        {w.state === 'open' && orderWindow !== 'open' && (
-                          <p className="text-[10px] text-emerald-400/90">{S.daysLeft(w.days as number)}</p>
+                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="rounded-lg bg-[#050505] border border-white/5 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex items-center gap-3">
+                        {it.image ? (
+                          <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-white/5 shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded bg-zinc-900 shrink-0" />
                         )}
-                        {w.state === 'closed' && <p className="text-[10px] text-zinc-500">{S.itemClosed}</p>}
+                        <div className="min-w-0">
+                          <p className="text-xs text-white truncate">{it.name}</p>
+                          <p className="text-[10px] text-zinc-500">× {it.qty} · {formatIqd(it.line_total_iqd)}</p>
+                          {w.state === 'open' && orderWindow !== 'open' && (
+                            <p className="text-[10px] text-emerald-400/90">{S.daysLeft(w.days as number)}</p>
+                          )}
+                          {w.state === 'closed' && <p className="text-[10px] text-zinc-500">{S.itemClosed}</p>}
+                        </div>
                       </div>
+                      {w.state !== 'closed' && (
+                        <button
+                          type="button"
+                          onClick={() => startForm(it.id)}
+                          className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        >
+                          {S.request}
+                        </button>
+                      )}
                     </div>
-                    {w.state !== 'closed' && (
-                      <button
-                        type="button"
-                        onClick={() => startForm(it.id)}
-                        className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-                      >
-                        {S.request}
-                      </button>
+                    {parts.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5">
+                        <p className="text-[10px] text-zinc-500">{S.faultyPartHint}</p>
+                        {parts.map((k) => (
+                          <div key={k.order_item_id} data-return-component={k.order_item_id} className="flex items-center justify-between gap-3">
+                            <p className="text-[11px] text-zinc-300 truncate min-w-0">
+                              {k.name}
+                              {k.variant ? <span className="text-zinc-500"> · {k.variant}</span> : null}
+                              <span className="text-zinc-500"> × {k.qty}</span>
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => startForm(k.order_item_id, true)}
+                              className="text-[11px] text-zinc-300 hover:text-white border border-white/10 hover:border-white/20 px-2 py-1 rounded-md shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                            >
+                              {S.reportFault}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
@@ -504,7 +550,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                     onChange={(e) => setForm({ ...form, reason: e.target.value as Reason })}
                     className="w-full bg-black border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
                   >
-                    {REASONS.map((r) => (
+                    {(form.component ? COMPONENT_REASONS : REASONS).map((r) => (
                       <option key={r} value={r}>{S.reasons[r]}</option>
                     ))}
                   </select>

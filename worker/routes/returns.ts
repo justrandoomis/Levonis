@@ -58,6 +58,25 @@ const WINDOW_MS = 7 * 86_400_000;
 const RETURN_REASONS = ['defective', 'manufacturing_fault', 'not_as_described', 'wrong_item', 'shipping_damage'] as const;
 type ReturnReason = (typeof RETURN_REASONS)[number];
 
+/**
+ * THE TWO KINDS OF RETURN, AND WHY ONE COMPONENT OF A BUNDLE CAN ONLY BE ONE
+ * OF THEM (owner decision 3).
+ *
+ * COMMERCIAL — "not as described", "wrong item" — is a change of mind about a
+ * purchase. The owner ruled that a bundle is returned whole or not at all:
+ * returning the expensive half of a discounted bundle and keeping the cheap
+ * half at the bundle price is a discount nobody offered.
+ *
+ * A DEFECT is not a purchase decision. The owner's words: a warranty or fault
+ * claim on one component must stay possible and must NOT be treated as a
+ * partial bundle return. The remedies this pipeline offers for a defect —
+ * `repair` and `replacement` — move no money at all, so nothing about the
+ * bundle's price is reopened by one; and where staff do choose `refund`, the
+ * arithmetic already prices a component from `component_alloc_iqd`, its own
+ * share of what was actually paid.
+ */
+const DEFECT_REASONS: readonly ReturnReason[] = ['defective', 'manufacturing_fault', 'shipping_damage'];
+
 const RETURN_STATES = [
   'requested', 'assessment', 'approved', 'rejected', 'collection', 'received', 'inspected', 'resolved',
 ] as const;
@@ -182,9 +201,10 @@ returnRoutes.post('/', async (c) => {
   // policy question the owner has not answered, so it is refused by name
   // rather than answered here: the screen offers "return the whole bundle",
   // which posts the PARENT and opens one case per component below.
-  if (item.bundle_parent_item_id) {
+  const componentDefectClaim = !!item.bundle_parent_item_id && DEFECT_REASONS.includes(reason);
+  if (item.bundle_parent_item_id && !componentDefectClaim) {
     throw badRequest(
-      'This item was bought as part of a bundle — return the whole bundle instead',
+      'This item was bought as part of a bundle — return the whole bundle instead. A faulty part can be claimed on its own.',
       'BUNDLE_PARTIAL_RETURN_NOT_ALLOWED',
       { bundle_parent_item_id: item.bundle_parent_item_id }
     );
@@ -216,9 +236,17 @@ returnRoutes.post('/', async (c) => {
    * nobody thinks of as a reveal surface. `MYSTERY_NOT_REVEALED` says so and
    * names nothing.
    */
-  if (bundleChildren.length > 0) {
+  //
+  // BOTH SHAPES, not only the parent. Before the defect carve-out below, every
+  // mystery row was reachable only through its parent, so gating on
+  // `bundleChildren.length > 0` was complete. A directly-posted component can
+  // now be a mystery spool, and it would have walked straight past this.
+  {
     const allocations = await loadAllocations(c.env.DB, [item.order_id]);
-    const mine = bundleChildren.flatMap((k) => allocations.get(String(k.id)) ?? []);
+    const mine =
+      bundleChildren.length > 0
+        ? bundleChildren.flatMap((k) => allocations.get(String(k.id)) ?? [])
+        : (allocations.get(orderItemId) ?? []);
     if (mine.length > 0) {
       const paid = (await paidOrderIds(c.env.DB, [item.order_id])).has(item.order_id);
       const facts = {
@@ -311,11 +339,27 @@ returnRoutes.post('/', async (c) => {
       .all<{ id: string; n: number }>();
     for (const r of results) usedByItem.set(String(r.id), Number(r.n) || 0);
   }
-  for (const t of quotaTargets) {
-    const cap = orderedQty.get(t.id) ?? 0;
-    if ((usedByItem.get(t.id) ?? 0) + t.qty > cap) {
-      throw badRequest('The requested quantity exceeds what remains returnable for this item', 'QTY_EXCEEDED');
+  const overCap = quotaTargets.filter((t) => (usedByItem.get(t.id) ?? 0) + t.qty > (orderedQty.get(t.id) ?? 0));
+  if (overCap.length > 0) {
+    // WHICH ROWS ARE FULL DECIDES WHICH ANSWER IS TRUE. On a whole-bundle
+    // return the quota targets are the CHILDREN, so there are two very
+    // different situations behind one failure:
+    //
+    //   every child full  → this bundle has already been returned. QTY_EXCEEDED
+    //                       is exactly right and stays.
+    //   only some full    → a part was claimed on its own (the defect carve-out
+    //                       of decision 3), and the customer is being told the
+    //                       quantity of a bundle they have not returned is
+    //                       exceeded. Name the part instead.
+    if (bundleChildren.length > 0 && overCap.length < quotaTargets.length) {
+      const part = bundleChildren.find((k) => String(k.id) === overCap[0].id);
+      throw badRequest(
+        `One part of this bundle already has an open case (${part?.name_snapshot ?? overCap[0].id}) — the rest can still be returned individually once it is resolved`,
+        'BUNDLE_COMPONENT_ALREADY_CLAIMED',
+        { order_item_id: overCap[0].id }
+      );
     }
+    throw badRequest('The requested quantity exceeds what remains returnable for this item', 'QTY_EXCEEDED');
   }
 
   const nowIso = new Date(now).toISOString();

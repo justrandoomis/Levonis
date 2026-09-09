@@ -155,11 +155,12 @@ test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qty 
   const printer = rows.find((r) => r.product_id === 'p_printer')!;
   assert.equal(Number(printer.qty), 2);
 
-  // One of the two printers comes back: half the component's allocation.
-  const opened = await json(
-    await post(appFor(db), '/api/returns', { orderItemId: printer.id, qty: 1, reason: 'defective' })
+  // The COMMERCIAL door on one component is still shut: a change of mind about
+  // one part of a discounted bundle is the case the owner refused (decision 3).
+  const commercial = await json(
+    await post(appFor(db), '/api/returns', { orderItemId: printer.id, qty: 1, reason: 'not_as_described' })
   );
-  assert.equal(opened.code, 'BUNDLE_PARTIAL_RETURN_NOT_ALLOWED', 'v1 policy: the whole bundle or nothing');
+  assert.equal(commercial.code, 'BUNDLE_PARTIAL_RETURN_NOT_ALLOWED', 'the whole bundle or nothing, commercially');
 
   // Through the whole-bundle door instead, at qty 1 of 2.
   const parent = rows.find((r) => r.bundle_parent_item_id === null)!;

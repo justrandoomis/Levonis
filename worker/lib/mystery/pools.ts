@@ -32,6 +32,7 @@ import type { BundleIssue } from '../bundleComposition';
 import { mysteryIssue } from './issues';
 import {
   loadCandidates,
+  isDrawable,
   type CandidateSet,
   type DuplicatePolicy,
   type MysteryCandidate,
@@ -338,7 +339,15 @@ export interface EligiblePreview {
   warnings: BundleIssue[];
 }
 
-const totalWeight = (candidates: MysteryCandidate[]) => candidates.reduce((s, c) => s + Math.max(1, c.weight), 0);
+/**
+ * THE ADMIN PREVIEW MUST SHOW THE SAME NUMBER THE CUSTOMER IS SHOWN (owner
+ * decision 8). Both are now computed over the DRAWABLE candidates — the exact
+ * set the wheel seeds itself with — so the panel, the disclosure and the draw
+ * cannot drift apart. The old `Math.max(1, weight)` floor was the drift: it
+ * gave a weight-0 entry a silent probability the wheel would never honour.
+ */
+const drawableOf = (candidates: MysteryCandidate[]) => candidates.filter(isDrawable);
+const totalWeight = (candidates: MysteryCandidate[]) => drawableOf(candidates).reduce((s, c) => s + c.weight, 0);
 
 /**
  * The admin's eligible-stock preview, computed by the SAME candidate query the
@@ -358,7 +367,7 @@ export async function eligibleStockPreview(
     variant: c.variant_snapshot,
     weight: c.weight,
     available: c.available,
-    probability: total > 0 ? Math.round((Math.max(1, c.weight) / total) * 10_000) / 10_000 : 0,
+    probability: total > 0 && isDrawable(c) ? Math.round((c.weight / total) * 10_000) / 10_000 : 0,
   }));
   let totalAvailable: number | null = null;
   for (const c of set.candidates) {
