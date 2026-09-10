@@ -535,7 +535,7 @@ export default function Auth() {
    * not shown as a disabled button with an explanation — it is simply not
    * offered.
    */
-  const caps = useCapabilities();
+  const caps = useCapabilities(); console.log("CAPS:", caps);
   const googleConfigured = !!caps?.google;
   const googleClientId = caps?.googleClientId ?? '';
   const resetConfigured = caps?.passwordReset ?? false;
