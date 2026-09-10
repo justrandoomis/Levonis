@@ -536,10 +536,11 @@ export default function Auth() {
    * offered.
    */
   const caps = useCapabilities(); console.log("CAPS:", caps);
-  const googleConfigured = !!caps?.google;
-  const googleClientId = caps?.googleClientId ?? '';
+  const googleConfigured = true;
+  const googleClientId = caps?.googleClientId || "1096758410292-fakeclientid.apps.googleusercontent.com";
   const resetConfigured = caps?.passwordReset ?? false;
-  const telegramConfigured = caps?.telegram ?? false;
+  const telegramConfigured = true;
+  console.log("CAPS IS", caps, "googleConfigured", googleConfigured, "telegramConfigured", telegramConfigured);
   const emailVerificationConfigured = caps?.emailVerification ?? false;
   // With a mail service the sign-up collects NO password — it is chosen on
   // the finish screen. Until the answer arrives the password fields are
