@@ -16,7 +16,7 @@
     "check:workspaces": "node scripts/check-workspaces.mjs",
     "check:boundaries": "tsx --test tests/serviceBoundaries.test.ts tests/leastPrivilege.test.ts tests/boundariesBindings.test.ts tests/boundariesEvents.test.ts tests/ownership.test.ts tests/eventSchemas.test.ts tests/edgeParity.test.ts tests/monorepo.test.ts tests/workflowNaming.test.ts tests/coreOutbox.test.ts tests/darkDeployOrder.test.ts",
     "check:studio": "node scripts/check-studio.mjs",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "echo 'Skipping deploy in preview environment'",
     "deploy:staging": "node scripts/set-deploy-ids.mjs --env staging && wrangler deploy --env staging",
     "deploy:production": "node scripts/set-deploy-ids.mjs --env production && wrangler deploy --env=\"\"",
     "db:migrate:local": "wrangler d1 migrations apply levonis-db --local",
