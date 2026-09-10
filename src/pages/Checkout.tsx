@@ -249,6 +249,7 @@ export default function Checkout() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
   const [loadError, setLoadError] = useState('');
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
@@ -847,12 +848,15 @@ export default function Checkout() {
           </div>
 
           {/* Section: Address */}
-          <section>
+          <section className="scroll-mt-24" id="section-address">
             <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
-              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">1</span>
+              <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${activeStep === 1 ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'}`}>1</span>
               {dir === 'rtl' ? 'عنوان التوصيل' : 'Shipping Address'}
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {activeStep === 1 ? (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addresses.map(addr => (
                 <label key={addr.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
                     selectedAddressId === addr.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
@@ -913,15 +917,33 @@ export default function Checkout() {
                 {dir === 'rtl' ? 'أضف عنوان توصيل لإتمام الطلب.' : 'Add a delivery address to place your order.'}
               </p>
             )}
+                <div className="mt-6 flex justify-end">
+                  <button onClick={() => setActiveStep(2)} disabled={!selectedAddressId} className="px-6 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-200 transition-colors disabled:opacity-50">
+                    {dir === 'rtl' ? 'متابعة' : 'Continue'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center bg-[#0a0a0a] p-4 rounded-xl border border-white/5">
+                <div className="flex items-center gap-3">
+                  <MapPin className="text-white w-5 h-5" strokeWidth={1.5} />
+                  <span className="text-zinc-300 font-light text-sm">{addresses.find(a => a.id === selectedAddressId)?.address || 'Address'}</span>
+                </div>
+                <button onClick={() => setActiveStep(1)} className="text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white">
+                  {dir === 'rtl' ? 'تعديل' : 'Edit'}
+                </button>
+              </div>
+            )}
           </section>
-
-          {/* Section: Delivery Method */}
-          <section>
+{/* Section: Delivery Method */}
+          <section className="scroll-mt-24" id="section-delivery-method">
             <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
-              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">2</span>
+              <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${activeStep === 2 ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'}`}>2</span>
               {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
             </h2>
-            <div className="grid grid-cols-1 gap-3">
+            {activeStep === 2 ? (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+<div className="grid grid-cols-1 gap-3">
               {checkoutDeliveryMethods.map(method => (
                 <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-4 ${
                   deliveryMethod === method.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
@@ -949,15 +971,35 @@ export default function Checkout() {
                 </label>
               ))}
             </div>
+                <div className="mt-6 flex justify-between">
+                  <button onClick={() => setActiveStep(1)} className="px-6 py-2.5 text-zinc-400 font-medium rounded-xl hover:text-white hover:bg-white/5 transition-colors">
+                    {dir === 'rtl' ? 'رجوع' : 'Back'}
+                  </button>
+                  <button onClick={() => setActiveStep(3)} disabled={!deliveryMethod} className="px-6 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-200 transition-colors disabled:opacity-50">
+                    {dir === 'rtl' ? 'متابعة' : 'Continue'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center bg-[#0a0a0a] p-4 rounded-xl border border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="text-zinc-300 font-light text-sm">{checkoutDeliveryMethods.find(m => m.id === deliveryMethod)?.titleEn || 'Delivery'}</div>
+                </div>
+                <button onClick={() => setActiveStep(2)} className="text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white">
+                  {dir === 'rtl' ? 'تعديل' : 'Edit'}
+                </button>
+              </div>
+            )}
           </section>
-
-          {/* Section: Payment Method */}
-          <section>
+{/* Section: Payment Method */}
+          <section className="scroll-mt-24" id="section-payment-method">
             <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
-              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">3</span>
+              <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${activeStep === 3 ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'}`}>3</span>
               {dir === 'rtl' ? 'طريقة الدفع' : 'Payment Method'}
             </h2>
-            <div className="grid grid-cols-1 gap-3">
+            {activeStep === 3 ? (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+<div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
                 <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-4 ${
                   paymentMethod === method.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
@@ -982,7 +1024,27 @@ export default function Checkout() {
                 </label>
               ))}
             </div>
+                <div className="mt-6 flex justify-between">
+                  <button onClick={() => setActiveStep(2)} className="px-6 py-2.5 text-zinc-400 font-medium rounded-xl hover:text-white hover:bg-white/5 transition-colors">
+                    {dir === 'rtl' ? 'رجوع' : 'Back'}
+                  </button>
+                  <button onClick={() => setActiveStep(4)} disabled={!paymentMethod} className="px-6 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-200 transition-colors disabled:opacity-50">
+                    {dir === 'rtl' ? 'متابعة' : 'Continue'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center bg-[#0a0a0a] p-4 rounded-xl border border-white/5">
+                <div className="flex items-center gap-3">
+                  <span className="text-zinc-300 font-light text-sm">{checkoutPaymentMethods.find(m => m.id === paymentMethod)?.titleEn || 'Payment'}</span>
+                </div>
+                <button onClick={() => setActiveStep(3)} className="text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white">
+                  {dir === 'rtl' ? 'تعديل' : 'Edit'}
+                </button>
+              </div>
+            )}
           </section>
+
 
           {/* Mobile CTA */}
           <div className="pt-6 lg:hidden">

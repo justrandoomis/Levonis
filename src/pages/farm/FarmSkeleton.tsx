@@ -1,49 +1,24 @@
 import React from 'react';
 import { Skeleton, SkeletonGroup } from '../../components/ui/Skeleton';
 
-/**
- * Eager and tiny: the Suspense fallback for the lazy farm chunk AND the
- * first-load state, so the layout never jumps. Mirrors the real page: the
- * header bar, the room, three machine rows and the bottom tab bar.
- */
-export default function FarmSkeleton() {
+export function GamesPageSkeleton() {
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a]" data-farm-skeleton>
-      <SkeletonGroup className="flex-1 min-h-0 flex flex-col">
-        <div className="h-[56px] px-4 flex items-center gap-3 border-b border-zinc-900" aria-hidden="true">
-          <Skeleton className="w-9 h-9 rounded-full" />
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="ms-auto h-8 w-24 rounded-full" />
+    <div className="min-h-screen bg-black text-white p-6 max-w-3xl mx-auto">
+      <SkeletonGroup>
+        <div className="flex items-center gap-3 mb-6">
+          <Skeleton className="w-10 h-10 rounded-xl" />
+          <Skeleton className="w-40 h-8 rounded-lg" />
         </div>
-        <div className="p-4 space-y-4 max-w-2xl mx-auto w-full" aria-hidden="true">
-          <Skeleton className="w-full aspect-[4/3] rounded-2xl" />
-          <Skeleton className="h-14 w-full rounded-2xl" />
-          <Skeleton className="h-14 w-full rounded-2xl" />
-          <Skeleton className="h-14 w-full rounded-2xl" />
-        </div>
-        <div className="mt-auto px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" aria-hidden="true">
-          <Skeleton className="h-[60px] w-full rounded-[28px]" />
+        <Skeleton className="w-full h-48 rounded-2xl mb-6" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Skeleton className="h-32 rounded-2xl" />
+          <Skeleton className="h-32 rounded-2xl" />
         </div>
       </SkeletonGroup>
     </div>
   );
 }
 
-/** The hub / leaderboard / profile pages while their chunk loads. */
-export function GamesPageSkeleton() {
-  return (
-    <div className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a]">
-      <SkeletonGroup>
-        <div className="h-[56px] px-4 flex items-center gap-3 border-b border-zinc-900" aria-hidden="true">
-          <Skeleton className="w-9 h-9 rounded-full" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-        <div className="p-4 space-y-4 max-w-2xl mx-auto w-full" aria-hidden="true">
-          <Skeleton className="h-44 w-full rounded-2xl" />
-          <Skeleton className="h-16 w-full rounded-2xl" />
-          <Skeleton className="h-16 w-full rounded-2xl" />
-        </div>
-      </SkeletonGroup>
-    </div>
-  );
+export default function FarmSkeleton() {
+  return <GamesPageSkeleton />;
 }

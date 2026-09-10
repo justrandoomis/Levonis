@@ -1,0 +1,6 @@
+{
+  "name": "Levonis",
+  "description": "Storefront and community platform for 3D-printing products, printers, filaments, and parts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -93,6 +93,12 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
     if (timer) clearTimeout(timer);
     opts?.signal?.removeEventListener('abort', onCallerAbort);
   }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
+  }
+
   let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
   try {
     data = await res.json();
@@ -116,7 +122,12 @@ export const api = {
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('POST', path, body, opts),
   put: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PUT', path, body, opts),
   patch: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PATCH', path, body, opts),
-  delete: <T>(path: string, opts?: RequestOptions) => request<T>('DELETE', path, undefined, opts),
+  delete: <T>(path: string, bodyOrOpts?: unknown, opts?: RequestOptions) => {
+    if (bodyOrOpts && typeof bodyOrOpts === 'object' && ('signal' in bodyOrOpts || 'timeoutMs' in bodyOrOpts)) {
+      return request<T>('DELETE', path, undefined, bodyOrOpts as RequestOptions);
+    }
+    return request<T>('DELETE', path, bodyOrOpts, opts);
+  },
 };
 
 /** True for a request the CALLER cancelled — never worth showing to anyone. */

@@ -116,6 +116,32 @@ export function priceMode(row: Partial<PriceFields> | null | undefined, field: P
   return 'inherit';
 }
 
+export interface ModelTransportOverride {
+  method: 'air' | 'sea' | 'land' | string;
+  enabled?: boolean;
+  commission_iqd?: number | null;
+  surcharge_iqd?: number | null;
+  surcharge_adjust_iqd?: number | null;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+}
+
+export interface ModelDirectConfig extends Partial<PriceFields> {
+  enabled?: boolean;
+  stock?: number | null;
+  surcharge_iqd?: number | null;
+}
+
+export interface ModelPreorderConfig extends Partial<PriceFields> {
+  enabled?: boolean;
+  stock?: number | null;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  transports?: ModelTransportOverride[];
+}
+
 export interface OptionV2 extends PriceFields {
   id: string;
   name_ar: string;
@@ -156,6 +182,10 @@ export interface OptionV2 extends PriceFields {
   sku_part?: string;
   /** Warn level for this option's own stock; null = no warning configured. */
   low_stock_threshold?: number | null;
+  /** Model-level Direct Sale override configuration */
+  direct?: ModelDirectConfig;
+  /** Model-level Pre-order override configuration */
+  preorder?: ModelPreorderConfig;
 }
 
 export interface ColorV2 extends PriceFields {
@@ -309,6 +339,10 @@ export interface ResolvedPrice {
   warranty: ResolvedWarranty | null;
   unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee
   errors: string[]; // non-empty = selection invalid, reject server-side
+  /** Authoritative fulfillment type resolved for this line */
+  fulfillment_type?: 'direct_sale' | 'pre_order';
+  /** Isolated stock quantity available for this specific fulfillment type */
+  stock_available?: number | null;
 }
 
 /** How a pre-order line is being paid, which decides its availability fee. */
@@ -522,6 +556,7 @@ export function resolveUnitPrice(input: {
   product: PricingProduct;
   optionId?: string | null;
   colorId?: string | null;
+  fulfillmentType?: 'direct_sale' | 'pre_order' | null;
   transportMethod?: string | null; // '' | air | sea | land
   warrantyPlanId?: string | null;
   tier: Tier;
@@ -548,10 +583,8 @@ export function resolveUnitPrice(input: {
   const proPolicy = input.proPolicy ?? DEFAULT_PRO_POLICY;
   const preorderPricing: PreorderPricing = input.preorderPricing === 'cod' ? 'cod' : 'prepaid';
   const errors: string[] = [];
-  // The direct-sale premium, read once: it decides both what a direct-priced
-  // line pays and whether cash on delivery can re-price a pre-order at all.
-  const directSurcharge = product.direct_surcharge_iqd ?? null;
-  const hasDirectPremium = typeof directSurcharge === 'number' && Number.isInteger(directSurcharge) && directSurcharge > 0;
+  const method = (input.transportMethod ?? '').trim();
+  const productSaleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
 
   const option = input.optionId
     ? product.options.find((o) => o.id === input.optionId) ?? null
@@ -569,40 +602,105 @@ export function resolveUnitPrice(input: {
     errors.push('COLOR_OPTION_MISMATCH');
   }
 
-  // Per-field independent inheritance. Regular is resolved first because the
-  // member fields may need to anchor an adjustment on it.
+  // Determine authoritative fulfillment type
+  let fulfillmentType: 'direct_sale' | 'pre_order' = input.fulfillmentType || 'direct_sale';
+  if (!input.fulfillmentType) {
+    if (method) {
+      fulfillmentType = 'pre_order';
+    } else if (option?.availability_type === 'pre_order' || (option?.preorder?.enabled && option?.direct?.enabled === false)) {
+      fulfillmentType = 'pre_order';
+    } else if (option?.availability_type === 'direct_sale' || (option?.direct?.enabled && option?.preorder?.enabled === false)) {
+      fulfillmentType = 'direct_sale';
+    } else {
+      const optionAvailability = effectiveAvailability(option, productSaleTypes);
+      fulfillmentType = optionAvailability === 'pre_order' ? 'pre_order' : 'direct_sale';
+    }
+  }
+
+  // Check fulfillment availability on option
+  if (fulfillmentType === 'direct_sale') {
+    if (option?.direct?.enabled === false) {
+      errors.push('DIRECT_SALE_DISABLED');
+    }
+  } else if (fulfillmentType === 'pre_order') {
+    if (option?.preorder?.enabled === false) {
+      errors.push('PREORDER_DISABLED');
+    }
+  }
+
+  // Direct surcharge discovery: check option-level override first, then product default
+  let directSurcharge: number | null = null;
+  let hasFixedDirectPrice = false;
+
+  if (fulfillmentType === 'direct_sale' && option?.direct) {
+    if (typeof option.direct.regular_price_iqd === 'number' && Number.isInteger(option.direct.regular_price_iqd)) {
+      hasFixedDirectPrice = true;
+    }
+    if (typeof option.direct.surcharge_iqd === 'number' && Number.isInteger(option.direct.surcharge_iqd)) {
+      directSurcharge = option.direct.surcharge_iqd;
+    } else if (typeof option.direct.regular_adjust_iqd === 'number' && Number.isInteger(option.direct.regular_adjust_iqd)) {
+      directSurcharge = option.direct.regular_adjust_iqd;
+    }
+  }
+  if (directSurcharge === null) {
+    directSurcharge = product.direct_surcharge_iqd ?? null;
+  }
+  const hasDirectPremium = typeof directSurcharge === 'number' && Number.isInteger(directSurcharge) && directSurcharge > 0;
+
+  // Base price ladder resolution
   const regular = pick('regular_price_iqd', color, option, product.price_iqd);
-  // PRIME and PRO carry every surcharge the regular ladder added (see
-  // memberAtRung); cost does not — a surcharge says nothing about what the
-  // extra costs the store, and inventing a cost would make §12 profit wrong.
+  let regularIqd = regular.value ?? product.price_iqd;
+
+  // Apply model-level price override if specified
+  if (fulfillmentType === 'direct_sale' && option?.direct) {
+    if (hasFixedDirectPrice && typeof option.direct.regular_price_iqd === 'number') {
+      regularIqd = option.direct.regular_price_iqd;
+    }
+  } else if (fulfillmentType === 'pre_order' && option?.preorder) {
+    if (typeof option.preorder.regular_price_iqd === 'number' && Number.isInteger(option.preorder.regular_price_iqd)) {
+      regularIqd = option.preorder.regular_price_iqd;
+    } else if (typeof option.preorder.regular_adjust_iqd === 'number' && Number.isInteger(option.preorder.regular_adjust_iqd)) {
+      regularIqd = Math.max(0, regularIqd + option.preorder.regular_adjust_iqd);
+    }
+  }
+
   const proExplicit = pickMember('pro_price_iqd', color, option, product.pro_price_iqd, regular.at);
   const primeExplicit = pickMember('prime_price_iqd', color, option, product.prime_price_iqd, regular.at);
   const cost = pick('cost_iqd', color, option, product.product_cost_iqd);
 
-  const regularIqd = regular.value ?? product.price_iqd;
   if (!Number.isInteger(regularIqd) || regularIqd < 0) errors.push('REGULAR_PRICE_INVALID');
 
-  // PRO resolution: explicit price, else policy, else (below) the line's PRIME
-  // price, else none.
+  // PRO resolution: explicit price, else policy, else line's PRIME price, else none.
   let proIqd: number | null = null;
-  if (proExplicit.value !== null && proExplicit.value !== undefined) {
-    proIqd = proExplicit.value;
+  let proExplicitVal = proExplicit.value;
+  if (fulfillmentType === 'direct_sale' && typeof option?.direct?.pro_price_iqd === 'number') {
+    proExplicitVal = option.direct.pro_price_iqd;
+  } else if (fulfillmentType === 'pre_order' && typeof option?.preorder?.pro_price_iqd === 'number') {
+    proExplicitVal = option.preorder.pro_price_iqd;
+  }
+
+  if (proExplicitVal !== null && proExplicitVal !== undefined) {
+    proIqd = proExplicitVal;
   } else if (proPolicy.mode === 'global_percent' && proPolicy.percent !== null && proPolicy.percent > 0) {
     proIqd = Math.max(0, regularIqd - Math.floor((regularIqd * proPolicy.percent) / 100));
   }
 
-  // PRIME resolution: explicit price only — no store-wide percentage policy,
-  // because §5 defines the PRIME discount as a per-product/per-variant price.
-  let primeIqd: number | null =
-    primeExplicit.value !== null && primeExplicit.value !== undefined ? primeExplicit.value : null;
+  // PRIME resolution: explicit price only
+  let primeIqd: number | null = null;
+  let primeExplicitVal = primeExplicit.value;
+  if (fulfillmentType === 'direct_sale' && typeof option?.direct?.prime_price_iqd === 'number') {
+    primeExplicitVal = option.direct.prime_price_iqd;
+  } else if (fulfillmentType === 'pre_order' && typeof option?.preorder?.prime_price_iqd === 'number') {
+    primeExplicitVal = option.preorder.prime_price_iqd;
+  }
+  if (primeExplicitVal !== null && primeExplicitVal !== undefined) {
+    primeIqd = primeExplicitVal;
+  }
 
-  // The ladder the customer is charged from is PRO <= PRIME <= Regular, and a
-  // PRO member never pays more than a PRIME member (clampMemberLadder). The
-  // Quick Edit grid applies the same function to its cells, which is what
-  // keeps the admin's numbers and the cart's identical.
+  // Clamp PRO <= PRIME <= Regular
   ({ prime: primeIqd, pro: proIqd } = clampMemberLadder(regularIqd, primeIqd, proIqd));
 
-  // §5 precedence: active PRO first, then active PRIME, then regular.
+  // Precedence: active PRO first, then active PRIME, then regular.
   const isPro = input.tier === 'pro' && input.tierActive;
   const isPrime = input.tier === 'prime' && input.tierActive;
   let appliedIqd = regularIqd;
@@ -615,61 +713,46 @@ export function resolveUnitPrice(input: {
     appliedTier = 'prime';
   }
 
-  // Preorder transport commission — added on top; waived for active PRO, and
-  // not charged at all when the line is paid cash on delivery (priced as a
-  // direct sale below — the transport itself stays, because the journey does).
+  // Preorder transport commission
   let transport: ResolvedPrice['transport'] = null;
-  const method = (input.transportMethod ?? '').trim();
-  const productSaleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
 
-  /**
-   * THE CHOSEN OPTION MAY DECIDE HOW THIS LINE IS FULFILLED.
-   *
-   * Until now a line's route came only from the product: a pre-order-only
-   * product demanded a transport, a direct-only one refused it, and a product
-   * selling both ways let the transport selection decide. That is still
-   * exactly what happens when the option has no opinion — which is every
-   * option that existed before this feature, so no priced line changes.
-   *
-   * When the option DOES declare itself, it narrows the line to its own route
-   * and nothing else: choosing "A1 Combo — Direct Sale" cannot be turned into
-   * a pre-order by adding a transport to the request, and choosing
-   * "A1 Combo — Pre-order" cannot skip one. That is what makes the four
-   * cells of the owner's grid genuinely independent rather than four labels
-   * over one shared fulfilment decision.
-   */
-  const optionAvailability = effectiveAvailability(option, productSaleTypes);
-  const saleTypes = optionAvailability ? [optionAvailability] : productSaleTypes;
-  if (saleTypes.includes('pre_order') && (saleTypes.length === 1 || method)) {
+  if (fulfillmentType === 'pre_order') {
     if (!method) {
       errors.push('TRANSPORT_REQUIRED');
     } else {
-      const offer = product.preorder_transports.find((t) => t.method === method && t.active !== false);
-      if (!offer) {
+      // Check option-level transport override first
+      const modelTransport = option?.preorder?.transports?.find((t) => t.method === method);
+      if (modelTransport && modelTransport.enabled === false) {
         errors.push('TRANSPORT_NOT_OFFERED');
       } else {
-        let commission = offer.commission_iqd;
-        if (commission === null || commission === undefined) {
-          const def = (input.transportDefaults ?? []).find((d) => d.method === method);
-          commission = def ? def.commission_iqd : null;
-        }
-        if (commission === null || commission === undefined) {
-          errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
-        } else if (preorderPricing === 'cod' && hasDirectPremium) {
-          // Cash on delivery: the owner's rule is that this line follows the
-          // DIRECT-SALE pricing, so the commission is not the fee here — the
-          // direct premium below is. The method stays: shipping_type, the
-          // fourteen stages, tracking and the gift rule all read it. Only
-          // when there IS a direct premium to price the line with: a product
-          // with none keeps its commission (the branch below), so the door is
-          // never cheaper than the wallet.
-          transport = { method, commission_iqd: commission, waived: true, waived_by: 'cod_direct_pricing' };
+        const offer = product.preorder_transports.find((t) => t.method === method && t.active !== false);
+        if (!modelTransport && !offer) {
+          errors.push('TRANSPORT_NOT_OFFERED');
         } else {
-          // §5: "لا تمنح PRIME أي ميزة PRO أخرى تلقائيًا" — the preorder
-          // commission waiver stays PRO-only.
-          transport = isPro
-            ? { method, commission_iqd: commission, waived: true, waived_by: 'pro' }
-            : { method, commission_iqd: commission, waived: false };
+          let commission: number | null = null;
+          if (typeof modelTransport?.commission_iqd === 'number' && Number.isInteger(modelTransport.commission_iqd)) {
+            commission = modelTransport.commission_iqd;
+          } else if (typeof modelTransport?.surcharge_iqd === 'number' && Number.isInteger(modelTransport.surcharge_iqd)) {
+            commission = modelTransport.surcharge_iqd;
+          } else if (typeof modelTransport?.surcharge_adjust_iqd === 'number' && Number.isInteger(modelTransport.surcharge_adjust_iqd)) {
+            const baseCommission = offer?.commission_iqd ?? (input.transportDefaults ?? []).find((d) => d.method === method)?.commission_iqd ?? 0;
+            commission = Math.max(0, baseCommission + modelTransport.surcharge_adjust_iqd);
+          } else if (offer && typeof offer.commission_iqd === 'number' && Number.isInteger(offer.commission_iqd)) {
+            commission = offer.commission_iqd;
+          } else {
+            const def = (input.transportDefaults ?? []).find((d) => d.method === method);
+            commission = def ? def.commission_iqd : null;
+          }
+
+          if (commission === null || commission === undefined) {
+            errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
+          } else if (preorderPricing === 'cod' && hasDirectPremium) {
+            transport = { method, commission_iqd: commission, waived: true, waived_by: 'cod_direct_pricing' };
+          } else {
+            transport = isPro
+              ? { method, commission_iqd: commission, waived: true, waived_by: 'pro' }
+              : { method, commission_iqd: commission, waived: false };
+          }
         }
       }
     }
@@ -678,46 +761,38 @@ export function resolveUnitPrice(input: {
     errors.push('TRANSPORT_NOT_APPLICABLE');
   }
 
-  // Direct-sale premium. It applies on a line PRICED as a direct sale: one
-  // actually fulfilled from stock (direct sale enabled, no transport chosen),
-  // or a pre-order line paid cash on delivery (`codDirectPricing` — the
-  // transport resolved above and the commission stepped aside). A prepaid
-  // pre-order line pays its commission instead; the two never stack. The
-  // customer is shown only the FINAL price (mandate: «يظهر له السعر النهائي
-  // فقط مع الزياده»), so the premium folds into unit_subtotal_iqd exactly
-  // like the commission — and, like the commission, an active PRO is exempt
-  // from it (the owner: «Pro Card users are exempt from this additional
-  // shipping-type cost»). The resolver's `isPro` is already the checkout's
-  // proContext gate (approved default address, benefits not restricted), so
-  // the two waivers can never disagree about who is PRO.
+  // Direct-sale premium
   let direct: ResolvedPrice['direct'] = null;
-  const directEnabled =
-    saleTypes.includes('direct_sale') ||
-    // A bundle is a catalogue classification, not a route, so it only enables
-    // direct fulfilment while the OPTION has not named a route of its own.
-    (!optionAvailability && productSaleTypes.includes('bundle'));
   const codDirectPricing = transport !== null && transport.waived_by === 'cod_direct_pricing';
-  const directPriced = (!method && directEnabled) || codDirectPricing;
-  if (directPriced && hasDirectPremium) {
-    direct = { surcharge_iqd: directSurcharge as number, waived: isPro };
+  const directPriced = (fulfillmentType === 'direct_sale' && !method) || codDirectPricing;
+
+  if (directPriced) {
+    if (hasFixedDirectPrice) {
+      // When the model specifies an explicit fixed direct price, that price ALREADY includes the direct sale amount.
+      // We do not add direct_surcharge_iqd on top (avoid double-counting!).
+      // If buyer is active PRO without explicit PRO price, they pay the base option price:
+      const baseOptionRegular = regular.value ?? product.price_iqd;
+      const directPremium = Math.max(0, regularIqd - baseOptionRegular);
+      if (isPro && proExplicitVal === null && directPremium > 0) {
+        appliedIqd = Math.min(appliedIqd, baseOptionRegular);
+      }
+      if (directPremium > 0 || (directSurcharge && directSurcharge > 0)) {
+        direct = { surcharge_iqd: directPremium || (directSurcharge as number), waived: isPro };
+      }
+    } else if (hasDirectPremium) {
+      direct = { surcharge_iqd: directSurcharge as number, waived: isPro };
+    }
   }
-  // 'preorder' only while the commission is the fee actually in force.
+
   const pricingBasis: ResolvedPrice['pricing_basis'] = transport !== null && !codDirectPricing ? 'preorder' : 'direct';
 
-  // Warranty fee — added on top of the resolved price; never waived by tier.
-  // A percent plan is priced on the REGULAR price of this exact selection
-  // (option and colour surcharges included), so a PRO and a guest pay the
-  // same dinar for the same extension; the rounding happens once, here, and
-  // the product page, the cart and the checkout all read this number.
+  // Warranty fee
   let warranty: ResolvedPrice['warranty'] = null;
   if (input.warrantyPlanId) {
     const plan = product.warranty_plans.find((w) => w.id === input.warrantyPlanId && w.active !== false);
     if (!plan) {
       errors.push('WARRANTY_PLAN_NOT_FOUND');
     } else {
-      // A printer's base defaults to 12 months when its ops_policy never said
-      // (worker/lib/warrantyPlans.ts) — the same answer the delivered unit
-      // will record, so the snapshot's 24/36 promise is one the store keeps.
       const baseMonths = effectiveBaseMonths(product.warranty_base_months ?? null, input.isPrinter === true);
       warranty = {
         plan_id: plan.id,
@@ -734,9 +809,19 @@ export function resolveUnitPrice(input: {
     }
   }
 
+  // Stock isolation
+  let stockAvailable: number | null = null;
+  if (fulfillmentType === 'direct_sale') {
+    stockAvailable = option?.direct?.stock !== undefined ? option.direct.stock : (option?.stock !== undefined ? option.stock : null);
+  } else {
+    // Pre-order stock is isolated: never consumes direct stock!
+    stockAvailable = option?.preorder?.stock !== undefined ? option.preorder.stock : null;
+  }
+
+  // When direct surcharge is added as separate line fee (only when NOT already baked in fixed direct price)
   const commissionEffective = transport && !transport.waived ? transport.commission_iqd : 0;
   const warrantyFee = warranty ? warranty.fee_iqd : 0;
-  const directFee = direct && !direct.waived ? direct.surcharge_iqd : 0;
+  const directFee = (!hasFixedDirectPrice && direct && !direct.waived) ? direct.surcharge_iqd : 0;
   const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
 
   return {
@@ -753,6 +838,8 @@ export function resolveUnitPrice(input: {
     warranty,
     unit_subtotal_iqd: unitSubtotal,
     errors,
+    fulfillment_type: fulfillmentType,
+    stock_available: stockAvailable,
   };
 }
 

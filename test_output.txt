@@ -1,0 +1,2424 @@
+TAP version 13
+# Subtest: envelope validation accepts the fixture and rejects bad payloads, foreign keys, bad ids and malformed signatures
+ok 1 - envelope validation accepts the fixture and rejects bad payloads, foreign keys, bad ids and malformed signatures
+  ---
+  duration_ms: 3.666025
+  type: 'test'
+  ...
+# Subtest: payload schemas are allowlists with pii annotations; the registry resolves by type and version
+ok 2 - payload schemas are allowlists with pii annotations; the registry resolves by type and version
+  ---
+  duration_ms: 2.858193
+  type: 'test'
+  ...
+# Subtest: subscriptions: producers allowlist with the audit wildcard; PII gate per consumer
+ok 3 - subscriptions: producers allowlist with the audit wildcard; PII gate per consumer
+  ---
+  duration_ms: 0.378913
+  type: 'test'
+  ...
+# Subtest: ownership map: every design table has one owner; rebuild artefacts and platform tables resolve to their owner
+ok 4 - ownership map: every design table has one owner; rebuild artefacts and platform tables resolve to their owner
+  ---
+  duration_ms: 0.541711
+  type: 'test'
+  ...
+# Subtest: every Phase 1 service with an HTTP surface has a contract file, and nothing else is in http/
+ok 5 - every Phase 1 service with an HTTP surface has a contract file, and nothing else is in http/
+  ---
+  duration_ms: 2.680131
+  type: 'test'
+  ...
+# Subtest: every contract file is re-exported from the package index
+ok 6 - every contract file is re-exported from the package index
+  ---
+  duration_ms: 0.444291
+  type: 'test'
+  ...
+# Subtest: per-service contract files are type-only: no value survives compilation
+ok 7 - per-service contract files are type-only: no value survives compilation
+  ---
+  duration_ms: 1.60356
+  type: 'test'
+  ...
+# Subtest: objects are allowlists: a missing field, an unknown key or a wrong type names the exact path
+ok 8 - objects are allowlists: a missing field, an unknown key or a wrong type names the exact path
+  ---
+  duration_ms: 5.04205
+  type: 'test'
+  ...
+# Subtest: primitive checks: ids, amounts, dates, uuid v7, hex digests; optional keys
+ok 9 - primitive checks: ids, amounts, dates, uuid v7, hex digests; optional keys
+  ---
+  duration_ms: 1.53618
+  type: 'test'
+  ...
+# Subtest: canonical JSON sorts keys recursively, drops undefined, refuses NaN; base64url round-trips
+ok 10 - canonical JSON sorts keys recursively, drops undefined, refuses NaN; base64url round-trips
+  ---
+  duration_ms: 15.430113
+  type: 'test'
+  ...
+# (node:8846) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: bus off: the facade writes exactly today audit_log row and nothing else
+ok 11 - bus off: the facade writes exactly today audit_log row and nothing else
+  ---
+  duration_ms: 15.635614
+  type: 'test'
+  ...
+# Subtest: bus on: dual-write — audit_log + AuditRecorded outbox row + the detail body in <svc>_audit_details, all in one batch
+ok 12 - bus on: dual-write — audit_log + AuditRecorded outbox row + the detail body in <svc>_audit_details, all in one batch
+  ---
+  duration_ms: 3.701641
+  type: 'test'
+  ...
+# Subtest: a service without the legacy table writes only the outbox pair; a failing standalone audit() never throws
+ok 13 - a service without the legacy table writes only the outbox pair; a failing standalone audit() never throws
+  ---
+  duration_ms: 3.060231
+  type: 'test'
+  ...
+# (node:8857) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: publish -> pumpIds delivers only the committed ids to every PII-eligible subscriber, one bookkeeping statement per deliver()
+ok 14 - publish -> pumpIds delivers only the committed ids to every PII-eligible subscriber, one bookkeeping statement per deliver()
+  ---
+  duration_ms: 13.528155
+  type: 'test'
+  ...
+# Subtest: a personal event never reaches Analytics; an unbound subscriber leaves its delivery pending (the event is not dispatched)
+ok 15 - a personal event never reaches Analytics; an unbound subscriber leaves its delivery pending (the event is not dispatched)
+  ---
+  duration_ms: 3.845651
+  type: 'test'
+  ...
+# Subtest: a failing consumer backs off exponentially and is dead after 8 attempts; the others are unaffected
+ok 16 - a failing consumer backs off exponentially and is dead after 8 attempts; the others are unaffected
+  ---
+  duration_ms: 11.898107
+  type: 'test'
+  ...
+# Subtest: schema-invalid / forged outcomes are dead at once (poison never blocks the stream)
+ok 17 - schema-invalid / forged outcomes are dead at once (poison never blocks the stream)
+  ---
+  duration_ms: 3.095878
+  type: 'test'
+  ...
+# Subtest: the cron pump is the only lock holder: a second concurrent pump returns null; budgets stop a run and the next run continues
+ok 18 - the cron pump is the only lock holder: a second concurrent pump returns null; budgets stop a run and the next run continues
+  ---
+  duration_ms: 8.1958
+  type: 'test'
+  ...
+# Subtest: best_effort telemetry never touches the outbox and is dropped on failure
+ok 19 - best_effort telemetry never touches the outbox and is dropped on failure
+  ---
+  duration_ms: 2.74613
+  type: 'test'
+  ...
+# Subtest: deliver() batches are capped at 50 events and 500 KB; queue chunks at 100 messages / 256 KB with pointers above 100 KB
+ok 20 - deliver() batches are capped at 50 events and 500 KB; queue chunks at 100 messages / 256 KB with pointers above 100 KB
+  ---
+  duration_ms: 41.224998
+  type: 'test'
+  ...
+# Subtest: queue mode reuses the same bookkeeping: a queue binding acks what it accepted
+ok 21 - queue mode reuses the same bookkeeping: a queue binding acks what it accepted
+  ---
+  duration_ms: 2.401862
+  type: 'test'
+  ...
+# Subtest: an unbound consumer backs off, dead-letters after the eighth attempt, and stops holding the event open
+ok 22 - an unbound consumer backs off, dead-letters after the eighth attempt, and stops holding the event open
+  ---
+  duration_ms: 11.060903
+  type: 'test'
+  ...
+# Subtest: an overrun run releases nothing: the lock stays with whoever holds it
+ok 23 - an overrun run releases nothing: the lock stays with whoever holds it
+  ---
+  duration_ms: 4.30088
+  type: 'test'
+  ...
+# Subtest: reads are memoised 30 s per isolate except money keys, which are read per request (TTL 0)
+ok 24 - reads are memoised 30 s per isolate except money keys, which are read per request (TTL 0)
+  ---
+  duration_ms: 2.103692
+  type: 'test'
+  ...
+# Subtest: KV source namespaces keys; memoryConfig helper; modeVar normalises on|off|log|shadow vars
+ok 25 - KV source namespaces keys; memoryConfig helper; modeVar normalises on|off|log|shadow vars
+  ---
+  duration_ms: 2.351693
+  type: 'test'
+  ...
+# (node:8871) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the idempotency guard blocks a duplicate event_id: the side effect runs once, the replay is acked as replayed
+ok 26 - the idempotency guard blocks a duplicate event_id: the side effect runs once, the replay is acked as replayed
+  ---
+  duration_ms: 32.159281
+  type: 'test'
+  ...
+# Subtest: unsigned, wrong-producer, above-PII-class and schema-invalid envelopes are refused before any state is touched
+ok 27 - unsigned, wrong-producer, above-PII-class and schema-invalid envelopes are refused before any state is touched
+  ---
+  duration_ms: 12.292743
+  type: 'test'
+  ...
+# Subtest: a handler that throws or asks for a retry yields retry (transient) and leaves no processed row; batches above 50 are refused
+ok 28 - a handler that throws or asks for a retry yields retry (transient) and leaves no processed row; batches above 50 are refused
+  ---
+  duration_ms: 7.153093
+  type: 'test'
+  ...
+# (node:8882) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: tablesInSql finds read and write positions and ignores names inside string literals and comments
+ok 29 - tablesInSql finds read and write positions and ignores names inside string literals and comments
+  ---
+  duration_ms: 4.980732
+  type: 'test'
+  ...
+# Subtest: checkStatement: owns may be written, reads only read, own platform tables implied, anything else is a violation
+ok 30 - checkStatement: owns may be written, reads only read, own platform tables implied, anything else is a violation
+  ---
+  duration_ms: 1.007236
+  type: 'test'
+  ...
+# Subtest: ownedDb throws in dark and logs in the first production release, for prepare and exec alike
+ok 31 - ownedDb throws in dark and logs in the first production release, for prepare and exec alike
+  ---
+  duration_ms: 3.004008
+  type: 'test'
+  ...
+# Subtest: inList splits at 90 and merges: 200 ids against a real SQLite table come back complete and in one list
+ok 32 - inList splits at 90 and merges: 200 ids against a real SQLite table come back complete and in one list
+  ---
+  duration_ms: 8.739705
+  type: 'test'
+  ...
+# Subtest: gatewayOnly: off passes; log counts and passes; on refuses without a valid gateway hop, accepts a signed forward and the health probe
+ok 33 - gatewayOnly: off passes; log counts and passes; on refuses without a valid gateway hop, accepts a signed forward and the health probe
+  ---
+  duration_ms: 109.634532
+  type: 'test'
+  ...
+# Subtest: the copied edge middlewares behave as the core: security headers, origin check, apex-only admin
+ok 34 - the copied edge middlewares behave as the core: security headers, origin check, apex-only admin
+  ---
+  duration_ms: 34.762444
+  type: 'test'
+  ...
+# Subtest: capabilities: longest prefix wins, admin surfaces are apex-only, money/PII admin paths need admin:full; denial bodies are today ones
+ok 35 - capabilities: longest prefix wins, admin surfaces are apex-only, money/PII admin paths need admin:full; denial bodies are today ones
+  ---
+  duration_ms: 1.505585
+  type: 'test'
+  ...
+# Subtest: scope over the principal: owner and full see money, assistant does not; stripping is recursive
+ok 36 - scope over the principal: owner and full see money, assistant does not; stripping is recursive
+  ---
+  duration_ms: 0.616844
+  type: 'test'
+  ...
+# Subtest: health: report shape, deep fan-out within a budget, probe token compare; process and realtime adapters
+ok 37 - health: report shape, deep fan-out within a budget, probe token compare; process and realtime adapters
+  ---
+  duration_ms: 22.779833
+  type: 'test'
+  ...
+# Subtest: a producer signs the canonical envelope; a consumer verifies producer key, allowlist and bytes
+ok 38 - a producer signs the canonical envelope; a consumer verifies producer key, allowlist and bytes
+  ---
+  duration_ms: 30.021346
+  type: 'test'
+  ...
+# Subtest: a signed hop verifies for the allowed issuer and method, and binds the arguments and principal
+ok 39 - a signed hop verifies for the allowed issuer and method, and binds the arguments and principal
+  ---
+  duration_ms: 28.032272
+  type: 'test'
+  ...
+# Subtest: issuer allowlist per method, replay, expiry and a tampered signature are refused
+ok 40 - issuer allowlist per method, replay, expiry and a tampered signature are refused
+  ---
+  duration_ms: 9.002413
+  type: 'test'
+  ...
+# Subtest: a retry re-signs with a fresh nonce, so the replay set does not block it
+ok 41 - a retry re-signs with a fresh nonce, so the replay set does not block it
+  ---
+  duration_ms: 5.364228
+  type: 'test'
+  ...
+# Subtest: validateOutboundUrl refuses private, loopback, mapped and credentialed addresses (the fetchGuard rules, verbatim)
+ok 42 - validateOutboundUrl refuses private, loopback, mapped and credentialed addresses (the fetchGuard rules, verbatim)
+  ---
+  duration_ms: 4.856924
+  type: 'test'
+  ...
+# Subtest: fetchWithBudget: retries on 503 only up to the budget, re-checks the SSRF guard on every redirect hop, times out
+ok 43 - fetchWithBudget: retries on 503 only up to the budget, re-checks the SSRF guard on every redirect hop, times out
+  ---
+  duration_ms: 67.545509
+  type: 'test'
+  ...
+# Subtest: a provider breaker opens after 5 failures and fails fast with 503 DEPENDENCY_UNAVAILABLE
+ok 44 - a provider breaker opens after 5 failures and fails fast with 503 DEPENDENCY_UNAVAILABLE
+  ---
+  duration_ms: 2.139216
+  type: 'test'
+  ...
+# (node:8931) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the command idempotency store is scoped to the caller: user B replaying user A key never receives A response
+ok 45 - the command idempotency store is scoped to the caller: user B replaying user A key never receives A response
+  ---
+  duration_ms: 14.500698
+  type: 'test'
+  ...
+# Subtest: keys shorter than 16 characters are refused with 400; bodies are not stored when the route recomputes
+ok 46 - keys shorter than 16 characters are refused with 400; bodies are not stored when the route recomputes
+  ---
+  duration_ms: 2.222263
+  type: 'test'
+  ...
+# Subtest: structured JSON lines carry the design fields, redact secrets and never print a token or a cookie
+ok 47 - structured JSON lines carry the design fields, redact secrets and never print a token or a cookie
+  ---
+  duration_ms: 4.504551
+  type: 'test'
+  ...
+# Subtest: info is head-sampled; warn, error and money lines are never sampled
+ok 48 - info is head-sampled; warn, error and money lines are never sampled
+  ---
+  duration_ms: 1.087139
+  type: 'test'
+  ...
+# Subtest: UUIDv7 ids are time-ordered, well-formed and carry their timestamp; correlation ids from browsers are ignored
+ok 49 - UUIDv7 ids are time-ordered, well-formed and carry their timestamp; correlation ids from browsers are ignored
+  ---
+  duration_ms: 65.267694
+  type: 'test'
+  ...
+# Subtest: the bootstrap ALLOWED_CALLER_KIDS list parses and checks kids; constant-time compare
+ok 50 - the bootstrap ALLOWED_CALLER_KIDS list parses and checks kids; constant-time compare
+  ---
+  duration_ms: 17.966188
+  type: 'test'
+  ...
+# (node:8954) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: publishStatement is a no-op while EVENT_BUS_ENABLED is off or the outbox table is absent — the business batch is identical to today
+ok 51 - publishStatement is a no-op while EVENT_BUS_ENABLED is off or the outbox table is absent — the business batch is identical to today
+  ---
+  duration_ms: 4.789555
+  type: 'test'
+  ...
+# Subtest: once the table exists and the var is on, the outbox row rides in the same batch; the probe result is cached per isolate
+ok 52 - once the table exists and the var is on, the outbox row rides in the same batch; the probe result is cached per isolate
+  ---
+  duration_ms: 2.28659
+  type: 'test'
+  ...
+# Subtest: a colliding aggregate_seq loses the EVENT, never the business batch it rides in
+ok 53 - a colliding aggregate_seq loses the EVENT, never the business batch it rides in
+  ---
+  duration_ms: 1.982017
+  type: 'test'
+  ...
+# Subtest: Uow refuses to commit a command declared as publishing without its outbox statement (bus enabled), and passes when the bus is off
+ok 54 - Uow refuses to commit a command declared as publishing without its outbox statement (bus enabled), and passes when the bus is off
+  ---
+  duration_ms: 2.395873
+  type: 'test'
+  ...
+# Subtest: signer/verifier round-trip: Identity signs, a service verifies with the published key
+ok 55 - signer/verifier round-trip: Identity signs, a service verifies with the published key
+  ---
+  duration_ms: 27.138376
+  type: 'test'
+  ...
+# Subtest: tampering with a claim is rejected; so is a signature by an unregistered or wrong-service key
+ok 56 - tampering with a claim is rejected; so is a signature by an unregistered or wrong-service key
+  ---
+  duration_ms: 9.881576
+  type: 'test'
+  ...
+# Subtest: expiry (120 s) and host_kind are enforced
+ok 57 - expiry (120 s) and host_kind are enforced
+  ---
+  duration_ms: 4.329244
+  type: 'test'
+  ...
+# Subtest: principalToSessionUser reconstructs the route shape and documents what it cannot fill
+ok 58 - principalToSessionUser reconstructs the route shape and documents what it cannot fill
+  ---
+  duration_ms: 0.640498
+  type: 'test'
+  ...
+# (node:8972) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rateLimitKey and identifierKey behave exactly as the core (user, ip, explicit; hashed identifiers)
+ok 59 - rateLimitKey and identifierKey behave exactly as the core (user, ip, explicit; hashed identifiers)
+  ---
+  duration_ms: 12.332044
+  type: 'test'
+  ...
+# Subtest: the D1 window (today SQL, run by Identity) and the memory window count the same way
+ok 60 - the D1 window (today SQL, run by Identity) and the memory window count the same way
+  ---
+  duration_ms: 3.542098
+  type: 'test'
+  ...
+# Subtest: adapters: the binding layer is a pre-filter, the D1 RPC layer is the authority; layered stops at the first refusal
+ok 61 - adapters: the binding layer is a pre-filter, the D1 RPC layer is the authority; layered stops at the first refusal
+  ---
+  duration_ms: 0.668207
+  type: 'test'
+  ...
+# Subtest: the rateLimit(c, bucket, limit, window) facade keeps today signature and semantics (429 body), and never falls back to memory silently
+ok 62 - the rateLimit(c, bucket, limit, window) facade keeps today signature and semantics (429 body), and never falls back to memory silently
+  ---
+  duration_ms: 77.464564
+  type: 'test'
+  ...
+# Subtest: circuit breaker: opens after 5 consecutive failures, half-open after 30 s with one trial, closes on success
+ok 63 - circuit breaker: opens after 5 consecutive failures, half-open after 30 s with one trial, closes on success
+  ---
+  duration_ms: 1.9057
+  type: 'test'
+  ...
+# Subtest: the client attaches a signed ctx as the last argument and returns the result
+ok 64 - the client attaches a signed ctx as the last argument and returns the result
+  ---
+  duration_ms: 29.457253
+  type: 'test'
+  ...
+# Subtest: retries only idempotent methods on transient failures, never a mutating forward; each attempt gets a fresh nonce
+ok 65 - retries only idempotent methods on transient failures, never a mutating forward; each attempt gets a fresh nonce
+  ---
+  duration_ms: 8.460455
+  type: 'test'
+  ...
+# Subtest: an open breaker fails fast with 503 DEPENDENCY_UNAVAILABLE and heals after 30 s
+ok 66 - an open breaker fails fast with 503 DEPENDENCY_UNAVAILABLE and heals after 30 s
+  ---
+  duration_ms: 7.175943
+  type: 'test'
+  ...
+# Subtest: the budget times a slow callee out (and the timeout counts as a failure)
+ok 67 - the budget times a slow callee out (and the timeout counts as a failure)
+  ---
+  duration_ms: 11.270719
+  type: 'test'
+  ...
+# (node:8995) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legal transitions only; the sweep decision follows the state
+ok 68 - legal transitions only; the sweep decision follows the state
+  ---
+  duration_ms: 1.96768
+  type: 'test'
+  ...
+# Subtest: the fence on both sides: request wins -> the sweep flips 0 rows; sweep wins -> the local batch aborts and persists nothing
+ok 69 - the fence on both sides: request wins -> the sweep flips 0 rows; sweep wins -> the local batch aborts and persists nothing
+  ---
+  duration_ms: 6.378974
+  type: 'test'
+  ...
+# Subtest: one in-flight saga per user, stuck excluded; failures count up to stuck; stale selection
+ok 70 - one in-flight saga per user, stuck excluded; failures count up to stuck; stale selection
+  ---
+  duration_ms: 7.943001
+  type: 'test'
+  ...
+# (node:9002) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: GET /health reports the service, its version and a live database
+ok 71 - GET /health reports the service, its version and a live database
+  ---
+  duration_ms: 77.782782
+  type: 'test'
+  ...
+# Subtest: GET /providers shows configured, enabled and the breaker per adapter, and the global switch
+ok 72 - GET /providers shows configured, enabled and the breaker per adapter, and the global switch
+  ---
+  duration_ms: 39.267125
+  type: 'test'
+  ...
+# Subtest: GET /event-map returns the seeded mapping with both kill switches folded in
+ok 73 - GET /event-map returns the seeded mapping with both kill switches folded in
+  ---
+  duration_ms: 7.67641
+  type: 'test'
+  ...
+# Subtest: POST /flags flips a provider and an event switch; the GLOBAL switch is not settable here
+ok 74 - POST /flags flips a provider and an event switch; the GLOBAL switch is not settable here
+  ---
+  duration_ms: 13.789206
+  type: 'test'
+  ...
+# Subtest: GET /deliveries pages, filters and reports the DLQ depth — and names no person
+ok 75 - GET /deliveries pages, filters and reports the DLQ depth — and names no person
+  ---
+  duration_ms: 12.227159
+  type: 'test'
+  ...
+# Subtest: an unknown path is a 404 in the platform envelope, not an empty body
+ok 76 - an unknown path is a 404 in the platform envelope, not an empty body
+  ---
+  duration_ms: 6.72314
+  type: 'test'
+  ...
+# Subtest: with GATEWAY_ONLY=on nothing but a health probe gets in without a signed gateway hop
+ok 77 - with GATEWAY_ONLY=on nothing but a health probe gets in without a signed gateway hop
+  ---
+  duration_ms: 4.567503
+  type: 'test'
+  ...
+# (node:9014) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: every admin route refuses a caller with no principal — including the one that flips a provider switch
+ok 78 - every admin route refuses a caller with no principal — including the one that flips a provider switch
+  ---
+  duration_ms: 78.595504
+  type: 'test'
+  ...
+# Subtest: a forged principal — signed by a key this Worker never registered — is refused
+ok 79 - a forged principal — signed by a key this Worker never registered — is refused
+  ---
+  duration_ms: 35.603122
+  type: 'test'
+  ...
+# Subtest: a customer, an assistant-scope admin and a merchant-host admin are all refused; a full admin on the apex is served
+ok 80 - a customer, an assistant-scope admin and a merchant-host admin are all refused; a full admin on the apex is served
+  ---
+  duration_ms: 12.356533
+  type: 'test'
+  ...
+# Subtest: with no caller key registered the admin surface is closed, whatever the header says
+ok 81 - with no caller key registered the admin surface is closed, whatever the header says
+  ---
+  duration_ms: 4.532403
+  type: 'test'
+  ...
+# Subtest: /health stays open — a probe that must authenticate cannot report that authentication is broken
+ok 82 - /health stays open — a probe that must authenticate cannot report that authentication is broken
+  ---
+  duration_ms: 3.90011
+  type: 'test'
+  ...
+# (node:9026) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the runtime list, the manifest and the design agree on what Ads owns
+ok 83 - the runtime list, the manifest and the design agree on what Ads owns
+  ---
+  duration_ms: 2.965037
+  type: 'test'
+  ...
+# Subtest: every table named by a SQL literal anywhere in src/ is owned by this service
+ok 84 - every table named by a SQL literal anywhere in src/ is owned by this service
+  ---
+  duration_ms: 6.261786
+  type: 'test'
+  ...
+# Subtest: the runtime guard REFUSES a foreign statement, it does not merely log it
+ok 85 - the runtime guard REFUSES a foreign statement, it does not merely log it
+  ---
+  duration_ms: 3.387359
+  type: 'test'
+  ...
+# Subtest: the consumer accepts exactly the six types subscriptions.ts lists for ads, and the manifest says the same
+ok 86 - the consumer accepts exactly the six types subscriptions.ts lists for ads, and the manifest says the same
+  ---
+  duration_ms: 0.612629
+  type: 'test'
+  ...
+# Subtest: Ads declares no call to any other service and publishes nothing yet
+ok 87 - Ads declares no call to any other service and publishes nothing yet
+  ---
+  duration_ms: 0.287071
+  type: 'test'
+  ...
+# Subtest: every secret NAME the adapters look for is declared in the manifest, and no value of one is in the tree
+ok 88 - every secret NAME the adapters look for is declared in the manifest, and no value of one is in the tree
+  ---
+  duration_ms: 4.366883
+  type: 'test'
+  ...
+# Subtest: normalisation is fixed here, so a hash computed anywhere else matches
+ok 89 - normalisation is fixed here, so a hash computed anywhere else matches
+  ---
+  duration_ms: 1.320586
+  type: 'test'
+  ...
+# Subtest: hashing happens ONLY under ads consent — no other value computes anything
+ok 90 - hashing happens ONLY under ads consent — no other value computes anything
+  ---
+  duration_ms: 14.391317
+  type: 'test'
+  ...
+# Subtest: a missing contact hashes to null rather than to the hash of an empty string
+ok 91 - a missing contact hashes to null rather than to the hash of an empty string
+  ---
+  duration_ms: 0.473642
+  type: 'test'
+  ...
+# Subtest: the send-time gate is independent of the storage-time one: a stale snapshot yields nothing once consent is not ads
+ok 92 - the send-time gate is independent of the storage-time one: a stale snapshot yields nothing once consent is not ads
+  ---
+  duration_ms: 0.466954
+  type: 'test'
+  ...
+# Subtest: the stable user hash is sha256(user_id) — the join key for envelopes that carry no hash
+ok 93 - the stable user hash is sha256(user_id) — the join key for envelopes that carry no hash
+  ---
+  duration_ms: 3.916912
+  type: 'test'
+  ...
+# (node:9044) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: SANDBOX: with no provider secret set, every conversion is recorded status=sandbox and NOTHING reaches the network
+ok 94 - SANDBOX: with no provider secret set, every conversion is recorded status=sandbox and NOTHING reaches the network
+  ---
+  duration_ms: 51.285943
+  type: 'test'
+  ...
+# Subtest: CONSENT: without an ads snapshot the delivery is no_consent, no identifier is stored and nothing is sent
+ok 95 - CONSENT: without an ads snapshot the delivery is no_consent, no identifier is stored and nothing is sent
+  ---
+  duration_ms: 10.82831
+  type: 'test'
+  ...
+# Subtest: CONSENT: withdrawing consent erases the stored hashes rather than merely stopping their use
+ok 96 - CONSENT: withdrawing consent erases the stored hashes rather than merely stopping their use
+  ---
+  duration_ms: 12.637993
+  type: 'test'
+  ...
+# Subtest: CONSENT: an out-of-order redelivery of an older UserUpdated cannot resurrect a withdrawn consent
+ok 97 - CONSENT: an out-of-order redelivery of an older UserUpdated cannot resurrect a withdrawn consent
+  ---
+  duration_ms: 16.654389
+  type: 'test'
+  ...
+# Subtest: CompleteRegistration fires on the FIRST transition to ads consent and never again
+ok 98 - CompleteRegistration fires on the FIRST transition to ads consent and never again
+  ---
+  duration_ms: 13.505985
+  type: 'test'
+  ...
+# Subtest: IDEMPOTENCY: a redelivered envelope produces no second delivery row and is acked as replayed
+ok 99 - IDEMPOTENCY: a redelivered envelope produces no second delivery row and is acked as replayed
+  ---
+  duration_ms: 17.996722
+  type: 'test'
+  ...
+# Subtest: IDEMPOTENCY: even with the processed_events row removed, UNIQUE (event_id, provider) collapses the second attempt
+ok 100 - IDEMPOTENCY: even with the processed_events row removed, UNIQUE (event_id, provider) collapses the second attempt
+  ---
+  duration_ms: 11.219576
+  type: 'test'
+  ...
+# Subtest: KILL SWITCH — global: ADS_ENABLED off writes nothing at all, not even a row
+ok 101 - KILL SWITCH — global: ADS_ENABLED off writes nothing at all, not even a row
+  ---
+  duration_ms: 20.691904
+  type: 'test'
+  ...
+# Subtest: KILL SWITCH — global fails CLOSED: an unset, empty or misspelt var is off
+ok 102 - KILL SWITCH — global fails CLOSED: an unset, empty or misspelt var is off
+  ---
+  duration_ms: 46.461496
+  type: 'test'
+  ...
+# Subtest: KILL SWITCH — per provider: a disabled provider gets no row; the others are untouched
+ok 103 - KILL SWITCH — per provider: a disabled provider gets no row; the others are untouched
+  ---
+  duration_ms: 9.779432
+  type: 'test'
+  ...
+# Subtest: KILL SWITCH — per event: a disabled event type produces nothing for anyone
+ok 104 - KILL SWITCH — per event: a disabled event type produces nothing for anyone
+  ---
+  duration_ms: 11.857335
+  type: 'test'
+  ...
+# Subtest: SubscriptionChanged maps only while the membership is active
+ok 105 - SubscriptionChanged maps only while the membership is active
+  ---
+  duration_ms: 9.191207
+  type: 'test'
+  ...
+# Subtest: a personal envelope is refused before any state is touched, whatever the subscriptions table says
+ok 106 - a personal envelope is refused before any state is touched, whatever the subscriptions table says
+  ---
+  duration_ms: 5.502423
+  type: 'test'
+  ...
+# Subtest: RETRY: a 5xx becomes a failed row with a backoff, the sweeper retries it, and it finally dead-letters
+ok 107 - RETRY: a 5xx becomes a failed row with a backoff, the sweeper retries it, and it finally dead-letters
+  ---
+  duration_ms: 3800.510966
+  type: 'test'
+  ...
+# Subtest: the sweeper claims a row before sending it, so an overlapping tick sends nothing
+ok 108 - the sweeper claims a row before sending it, so an overlapping tick sends nothing
+  ---
+  duration_ms: 18.44411
+  type: 'test'
+  ...
+# Subtest: a sweep stops at its send budget and leaves the rest due
+ok 109 - a sweep stops at its send budget and leaves the rest due
+  ---
+  duration_ms: 11.316421
+  type: 'test'
+  ...
+# Subtest: deliver() makes no outbound request at all, however many events and providers are in play
+ok 110 - deliver() makes no outbound request at all, however many events and providers are in play
+  ---
+  duration_ms: 26.430686
+  type: 'test'
+  ...
+# Subtest: RETRY: a 4xx is rejected once and never retried — our payload is wrong, repeating it is noise
+ok 111 - RETRY: a 4xx is rejected once and never retried — our payload is wrong, repeating it is noise
+  ---
+  duration_ms: 12.215692
+  type: 'test'
+  ...
+# Subtest: BREAKER: five consecutive failures open the per-provider breaker and the sixth attempt fails fast
+ok 112 - BREAKER: five consecutive failures open the per-provider breaker and the sixth attempt fails fast
+  ---
+  duration_ms: 3.009921
+  type: 'test'
+  ...
+# Subtest: a successful send is recorded sent, with a delivery time and no backoff
+ok 113 - a successful send is recorded sent, with a delivery time and no backoff
+  ---
+  duration_ms: 16.11596
+  type: 'test'
+  ...
+# Subtest: the engine returns statements rather than executing them, so the side effect and processed_events commit together
+ok 114 - the engine returns statements rather than executing them, so the side effect and processed_events commit together
+  ---
+  duration_ms: 10.649402
+  type: 'test'
+  ...
+# (node:9056) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the migration applies to a fresh database and creates exactly the owned tables plus the platform ones
+ok 115 - the migration applies to a fresh database and creates exactly the owned tables plus the platform ones
+  ---
+  duration_ms: 6.260816
+  type: 'test'
+  ...
+# Subtest: applying it a second time is a no-op: no error, no duplicated seed row
+ok 116 - applying it a second time is a no-op: no error, no duplicated seed row
+  ---
+  duration_ms: 2.932828
+  type: 'test'
+  ...
+# Subtest: the seed covers every event Ads subscribes to, for every delivering provider
+ok 117 - the seed covers every event Ads subscribes to, for every delivering provider
+  ---
+  duration_ms: 4.013834
+  type: 'test'
+  ...
+# Subtest: the platform tables match what the kit would create, column for column
+ok 118 - the platform tables match what the kit would create, column for column
+  ---
+  duration_ms: 3.57402
+  type: 'test'
+  ...
+# Subtest: a foreign key stops a delivery row naming a provider that is not in the registry table
+ok 119 - a foreign key stops a delivery row naming a provider that is not in the registry table
+  ---
+  duration_ms: 3.093681
+  type: 'test'
+  ...
+# (node:9063) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the consent snapshot in this suite is the one the committed UserUpdated fixture describes
+ok 120 - the consent snapshot in this suite is the one the committed UserUpdated fixture describes
+  ---
+  duration_ms: 2.08611
+  type: 'test'
+  ...
+# Subtest: every adapter has a recorded exchange and every recorded exchange has an adapter
+ok 121 - every adapter has a recorded exchange and every recorded exchange has an adapter
+  ---
+  duration_ms: 2.083187
+  type: 'test'
+  ...
+# Subtest: meta_capi: maps the committed PurchaseCompleted fixture to the recorded provider payload
+ok 122 - meta_capi: maps the committed PurchaseCompleted fixture to the recorded provider payload
+  ---
+  duration_ms: 1.459042
+  type: 'test'
+  ...
+# Subtest: meta_capi: puts the recorded request on the wire and reads the recorded response
+ok 123 - meta_capi: puts the recorded request on the wire and reads the recorded response
+  ---
+  duration_ms: 64.551786
+  type: 'test'
+  ...
+# Subtest: meta_capi: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+ok 124 - meta_capi: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+  ---
+  duration_ms: 2.662183
+  type: 'test'
+  ...
+# Subtest: meta_capi: unconfigured — no secret means configured() is false
+ok 125 - meta_capi: unconfigured — no secret means configured() is false
+  ---
+  duration_ms: 0.357151
+  type: 'test'
+  ...
+# Subtest: google_ads: maps the committed PurchaseCompleted fixture to the recorded provider payload
+ok 126 - google_ads: maps the committed PurchaseCompleted fixture to the recorded provider payload
+  ---
+  duration_ms: 1.169385
+  type: 'test'
+  ...
+# Subtest: google_ads: puts the recorded request on the wire and reads the recorded response
+ok 127 - google_ads: puts the recorded request on the wire and reads the recorded response
+  ---
+  duration_ms: 1.423216
+  type: 'test'
+  ...
+# Subtest: google_ads: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+ok 128 - google_ads: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+  ---
+  duration_ms: 5.349931
+  type: 'test'
+  ...
+# Subtest: google_ads: unconfigured — no secret means configured() is false
+ok 129 - google_ads: unconfigured — no secret means configured() is false
+  ---
+  duration_ms: 0.723958
+  type: 'test'
+  ...
+# Subtest: tiktok: maps the committed PurchaseCompleted fixture to the recorded provider payload
+ok 130 - tiktok: maps the committed PurchaseCompleted fixture to the recorded provider payload
+  ---
+  duration_ms: 0.725208
+  type: 'test'
+  ...
+# Subtest: tiktok: puts the recorded request on the wire and reads the recorded response
+ok 131 - tiktok: puts the recorded request on the wire and reads the recorded response
+  ---
+  duration_ms: 2.485307
+  type: 'test'
+  ...
+# Subtest: tiktok: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+ok 132 - tiktok: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+  ---
+  duration_ms: 2.321157
+  type: 'test'
+  ...
+# Subtest: tiktok: unconfigured — no secret means configured() is false
+ok 133 - tiktok: unconfigured — no secret means configured() is false
+  ---
+  duration_ms: 0.225761
+  type: 'test'
+  ...
+# Subtest: snapchat: maps the committed PurchaseCompleted fixture to the recorded provider payload
+ok 134 - snapchat: maps the committed PurchaseCompleted fixture to the recorded provider payload
+  ---
+  duration_ms: 0.645582
+  type: 'test'
+  ...
+# Subtest: snapchat: puts the recorded request on the wire and reads the recorded response
+ok 135 - snapchat: puts the recorded request on the wire and reads the recorded response
+  ---
+  duration_ms: 0.78018
+  type: 'test'
+  ...
+# Subtest: snapchat: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+ok 136 - snapchat: a 5xx is retryable and a 4xx is not — and neither leaks a credential
+  ---
+  duration_ms: 0.970093
+  type: 'test'
+  ...
+# Subtest: snapchat: unconfigured — no secret means configured() is false
+ok 137 - snapchat: unconfigured — no secret means configured() is false
+  ---
+  duration_ms: 0.251785
+  type: 'test'
+  ...
+# Subtest: tiktok reports a 200 with a non-zero code as a rejection, not a success
+ok 138 - tiktok reports a 200 with a non-zero code as a rejection, not a success
+  ---
+  duration_ms: 0.715286
+  type: 'test'
+  ...
+# Subtest: google_ads refuses to map a conversion it could not attribute: no consented identifier, no upload
+ok 139 - google_ads refuses to map a conversion it could not attribute: no consented identifier, no upload
+  ---
+  duration_ms: 0.238035
+  type: 'test'
+  ...
+# Subtest: noop is the default and does nothing at all — it maps to null and never fetches
+ok 140 - noop is the default and does nothing at all — it maps to null and never fetches
+  ---
+  duration_ms: 0.301387
+  type: 'test'
+  ...
+# (node:9071) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: health answers without a principal, and its database check is real
+ok 141 - health answers without a principal, and its database check is real
+  ---
+  duration_ms: 110.359598
+  type: 'test'
+  ...
+# Subtest: the admin read models need an admin principal signed by Identity, on the apex
+ok 142 - the admin read models need an admin principal signed by Identity, on the apex
+  ---
+  duration_ms: 41.676708
+  type: 'test'
+  ...
+# Subtest: overview answers the contract shape from the rollups
+ok 143 - overview answers the contract shape from the rollups
+  ---
+  duration_ms: 16.990793
+  type: 'test'
+  ...
+# Subtest: a range must be a day, and it filters
+ok 144 - a range must be a day, and it filters
+  ---
+  duration_ms: 18.368183
+  type: 'test'
+  ...
+# Subtest: the daily series is `[{day, metric, value}]`, filterable by metric
+ok 145 - the daily series is `[{day, metric, value}]`, filterable by metric
+  ---
+  duration_ms: 15.377619
+  type: 'test'
+  ...
+# Subtest: a merchant reads its own numbers and nobody else`s; a full admin reads any
+ok 146 - a merchant reads its own numbers and nobody else`s; a full admin reads any
+  ---
+  duration_ms: 20.914891
+  type: 'test'
+  ...
+# Subtest: an unknown path is a 404 in the platform envelope
+ok 147 - an unknown path is a 404 in the platform envelope
+  ---
+  duration_ms: 4.499047
+  type: 'test'
+  ...
+# (node:9083) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the mappers are exactly Analytics subscriptions, and none of them is a personal event
+ok 148 - the mappers are exactly Analytics subscriptions, and none of them is a personal event
+  ---
+  duration_ms: 3.185877
+  type: 'test'
+  ...
+# Subtest: every annotated field is dropped from every subscribed fixture, and nothing else is
+ok 149 - every annotated field is dropped from every subscribed fixture, and nothing else is
+  ---
+  duration_ms: 2.192525
+  type: 'test'
+  ...
+# Subtest: no raw person id survives ingest: neither in the payload nor as the aggregate id
+ok 150 - no raw person id survives ingest: neither in the payload nor as the aggregate id
+  ---
+  duration_ms: 81.17356
+  type: 'test'
+  ...
+# Subtest: the actor is a per-day salted hash, and the same person hashes differently tomorrow
+ok 151 - the actor is a per-day salted hash, and the same person hashes differently tomorrow
+  ---
+  duration_ms: 1.314993
+  type: 'test'
+  ...
+# Subtest: the day is the envelope`s UTC day, and a malformed clock falls back rather than poisoning the index
+ok 152 - the day is the envelope`s UTC day, and a malformed clock falls back rather than poisoning the index
+  ---
+  duration_ms: 0.448643
+  type: 'test'
+  ...
+# Subtest: the counters are computable from the projection alone — no metric depends on a dropped field
+ok 153 - the counters are computable from the projection alone — no metric depends on a dropped field
+  ---
+  duration_ms: 1.879147
+  type: 'test'
+  ...
+# Subtest: the stored projection is the projection: payload, hashed actor, lifted merchant id
+ok 154 - the stored projection is the projection: payload, hashed actor, lifted merchant id
+  ---
+  duration_ms: 3.222094
+  type: 'test'
+  ...
+# (node:9094) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: an order raises the order counters, the item count and the day`s GMV
+ok 155 - an order raises the order counters, the item count and the day`s GMV
+  ---
+  duration_ms: 28.985328
+  type: 'test'
+  ...
+# Subtest: a redelivery adds nothing: the rollup rides in the same batch as processed_events
+ok 156 - a redelivery adds nothing: the rollup rides in the same batch as processed_events
+  ---
+  duration_ms: 10.398391
+  type: 'test'
+  ...
+# Subtest: a refused event contributes no row and no counter
+ok 157 - a refused event contributes no row and no counter
+  ---
+  duration_ms: 5.208245
+  type: 'test'
+  ...
+# Subtest: merchant counters are kept per merchant, and only for events that name one
+ok 158 - merchant counters are kept per merchant, and only for events that name one
+  ---
+  duration_ms: 11.160447
+  type: 'test'
+  ...
+# Subtest: the repair pass recomputes a day to exactly what the incremental path produced
+ok 159 - the repair pass recomputes a day to exactly what the incremental path produced
+  ---
+  duration_ms: 28.906117
+  type: 'test'
+  ...
+# Subtest: the repair pass restores a rollup that drifted, and refuses to walk a day above its ceiling
+ok 160 - the repair pass restores a rollup that drifted, and refuses to walk a day above its ceiling
+  ---
+  duration_ms: 12.339256
+  type: 'test'
+  ...
+# Subtest: the sweep rolls raw events out at the retention window and keeps every rollup
+ok 161 - the sweep rolls raw events out at the retention window and keeps every rollup
+  ---
+  duration_ms: 21.036362
+  type: 'test'
+  ...
+# Subtest: the repair window never reaches a day whose raw rows have rolled off
+ok 162 - the repair window never reaches a day whose raw rows have rolled off
+  ---
+  duration_ms: 0.392028
+  type: 'test'
+  ...
+# Subtest: overview() reads the rollups and reports what it cannot know as zero
+ok 163 - overview() reads the rollups and reports what it cannot know as zero
+  ---
+  duration_ms: 22.836448
+  type: 'test'
+  ...
+# Subtest: a cancelled order leaves `pending` where it should be, and never negative
+ok 164 - a cancelled order leaves `pending` where it should be, and never negative
+  ---
+  duration_ms: 21.931774
+  type: 'test'
+  ...
+# Subtest: metricsOf is total and drops empty counters
+ok 165 - metricsOf is total and drops empty counters
+  ---
+  duration_ms: 0.545151
+  type: 'test'
+  ...
+# Subtest: a day with many merchants is written in bounded batches, never one huge one
+ok 166 - a day with many merchants is written in bounded batches, never one huge one
+  ---
+  duration_ms: 41.245021
+  type: 'test'
+  ...
+# (node:9105) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the migration is the schema module, statement for statement
+ok 167 - the migration is the schema module, statement for statement
+  ---
+  duration_ms: 3.86181
+  type: 'test'
+  ...
+# Subtest: every statement is CREATE ... IF NOT EXISTS — additive and re-runnable
+ok 168 - every statement is CREATE ... IF NOT EXISTS — additive and re-runnable
+  ---
+  duration_ms: 0.842103
+  type: 'test'
+  ...
+# Subtest: applying the migration twice leaves the same schema and no rows
+ok 169 - applying the migration twice leaves the same schema and no rows
+  ---
+  duration_ms: 2.77281
+  type: 'test'
+  ...
+# Subtest: it creates only tables the design gives to Analytics (or this service own platform tables)
+ok 170 - it creates only tables the design gives to Analytics (or this service own platform tables)
+  ---
+  duration_ms: 1.842859
+  type: 'test'
+  ...
+# Subtest: the service keeps its own migration stream, separate from the core stream
+ok 171 - the service keeps its own migration stream, separate from the core stream
+  ---
+  duration_ms: 0.797814
+  type: 'test'
+  ...
+# (node:9112) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sealing links every unsealed row onto the head and advances it once
+ok 172 - sealing links every unsealed row onto the head and advances it once
+  ---
+  duration_ms: 26.576707
+  type: 'test'
+  ...
+# Subtest: a second seal is a no-op, and sealing continues across runs
+ok 173 - a second seal is a no-op, and sealing continues across runs
+  ---
+  duration_ms: 4.601798
+  type: 'test'
+  ...
+# Subtest: verification catches an edited row, a removed row, a reordered chain and a rewritten head
+ok 174 - verification catches an edited row, a removed row, a reordered chain and a rewritten head
+  ---
+  duration_ms: 25.90482
+  type: 'test'
+  ...
+# Subtest: the chain key is what makes the chain unforgeable: the same row hashes differently with and without it
+ok 175 - the chain key is what makes the chain unforgeable: the same row hashes differently with and without it
+  ---
+  duration_ms: 5.647375
+  type: 'test'
+  ...
+# Subtest: two sealers racing: the loser rolls back completely — one chain, no half-sealed rows
+ok 176 - two sealers racing: the loser rolls back completely — one chain, no half-sealed rows
+  ---
+  duration_ms: 6.723189
+  type: 'test'
+  ...
+# Subtest: health lag: zero with nothing pending, the age of the oldest unsealed entry otherwise
+ok 177 - health lag: zero with nothing pending, the age of the oldest unsealed entry otherwise
+  ---
+  duration_ms: 4.057937
+  type: 'test'
+  ...
+# Subtest: the head row is created by the first seal and never duplicated
+ok 178 - the head row is created by the first seal and never duplicated
+  ---
+  duration_ms: 5.975459
+  type: 'test'
+  ...
+# (node:9123) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the mappers are exactly Audit`s subscriptions — no more, no less
+ok 179 - the mappers are exactly Audit`s subscriptions — no more, no less
+  ---
+  duration_ms: 3.206074
+  type: 'test'
+  ...
+# Subtest: every subscribed fixture becomes one entry with a non-empty action and a hashed detail
+ok 180 - every subscribed fixture becomes one entry with a non-empty action and a hashed detail
+  ---
+  duration_ms: 63.434816
+  type: 'test'
+  ...
+# Subtest: AuditRecorded keeps the producer`s hash and reference and stores no body
+ok 181 - AuditRecorded keeps the producer`s hash and reference and stores no body
+  ---
+  duration_ms: 8.609201
+  type: 'test'
+  ...
+# Subtest: idempotency: the same event delivered twice is acked once and recorded once
+ok 182 - idempotency: the same event delivered twice is acked once and recorded once
+  ---
+  duration_ms: 18.586252
+  type: 'test'
+  ...
+# Subtest: an envelope signed by a service that may not produce it is refused as forged and writes nothing
+ok 183 - an envelope signed by a service that may not produce it is refused as forged and writes nothing
+  ---
+  duration_ms: 5.024183
+  type: 'test'
+  ...
+# Subtest: an unsigned envelope is refused unless the fixture marker is explicitly accepted (dark only)
+ok 184 - an unsigned envelope is refused unless the fixture marker is explicitly accepted (dark only)
+  ---
+  duration_ms: 5.501783
+  type: 'test'
+  ...
+# Subtest: a tampered payload is refused: the signature covers the whole envelope
+ok 185 - a tampered payload is refused: the signature covers the whole envelope
+  ---
+  duration_ms: 4.426879
+  type: 'test'
+  ...
+# Subtest: an event Audit does not subscribe to is refused, not recorded — and is RETRYABLE, not poison
+ok 186 - an event Audit does not subscribe to is refused, not recorded — and is RETRYABLE, not poison
+  ---
+  duration_ms: 5.822208
+  type: 'test'
+  ...
+# Subtest: an empty key ring records nothing: an entry whose producer cannot be established is not an entry
+ok 187 - an empty key ring records nothing: an entry whose producer cannot be established is not an entry
+  ---
+  duration_ms: 5.421695
+  type: 'test'
+  ...
+# Subtest: record(): a direct entry, idempotent by event_id, and it fills the body of an entry the bus recorded by hash
+ok 188 - record(): a direct entry, idempotent by event_id, and it fills the body of an entry the bus recorded by hash
+  ---
+  duration_ms: 10.514542
+  type: 'test'
+  ...
+# Subtest: a detail body is bounded exactly as the audit() facade bounds it
+ok 189 - a detail body is bounded exactly as the audit() facade bounds it
+  ---
+  duration_ms: 0.621529
+  type: 'test'
+  ...
+# Subtest: the query read model: newest first, keyset-paged, filtered on the indexed columns
+ok 190 - the query read model: newest first, keyset-paged, filtered on the indexed columns
+  ---
+  duration_ms: 33.676047
+  type: 'test'
+  ...
+# Subtest: the mappers put the ADMIN in actor_id for a role change, not the subject
+ok 191 - the mappers put the ADMIN in actor_id for a role change, not the subject
+  ---
+  duration_ms: 0.741702
+  type: 'test'
+  ...
+# Subtest: every recorded row is chained, and the chain covers what the log claims
+ok 192 - every recorded row is chained, and the chain covers what the log claims
+  ---
+  duration_ms: 25.447684
+  type: 'test'
+  ...
+# audit: hop refused (log) AuditEntrypoint.record UNKNOWN_KID
+# audit: hop refused (log) AuditEntrypoint.record MISSING_HOP
+# Subtest: log mode returns NO issuer for an unverified hop — an unsigned claim is not an identity
+ok 193 - log mode returns NO issuer for an unverified hop — an unsigned claim is not an identity
+  ---
+  duration_ms: 22.820671
+  type: 'test'
+  ...
+# Subtest: log mode still returns the issuer when the hop actually verifies
+ok 194 - log mode still returns the issuer when the hop actually verifies
+  ---
+  duration_ms: 7.197613
+  type: 'test'
+  ...
+# audit: hop refused (on) AuditEntrypoint.record MISSING_HOP
+# Subtest: on mode refuses outright, and off attributes nothing
+ok 195 - on mode refuses outright, and off attributes nothing
+  ---
+  duration_ms: 5.901679
+  type: 'test'
+  ...
+# Subtest: the READ methods are allowlisted; only recording is open to every service
+ok 196 - the READ methods are allowlisted; only recording is open to every service
+  ---
+  duration_ms: 2.625846
+  type: 'test'
+  ...
+# (node:9145) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: health answers without a principal — a probe that must authenticate cannot report broken authentication
+ok 197 - health answers without a principal — a probe that must authenticate cannot report broken authentication
+  ---
+  duration_ms: 91.731504
+  type: 'test'
+  ...
+# Subtest: no principal is 401, and the body is the platform envelope
+ok 198 - no principal is 401, and the body is the platform envelope
+  ---
+  duration_ms: 10.847108
+  type: 'test'
+  ...
+# Subtest: a customer is 401 by verification, an assistant admin is 403, a full admin reads
+ok 199 - a customer is 401 by verification, an assistant admin is 403, a full admin reads
+  ---
+  duration_ms: 33.763243
+  type: 'test'
+  ...
+# Subtest: a principal signed by anyone but Identity is refused, and so is one minted on a merchant host
+ok 200 - a principal signed by anyone but Identity is refused, and so is one minted on a merchant host
+  ---
+  duration_ms: 11.679553
+  type: 'test'
+  ...
+# Subtest: the query string drives the filters and the cursor
+ok 201 - the query string drives the filters and the cursor
+  ---
+  duration_ms: 27.640222
+  type: 'test'
+  ...
+# Subtest: verify reports the chain, and reports it broken after a row is edited behind the service
+ok 202 - verify reports the chain, and reports it broken after a row is edited behind the service
+  ---
+  duration_ms: 23.628548
+  type: 'test'
+  ...
+# Subtest: an unknown path under the service is a 404 in the platform envelope, never an unhandled throw
+ok 203 - an unknown path under the service is a 404 in the platform envelope, never an unhandled throw
+  ---
+  duration_ms: 4.657339
+  type: 'test'
+  ...
+# (node:9157) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the migration is the schema module, statement for statement
+ok 204 - the migration is the schema module, statement for statement
+  ---
+  duration_ms: 3.858964
+  type: 'test'
+  ...
+# Subtest: every statement is CREATE ... IF NOT EXISTS — additive and re-runnable
+ok 205 - every statement is CREATE ... IF NOT EXISTS — additive and re-runnable
+  ---
+  duration_ms: 0.877777
+  type: 'test'
+  ...
+# Subtest: applying the migration twice leaves the same schema and no rows
+ok 206 - applying the migration twice leaves the same schema and no rows
+  ---
+  duration_ms: 3.125546
+  type: 'test'
+  ...
+# Subtest: it creates only tables the design gives to Audit (or this service own platform tables)
+ok 207 - it creates only tables the design gives to Audit (or this service own platform tables)
+  ---
+  duration_ms: 2.133415
+  type: 'test'
+  ...
+# Subtest: the service keeps its own migration stream, separate from the core stream
+ok 208 - the service keeps its own migration stream, separate from the core stream
+  ---
+  duration_ms: 0.887059
+  type: 'test'
+  ...
+# Subtest: only an anonymous GET of an allowlisted path is a candidate
+ok 209 - only an anonymous GET of an allowlisted path is a candidate
+  ---
+  duration_ms: 61.689247
+  type: 'test'
+  ...
+# Subtest: the key separates host, path, sorted query and language
+ok 210 - the key separates host, path, sorted query and language
+  ---
+  duration_ms: 1.007505
+  type: 'test'
+  ...
+# Subtest: the language comes from ?lang, then Accept-Language, then en
+ok 211 - the language comes from ?lang, then Accept-Language, then en
+  ---
+  duration_ms: 0.605069
+  type: 'test'
+  ...
+# Subtest: a response is stored only when it is a plain, public, successful 200
+ok 212 - a response is stored only when it is a plain, public, successful 200
+  ---
+  duration_ms: 2.773661
+  type: 'test'
+  ...
+# Subtest: the shared TTL lives on the entry; the client is told private, max-age=0
+ok 213 - the shared TTL lives on the entry; the client is told private, max-age=0
+  ---
+  duration_ms: 0.386639
+  type: 'test'
+  ...
+# Subtest: through the app: the second identical anonymous GET never reaches the core
+ok 214 - through the app: the second identical anonymous GET never reaches the core
+  ---
+  duration_ms: 17.232159
+  type: 'test'
+  ...
+# Subtest: a request carrying a session neither reads nor writes the cache
+ok 215 - a request carrying a session neither reads nor writes the cache
+  ---
+  duration_ms: 5.559044
+  type: 'test'
+  ...
+# Subtest: a mutation is never cached, even on a cacheable prefix
+ok 216 - a mutation is never cached, even on a cacheable prefix
+  ---
+  duration_ms: 2.239108
+  type: 'test'
+  ...
+# Subtest: a success:false body is never stored
+ok 217 - a success:false body is never stored
+  ---
+  duration_ms: 3.33513
+  type: 'test'
+  ...
+# Subtest: a response that sets a cookie is never stored
+ok 218 - a response that sets a cookie is never stored
+  ---
+  duration_ms: 3.051077
+  type: 'test'
+  ...
+# Subtest: two hosts and two languages are four entries, never one
+ok 219 - two hosts and two languages are four entries, never one
+  ---
+  duration_ms: 9.512027
+  type: 'test'
+  ...
+# Subtest: CACHE_MODE off means the Cache API is never touched
+ok 220 - CACHE_MODE off means the Cache API is never touched
+  ---
+  duration_ms: 2.786154
+  type: 'test'
+  ...
+# Subtest: a HEAD is never a cache candidate — the key has no method in it
+ok 221 - a HEAD is never a cache candidate — the key has no method in it
+  ---
+  duration_ms: 0.697662
+  type: 'test'
+  ...
+# Subtest: an empty 200 body is never stored, whatever produced it
+ok 222 - an empty 200 body is never stored, whatever produced it
+  ---
+  duration_ms: 0.360571
+  type: 'test'
+  ...
+# Subtest: through the app: an anonymous HEAD cannot blank the GET body for the next caller
+ok 223 - through the app: an anonymous HEAD cannot blank the GET body for the next caller
+  ---
+  duration_ms: 3.81321
+  type: 'test'
+  ...
+# Subtest: every admin path the core mounts is apex-only in the routing table
+not ok 224 - every admin path the core mounts is apex-only in the routing table
+  ---
+  duration_ms: 2.829433
+  type: 'test'
+  location: '/app/applet/services/gateway/test/capabilities.test.ts:43:1'
+  failureType: 'testCodeFailure'
+  error: "expected the core's admin surface, saw 0"
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (/app/applet/services/gateway/test/capabilities.test.ts:45:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: the money and PII admin surfaces need a non-assistant admin
+ok 225 - the money and PII admin surfaces need a non-assistant admin
+  ---
+  duration_ms: 0.892983
+  type: 'test'
+  ...
+# Subtest: the host rule refuses a merchant storefront and a too-deep host, and allows the operator's own deployment
+ok 226 - the host rule refuses a merchant storefront and a too-deep host, and allows the operator's own deployment
+  ---
+  duration_ms: 0.933455
+  type: 'test'
+  ...
+# Subtest: the refusal bodies are today's, and in today's order: host, then auth, then role, then scope
+ok 227 - the refusal bodies are today's, and in today's order: host, then auth, then role, then scope
+  ---
+  duration_ms: 2.486631
+  type: 'test'
+  ...
+# Subtest: while the core still resolves the session, the gateway applies the HOST rule and nothing else
+ok 228 - while the core still resolves the session, the gateway applies the HOST rule and nothing else
+  ---
+  duration_ms: 0.492577
+  type: 'test'
+  ...
+# Subtest: through the app: every discovered admin path 404s on a merchant host and is forwarded on the apex
+not ok 229 - through the app: every discovered admin path 404s on a merchant host and is forwarded on the apex
+  ---
+  duration_ms: 74.725244
+  type: 'test'
+  location: '/app/applet/services/gateway/test/capabilities.test.ts:107:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    404 !== 200
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 200
+  actual: 404
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/app/applet/services/gateway/test/capabilities.test.ts:120:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a non-admin surface is still served on a storefront — the guard is a capability, not a blanket
+ok 230 - a non-admin surface is still served on a storefront — the guard is a capability, not a blanket
+  ---
+  duration_ms: 10.385732
+  type: 'test'
+  ...
+# Subtest: main-only customer surfaces stay off storefronts
+ok 231 - main-only customer surfaces stay off storefronts
+  ---
+  duration_ms: 5.654886
+  type: 'test'
+  ...
+# Subtest: a forwarded request keeps its method, URL and body, and the response keeps its status and body
+ok 232 - a forwarded request keeps its method, URL and body, and the response keeps its status and body
+  ---
+  duration_ms: 81.739779
+  type: 'test'
+  ...
+# Subtest: the security headers are the CORE's, from the one shared source
+not ok 233 - the security headers are the CORE's, from the one shared source
+  ---
+  duration_ms: 0.821025
+  type: 'test'
+  location: '/app/applet/services/gateway/test/pipeline.test.ts:45:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/app/applet/worker/lib/securityPolicy.ts'"
+  code: 'ENOENT'
+  stack: |-
+    readFileSync (node:fs:440:20)
+    readCore (/app/applet/services/gateway/test/_harness.ts:17:50)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/pipeline.test.ts:48:5)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: a refusal carries the same security headers as a forward — they are set outermost
+ok 234 - a refusal carries the same security headers as a forward — they are set outermost
+  ---
+  duration_ms: 3.267065
+  type: 'test'
+  ...
+# Subtest: inbound internal headers and a client correlation id are stripped; the gateway sets its own
+ok 235 - inbound internal headers and a client correlation id are stripped; the gateway sets its own
+  ---
+  duration_ms: 3.498389
+  type: 'test'
+  ...
+# Subtest: the Cookie goes to CORE and IDENTITY only, and only they may set one
+ok 236 - the Cookie goes to CORE and IDENTITY only, and only they may set one
+  ---
+  duration_ms: 4.407118
+  type: 'test'
+  ...
+# Subtest: a host under the root that is too deep to be a store is refused outright
+ok 237 - a host under the root that is too deep to be a store is refused outright
+  ---
+  duration_ms: 2.171483
+  type: 'test'
+  ...
+# Subtest: GATEWAY_LOCKED refuses everything except a request carrying the probe token
+ok 238 - GATEWAY_LOCKED refuses everything except a request carrying the probe token
+  ---
+  duration_ms: 5.072396
+  type: 'test'
+  ...
+# Subtest: /api/health is forwarded unchanged; only ?gw=1 and ?deep=1 are the gateway's own
+ok 239 - /api/health is forwarded unchanged; only ?gw=1 and ?deep=1 are the gateway's own
+  ---
+  duration_ms: 5.217492
+  type: 'test'
+  ...
+# Subtest: request validation refuses before anything expensive happens
+ok 240 - request validation refuses before anything expensive happens
+  ---
+  duration_ms: 5.344669
+  type: 'test'
+  ...
+# Subtest: a bodiless POST or DELETE — 41 of them in the SPA — passes with no Content-Type
+ok 241 - a bodiless POST or DELETE — 41 of them in the SPA — passes with no Content-Type
+  ---
+  duration_ms: 3.993167
+  type: 'test'
+  ...
+# Subtest: an upload class raises the cap only for its own route
+ok 242 - an upload class raises the cap only for its own route
+  ---
+  duration_ms: 7.178084
+  type: 'test'
+  ...
+# Subtest: Content-Length and Transfer-Encoding together is smuggling, not a client
+ok 243 - Content-Length and Transfer-Encoding together is smuggling, not a client
+  ---
+  duration_ms: 1.255227
+  type: 'test'
+  ...
+# Subtest: a cross-site mutation is refused by the core's own originCheck, and by Sec-Fetch-Site when Origin was stripped
+ok 244 - a cross-site mutation is refused by the core's own originCheck, and by Sec-Fetch-Site when Origin was stripped
+  ---
+  duration_ms: 2.249588
+  type: 'test'
+  ...
+# Subtest: a same-origin mutation from a merchant storefront still works — that is what the host classes are for
+ok 245 - a same-origin mutation from a merchant storefront still works — that is what the host classes are for
+  ---
+  duration_ms: 1.586129
+  type: 'test'
+  ...
+# Subtest: the rate limiter refuses with the core's own 429 body, and refuses to run at all without a counter
+ok 246 - the rate limiter refuses with the core's own 429 body, and refuses to run at all without a counter
+  ---
+  duration_ms: 313.601249
+  type: 'test'
+  ...
+# Subtest: a shadow class counts but never refuses
+ok 247 - a shadow class counts but never refuses
+  ---
+  duration_ms: 227.836586
+  type: 'test'
+  ...
+# Subtest: with a signing key the forward carries a hop envelope the callee can verify
+ok 248 - with a signing key the forward carries a hop envelope the callee can verify
+  ---
+  duration_ms: 33.586338
+  type: 'test'
+  ...
+# Subtest: without a signing key nothing hop-shaped is sent — a degraded gateway is visibly degraded
+ok 249 - without a signing key nothing hop-shaped is sent — a degraded gateway is visibly degraded
+  ---
+  duration_ms: 1.083334
+  type: 'test'
+  ...
+# Subtest: a target whose Worker is not deployed yet falls back to CORE, and a missing CORE is a 503
+ok 250 - a target whose Worker is not deployed yet falls back to CORE, and a missing CORE is a 503
+  ---
+  duration_ms: 1.372078
+  type: 'test'
+  ...
+# Subtest: a legacy alias is marked on the way out so the 410 decision has usage data
+ok 251 - a legacy alias is marked on the way out so the 410 decision has usage data
+  ---
+  duration_ms: 1.076224
+  type: 'test'
+  ...
+# Subtest: an internal header set by an upstream never reaches the client
+ok 252 - an internal header set by an upstream never reaches the client
+  ---
+  duration_ms: 1.07302
+  type: 'test'
+  ...
+# Subtest: the cookie is hashed exactly as worker/lib/session.ts hashes it
+ok 253 - the cookie is hashed exactly as worker/lib/session.ts hashes it
+  ---
+  duration_ms: 13.783336
+  type: 'test'
+  ...
+# Subtest: a verified principal is forwarded, and it is the token Identity signed
+ok 254 - a verified principal is forwarded, and it is the token Identity signed
+  ---
+  duration_ms: 102.265677
+  type: 'test'
+  ...
+# Subtest: a principal signed by a key the gateway does not know is dropped, not forwarded
+ok 255 - a principal signed by a key the gateway does not know is dropped, not forwarded
+  ---
+  duration_ms: 7.974321
+  type: 'test'
+  ...
+# Subtest: an expired principal is dropped
+ok 256 - an expired principal is dropped
+  ---
+  duration_ms: 5.61964
+  type: 'test'
+  ...
+# Subtest: a principal whose host_kind does not match the request host is dropped
+ok 257 - a principal whose host_kind does not match the request host is dropped
+  ---
+  duration_ms: 5.117068
+  type: 'test'
+  ...
+# Subtest: an admin principal passes the capability guard the core would apply
+ok 258 - an admin principal passes the capability guard the core would apply
+  ---
+  duration_ms: 11.368334
+  type: 'test'
+  ...
+# Subtest: a read class is cached for 30 s; a money class resolves every time
+ok 259 - a read class is cached for 30 s; a money class resolves every time
+  ---
+  duration_ms: 14.19313
+  type: 'test'
+  ...
+# Subtest: the cache is keyed by host kind: the apex principal is not reused on a storefront
+ok 260 - the cache is keyed by host kind: the apex principal is not reused on a storefront
+  ---
+  duration_ms: 10.080539
+  type: 'test'
+  ...
+# Subtest: no cookie means no lookup at all
+ok 261 - no cookie means no lookup at all
+  ---
+  duration_ms: 5.304693
+  type: 'test'
+  ...
+# Subtest: PRINCIPAL_MODE=off keeps the core the only session reader — no second lookup per request
+ok 262 - PRINCIPAL_MODE=off keeps the core the only session reader — no second lookup per request
+  ---
+  duration_ms: 3.445667
+  type: 'test'
+  ...
+# Subtest: shadow mode resolves a sampled share only — the share is a cost dial, not a switch
+ok 263 - shadow mode resolves a sampled share only — the share is a cost dial, not a switch
+  ---
+  duration_ms: 7.300185
+  type: 'test'
+  ...
+# Subtest: the principal cache evicts by session and clears wholesale, and expires by age
+ok 264 - the principal cache evicts by session and clears wholesale, and expires by age
+  ---
+  duration_ms: 0.671073
+  type: 'test'
+  ...
+# Subtest: the extractor sees every rateLimit( call site in worker/routes
+not ok 265 - the extractor sees every rateLimit( call site in worker/routes
+  ---
+  duration_ms: 1.439126
+  type: 'test'
+  location: '/app/applet/services/gateway/test/rateLimitParity.test.ts:37:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, scandir '/app/applet/worker/routes'"
+  code: 'ENOENT'
+  stack: |-
+    readdirSync (node:fs:1590:26)
+    coreRateLimitCalls (/app/applet/services/gateway/test/_harness.ts:61:19)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/rateLimitParity.test.ts:38:17)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: no gateway class is tighter than the core bucket over the same prefix
+not ok 266 - no gateway class is tighter than the core bucket over the same prefix
+  ---
+  duration_ms: 0.407957
+  type: 'test'
+  location: '/app/applet/services/gateway/test/rateLimitParity.test.ts:43:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, scandir '/app/applet/worker/routes'"
+  code: 'ENOENT'
+  stack: |-
+    readdirSync (node:fs:1590:26)
+    coreRateLimitCalls (/app/applet/services/gateway/test/_harness.ts:61:19)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/rateLimitParity.test.ts:46:22)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: the Telegram status poll keeps its 240/min — the regression this rule exists for
+not ok 267 - the Telegram status poll keeps its 240/min — the regression this rule exists for
+  ---
+  duration_ms: 0.346429
+  type: 'test'
+  location: '/app/applet/services/gateway/test/rateLimitParity.test.ts:69:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, scandir '/app/applet/worker/routes'"
+  code: 'ENOENT'
+  stack: |-
+    readdirSync (node:fs:1590:26)
+    coreRateLimitCalls (/app/applet/services/gateway/test/_harness.ts:61:19)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/rateLimitParity.test.ts:70:16)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: Studio's server-to-server calls are not judged as one browser
+not ok 268 - Studio's server-to-server calls are not judged as one browser
+  ---
+  duration_ms: 0.273841
+  type: 'test'
+  location: '/app/applet/services/gateway/test/rateLimitParity.test.ts:78:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, scandir '/app/applet/worker/routes'"
+  code: 'ENOENT'
+  stack: |-
+    readdirSync (node:fs:1590:26)
+    coreRateLimitCalls (/app/applet/services/gateway/test/_harness.ts:61:19)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/rateLimitParity.test.ts:79:18)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: an ip-exempt route keeps its own class rather than being left unlimited
+ok 269 - an ip-exempt route keeps its own class rather than being left unlimited
+  ---
+  duration_ms: 0.725077
+  type: 'test'
+  ...
+# Subtest: the classes that have no counter today ship in shadow, and enforcement is a var
+ok 270 - the classes that have no counter today ship in shadow, and enforcement is a var
+  ---
+  duration_ms: 0.346319
+  type: 'test'
+  ...
+# Subtest: a money or admin-write class keys by user, a public one by ip
+ok 271 - a money or admin-write class keys by user, a public one by ip
+  ---
+  duration_ms: 0.224602
+  type: 'test'
+  ...
+# Subtest: every mount in worker/index.ts resolves to exactly one rule, with the owner this design records
+not ok 272 - every mount in worker/index.ts resolves to exactly one rule, with the owner this design records
+  ---
+  duration_ms: 3.105989
+  type: 'test'
+  location: '/app/applet/services/gateway/test/routing.test.ts:77:1'
+  failureType: 'testCodeFailure'
+  error: "expected the core's full mount list, saw 0"
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (/app/applet/services/gateway/test/routing.test.ts:79:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: at phase 1 every legacy mount is still served by CORE — the gateway is a transparent hop
+ok 273 - at phase 1 every legacy mount is still served by CORE — the gateway is a transparent hop
+  ---
+  duration_ms: 0.837751
+  type: 'test'
+  ...
+# Subtest: a phase raises exactly the prefixes whose flipPhase it reaches
+ok 274 - a phase raises exactly the prefixes whose flipPhase it reaches
+  ---
+  duration_ms: 0.937955
+  type: 'test'
+  ...
+# Subtest: the kill switch beats the phase, and the longest override prefix wins
+ok 275 - the kill switch beats the phase, and the longest override prefix wins
+  ---
+  duration_ms: 2.246136
+  type: 'test'
+  ...
+# Subtest: the kill switch never invents a target: junk entries are dropped, not guessed
+ok 276 - the kill switch never invents a target: junk entries are dropped, not guessed
+  ---
+  duration_ms: 0.365035
+  type: 'test'
+  ...
+# Subtest: the four permanent 410s of worker/index.ts are answered by the gateway itself
+not ok 277 - the four permanent 410s of worker/index.ts are answered by the gateway itself
+  ---
+  duration_ms: 1.837904
+  type: 'test'
+  location: '/app/applet/services/gateway/test/routing.test.ts:130:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   '/api/d1/init',
+    -   '/api/d1/query',
+    -   '/api/make-all-investors',
+    -   '/api/upload'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: '/api/d1/init'
+    1: '/api/d1/query'
+    2: '/api/make-all-investors'
+    3: '/api/upload'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/app/applet/services/gateway/test/routing.test.ts:132:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: the narrow rows win over their prefix, and only for their method
+ok 278 - the narrow rows win over their prefix, and only for their method
+  ---
+  duration_ms: 0.879768
+  type: 'test'
+  ...
+# Subtest: the prefixes that share a stem resolve to their own owner, not to the shorter row
+ok 279 - the prefixes that share a stem resolve to their own owner, not to the shorter row
+  ---
+  duration_ms: 0.605747
+  type: 'test'
+  ...
+# Subtest: every row is well formed: a known target, a phase that exists, and no duplicate (prefix, methods, pattern)
+ok 280 - every row is well formed: a known target, a phase that exists, and no duplicate (prefix, methods, pattern)
+  ---
+  duration_ms: 1.331209
+  type: 'test'
+  ...
+# Subtest: targetFor applies the override to the PATH, not only to the matched prefix
+ok 281 - targetFor applies the override to the PATH, not only to the matched prefix
+  ---
+  duration_ms: 0.866114
+  type: 'test'
+  ...
+# Subtest: every route that reads a request body has a gateway size class
+not ok 282 - every route that reads a request body has a gateway size class
+  ---
+  duration_ms: 1.274968
+  type: 'test'
+  location: '/app/applet/services/gateway/test/uploadClasses.test.ts:28:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, scandir '/app/applet/worker/routes'"
+  code: 'ENOENT'
+  stack: |-
+    readdirSync (node:fs:1590:26)
+    coreUploadRouteFiles (/app/applet/services/gateway/test/_harness.ts:105:10)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/uploadClasses.test.ts:29:17)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: every class points at a constant that still exists, with the value the class uses
+not ok 283 - every class points at a constant that still exists, with the value the class uses
+  ---
+  duration_ms: 0.415685
+  type: 'test'
+  location: '/app/applet/services/gateway/test/uploadClasses.test.ts:36:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/app/applet/worker/routes/uploads.ts'"
+  code: 'ENOENT'
+  stack: |-
+    readFileSync (node:fs:440:20)
+    readCore (/app/applet/services/gateway/test/_harness.ts:17:50)
+    constantValue (/app/applet/services/gateway/test/uploadClasses.test.ts:20:15)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/uploadClasses.test.ts:41:19)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: the cap is 1 MB unless a class raises it, and multipart gets its envelope allowance
+ok 284 - the cap is 1 MB unless a class raises it, and multipart gets its envelope allowance
+  ---
+  duration_ms: 0.54299
+  type: 'test'
+  ...
+# Subtest: the admin JSON allowance covers the template body the core actually accepts
+not ok 285 - the admin JSON allowance covers the template body the core actually accepts
+  ---
+  duration_ms: 0.274231
+  type: 'test'
+  location: '/app/applet/services/gateway/test/uploadClasses.test.ts:65:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/app/applet/worker/routes/template.ts'"
+  code: 'ENOENT'
+  stack: |-
+    readFileSync (node:fs:440:20)
+    readCore (/app/applet/services/gateway/test/_harness.ts:17:50)
+    constantValue (/app/applet/services/gateway/test/uploadClasses.test.ts:20:15)
+    TestContext.<anonymous> (/app/applet/services/gateway/test/uploadClasses.test.ts:66:17)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: no class is wider than the largest thing the platform accepts
+ok 286 - no class is wider than the largest thing the platform accepts
+  ---
+  duration_ms: 0.356296
+  type: 'test'
+  ...
+# Subtest: the method allowlist is the platform's six; anything else gets today's 404 body
+ok 287 - the method allowlist is the platform's six; anything else gets today's 404 body
+  ---
+  duration_ms: 68.03232
+  type: 'test'
+  ...
+# Subtest: a read-only prefix answers a mutation the way the core does: it has no such route
+ok 288 - a read-only prefix answers a mutation the way the core does: it has no such route
+  ---
+  duration_ms: 1.346597
+  type: 'test'
+  ...
+# Subtest: traversal is refused raw and percent-encoded
+ok 289 - traversal is refused raw and percent-encoded
+  ---
+  duration_ms: 2.195293
+  type: 'test'
+  ...
+# Subtest: "has a body" means Content-Length, Transfer-Encoding OR a body stream
+ok 290 - "has a body" means Content-Length, Transfer-Encoding OR a body stream
+  ---
+  duration_ms: 0.578044
+  type: 'test'
+  ...
+# Subtest: a bodiless mutation passes with no Content-Type; a typed one must be JSON or multipart
+ok 291 - a bodiless mutation passes with no Content-Type; a typed one must be JSON or multipart
+  ---
+  duration_ms: 1.017015
+  type: 'test'
+  ...
+# Subtest: Content-Length together with Transfer-Encoding is refused as smuggling
+ok 292 - Content-Length together with Transfer-Encoding is refused as smuggling
+  ---
+  duration_ms: 0.447674
+  type: 'test'
+  ...
+# Subtest: the size cap is per class and only applies to a declared length
+ok 293 - the size cap is per class and only applies to a declared length
+  ---
+  duration_ms: 0.492653
+  type: 'test'
+  ...
+# Subtest: Turnstile is off until the secret exists — no route is challenged and nothing is fetched
+ok 294 - Turnstile is off until the secret exists — no route is challenged and nothing is fetched
+  ---
+  duration_ms: 14.859217
+  type: 'test'
+  ...
+# Subtest: with a secret, a flagged route without a token is refused with the sitekey the widget needs
+ok 295 - with a secret, a flagged route without a token is refused with the sitekey the widget needs
+  ---
+  duration_ms: 5.09502
+  type: 'test'
+  ...
+# Subtest: with a secret, a valid token passes and an unflagged route is never challenged
+ok 296 - with a secret, a valid token passes and an unflagged route is never challenged
+  ---
+  duration_ms: 7.069893
+  type: 'test'
+  ...
+# Subtest: a Turnstile outage is a refusal, not an exception — and never a silent pass
+ok 297 - a Turnstile outage is a refusal, not an exception — and never a silent pass
+  ---
+  duration_ms: 1.284138
+  type: 'test'
+  ...
+# Subtest: login is challenged only after Identity arms the marker, and asking never arms it
+ok 298 - login is challenged only after Identity arms the marker, and asking never arms it
+  ---
+  duration_ms: 11.01152
+  type: 'test'
+  ...
+# Subtest: the marker store is a pure read with a TTL
+ok 299 - the marker store is a pure read with a TTL
+  ---
+  duration_ms: 0.40754
+  type: 'test'
+  ...
+# Subtest: the marker is keyed by the caller the gateway can recognise without reading a body
+ok 300 - the marker is keyed by the caller the gateway can recognise without reading a body
+  ---
+  duration_ms: 0.211171
+  type: 'test'
+  ...
+# Subtest: the hook list is the design's, and login is conditional rather than blanket
+ok 301 - the hook list is the design's, and login is conditional rather than blanket
+  ---
+  duration_ms: 0.258527
+  type: 'test'
+  ...
+# (node:9235) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the inbox refuses a request it cannot attribute — no principal, no rows
+ok 302 - the inbox refuses a request it cannot attribute — no principal, no rows
+  ---
+  duration_ms: 85.587457
+  type: 'test'
+  ...
+# Subtest: the inbox returns only the caller's rows, newest first, with the contract's field names
+ok 303 - the inbox returns only the caller's rows, newest first, with the contract's field names
+  ---
+  duration_ms: 16.573291
+  type: 'test'
+  ...
+# Subtest: unread=1 filters, and unread-count agrees with the list
+ok 304 - unread=1 filters, and unread-count agrees with the list
+  ---
+  duration_ms: 12.6191
+  type: 'test'
+  ...
+# Subtest: marking read is scoped to the owner IN SQL: a guessed id belonging to someone else changes nothing
+ok 305 - marking read is scoped to the owner IN SQL: a guessed id belonging to someone else changes nothing
+  ---
+  duration_ms: 9.978727
+  type: 'test'
+  ...
+# Subtest: the admin delivery history reports rows and the outbox lag, and carries no body or recipient
+ok 306 - the admin delivery history reports rows and the outbox lag, and carries no body or recipient
+  ---
+  duration_ms: 10.822439
+  type: 'test'
+  ...
+# Subtest: the webhook answers 200 to everything, dedups on update_id, and accepts nothing without the secret
+ok 307 - the webhook answers 200 to everything, dedups on update_id, and accepts nothing without the secret
+  ---
+  duration_ms: 7.325493
+  type: 'test'
+  ...
+# Subtest: with no webhook secret configured the endpoint accepts nothing at all
+ok 308 - with no webhook secret configured the endpoint accepts nothing at all
+  ---
+  duration_ms: 3.487474
+  type: 'test'
+  ...
+# Subtest: the update classifier fixes the shape the router will dispatch on
+ok 309 - the update classifier fixes the shape the router will dispatch on
+  ---
+  duration_ms: 0.480051
+  type: 'test'
+  ...
+# Subtest: GET /health reports the database and the outbox lag
+ok 310 - GET /health reports the database and the outbox lag
+  ---
+  duration_ms: 3.914209
+  type: 'test'
+  ...
+# Subtest: with GATEWAY_ONLY=on nothing but a health probe gets in without a signed gateway hop
+ok 311 - with GATEWAY_ONLY=on nothing but a health probe gets in without a signed gateway hop
+  ---
+  duration_ms: 3.308206
+  type: 'test'
+  ...
+# (node:9247) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a self-minted principal binds nobody: the inbox refuses a header signed by an unknown key
+ok 312 - a self-minted principal binds nobody: the inbox refuses a header signed by an unknown key
+  ---
+  duration_ms: 83.501722
+  type: 'test'
+  ...
+# Subtest: an expired principal, and one from the wrong issuer, are refused as firmly as a forged one
+ok 313 - an expired principal, and one from the wrong issuer, are refused as firmly as a forged one
+  ---
+  duration_ms: 19.450198
+  type: 'test'
+  ...
+# Subtest: with no key registered the inbox answers 401 to everything — the fail-closed state before Phase 3
+ok 314 - with no key registered the inbox answers 401 to everything — the fail-closed state before Phase 3
+  ---
+  duration_ms: 5.106646
+  type: 'test'
+  ...
+# Subtest: the admin delivery history refuses an anonymous caller and an assistant-scope admin
+ok 315 - the admin delivery history refuses an anonymous caller and an assistant-scope admin
+  ---
+  duration_ms: 15.420255
+  type: 'test'
+  ...
+# notifications: hop refused (on) NotificationsEntrypoint.send MISSING_HOP
+# notifications: hop refused (on) NotificationsEntrypoint.send ARGS_MISMATCH
+# notifications: hop refused (on) NotificationsEntrypoint.send ISSUER_NOT_ALLOWED
+# Subtest: send() is hop-guarded: no hop, a wrong issuer and tampered arguments are all refused
+ok 316 - send() is hop-guarded: no hop, a wrong issuer and tampered arguments are all refused
+  ---
+  duration_ms: 13.346159
+  type: 'test'
+  ...
+# Subtest: the send allowlist is explicit — never `*` — and every method of the class has an entry
+ok 317 - the send allowlist is explicit — never `*` — and every method of the class has an entry
+  ---
+  duration_ms: 0.405862
+  type: 'test'
+  ...
+# (node:9261) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the runtime list, the manifest and the design agree on what Notifications owns
+ok 318 - the runtime list, the manifest and the design agree on what Notifications owns
+  ---
+  duration_ms: 5.029378
+  type: 'test'
+  ...
+# Subtest: every table named by a SQL literal anywhere in src/ is owned by this service
+ok 319 - every table named by a SQL literal anywhere in src/ is owned by this service
+  ---
+  duration_ms: 4.757212
+  type: 'test'
+  ...
+# Subtest: the runtime guard REFUSES a foreign statement, it does not merely log it
+ok 320 - the runtime guard REFUSES a foreign statement, it does not merely log it
+  ---
+  duration_ms: 3.790385
+  type: 'test'
+  ...
+# Subtest: the consumer handles exactly what the manifest declares, and every declared type is one subscriptions.ts gives us
+ok 321 - the consumer handles exactly what the manifest declares, and every declared type is one subscriptions.ts gives us
+  ---
+  duration_ms: 0.582004
+  type: 'test'
+  ...
+# Subtest: the types subscriptions.ts lists but this slice does not handle are named, not forgotten
+ok 322 - the types subscriptions.ts lists but this slice does not handle are named, not forgotten
+  ---
+  duration_ms: 0.715425
+  type: 'test'
+  ...
+# Subtest: Notifications declares no call and publishes nothing yet; its legacy routes are the core's, spelled exactly
+ok 323 - Notifications declares no call and publishes nothing yet; its legacy routes are the core's, spelled exactly
+  ---
+  duration_ms: 0.364487
+  type: 'test'
+  ...
+# Subtest: no source file logs a credential name
+ok 324 - no source file logs a credential name
+  ---
+  duration_ms: 1.38375
+  type: 'test'
+  ...
+# (node:9268) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: UserCreated with a bound contact resolver enqueues the verification mail, keyed on the user
+ok 325 - UserCreated with a bound contact resolver enqueues the verification mail, keyed on the user
+  ---
+  duration_ms: 35.250444
+  type: 'test'
+  ...
+# Subtest: UserCreated with NO contact resolver records the event honestly as skipped, and sends nothing
+ok 326 - UserCreated with NO contact resolver records the event honestly as skipped, and sends nothing
+  ---
+  duration_ms: 14.030208
+  type: 'test'
+  ...
+# Subtest: UserCreated for an already-verified signup does nothing at all
+ok 327 - UserCreated for an already-verified signup does nothing at all
+  ---
+  duration_ms: 11.526385
+  type: 'test'
+  ...
+# Subtest: OrderCreated writes the customer inbox row and, when the group is configured, the admin message
+ok 328 - OrderCreated writes the customer inbox row and, when the group is configured, the admin message
+  ---
+  duration_ms: 21.770398
+  type: 'test'
+  ...
+# Subtest: the in-app row carries a PATH, never an origin
+ok 329 - the in-app row carries a PATH, never an origin
+  ---
+  duration_ms: 9.302552
+  type: 'test'
+  ...
+# Subtest: DepositDecided — a personal envelope this service IS allowed — becomes one inbox row
+ok 330 - DepositDecided — a personal envelope this service IS allowed — becomes one inbox row
+  ---
+  duration_ms: 13.01998
+  type: 'test'
+  ...
+# Subtest: RequestPublished tells every matched merchant once — and the same merchant twice never
+ok 331 - RequestPublished tells every matched merchant once — and the same merchant twice never
+  ---
+  duration_ms: 13.830588
+  type: 'test'
+  ...
+# Subtest: IDEMPOTENCY: a redelivered envelope is replayed and writes nothing a second time
+ok 332 - IDEMPOTENCY: a redelivered envelope is replayed and writes nothing a second time
+  ---
+  duration_ms: 30.211587
+  type: 'test'
+  ...
+# Subtest: IDEMPOTENCY: even without the processed_events row, notify_outbox.event_key refuses the duplicate
+ok 333 - IDEMPOTENCY: even without the processed_events row, notify_outbox.event_key refuses the duplicate
+  ---
+  duration_ms: 8.170401
+  type: 'test'
+  ...
+# Subtest: an event this service does not handle is refused, not half-processed — and is RETRYABLE, not poison
+ok 334 - an event this service does not handle is refused, not half-processed — and is RETRYABLE, not poison
+  ---
+  duration_ms: 8.683771
+  type: 'test'
+  ...
+# Subtest: a forged envelope — right type, wrong producer — is refused before any row is written
+ok 335 - a forged envelope — right type, wrong producer — is refused before any row is written
+  ---
+  duration_ms: 7.118458
+  type: 'test'
+  ...
+# Subtest: PUMP: the master switch off claims nothing and sends nothing
+ok 336 - PUMP: the master switch off claims nothing and sends nothing
+  ---
+  duration_ms: 6.738369
+  type: 'test'
+  ...
+# Subtest: PUMP: the master switch fails CLOSED — unset, empty or misspelt is off
+ok 337 - PUMP: the master switch fails CLOSED — unset, empty or misspelt is off
+  ---
+  duration_ms: 34.635687
+  type: 'test'
+  ...
+# Subtest: PUMP: an unconfigured transport drops the row with its own reason and makes NO request
+ok 338 - PUMP: an unconfigured transport drops the row with its own reason and makes NO request
+  ---
+  duration_ms: 7.465624
+  type: 'test'
+  ...
+# Subtest: PUMP: a configured transport sends once, records sent, and never sends the same row again
+ok 339 - PUMP: a configured transport sends once, records sent, and never sends the same row again
+  ---
+  duration_ms: 66.94745
+  type: 'test'
+  ...
+# Subtest: PUMP: the staging allowlist skips a non-allowlisted recipient without sending, and logs no address
+ok 340 - PUMP: the staging allowlist skips a non-allowlisted recipient without sending, and logs no address
+  ---
+  duration_ms: 22.582121
+  type: 'test'
+  ...
+# Subtest: PUMP: a 5xx becomes failed and is retried until the attempt ceiling turns it dead
+ok 341 - PUMP: a 5xx becomes failed and is retried until the attempt ceiling turns it dead
+  ---
+  duration_ms: 18.098735
+  type: 'test'
+  ...
+# Subtest: PUMP: an unparseable payload is dead on the first attempt — retrying it would never help
+ok 342 - PUMP: an unparseable payload is dead on the first attempt — retrying it would never help
+  ---
+  duration_ms: 2.485866
+  type: 'test'
+  ...
+# (node:9280) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the migration applies to a fresh database and creates exactly the owned tables plus the platform ones
+ok 343 - the migration applies to a fresh database and creates exactly the owned tables plus the platform ones
+  ---
+  duration_ms: 13.020025
+  type: 'test'
+  ...
+# Subtest: applying it a second time is a no-op
+ok 344 - applying it a second time is a no-op
+  ---
+  duration_ms: 1.532536
+  type: 'test'
+  ...
+# Subtest: notify_outbox is the legacy `outbox` shape, column for column
+ok 345 - notify_outbox is the legacy `outbox` shape, column for column
+  ---
+  duration_ms: 2.799402
+  type: 'test'
+  ...
+# Subtest: user_notifications is the legacy table minus the users(id) foreign key, which cannot exist in this database
+ok 346 - user_notifications is the legacy table minus the users(id) foreign key, which cannot exist in this database
+  ---
+  duration_ms: 2.624459
+  type: 'test'
+  ...
+# Subtest: the dedup indexes that make a duplicate message impossible are present
+ok 347 - the dedup indexes that make a duplicate message impossible are present
+  ---
+  duration_ms: 2.739225
+  type: 'test'
+  ...
+# Subtest: the platform tables match what the kit would create, column for column
+ok 348 - the platform tables match what the kit would create, column for column
+  ---
+  duration_ms: 2.187079
+  type: 'test'
+  ...
+# Subtest: the monolith keeps its own copies: nothing in this slice removes the core outbox or its transports
+ok 349 - the monolith keeps its own copies: nothing in this slice removes the core outbox or its transports
+  ---
+  duration_ms: 0.538184
+  type: 'test'
+  ...
+# (node:9287) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the endpoints are the ones the core uses today, read from the core rather than restated
+ok 350 - the endpoints are the ones the core uses today, read from the core rather than restated
+  ---
+  duration_ms: 1.708825
+  type: 'test'
+  ...
+# Subtest: EMAIL: disabled without its secret NAMES — no request is made and the row is dropped, not failed
+ok 351 - EMAIL: disabled without its secret NAMES — no request is made and the row is dropped, not failed
+  ---
+  duration_ms: 2.128058
+  type: 'test'
+  ...
+# Subtest: EMAIL: the request is the core's, and Idempotency-Key IS the event key
+ok 352 - EMAIL: the request is the core's, and Idempotency-Key IS the event key
+  ---
+  duration_ms: 62.112152
+  type: 'test'
+  ...
+# Subtest: EMAIL: an over-long event key is truncated to the provider limit rather than rejected
+ok 353 - EMAIL: an over-long event key is truncated to the provider limit rather than rejected
+  ---
+  duration_ms: 0.937819
+  type: 'test'
+  ...
+# Subtest: EMAIL: a 5xx is retryable, a 4xx is not, and neither error carries the API key
+ok 354 - EMAIL: a 5xx is retryable, a 4xx is not, and neither error carries the API key
+  ---
+  duration_ms: 3.154752
+  type: 'test'
+  ...
+# Subtest: TELEGRAM: disabled without the bot token; the admin group is a separate requirement
+ok 355 - TELEGRAM: disabled without the bot token; the admin group is a separate requirement
+  ---
+  duration_ms: 0.463193
+  type: 'test'
+  ...
+# Subtest: TELEGRAM: plain text, capped, no parse_mode — a user-supplied name cannot inject markup
+ok 356 - TELEGRAM: plain text, capped, no parse_mode — a user-supplied name cannot inject markup
+  ---
+  duration_ms: 0.782155
+  type: 'test'
+  ...
+# Subtest: TELEGRAM: the bot token is in the URL, so the failure path must not put the URL in the error
+ok 357 - TELEGRAM: the bot token is in the URL, so the failure path must not put the URL in the error
+  ---
+  duration_ms: 0.573839
+  type: 'test'
+  ...
+# Subtest: a transport refuses a payload of the other kind rather than sending it somewhere odd
+ok 358 - a transport refuses a payload of the other kind rather than sending it somewhere odd
+  ---
+  duration_ms: 0.617454
+  type: 'test'
+  ...
+# Subtest: the staging recipient allowlist is the core's, character for character
+ok 359 - the staging recipient allowlist is the core's, character for character
+  ---
+  duration_ms: 0.684497
+  type: 'test'
+  ...
+# Subtest: the registry answers "can this be sent" without ever looking at a value
+ok 360 - the registry answers "can this be sent" without ever looking at a value
+  ---
+  duration_ms: 0.430583
+  type: 'test'
+  ...
+# Subtest: env.dark cannot deliver mail to an unbounded set of recipients
+ok 361 - env.dark cannot deliver mail to an unbounded set of recipients
+  ---
+  duration_ms: 0.614256
+  type: 'test'
+  ...
+1..361
+# tests 361
+# suites 0
+# pass 349
+# fail 12
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 24274.913379
+test-workspaces: a workspace test failed (see above)

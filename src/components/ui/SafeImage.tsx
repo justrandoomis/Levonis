@@ -60,6 +60,14 @@ export default function SafeImage({
   const [attempt, setAttempt] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
+  // Generate responsive WebP delivery via Cloudflare Image Resizing
+  const isLocal = cleanSrc.startsWith('/') && !cleanSrc.startsWith('//');
+  const srcSet = isLocal 
+    ? `/cdn-cgi/image/width=400,format=webp,fit=cover${cleanSrc} 400w, /cdn-cgi/image/width=800,format=webp,fit=cover${cleanSrc} 800w, /cdn-cgi/image/width=1200,format=webp,fit=cover${cleanSrc} 1200w`
+    : undefined;
+  const sizes = isLocal ? "(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px" : undefined;
+  const finalSrc = isLocal ? `/cdn-cgi/image/format=webp${cleanSrc}` : cleanSrc;
+
   // A new src is a new load — never keep a previous image's state.
   useEffect(() => {
     setStatus('loading');
@@ -99,7 +107,9 @@ export default function SafeImage({
         <img
           key={`${cleanSrc}#${attempt}`}
           ref={imgRef}
-          src={cleanSrc}
+          src={finalSrc}
+          srcSet={srcSet}
+          sizes={sizes}
           alt={alt}
           referrerPolicy={referrerPolicy}
           loading={eager ? 'eager' : 'lazy'}

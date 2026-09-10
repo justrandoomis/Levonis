@@ -8,9 +8,9 @@
     "services/*"
   ],
   "scripts": {
-    "dev": "wrangler dev",
-    "dev:web": "vite",
-    "build": "node scripts/prepare-deploy-config.mjs && vite build && node scripts/write-asset-headers.mjs && node scripts/check-live-markers.mjs",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "dev:web": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
     "lint": "eslint .",
     "check": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json && tsc --noEmit -p tests/tsconfig.json && eslint . && npm run check:workspaces && npm run check:boundaries && npm run check:studio",
     "check:workspaces": "node scripts/check-workspaces.mjs",
@@ -35,6 +35,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "ogl": "^1.0.11",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.1",

@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import { setCartCount, countCartItems } from '../lib/cartCount';
+import { optionFulfillmentTypes, getModelStock, getModelLeadTime } from '@levonis/pricing/availability';
 import ReviewSection from '../components/reviews/ReviewSection';
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
@@ -981,16 +982,12 @@ export default function Product() {
 
   const models = useMemo(() => {
     const options = product?.options ?? [];
-    const declared = options.some((o) => o.availability_type === 'pre_order' || o.availability_type === 'direct_sale');
-    if (!declared) return null;
-    const byKey = new Map<string, { key: string; label: string; options: OptionItem[] }>();
-    for (const o of options) {
-      const key = o.variant_key || o.id;
-      const entry = byKey.get(key);
-      if (entry) entry.options.push(o);
-      else byKey.set(key, { key, label: o.variant_label || pickName(o.name_en, o.name, o.name_ar) || key, options: [o] });
-    }
-    return [...byKey.values()];
+    if (options.length === 0) return null;
+    return options.map(o => ({
+      key: o.id,
+      label: o.variant_label || pickName(o.name_en, o.name_ar, o.name_ckb) || o.id,
+      option: o,
+    }));
   }, [product]);
 
   const selectedOption = useMemo(
@@ -1389,10 +1386,11 @@ export default function Product() {
   );
 
   const activeModel = models?.find((m) => m.key === modelKey) ?? null;
+  const fulfillmentTypes = activeModel ? optionFulfillmentTypes(activeModel.option as any, []) : [];
 
   const selectionBlocks = (
     <>
-      {models ? (
+      {models && models.length > 0 ? (
         <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4" data-variant-chooser>
           <legend className="px-1 text-white font-bold text-[14px]">
             {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
@@ -1408,10 +1406,17 @@ export default function Product() {
                   data-variant-model={m.key}
                   aria-pressed={selected}
                   onClick={() => {
-                    setModelKey(selected ? '' : m.key);
-                    // Changing the model invalidates the availability chosen
-                    // under the previous one.
-                    setOptionId('');
+                    if (selected) {
+                      setModelKey('');
+                      setOptionId('');
+                      setWantPreorder(false);
+                      setTransportMethod('');
+                    } else {
+                      setModelKey(m.key);
+                      setOptionId(m.key);
+                      setWantPreorder(false);
+                      setTransportMethod('');
+                    }
                   }}
                   className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 text-sm font-bold transition-colors ${
                     selected
@@ -1419,9 +1424,9 @@ export default function Product() {
                       : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
                   }`}
                 >
-                  {m.options[0]?.image ? (
+                  {m.option?.image ? (
                     <img
-                      src={m.options[0].image}
+                      src={m.option.image}
                       alt=""
                       aria-hidden="true"
                       className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
@@ -1440,27 +1445,25 @@ export default function Product() {
                 {tr('طريقة التوفر', 'How to get it', 'چۆنیەتی بەردەستبوون')}
               </p>
               <div className="flex flex-wrap gap-2">
-                {activeModel.options.map((opt) => {
-                  const selected = optionId === opt.id;
-                  const isPre = opt.availability_type === 'pre_order';
-                  const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
-                  const wait = (opt.lead_time_text ?? '').trim();
+                {fulfillmentTypes.map((type) => {
+                  const isPre = type === 'pre_order';
+                  const selected = isPre ? wantPreorder : !wantPreorder;
+                  
+                  const stock = getModelStock(activeModel.option as any, type, undefined);
+                  const wait = isPre ? getModelLeadTime(activeModel.option as any, transportMethod) : null;
+                  
+                  // Use the existing levelChip function
+                  const chip = stock !== null ? levelChip(stock) : null;
+                  
                   return (
                     <button
-                      key={opt.id}
+                      key={type}
                       type="button"
-                      data-availability-option={opt.id}
-                      data-availability={opt.availability_type || 'inherit'}
+                      data-availability={type}
                       aria-pressed={selected}
                       onClick={() => {
-                        const next = selected ? '' : opt.id;
-                        setOptionId(next);
-                        // The option now decides the route, so the page stops
-                        // asking the fulfilment question separately: a direct
-                        // option clears any transport, a pre-order one keeps
-                        // the transport picker below for the journey.
-                        if (next && opt.availability_type === 'direct_sale') setTransportMethod('');
-                        if (next) setWantPreorder(opt.availability_type === 'pre_order');
+                        setWantPreorder(isPre);
+                        if (!isPre) setTransportMethod('');
                       }}
                       className={`min-h-[44px] px-3 rounded-xl border text-start transition-colors ${
                         selected
@@ -1473,8 +1476,8 @@ export default function Product() {
                           ? tr('طلب مسبق', 'Pre-order', 'پێش-داواکاری')
                           : tr('بيع مباشر', 'Direct sale', 'فرۆشتنی ڕاستەوخۆ')}
                       </span>
-                      {isPre && wait ? (
-                        <span className="block text-[11px] font-medium text-amber-300/90 leading-tight">{wait}</span>
+                      {wait && wait.text ? (
+                        <span className="block text-[11px] font-medium text-amber-300/90 leading-tight">{wait.text}</span>
                       ) : null}
                       {chip ? (
                         <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>

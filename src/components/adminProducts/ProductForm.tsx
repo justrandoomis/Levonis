@@ -38,7 +38,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
 import { useLanguage } from '../../LanguageContext';
@@ -53,7 +53,9 @@ import {
   type EditorDoc,
   type ProductResponse,
   type SaveResponse,
+  type DeleteResponse,
 } from './types';
+import DeleteConfirmModal from './DeleteConfirmModal';
 import PinnedPriceNotice from './PinnedPriceNotice';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
@@ -130,10 +132,12 @@ export default function ProductForm({
   productId,
   onBack,
   onListChanged,
+  onDeleted,
 }: {
   productId: string | null;
   onBack: () => void;
   onListChanged: () => void;
+  onDeleted?: (name: string) => void;
 }) {
   const { dir, lang } = useLanguage();
   const { user } = useAuth();
@@ -232,6 +236,52 @@ export default function ProductForm({
   const [reviewNeeded, setReviewNeeded] = useState<string[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveToggle = async () => {
+    if (!productId) return;
+    const nextStatus = doc.status === 'hidden' ? 'active' : 'hidden';
+    setArchiving(true);
+    setSaveErr(null);
+    try {
+      await api.patch(`/api/admin/products-v2/${productId}/status`, { status: nextStatus });
+      setDoc((d) => ({ ...d, status: nextStatus }));
+      onListChanged();
+      setSaveNote(
+        nextStatus === 'hidden'
+          ? (dir === 'rtl' ? 'تمت أرشفة المنتج وإخفاؤه من المتجر.' : 'Product was archived and hidden from storefront.')
+          : (dir === 'rtl' ? 'تمت استعادة المنتج ونشره في المتجر.' : 'Product was unarchived and published to storefront.')
+      );
+    } catch (e) {
+      setSaveErr(e instanceof ApiError ? e.message : (dir === 'rtl' ? 'فشل تغيير حالة المنتج' : 'Failed to update product status'));
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleDeletePermanentConfirm = async () => {
+    if (!productId) return;
+    const name = doc.name_ar || doc.name_en || doc.slug || productId;
+    setDeleting(true);
+    setSaveErr(null);
+    try {
+      await api.delete<DeleteResponse>(`/api/admin/products-v2/${productId}?permanent=true`, { permanent: true, mode: 'permanent' });
+      setDeleteOpen(false);
+      onListChanged();
+      if (onDeleted) {
+        onDeleted(name);
+      } else {
+        onBack();
+      }
+    } catch (e) {
+      setSaveErr(e instanceof ApiError ? e.message : (dir === 'rtl' ? 'فشل الحذف النهائي' : 'Failed to permanently delete product'));
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // ------------------------------------------------------------- loading
 
@@ -694,7 +744,52 @@ export default function ProductForm({
         >
           {doc.status === 'active' ? 'منشور' : doc.status === 'draft' ? 'مسودة' : 'مخفي'}
         </span>
+
+        {productId && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleArchiveToggle}
+              disabled={archiving || saving || deleting}
+              className={`${btnGhost} h-8 px-2.5 text-[12px] gap-1.5`}
+              title={doc.status === 'hidden' ? (dir === 'rtl' ? 'استعادة / تفعيل' : 'Restore / Publish') : (dir === 'rtl' ? 'أرشفة / إخفاء' : 'Archive / Hide')}
+            >
+              {archiving ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : doc.status === 'hidden' ? (
+                <>
+                  <ArchiveRestore className="w-3.5 h-3.5" />
+                  <span>{dir === 'rtl' ? 'استعادة' : 'Restore'}</span>
+                </>
+              ) : (
+                <>
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>{dir === 'rtl' ? 'أرشفة' : 'Archive'}</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              disabled={archiving || saving || deleting}
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-2.5 rounded-lg text-[12px] font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-colors disabled:opacity-40 shrink-0"
+              title={dir === 'rtl' ? 'حذف نهائي' : 'Delete permanently'}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{dir === 'rtl' ? 'حذف نهائي' : 'Delete'}</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      <DeleteConfirmModal
+        open={deleteOpen}
+        productName={doc.name_ar || doc.name_en || doc.slug || productId || ''}
+        isDeleting={deleting}
+        dir={dir}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDeletePermanentConfirm}
+      />
 
       {saveErr && <Banner kind="error">{saveErr}</Banner>}
       {saveNote && <Banner kind="warn">{saveNote}</Banner>}
