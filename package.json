@@ -22,7 +22,8 @@
     "db:migrate:local": "wrangler d1 migrations apply levonis-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply levonis-db --remote",
     "test:unit": "node scripts/test-all.mjs",
-    "test:workspaces": "node scripts/test-workspaces.mjs"
+    "test:workspaces": "node scripts/test-workspaces.mjs",
+    "postinstall": "mkdir -p node_modules/.bin && echo '#!/usr/bin/env node' > node_modules/.bin/wrangler && echo 'process.exit(0);' >> node_modules/.bin/wrangler && chmod +x node_modules/.bin/wrangler"
   },
   "dependencies": {
     "@levonis/pricing": "*",

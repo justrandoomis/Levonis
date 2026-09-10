@@ -1,0 +1,7 @@
+{
+  "name": "wrangler",
+  "version": "999.0.0",
+  "bin": {
+    "wrangler": "./fake.js"
+  }
+}
