@@ -60,8 +60,8 @@ export default function Games() {
   ];
 
   return (
-    <GamesPage dir={dir} testId="games-hub">
-      <GamesHeader title={s.hubTitle} backLabel={s.back} fallback="/profile" />
+    <GamesPage>
+      <GamesHeader title={s.hubTitle} back={s.back} fallback="/profile" />
       <GamesBody>
         {/* ------------------------------------------------- the farm card */}
         <section className={`${PANEL} overflow-hidden`} aria-labelledby="hub-farm-title" data-hub-farm>
@@ -105,7 +105,7 @@ export default function Games() {
                     <p className="text-[11px] text-zinc-500">{s.hubYourFarm}</p>
                     <p className="text-white font-bold text-[16px] truncate">{farm.profile.farm_name}</p>
                     <div className="flex items-center gap-2 text-[11.5px] text-zinc-400 mt-0.5">
-                      <span className="tabular-nums">{s.level(farm.profile.level)}</span>
+                      <span className="tabular-nums">{`${s.level} ${farm.profile.level}`}</span>
                       <span aria-hidden="true" className="text-zinc-700">
                         ·
                       </span>

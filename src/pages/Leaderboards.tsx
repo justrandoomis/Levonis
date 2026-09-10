@@ -59,8 +59,8 @@ export default function Leaderboards() {
   }, [board, load]);
 
   return (
-    <GamesPage dir={dir} testId="leaderboards">
-      <GamesHeader title={s.lbTitle} backLabel={s.back} fallback="/games" />
+    <GamesPage>
+      <GamesHeader title={s.lbTitle} back={s.back} fallback="/games" />
       <GamesBody>
         <Segmented
           group="farm-board"
@@ -97,7 +97,7 @@ export default function Leaderboards() {
                   data-lb-mine={mine || undefined}
                   className={`${PANEL} flex items-center gap-3 px-3 py-2.5 ${mine ? 'border-[#BAA369]/50 bg-[#BAA369]/[0.06]' : ''}`}
                 >
-                  <span className={`w-7 text-center font-black tabular-nums text-[14px] ${rank <= 3 ? 'text-[#BAA369]' : 'text-zinc-500'}`} dir="ltr" aria-label={s.lbRank(rank)}>
+                  <span className={`w-7 text-center font-black tabular-nums text-[14px] ${rank <= 3 ? 'text-[#BAA369]' : 'text-zinc-500'}`} dir="ltr" aria-label={`${s.lbRank} ${rank}`}>
                     {rank}
                   </span>
                   <span className="w-9 h-9 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0 flex items-center justify-center text-zinc-300 font-bold text-[13px]">
@@ -116,7 +116,7 @@ export default function Leaderboards() {
                   </span>
                   {/* The reputation score is the server's basis points, always — see leaderboardScore. */}
                   <span className="text-[#BAA369] font-black tabular-nums text-[14px] shrink-0" dir="ltr">
-                    {leaderboardScore(board, row.score, lang, s)}
+                    {leaderboardScore(board, row.score)}
                   </span>
                 </li>
               );

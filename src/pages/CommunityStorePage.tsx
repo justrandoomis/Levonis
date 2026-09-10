@@ -89,7 +89,7 @@ function syntheticStore(d: LegacyStorePayload): StoreShape {
 export default function CommunityStorePage() {
   const { id } = useParams<{ id: string }>();
   const [store, setStore] = useState<StoreShape | null>(null);
-  const [profileProducts, setProfileProducts] = useState<MerchantProduct[] | null>(null);
+  const [profileProducts, setProfileProducts] = useState<Record<string, unknown>[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function CommunityStorePage() {
           const d = await api.get<LegacyStorePayload>(`/api/community/store/${encodeURIComponent(id)}`);
           if (!alive) return;
           setStore(syntheticStore(d));
-          setProfileProducts((d.products ?? []) as unknown as MerchantProduct[]);
+          setProfileProducts((d.products ?? []) as unknown as Record<string, unknown>[]);
         } catch {
           /* merchant truly gone — the legacy page below owns not-found */
         }

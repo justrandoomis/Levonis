@@ -5,6 +5,12 @@ import tailwindcss from '@tailwindcss/vite';
 const BACKEND_URL = process.env.VITE_BACKEND_URL || 'https://levonis-iq.com';
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      { find: '@levonis/pricing/availability', replacement: '/app/applet/packages/pricing/src/availability.ts' },
+      { find: '@levonis/pricing', replacement: '/app/applet/packages/pricing/src' },
+    ],
+  },
   plugins: [
     react(),
     tailwindcss(),

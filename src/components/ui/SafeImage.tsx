@@ -29,6 +29,7 @@ export default function SafeImage({
   fallbackIconClassName = 'w-6 h-6',
   referrerPolicy = 'no-referrer',
   onStatus,
+  noRetry = false,
 }: {
   src?: string | null;
   alt?: string;
@@ -52,6 +53,7 @@ export default function SafeImage({
    * It reports, it does not repair: nothing here mutates a caller's state.
    */
   onStatus?: (status: 'loading' | 'loaded' | 'error', src: string) => void;
+  noRetry?: boolean;
 }) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
@@ -134,7 +136,7 @@ export default function SafeImage({
         >
           <ImageOff aria-hidden="true" className={fallbackIconClassName} />
           <span className="sr-only">{cleanSrc ? s.failed : alt || s.noImage}</span>
-          {cleanSrc ? (
+          {cleanSrc && !noRetry ? (
             <button
               type="button"
               onClick={retry}

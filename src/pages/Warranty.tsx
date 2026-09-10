@@ -87,13 +87,13 @@ export default function Warranty() {
           <div className="space-y-4">
             {devices.map((device) => (
               <DeviceCard
-                key={device.id}
+                key={device.unit_id}
                 device={device}
                 lang={lang}
                 s={s}
                 onOpenClaim={() => {}}
                 onRemove={() => {
-                  setDevices((prev) => prev.filter((d) => d.id !== device.id));
+                  setDevices((prev) => prev.filter((d) => d.unit_id !== device.unit_id));
                 }}
               />
             ))}

@@ -249,7 +249,7 @@ export default function Checkout() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
   const [loadError, setLoadError] = useState('');
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
