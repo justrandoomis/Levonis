@@ -1,6 +1,2 @@
 import React from 'react';
-import Checkout from './Checkout';
-
-export default function StoreCheckout() {
-  return <Checkout />;
-}
+export default function StoreCheckout() { return <div>StoreCheckout</div>; }

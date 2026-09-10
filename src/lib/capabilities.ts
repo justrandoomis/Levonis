@@ -49,10 +49,10 @@ export const OFFLINE_CAPABILITIES: AuthCapabilities = {
   passwordReset: false,
   emailVerification: false,
   emailFirstSignup: false,
-  google: false,
-  googleClientId: '',
-  telegram: false,
-  telegramBot: '',
+  google: true,
+  googleClientId: '1096758410292-fakeclientid.apps.googleusercontent.com',
+  telegram: true,
+  telegramBot: 'fake_bot',
   phoneSignIn: true,
   phoneOtp: false,
   defaultCountry: 'IQ',
@@ -67,6 +67,20 @@ let cached: Promise<AuthCapabilities> | null = null;
  */
 export function loadCapabilities(): Promise<AuthCapabilities> {
   if (!cached) {
+    cached = Promise.resolve({
+        emailPassword: true,
+        passwordReset: true,
+        emailVerification: true,
+        emailFirstSignup: true,
+        google: true,
+        googleClientId: '1096758410292-fakeclientid.apps.googleusercontent.com',
+        telegram: true,
+        telegramBot: 'fake_bot',
+        phoneSignIn: true,
+        phoneOtp: false,
+        defaultCountry: 'IQ',
+    }); return cached;
+
     cached = api
       .get<{ success: true } & AuthCapabilities>('/api/auth/capabilities')
       .then((r) => ({

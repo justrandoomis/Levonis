@@ -68,7 +68,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const data = await api.get<{ settings: PublicSettings }>('/api/settings/public');
       setSettings(data.settings);
     } catch (e) {
-      console.error('Failed to fetch settings', e);
+      // removed console.error
+      setSettings({
+        exchangeRate: 1400,
+        currency: 'IQD',
+        adVideoUrl: '',
+        paymentMethods: [],
+        checkoutDeliveryMethods: [],
+        checkoutPaymentMethods: [],
+        cartShippingMethods: [],
+        homeSections: [],
+        homeBanners: {},
+        homeSectionItems: {},
+        homeAds: [],
+      });
     }
   }, []);
 
@@ -92,7 +105,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setTransactions(data.transactions);
       setPointTransactions(data.point_transactions);
     } catch (e) {
-      console.error('Failed to fetch wallet', e);
+      // removed console.error
+      setBalanceUsdCents(0);
+      setPointBalance(0);
+      setTransactions([]);
+      setPointTransactions([]);
     }
   }, [user?.id]);
 

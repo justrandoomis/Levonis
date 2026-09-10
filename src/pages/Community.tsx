@@ -91,7 +91,7 @@ export default function Community() {
           if (!cancelled) setRequests(data.requests || []);
         }
       } catch (err) {
-        console.error(err);
+        // removed console.error
         if (!cancelled) {
           setLoadError(
             err instanceof ApiError && err.message
