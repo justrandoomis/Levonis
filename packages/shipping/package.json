@@ -1,6 +1,6 @@
 {
   "name": "@levonis/shipping",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Pure shipping quote engine and the Iraq governorate table, shared by the core and, from Phase 7b, the Fulfilment deployable. No I/O, no Cloudflare bindings, no imports from worker/ or services/.",

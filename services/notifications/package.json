@@ -1,12 +1,12 @@
 {
   "name": "@levonis/svc-notifications",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "levonis-notifications — the durable outbox-shaped inbox, the in-app notification store, and the two transports (Resend email, Telegram bot) moved out of the core as adapters: delivery is disabled unless the transport's secret NAMES exist, the provider Idempotency-Key is the event key, and the monolith keeps its own copies until Phase 3.",
   "dependencies": {
-    "@levonis/contracts": "0.1.0",
-    "@levonis/platform-kit": "0.1.0",
+    "@levonis/contracts": "*",
+    "@levonis/platform-kit": "*",
     "hono": "^4.9.0"
   },
   "scripts": {

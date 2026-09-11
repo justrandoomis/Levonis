@@ -1,6 +1,6 @@
 {
   "name": "@levonis/contracts",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "The published contracts between LEVONIS services: the event envelope, every v1 event schema with a fixture, the subscriptions table (consumers and producers per event type), the RPC interfaces each named WorkerEntrypoint implements, the Ledger argument policies, the table-ownership map and the HTTP response types shared with the SPA. Hand-written validators; no runtime dependency.",
