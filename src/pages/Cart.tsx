@@ -808,19 +808,20 @@ export default function Cart() {
     // short page. The bottom padding clears the summary bar (≈76px) and the
     // safe area, and nothing more — `pb-48` (192px) was reserving room for a
     // nav that is no longer on this route.
-    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+92px)] text-zinc-300 min-h-dvh bg-black flex flex-col font-sans">
+    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-zinc-300 min-h-dvh bg-black flex flex-col font-sans">
       {/* Header */}
       {/* `backdrop-blur-xl` behind a fully opaque `bg-black` was a compositing
           layer blurring nothing. Translucent, like the product page's bar, so
           content passing underneath actually frosts. */}
       <div className="fixed inset-x-0 top-0 z-40 bg-black/85 backdrop-blur-xl border-b border-zinc-900 px-4 py-4 flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="p-1 hover:text-white transition-colors">
+        <button type="button" onClick={() => navigate(-1)} className="p-1 hover:text-white transition-colors">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>
         <h1 className="text-white font-bold text-[17px]">
           {t('cart' as any) || loc('السلة', 'Cart', 'سەبەتە')}
         </h1>
         <button
+          type="button"
           onClick={() => navigate('/profile')}
           className="text-[15px] text-zinc-300 hover:text-white font-medium"
         >
@@ -837,7 +838,7 @@ export default function Cart() {
         {error && (
           <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between gap-3">
             <span>{error}</span>
-            <button onClick={() => setError('')} className="shrink-0 p-1 hover:text-white"><X className="w-4 h-4" /></button>
+            <button type="button" onClick={() => setError('')} className="shrink-0 p-1 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
         )}
 
@@ -858,6 +859,7 @@ export default function Cart() {
             <ShoppingCart className="w-10 h-10 text-zinc-700" />
             <p>{loc('سلتك فارغة', 'Your cart is empty.', 'سەبەتەکەت بەتاڵە.')}</p>
             <button
+              type="button"
               onClick={() => navigate('/products')}
               className="bg-gold text-black font-black min-h-[44px] px-6 rounded-xl text-sm hover:brightness-110 transition-[filter] duration-150"
             >
@@ -944,6 +946,7 @@ export default function Cart() {
                     <div className="flex flex-wrap gap-1.5 mb-1.5">
                       {hasVariants && (
                         <button
+                          type="button"
                           onClick={() => openVariantModal(item)}
                           aria-invalid={incomplete || undefined}
                           className={`rounded px-2 py-1 flex items-center gap-1 w-max border ${
@@ -1222,8 +1225,8 @@ export default function Cart() {
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* THE CAP IS THE SERVER'S, AND THE STEPPER DISABLES AT IT
                           (§10). A composition line's `stock` is NULL for ever by
                           design (§1.2), so the scarcity line below could never
@@ -1625,7 +1628,7 @@ export default function Cart() {
         >
           {/* A FIXED ROW HEIGHT. The savings line used to mount and unmount as
               items were ticked, so the bar grew and shrank while being used. */}
-          <div className="w-full min-h-[48px] flex items-center justify-between gap-3">
+          <div className="grid w-full min-h-[48px] grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
             <button
               type="button"
               role="checkbox"
@@ -1673,7 +1676,7 @@ export default function Cart() {
                   state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
                 })
               }
-              className="bg-gold text-black font-black min-h-[48px] px-5 rounded-xl text-[15px] tabular-nums shrink-0 whitespace-nowrap hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,opacity] duration-150 active:scale-[0.985] [touch-action:manipulation]"
+              className="col-span-2 w-full bg-gold text-black font-black min-h-[48px] px-5 rounded-xl text-[15px] tabular-nums shrink-0 whitespace-nowrap hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,opacity] duration-150 active:scale-[0.985] [touch-action:manipulation] sm:col-auto sm:w-auto"
               disabled={
                 selectedCount === 0 ||
                 // The server refuses an incomplete line at checkout; say so here
@@ -1752,7 +1755,7 @@ export default function Cart() {
                   )}
                 </div>
               </div>
-              <button onClick={() => setVariantModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setVariantModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1768,6 +1771,7 @@ export default function Cart() {
                     return (
                       <button
                         key={c.id}
+                        type="button"
                         onClick={() => setPendingColorId(active ? '' : c.id)}
                         className={`px-4 py-2 rounded-lg border text-sm flex items-center gap-2 ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
                       >
@@ -1793,6 +1797,7 @@ export default function Cart() {
                     return (
                       <button
                         key={o.id}
+                        type="button"
                         onClick={() => setPendingOptionId(active ? '' : o.id)}
                         className={`px-4 py-2 rounded-lg border text-sm ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
                       >
@@ -1810,6 +1815,7 @@ export default function Cart() {
             )}
 
             <button
+              type="button"
               onClick={confirmVariant}
               disabled={variantSaving}
               className="w-full mt-4 bg-gold text-black font-black min-h-[48px] rounded-xl hover:brightness-110 transition-[filter] duration-150 disabled:opacity-45 flex items-center justify-center gap-2"
@@ -1857,7 +1863,7 @@ export default function Cart() {
                 <h3 id="cart-shipping-sheet-title" className="text-white font-bold text-[17px]">{loc('طريقة الشحن', 'Shipping Method', 'شێوازی گەیاندن')}</h3>
                 <p className="text-zinc-400 text-sm mt-1">{loc('اختر طريقة الشحن المفضلة لهذا المنتج', 'Choose your preferred shipping method for this item', 'شێوازی گەیاندنی دڵخوازت بۆ ئەم بەرهەمە دیاری بکە')}</p>
               </div>
-              <button onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1879,6 +1885,7 @@ export default function Cart() {
                 return (
                   <button
                     key={sm.id}
+                    type="button"
                     // The LIVE line, not the one being rendered: the panel
                     // stays on screen for the length of its exit, and a tap
                     // that lands there must not patch a row the cart has

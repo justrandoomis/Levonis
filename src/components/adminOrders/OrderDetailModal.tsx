@@ -198,6 +198,25 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
+            {detail.priority === 1 && (
+              <section data-pro-priority className="rounded-2xl border border-[#B03142]/40 bg-gradient-to-r from-[#B03142]/15 to-amber-500/[0.06] p-3.5">
+                <div className="flex items-start gap-2.5">
+                  <Truck className="mt-0.5 h-4.5 w-4.5 shrink-0 text-[#f3bdc5]" aria-hidden="true" />
+                  <div>
+                    <p className="text-[13px] font-black text-[#f3bdc5]">
+                      {detail.fulfillment_service === 'pro_priority_12h'
+                        ? loc('أولوية PRO — يجب إتمام الخدمة خلال 12 ساعة', 'PRO priority — service due within 12 hours', 'پێشینەیی PRO — خزمەت لە ١٢ کاتژمێردا')
+                        : loc('أولوية تجهيز وتوصيل PRO', 'PRO preparation and delivery priority', 'پێشینەیی ئامادەکردن و گەیاندنی PRO')}
+                    </p>
+                    {detail.priority_due_at && (
+                      <p className="mt-0.5 text-[11.5px] text-[#f3bdc5]/75">
+                        {loc('الموعد الأقصى', 'Deadline', 'کۆتا کات')}: <time dateTime={detail.priority_due_at}>{new Date(detail.priority_due_at).toLocaleString()}</time>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
             {/* ------------------------------------------- what to write down */}
             <section>
               <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
@@ -215,6 +234,12 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   <>
                     {' · '}
                     {loc('يُحصَّل عند التسليم', 'due on delivery', 'لە کاتی گەیاندن')}: {formatIqd(fin.due_on_delivery_iqd)}
+                  </>
+                )}
+                {fin && (fin.bnpl_due_iqd ?? 0) > 0 && (
+                  <>
+                    {' · '}
+                    {loc('ممّول عبر BNPL', 'financed through BNPL', 'بە BNPL دارایی کراوە')}: {formatIqd(fin.bnpl_due_iqd ?? 0)}
                   </>
                 )}
               </p>

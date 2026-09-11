@@ -93,12 +93,6 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
     if (timer) clearTimeout(timer);
     opts?.signal?.removeEventListener('abort', onCallerAbort);
   }
-
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
-  }
-
   let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
   try {
     data = await res.json();
@@ -122,12 +116,7 @@ export const api = {
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('POST', path, body, opts),
   put: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PUT', path, body, opts),
   patch: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PATCH', path, body, opts),
-  delete: <T>(path: string, bodyOrOpts?: unknown, opts?: RequestOptions) => {
-    if (bodyOrOpts && typeof bodyOrOpts === 'object' && ('signal' in bodyOrOpts || 'timeoutMs' in bodyOrOpts)) {
-      return request<T>('DELETE', path, undefined, bodyOrOpts as RequestOptions);
-    }
-    return request<T>('DELETE', path, bodyOrOpts, opts);
-  },
+  delete: <T>(path: string, opts?: RequestOptions) => request<T>('DELETE', path, undefined, opts),
 };
 
 /** True for a request the CALLER cancelled — never worth showing to anyone. */
@@ -654,6 +643,17 @@ export interface ApiOrder {
   delivered_at?: string | null;
   delivery_waived?: boolean;
   membership_tier_snapshot?: string;
+  /** Server-snapshotted fulfilment lane. `pro_priority_12h` is only emitted
+   *  after the Worker proves the active PRO, approved address and service
+   *  coverage requirements at checkout. */
+  priority?: number;
+  fulfillment_service?: 'standard' | 'pro_priority' | 'pro_priority_12h' | string;
+  priority_due_at?: string | null;
+  /** Amount financed through the PRO-only BNPL ledger and its contractual due
+   *  date. These are server values, never calculated from the selected client
+   *  payment label. */
+  bnpl_due_iqd?: number;
+  bnpl_due_at?: string | null;
   coupon?: { coupon_id?: string; code?: string; discount_iqd?: number } | null;
   coupon_discount_iqd?: number;
   progress?: OrderStageProgress;
@@ -703,9 +703,11 @@ export interface OrderFinancial {
   total_iqd: number;
   wallet_applied_iqd: number;
   due_on_delivery_iqd: number;
+  bnpl_due_iqd?: number;
+  bnpl_due_at?: string | null;
   collected_iqd: number | null;
   outstanding_iqd: number;
-  payment_state: 'paid' | 'partial' | 'cod_due' | string;
+  payment_state: 'paid' | 'partial' | 'cod_due' | 'bnpl_due' | string;
   wallet_tx_id?: string | null;
   points_tx_id?: string | null;
   settlement?: { collected_iqd: number; settled_at: string | null; fully_settled: boolean } | null;

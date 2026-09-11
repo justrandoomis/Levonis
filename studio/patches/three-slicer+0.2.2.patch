@@ -1,0 +1,13 @@
+diff --git a/node_modules/three-slicer/viewer/dist/Viewport.js b/node_modules/three-slicer/viewer/dist/Viewport.js
+index 679c796..4fa3617 100644
+--- a/node_modules/three-slicer/viewer/dist/Viewport.js
++++ b/node_modules/three-slicer/viewer/dist/Viewport.js
+@@ -1660,7 +1660,7 @@ function _l(e) {
+         } else
+           E(ne), v(!1);
+       };
+-      k.onerror = (ne) => F("Worker terminated (likely out of memory): " + (ne.message || "worker error")), k.onmessageerror = () => F("Worker message error (structured clone failed)"), r.current = k, typeof window < "u" && (window.__vpWorker = k);
++      k.onerror = (ne) => F("Worker terminated (likely out of memory): " + (ne.message || "worker error")), k.onmessageerror = () => F("Worker message error (structured clone failed)"), r.current = k, typeof window < "u" && (window.__vpWorker = k, window.__vpReleaseWorker = () => { if ($.current || r.current !== k) return !1; try { k.terminate(); } catch { } return r.current = null, N.current = null, window.__vpWorker === k && (window.__vpWorker = null), !0; });
+     }
+     return r.current;
+   }

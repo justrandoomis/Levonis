@@ -30,7 +30,9 @@ const STRINGS = {
     wallet: 'من المحفظة',
     collected: 'المحصَّل',
     outstanding: 'المتبقي عند التسليم',
-    state: { paid: 'مدفوع', partial: 'مدفوع جزئيًا', cod_due: 'الدفع عند التسليم' } as Record<string, string>,
+    bnplOutstanding: 'رصيد BNPL المستحق',
+    bnplDueAt: (d: string) => `موعد السداد ${d}`,
+    state: { paid: 'مدفوع', partial: 'مدفوع جزئيًا', cod_due: 'الدفع عند التسليم', bnpl_due: 'ممّول عبر BNPL' } as Record<string, string>,
     earned: 'النقاط المكتسبة',
     pending: (n: number) => `${n} نقطة معلّقة`,
     released: (n: number) => `${n} نقطة مُفرَجة`,
@@ -55,7 +57,9 @@ const STRINGS = {
     wallet: 'Paid from wallet',
     collected: 'Collected',
     outstanding: 'Due on delivery',
-    state: { paid: 'Paid', partial: 'Partially paid', cod_due: 'Due on delivery' } as Record<string, string>,
+    bnplOutstanding: 'BNPL balance due',
+    bnplDueAt: (d: string) => `Repayment due ${d}`,
+    state: { paid: 'Paid', partial: 'Partially paid', cod_due: 'Due on delivery', bnpl_due: 'Financed with BNPL' } as Record<string, string>,
     earned: 'Points earned',
     pending: (n: number) => `${n} points pending`,
     released: (n: number) => `${n} points released`,
@@ -80,7 +84,9 @@ const STRINGS = {
     wallet: 'لە جزدانەوە',
     collected: 'وەرگیراو',
     outstanding: 'ماوە لە کاتی گەیاندن',
-    state: { paid: 'دراوە', partial: 'بەشێک دراوە', cod_due: 'پارەدان لە کاتی گەیاندن' } as Record<string, string>,
+    bnplOutstanding: 'قەرزی BNPL',
+    bnplDueAt: (d: string) => `کاتی گەڕاندنەوە ${d}`,
+    state: { paid: 'دراوە', partial: 'بەشێک دراوە', cod_due: 'پارەدان لە کاتی گەیاندن', bnpl_due: 'بە BNPL دارایی کراوە' } as Record<string, string>,
     earned: 'خاڵی وەرگیراو',
     pending: (n: number) => `${n} خاڵ چاوەڕوان`,
     released: (n: number) => `${n} خاڵ ئازادکراو`,
@@ -134,6 +140,8 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
   const stateStyle =
     f.payment_state === 'paid'
       ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+      : f.payment_state === 'bnpl_due'
+        ? 'bg-[#B03142]/15 text-[#f3bdc5] border-[#B03142]/35'
       : f.payment_state === 'partial'
         ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
         : 'bg-zinc-800 text-zinc-300 border-zinc-700';
@@ -169,11 +177,17 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
         <div className="pb-1 text-[11px] font-bold text-zinc-500">{s.payment}</div>
         {f.wallet_applied_iqd > 0 && <Row label={s.wallet} value={formatIqd(f.wallet_applied_iqd)} negative />}
         {f.collected_iqd !== null && f.collected_iqd !== undefined && <Row label={s.collected} value={formatIqd(f.collected_iqd)} />}
-        {f.outstanding_iqd > 0 && <Row label={s.outstanding} value={formatIqd(f.outstanding_iqd)} />}
+        {f.outstanding_iqd > 0 && <Row label={f.payment_state === 'bnpl_due' ? s.bnplOutstanding : s.outstanding} value={formatIqd(f.outstanding_iqd)} />}
         {f.wallet_applied_iqd <= 0 && (f.collected_iqd === null || f.collected_iqd === undefined) && f.outstanding_iqd <= 0 && (
           <Row label={s.state[f.payment_state] ?? f.payment_state} value={formatIqd(f.total_iqd)} muted />
         )}
       </dl>
+
+      {f.payment_state === 'bnpl_due' && f.bnpl_due_at && (
+        <p className="mt-2 text-[11.5px] font-medium text-[#f3bdc5]">
+          {s.bnplDueAt(formatDate(f.bnpl_due_at, lang))}
+        </p>
+      )}
 
       {f.support && f.support.referrer_username && (
         <p className="mt-3 text-[11.5px] text-zinc-500">{s.support(f.support.referrer_username)}</p>

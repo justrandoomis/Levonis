@@ -27,10 +27,9 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import {
   Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
-  AlignJustify, SlidersHorizontal, X, MoreHorizontal, Link2,
+  AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
   Copy, ChevronRight, ChevronLeft, Package, PackageX, ShoppingBag, Check, Pencil,
   CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag, FileDown,
-  Archive, ArchiveRestore,
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
@@ -38,7 +37,6 @@ import type { ListingItem, ListingResponse, DeleteResponse } from './adminProduc
 import { Modal, ErrorBanner, fmtDate } from './adminProducts/ui';
 import { Spark } from './ui/statCards';
 import { downloadAdminFile, DownloadError } from './adminProducts/download';
-import DeleteConfirmModal from './adminProducts/DeleteConfirmModal';
 import * as T from './adminProducts/theme';
 import './adminProducts/theme.css';
 
@@ -95,9 +93,7 @@ const STRINGS = {
     untracked: 'غير محدود',
     updated: 'آخر تحديث',
     edit: 'تعديل',
-    del: 'حذف نهائي',
-    archive: 'أرشفة',
-    restore: 'استعادة',
+    del: 'حذف / أرشفة',
     quickPrice: 'تعديل سريع للسعر',
     quickPriceTitle: 'تعديل سريع للأسعار',
     featured: 'مميز',
@@ -126,9 +122,7 @@ const STRINGS = {
     untracked: 'untracked',
     updated: 'Updated',
     edit: 'Edit',
-    del: 'Delete permanently',
-    archive: 'Archive',
-    restore: 'Restore',
+    del: 'Delete / archive',
     quickPrice: 'Quick price edit',
     quickPriceTitle: 'Quick price edit',
     featured: 'Featured',
@@ -157,9 +151,7 @@ const STRINGS = {
     untracked: 'بێ سنوور',
     updated: 'دوا نوێکردنەوە',
     edit: 'دەستکاری',
-    del: 'سڕینەوەی یەکجارەکی',
-    archive: 'ئەرشیفکردن',
-    restore: 'گەڕاندنەوە',
+    del: 'سڕینەوە / ئەرشیف',
     quickPrice: 'دەستکاری خێرای نرخ',
     quickPriceTitle: 'دەستکاری خێرای نرخەکان',
     featured: 'تایبەت',
@@ -250,8 +242,7 @@ export default function AdminProducts() {
   // window; the panel decides which, and answers through this handle.
   const pricingEscape = useRef<(() => boolean) | null>(null);
   // The §10 flow is the default tab; the TXT tools are one click away.
-  const [deleteTarget, setDeleteTarget] = useState<ListingItem | null>(null);
-  const [permanentDeleting, setPermanentDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState('');
@@ -389,40 +380,38 @@ export default function AdminProducts() {
     setImportDirty(false);
   }, []);
 
-  const handlePermanentDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    const p = deleteTarget;
-    const name = p.name_ar || p.name_en || p.slug || p.id;
-    setPermanentDeleting(true);
+  const handleDelete = async (p: ListingItem) => {
+    const name = p.name_ar || p.name_en || p.id;
+    const msg = dir === 'rtl'
+      ? `حذف/أرشفة المنتج «${name}»؟ المنتجات المرتبطة بطلبات سابقة تُخفى بدل الحذف.`
+      : `Delete/archive "${name}"? Products referenced by past orders are hidden, not deleted.`;
+    if (!window.confirm(msg)) return;
+    setDeletingId(p.id);
     setNotice(null);
     try {
-      await api.delete<DeleteResponse>(`/api/admin/products-v2/${p.id}?permanent=true`, { permanent: true, mode: 'permanent' });
-      setItems((prev) => prev.filter((item) => item.id !== p.id));
-      setDeleteTarget(null);
-      setNotice(dir === 'rtl' ? `حُذف «${name}» نهائياً.` : `"${name}" was permanently deleted.`);
+      const res = await api.delete<DeleteResponse>(`/api/admin/products-v2/${p.id}`);
+      setNotice(
+        res.deleted
+          ? (dir === 'rtl' ? `حُذف «${name}» نهائياً.` : `"${name}" was permanently deleted.`)
+          : (dir === 'rtl'
+              ? `أُخفي «${name}» بدل حذفه — ${res.reason ?? 'مرتبط بطلبات سابقة.'}`
+              : `"${name}" was hidden instead of deleted — ${res.reason ?? 'referenced by past orders.'}`)
+      );
       reloadAll();
     } catch (e) {
       setNotice(t.deleteFailed + (e instanceof ApiError ? e.message : 'unknown error'));
     } finally {
-      setPermanentDeleting(false);
+      setDeletingId(null);
     }
   };
 
-  const handleArchiveToggle = async (p: ListingItem) => {
-    const name = p.name_ar || p.name_en || p.slug || p.id;
-    const nextStatus = p.status === 'hidden' ? 'active' : 'hidden';
+  // A status-only endpoint: the full-document save would demand (and the
+  // legacy upsert would clobber) every other field of the product.
+  const quickStatus = async (p: ListingItem, next: 'active' | 'hidden') => {
     setBusyId(p.id);
     setMenuFor('');
     try {
-      await api.patch(`/api/admin/products-v2/${p.id}/status`, { status: nextStatus });
-      setItems((prev) =>
-        prev.map((item) => (item.id === p.id ? { ...item, status: nextStatus } : item))
-      );
-      setNotice(
-        nextStatus === 'hidden'
-          ? (dir === 'rtl' ? `تمت أرشفة «${name}» وإخفاؤه من المتجر.` : `"${name}" was archived and hidden from the storefront.`)
-          : (dir === 'rtl' ? `تمت استعادة «${name}» ونشره في المتجر.` : `"${name}" was restored and published to the storefront.`)
-      );
+      await api.patch(`/api/admin/products-v2/${p.id}/status`, { status: next });
       reloadAll();
     } catch (e) {
       setNotice(e instanceof ApiError ? e.message : 'error');
@@ -489,14 +478,6 @@ export default function AdminProducts() {
           productId={editing.id}
           onBack={() => setEditing({ open: false, id: null })}
           onListChanged={() => reloadAll()}
-          onDeleted={(name) => {
-            setEditing({ open: false, id: null });
-            if (editing.id) {
-              setItems((prev) => prev.filter((item) => item.id !== editing.id));
-            }
-            setNotice(dir === 'rtl' ? `حُذف «${name}» نهائياً.` : `"${name}" was permanently deleted.`);
-            reloadAll();
-          }}
         />
       </Suspense>
     );
@@ -522,27 +503,10 @@ export default function AdminProducts() {
       >
         <Tag className="w-3.5 h-3.5" />
       </button>
-
-      {/* Reversible Archive / Restore */}
-      <button
-        data-action="archive-toggle"
-        onClick={() => void handleArchiveToggle(p)}
-        disabled={busyId === p.id}
-        className={T.btnIcon}
-        title={p.status === 'hidden' ? t.restore : t.archive}
-        aria-label={p.status === 'hidden' ? t.restore : t.archive}
-      >
-        {p.status === 'hidden' ? (
-          <ArchiveRestore className="w-3.5 h-3.5 text-emerald-400" />
-        ) : (
-          <Archive className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
-        )}
-      </button>
-
       {!compact && (
         <button
-          onClick={() => setDeleteTarget(p)}
-          disabled={permanentDeleting && deleteTarget?.id === p.id}
+          onClick={() => handleDelete(p)}
+          disabled={deletingId === p.id}
           className={T.btnIconDanger}
           title={t.del}
           aria-label={t.del}
@@ -590,12 +554,21 @@ export default function AdminProducts() {
             onClose={() => setMenuFor('')}
             returnTo={menuTriggerRef}
           >
-              <MenuItem
-                icon={p.status === 'hidden' ? <ArchiveRestore className="w-3.5 h-3.5 text-emerald-400" /> : <Archive className="w-3.5 h-3.5" />}
-                label={p.status === 'hidden' ? t.restore : t.archive}
-                onClick={() => void handleArchiveToggle(p)}
-                disabled={busyId === p.id}
-              />
+              {p.status === 'active' ? (
+                <MenuItem
+                  icon={<EyeOff className="w-3.5 h-3.5" />}
+                  label={loc('إخفاء من الموقع', 'Hide from the site', 'شاردنەوە')}
+                  onClick={() => quickStatus(p, 'hidden')}
+                  disabled={busyId === p.id}
+                />
+              ) : (
+                <MenuItem
+                  icon={<Eye className="w-3.5 h-3.5" />}
+                  label={loc('نشر في الموقع', 'Publish to the site', 'بڵاوکردنەوە')}
+                  onClick={() => quickStatus(p, 'active')}
+                  disabled={busyId === p.id}
+                />
+              )}
               <MenuItem
                 icon={<Link2 className="w-3.5 h-3.5" />}
                 label={loc('فتح في الموقع', 'Open on the site', 'کردنەوە')}
@@ -629,15 +602,17 @@ export default function AdminProducts() {
                 }}
                 disabled={busyId === p.id}
               />
-              <MenuItem
-                icon={<Trash2 className="w-3.5 h-3.5" />}
-                label={t.del}
-                danger
-                onClick={() => {
-                  setMenuFor('');
-                  setDeleteTarget(p);
-                }}
-              />
+              {compact && (
+                <MenuItem
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  label={t.del}
+                  danger
+                  onClick={() => {
+                    setMenuFor('');
+                    handleDelete(p);
+                  }}
+                />
+              )}
           </MenuPanel>
         )}
       </div>
@@ -1170,15 +1145,6 @@ export default function AdminProducts() {
           </Suspense>
         </Modal>
       )}
-
-      <DeleteConfirmModal
-        open={!!deleteTarget}
-        productName={deleteTarget ? nameOf(deleteTarget) : ''}
-        isDeleting={permanentDeleting}
-        dir={dir}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handlePermanentDeleteConfirm}
-      />
     </div>
   );
 }

@@ -535,12 +535,11 @@ export default function Auth() {
    * not shown as a disabled button with an explanation — it is simply not
    * offered.
    */
-  const caps = useCapabilities(); console.log("CAPS:", caps);
-  const googleConfigured = true;
-  const googleClientId = caps?.googleClientId || "1096758410292-fakeclientid.apps.googleusercontent.com";
+  const caps = useCapabilities();
+  const googleConfigured = !!caps?.google;
+  const googleClientId = caps?.googleClientId ?? '';
   const resetConfigured = caps?.passwordReset ?? false;
-  const telegramConfigured = true;
-  console.log("CAPS IS", caps, "googleConfigured", googleConfigured, "telegramConfigured", telegramConfigured);
+  const telegramConfigured = caps?.telegram ?? false;
   const emailVerificationConfigured = caps?.emailVerification ?? false;
   // With a mail service the sign-up collects NO password — it is chosen on
   // the finish screen. Until the answer arrives the password fields are

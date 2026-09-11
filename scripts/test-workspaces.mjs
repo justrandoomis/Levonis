@@ -16,7 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const TSX = join(ROOT, 'node_modules', '.bin', 'tsx');
+const TSX_PACKAGE = join(ROOT, 'node_modules', 'tsx');
 
 function testFiles() {
   const out = [];
@@ -39,8 +39,8 @@ if (process.argv.includes('--list')) {
   for (const f of files) console.log(f.slice(ROOT.length + 1));
   process.exit(0);
 }
-if (!existsSync(TSX)) {
-  console.error('test-workspaces: node_modules/.bin/tsx is missing — run npm ci first');
+if (!existsSync(TSX_PACKAGE)) {
+  console.error('test-workspaces: the tsx package is missing — run npm ci first');
   process.exit(1);
 }
 if (files.length === 0) {
@@ -48,7 +48,7 @@ if (files.length === 0) {
   process.exit(1);
 }
 try {
-  execFileSync(TSX, ['--test', ...files], { cwd: ROOT, stdio: 'inherit' });
+  execFileSync(process.execPath, ['--import', 'tsx', '--test', ...files], { cwd: ROOT, stdio: 'inherit' });
   console.log(`test-workspaces: ${files.length} workspace test files passed`);
 } catch {
   console.error('test-workspaces: a workspace test failed (see above)');

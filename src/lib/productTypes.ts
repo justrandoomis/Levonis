@@ -24,32 +24,6 @@ export interface PriceFieldsV2 {
   cost_adjust_iqd?: number | null;
 }
 
-export interface ModelTransportOverride {
-  method: 'air' | 'sea' | 'land' | string;
-  enabled?: boolean;
-  commission_iqd?: number | null;
-  surcharge_iqd?: number | null;
-  surcharge_adjust_iqd?: number | null;
-  lead_time_text?: string;
-  lead_time_min_days?: number | null;
-  lead_time_max_days?: number | null;
-}
-
-export interface ModelDirectConfig extends Partial<PriceFieldsV2> {
-  enabled?: boolean;
-  stock?: number | null;
-  surcharge_iqd?: number | null;
-}
-
-export interface ModelPreorderConfig extends Partial<PriceFieldsV2> {
-  enabled?: boolean;
-  stock?: number | null;
-  lead_time_text?: string;
-  lead_time_min_days?: number | null;
-  lead_time_max_days?: number | null;
-  transports?: ModelTransportOverride[];
-}
-
 /**
  * One option as the ADMIN document carries it. The fields after `active` are
  * the ones the server's OptionV2 (packages/pricing/src/pricing.ts) declares
@@ -78,10 +52,6 @@ export interface OptionV2 extends PriceFieldsV2 {
   group_en?: string;
   sku_part?: string;
   low_stock_threshold?: number | null;
-  /** Model-level Direct Sale override configuration */
-  direct?: ModelDirectConfig;
-  /** Model-level Pre-order override configuration */
-  preorder?: ModelPreorderConfig;
 }
 
 export interface ColorV2 extends PriceFieldsV2 {

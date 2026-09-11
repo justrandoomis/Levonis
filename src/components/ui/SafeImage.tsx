@@ -29,7 +29,6 @@ export default function SafeImage({
   fallbackIconClassName = 'w-6 h-6',
   referrerPolicy = 'no-referrer',
   onStatus,
-  noRetry = false,
 }: {
   src?: string | null;
   alt?: string;
@@ -53,7 +52,6 @@ export default function SafeImage({
    * It reports, it does not repair: nothing here mutates a caller's state.
    */
   onStatus?: (status: 'loading' | 'loaded' | 'error', src: string) => void;
-  noRetry?: boolean;
 }) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
@@ -61,14 +59,6 @@ export default function SafeImage({
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
-
-  // Generate responsive WebP delivery via Cloudflare Image Resizing
-  const isLocal = cleanSrc.startsWith('/') && !cleanSrc.startsWith('//');
-  const srcSet = isLocal 
-    ? `/cdn-cgi/image/width=400,format=webp,fit=cover${cleanSrc} 400w, /cdn-cgi/image/width=800,format=webp,fit=cover${cleanSrc} 800w, /cdn-cgi/image/width=1200,format=webp,fit=cover${cleanSrc} 1200w`
-    : undefined;
-  const sizes = isLocal ? "(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px" : undefined;
-  const finalSrc = isLocal ? `/cdn-cgi/image/format=webp${cleanSrc}` : cleanSrc;
 
   // A new src is a new load — never keep a previous image's state.
   useEffect(() => {
@@ -109,9 +99,7 @@ export default function SafeImage({
         <img
           key={`${cleanSrc}#${attempt}`}
           ref={imgRef}
-          src={finalSrc}
-          srcSet={srcSet}
-          sizes={sizes}
+          src={cleanSrc}
           alt={alt}
           referrerPolicy={referrerPolicy}
           loading={eager ? 'eager' : 'lazy'}
@@ -136,7 +124,7 @@ export default function SafeImage({
         >
           <ImageOff aria-hidden="true" className={fallbackIconClassName} />
           <span className="sr-only">{cleanSrc ? s.failed : alt || s.noImage}</span>
-          {cleanSrc && !noRetry ? (
+          {cleanSrc ? (
             <button
               type="button"
               onClick={retry}

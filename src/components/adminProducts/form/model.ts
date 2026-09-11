@@ -62,40 +62,6 @@ export interface FormValue extends FormPrices {
   lead_time_text: string;
   lead_time_min_days: number | null;
   lead_time_max_days: number | null;
-  /** Model-level Direct Sale override configuration */
-  direct?: {
-    enabled?: boolean;
-    stock?: number | null;
-    regular_price_iqd?: number | null;
-    regular_adjust_iqd?: number | null;
-    prime_price_iqd?: number | null;
-    pro_price_iqd?: number | null;
-    cost_iqd?: number | null;
-    surcharge_iqd?: number | null;
-  };
-  /** Model-level Pre-order override configuration */
-  preorder?: {
-    enabled?: boolean;
-    stock?: number | null;
-    lead_time_text?: string;
-    lead_time_min_days?: number | null;
-    lead_time_max_days?: number | null;
-    regular_price_iqd?: number | null;
-    regular_adjust_iqd?: number | null;
-    prime_price_iqd?: number | null;
-    pro_price_iqd?: number | null;
-    cost_iqd?: number | null;
-    transports?: {
-      method: string;
-      enabled?: boolean;
-      commission_iqd?: number | null;
-      surcharge_iqd?: number | null;
-      surcharge_adjust_iqd?: number | null;
-      lead_time_text?: string;
-      lead_time_min_days?: number | null;
-      lead_time_max_days?: number | null;
-    }[];
-  };
   /** The MODEL this option is a fulfilment of — A1 vs A1 Combo. */
   variant_key: string;
   variant_label: string;
@@ -394,8 +360,6 @@ const valueFromWire = (v: WireValue): FormValue => ({
   lead_time_text: v.lead_time_text ?? '',
   lead_time_min_days: v.lead_time_min_days ?? null,
   lead_time_max_days: v.lead_time_max_days ?? null,
-  direct: v.direct,
-  preorder: v.preorder,
   variant_key: v.variant_key ?? '',
   variant_label: v.variant_label ?? '',
 });
@@ -585,8 +549,6 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
       lead_time_text: o.lead_time_text ?? '',
       lead_time_min_days: o.lead_time_min_days ?? null,
       lead_time_max_days: o.lead_time_max_days ?? null,
-      direct: o.direct,
-      preorder: o.preorder,
       variant_key: o.variant_key ?? '',
       variant_label: o.variant_label ?? '',
     });
@@ -711,8 +673,6 @@ export function relationsToWire(rel: RelationsState) {
         lead_time_text: v.availability_type === 'direct_sale' ? '' : v.lead_time_text,
         lead_time_min_days: v.availability_type === 'direct_sale' ? null : v.lead_time_min_days,
         lead_time_max_days: v.availability_type === 'direct_sale' ? null : v.lead_time_max_days,
-        direct: v.direct,
-        preorder: v.preorder,
         variant_key: v.variant_key,
         variant_label: v.variant_label,
       })),

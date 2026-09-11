@@ -10,8 +10,8 @@ import { tierLabel, tierMetaFor } from './subscription/tierMeta';
  *  - member search/filter (tier, membership state, KYC state, restrictions,
  *    expiry window) and a member detail view that SEPARATES subscription
  *    payment/term, identity status (kyc_cases states only), benefit
- *    eligibility context, debt (BNPL read-only — feature disabled, shown
- *    honestly) and restriction cases;
+ *    eligibility context, the live BNPL credit line/ledger and restriction
+ *    cases;
  *  - restriction-case management: open a typed case with evidence, gate
  *    specific benefit flags (pause/revoke), resume with reason — audited
  *    server-side. Restrictions gate benefit computation only, never orders,
@@ -96,6 +96,9 @@ interface MemberDetailData {
   }>;
   debt: {
     bnpl_enabled: boolean;
+    eligible: boolean;
+    eligibility_reason: string | null;
+    available_iqd: number;
     account_state: string;
     credit_limit_iqd: number;
     outstanding_iqd: number;
@@ -161,7 +164,14 @@ const STRINGS = {
     secAddresses: 'العنوان المعتمد',
     secDebt: 'الديون (الشراء الآن والدفع لاحقًا)',
     secRestrictions: 'قضايا القيود',
-    bnplDisabled: 'ميزة الدفع الآجل معطّلة حاليًا (قرار المالك معلّق) — البيانات هنا للقراءة فقط ولا يوجد حقل تعديل مباشر للدين.',
+    bnplStatus: 'BNPL فعّال حصريًا لأعضاء PRO المستوفين. سجل الدين غير قابل للتعديل؛ إدارة السقف والحالة مدققة أدناه.',
+    eligible: 'مؤهل الآن',
+    ineligible: 'غير مؤهل',
+    available: 'المتاح',
+    approveBnpl: 'اعتماد / تحديث السقف',
+    suspendBnpl: 'تعليق BNPL',
+    limitPlaceholder: 'السقف بالدينار',
+    bnplSaved: 'تم تحديث حساب BNPL',
     outstanding: 'الرصيد المستحق',
     creditLimit: 'السقف',
     accountState: 'حالة الحساب',
@@ -174,7 +184,7 @@ const STRINGS = {
     benefitNote:
       'القيود تقيّد احتساب المزايا فقط — لا تحذف طلبات أو محفظة أو نقاطًا ولا تمنع الضمان أو الدعم. اختيار عنوان بديل حالة لكل طلب وليس عقوبة.',
     gatingScopeNote:
-      'التقييد نافذ الآن على أولوية تذاكر الدعم؛ ربطه بحساب مزايا الدفع/المجتمع بانتظار دمج طبقة الاستحقاقات (موثّق).',
+      'التقييد نافذ عبر طبقة الاستحقاقات المركزية في الدفع والشحن والمجتمع والمتجر والدعم.',
     addrNone: 'لا يوجد عنوان معتمد',
     subsNone: 'لا اشتراكات',
     openCase: 'فتح قضية قيد',
@@ -255,8 +265,14 @@ const STRINGS = {
     secAddresses: 'Approved address',
     secDebt: 'Debt (Buy Now Pay Later)',
     secRestrictions: 'Restriction cases',
-    bnplDisabled:
-      'BNPL is currently DISABLED (owner decision pending) — this data is read-only and there is deliberately no editable "debt" field.',
+    bnplStatus: 'BNPL is active exclusively for eligible PRO members. Debt entries are immutable; audited limit/state controls are below.',
+    eligible: 'Eligible now',
+    ineligible: 'Not eligible',
+    available: 'Available',
+    approveBnpl: 'Approve / update limit',
+    suspendBnpl: 'Suspend BNPL',
+    limitPlaceholder: 'Credit limit (IQD)',
+    bnplSaved: 'BNPL account updated',
     outstanding: 'Outstanding',
     creditLimit: 'Limit',
     accountState: 'Account state',
@@ -269,7 +285,7 @@ const STRINGS = {
     benefitNote:
       'Restrictions gate benefit computation ONLY — they never delete orders, wallet or points, and never block warranty or support access. Choosing an alternate address is a per-order condition, not a sanction.',
     gatingScopeNote:
-      'Gating is live for support-ticket priority; wiring into checkout/community benefit computation awaits the entitlements-layer integration (documented).',
+      'Gating is enforced through the canonical entitlement layer across checkout, shipping, Community, stores and support.',
     addrNone: 'No approved address',
     subsNone: 'No memberships',
     openCase: 'Open restriction case',
@@ -349,7 +365,14 @@ const STRINGS = {
     secAddresses: 'ناونیشانی پەسەندکراو',
     secDebt: 'قەرز (BNPL)',
     secRestrictions: 'کەیسەکانی سنووردارکردن',
-    bnplDisabled: 'BNPL لە ئێستادا ناچالاکە (بڕیاری خاوەن ماوە) — ئەم داتایە تەنها بۆ خوێندنەوەیە و هیچ خانەیەکی دەستکاری قەرز نییە.',
+    bnplStatus: 'BNPL تەنها بۆ ئەندامی PRO ی گونجاو چالاکە. تۆماری قەرز ناگۆڕدرێت؛ سنوور و دۆخ لە خوارەوە بە پشکنینەوە بەڕێوەدەبرێت.',
+    eligible: 'ئێستا گونجاوە',
+    ineligible: 'گونجاو نییە',
+    available: 'بەردەست',
+    approveBnpl: 'پەسەندکردن / نوێکردنەوەی سنوور',
+    suspendBnpl: 'ڕاگرتنی BNPL',
+    limitPlaceholder: 'سنووری قەرز (IQD)',
+    bnplSaved: 'هەژماری BNPL نوێکرایەوە',
     outstanding: 'ماوەی قەرز',
     creditLimit: 'سنوور',
     accountState: 'دۆخی هەژمار',
@@ -362,7 +385,7 @@ const STRINGS = {
     benefitNote:
       'سنووردارکردنەکان تەنها ژماردنی سوودەکان دەگرنەوە — هەرگیز داواکاری، جزدان یان خاڵ ناسڕنەوە و گەرەنتی و پشتگیری ناگیرێت. هەڵبژاردنی ناونیشانی جیاواز مەرجی هەر داواکارییەکە، نەک سزا.',
     gatingScopeNote:
-      'سنووردارکردن ئێستا کاریگەرە لەسەر پێشینەیی تیکێتی پشتگیری؛ بەستنەوەی بە ژماردنی سوودی پارەدان/کۆمەڵگا چاوەڕوانی تەواوکردنی توێژی شایستەییەکانە (تۆمارکراوە).',
+      'سنووردارکردن لە ڕێگەی توێژی ناوەندی سوودەکان لە پارەدان و گەیاندن و کۆمەڵگە و فرۆشگا و پشتگیری جێبەجێ دەکرێت.',
     addrNone: 'ناونیشانی پەسەندکراو نییە',
     subsNone: 'هیچ ئەندامێتییەک نییە',
     openCase: 'کردنەوەی کەیسی سنووردارکردن',
@@ -422,7 +445,8 @@ const BENEFIT_LABELS: Record<string, { ar: string; en: string; ckb: string }> = 
   proExclusive: { ar: 'عروض PRO الحصرية', en: 'PRO-exclusive offers', ckb: 'ئۆفەرە تایبەتەکانی PRO' },
   merchantProfile: { ar: 'ملف التاجر', en: 'Merchant profile', ckb: 'پرۆفایلی بازرگان' },
   exclusiveSections: { ar: 'الأقسام الحصرية', en: 'Exclusive sections', ckb: 'بەشە تایبەتەکان' },
-  verifiedMerchant: { ar: 'شارة التاجر الموثّق', en: 'Verified merchant badge', ckb: 'نیشانەی بازرگانی پشتڕاستکراو' },
+  verifiedMerchant: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
+  proMerchantBadge: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
   exclusiveCoupons: { ar: 'كوبونات الأعضاء', en: 'Member coupons', ckb: 'کۆپۆنی ئەندامان' },
 };
 
@@ -648,6 +672,9 @@ function MemberDetail({
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [rowError, setRowError] = useState('');
+  const [bnplLimit, setBnplLimit] = useState('');
+  const [bnplBusy, setBnplBusy] = useState(false);
+  const [bnplNote, setBnplNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -655,6 +682,7 @@ function MemberDetail({
     try {
       const d = await api.get<{ member: MemberDetailData }>(`/api/support/admin/members/${userId}`);
       setData(d.member);
+      setBnplLimit(String(d.member.debt.credit_limit_iqd || ''));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : s.loadError);
     } finally {
@@ -681,6 +709,30 @@ function MemberDetail({
       setRowError(e instanceof ApiError ? e.message : s.loadError);
     } finally {
       setRowBusy(null);
+    }
+  };
+
+  const updateBnpl = async (state: 'approved' | 'suspended') => {
+    if (bnplBusy || !data) return;
+    const limit = Number(bnplLimit);
+    if (state === 'approved' && (!Number.isInteger(limit) || limit <= 0)) {
+      setBnplNote({ ok: false, text: s.limitPlaceholder });
+      return;
+    }
+    setBnplBusy(true);
+    setBnplNote(null);
+    try {
+      await api.put(`/api/memberships/admin/bnpl/${encodeURIComponent(userId)}`, {
+        state,
+        credit_limit_iqd: state === 'approved' ? limit : data.debt.credit_limit_iqd,
+      });
+      setBnplNote({ ok: true, text: s.bnplSaved });
+      await load();
+      onChanged();
+    } catch (e) {
+      setBnplNote({ ok: false, text: e instanceof ApiError ? e.message : s.loadError });
+    } finally {
+      setBnplBusy(false);
     }
   };
 
@@ -802,11 +854,15 @@ function MemberDetail({
             )}
           </div>
 
-          {/* debt — BNPL read-only */}
+          {/* BNPL credit line and immutable ledger */}
           <div className={sec}>
             <div className={secTitle}>{s.secDebt}</div>
-            <div className="text-[11px] text-amber-400/80 mb-2">{s.bnplDisabled}</div>
+            <div className="text-[11px] text-zinc-500 mb-2">{s.bnplStatus}</div>
             <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4">
+              <span className={data.debt.eligible ? 'font-bold text-emerald-300' : 'font-bold text-amber-300'}>
+                {data.debt.eligible ? s.eligible : s.ineligible}
+                {!data.debt.eligible && data.debt.eligibility_reason ? ` · ${data.debt.eligibility_reason}` : ''}
+              </span>
               <span>
                 {s.accountState}: <span className="text-zinc-300">{data.debt.account_state}</span>
               </span>
@@ -816,7 +872,30 @@ function MemberDetail({
               <span>
                 {s.outstanding}: <span className={data.debt.outstanding_iqd > 0 ? 'text-red-300 font-bold' : 'text-zinc-300'}>{formatIqd(data.debt.outstanding_iqd)}</span>
               </span>
+              <span>
+                {s.available}: <span className="text-zinc-300">{formatIqd(data.debt.available_iqd)}</span>
+              </span>
             </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1000}
+                value={bnplLimit}
+                onChange={(e) => setBnplLimit(e.target.value)}
+                placeholder={s.limitPlaceholder}
+                aria-label={s.limitPlaceholder}
+                className="min-h-10 min-w-0 flex-1 rounded-xl border border-zinc-700 bg-black px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold/60"
+              />
+              <button type="button" disabled={bnplBusy} onClick={() => void updateBnpl('approved')} className="min-h-10 rounded-xl bg-gold px-3 text-xs font-black text-black disabled:opacity-50">
+                {s.approveBnpl}
+              </button>
+              <button type="button" disabled={bnplBusy || data.debt.account_state === 'suspended'} onClick={() => void updateBnpl('suspended')} className="min-h-10 rounded-xl border border-red-500/35 bg-red-500/10 px-3 text-xs font-bold text-red-300 disabled:opacity-50">
+                {s.suspendBnpl}
+              </button>
+            </div>
+            {bnplNote && <p role={bnplNote.ok ? 'status' : 'alert'} className={`mt-2 text-xs ${bnplNote.ok ? 'text-emerald-300' : 'text-red-300'}`}>{bnplNote.text}</p>}
             {data.debt.ledger.length === 0 ? (
               <div className="text-xs text-zinc-600 mt-2">{s.noLedger}</div>
             ) : (
@@ -2038,4 +2117,3 @@ function ReasonWindow({
     </Overlay>
   );
 }
-

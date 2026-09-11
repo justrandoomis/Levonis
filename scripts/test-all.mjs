@@ -11,7 +11,7 @@
 import { spawnSync } from 'node:child_process';
 
 const runs = [
-  { name: 'root', cmd: 'npx', args: ['tsx', '--test', 'tests/*.test.ts'], shell: true },
+  { name: 'root', cmd: process.execPath, args: ['--import', 'tsx', '--test', 'tests/*.test.ts'], shell: true },
   { name: 'workspaces', cmd: 'node', args: ['scripts/test-workspaces.mjs'], shell: false },
 ];
 

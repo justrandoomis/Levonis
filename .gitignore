@@ -16,5 +16,3 @@ coverage/
 # Probe output. The screenshots worth keeping are copied into docs/evidence/
 # deliberately; the rest is one local run's scratch.
 artifacts/
-bun.lock
-package-lock.json

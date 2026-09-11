@@ -5,7 +5,7 @@ import {
   ArrowLeft, ArrowRight, Truck, Store,
   CreditCard, Wallet, Banknote,
   Check, Sparkles, MapPin, AlertCircle,
-  Lock, CheckCircle2, Plus, Receipt, ShoppingCart
+  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
@@ -37,6 +37,9 @@ interface ShippingQuoteDto {
   total_before_waiver_iqd: number;
   advance_due_iqd: number;
   pro_waiver_applied: boolean;
+  prime_waiver_applied: boolean;
+  waiver_source: 'none' | 'pro' | 'prime' | 'promotion';
+  waiver_basis_iqd: number;
   needs_config: string[];
   assumptions: string[];
   reasons: string[];
@@ -93,6 +96,14 @@ interface CheckoutQuoteDto {
   shipping_type?: 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land' | string;
   /** The payment ids the server allows for this cart; the screen offers exactly these. */
   allowed_payment_methods?: string[];
+  bnpl?: {
+    eligible: boolean;
+    available_iqd?: number;
+    outstanding_iqd?: number;
+    financed_iqd?: number;
+    due_at?: string | null;
+  };
+  priority_delivery?: { eligible: boolean; max_hours: 12; due_at: string | null; reason: string | null };
   /** 'direct' = priced by the direct-sale rule (a direct cart, or a pre-order
    *  paid cash on delivery); 'preorder' = the transport commission applies. */
   pricing_basis?: 'direct' | 'preorder';
@@ -152,6 +163,7 @@ const STRINGS = {
     paymentHint: {
       wallet: 'الدفع مقدمًا بالكامل من محفظتك',
       cash: 'تدفع المبلغ نقدًا عند الاستلام',
+      bnpl: 'حصري لـ PRO المؤهل — يُسجّل المبلغ والموعد في حسابك',
     } as Record<string, string>,
     codDirectPricing: 'اختيار الدفع عند الاستلام يُسعَّر كبيع مباشر؛ يبقى طلبك طلبًا مسبقًا بمراحله ووسيلة نقله كما هي.',
     prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
@@ -181,6 +193,7 @@ const STRINGS = {
     paymentHint: {
       wallet: 'Pay the full amount in advance from your wallet',
       cash: 'Pay in cash when the order is delivered',
+      bnpl: 'For eligible PRO members — amount and due date are recorded on your account',
     } as Record<string, string>,
     codDirectPricing: 'Cash on delivery is priced as a direct sale; your order stays a pre-order, on its journey and its stages.',
     prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
@@ -210,6 +223,7 @@ const STRINGS = {
     paymentHint: {
       wallet: 'تەواوی بڕەکە پێشوەخت لە جزدانەکەتەوە بدە',
       cash: 'پارەکە بە کاش لە کاتی گەیاندن بدە',
+      bnpl: 'تایبەت بە ئەندامی PRO ی شیاو — بڕ و بەرواری دانەوە تۆمار دەکرێت',
     } as Record<string, string>,
     codDirectPricing: 'پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت؛ داواکارییەکەت وەک پێش-داواکاری دەمێنێتەوە بە قۆناغەکانی و شێوازی گواستنەوەی خۆی.',
     prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
@@ -249,7 +263,6 @@ export default function Checkout() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
   const [loadError, setLoadError] = useState('');
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
@@ -466,6 +479,7 @@ export default function Checkout() {
       case 'CreditCard': return <CreditCard className={className} strokeWidth={1.5} />;
       case 'Wallet': return <Wallet className={className} strokeWidth={1.5} />;
       case 'Banknote': return <Banknote className={className} strokeWidth={1.5} />;
+      case 'CalendarClock': return <CalendarClock className={className} strokeWidth={1.5} />;
       default: return <CheckCircle2 className={className} strokeWidth={1.5} />;
     }
   };
@@ -600,6 +614,7 @@ export default function Checkout() {
   // `full_advance` id means the same thing), and it covers the whole total —
   // the server refuses a half advance (worker/lib/paymentPolicy.ts).
   const isPrepaidMethod = paymentMethod === 'wallet' || paymentMethod === 'full_advance';
+  const isBnplMethod = paymentMethod === 'bnpl';
   const requiredAdvance = isPrepaidMethod ? orderTotal : 0;
   const isAdvanceRequired = requiredAdvance > 0;
 
@@ -612,7 +627,11 @@ export default function Checkout() {
 
   // Calculate wallet discount
   const isWalletActive = isAdvanceRequired || useWalletBalance;
-  const walletDiscount = isWalletActive ? Math.min(walletBalanceIQD, orderTotal) : 0;
+  const walletDiscount = quote
+    ? quote.wallet.applied_iqd
+    : isWalletActive
+      ? Math.min(walletBalanceIQD, orderTotal)
+      : 0;
 
   // Verify if balance is sufficient for required advance
   const isBalanceSufficient = walletDiscount >= requiredAdvance;
@@ -622,6 +641,9 @@ export default function Checkout() {
     !quoteLoading && !shippingNeedsConfig && consentSatisfied;
 
   const amountRemainingOnDelivery = quote ? quote.due_on_delivery_iqd : orderTotal - walletDiscount;
+  const bnplFinancedIqd = isBnplMethod
+    ? quote?.bnpl?.financed_iqd ?? Math.max(0, orderTotal - walletDiscount)
+    : 0;
 
   const placeOrder = async () => {
     if (!canCompleteOrder) return;
@@ -848,15 +870,12 @@ export default function Checkout() {
           </div>
 
           {/* Section: Address */}
-          <section className="scroll-mt-24" id="section-address">
+          <section>
             <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
-              <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${activeStep === 1 ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'}`}>1</span>
+              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">1</span>
               {dir === 'rtl' ? 'عنوان التوصيل' : 'Shipping Address'}
             </h2>
-            {activeStep === 1 ? (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                
-<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addresses.map(addr => (
                 <label key={addr.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
                     selectedAddressId === addr.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
@@ -917,89 +936,77 @@ export default function Checkout() {
                 {dir === 'rtl' ? 'أضف عنوان توصيل لإتمام الطلب.' : 'Add a delivery address to place your order.'}
               </p>
             )}
-                <div className="mt-6 flex justify-end">
-                  <button onClick={() => setActiveStep(2)} disabled={!selectedAddressId} className="px-6 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-200 transition-colors disabled:opacity-50">
-                    {dir === 'rtl' ? 'متابعة' : 'Continue'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center bg-[#0a0a0a] p-4 rounded-xl border border-white/5">
-                <div className="flex items-center gap-3">
-                  <MapPin className="text-white w-5 h-5" strokeWidth={1.5} />
-                  <span className="text-zinc-300 font-light text-sm">{addresses.find(a => a.id === selectedAddressId)?.address || 'Address'}</span>
-                </div>
-                <button onClick={() => setActiveStep(1)} className="text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white">
-                  {dir === 'rtl' ? 'تعديل' : 'Edit'}
-                </button>
-              </div>
-            )}
           </section>
-{/* Section: Delivery Method */}
-          <section className="scroll-mt-24" id="section-delivery-method">
+
+          {/* Section: Delivery Method */}
+          <section>
             <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
-              <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${activeStep === 2 ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'}`}>2</span>
+              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">2</span>
               {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
             </h2>
-            {activeStep === 2 ? (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-<div className="grid grid-cols-1 gap-3">
-              {checkoutDeliveryMethods.map(method => (
-                <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-4 ${
-                  deliveryMethod === method.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
+            <div className="grid grid-cols-1 gap-3">
+              {checkoutDeliveryMethods.map(method => {
+                const selected = deliveryMethod === method.id;
+                const selectedQuote = selected ? quote?.shipping : null;
+                const displayedPrice = selectedQuote?.total_iqd ?? method.price_iqd;
+                const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
+                return (
+                <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-3 sm:gap-4 ${
+                  selected ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
                 }`}>
-                  <input type="radio" name="delivery" className="sr-only" checked={deliveryMethod === method.id} onChange={() => setDeliveryMethod(method.id)} />
+                  <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => setDeliveryMethod(method.id)} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${deliveryMethod === method.id ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${selected ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
                         {getMethodIcon(method.icon || '', "w-5 h-5")}
                       </div>
-                      <div>
-                        <h3 className={`font-normal text-base ${deliveryMethod === method.id ? 'text-white' : 'text-zinc-300'}`}>
+                      <div className="min-w-0">
+                        <h3 className={`font-normal text-base ${selected ? 'text-white' : 'text-zinc-300'}`}>
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                         </h3>
                         <p className="text-xs text-zinc-500 mt-0.5 font-light">{dir === 'rtl' ? method.descAr : method.descEn}</p>
+                        {selectedQuote && (
+                          <p className={`mt-1 text-[11px] font-medium ${memberWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                            {memberWaiver
+                              ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
+                              : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <span className={`font-medium text-sm ${method.price_iqd === 0 ? 'text-emerald-400' : 'text-white'}`}>
-                      {method.price_iqd === 0 ? (dir === 'rtl' ? 'مجاناً' : 'Free') : formatIqd(method.price_iqd)}
+                    <span className={`font-medium text-sm shrink-0 ${displayedPrice === 0 ? 'text-emerald-400' : 'text-white'}`}>
+                      {displayedPrice === 0 ? loc('مجاناً', 'Free', 'بەخۆڕایی') : formatIqd(displayedPrice)}
                     </span>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ml-2 ${deliveryMethod === method.id ? 'border-white' : 'border-zinc-700'}`}>
-                    {deliveryMethod === method.id && <div className="w-2 h-2 rounded-full bg-white" />}
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ms-1 ${selected ? 'border-white' : 'border-zinc-700'}`}>
+                    {selected && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
                 </label>
-              ))}
+                );
+              })}
             </div>
-                <div className="mt-6 flex justify-between">
-                  <button onClick={() => setActiveStep(1)} className="px-6 py-2.5 text-zinc-400 font-medium rounded-xl hover:text-white hover:bg-white/5 transition-colors">
-                    {dir === 'rtl' ? 'رجوع' : 'Back'}
-                  </button>
-                  <button onClick={() => setActiveStep(3)} disabled={!deliveryMethod} className="px-6 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-200 transition-colors disabled:opacity-50">
-                    {dir === 'rtl' ? 'متابعة' : 'Continue'}
-                  </button>
+            {quote?.priority_delivery?.eligible && (
+              <div className="mt-3 rounded-xl border border-[#d6b866]/35 bg-gradient-to-r from-[#d6b866]/10 to-[#b03142]/10 p-3 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-[#e8c97a] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-[#f2ddb0]">
+                    {loc('توصيل أولوية PRO خلال 12 ساعة', 'PRO priority delivery within 12 hours', 'گەیاندنی پێشینەیی PRO لە ١٢ کاتژمێردا')}
+                  </p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {loc('تم التحقق من العنوان وطريقة التوصيل لهذا الطلب.', 'Address and delivery method are eligible for this order.', 'ناونیشان و شێوازی گەیاندن بۆ ئەم داواکارییە شیاون.')}
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center bg-[#0a0a0a] p-4 rounded-xl border border-white/5">
-                <div className="flex items-center gap-3">
-                  <div className="text-zinc-300 font-light text-sm">{checkoutDeliveryMethods.find(m => m.id === deliveryMethod)?.titleEn || 'Delivery'}</div>
-                </div>
-                <button onClick={() => setActiveStep(2)} className="text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white">
-                  {dir === 'rtl' ? 'تعديل' : 'Edit'}
-                </button>
               </div>
             )}
           </section>
-{/* Section: Payment Method */}
-          <section className="scroll-mt-24" id="section-payment-method">
+
+          {/* Section: Payment Method */}
+          <section>
             <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
-              <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${activeStep === 3 ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'}`}>3</span>
+              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">3</span>
               {dir === 'rtl' ? 'طريقة الدفع' : 'Payment Method'}
             </h2>
-            {activeStep === 3 ? (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-<div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
                 <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-4 ${
                   paymentMethod === method.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
@@ -1024,27 +1031,7 @@ export default function Checkout() {
                 </label>
               ))}
             </div>
-                <div className="mt-6 flex justify-between">
-                  <button onClick={() => setActiveStep(2)} className="px-6 py-2.5 text-zinc-400 font-medium rounded-xl hover:text-white hover:bg-white/5 transition-colors">
-                    {dir === 'rtl' ? 'رجوع' : 'Back'}
-                  </button>
-                  <button onClick={() => setActiveStep(4)} disabled={!paymentMethod} className="px-6 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-200 transition-colors disabled:opacity-50">
-                    {dir === 'rtl' ? 'متابعة' : 'Continue'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center bg-[#0a0a0a] p-4 rounded-xl border border-white/5">
-                <div className="flex items-center gap-3">
-                  <span className="text-zinc-300 font-light text-sm">{checkoutPaymentMethods.find(m => m.id === paymentMethod)?.titleEn || 'Payment'}</span>
-                </div>
-                <button onClick={() => setActiveStep(3)} className="text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white">
-                  {dir === 'rtl' ? 'تعديل' : 'Edit'}
-                </button>
-              </div>
-            )}
           </section>
-
 
           {/* Mobile CTA */}
           <div className="pt-6 lg:hidden">
@@ -1174,6 +1161,32 @@ export default function Checkout() {
                 <span className="text-white font-normal">{formatIqd(shippingIqd)}</span>
               )}
             </div>
+
+            {quote && quote.shipping.components.length > 0 && (
+              <div className="rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2 space-y-1.5">
+                {quote.shipping.components.map((component, index) => {
+                  const names: Record<string, [string, string]> = {
+                    ordinary: ['توصيل الطلب', 'Order delivery'],
+                    protected: ['حماية وتغليف', 'Protected handling'],
+                    printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery'],
+                    printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery'],
+                    carton: ['كرتونة كمية إضافية', 'Extra quantity carton'],
+                  };
+                  const name = names[component.kind] ?? [component.kind, component.kind];
+                  return (
+                    <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-zinc-500">
+                        {dir === 'rtl' ? name[0] : name[1]}
+                        {component.units > 1 ? ` × ${component.units}` : ''}
+                      </span>
+                      <span className={component.waived ? 'text-emerald-400' : 'text-zinc-300'}>
+                        {component.waived ? S.freeShipping : formatIqd(component.fee_iqd)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Protected delivery — offered only when the owner priced it, so
                 the customer never sees a switch that cannot be honoured. */}
@@ -1360,14 +1373,23 @@ export default function Checkout() {
             <div className="pt-6 border-t border-white/5 flex justify-between items-end mt-2">
               <div>
                 <span className="text-white font-normal block mb-1 text-base">
-                  {dir === 'rtl' ? 'المبلغ المستحق الدفع' : 'Amount Due'}
+                  {isBnplMethod
+                    ? (dir === 'rtl' ? 'المبلغ المموّل عبر BNPL' : 'Amount financed with BNPL')
+                    : (dir === 'rtl' ? 'المبلغ المستحق الدفع' : 'Amount Due')}
                 </span>
-                {amountRemainingOnDelivery > 0 && (
+                {isBnplMethod && quote?.bnpl?.due_at && (
+                  <span className="text-[#e8c97a] text-sm flex items-center gap-1.5">
+                    <CalendarClock className="w-4 h-4" />
+                    {dir === 'rtl' ? 'موعد السداد' : 'Due'}{' '}
+                    {new Date(quote.bnpl.due_at).toLocaleDateString(lang === 'ar' ? 'ar-IQ' : 'en-US')}
+                  </span>
+                )}
+                {!isBnplMethod && amountRemainingOnDelivery > 0 && (
                   <span className="text-zinc-500 text-sm">
                     {dir === 'rtl' ? 'يدفع عند الاستلام' : 'To pay on delivery'}
                   </span>
                 )}
-                {amountRemainingOnDelivery === 0 && (
+                {!isBnplMethod && amountRemainingOnDelivery === 0 && (
                   <span className="text-emerald-400 text-sm font-medium flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4" />
                     {dir === 'rtl' ? 'مدفوع بالكامل' : 'Fully Paid'}
@@ -1376,7 +1398,8 @@ export default function Checkout() {
               </div>
               <div className="text-right">
                 <span className="text-3xl font-normal text-white tracking-tight">
-                  {amountRemainingOnDelivery.toLocaleString()} <span className="text-lg text-zinc-500 font-light ml-1">د.ع</span>
+                  {(isBnplMethod ? bnplFinancedIqd : amountRemainingOnDelivery).toLocaleString()}{' '}
+                  <span className="text-lg text-zinc-500 font-light ml-1">د.ع</span>
                 </span>
               </div>
             </div>

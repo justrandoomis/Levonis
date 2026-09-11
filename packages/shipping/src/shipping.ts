@@ -94,6 +94,10 @@ export function quoteShipping(input: {
   merchandiseIqd: number;
   tier: 'free' | 'plus' | 'pro' | 'prime';
   tierActive: boolean;
+  /** Canonical server entitlement flags. Older pure callers may omit them;
+   *  production checkout always supplies them from entitlements.ts. */
+  proShippingEntitled?: boolean;
+  premiumShippingEntitled?: boolean;
   atApprovedDefaultAddress: boolean;
   /** PRIME basis (§5): merchandise AFTER product discounts, coupons and
    *  points, BEFORE delivery. It is a distinct number from `merchandiseIqd`,
@@ -125,15 +129,16 @@ export function quoteShipping(input: {
 
   // PRO waiver eligibility — CONFIRMED: PRO only, approved default address
   // only, strictly greater than the threshold.
+  const proEntitled = input.proShippingEntitled ?? (input.tier === 'pro' && input.tierActive);
+  const premiumEntitled = input.premiumShippingEntitled ?? (input.tier === 'prime' && input.tierActive);
   const proEligible =
-    input.tier === 'pro' &&
-    input.tierActive &&
+    proEntitled &&
     input.atApprovedDefaultAddress &&
     input.merchandiseIqd > config.pro_threshold_iqd;
-  if (input.tier === 'pro' && input.tierActive && input.atApprovedDefaultAddress && !proEligible) {
+  if (proEntitled && input.atApprovedDefaultAddress && !proEligible) {
     reasons.push(`PRO free delivery requires order value above ${config.pro_threshold_iqd.toLocaleString()} IQD (strictly greater).`);
   }
-  if (input.tier === 'pro' && input.tierActive && !input.atApprovedDefaultAddress) {
+  if (proEntitled && !input.atApprovedDefaultAddress) {
     reasons.push('Alternate delivery address selected — ordinary pricing applies for this order (PRO benefits restore automatically at your approved address).');
   }
 
@@ -142,9 +147,8 @@ export function quoteShipping(input: {
   // requirement is imposed: the owner stated that rule for PRO alone, and
   // inventing an extra condition would silently deny a paid benefit.
   const primeBasis = input.primeMerchandiseIqd ?? input.merchandiseIqd;
-  const primeEligible =
-    input.tier === 'prime' && input.tierActive && primeBasis > config.prime_threshold_iqd;
-  if (input.tier === 'prime' && input.tierActive && !primeEligible) {
+  const primeEligible = premiumEntitled && primeBasis > config.prime_threshold_iqd;
+  if (premiumEntitled && !primeEligible) {
     reasons.push(
       `LEVO PRIME free delivery needs an order above ${config.prime_threshold_iqd.toLocaleString()} IQD (strictly greater; ${config.prime_threshold_iqd.toLocaleString()} itself does not qualify).`
     );

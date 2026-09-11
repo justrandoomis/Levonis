@@ -1,0 +1,48 @@
+{
+  "kind": "levo-studio-browser-memory",
+  "version": 1,
+  "generatedAt": "2026-08-31T07:44:58.876Z",
+  "method": "per-process VmRSS from /proc, sampled after CDP HeapProfiler.collectGarbage",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36",
+  "plates": 9,
+  "bytesPerPlate": 20971520,
+  "charsHeld": 188743899,
+  "blobBytesHeld": 188743899,
+  "samplesKb": {
+    "baseline": {
+      "browser": 182316,
+      "zygote": 128772,
+      "gpu-process": 78508,
+      "utility": 150332,
+      "renderer": 174804
+    },
+    "withStrings": {
+      "browser": 186328,
+      "zygote": 128772,
+      "gpu-process": 77884,
+      "utility": 153652,
+      "renderer": 368028
+    },
+    "dropped": {
+      "browser": 186340,
+      "zygote": 128772,
+      "gpu-process": 77884,
+      "utility": 153652,
+      "renderer": 183476
+    },
+    "withBlobs": {
+      "browser": 373308,
+      "zygote": 128772,
+      "gpu-process": 78824,
+      "utility": 156908,
+      "renderer": 185860
+    }
+  },
+  "rendererRssDeltaKb": {
+    "before": 193224,
+    "after": 2384
+  },
+  "browserProcessRssDeltaKb": {
+    "blobs": 186968
+  }
+}

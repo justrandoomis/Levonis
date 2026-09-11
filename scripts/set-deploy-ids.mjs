@@ -28,7 +28,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const path = new URL('../worker/wrangler.jsonc', import.meta.url);
+const path = new URL('../wrangler.jsonc', import.meta.url);
 let cfg = readFileSync(path, 'utf8');
 const changes = [];
 const notes = [];
