@@ -10,7 +10,7 @@
     "./edge/*": "./src/edge/*.ts"
   },
   "dependencies": {
-    "@levonis/contracts": "*",
+    "@levonis/contracts": "0.1.0",
     "hono": "^4.9.0"
   },
   "scripts": {

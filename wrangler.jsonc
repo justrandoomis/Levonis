@@ -7,7 +7,7 @@
   // no real IDs are committed. Local development ignores them.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "levonis",
-  "main": "worker/index.ts",
+  "main": "services/gateway/dev/core-stub/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 

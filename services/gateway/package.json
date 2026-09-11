@@ -5,8 +5,8 @@
   "type": "module",
   "description": "levonis-gateway — the only Worker with zone routes: host classification, origin check and security headers (the core's, byte-identical), signed-principal resolution, the capability table, layered rate limiting, request validation, the safe anonymous-GET cache, the Turnstile hook, correlation ids, health, and the routing table that forwards every legacy prefix to the core over a service binding with a kill-switch override.",
   "dependencies": {
-    "@levonis/contracts": "*",
-    "@levonis/platform-kit": "*",
+    "@levonis/contracts": "0.1.0",
+    "@levonis/platform-kit": "0.1.0",
     "hono": "^4.9.0"
   },
   "scripts": {

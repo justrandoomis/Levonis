@@ -1,1 +1,1 @@
-export const splitUrlList = (s: string) => [];
+export const splitUrlList = (_s: string) => [];
