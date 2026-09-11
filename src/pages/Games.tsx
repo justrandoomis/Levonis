@@ -1,2 +1,6 @@
 import React from 'react';
-export default function Games() { return <div>Games</div>; }
+import ComingSoon from '../components/ComingSoon';
+
+export default function Games() {
+  return <ComingSoon title="Games" titleAr="الألعاب" />;
+}

@@ -1,2 +1,6 @@
 import React from 'react';
-export default function GameRedeem() { return <div>GameRedeem</div>; }
+import ComingSoon from '../../components/ComingSoon';
+
+export default function GameRedeem() {
+  return <ComingSoon title="Redeem Rewards" titleAr="استرداد المكافآت" />;
+}

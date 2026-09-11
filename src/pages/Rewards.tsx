@@ -1,2 +1,6 @@
 import React from 'react';
-export default function Rewards() { return <div>Rewards</div>; }
+import ComingSoon from '../components/ComingSoon';
+
+export default function Rewards() {
+  return <ComingSoon title="Points & Rewards" titleAr="النقاط والمكافآت" />;
+}

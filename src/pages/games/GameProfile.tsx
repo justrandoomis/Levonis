@@ -1,2 +1,6 @@
 import React from 'react';
-export default function GameProfile() { return <div>GameProfile</div>; }
+import ComingSoon from '../../components/ComingSoon';
+
+export default function GameProfile() {
+  return <ComingSoon title="Game Profile" titleAr="الملف الشخصي للعبة" />;
+}
