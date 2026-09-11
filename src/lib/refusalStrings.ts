@@ -25,6 +25,68 @@ export interface RefusalStrings {
 }
 
 export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
+  // ---- PRO Buy Now, Pay Later --------------------------------------------
+  PRO_REQUIRED: {
+    ar: 'الدفع لاحقًا متاح حصريًا لعضوية PRO الفعّالة.',
+    en: 'Buy Now, Pay Later is available exclusively with an active PRO membership.',
+    ckb: 'ئێستا بکڕە و دواتر بدە تەنها بۆ ئەندامێتی چالاکی PRO بەردەستە.',
+  },
+  BNPL_RESTRICTED: {
+    ar: 'ميزة الدفع لاحقًا موقوفة مؤقتًا على هذا الحساب. تواصل مع الدعم لمراجعتها.',
+    en: 'Buy Now, Pay Later is temporarily paused on this account. Contact support for a review.',
+    ckb: 'خزمەتی ئێستا بکڕە و دواتر بدە بۆ ئەم هەژمارە کاتی ڕاگیراوە. بۆ پێداچوونەوە پەیوەندی بە پشتگیری بکە.',
+  },
+  BNPL_DISABLED: {
+    ar: 'خدمة الدفع لاحقًا غير متاحة حاليًا.',
+    en: 'Buy Now, Pay Later is currently unavailable.',
+    ckb: 'خزمەتی ئێستا بکڕە و دواتر بدە لە ئێستادا بەردەست نییە.',
+  },
+  BNPL_NOT_APPROVED: {
+    ar: 'يجب اعتماد حد الدفع لاحقًا لحسابك قبل استخدامه.',
+    en: 'Your Buy Now, Pay Later limit must be approved before you can use it.',
+    ckb: 'پێویستە سنووری ئێستا بکڕە و دواتر بدە بۆ هەژمارەکەت پەسەند بکرێت پێش بەکارهێنان.',
+  },
+  IDENTITY_VERIFICATION_REQUIRED: {
+    ar: 'أكمل توثيق الهوية أولًا لاستخدام الدفع لاحقًا.',
+    en: 'Complete identity verification before using Buy Now, Pay Later.',
+    ckb: 'پێش بەکارهێنانی ئێستا بکڕە و دواتر بدە، پشتڕاستکردنەوەی ناسنامە تەواو بکە.',
+  },
+  APPROVED_ADDRESS_REQUIRED: {
+    ar: 'اختر عنوانك الافتراضي المعتمد لاستخدام الدفع لاحقًا.',
+    en: 'Use your approved default address for Buy Now, Pay Later.',
+    ckb: 'بۆ ئێستا بکڕە و دواتر بدە، ناونیشانی بنەڕەتی پەسەندکراوت بەکاربهێنە.',
+  },
+  BNPL_AMOUNT_TOO_LOW: {
+    ar: 'قيمة الطلب أقل من الحد الأدنى المعتمد للدفع لاحقًا.',
+    en: 'The order total is below the approved minimum for Buy Now, Pay Later.',
+    ckb: 'کۆی داواکارییەکە لە کەمترین سنووری پەسەندکراو بۆ ئێستا بکڕە و دواتر بدە کەمترە.',
+  },
+  BNPL_AMOUNT_TOO_HIGH: {
+    ar: 'قيمة الطلب أعلى من الحد المعتمد للدفع لاحقًا.',
+    en: 'The order total is above the approved Buy Now, Pay Later maximum.',
+    ckb: 'کۆی داواکارییەکە لە زۆرترین سنووری پەسەندکراو بۆ ئێستا بکڕە و دواتر بدە زیاترە.',
+  },
+  BNPL_LIMIT_EXCEEDED: {
+    ar: 'المبلغ يتجاوز الرصيد المتاح من حد الدفع لاحقًا.',
+    en: 'The amount exceeds your available Buy Now, Pay Later limit.',
+    ckb: 'بڕەکە لە سنووری بەردەستی ئێستا بکڕە و دواتر بدە زیاترە.',
+  },
+  BNPL_NOT_ELIGIBLE: {
+    ar: 'هذا الطلب غير مؤهل للدفع لاحقًا. راجع العنوان والمبلغ ثم أعد المحاولة.',
+    en: 'This order is not eligible for Buy Now, Pay Later. Review the address and amount, then try again.',
+    ckb: 'ئەم داواکارییە بۆ ئێستا بکڕە و دواتر بدە گونجاو نییە. ناونیشان و بڕەکە بپشکنەوە و دووبارە هەوڵ بدە.',
+  },
+  BNPL_REPAYMENT_EXCEEDS_DEBT: {
+    ar: 'مبلغ السداد أكبر من الرصيد المستحق. حدّث البيانات واختر مبلغًا أقل.',
+    en: 'The repayment is larger than the outstanding balance. Refresh and choose a smaller amount.',
+    ckb: 'بڕی دانەوە لە قەرزی ماوە زیاترە. زانیارییەکان نوێ بکەرەوە و بڕێکی کەمتر هەڵبژێرە.',
+  },
+  BNPL_REPAYMENT_CONFLICT: {
+    ar: 'تغيّر رصيد المحفظة أو الدين. حدّث البيانات ثم أعد السداد.',
+    en: 'Your wallet or debt balance changed. Refresh and submit the repayment again.',
+    ckb: 'باڵانسی جزدان یان قەرزەکە گۆڕاوە. زانیارییەکان نوێ بکەرەوە و دووبارە دانەوە بنێرە.',
+  },
+
   // ---- eligibility and scheduling (§9) ------------------------------------
   MEMBERSHIP_REQUIRED: {
     ar: 'هذا العرض للأعضاء فقط. اشترك للوصول إليه.',

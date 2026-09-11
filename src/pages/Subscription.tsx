@@ -40,6 +40,7 @@ import { PlanSummary } from '../components/subscription/PlanSummary';
 import { PurchaseConfirm } from '../components/subscription/PurchaseConfirm';
 import { BenefitsSection } from '../components/subscription/BenefitsSection';
 import { MembershipLedger } from '../components/subscription/MembershipLedger';
+import { BnplPanel } from '../components/subscription/BnplPanel';
 import { FREE_FACE, TIER_META, isPaidTier, tierLabel, type AnyTier, type PaidTier } from '../components/subscription/tierMeta';
 import type {
   ApiPlan,
@@ -377,6 +378,15 @@ export default function Subscription() {
         {user && mine && (mine.memberships.length > 0 || gatedBenefits.length > 0) && (
           <motion.div {...enter(0.1)} className="max-w-2xl mx-auto lg:max-w-none">
             <MembershipLedger memberships={mine.memberships} gatedBenefits={gatedBenefits} />
+          </motion.div>
+        )}
+
+        {/* Active PRO customers manage the real BNPL line here. The panel
+            also remains visible after a downgrade only when an existing
+            account or debt must still be reviewable/repayable. */}
+        {user && mine && (
+          <motion.div {...enter(0.12)} className="max-w-2xl mx-auto lg:max-w-none">
+            <BnplPanel activePro={mine.status.active && mine.status.tier === 'pro'} />
           </motion.div>
         )}
 

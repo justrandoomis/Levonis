@@ -4,7 +4,19 @@ import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, requireAdmin, requireMainHost, badRequest, notFound, oneOf, str, int, HttpError } from '../lib/http';
 import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
-import { getLaunchConfig, getTierStatus, type LaunchConfig } from '../lib/entitlements';
+import {
+  ENTITLEMENT_MINIMUM_TIER,
+  entitlementSnapshot,
+  benefits,
+  defaultAddressOf,
+  getLaunchConfig,
+  getTierStatus,
+  type LaunchConfig,
+  type TierStatus,
+  isApprovedDefaultAddress,
+} from '../lib/entitlements';
+import { bnplEligibility, bnplOutstanding, bnplRepaymentStatement } from '../lib/bnpl';
+import { iqdToUsdCents } from '../lib/escrowOps';
 import { addMonths, attributeReferral, onProSubscriptionPurchased } from '../lib/membershipOps';
 import { TIER_RANK } from '../lib/pricing';
 import { audit } from '../lib/audit';
@@ -27,9 +39,9 @@ interface PlanRow {
 
 type PaidTier = PlanRow['tier'];
 
-/** The tier as the customer sees it — PRIME is never called PLUS. */
+/** Customer-facing name; `prime` remains the compatibility database id. */
 export function tierLabel(tier: string): string {
-  return tier === 'pro' ? 'PRO' : tier === 'prime' ? 'PRIME' : tier === 'plus' ? 'PLUS' : String(tier).toUpperCase();
+  return tier === 'pro' ? 'PRO' : tier === 'prime' ? 'PREMIUM' : tier === 'plus' ? 'PLUS' : String(tier).toUpperCase();
 }
 
 const tierRank = (tier: string): number => TIER_RANK[tier as keyof typeof TIER_RANK] ?? 0;
@@ -656,6 +668,17 @@ function thresholdOr(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : fallback;
 }
 
+function entitlementsForTier(tier: PaidTier) {
+  const status: TierStatus = {
+    tier,
+    active: true,
+    expires_at: null,
+    pending_launch: null,
+    gated_benefits: [],
+  };
+  return entitlementSnapshot(status);
+}
+
 /**
  * Active plans + purchasability + launch status (public storefront data).
  *
@@ -699,6 +722,14 @@ membershipsRoutes.get('/plans', async (c) => {
     delivery: {
       pro_threshold_iqd: thresholdOr(policy.pro_threshold_iqd, SETTING_DEFAULTS.shippingPolicy.pro_threshold_iqd),
       prime_threshold_iqd: thresholdOr(policy.prime_threshold_iqd, SETTING_DEFAULTS.shippingPolicy.prime_threshold_iqd),
+    },
+    entitlement_contract: {
+      minimum_tier: ENTITLEMENT_MINIMUM_TIER,
+      tiers: {
+        plus: entitlementsForTier('plus'),
+        prime: entitlementsForTier('prime'),
+        pro: entitlementsForTier('pro'),
+      },
     },
   });
 });
@@ -768,6 +799,7 @@ membershipsRoutes.get('/mine', requireAuth, async (c) => {
   return c.json({
     success: true,
     status,
+    entitlements: entitlementSnapshot(status),
     memberships: rows.map(membershipPublic),
     referral: {
       code,
@@ -781,6 +813,114 @@ membershipsRoutes.get('/mine', requireAuth, async (c) => {
     },
     launch: { launch_at: launch.launch_at, activated: launch.activated },
   });
+});
+
+/**
+ * A small authenticated capability endpoint for clients that do not need the
+ * membership ledger.  The request has no tier parameter by design: the
+ * server resolves the live membership and expiry every time.
+ */
+membershipsRoutes.get('/entitlements', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const status = await getTierStatus(c.env.DB, user.id);
+  return c.json({ success: true, status, entitlements: entitlementSnapshot(status) });
+});
+
+membershipsRoutes.get('/bnpl', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const [eligibility, { results: ledger }] = await Promise.all([
+    bnplEligibility(c.env.DB, user.id),
+    c.env.DB
+      .prepare(
+        `SELECT id, order_id, kind, amount_iqd, due_at, note, created_at
+           FROM bnpl_ledger WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`
+      )
+      .bind(user.id)
+      .all<Record<string, unknown>>(),
+  ]);
+  return c.json({ success: true, eligibility, ledger });
+});
+
+/** A PRO member asks staff to approve a credit line; approval remains manual. */
+membershipsRoutes.post('/bnpl/request', requireAuth, async (c) => {
+  await rateLimit(c, 'bnpl-request', 3, 86_400);
+  const user = c.get('user')!;
+  const [status, identity, address] = await Promise.all([
+    getTierStatus(c.env.DB, user.id),
+    c.env.DB
+      .prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND state = 'verified' LIMIT 1")
+      .bind(user.id)
+      .first(),
+    defaultAddressOf(c.env.DB, user.id),
+  ]);
+  if (!benefits.bnpl(status)) throw badRequest('An active PRO membership is required for BNPL', 'PRO_REQUIRED');
+  if (!identity) throw badRequest('Verified identity is required before requesting BNPL', 'IDENTITY_VERIFICATION_REQUIRED');
+  if (!address || !(await isApprovedDefaultAddress(c.env.DB, user.id, address))) {
+    throw badRequest('Your approved default address is required before requesting BNPL', 'APPROVED_ADDRESS_REQUIRED');
+  }
+  await c.env.DB
+    .prepare(
+      `INSERT INTO bnpl_accounts (user_id, state, credit_limit_iqd)
+       VALUES (?, 'requested', 0)
+       ON CONFLICT(user_id) DO UPDATE SET state = CASE
+         WHEN bnpl_accounts.state = 'approved' THEN 'approved' ELSE 'requested' END`
+    )
+    .bind(user.id)
+    .run();
+  const eligibility = await bnplEligibility(c.env.DB, user.id, address);
+  return c.json({ success: true, eligibility });
+});
+
+/** Wallet repayment. It remains available after expiry/cancellation by design. */
+membershipsRoutes.post('/bnpl/repay', requireAuth, async (c) => {
+  await rateLimit(c, 'bnpl-repay', 20, 86_400);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const amountIqd = int(body.amount_iqd, 'amount_iqd', { min: 1, max: 1_000_000_000 });
+  const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
+  const ledgerKey = `repayment:${user.id}:${idempotencyKey}`;
+  const existing = await c.env.DB
+    .prepare('SELECT id FROM bnpl_ledger WHERE idempotency_key = ? AND user_id = ?')
+    .bind(ledgerKey, user.id)
+    .first();
+  if (existing) return c.json({ success: true, replay: true, outstanding_iqd: await bnplOutstanding(c.env.DB, user.id) });
+
+  const outstanding = await bnplOutstanding(c.env.DB, user.id);
+  if (amountIqd > outstanding) throw badRequest('Repayment cannot exceed the outstanding balance', 'BNPL_REPAYMENT_EXCEEDS_DEBT');
+  const rate = Number(await getSetting(c.env.DB, 'exchangeRate')) || 1400;
+  const walletCents = iqdToUsdCents(amountIqd, rate);
+  const now = new Date().toISOString();
+  try {
+    await c.env.DB.batch([
+      usdSpendStatement(c.env.DB, {
+        txId: `wtx_bnpl_${await sha256Hex(`${user.id}:${idempotencyKey}`)}`,
+        userId: user.id,
+        amountCents: walletCents,
+        note: 'BNPL repayment',
+        ref: ledgerKey,
+        nowIso: now,
+      }),
+      bnplRepaymentStatement(c.env.DB, { userId: user.id, amountIqd, idempotencyKey, createdAt: now }),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const replay = await c.env.DB
+      .prepare('SELECT id FROM bnpl_ledger WHERE idempotency_key = ? AND user_id = ?')
+      .bind(ledgerKey, user.id)
+      .first();
+    if (replay) {
+      // A concurrent identical request won. Its wallet debit and ledger row
+      // are the one result; do not write a second audit record or describe
+      // this retry as a new repayment.
+      return c.json({ success: true, replay: true, outstanding_iqd: await bnplOutstanding(c.env.DB, user.id) });
+    }
+    if (/CHECK|BNPL_REPAYMENT/i.test(message)) {
+      throw badRequest('Balance or debt changed; refresh and try again', 'BNPL_REPAYMENT_CONFLICT');
+    }
+    throw error;
+  }
+  await audit(c.env.DB, user.id, 'bnpl.repayment', user.id, { amount_iqd: amountIqd, wallet_usd_cents: walletCents });
+  return c.json({ success: true, replay: false, outstanding_iqd: await bnplOutstanding(c.env.DB, user.id) });
 });
 
 membershipsRoutes.post('/subscribe', requireAuth, async (c) => {
@@ -867,6 +1007,48 @@ membershipsRoutes.post('/referral/enter', requireAuth, async (c) => {
 // host only, then admin. A merchant subdomain page never reaches it, even
 // with a visiting admin's shared cookie (the same pattern as devices.ts).
 membershipsRoutes.use('/admin/*', requireMainHost, requireAdmin);
+
+/** Approve/suspend a PRO BNPL line. No client membership label is accepted. */
+membershipsRoutes.put('/admin/bnpl/:userId', async (c) => {
+  const admin = c.get('user')!;
+  const userId = str(c.req.param('userId'), 'userId', { min: 1, max: 80 });
+  const body = await c.req.json().catch(() => ({}));
+  const state = oneOf(body.state, 'state', ['requested', 'approved', 'suspended'] as const);
+  const creditLimit = int(body.credit_limit_iqd, 'credit_limit_iqd', {
+    min: state === 'approved' ? 1 : 0,
+    max: 1_000_000_000,
+    def: 0,
+  });
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!target) throw notFound('User not found');
+
+  if (state === 'approved') {
+    const [status, identity, address] = await Promise.all([
+      getTierStatus(c.env.DB, userId),
+      c.env.DB.prepare("SELECT id FROM kyc_cases WHERE user_id = ? AND state = 'verified' LIMIT 1").bind(userId).first(),
+      defaultAddressOf(c.env.DB, userId),
+    ]);
+    if (!benefits.bnpl(status)) throw badRequest('Only an active PRO member can receive a BNPL limit', 'PRO_REQUIRED');
+    if (!identity) throw badRequest('Identity verification is required', 'IDENTITY_VERIFICATION_REQUIRED');
+    if (!address || !(await isApprovedDefaultAddress(c.env.DB, userId, address))) {
+      throw badRequest('An approved default address is required', 'APPROVED_ADDRESS_REQUIRED');
+    }
+  }
+
+  await c.env.DB
+    .prepare(
+      `INSERT INTO bnpl_accounts (user_id, state, credit_limit_iqd, approved_by)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         state = excluded.state,
+         credit_limit_iqd = excluded.credit_limit_iqd,
+         approved_by = excluded.approved_by`
+    )
+    .bind(userId, state, creditLimit, admin.id)
+    .run();
+  await audit(c.env.DB, admin.id, 'bnpl.account_update', userId, { state, credit_limit_iqd: creditLimit });
+  return c.json({ success: true, eligibility: await bnplEligibility(c.env.DB, userId) });
+});
 
 membershipsRoutes.get('/admin/list', async (c) => {
   const state = str(c.req.query('state'), 'state', { max: 30, required: false });

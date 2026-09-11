@@ -16,6 +16,7 @@ import { sweepExpiredOrders } from './orderExpirySweep';
 import type { OrderExpiryReport } from './orderExpirySweep';
 import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
+import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -71,8 +72,8 @@ export interface DurableJobsReport {
    * owner has mapped that status.
    */
   delivery_sync: { configured: boolean; scanned: number; moved: number; unmapped: number; errors: number };
-  /** BNPL overdue enforcement is intentionally disabled — see below. */
-  bnpl_overdue: 'disabled';
+  /** PRO BNPL accounts whose oldest unpaid instalment passed its due date. */
+  bnpl_overdue: BnplOverdueReport;
   errors: string[];
 }
 
@@ -99,7 +100,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
     order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
-    bnpl_overdue: 'disabled',
+    bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     errors: [],
   };
 
@@ -268,23 +269,11 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     };
   });
 
-  // 13. BNPL overdue checks — DELIBERATELY DISABLED STUB.
+  // 13. Enforce overdue PRO BNPL balances. This is an account-credit action,
+  //     never an order-state transition, and is safe under overlapping crons.
   await step('bnpl_overdue', async () => {
-    report.bnpl_overdue = await bnplOverdueCheckStub();
+    report.bnpl_overdue = await sweepBnplOverdue(env.DB, nowIso, 100);
   });
 
   return report;
-}
-
-/**
- * BNPL overdue enforcement stub — the Buy-Now-Pay-Later feature is gated OFF
- * (docs/DECISIONS.md row 21: clock-start event, exposure components and the
- * one-month escalation reference are unresolved owner decisions). Until the
- * owner supplies those rules NOTHING here restricts any account: this stub
- * exists so the scheduled pipeline is already wired when the feature lands,
- * and so nobody mistakes the absence of a job for a finished feature.
- * It reads nothing and writes nothing.
- */
-async function bnplOverdueCheckStub(): Promise<'disabled'> {
-  return 'disabled';
 }

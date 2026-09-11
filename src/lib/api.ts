@@ -643,6 +643,17 @@ export interface ApiOrder {
   delivered_at?: string | null;
   delivery_waived?: boolean;
   membership_tier_snapshot?: string;
+  /** Server-snapshotted fulfilment lane. `pro_priority_12h` is only emitted
+   *  after the Worker proves the active PRO, approved address and service
+   *  coverage requirements at checkout. */
+  priority?: number;
+  fulfillment_service?: 'standard' | 'pro_priority' | 'pro_priority_12h' | string;
+  priority_due_at?: string | null;
+  /** Amount financed through the PRO-only BNPL ledger and its contractual due
+   *  date. These are server values, never calculated from the selected client
+   *  payment label. */
+  bnpl_due_iqd?: number;
+  bnpl_due_at?: string | null;
   coupon?: { coupon_id?: string; code?: string; discount_iqd?: number } | null;
   coupon_discount_iqd?: number;
   progress?: OrderStageProgress;
@@ -692,9 +703,11 @@ export interface OrderFinancial {
   total_iqd: number;
   wallet_applied_iqd: number;
   due_on_delivery_iqd: number;
+  bnpl_due_iqd?: number;
+  bnpl_due_at?: string | null;
   collected_iqd: number | null;
   outstanding_iqd: number;
-  payment_state: 'paid' | 'partial' | 'cod_due' | string;
+  payment_state: 'paid' | 'partial' | 'cod_due' | 'bnpl_due' | string;
   wallet_tx_id?: string | null;
   points_tx_id?: string | null;
   settlement?: { collected_iqd: number; settled_at: string | null; fully_settled: boolean } | null;

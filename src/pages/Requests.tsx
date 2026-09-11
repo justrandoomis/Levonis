@@ -33,6 +33,7 @@ import { AttachmentList, type RequestFile } from '../components/media/RequestAtt
 import PrintRequestWizard from '../components/print/PrintRequestWizard';
 import PrintSummary from '../components/print/PrintSummary';
 import MyRequestsList from '../components/print/MyRequestsList';
+import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 
 interface RequestRow {
   id: string;
@@ -64,6 +65,7 @@ interface OfferRow {
     id: string;
     name: string;
     verified: boolean;
+    pro_badge?: boolean;
     badge: string;
     rating: number | null;
     rating_count: number;
@@ -521,6 +523,7 @@ function OfferCard({
           <div className="flex items-center gap-1.5">
             <span className="text-white font-semibold text-[13.5px] truncate">{m?.name ?? '—'}</span>
             {m?.verified && <BadgeCheck className="w-3.5 h-3.5 text-gold shrink-0" />}
+            {m?.pro_badge && <ProMerchantBadge compact />}
           </div>
           {/* Reputation, so a customer can compare on more than price (§27). */}
           <div className="flex items-center gap-2 mt-0.5 text-[11.5px] text-zinc-500">

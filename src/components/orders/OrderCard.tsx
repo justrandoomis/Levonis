@@ -31,6 +31,9 @@ const STRINGS = {
     review: 'تقييم',
     total: 'المجموع',
     due: 'المتبقي عند التسليم',
+    bnplDue: 'رصيد BNPL',
+    priority12h: 'أولوية PRO · خلال 12 ساعة',
+    priority: 'أولوية تجهيز PRO',
     next: 'الخطوة التالية',
     orderId: 'رقم الطلب',
     giftTitle: 'هدية مرفقة مع هذا الطلب',
@@ -46,6 +49,9 @@ const STRINGS = {
     review: 'Review',
     total: 'Total',
     due: 'Due on delivery',
+    bnplDue: 'BNPL balance',
+    priority12h: 'PRO priority · within 12 hours',
+    priority: 'PRO preparation priority',
     next: 'Next step',
     orderId: 'Order number',
     giftTitle: 'A gift ships with this order',
@@ -61,6 +67,9 @@ const STRINGS = {
     review: 'هەڵسەنگاندن',
     total: 'کۆی گشتی',
     due: 'ماوە لە کاتی گەیاندن',
+    bnplDue: 'قەرزی BNPL',
+    priority12h: 'پێشینەیی PRO · لە ١٢ کاتژمێردا',
+    priority: 'پێشینەیی ئامادەکردنی PRO',
     next: 'هەنگاوی داهاتوو',
     orderId: 'ژمارەی داواکاری',
     giftTitle: 'دیارییەک لەگەڵ ئەم داواکارییە دەنێردرێت',
@@ -85,7 +94,7 @@ function dueOnDelivery(order: ApiOrder): number {
   if (order.status === 'cancelled') return 0;
   const fin = order.financial;
   if (fin) {
-    if (fin.payment_state === 'paid') return 0;
+    if (fin.payment_state === 'paid' || fin.payment_state === 'bnpl_due') return 0;
     return Number(fin.outstanding_iqd) || 0;
   }
   if (order.status === 'delivered') return 0;
@@ -114,6 +123,7 @@ export default function OrderCard({
   const stack = order.items.slice(0, 3);
   const extraLines = Math.max(0, order.items.length - 1);
   const due = dueOnDelivery(order);
+  const bnplDue = order.status === 'cancelled' ? 0 : Number(order.financial?.bnpl_due_iqd ?? order.bnpl_due_iqd) || 0;
   const canReview =
     order.status === 'delivered' &&
     (reviewedProductIds === null ||
@@ -164,6 +174,13 @@ export default function OrderCard({
           </span>
         </header>
 
+        {order.priority === 1 && (
+          <p data-pro-priority className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#B03142]/35 bg-[#B03142]/12 px-2.5 py-1 text-[10.5px] font-bold text-[#f3bdc5]">
+            <Truck className="h-3 w-3" aria-hidden="true" />
+            {order.fulfillment_service === 'pro_priority_12h' ? s.priority12h : s.priority}
+          </p>
+        )}
+
         {order.items[0] && (
           <p className="mt-3 text-[13px] text-zinc-300 truncate">
             {order.items[0].name}
@@ -178,6 +195,11 @@ export default function OrderCard({
             {due > 0 && (
               <p className="text-[11.5px] text-zinc-400 tabular-nums">
                 {s.due}: {formatIqd(due)}
+              </p>
+            )}
+            {bnplDue > 0 && (
+              <p className="text-[11.5px] text-[#f3bdc5] tabular-nums">
+                {s.bnplDue}: {formatIqd(bnplDue)}
               </p>
             )}
           </div>

@@ -127,14 +127,14 @@ test('the member rungs are clamped against the OFFER price, so a PRO never pays 
   assert.equal(out.applied_iqd, 60_000);
 });
 
-test('the offer’s PLUS rung reaches an active PLUS member and nobody else', () => {
+test('the offer’s PLUS rung reaches PLUS and every inheriting tier', () => {
   const w = window({ offer_price_mode: 'fixed', offer_price_iqd: 80_000, plus_price_iqd: 70_000 });
   const plus = resolveOfferPrice({ base: base('plus', true), window: w, scheduleState: 'live', tier: 'plus', tierActive: true });
   assert.equal(plus.applied_iqd, 70_000);
   assert.equal(plus.plus_iqd, 70_000);
 
   const prime = resolveOfferPrice({ base: base('prime', true), window: w, scheduleState: 'live', tier: 'prime', tierActive: true });
-  assert.equal(prime.applied_iqd, 80_000, 'PRIME is not offered the PLUS price');
+  assert.equal(prime.applied_iqd, 70_000, 'PREMIUM inherits the PLUS price');
 
   const lapsed = resolveOfferPrice({ base: base('plus', false), window: w, scheduleState: 'live', tier: 'plus', tierActive: false });
   assert.equal(lapsed.applied_iqd, 80_000);

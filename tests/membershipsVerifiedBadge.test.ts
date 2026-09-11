@@ -1,11 +1,9 @@
 /**
- * The PRO "verified merchant" badge is real.
+ * The PRO merchant-status badge is real and is not identity verification.
  *
- * benefits.verifiedMerchant existed and nothing read it, so a benefit the
- * PRO card advertised was never granted. Every community payload that shows
- * a store's `verified` flag now resolves it as: the admin's manual mark OR an
- * ACTIVE PRO owner whose benefit is not paused. PLUS never gets it, a lapsed
- * PRO loses it, and a restriction case pauses it.
+ * `verified` remains the independent admin mark. `pro_badge` is derived only
+ * from an ACTIVE PRO entitlement: PLUS never gets it, a lapsed PRO loses it,
+ * and a restriction case pauses it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -70,15 +68,17 @@ function app(db: D1Database, userId: string | null = null) {
 
 const json = async (r: Response) => (await r.json()) as Record<string, unknown>;
 
-test('the merchant directory verifies active PRO owners and the admin-marked store, nobody else', async () => {
+test('the merchant directory keeps verification separate from the PRO status badge', async () => {
   const { db } = setup();
   const body = await json(await app(db).request('/api/community/merchants'));
-  const byId = new Map((body.merchants as Array<Record<string, unknown>>).map((m) => [m.id, m.verified]));
-  assert.equal(byId.get('cm_pro'), true, 'an active PRO owner is verified by entitlement');
-  assert.equal(byId.get('cm_manual'), true, "the admin's mark still verifies on its own");
-  assert.equal(byId.get('cm_plus'), false, 'PLUS is not PRO');
-  assert.equal(byId.get('cm_lapsed'), false, 'an expired PRO is not verified');
-  assert.equal(byId.get('cm_gated'), false, 'a paused verifiedMerchant benefit is not verified');
+  const byId = new Map((body.merchants as Array<Record<string, unknown>>).map((m) => [m.id, m]));
+  assert.equal(byId.get('cm_pro')?.verified, false, 'PRO membership is not KYC/admin verification');
+  assert.equal(byId.get('cm_pro')?.pro_badge, true, 'an active PRO owner receives the status badge');
+  assert.equal(byId.get('cm_manual')?.verified, true, "the admin's mark stays independent");
+  assert.equal(byId.get('cm_manual')?.pro_badge, false, 'manual verification does not fabricate PRO status');
+  assert.equal(byId.get('cm_plus')?.pro_badge, false, 'PLUS is not PRO');
+  assert.equal(byId.get('cm_lapsed')?.pro_badge, false, 'an expired PRO loses the badge');
+  assert.equal(byId.get('cm_gated')?.pro_badge, false, 'a paused legacy verifiedMerchant flag gates the renamed badge');
   // No membership data leaks into the public card.
   for (const m of body.merchants as Array<Record<string, unknown>>) {
     assert.ok(!('tier' in m) && !('expires_at' in m));
@@ -88,28 +88,29 @@ test('the merchant directory verifies active PRO owners and the admin-marked sto
 test('the store page and the owner\'s own view agree with the directory', async () => {
   const { db } = setup();
   const pro = await json(await app(db).request('/api/community/store/cm_pro'));
-  assert.equal((pro.merchant as Record<string, unknown>).verified, true);
+  assert.equal((pro.merchant as Record<string, unknown>).verified, false);
+  assert.equal((pro.merchant as Record<string, unknown>).pro_badge, true);
   const plus = await json(await app(db).request('/api/community/store/cm_plus'));
-  assert.equal((plus.merchant as Record<string, unknown>).verified, false);
+  assert.equal((plus.merchant as Record<string, unknown>).pro_badge, false);
 
   const mine = await json(await app(db, 'pro').request('/api/community/my-store'));
-  assert.equal((mine.merchant as Record<string, unknown>).verified, true);
+  assert.equal((mine.merchant as Record<string, unknown>).pro_badge, true);
   const minePlus = await json(await app(db, 'plus').request('/api/community/my-store'));
-  assert.equal((minePlus.merchant as Record<string, unknown>).verified, false);
+  assert.equal((minePlus.merchant as Record<string, unknown>).pro_badge, false);
 });
 
 test('the badge follows the membership: cancel the PRO and it is gone', async () => {
   const { db, raw } = setup();
   raw.exec("UPDATE memberships SET state = 'cancelled' WHERE id = 'm_pro'");
   const pro = await json(await app(db).request('/api/community/store/cm_pro'));
-  assert.equal((pro.merchant as Record<string, unknown>).verified, false);
+  assert.equal((pro.merchant as Record<string, unknown>).pro_badge, false);
 });
 
 test('followed stores carry the same flag', async () => {
   const { db, raw } = setup();
   raw.exec("INSERT INTO follows (user_id, merchant_id) VALUES ('viewer','cm_pro'), ('viewer','cm_plus')");
   const body = await json(await app(db, 'viewer').request('/api/community/followed'));
-  const byId = new Map((body.merchants as Array<Record<string, unknown>>).map((m) => [m.id, m.verified]));
+  const byId = new Map((body.merchants as Array<Record<string, unknown>>).map((m) => [m.id, m.pro_badge]));
   assert.equal(byId.get('cm_pro'), true);
   assert.equal(byId.get('cm_plus'), false);
 });

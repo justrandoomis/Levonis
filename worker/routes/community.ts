@@ -5,65 +5,24 @@ import { safeParse } from '../lib/types';
 import { requireAuth, notFound, forbidden, str, int, jsonArray } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { getTierStatus, benefits, type TierStatus } from '../lib/entitlements';
+import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 
 export const communityRoutes = new Hono<AppContext>();
 
 /**
- * VERIFIED MERCHANT — two sources, one flag.
+ * PRO STATUS BADGE — deliberately separate from verification.
  *
- * `community_merchants.verified` is the admin's manual mark (0001: "set only
- * by admins") and keeps that meaning. The PRO membership sells a "verified
- * merchant badge" as well (benefits.verifiedMerchant), and until now nothing
- * read that benefit — the badge was advertised and never granted. So the
- * public flag is now: the admin's mark OR an ACTIVE PRO owner whose
- * verifiedMerchant benefit is not paused by a restriction case. PRO lapses →
- * the badge goes with it; the admin's mark stays until an admin removes it.
+ * `community_merchants.verified` remains an administrator's independent
+ * moderation mark. `pro_badge` is an ACTIVE PRO membership status and is
+ * never described as identity/KYC verification. PRO lapses → only the PRO
+ * badge disappears; the admin mark is unchanged.
  *
  * Resolved for a whole page of merchants in two queries rather than one
- * getTierStatus per row, but through the SAME `benefits.verifiedMerchant`
+ * getTierStatus per row, but through the SAME `benefits.proMerchantBadge`
  * check so the rule cannot drift from entitlements.ts.
  */
-async function proVerifiedOwners(db: D1Database, ownerIds: unknown[]): Promise<Set<string>> {
-  const ids = [...new Set(ownerIds.filter((x): x is string => typeof x === 'string' && x !== ''))];
-  const out = new Set<string>();
-  if (ids.length === 0) return out;
-  const placeholders = ids.map(() => '?').join(',');
-  const nowIso = new Date().toISOString();
-  const [{ results: rows }, { results: cases }] = await Promise.all([
-    db
-      .prepare(
-        `SELECT user_id, expires_at FROM memberships
-          WHERE tier = 'pro' AND state = 'active' AND (expires_at IS NULL OR expires_at > ?)
-            AND user_id IN (${placeholders})`
-      )
-      .bind(nowIso, ...ids)
-      .all<{ user_id: string; expires_at: string | null }>(),
-    db
-      .prepare(`SELECT user_id, benefit_flags FROM restriction_cases WHERE state = 'active' AND user_id IN (${placeholders})`)
-      .bind(...ids)
-      .all<{ user_id: string; benefit_flags: string }>(),
-  ]);
-  const gated = new Map<string, string[]>();
-  for (const r of cases) {
-    const flags = safeParse<unknown[]>(r.benefit_flags, []).filter((f): f is string => typeof f === 'string');
-    gated.set(r.user_id, [...(gated.get(r.user_id) ?? []), ...flags]);
-  }
-  for (const r of rows) {
-    const status: TierStatus = {
-      tier: 'pro',
-      active: true,
-      expires_at: r.expires_at,
-      pending_launch: null,
-      gated_benefits: gated.get(r.user_id) ?? [],
-    };
-    if (benefits.verifiedMerchant(status)) out.add(r.user_id);
-  }
-  return out;
-}
-
-function merchantPublic(m: Record<string, unknown>, proVerified: Set<string>) {
+function merchantPublic(m: Record<string, unknown>, proBadges: Set<string>) {
   return {
     id: m.id,
     // The account behind the store, so a customer can open a conversation
@@ -74,7 +33,8 @@ function merchantPublic(m: Record<string, unknown>, proVerified: Set<string>) {
     name: m.name,
     bio: m.bio,
     avatarUrl: m.avatar_key ? `/files/${m.avatar_key}` : null,
-    verified: !!m.verified || proVerified.has(String(m.user_id)),
+    verified: !!m.verified,
+    pro_badge: proBadges.has(String(m.user_id)),
     created_at: m.created_at,
   };
 }
@@ -112,11 +72,11 @@ communityRoutes.get('/merchants', async (c) => {
        FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
       ORDER BY cm.created_at DESC LIMIT 20`
   ).all<Record<string, unknown>>();
-  const proVerified = await proVerifiedOwners(c.env.DB, results.map((m) => m.user_id));
+  const proBadges = await usersWithEntitlement(c.env.DB, results.map((m) => m.user_id), 'proMerchantBadge');
   return c.json({
     success: true,
     merchants: results.map((m) => ({
-      ...merchantPublic(m, proVerified),
+      ...merchantPublic(m, proBadges),
       store_slug: m.store_slug ?? null,
       // A suspended store is not advertised as a destination; the card falls
       // back to the in-site page. Paused shops keep their address — the page
@@ -198,10 +158,10 @@ communityRoutes.get('/store/:id', async (c) => {
       .first();
     following = !!f;
   }
-  const proVerified = await proVerifiedOwners(c.env.DB, [merchant.user_id]);
+  const proBadges = await usersWithEntitlement(c.env.DB, [merchant.user_id], 'proMerchantBadge');
   return c.json({
     success: true,
-    merchant: merchantPublic(merchant, proVerified),
+    merchant: merchantPublic(merchant, proBadges),
     products: products.map(communityProductPublic),
     followers: followers?.n ?? 0,
     following,
@@ -241,11 +201,11 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
-  const proVerified = await proVerifiedOwners(c.env.DB, results.map((m) => m.user_id));
+  const proBadges = await usersWithEntitlement(c.env.DB, results.map((m) => m.user_id), 'proMerchantBadge');
   return c.json({
     success: true,
     merchants: results.map((m) => ({
-      ...merchantPublic(m, proVerified),
+      ...merchantPublic(m, proBadges),
       store_slug: m.store_slug ?? null,
       store_url:
         m.store_slug && m.store_status !== 'suspended'
@@ -269,8 +229,8 @@ communityRoutes.get('/my-store', requireAuth, async (c) => {
   )
     .bind(merchant.id)
     .all();
-  const proVerified = await proVerifiedOwners(c.env.DB, [user.id]);
-  return c.json({ success: true, merchant: merchantPublic(merchant, proVerified), products: products.map(communityProductPublic) });
+  const proBadges = await usersWithEntitlement(c.env.DB, [user.id], 'proMerchantBadge');
+  return c.json({ success: true, merchant: merchantPublic(merchant, proBadges), products: products.map(communityProductPublic) });
 });
 
 communityRoutes.post('/my-store', requireAuth, async (c) => {
@@ -289,18 +249,19 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
       .run();
     return c.json({ success: true, id: existing.id });
   }
-  // Creating a NEW merchant profile is a PLUS/PRO benefit (mandate §8) —
+  // Creating a NEW merchant profile is a PLUS benefit inherited by PREMIUM
+  // and PRO — server-side tier check, never a client flag.
   // server-side tier check, never a client flag. Existing merchants above
   // are grandfathered for updates and product management.
   const status = await getTierStatus(c.env.DB, user.id);
   if (!benefits.merchantProfile(status)) {
-    throw forbidden('يتطلب عضوية LEVO PLUS او PRO / Requires an active LEVO PLUS or PRO membership');
+    throw forbidden('يتطلب عضوية LEVO PLUS أو PREMIUM أو PRO / Requires an active LEVO PLUS, PREMIUM, or PRO membership');
   }
 
   const id = newId('cm');
   // verified stays 0 — the stored flag is the admin's mark. A PRO owner's
   // badge is resolved from the memberships ledger on every read instead
-  // (proVerifiedOwners), so it follows the membership and never goes stale.
+  // (proBadgeOwners), so it follows the membership and never goes stale.
   await c.env.DB.prepare('INSERT INTO community_merchants (id, user_id, name, bio) VALUES (?, ?, ?, ?)')
     .bind(id, user.id, name, bio)
     .run();
@@ -356,7 +317,7 @@ communityRoutes.get('/profile-status', requireAuth, async (c) => {
     .bind(user.id)
     .first();
   // merchant_allowed: existing merchants are grandfathered; new stores need
-  // an active PLUS/PRO membership (server-side check).
+  // an active paid membership (server-side inherited entitlement check).
   const status = await getTierStatus(c.env.DB, user.id);
   return c.json({
     success: true,

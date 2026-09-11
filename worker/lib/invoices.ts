@@ -45,6 +45,8 @@ interface OrderRow {
   exchange_rate: number;
   total_iqd: number;
   due_on_delivery_iqd: number;
+  bnpl_due_iqd?: number | null;
+  bnpl_due_at?: string | null;
   delivery_waived: number | null;
   membership_tier_snapshot: string | null;
   coupon_snapshot: string | null;
@@ -179,6 +181,10 @@ function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
  */
 function paymentFacts(order: OrderRow): { paid: number; due: number; status: InvoicePaymentStatus } {
   const total = Number(order.total_iqd) || 0;
+  const financed = Math.max(0, Number(order.bnpl_due_iqd) || 0);
+  if (financed > 0) {
+    return { paid: Math.max(0, total - financed), due: financed, status: 'bnpl_due' };
+  }
   const due = Math.max(0, Number(order.due_on_delivery_iqd) || 0);
   const paid = Math.max(0, total - due);
   const status: InvoicePaymentStatus = due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'cod_due';

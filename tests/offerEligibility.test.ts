@@ -1,14 +1,11 @@
 /**
- * ELIGIBILITY — case 16 of the owner's seventeen ("PRO inherits PLUS; every
- * eligibility check is server-side"), docs/BUNDLES_MYSTERY.md §9.
+ * ELIGIBILITY — the canonical paid-tier inheritance used by every offer:
+ * PREMIUM inherits PLUS and PRO inherits both, with server-side checks.
  *
- * `required_tiers` is an explicit SET, and that is a deliberate departure from
- * `validateCoupon`'s ladder minimum. `TIER_RANK` is
- * { free: 0, plus: 1, prime: 2, pro: 3 }, so a MINIMUM of 'plus' would silently
- * admit PRIME to every PLUS-exclusive offer and hand it the PLUS member price,
- * while the repo's own entitlements module states the opposite intent for buyer
- * tiers in as many words. And the owner's own enumeration includes
- * "PLUS + PRO but not PRIME", which a linear minimum cannot express at all.
+ * `required_tiers` stays an explicit SET so an offer can name several entry
+ * tiers, but each named entry is interpreted through the one inheritance
+ * relation in entitlements.ts. The historical database id `prime` is the
+ * customer-facing PREMIUM tier.
  *
  * The whole matrix is walked here — {guest, free, plus, prime, pro} ×
  * {no gate, plus, prime, pro, plus+pro} × {active, expired, restricted} —
@@ -93,11 +90,11 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   guest: { 'no gate': true, plus: false, prime: false, pro: false, 'plus+pro': false },
   free: { 'no gate': true, plus: false, prime: false, pro: false, 'plus+pro': false },
   plus: { 'no gate': true, plus: true, prime: false, pro: false, 'plus+pro': true },
-  prime: { 'no gate': true, plus: false, prime: true, pro: false, 'plus+pro': false },
-  pro: { 'no gate': true, plus: true, prime: false, pro: true, 'plus+pro': true },
+  prime: { 'no gate': true, plus: true, prime: true, pro: false, 'plus+pro': true },
+  pro: { 'no gate': true, plus: true, prime: true, pro: true, 'plus+pro': true },
 };
 
-test('the whole {viewer} × {gate} matrix, with PRO inheriting PLUS and PRIME standing alone', () => {
+test('the whole {viewer} × {gate} matrix follows PLUS → PREMIUM → PRO inheritance', () => {
   for (const [gateName, tiers] of GATES) {
     for (const viewer of ['guest', 'free', 'plus', 'prime', 'pro'] as const) {
       const s = viewer === 'guest' ? null : status(viewer === 'free' ? 'free' : (viewer as Tier), viewer !== 'free');
@@ -114,11 +111,11 @@ test('the whole {viewer} × {gate} matrix, with PRO inheriting PLUS and PRIME st
 test('the load-bearing cells, stated on their own', () => {
   const plusOnly = view({ required_tiers: ['plus'] });
   assert.equal(offerEligible(status('pro'), plusOnly, NOW).ok, true, 'PRO satisfies a PLUS requirement');
-  assert.equal(offerEligible(status('prime'), plusOnly, NOW).ok, false, 'PRIME does NOT');
+  assert.equal(offerEligible(status('prime'), plusOnly, NOW).ok, true, 'PREMIUM inherits PLUS');
   const plusPro = view({ required_tiers: ['plus', 'pro'] });
   assert.equal(offerEligible(status('plus'), plusPro, NOW).ok, true);
   assert.equal(offerEligible(status('pro'), plusPro, NOW).ok, true);
-  assert.equal(offerEligible(status('prime'), plusPro, NOW).ok, false, 'plus+pro excludes PRIME — unrepresentable as a minimum');
+  assert.equal(offerEligible(status('prime'), plusPro, NOW).ok, true, 'PREMIUM satisfies the PLUS entry in the set');
 });
 
 test('an UNGATED window is public: a guest and a free account are both eligible', () => {
@@ -147,14 +144,13 @@ test('no window at all is not a refusal — the subject simply has no offer', ()
   assert.equal(offerEligible(null, null, NOW).ok, true);
 });
 
-test('the tier SET is a membership relation, and TIER_RANK stays the only ranking', () => {
-  assert.deepEqual(INHERITS.pro, ['free', 'plus', 'pro']);
-  assert.deepEqual(INHERITS.prime, ['free', 'prime'], 'PRIME inherits nothing from PLUS');
+test('the tier SET delegates to the one canonical inheritance relation', () => {
+  assert.deepEqual(INHERITS.pro, ['free', 'plus', 'prime', 'pro']);
+  assert.deepEqual(INHERITS.prime, ['free', 'plus', 'prime'], 'PREMIUM inherits PLUS');
   assert.deepEqual(TIER_RANK, { free: 0, plus: 1, prime: 2, pro: 3 });
-  // A ladder minimum on TIER_RANK would admit PRIME to a PLUS gate — this is
-  // exactly the bug the set exists to prevent.
   assert.ok(TIER_RANK.prime > TIER_RANK.plus);
-  assert.equal(offerEligible(status('prime'), view({ required_tiers: ['plus'] }), NOW).ok, false);
+  assert.equal(offerEligible(status('prime'), view({ required_tiers: ['plus'] }), NOW).ok, true);
+  assert.equal(offerEligible(status('pro'), view({ required_tiers: ['prime'] }), NOW).ok, true);
 });
 
 test('a stored required_tiers set is parsed, sorted and cleaned of anything that is not a tier', () => {
@@ -205,7 +201,7 @@ test('the stored window and limits load in one pass, and the real tier status de
   assert.deepEqual(verdicts, {
     u_free: false,
     u_plus: true,
-    u_prime: false, // PRIME is not a PLUS
+    u_prime: true, // PREMIUM inherits PLUS
     u_pro: true, // PRO inherits PLUS
     u_gated: false, // an active restriction case
   });

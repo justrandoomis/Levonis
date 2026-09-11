@@ -1014,6 +1014,7 @@ export default function Product() {
       <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
         <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center">
           <button
+            type="button"
             onClick={() => navigate(-1)}
             aria-label={s.back}
             className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
@@ -1969,6 +1970,7 @@ export default function Product() {
           overlay that could land in the middle of the content. */}
       <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           aria-label={s.back}
           className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
@@ -1977,6 +1979,7 @@ export default function Product() {
         </button>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={handleShare}
             aria-label={s.share}
             className="w-11 h-11 rounded-full bg-zinc-900/60 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -1984,6 +1987,7 @@ export default function Product() {
             <Share2 aria-hidden="true" className="w-5 h-5" />
           </button>
           <button
+            type="button"
             onClick={toggleFavorite}
             disabled={favBusy || source !== 'catalog'}
             aria-label={favorite ? s.unfavorite : s.favorite}
@@ -2000,7 +2004,7 @@ export default function Product() {
       {/* Bottom clearance equals the phone purchase bar (its height + safe
           area). BottomNav does not render on /product/*, so this is the only
           reserved space and nothing is covered. */}
-      <div className="mx-auto w-full max-w-[1240px] px-4 pt-2 pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
+      <div className="mx-auto w-full max-w-[1240px] px-4 pt-2 pb-[calc(156px+env(safe-area-inset-bottom))] sm:pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
         {/*
           THE LEFT COLUMN NEEDED A CEILING. With a single `minmax(0,1fr)` track
           against a fixed 400px panel inside a 1240px shell, the content side
@@ -2363,14 +2367,14 @@ export default function Product() {
             </Link>
           </div>
         ) : null}
-        <div className="mx-auto w-full max-w-[640px] flex items-center gap-2.5">
+        <div className="mx-auto grid w-full max-w-[640px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:gap-2.5">
           {/*
             A FIXED FOOTPRINT. This cell used to be auto-sized, so its width
             followed whichever string it held — a number, «يجري تحديث السعر…»,
             or an em dash — and the `flex-1` CTA beside it visibly grew and
             shrank on every quote. Reserving the space keeps the bar still.
           */}
-          <div className="min-w-0 basis-[7.5rem] shrink-0">
+          <div className="min-w-0 sm:basis-[7.5rem] sm:shrink-0">
             <div className="text-[11px] text-zinc-500">{s.price}</div>
             <div
               aria-busy={priceIsPending || undefined}
@@ -2382,7 +2386,7 @@ export default function Product() {
             </div>
           </div>
           {barStepper}
-          <div className="flex-1 min-w-0">{buyButton}</div>
+          <div className="col-span-2 min-w-0 sm:flex-1">{buyButton}</div>
         </div>
       </div>
 

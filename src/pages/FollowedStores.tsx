@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import { storeHref } from '../lib/merchant';
+import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import { ArrowLeft, ArrowRight, Store, BadgeCheck } from 'lucide-react';
 
 interface FollowedMerchant {
@@ -11,6 +12,7 @@ interface FollowedMerchant {
   bio: string;
   avatarUrl: string | null;
   verified: boolean;
+  pro_badge?: boolean;
   created_at: string;
   store_slug?: string | null;
   /** The shop's own address — a card click is a full navigation there. */
@@ -116,6 +118,7 @@ export default function FollowedStores() {
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-bold truncate">{store.name}</h3>
                   {store.verified && <BadgeCheck className="w-4 h-4 text-gold shrink-0" />}
+                  {store.pro_badge && <ProMerchantBadge compact />}
                 </div>
                 {store.bio && <div className="text-sm text-zinc-400 truncate">{store.bio}</div>}
               </div>

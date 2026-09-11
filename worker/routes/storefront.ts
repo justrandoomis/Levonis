@@ -23,12 +23,14 @@ import { safeParse } from '../lib/types';
 import { notFound, int, str } from '../lib/http';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { storeBySlug, storeById, storeIsOpen, type StoreContext } from '../lib/merchantAuth';
+import { benefits, getTierStatus } from '../lib/entitlements';
 
 export const storefrontRoutes = new Hono<AppContext>();
 
 /** The shopfront view. Deliberately smaller than the merchant's own view. */
-function publicStore(ctx: StoreContext, rootDomain: string | null) {
+async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
   const { store: s, merchant: m } = ctx;
+  const tier = await getTierStatus(db, m.user_id);
   return {
     id: s.id,
     slug: s.slug,
@@ -72,6 +74,7 @@ function publicStore(ctx: StoreContext, rootDomain: string | null) {
       id: m.id,
       name: m.name,
       verified: !!m.verified,
+      pro_badge: benefits.proMerchantBadge(tier),
       badge: m.badge_override || m.badge,
       rating: m.rating_count ? m.rating_avg_x100 / 100 : null,
       rating_count: m.rating_count,
@@ -169,7 +172,7 @@ storefrontRoutes.get('/resolve', async (c) => {
   return c.json({
     success: true,
     kind: 'merchant',
-    store: { ...publicStore(ctx, root), ...(await storeStats(c.env.DB, ctx)) },
+    store: { ...(await publicStore(c.env.DB, ctx, root)), ...(await storeStats(c.env.DB, ctx)) },
   });
 });
 
@@ -179,7 +182,7 @@ storefrontRoutes.get('/:slug', async (c) => {
   return c.json({
     success: true,
     store: {
-      ...publicStore(ctx, rootDomainFrom(c.env)),
+      ...(await publicStore(c.env.DB, ctx, rootDomainFrom(c.env))),
       ...(await storeStats(c.env.DB, ctx)),
     },
   });
@@ -306,7 +309,7 @@ storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
       .catch(() => {})
   );
 
-  return c.json({ success: true, product: publicProduct(p), store: publicStore(ctx, rootDomainFrom(c.env)) });
+  return c.json({ success: true, product: publicProduct(p), store: await publicStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
 });
 
 storefrontRoutes.get('/:slug/reviews', async (c) => {
@@ -387,7 +390,7 @@ storefrontRoutes.get('/by-id/:storeId', async (c) => {
   return c.json({
     success: true,
     store: {
-      ...publicStore(ctx, rootDomainFrom(c.env)),
+      ...(await publicStore(c.env.DB, ctx, rootDomainFrom(c.env))),
       ...(await storeStats(c.env.DB, ctx)),
     },
   });

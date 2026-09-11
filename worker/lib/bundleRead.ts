@@ -62,7 +62,7 @@ import { resolveStock } from './inventory';
 import type { InventorySnapshot, StockResolution } from './inventory';
 import { resolveUnitPrice, clampMemberLadder } from './pricing';
 import type { PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './pricing';
-import type { TierStatus } from './entitlements';
+import { tierInherits, type TierStatus } from './entitlements';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
 import { parseProductRow, type ProductDoc } from './productModel';
@@ -785,10 +785,12 @@ function memberLadder(
     if (prime !== null) plus = Math.max(plus, prime);
     if (pro !== null) plus = Math.max(plus, pro);
   }
-  if (viewer.tier === 'pro' && viewer.tierActive && pro !== null) return { applied: pro, prime, pro, plus, tier: 'pro' };
-  if (viewer.tier === 'prime' && viewer.tierActive && prime !== null)
-    return { applied: prime, prime, pro, plus, tier: 'prime' };
-  if (viewer.tier === 'plus' && viewer.tierActive && plus !== null) return { applied: plus, prime, pro, plus, tier: 'plus' };
+  if (viewer.tier === 'pro' && viewer.tierActive && (pro !== null || prime !== null || plus !== null))
+    return { applied: pro ?? prime ?? plus!, prime, pro, plus, tier: 'pro' };
+  if (viewer.tier === 'prime' && viewer.tierActive && (prime !== null || plus !== null))
+    return { applied: prime ?? plus!, prime, pro, plus, tier: 'prime' };
+  if (viewer.tierActive && tierInherits(viewer.tier, 'plus') && plus !== null)
+    return { applied: plus, prime, pro, plus, tier: 'plus' };
   return { applied: regular, prime, pro, plus, tier: 'regular' };
 }
 

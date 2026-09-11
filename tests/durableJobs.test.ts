@@ -146,7 +146,8 @@ test('a step whose table is missing fails alone — the later steps still run', 
   assert.ok(!report.errors.some((e) => e.startsWith('wallet_reconciliation:')));
   assert.ok(!report.errors.some((e) => e.startsWith('wallet_notifications:')));
   assert.ok(!report.errors.some((e) => e.startsWith('support_gifts:')));
-  assert.equal(report.bnpl_overdue, 'disabled');
+  assert.deepEqual(report.bnpl_overdue, { scanned: 0, overdue: 0, suspended: 0 });
+  assert.ok(report.errors.some((e) => e.startsWith('bnpl_overdue:')));
 });
 
 test('reconciliation ALERTS on a broken invariant with exactly one audit row — and repairs nothing', async () => {

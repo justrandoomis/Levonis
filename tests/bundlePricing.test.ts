@@ -157,7 +157,7 @@ test('the whole ladder is ordered for every tier, in both price modes', () => {
   }
 });
 
-test('the PLUS rung applies to an ACTIVE plus member and to nobody else', () => {
+test('the PLUS rung applies to active PLUS and every inheriting tier', () => {
   const cfg = config({ plus_price_iqd: 130_000 });
   const plus = resolveBundlePrice({
     resolved: resolved('plus', true),
@@ -179,7 +179,7 @@ test('the PLUS rung applies to an ACTIVE plus member and to nobody else', () => 
   assert.equal(lapsed.bundle_price_iqd, 145_000, 'an inactive membership pays the regular price');
   assert.equal(lapsed.applied_tier, 'regular');
 
-  // PRIME is NOT offered the PLUS price — it is a buyer tier standing alone.
+  // PREMIUM inherits the PLUS rung when no better PREMIUM price is configured.
   const prime = resolveBundlePrice({
     resolved: resolved('prime', true),
     config: cfg,
@@ -187,8 +187,8 @@ test('the PLUS rung applies to an ACTIVE plus member and to nobody else', () => 
     tier: 'prime',
     tierActive: true,
   });
-  assert.equal(prime.bundle_price_iqd, 145_000);
-  assert.equal(prime.applied_tier, 'regular');
+  assert.equal(prime.bundle_price_iqd, 130_000);
+  assert.equal(prime.applied_tier, 'prime', 'the inherited price is presented as the member’s PREMIUM tier');
 });
 
 test('a PRO away from the approved default address pays the regular price (tierActive is the context, not the tier)', () => {

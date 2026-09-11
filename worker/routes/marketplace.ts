@@ -34,7 +34,7 @@ import {
   safeFileName,
   MODEL_MAX_BYTES,
 } from '../lib/attachments';
-import { getTierStatus, benefits } from '../lib/entitlements';
+import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
 import { requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import { holdEscrow, escrowForOrder, releaseEscrow, refundEscrow, disputeEscrow } from '../lib/escrowOps';
@@ -84,7 +84,7 @@ function publicRequest(r: Record<string, unknown>) {
   };
 }
 
-function offerShape(o: Record<string, unknown>) {
+function offerShape(o: Record<string, unknown>, proBadges: Set<string> = new Set()) {
   return {
     id: o.id,
     request_id: o.request_id,
@@ -107,6 +107,8 @@ function offerShape(o: Record<string, unknown>) {
           id: o.merchant_id,
           name: o.m_name,
           verified: !!o.m_verified,
+          /** Membership status badge, separate from the moderation mark. */
+          pro_badge: proBadges.has(String(o.m_user_id)),
           badge: o.m_badge_override || o.m_badge,
           rating: o.m_rating_count ? Number(o.m_rating) / 100 : null,
           rating_count: o.m_rating_count,
@@ -498,7 +500,7 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
 
   // A merchant must not be able to read a competitor's price on the same job.
   const { results } = await c.env.DB.prepare(
-    `SELECT o.*, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
+    `SELECT o.*, m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
             m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
             m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
             s.slug AS s_slug
@@ -510,7 +512,8 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
       ORDER BY o.created_at ASC`
   ).bind(requestId, isCustomer ? 1 : 0, mine?.merchant.id ?? '').all();
 
-  return c.json({ success: true, offers: results.map(offerShape), is_customer: isCustomer });
+  const proBadges = await usersWithEntitlement(c.env.DB, results.map((row) => row.m_user_id), 'proMerchantBadge');
+  return c.json({ success: true, offers: results.map((row) => offerShape(row, proBadges)), is_customer: isCustomer });
 });
 
 marketplaceRoutes.post('/requests/:id/offers', requireAuth, async (c) => {

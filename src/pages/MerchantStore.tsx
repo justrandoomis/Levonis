@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
+import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import {
   ArrowLeft, ArrowRight, Star, Store as StoreIcon, BadgeCheck, Box
 } from 'lucide-react';
@@ -16,6 +17,7 @@ interface StoreMerchant {
   bio: string;
   avatarUrl: string | null;
   verified: boolean;
+  pro_badge?: boolean;
   created_at: string;
 }
 
@@ -180,6 +182,7 @@ export default function MerchantStore() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{merchant.name}</h1>
               {merchant.verified && <BadgeCheck className="w-5 h-5 text-gold" />}
+              {merchant.pro_badge && <ProMerchantBadge />}
             </div>
             {joined && (
               <p className="text-zinc-400 text-sm">{dir === 'rtl' ? 'انضم في' : 'Joined'} {joined}</p>

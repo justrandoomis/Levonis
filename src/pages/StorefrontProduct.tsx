@@ -28,6 +28,7 @@ import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { storefrontApi, iqd, type MerchantProduct, type MerchantStore } from '../lib/merchant';
 import SellerConflictDialog, { type SellerConflict } from '../components/merchant/SellerConflictDialog';
+import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import { useStore } from '../StoreContext';
 
 export default function StorefrontProduct() {
@@ -176,6 +177,7 @@ export default function StorefrontProduct() {
               <div className="flex items-center gap-1">
                 <span className="text-white text-[13px] font-semibold truncate">{store.name}</span>
                 {store.merchant.verified && <BadgeCheck className="w-3.5 h-3.5 text-gold shrink-0" />}
+                {store.merchant.pro_badge && <ProMerchantBadge compact />}
               </div>
               {store.merchant.rating !== null && (
                 <span className="text-zinc-500 text-[11.5px]">

@@ -22,7 +22,7 @@
  *
  * PRO operations (/api/support/admin/...): member search/detail (subscription
  * term, identity state via kyc_cases READ — never decrypted identity or
- * evidence keys —, benefit context, BNPL read-only [feature disabled],
+ * evidence keys —, benefit context, BNPL account and repayment history,
  * restriction cases) and restriction-case management. Restrictions only ever
  * gate BENEFIT COMPUTATION — never orders, wallet, points, warranty or
  * support access.
@@ -47,7 +47,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
-import { getTierStatus } from '../lib/entitlements';
+import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
+import { bnplEligibility } from '../lib/bnpl';
 import { coverageState, maskSerial } from '../lib/deviceOps';
 
 export const supportRoutes = new Hono<AppContext>();
@@ -55,22 +56,15 @@ export const supportRoutes = new Hono<AppContext>();
 // ============================================================ shared helpers
 
 /**
- * Benefit keys a restriction case may gate — mirrors the benefit names in
- * worker/lib/entitlements.ts so decisions here can be consumed wherever
- * benefits are computed. Support/warranty/data ACCESS is intentionally not
- * restrictable — only benefit computation.
+ * Benefit keys a restriction case may gate. They are generated from the
+ * canonical entitlement contract rather than copied here, so adding or
+ * renaming a membership capability cannot silently bypass support controls.
+ * Support/warranty/data ACCESS is intentionally not restrictable — only
+ * benefit computation.
  */
-export const RESTRICTABLE_BENEFITS = [
-  'proPricing',
-  'freeDelivery',
-  'noPreorderCommission',
-  'priorityService',
-  'proExclusive',
-  'merchantProfile',
-  'exclusiveSections',
-  'verifiedMerchant',
-  'exclusiveCoupons',
-] as const;
+export const RESTRICTABLE_BENEFITS = Object.freeze(
+  Object.keys(ENTITLEMENT_MINIMUM_TIER) as MembershipEntitlement[]
+);
 
 export const RESTRICTION_CASE_TYPES = [
   'dropshipping_suspected',
@@ -1002,8 +996,8 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
 
   // REAL PRO priority snapshot: eligible active PRO, unless an active
   // restriction case gates the priorityService benefit.
-  const [tier, gated] = await Promise.all([getTierStatus(c.env.DB, user.id), activeRestrictionFlags(c.env.DB, user.id)]);
-  const priority = tier.active && tier.tier === 'pro' && !gated.has('priorityService') ? 1 : 0;
+  const tier = await getTierStatus(c.env.DB, user.id);
+  const priority = benefits.priorityService(tier) ? 1 : 0;
 
   const ticketId = newId('tkt');
   const now = new Date().toISOString();
@@ -1191,7 +1185,7 @@ supportRoutes.get('/admin/members', async (c) => {
     conds.push("(email LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\')");
     params.push(like, like, like);
   }
-  if (tier === 'pro' || tier === 'plus') {
+  if (tier === 'pro' || tier === 'prime' || tier === 'plus') {
     conds.push('m_tier = ?');
     params.push(tier);
   } else if (tier === 'free') {
@@ -1279,7 +1273,7 @@ function restrictionPublic(r: RestrictionRow) {
 /**
  * Member detail: subscription payment/term, identity STATE (kyc_cases read —
  * no decrypted fields, no evidence keys), benefit-eligibility context, BNPL
- * debt READ-ONLY (feature disabled — stated honestly), restriction cases.
+ * debt and live BNPL eligibility, plus restriction cases.
  */
 supportRoutes.get('/admin/members/:userId', async (c) => {
   const userId = c.req.param('userId');
@@ -1336,6 +1330,7 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
       for (const f of safeParse<unknown[]>(r.benefit_flags, [])) if (typeof f === 'string') gatedFlags.add(f);
     }
   }
+  const bnpl = await bnplEligibility(db, userId);
 
   return c.json({
     success: true,
@@ -1355,9 +1350,13 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
         note: 'Address selection is a per-order eligibility condition, never a sanction; restrictions gate benefit computation only.',
       },
       approved_addresses: addresses.results,
-      // 4) Debt — BNPL is DISABLED (owner decision pending); read-only ledger.
+      // 4) Debt — the ledger is immutable here; approval lives on the audited
+      // memberships admin endpoint.
       debt: {
-        bnpl_enabled: false,
+        bnpl_enabled: benefits.bnpl(tierStatus),
+        eligible: bnpl.eligible,
+        eligibility_reason: bnpl.reason,
+        available_iqd: bnpl.available_iqd,
         account_state: bnplAccount?.state ?? 'none',
         credit_limit_iqd: Number(bnplAccount?.credit_limit_iqd) || 0,
         outstanding_iqd: Number(bnplSum?.outstanding) || 0,

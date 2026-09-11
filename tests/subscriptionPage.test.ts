@@ -69,12 +69,12 @@ test('the removed translation keys are gone from every language block', () => {
 
 // ------------------------------------------------------------- three tiers
 
-test('all three tiers are named, and PRIME is never a fallback to PLUS', () => {
+test('all three tiers are named, and PREMIUM is never a fallback to PLUS', () => {
   assert.deepEqual(
     Object.values(TIER_META).map((m) => m.label),
-    ['PLUS', 'PRIME', 'PRO']
+    ['PLUS', 'PREMIUM', 'PRO']
   );
-  assert.equal(tierLabel('prime'), 'PRIME');
+  assert.equal(tierLabel('prime'), 'PREMIUM');
   assert.equal(tierLabel('plus'), 'PLUS');
   assert.equal(tierLabel('pro'), 'PRO');
 
@@ -265,9 +265,9 @@ test('the benefits copy never renders an empty gap when the thresholds are unkno
   const src = read('src/components/subscription/BenefitsSection.tsx');
   // A null threshold takes the figure-less wording; no template still interpolates an empty string.
   assert.equal(/delivery \? formatIqd\([^)]*\) : ''/.test(src), false, "the thresholds still default to '' — an empty gap");
-  assert.match(src, /the store's free-delivery threshold/);
-  assert.match(src, /حد التوصيل المجاني للمتجر/);
-  assert.match(src, /سنووری گەیاندنی بێبەرامبەری فرۆشگا/);
+  assert.match(src, /the store's approved threshold/);
+  assert.match(src, /حد المتجر المعتمد/);
+  assert.match(src, /سنووری پەسەندکراوی فرۆشگا/);
   // Every interpolation of a threshold is guarded by the threshold itself.
   for (const m of src.matchAll(/\$\{(prime|pro)\}/g)) {
     const before = src.slice(Math.max(0, m.index! - 700), m.index!);
@@ -275,13 +275,36 @@ test('the benefits copy never renders an empty gap when the thresholds are unkno
   }
 });
 
-test('how one gets PLUS free is a note under the PLUS card, not a checkmarked PLUS benefit', () => {
+test('the optional printer gift is a note under PLUS, not a fabricated core benefit', () => {
   const src = read('src/components/subscription/BenefitsSection.tsx');
-  assert.match(src, /'How to get PLUS free'/);
-  assert.match(src, /'كيف تحصل على PLUS مجانًا'/);
   assert.equal(/plusLines\.push\(\{[\s\S]{0,300}printer purchase/.test(src), false, 'the gift is still pushed into the checkmarked list');
   assert.match(src, /features\?\.printer_gift \?/, 'still gated on features.printer_gift');
   assert.match(src, /note=\{plusNote\}/);
+});
+
+test('benefit cards state inheritance, keep BNPL PRO-only, and remove retired teasers', () => {
+  const src = read('src/components/subscription/BenefitsSection.tsx');
+  assert.match(src, /'Includes all PLUS benefits'/);
+  assert.match(src, /'Includes all PLUS and PREMIUM benefits'/);
+  const plus = /const plusLines = \[([\s\S]*?)\n {2}\];/.exec(src)?.[1] ?? '';
+  const premium = /const premiumLines = \[([\s\S]*?)\n {2}\];/.exec(src)?.[1] ?? '';
+  const pro = /const proLines = \[([\s\S]*?)\n {2}\];/.exec(src)?.[1] ?? '';
+  assert.equal(/BNPL|Buy Now, Pay Later|ادفع لاحقًا/.test(plus), false, 'PLUS must not tease BNPL');
+  assert.equal(/BNPL|Buy Now, Pay Later|ادفع لاحقًا/.test(premium), false, 'PREMIUM must not receive BNPL');
+  assert.match(pro, /BNPL/);
+  assert.equal(/Coming soon|قريباً|قريبًا|Custom domain|نطاق خاص/.test(src), false);
+  assert.match(src, /self-start/);
+  assert.match(src, /<details/);
+});
+
+test('PRO BNPL has a real customer account, approval, ledger and repayment surface', () => {
+  const panel = read('src/components/subscription/BnplPanel.tsx');
+  assert.match(panel, /\/api\/memberships\/bnpl'/);
+  assert.match(panel, /\/api\/memberships\/bnpl\/request/);
+  assert.match(panel, /\/api\/memberships\/bnpl\/repay/);
+  assert.match(panel, /newIdempotencyKey\(\)/);
+  assert.match(panel, /!activePro && !hasHistory/);
+  assert.match(read('src/pages/Subscription.tsx'), /activePro=\{mine\.status\.active && mine\.status\.tier === 'pro'\}/);
 });
 
 test('the purchase result is announced and takes focus; a machine state never reaches the screen', () => {
