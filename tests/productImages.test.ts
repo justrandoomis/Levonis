@@ -27,7 +27,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { classifyImageUrl, isUsableImageUrl, primaryRepair } from '../src/lib/imageUrl';
-import { productPrimaryImage } from '../src/lib/productImage';
+import { productGalleryForSelection, productPrimaryImage } from '../src/lib/productImage';
 import { validateOutboundUrl } from '../worker/lib/fetchGuard';
 
 // ------------------------------------------------- 1. a string is not a URL
@@ -150,6 +150,24 @@ test('thumbnail fallback uses the published server order, then media order', () 
   assert.equal(
     productPrimaryImage({ images: [], media: [{ url: 'later.jpg', order: 4 }, { url: 'first.jpg', order: 0 }] }),
     'first.jpg'
+  );
+});
+
+test('product detail keeps the authoritative primary first until a variant is selected', () => {
+  const primary = { url: '/primary.png', primary: true, order: 0 };
+  const general = { url: '/general.png', order: 1 };
+  const bindings = [{ url: '/primary.png', option_value_id: 'combo', color_id: null }];
+
+  assert.deepEqual(
+    productGalleryForSelection([primary, general], bindings, {}).map((image) => image.url),
+    ['/primary.png', '/general.png'],
+    'an option-bound primary must not sink before the customer chooses an option'
+  );
+
+  assert.deepEqual(
+    productGalleryForSelection([primary, general], bindings, { optionId: 'combo' }).map((image) => image.url),
+    ['/primary.png', '/general.png'],
+    'the selected option may deliberately promote its bound image'
   );
 });
 

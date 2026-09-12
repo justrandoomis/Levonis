@@ -55,6 +55,7 @@ import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { captureSupportRefFromSearch } from '../lib/supportRef';
+import { productGalleryForSelection } from '../lib/productImage';
 
 // ------------------------------------------------------------------ strings
 
@@ -1053,22 +1054,12 @@ export default function Product() {
     const rImages = relations?.images ?? [];
     const optionObj = optionId ? (product.options ?? []).find((o) => o.id === optionId) : null;
     const colorObj = colorId ? (product.colors ?? []).find((c) => c.id === colorId) : null;
-    if (!rImages.length && !optionObj?.image && !colorObj?.image) return base;
-    const linkOf = new Map(rImages.map((i) => [i.url, i]));
-    const extras: MediaItem[] = [];
-    if (colorObj?.image && !base.some((m) => m.url === colorObj.image)) extras.push({ url: colorObj.image });
-    if (optionObj?.image && !base.some((m) => m.url === optionObj.image)) extras.push({ url: optionObj.image });
-    const score = (m: MediaItem): number => {
-      const l = linkOf.get(m.url);
-      if (colorId && (l?.color_id === colorId || m.url === colorObj?.image)) return 0;
-      if (optionId && (l?.option_value_id === optionId || m.url === optionObj?.image)) return 1;
-      if (l?.color_id || l?.option_value_id) return 3;
-      return 2;
-    };
-    return [...extras, ...base]
-      .map((m, i) => ({ m, i, s: score(m) }))
-      .sort((a, b) => a.s - b.s || a.i - b.i)
-      .map((x) => x.m);
+    return productGalleryForSelection(base, rImages, {
+      optionId,
+      colorId,
+      optionImage: optionObj?.image,
+      colorImage: colorObj?.image,
+    });
   })();
   const activeMedia = gallery[Math.min(galleryIndex, Math.max(0, gallery.length - 1))];
   const options = product.options ?? [];
