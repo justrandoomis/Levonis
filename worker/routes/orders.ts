@@ -4,6 +4,7 @@ import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
+import { primaryMedia } from '../lib/productModel';
 import { getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
 import {
@@ -785,7 +786,7 @@ function priceCompositionLine(
       // receipt, the courier payload and every e-mail read this field.
       name: b.doc.name_en || b.doc.name_ar || b.doc.id,
       name_ar: b.doc.name_ar,
-      image: b.doc.media[0]?.url ?? '',
+      image: primaryMedia(b.doc.media)?.url ?? '',
       variant: '',
       option_id: '',
       color_id: '',
@@ -876,7 +877,7 @@ function priceCompositionLine(
       stock_targets: k.resolution.targets,
       name: k.doc.name_en || k.doc.name_ar || k.member_product_id,
       name_ar: k.doc.name_ar,
-      image: k.doc.media[0]?.url ?? '',
+      image: primaryMedia(k.doc.media)?.url ?? '',
       variant: componentVariantLabel(k),
       option_id: k.selection.option_value_ids[0] ?? '',
       color_id: k.selection.color_id ?? '',
@@ -941,7 +942,7 @@ function priceCompositionLine(
     stock_targets: [],
     name: b.doc.name_en || b.doc.name_ar || b.doc.id,
     name_ar: b.doc.name_ar,
-    image: b.doc.media[0]?.url ?? '',
+    image: primaryMedia(b.doc.media)?.url ?? '',
     variant: compositionOptionSnapshot(b),
     /** The `bx_…` composition key, kept as provenance. Nothing derives a
      *  selection from it, and price protection refuses a parent claim by name
@@ -1669,7 +1670,7 @@ async function computeCheckout(
         stock_targets: stockRes.targets,
         name: String(row.name),
         name_ar: String(row.name_ar ?? ''),
-        image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
+        image: primaryMedia(doc.media)?.url ?? '',
         variant: variantLabel,
         option_id: String(row.option_id ?? ''),
         color_id: String(row.color_id ?? ''),

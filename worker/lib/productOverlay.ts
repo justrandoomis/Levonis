@@ -22,7 +22,7 @@
  * neither options nor colours nor images.
  */
 
-import type { MediaV2, ProductDoc } from './productModel';
+import { primaryMediaFirst, type MediaV2, type ProductDoc } from './productModel';
 import type { ColorV2, OptionV2 } from './pricing';
 import {
   loadProductRelations,
@@ -447,7 +447,7 @@ export function applyRelations(
         }))
       : doc.media;
 
-  return { ...doc, options, colors, media };
+  return { ...doc, options, colors, media: primaryMediaFirst(media) };
 }
 
 /** The snapshot the inventory engine needs, from an already-loaded view. */

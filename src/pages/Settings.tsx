@@ -255,12 +255,12 @@ interface AddressesResponse {
 
 function SectionCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="mb-6">
-      <h2 className="text-zinc-400 text-[13px] font-bold mb-2 ms-1 flex items-center gap-2">
+    <section className="mb-7">
+      <h2 className="text-text-muted text-xs font-bold uppercase tracking-[0.08em] mb-2 ms-1 flex items-center gap-2">
         {icon}
         {title}
       </h2>
-      <div className="bg-zinc-900/95 border border-zinc-800 rounded-3xl overflow-hidden">{children}</div>
+      <div className="lv-surface overflow-hidden divide-y divide-border-subtle/70">{children}</div>
     </section>
   );
 }
@@ -285,7 +285,7 @@ function NavRow({
     </>
   );
   const cls =
-    'w-full min-h-[56px] flex items-center justify-between gap-3 px-4 py-3 text-start border-b border-zinc-800 last:border-b-0 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors';
+    'w-full min-h-14 flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus transition-colors';
   if (to) {
     return (
       <Link to={to} className={cls}>
@@ -302,7 +302,7 @@ function NavRow({
 
 function DisabledRow({ label, reason, icon, note }: { label: string; reason: string; icon: React.ReactNode; note: string }) {
   return (
-    <div className="px-4 py-3 border-b border-zinc-800 last:border-b-0 opacity-80">
+    <div className="px-4 py-3 opacity-80">
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-3 min-w-0">
           <span className="text-zinc-500 shrink-0">{icon}</span>
@@ -330,7 +330,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
         placeholder={placeholder}
-        className="w-full min-h-[44px] bg-zinc-950 border border-zinc-800 rounded-xl px-3 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="lv-input text-sm"
       />
     </label>
   );
@@ -548,25 +548,26 @@ export default function Settings() {
   const defaultAddress = addresses?.addresses.find((a) => a.is_default) ?? null;
 
   return (
-    <div className="w-full flex-1 h-full overflow-y-auto bg-[#0a0a0a] text-white font-sans" dir={dir}>
-      <div className="sticky top-0 z-20 bg-[#0a0a0a]/95 backdrop-blur px-4 py-3 flex items-center gap-3 border-b border-zinc-900">
+    <div className="w-full flex-1 h-full overflow-y-auto bg-canvas text-text-primary font-sans" dir={dir}>
+      <div className="sticky top-0 z-20 bg-canvas/96 backdrop-blur px-3 sm:px-4 py-2 flex items-center gap-3 border-b border-border-subtle/70">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           aria-label={s.back}
-          className="w-11 h-11 flex items-center justify-center bg-zinc-900 rounded-full border border-zinc-800 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+          className="w-11 h-11 flex items-center justify-center rounded-md hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
         >
           {rtl ? <ChevronRight aria-hidden="true" className="w-5 h-5" /> : <ChevronLeft aria-hidden="true" className="w-5 h-5" />}
         </button>
         <h1 className="text-[18px] font-bold">{s.title}</h1>
       </div>
 
-      <div className="px-4 py-5 max-w-xl mx-auto pb-16">
+      <div className="px-3 sm:px-4 py-5 max-w-xl mx-auto pb-[max(4rem,env(safe-area-inset-bottom))]">
         {!user ? (
-          <div className="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-6 text-center">
-            <p className="text-white font-bold mb-3">{s.guestTitle}</p>
+          <div className="lv-surface p-6 text-center">
+            <p className="text-text-primary font-bold mb-3">{s.guestTitle}</p>
             <Link
               to={`/auth?next=${encodeURIComponent('/settings')}`}
-              className="inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl bg-gold text-black font-bold text-sm"
+              className="lv-button lv-button-primary"
             >
               {s.signIn}
             </Link>
@@ -577,7 +578,7 @@ export default function Settings() {
             <SectionCard title={s.secAccount} icon={<User aria-hidden="true" className="w-4 h-4" />}>
               <Link
                 to="/edit-profile"
-                className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+                className="flex items-center gap-3 px-4 py-4 hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus transition-colors"
               >
                 <img
                   referrerPolicy="no-referrer"
@@ -590,7 +591,7 @@ export default function Settings() {
                   <span className="block font-bold text-[15px] truncate">{user.username || user.name || s.guest}</span>
                   <span className="block text-[12px] text-zinc-400 truncate">{user.email}</span>
                 </span>
-                <span className="text-[12px] text-gold font-bold shrink-0">{s.editProfile}</span>
+                <span className="text-[12px] text-text-secondary font-bold shrink-0">{s.editProfile}</span>
               </Link>
               <div className="px-4 py-3">
                 <p className="text-[12px] text-zinc-400 leading-relaxed">{s.accountRow}</p>
@@ -601,7 +602,7 @@ export default function Settings() {
             {/* ----------------------------------------------- 2. Security */}
             <SectionCard title={s.secSecurity} icon={<ShieldCheck aria-hidden="true" className="w-4 h-4" />}>
               {/* Email verification — real status */}
-              <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-3 min-w-0">
                     <Mail aria-hidden="true" className="w-5 h-5 text-zinc-300 shrink-0" />
@@ -612,10 +613,10 @@ export default function Settings() {
                   </span>
                   {emailStatus ? (
                     <span
-                      className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                      className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
                         emailStatus.verified
-                          ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
-                          : 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+                          ? 'text-success bg-success/10'
+                          : 'text-warning bg-warning/10'
                       }`}
                     >
                       {emailStatus.verified ? s.emailVerified : s.emailUnverified}
@@ -630,7 +631,7 @@ export default function Settings() {
                 </div>
 
                 {emailStatus && !emailStatus.emailConfigured ? (
-                  <p className="mt-2 text-[12px] text-amber-200/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+                  <p className="lv-alert lv-alert-warning mt-2 text-xs">
                     {s.emailNotConfigured}
                   </p>
                 ) : null}
@@ -640,7 +641,7 @@ export default function Settings() {
                     type="button"
                     onClick={sendVerification}
                     disabled={emailBusy}
-                    className="mt-2 min-h-[44px] px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold disabled:opacity-50"
+                    className="lv-button lv-button-secondary mt-2"
                   >
                     {emailBusy ? s.sending : s.sendVerify}
                   </button>
@@ -652,7 +653,7 @@ export default function Settings() {
                       type="button"
                       onClick={() => setShowEmailForm((v) => !v)}
                       aria-expanded={showEmailForm}
-                      className="text-[13px] font-bold text-gold min-h-[44px]"
+                      className="lv-button lv-button-ghost px-0 text-[13px]"
                     >
                       {s.changeEmail}
                     </button>
@@ -668,7 +669,7 @@ export default function Settings() {
                         />
                         <p className="text-[12px] text-zinc-500">{s.changeEmailNote}</p>
                         {emailFormError ? (
-                          <p role="alert" className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                          <p role="alert" className="lv-alert lv-alert-danger text-xs">
                             {emailFormError}
                           </p>
                         ) : null}
@@ -676,7 +677,7 @@ export default function Settings() {
                           type="button"
                           onClick={submitEmailChange}
                           disabled={emailFormBusy}
-                          className="min-h-[44px] w-full rounded-xl bg-gold text-black font-bold text-sm disabled:opacity-50"
+                          className="lv-button lv-button-primary w-full"
                         >
                           {emailFormBusy ? s.saving : s.save}
                         </button>
@@ -686,12 +687,12 @@ export default function Settings() {
                 ) : null}
 
                 {emailMsg ? (
-                  <p className="mt-2 text-[12px] text-zinc-300 bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2">{emailMsg}</p>
+                  <p className="lv-alert lv-alert-info mt-2 text-xs">{emailMsg}</p>
                 ) : null}
               </div>
 
               {/* Password */}
-              <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="px-4 py-3">
                 <button
                   type="button"
                   onClick={() => setShowPwForm((v) => !v)}
@@ -712,7 +713,7 @@ export default function Settings() {
                     <p className="text-[12px] text-zinc-500">{s.pwMin}</p>
                     <p className="text-[12px] text-zinc-500">{s.pwOtherSessions}</p>
                     {pwError ? (
-                      <p role="alert" className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                      <p role="alert" className="lv-alert lv-alert-danger text-xs">
                         {pwError}
                       </p>
                     ) : null}
@@ -720,14 +721,14 @@ export default function Settings() {
                       type="button"
                       onClick={submitPasswordChange}
                       disabled={pwBusy}
-                      className="min-h-[44px] w-full rounded-xl bg-gold text-black font-bold text-sm disabled:opacity-50"
+                      className="lv-button lv-button-primary w-full"
                     >
                       {pwBusy ? s.saving : s.save}
                     </button>
                   </div>
                 ) : null}
                 {pwMsg ? (
-                  <p className="mt-2 text-[12px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <p className="lv-alert lv-alert-success mt-2 text-xs flex items-center gap-2">
                     <Check aria-hidden="true" className="w-4 h-4" />
                     {pwMsg}
                   </p>
@@ -747,7 +748,7 @@ export default function Settings() {
 
             {/* ------------------------------------------------ 3. Linking */}
             <section className="mb-6">
-              <h2 className="text-zinc-400 text-[13px] font-bold mb-2 ms-1 flex items-center gap-2">
+              <h2 className="text-text-muted text-xs font-bold uppercase tracking-[0.08em] mb-2 ms-1 flex items-center gap-2">
                 <Link2 aria-hidden="true" className="w-4 h-4" />
                 {s.secLinking}
               </h2>
@@ -757,19 +758,19 @@ export default function Settings() {
                   linked" — an honest message about a gap that has now been
                   closed. `has_google` is a boolean on the user object; the
                   Google subject itself still never leaves the server. */}
-              <div className="mt-3 bg-zinc-900/95 border border-zinc-800 rounded-3xl overflow-hidden">
+              <div className="mt-3 lv-surface overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-4">
                   <span className="text-zinc-400" aria-hidden="true">
                     <Link2 className="w-5 h-5" />
                   </span>
                   <span className="flex-1 text-[14px] font-semibold text-white">{s.google}</span>
                   {user?.has_google ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-[12px] font-bold text-emerald-300">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-[12px] font-bold text-success">
                       <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                       {s.googleConnected}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-zinc-800 px-3 py-1 text-[12px] font-semibold text-zinc-400">
+                    <span className="rounded-full bg-surface-raised px-3 py-1 text-[12px] font-semibold text-text-muted">
                       {s.googleNotConnected}
                     </span>
                   )}
@@ -777,7 +778,7 @@ export default function Settings() {
                 <p className="px-4 pb-3 text-[12px] text-zinc-500 leading-relaxed">
                   {user?.has_google ? s.googleConnectedNote : s.googleConnectHint}
                 </p>
-                <p className="px-4 py-3 text-[12px] text-zinc-500 leading-relaxed border-t border-zinc-800">{s.unlinkNote}</p>
+                <p className="px-4 py-3 text-[12px] text-text-muted leading-relaxed border-t border-border-subtle/70">{s.unlinkNote}</p>
               </div>
             </section>
 
@@ -813,7 +814,7 @@ export default function Settings() {
 
             {/* -------------------------------------------- 5. Preferences */}
             <SectionCard title={s.secPrefs} icon={<Globe aria-hidden="true" className="w-4 h-4" />}>
-              <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="px-4 py-3">
                 <p className="font-bold text-[15px] mb-2">{s.language}</p>
                 <div className="flex gap-2 flex-wrap">
                   {([
@@ -827,9 +828,8 @@ export default function Settings() {
                       onClick={() => void chooseLanguage(code)}
                       disabled={langBusy}
                       aria-pressed={lang === code}
-                      className={`min-h-[44px] px-4 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60 ${
-                        lang === code ? 'border-gold bg-gold/15 text-gold' : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                      }`}
+                      data-selected={lang === code}
+                      className="lv-choice min-h-11 px-4 text-sm font-bold disabled:opacity-60"
                     >
                       {label}
                     </button>
@@ -853,7 +853,7 @@ export default function Settings() {
 
             {/* ------------------------------------------ 6. Notifications */}
             <SectionCard title={s.secNotifications} icon={<Bell aria-hidden="true" className="w-4 h-4" />}>
-              <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-bold text-[15px]">{s.pushTitle}</span>
                   <span className="text-[12px] text-zinc-400 shrink-0">{pushLabel}</span>
@@ -863,13 +863,13 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={requestPush}
-                    className="mt-2 min-h-[44px] px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold"
+                    className="lv-button lv-button-secondary mt-2"
                   >
                     {s.pushAsk}
                   </button>
                 ) : null}
               </div>
-              <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="px-4 py-3">
                 <p className="font-bold text-[15px]">{s.emailNotifTitle}</p>
                 <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.emailNotifNote}</p>
                 {emailStatus && !emailStatus.verified ? (
@@ -893,16 +893,16 @@ export default function Settings() {
             </SectionCard>
 
             {/* ------------------------------------------------- 8. Logout */}
-            <div className="bg-zinc-900/95 border border-zinc-800 rounded-3xl overflow-hidden">
+            <div className="lv-surface overflow-hidden">
               <button
                 type="button"
                 onClick={handleSignOut}
                 disabled={signingOut}
-                className="w-full min-h-[56px] flex items-center justify-between gap-3 px-4 py-3 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50 transition-colors"
+                className="w-full min-h-14 flex items-center justify-between gap-3 px-4 py-3 hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-danger disabled:opacity-50 transition-colors"
               >
                 <span className="flex items-center gap-3">
-                  <LogOut aria-hidden="true" className="w-5 h-5 text-red-400" />
-                  <span className="font-bold text-[15px] text-red-400">{signingOut ? s.signingOut : s.signOut}</span>
+                  <LogOut aria-hidden="true" className="w-5 h-5 text-danger" />
+                  <span className="font-bold text-[15px] text-danger">{signingOut ? s.signingOut : s.signOut}</span>
                 </span>
               </button>
             </div>

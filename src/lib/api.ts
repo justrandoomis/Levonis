@@ -209,6 +209,16 @@ export interface ApiProduct {
   description: string;
   description_ar: string;
   description_ku?: string;
+  /** Canonical media metadata. The explicit primary wins over legacy order. */
+  media?: Array<{
+    id: string;
+    url: string;
+    primary: boolean;
+    order: number;
+    alt_ar?: string;
+    alt_en?: string;
+    alt_ckb?: string;
+  }>;
   images: string[];
   options: Array<{ id: string; name?: string; name_ar?: string; image?: string; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   colors: Array<{ id: string; name?: string; name_ar?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;

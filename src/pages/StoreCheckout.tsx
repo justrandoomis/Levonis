@@ -125,10 +125,10 @@ export default function StoreCheckout() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6">
+      <div className="h-full min-h-0 overflow-y-auto bg-canvas flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
-            <Check className="w-7 h-7 text-emerald-400" />
+          <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
+            <Check className="w-7 h-7 text-success" />
           </div>
           <h1 className="text-white font-bold text-[17px] mb-1.5">
             {loc('تم استلام طلبك', 'Your order is in', 'داواکاریەکەت وەرگیرا')}
@@ -143,7 +143,7 @@ export default function StoreCheckout() {
           </p>
           <Link
             to="/orders"
-            className="inline-flex items-center gap-2 h-11 px-6 rounded-2xl bg-olive text-white font-bold text-[13.5px]"
+            className="lv-button lv-button-primary"
           >
             <ShoppingBag className="w-4 h-4" />
             {loc('طلباتي', 'My orders', 'داواکاریەکانم')}
@@ -154,18 +154,19 @@ export default function StoreCheckout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-36">
-      <div className="sticky top-0 z-30 bg-[#0a0a0a]/95 backdrop-blur border-b border-white/5 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-xl border border-white/10 flex items-center justify-center text-zinc-300">
+    <div className="h-full min-h-0 bg-canvas text-text-secondary flex flex-col">
+      <div className="shrink-0 bg-canvas/96 backdrop-blur border-b border-border-subtle/70 px-3 sm:px-4 py-2 flex items-center gap-3">
+        <button type="button" aria-label={loc('رجوع', 'Back', 'گەڕانەوە')} onClick={() => navigate(-1)} className="w-11 h-11 rounded-md flex items-center justify-center text-text-secondary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
         </button>
         <h1 className="text-white font-bold text-[15px]">{loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')}</h1>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-4 space-y-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain w-full">
+      <div className="max-w-2xl mx-auto px-3 sm:px-6 py-4 space-y-3">
         {quoteError && (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-            <p className="text-red-300 text-[12.5px]">{quoteError}</p>
+          <div className="lv-alert lv-alert-danger">
+            <p className="text-text-secondary text-[12.5px]">{quoteError}</p>
             <Link to="/cart" className="text-gold text-[12px] font-bold mt-1 inline-block">
               {loc('العودة إلى السلة', 'Back to the cart', 'گەڕانەوە بۆ سەبەتە')}
             </Link>
@@ -173,14 +174,15 @@ export default function StoreCheckout() {
         )}
 
         {!quote && !quoteError && (
-          <div className="py-16 flex justify-center">
-            <Loader2 className="w-6 h-6 text-gold animate-spin" />
+          <div role="status" className="py-16 flex flex-col items-center justify-center gap-3 text-text-muted">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-xs">{loc('جارٍ تجهيز دفع المتجر…', 'Preparing store checkout…', 'ئامادەکردنی پارەدان…')}</span>
           </div>
         )}
 
         {quote && (
           <>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+            <section className="lv-surface p-3.5">
               <div className="flex items-center gap-2 mb-2.5">
                 <Store className="w-4 h-4 text-gold" />
                 <h2 className="text-white font-bold text-[13px]">{quote.store_name}</h2>
@@ -197,17 +199,17 @@ export default function StoreCheckout() {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
             {/* Delivery address — the platform's own address book. */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+            <section className="lv-surface p-3.5">
               <div className="flex items-center justify-between mb-2.5">
                 <h2 className="text-white font-bold text-[13px] flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-gold" />
                   {loc('عنوان التوصيل', 'Delivery address', 'ناونیشانی گەیاندن')}
                 </h2>
                 {!addingAddress && (
-                  <button onClick={() => setAddingAddress(true)} className="text-gold text-[11.5px] font-bold inline-flex items-center gap-1">
+                  <button type="button" onClick={() => setAddingAddress(true)} className="lv-button lv-button-ghost min-h-9 px-2 text-[11.5px]">
                     <Plus className="w-3.5 h-3.5" />
                     {loc('عنوان جديد', 'New address', 'ناونیشانی نوێ')}
                   </button>
@@ -236,19 +238,18 @@ export default function StoreCheckout() {
                 <div className="space-y-2">
                   {addresses.map((a) => (
                     <button
+                      type="button"
                       key={a.id}
                       onClick={() => setAddressId(a.id)}
-                      className={`w-full text-start rounded-xl border p-2.5 transition-colors ${
-                        addressId === a.id ? 'border-gold/50 bg-gold/5' : 'border-white/10 bg-black/20'
-                      }`}
+                      aria-pressed={addressId === a.id}
+                      data-selected={addressId === a.id}
+                      className="lv-choice w-full text-start p-2.5"
                     >
                       <div className="flex items-center gap-2">
                         <span
-                          className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                            addressId === a.id ? 'border-gold' : 'border-zinc-600'
-                          }`}
+                          className="lv-choice-mark"
                         >
-                          {addressId === a.id && <span className="w-2 h-2 rounded-full bg-gold" />}
+                          <Check className="w-3 h-3" aria-hidden="true" />
                         </span>
                         <span className="text-white text-[12.5px] font-semibold">{a.label || a.name}</span>
                         <span className="text-zinc-500 text-[11px]" dir="ltr">{a.phone}</span>
@@ -258,35 +259,37 @@ export default function StoreCheckout() {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
             {/* Payment */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+            <section className="lv-surface p-3.5">
               <h2 className="text-white font-bold text-[13px] mb-2.5">{loc('طريقة الدفع', 'Payment', 'پارەدان')}</h2>
               <div className="grid grid-cols-2 gap-2">
                 <button
+                  type="button"
                   onClick={() => setPayWithWallet(false)}
-                  className={`h-11 rounded-xl border text-[12.5px] font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                    !payWithWallet ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 bg-black/20 text-zinc-400'
-                  }`}
+                  aria-pressed={!payWithWallet}
+                  data-selected={!payWithWallet}
+                  className="lv-choice min-h-11 text-[12.5px] font-bold flex items-center justify-center gap-1.5"
                 >
                   <Banknote className="w-4 h-4" />
                   {loc('عند الاستلام', 'Cash on delivery', 'لە کاتی گەیاندن')}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setPayWithWallet(true)}
-                  className={`h-11 rounded-xl border text-[12.5px] font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                    payWithWallet ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 bg-black/20 text-zinc-400'
-                  }`}
+                  aria-pressed={payWithWallet}
+                  data-selected={payWithWallet}
+                  className="lv-choice min-h-11 text-[12.5px] font-bold flex items-center justify-center gap-1.5"
                 >
                   <WalletIcon className="w-4 h-4" />
                   {loc('من المحفظة', 'From wallet', 'لە جزدان')}
                 </button>
               </div>
-            </div>
+            </section>
 
             {/* The store's own coupon. */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+            <section className="lv-surface p-3.5">
               <h2 className="text-white font-bold text-[13px] mb-2.5 flex items-center gap-1.5">
                 <Tag className="w-4 h-4 text-gold" />
                 {loc('كوبون المتجر', 'Store coupon', 'کۆبۆنی فرۆشگا')}
@@ -307,28 +310,34 @@ export default function StoreCheckout() {
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div>
+                  <label htmlFor="store-coupon-code" className="mb-1.5 block text-xs text-text-muted">
+                    {loc('رمز الكوبون', 'Coupon code', 'کۆدی کۆبۆن')}
+                  </label>
+                  <div className="flex gap-2">
                   <input
+                    id="store-coupon-code"
                     value={couponInput}
                     onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                     dir="ltr"
                     placeholder={loc('الكود', 'Code', 'کۆد')}
-                    className="flex-1 min-w-0 h-10 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] font-mono outline-none focus:border-gold/40"
+                    className="lv-input flex-1 min-w-0 text-[13px] font-mono"
                   />
                   <button
                     onClick={() => couponInput.trim() && loadQuote(couponInput.trim())}
                     disabled={!couponInput.trim()}
-                    className="h-10 px-4 rounded-xl bg-white/[0.05] border border-white/10 text-zinc-200 text-[12.5px] font-bold disabled:opacity-40"
+                    className="lv-button lv-button-secondary text-[12.5px]"
                   >
                     {loc('تطبيق', 'Apply', 'جێبەجێ')}
                   </button>
+                  </div>
                 </div>
               )}
-              {couponError && <p className="text-amber-400 text-[11.5px] mt-1.5">{couponError}</p>}
-            </div>
+              {couponError && <p role="alert" className="lv-field-error text-warning">{couponError}</p>}
+            </section>
 
             {/* Totals — the server's numbers, verbatim. */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-1.5 text-[12.5px]">
+            <section className="lv-surface p-3.5 space-y-1.5 text-[12.5px]">
               <div className="flex justify-between">
                 <span className="text-zinc-400">{loc('المنتجات', 'Items', 'بەرهەمەکان')}</span>
                 <span className="text-zinc-200" dir="ltr">{iqd(quote.subtotal_iqd)}</span>
@@ -354,11 +363,11 @@ export default function StoreCheckout() {
                 <span className="text-white font-bold">{loc('الإجمالي', 'Total', 'کۆی گشتی')}</span>
                 <span className="text-gold font-bold" dir="ltr">{iqd(quote.total_iqd)}</span>
               </div>
-            </div>
+            </section>
 
             {placeError && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-                <p className="text-red-300 text-[12.5px]">{placeError}</p>
+              <div className="lv-alert lv-alert-danger">
+                <p className="text-text-secondary text-[12.5px]">{placeError}</p>
                 {payWithWallet && !hostStore && (
                   <Link to="/wallet" className="text-gold text-[12px] font-bold mt-1 inline-block">
                     {loc('شحن المحفظة', 'Top up the wallet', 'پڕکردنەوەی جزدان')}
@@ -369,14 +378,15 @@ export default function StoreCheckout() {
           </>
         )}
       </div>
+      </div>
 
       {quote && (
-        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+        <div className="shrink-0 border-t border-border-subtle/70 bg-surface-raised/98 px-3 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
             <button
               onClick={place}
               disabled={placing || !addressId}
-              className="w-full h-12 rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
+              className="lv-button lv-button-primary w-full min-h-12 text-[14px]"
             >
               {placing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {loc('تأكيد الطلب', 'Place the order', 'دووپاتکردنەوە')}

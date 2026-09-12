@@ -286,9 +286,9 @@ export default function TelegramLink() {
   };
 
   return (
-    <div className="bg-zinc-900/95 border border-zinc-800/50 rounded-3xl p-4 text-white w-full">
+    <div className="lv-surface p-4 text-text-primary w-full">
       <div className="flex items-center gap-3 mb-1">
-        <div className="w-10 h-10 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-md bg-info/10 flex items-center justify-center shrink-0">
           <Send className="w-5 h-5 text-sky-400" />
         </div>
         <div className="min-w-0">
@@ -298,9 +298,9 @@ export default function TelegramLink() {
       </div>
 
       {notConfigured && (
-        <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3">
-          <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-[13px] text-amber-200">{s.notConfigured}</p>
+        <div className="lv-alert lv-alert-warning mt-3 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+          <p className="text-[13px] text-text-secondary">{s.notConfigured}</p>
         </div>
       )}
 
@@ -313,9 +313,9 @@ export default function TelegramLink() {
 
       {view === 'error' && (
         <div className="mt-4">
-          <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
-            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-            <p className="text-[13px] text-red-300">{loadError || s.loadFailed}</p>
+          <div className="lv-alert lv-alert-danger flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-danger mt-0.5 shrink-0" />
+            <p className="text-[13px] text-text-secondary">{loadError || s.loadFailed}</p>
           </div>
           <button
             onClick={() => {
@@ -323,7 +323,7 @@ export default function TelegramLink() {
               setLoadError(null);
               fetchStatus();
             }}
-            className="mt-3 flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 rounded-full px-4 py-2 text-[13px] font-bold transition-colors"
+            className="lv-button lv-button-secondary mt-3"
           >
             <RefreshCw className="w-4 h-4" /> {s.retry}
           </button>
@@ -333,13 +333,13 @@ export default function TelegramLink() {
       {view === 'linked' && status && (
         <div className="mt-4">
           {justLinked && (
-            <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 mb-3">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-              <p className="text-[13px] text-emerald-300">{s.successLinked}</p>
+            <div className="lv-alert lv-alert-success flex items-start gap-2 mb-3">
+              <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
+              <p className="text-[13px] text-text-secondary">{s.successLinked}</p>
             </div>
           )}
-          <div className="flex items-center gap-3 bg-zinc-800/60 rounded-2xl p-3">
-            <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-3 bg-surface-raised rounded-md p-3">
+            <ShieldCheck className="w-6 h-6 text-success shrink-0" />
             <div className="min-w-0">
               <p className="text-[14px] font-bold" dir="ltr">
                 {s.linkedAs} {status.phone_masked}
@@ -374,7 +374,7 @@ export default function TelegramLink() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder={s.phonePlaceholder}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-[15px] text-white placeholder-zinc-500 outline-none focus:border-sky-500 transition-colors"
+            className="lv-input text-[15px]"
           />
           {startError && (
             <div className="mt-2 flex items-start gap-2">
@@ -386,7 +386,7 @@ export default function TelegramLink() {
             <button
               type="submit"
               disabled={starting || !phone.trim()}
-              className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-full px-4 py-3 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
+              className="lv-button lv-button-primary flex-1"
             >
               {starting ? (
                 <>
@@ -423,7 +423,7 @@ export default function TelegramLink() {
                   href={deepLink.deep_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full bg-sky-600 hover:bg-sky-500 rounded-full px-4 py-3 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
+                  className="lv-button lv-button-primary w-full"
                 >
                   <ExternalLink className="w-4 h-4" /> {s.openTelegram}
                 </a>
@@ -431,9 +431,9 @@ export default function TelegramLink() {
               <p className="mt-3 text-[13px] text-zinc-400">{s.openHint}</p>
 
               {challenge.state === 'contact_received' ? (
-                <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3">
-                  <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <p className="text-[13px] text-amber-200">{s.mismatch}</p>
+                <div className="lv-alert lv-alert-warning mt-3 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+                  <p className="text-[13px] text-text-secondary">{s.mismatch}</p>
                 </div>
               ) : (
                 <div className="mt-3 flex items-center gap-2 text-zinc-400 text-[13px]">
@@ -446,14 +446,14 @@ export default function TelegramLink() {
 
           {challenge.state === 'phone_verified' && (
             <>
-              <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                <p className="text-[13px] text-emerald-300">{s.verifiedReady}</p>
+              <div className="lv-alert lv-alert-success flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
+                <p className="text-[13px] text-text-secondary">{s.verifiedReady}</p>
               </div>
               <button
                 onClick={handleConfirm}
                 disabled={confirming}
-                className="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-full px-4 py-3 text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
+                className="lv-button lv-button-primary mt-3 w-full"
               >
                 {confirming ? (
                   <>
@@ -467,9 +467,9 @@ export default function TelegramLink() {
           )}
 
           {confirmError && (
-            <div className="mt-3 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
-              <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <p className="text-[13px] text-red-300">{confirmError}</p>
+            <div className="lv-alert lv-alert-danger mt-3 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-danger mt-0.5 shrink-0" />
+              <p className="text-[13px] text-text-secondary">{confirmError}</p>
             </div>
           )}
 
@@ -485,9 +485,9 @@ export default function TelegramLink() {
       {/* An expired challenge drops challengeActive, so the card returns to
           the entry form; the expiry itself is announced inline there. */}
       {view === 'enter' && challenge?.state === 'expired' && !startError && (
-        <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3">
-          <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-[13px] text-amber-200">{s.expired}</p>
+        <div className="lv-alert lv-alert-warning mt-3 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+          <p className="text-[13px] text-text-secondary">{s.expired}</p>
         </div>
       )}
     </div>

@@ -65,7 +65,7 @@ import type { PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './p
 import { tierInherits, type TierStatus } from './entitlements';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
-import { parseProductRow, type ProductDoc } from './productModel';
+import { parseProductRow, primaryMedia, type ProductDoc } from './productModel';
 import { snapshotFrom } from './productOverlay';
 
 // ---------------------------------------------------------------- the rows
@@ -923,7 +923,7 @@ function mainItems(b: ResolvedBundle) {
       product_id: c.member_product_id,
       slug: c.doc.slug,
       name: c.doc.name_en,
-      image: c.doc.media[0]?.url ?? '',
+      image: primaryMedia(c.doc.media)?.url ?? '',
       qty: c.qty_per_bundle,
     }));
 }
@@ -940,7 +940,7 @@ export function componentViews(b: ResolvedBundle) {
     product_id: c.member_product_id,
     slug: c.doc.slug,
     name: c.doc.name_en,
-    image: c.doc.media[0]?.url ?? '',
+    image: primaryMedia(c.doc.media)?.url ?? '',
     qty_per_bundle: c.qty_per_bundle,
     optional: c.optional,
     included: c.included,

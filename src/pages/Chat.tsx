@@ -298,14 +298,15 @@ export default function Chat() {
 
   if (notFound) {
     return (
-      <div className="w-full bg-[#f2f2f2] dark:bg-[#000000] min-h-screen flex flex-col items-center justify-center gap-4 p-8 font-sans">
-        <MessageSquare className="w-16 h-16 text-[#999] opacity-50" strokeWidth={1} />
-        <p className="text-[#666] dark:text-[#999] text-center">
+      <div className="h-full min-h-0 w-full bg-canvas flex flex-col items-center justify-center gap-4 p-8 font-sans">
+        <MessageSquare className="w-14 h-14 text-text-muted opacity-60" strokeWidth={1} />
+        <p className="max-w-md text-text-secondary text-center leading-relaxed">
           {dir === 'rtl' ? 'المحادثة غير موجودة أو لا يمكنك الوصول إليها' : 'Conversation not found or you do not have access to it'}
         </p>
         <button
+          type="button"
           onClick={() => navigate('/chats')}
-          className="bg-white dark:bg-[#1a1a1a] border border-black/5 dark:border-white/10 text-black dark:text-white rounded-full px-6 py-2.5 font-bold shadow-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          className="lv-button lv-button-secondary"
         >
           {dir === 'rtl' ? 'رجوع إلى المحادثات' : 'Back to Chats'}
         </button>
@@ -319,57 +320,70 @@ export default function Chat() {
   const renderBubble = (kind: 'text' | 'image', body: string | null, fileUrl: string | null, mine: boolean, faded = false) => {
     if (kind === 'image') {
       return (
-        <div className={`${mine ? 'ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-2xl shadow-sm max-w-[65%] mt-1 overflow-hidden border border-black/5 dark:border-white/5 ${faded ? 'opacity-60' : ''}`}>
+        <div className={`${mine ? 'ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-lg max-w-[min(76%,24rem)] mt-1 overflow-hidden bg-surface ${faded ? 'opacity-60' : ''}`}>
           {fileUrl ? (
             <img referrerPolicy="no-referrer" src={fileUrl} alt="" className="w-full h-auto object-cover max-h-[300px]" />
           ) : (
-            <div className="w-40 h-28 bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-              <ImageIcon className="w-6 h-6 text-zinc-400" />
+            <div className="w-40 h-28 bg-surface-raised flex items-center justify-center">
+              <ImageIcon className="w-6 h-6 text-text-muted" />
             </div>
           )}
         </div>
       );
     }
     return (
-      <div className={`${mine ? 'bg-[#FFF0D6] dark:bg-[#3d3119] text-black dark:text-[#fde2b4] ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-white dark:bg-[#1a1a1a] text-black dark:text-white ltr:rounded-tl-sm rtl:rounded-tr-sm'} px-4 py-3 rounded-2xl text-[15px] shadow-sm max-w-[75%] mt-1 whitespace-pre-wrap break-words ${faded ? 'opacity-60' : ''}`}>
+      <div
+        dir="auto"
+        className={`${mine ? 'bg-surface-selected text-text-primary ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface text-text-primary ltr:rounded-tl-sm rtl:rounded-tr-sm'} px-3.5 py-2.5 rounded-lg text-[14px] sm:text-[15px] leading-relaxed max-w-[min(80%,34rem)] mt-1 whitespace-pre-wrap break-words ${faded ? 'opacity-60' : ''}`}
+      >
         {body}
       </div>
     );
   };
 
   const renderAvatar = (mine: boolean) => (
-    <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0 overflow-hidden border border-black/5 dark:border-white/5">
-      <span className="text-sm font-bold text-black dark:text-white">{mine ? myInitial : otherInitial}</span>
+    <div className="w-8 h-8 rounded-full bg-surface-raised flex items-center justify-center shrink-0 overflow-hidden">
+      <span className="text-xs font-bold text-text-secondary">{mine ? myInitial : otherInitial}</span>
     </div>
   );
 
   return (
-    <div className="w-full bg-[#f2f2f2] dark:bg-[#000000] min-h-screen flex flex-col font-sans text-[#333] dark:text-[#ccc]">
+    <div data-chat-layout className="h-full min-h-0 w-full bg-canvas flex flex-col font-sans text-text-secondary">
       <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
 
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-[#f2f2f2] dark:bg-[#000000] px-4 py-2 flex items-center justify-between border-b border-black/5 dark:border-white/5">
+      <header className="shrink-0 bg-canvas px-3 sm:px-4 py-2 flex items-center justify-between border-b border-border-subtle/70">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 -ms-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white">
-            {dir === 'rtl' ? <ArrowRight className="w-6 h-6" strokeWidth={2} /> : <ArrowLeft className="w-6 h-6" strokeWidth={2} />}
+          <button
+            type="button"
+            aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
+            onClick={() => navigate(-1)}
+            className="min-w-11 min-h-11 -ms-2 rounded-md inline-flex items-center justify-center hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-text-primary"
+          >
+            {dir === 'rtl' ? <ArrowRight className="w-5 h-5" strokeWidth={2} /> : <ArrowLeft className="w-5 h-5" strokeWidth={2} />}
           </button>
           <div className="flex flex-col">
-            <h1 className="font-bold text-lg leading-tight text-black dark:text-white">
+            <h1 className="font-bold text-base sm:text-lg leading-tight text-text-primary">
               {otherName || (dir === 'rtl' ? 'محادثة' : 'Chat')}
             </h1>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto px-4 pt-20 pb-[160px] flex flex-col gap-6" onClick={() => { setIsPlusMenuOpen(false); setShowEmojiPicker(false); }}>
+      <div
+        data-chat-messages
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 sm:px-5 py-4 flex flex-col gap-4 scroll-pb-6"
+        onClick={() => { setIsPlusMenuOpen(false); setShowEmojiPicker(false); }}
+      >
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-[#ff5000] border-t-transparent rounded-full animate-spin"></div>
+          <div role="status" className="flex-1 flex flex-col items-center justify-center gap-3 text-text-muted">
+            <div className="w-5 h-5 border-2 border-text-muted border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs">{dir === 'rtl' ? 'جارٍ تحميل المحادثة…' : 'Loading conversation…'}</span>
           </div>
         ) : messages.length === 0 && pending.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-[#999] gap-2">
+          <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2 px-6 text-center">
             <MessageSquare className="w-12 h-12 opacity-40" strokeWidth={1} />
             <p className="text-sm">{dir === 'rtl' ? 'لا توجد رسائل بعد — ابدأ المحادثة' : 'No messages yet — say hello'}</p>
           </div>
@@ -381,9 +395,9 @@ export default function Chat() {
               return (
                 <React.Fragment key={msg.id}>
                   {(index === 0 || prevTime !== time) && (
-                    <div className="text-center text-[11px] text-[#999] font-medium tracking-wide">{time}</div>
+                    <div className="text-center text-[11px] text-text-muted font-medium tracking-wide">{time}</div>
                   )}
-                  <div className={`flex items-start gap-3 ${msg.mine ? 'justify-end' : ''}`}>
+                  <div className={`flex items-start gap-2 ${msg.mine ? 'justify-end' : ''}`}>
                     {!msg.mine && renderAvatar(false)}
                     {renderBubble(msg.kind, msg.body, msg.fileUrl, msg.mine)}
                     {msg.mine && renderAvatar(true)}
@@ -392,7 +406,7 @@ export default function Chat() {
               );
             })}
             {pending.map((msg) => (
-              <div key={msg.tempId} className="flex items-start gap-3 justify-end">
+              <div key={msg.tempId} className="flex items-start gap-2 justify-end" aria-label={dir === 'rtl' ? 'جارٍ الإرسال' : 'Sending'}>
                 {renderBubble(msg.kind, msg.body, msg.fileUrl, true, true)}
                 {renderAvatar(true)}
               </div>
@@ -400,23 +414,29 @@ export default function Chat() {
           </>
         )}
         {sendError && (
-          <div className="text-center text-[11px] text-red-500 font-medium">{sendError}</div>
+          <div role="alert" className="lv-alert lv-alert-danger self-center text-xs">{sendError}</div>
         )}
         {actionNotice && (
-          <div role="status" className="text-center text-[11px] text-[#999] font-medium">{actionNotice}</div>
+          <div role="status" className="text-center text-xs text-text-muted font-medium">{actionNotice}</div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-px shrink-0" aria-hidden="true" />
       </div>
 
       {/* Bottom Area */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#f7f7f7] dark:bg-[#0a0a0a] border-t border-black/5 dark:border-white/5 pb-safe transition-all duration-300">
+      <div data-chat-composer className="relative z-10 shrink-0 bg-surface border-t border-border-subtle/70 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
 
-        {/* Emoji Picker Overlay */}
+        {/* Emoji choices remain part of the composer flow. They can expand
+            the control but never cover the last message or sit behind it. */}
         {showEmojiPicker && (
-          <div className="px-4 py-3 bg-white dark:bg-[#1a1a1a] border-b border-black/5 dark:border-white/5">
-            <div className="flex flex-wrap gap-2 justify-between">
+          <div className="px-3 sm:px-4 py-3 border-b border-border-subtle/60 max-h-[28dvh] overflow-y-auto">
+            <div className="flex flex-wrap gap-1.5 justify-between" aria-label={dir === 'rtl' ? 'الرموز التعبيرية' : 'Emoji'}>
               {emojis.map((emoji, i) => (
-                <button key={i} className="text-2xl hover:scale-110 transition-transform" onClick={() => setInputText(prev => prev + emoji)}>
+                <button
+                  type="button"
+                  key={i}
+                  className="min-w-11 min-h-11 rounded-md text-xl hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  onClick={() => setInputText(prev => prev + emoji)}
+                >
                   {emoji}
                 </button>
               ))}
@@ -426,12 +446,13 @@ export default function Chat() {
 
         {/* Suggestions */}
         {!showEmojiPicker && (
-          <div className="flex overflow-x-auto px-4 py-3 gap-2.5 hide-scrollbar w-full">
+          <div data-chat-suggestions className="flex overflow-x-auto overscroll-x-contain px-3 sm:px-4 py-2 gap-2 hide-scrollbar w-full" aria-label={dir === 'rtl' ? 'ردود سريعة' : 'Quick replies'}>
             {suggestions.map((s, i) => (
               <button
+                type="button"
                 key={i}
                 onClick={() => sendText(s)}
-                className="whitespace-nowrap bg-white dark:bg-[#1a1a1a] border border-black/5 dark:border-white/10 px-3.5 py-1.5 rounded-full text-[13px] text-black dark:text-white shadow-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                className="whitespace-nowrap min-h-9 bg-surface-raised px-3 py-1.5 rounded-full text-xs text-text-secondary font-semibold hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {s}
               </button>
@@ -440,54 +461,66 @@ export default function Chat() {
         )}
 
         {/* Input Bar */}
-        <div className="px-4 py-2.5 flex items-center gap-3">
+        <div className="px-3 sm:px-4 py-2 flex items-end gap-2">
           {/* Voice messages have no backend yet — shown honestly as disabled. */}
           <button
+            type="button"
             disabled
+            aria-label={dir === 'rtl' ? 'الرسائل الصوتية غير متاحة بعد' : 'Voice messages are not available yet'}
             title={dir === 'rtl' ? 'الرسائل الصوتية قريباً' : `Voice messages ${comingSoon.toLowerCase()}`}
-            className="text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+            className="min-w-11 min-h-11 inline-flex items-center justify-center text-text-muted opacity-45 cursor-not-allowed"
           >
-            <Mic className="w-6 h-6" strokeWidth={1.5} />
+            <Mic className="w-5 h-5" strokeWidth={1.5} />
           </button>
 
-          <div className="flex-1 bg-white dark:bg-[#1a1a1a] rounded-full h-10 flex items-center px-4 border border-black/5 dark:border-white/5 shadow-sm relative overflow-hidden">
+          <div className="flex-1 min-h-11 bg-surface-raised rounded-lg flex items-center px-3 border border-border-subtle relative">
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder={dir === 'rtl' ? 'اكتب رسالة...' : 'Type a message...'}
-              className="flex-1 bg-transparent border-none outline-none text-[15px] h-full text-black dark:text-white"
+              aria-label={dir === 'rtl' ? 'نص الرسالة' : 'Message text'}
+              className="min-w-0 flex-1 bg-transparent border-none outline-none text-[15px] h-11 text-text-primary placeholder:text-text-muted"
             />
 
             <button
-              className={`${showEmojiPicker ? 'text-[#ff5000]' : 'text-black dark:text-white'} hover:opacity-70 transition-colors ms-2`}
+              type="button"
+              aria-label={dir === 'rtl' ? 'الرموز التعبيرية' : 'Emoji'}
+              aria-expanded={showEmojiPicker}
+              className={`${showEmojiPicker ? 'text-gold' : 'text-text-secondary'} min-w-10 min-h-10 inline-flex items-center justify-center hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-md ms-1`}
               onClick={() => {
                 setShowEmojiPicker(!showEmojiPicker);
                 setIsPlusMenuOpen(false);
               }}
             >
-              <Smile className="w-6 h-6" strokeWidth={1.5} />
+              <Smile className="w-5 h-5" strokeWidth={1.5} />
             </button>
           </div>
 
           {inputText.trim() ? (
-             <button className="text-white bg-[#ff5000] p-1.5 rounded-full hover:opacity-90 transition-opacity" onClick={handleSendMessage}>
-               <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2} />
+             <button
+               type="button"
+               aria-label={dir === 'rtl' ? 'إرسال الرسالة' : 'Send message'}
+               className="min-w-11 min-h-11 inline-flex items-center justify-center text-[#101114] bg-[#ece8dc] rounded-md hover:bg-[#fffaf0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+               onClick={handleSendMessage}
+             >
+               <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2.2} />
              </button>
           ) : (
             <button
+              type="button"
               data-chat-plus
               aria-label={dir === 'rtl' ? 'إرفاق' : 'Attach'}
               aria-expanded={isPlusMenuOpen}
-              className="text-black dark:text-white hover:opacity-70 transition-transform duration-300 relative"
+              className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-primary hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus relative"
               onClick={() => {
                 setIsPlusMenuOpen(!isPlusMenuOpen);
                 setShowEmojiPicker(false);
               }}
             >
-              <div className={`transition-transform duration-300 ${isPlusMenuOpen ? 'rotate-45' : 'rotate-0'}`}>
-                <Plus className="w-6 h-6" strokeWidth={1.5} />
+              <div className={`transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : 'rotate-0'}`}>
+                <Plus className="w-5 h-5" strokeWidth={1.5} />
               </div>
             </button>
           )}
@@ -495,24 +528,23 @@ export default function Chat() {
 
         {/* Plus Menu Grid */}
         {isPlusMenuOpen && (
-          <div className="px-4 py-6 grid grid-cols-4 gap-y-6 gap-x-4 bg-[#f7f7f7] dark:bg-[#0a0a0a] animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="px-3 sm:px-4 py-4 grid grid-cols-4 gap-y-4 gap-x-2 bg-surface max-h-[min(42dvh,21rem)] overflow-y-auto animate-in slide-in-from-bottom-2 fade-in duration-200">
             {plusMenuOptions.map((opt, idx) => (
               <button
+                type="button"
                 key={idx}
                 onClick={opt.disabled ? undefined : opt.onClick}
                 disabled={opt.disabled || (uploading && !opt.disabled)}
-                className={`flex flex-col items-center gap-2 group ${opt.disabled ? 'cursor-not-allowed opacity-40' : ''}`}
+                className={`min-h-20 rounded-md flex flex-col items-center justify-center gap-1.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${opt.disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-surface-raised'}`}
               >
-                <div className={`w-[60px] h-[60px] bg-white dark:bg-[#1a1a1a] rounded-2xl flex items-center justify-center shadow-sm border border-black/5 dark:border-white/5 ${opt.disabled ? '' : 'group-hover:scale-95 transition-transform'}`}>
-                  <opt.icon className="w-7 h-7 text-black dark:text-white" strokeWidth={1.5} />
+                <div className="w-10 h-10 bg-surface-raised rounded-md flex items-center justify-center">
+                  <opt.icon className="w-5 h-5 text-text-primary" strokeWidth={1.5} />
                 </div>
-                <span className="text-[11px] text-[#666] dark:text-[#999] text-center leading-tight">{opt.label}</span>
+                <span className="text-[11px] text-text-muted text-center leading-tight line-clamp-2">{opt.label}</span>
               </button>
             ))}
           </div>
         )}
-
-        {!isPlusMenuOpen && <div className="h-4"></div>}
       </div>
     </div>
   );

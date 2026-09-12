@@ -78,10 +78,6 @@ export default function BottomNav() {
     { icon: User, label: t('profile'), path: '/profile' },
   ];
 
-  const leftItems = navItems.slice(0, 2);
-  const homeItem = navItems[2];
-  const rightItems = navItems.slice(3, 5);
-
   if (isBottomNavHidden(location.pathname)) return null;
 
   const linkTarget = (path: string) =>
@@ -98,13 +94,19 @@ export default function BottomNav() {
         to={linkTarget(item.path)}
         aria-label={badge > 0 ? `${item.label} (${badge})` : item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`flex flex-col items-center justify-center flex-1 h-full rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95 ${
-          isActive ? 'bg-olive/20 text-gold shadow-sm' : 'text-zinc-500 hover:text-gold'
+        className={`relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.98] ${
+          isActive ? 'bg-white/[0.07] text-text-primary' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-secondary'
         }`}
       >
+        {isActive && (
+          <span
+            aria-hidden="true"
+            className="absolute start-1/2 top-0 h-0.5 w-5 -translate-x-1/2 rtl:translate-x-1/2 rounded-full bg-gold"
+          />
+        )}
         <span className="relative">
           <item.icon
-            className={`w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mb-0.5 sm:mb-1 ${isActive ? 'text-gold' : ''}`}
+            className="h-5 w-5 sm:h-[22px] sm:w-[22px]"
             strokeWidth={isActive ? 2.5 : 2}
             aria-hidden="true"
           />
@@ -114,19 +116,23 @@ export default function BottomNav() {
             // decorative.
             <span
               aria-hidden="true"
-              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-gold text-black text-[10px] font-black leading-[16px] text-center tabular-nums"
+              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-black leading-[16px] text-center tabular-nums"
             >
               {badge > 99 ? '99+' : badge}
             </span>
           ) : null}
         </span>
-        <span className={`text-[9px] sm:text-[11px] font-medium whitespace-nowrap ${isActive ? 'text-gold font-bold' : ''}`}>{item.label}</span>
+        <span className={`max-w-full truncate text-[9px] sm:text-[11px] ${isActive ? 'font-bold text-text-primary' : 'font-medium'}`}>{item.label}</span>
       </Link>
     );
   };
 
   return (
-    <nav aria-label="LEVONIS" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-[120] flex items-center justify-center gap-1.5 sm:gap-3 px-2 sm:px-4 pointer-events-none">
+    <nav
+      aria-label="LEVONIS"
+      data-bottom-nav
+      className="fixed bottom-[max(0.625rem,env(safe-area-inset-bottom))] sm:bottom-[max(1rem,env(safe-area-inset-bottom))] inset-x-0 z-[120] flex items-center justify-center px-3 sm:px-4 pointer-events-none transition-[opacity,transform] duration-200"
+    >
       {/* A scrim under the whole bar. The page scrolls UNDER a floating nav by
           design, and at 20% black the text passing behind it stayed perfectly
           legible — so a price or a heading appeared sliced in half by the bar
@@ -135,35 +141,13 @@ export default function BottomNav() {
           takes no pointer events, and is decorative. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-[calc(-1*max(1rem,env(safe-area-inset-bottom)))] sm:bottom-[calc(-1*max(1.5rem,env(safe-area-inset-bottom)))] h-[calc(100%+max(1rem,env(safe-area-inset-bottom))+28px)] -z-10 bg-gradient-to-t from-black via-black/95 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-[calc(-1*max(0.625rem,env(safe-area-inset-bottom)))] sm:bottom-[calc(-1*max(1rem,env(safe-area-inset-bottom)))] h-[calc(100%+max(0.625rem,env(safe-area-inset-bottom))+20px)] -z-10 bg-gradient-to-t from-black via-black/94 to-transparent"
       />
 
-      {/* Left Pill */}
-      <div className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
-        {leftItems.map(renderItem)}
-      </div>
-
-      {/* Center Home Circle */}
-      <Link
-        to={homeItem.path}
-        aria-label={homeItem.label}
-        aria-current={location.pathname === homeItem.path ? 'page' : undefined}
-        className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105 active:scale-95 border border-white/10 shrink-0 pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-          location.pathname === homeItem.path
-            ? 'bg-olive text-gold border-olive/50 shadow-olive/20'
-            : 'bg-zinc-950/95 backdrop-blur-2xl text-zinc-500 hover:text-gold border-white/10'
-        }`}
-      >
-        <homeItem.icon
-          className="w-6 h-6 sm:w-7 sm:h-7"
-          strokeWidth={location.pathname === homeItem.path ? 2.5 : 2}
-          aria-hidden="true"
-        />
-      </Link>
-
-      {/* Right Pill */}
-      <div className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-[36px] p-1 sm:p-2 flex items-center shadow-xl h-[60px] sm:h-[72px] pointer-events-auto flex-1 max-w-[160px] sm:max-w-[180px] justify-between">
-        {rightItems.map(renderItem)}
+      {/* One calm navigation surface. The active tab uses hierarchy and a tiny
+          brand marker instead of turning a whole pill gold. */}
+      <div className="material material-thin grid h-16 w-full max-w-[520px] grid-cols-5 gap-1 rounded-2xl border border-border-subtle p-1.5 shadow-2xl pointer-events-auto sm:h-[68px] sm:p-2">
+        {navItems.map(renderItem)}
       </div>
     </nav>
   );

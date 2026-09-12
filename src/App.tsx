@@ -303,11 +303,11 @@ function AppContent() {
   // it to the other <Routes> block and render a different tree for the same
   // page. Comparing the way the router does keeps the two in step.
   const pathForShell = location.pathname.toLowerCase();
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/model-viewer'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
     return (
-      <div className="h-[100dvh] flex flex-col font-sans overflow-hidden bg-white dark:bg-black">
+      <div className="h-[100dvh] min-h-0 flex flex-col font-sans overflow-hidden bg-canvas text-text-primary">
         <main className="flex-1 flex overflow-hidden">
           <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -374,6 +374,12 @@ function AppContent() {
               }
             />
             <Route path="/support" element={<Support />} />
+            {/* A conversation owns the mobile viewport: its message list is
+                the one scroll region and its composer stays in normal flex
+                flow above the keyboard/safe area. Keeping it in the regular
+                page shell used to create two scroll owners and forced a fixed
+                composer to cover the last messages. */}
+            <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             {/* PUBLIC BY DESIGN, AND THAT IS THE WHOLE POINT OF THE TOKEN.
                 A print model belongs to the customer, so the preview is not
                 gated on being signed in — it is gated on holding a token that
@@ -486,7 +492,6 @@ function AppContent() {
               state for the private conversation list, and every /api/chats
               read is still authorised server-side. */}
           <Route path="/chats" element={<Chats />} />
-          <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
           <Route path="/bundles" element={<Bundles />} />

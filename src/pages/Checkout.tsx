@@ -755,7 +755,7 @@ export default function Checkout() {
 
   if (placedOrder) {
     return (
-      <div className="w-full min-h-screen bg-[#030303] text-white flex flex-col font-sans selection:bg-white/20">
+      <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col font-sans selection:bg-white/20">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-700">
           <div className="w-24 h-24 mb-8 relative flex items-center justify-center">
             <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-50" />
@@ -806,15 +806,25 @@ export default function Checkout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#030303] text-white flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+      <div
+        className="grid h-full min-h-0 w-full flex-1 place-items-center bg-canvas text-text-primary"
+        data-testid="checkout-loading"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-text-muted border-t-transparent" aria-hidden="true" />
+          <p className="text-sm text-text-secondary">
+            {loc('جارٍ تجهيز صفحة الدفع…', 'Preparing checkout…', 'ئامادەکردنی پارەدان…')}
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!loading && items.length === 0) {
     return (
-      <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col items-center justify-center p-6 text-center font-sans">
         <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
           <ShoppingCart className="w-7 h-7 text-zinc-500" strokeWidth={1.5} />
         </div>
@@ -839,18 +849,18 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white font-sans selection:bg-white/20 flex flex-col lg:flex-row">
+    <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary font-sans selection:bg-white/20 flex flex-col lg:flex-row lg:overflow-hidden" data-checkout-viewport>
 
       {/* Left Form Area */}
-      <div className="flex-1 flex flex-col lg:max-h-screen lg:overflow-y-auto custom-scrollbar relative z-10">
-        <header className="px-6 lg:px-12 py-8 flex items-center justify-between sticky top-0 bg-[#030303]/90 backdrop-blur-xl z-20 border-b border-white/5 lg:border-none">
+      <div className="relative z-10 flex min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg sm:px-6 lg:px-12 lg:py-6">
           <button
             onClick={handleBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors border border-white/10 bg-white/5"
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" strokeWidth={1.5} /> : <ArrowLeft className="w-5 h-5 text-white" strokeWidth={1.5} />}
           </button>
-          <div className="flex items-center gap-2 text-zinc-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+          <div className="flex items-center gap-2 text-text-secondary px-2 py-2">
             <Lock className="w-4 h-4" strokeWidth={1.5} />
             <span className="text-xs font-semibold tracking-widest uppercase">
               {dir === 'rtl' ? 'دفع آمن' : 'Secure Checkout'}
@@ -858,10 +868,10 @@ export default function Checkout() {
           </div>
         </header>
 
-        <div className="px-6 lg:px-12 py-4 max-w-3xl mx-auto w-full space-y-12 pb-32 lg:pb-16">
+        <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-5 pb-10 sm:px-6 lg:space-y-10 lg:px-12 lg:pb-16">
 
           <div>
-            <h1 className="text-2xl lg:text-3xl font-medium tracking-tight mb-2">
+            <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight mb-2">
               {dir === 'rtl' ? 'إتمام الطلب' : 'Checkout'}
             </h1>
             <p className="text-sm text-zinc-500 font-light">
@@ -877,18 +887,14 @@ export default function Checkout() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addresses.map(addr => (
-                <label key={addr.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
-                    selectedAddressId === addr.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
-                }`}>
+                <label key={addr.id} data-selected={selectedAddressId === addr.id} className="lv-choice relative flex cursor-pointer flex-col gap-2 p-4">
                   <input type="radio" name="address" className="sr-only" checked={selectedAddressId === addr.id} onChange={() => setSelectedAddressId(addr.id)} />
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
-                      <MapPin className={`w-4 h-4 ${selectedAddressId === addr.id ? 'text-white' : 'text-zinc-500'}`} strokeWidth={1.5} />
+                      <MapPin className="w-4 h-4 text-text-muted" strokeWidth={1.5} />
                       <span className="font-normal text-white text-base">{addr.label}</span>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedAddressId === addr.id ? 'border-white' : 'border-zinc-700'}`}>
-                      {selectedAddressId === addr.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
+                    <span className="lv-choice-mark"><Check className="h-3 w-3" aria-hidden="true" /></span>
                   </div>
                   <p className="text-xs text-zinc-500 leading-relaxed pl-1 font-light">
                     {addr.name} — {addr.phone}
@@ -902,7 +908,7 @@ export default function Checkout() {
                 <button
                   type="button"
                   onClick={() => setAddingAddress(true)}
-                  className="relative p-4 rounded-xl border border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-white/20 transition-colors flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-white min-h-[100px] [touch-action:manipulation]"
+                  className="relative flex min-h-[100px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-subtle bg-transparent p-4 text-text-muted transition-colors hover:bg-white/[0.03] hover:text-text-primary [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
                     <Plus aria-hidden="true" className="w-4 h-4" strokeWidth={1.5} />
@@ -914,7 +920,7 @@ export default function Checkout() {
               ) : null}
             </div>
             {addingAddress ? (
-              <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+              <div className="lv-surface mt-3 p-4">
                 <AddressForm
                   dense
                   defaultWhenFirst={addresses.length === 0}
@@ -951,13 +957,11 @@ export default function Checkout() {
                 const displayedPrice = selectedQuote?.total_iqd ?? method.price_iqd;
                 const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
                 return (
-                <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-3 sm:gap-4 ${
-                  selected ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
-                }`}>
+                <label key={method.id} data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
                   <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => setDeliveryMethod(method.id)} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${selected ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
                         {getMethodIcon(method.icon || '', "w-5 h-5")}
                       </div>
                       <div className="min-w-0">
@@ -978,9 +982,7 @@ export default function Checkout() {
                       {displayedPrice === 0 ? loc('مجاناً', 'Free', 'بەخۆڕایی') : formatIqd(displayedPrice)}
                     </span>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ms-1 ${selected ? 'border-white' : 'border-zinc-700'}`}>
-                    {selected && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
+                  <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
                 );
               })}
@@ -1008,12 +1010,10 @@ export default function Checkout() {
             </h2>
             <div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
-                <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-4 ${
-                  paymentMethod === method.id ? 'border-white bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'border-white/5 bg-[#0a0a0a] hover:border-white/20'
-                }`}>
+                <label key={method.id} data-selected={paymentMethod === method.id} className="lv-choice relative flex cursor-pointer items-center gap-4 p-4">
                   <input type="radio" name="payment" className="sr-only" checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} />
                   <div className="flex-1 flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${paymentMethod === method.id ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
                       {getMethodIcon(method.icon || '', 'w-5 h-5')}
                     </div>
                     <div>
@@ -1025,9 +1025,7 @@ export default function Checkout() {
                       )}
                     </div>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ${paymentMethod === method.id ? 'border-white' : 'border-zinc-700'}`}>
-                      {paymentMethod === method.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
+                  <span className="lv-choice-mark"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
               ))}
             </div>
@@ -1054,7 +1052,7 @@ export default function Checkout() {
             <button
               onClick={placeOrder}
               disabled={!canCompleteOrder}
-              className="w-full bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed font-normal py-4 rounded-xl transition-all text-base shadow-[0_0_20px_rgba(255,255,255,0.05)]"
+              className="lv-button lv-button-primary w-full min-h-[52px] text-base"
             >
               {submitting
                 ? (dir === 'rtl' ? 'جارٍ تأكيد الطلب...' : 'Placing Order...')
@@ -1071,18 +1069,18 @@ export default function Checkout() {
       </div>
 
       {/* Right Summary Area */}
-      <div className="w-full lg:w-[460px] bg-[#0a0a0a] lg:border-l border-white/5 flex flex-col shrink-0 relative z-20">
-        <div className="p-6 lg:p-10 lg:sticky lg:top-0 lg:h-screen flex flex-col">
+      <div className="relative z-20 flex w-full shrink-0 flex-col bg-surface lg:h-full lg:min-h-0 lg:w-[460px] lg:border-s lg:border-border-subtle">
+        <div className="flex min-h-0 flex-col p-4 sm:p-6 lg:h-full lg:p-10">
 
           <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-6">
             <Receipt className="w-5 h-5 text-zinc-400" strokeWidth={1.5} />
             {dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}
           </h2>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar lg:pe-2 mb-8 space-y-3">
+          <div className="mb-6 space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-2 custom-scrollbar">
             {summaryLines.map((line) => (
-                <div key={line.key} data-checkout-line={line.key} className="flex gap-4 p-3 rounded-xl bg-[#050505] border border-white/5 relative overflow-hidden group">
-                  <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0 border border-white/5">
+                <div key={line.key} data-checkout-line={line.key} className="group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0">
+                  <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0">
                     {line.image ? (
                       <img referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
                     ) : (
@@ -1425,7 +1423,7 @@ export default function Checkout() {
             <button
               onClick={placeOrder}
               disabled={!canCompleteOrder}
-              className="w-full bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed font-normal py-4 rounded-xl transition-all text-base shadow-[0_0_20px_rgba(255,255,255,0.05)]"
+              className="lv-button lv-button-primary w-full min-h-[52px] text-base"
             >
               {submitting
                 ? (dir === 'rtl' ? 'جارٍ تأكيد الطلب...' : 'Placing Order...')

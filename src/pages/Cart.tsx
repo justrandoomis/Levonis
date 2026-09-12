@@ -808,13 +808,13 @@ export default function Cart() {
     // short page. The bottom padding clears the summary bar (≈76px) and the
     // safe area, and nothing more — `pb-48` (192px) was reserving room for a
     // nav that is no longer on this route.
-    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-zinc-300 min-h-dvh bg-black flex flex-col font-sans">
+    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh bg-canvas flex flex-col font-sans">
       {/* Header */}
       {/* `backdrop-blur-xl` behind a fully opaque `bg-black` was a compositing
           layer blurring nothing. Translucent, like the product page's bar, so
           content passing underneath actually frosts. */}
-      <div className="fixed inset-x-0 top-0 z-40 bg-black/85 backdrop-blur-xl border-b border-zinc-900 px-4 py-4 flex items-center justify-between">
-        <button type="button" onClick={() => navigate(-1)} className="p-1 hover:text-white transition-colors">
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg">
+        <button type="button" onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>
         <h1 className="text-white font-bold text-[17px]">
@@ -834,9 +834,9 @@ export default function Cart() {
           scroll container while its flex parent had an indefinite height, so
           it never actually scrolled — dead weight that disabled scroll
           anchoring and would silently break any `position: sticky` child. */}
-      <div className="flex-1">
+      <div className="mx-auto w-full max-w-4xl flex-1">
         {error && (
-          <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between gap-3">
+          <div className="lv-alert lv-alert-danger mx-4 mt-3 flex items-center justify-between gap-3 text-sm text-red-300">
             <span>{error}</span>
             <button type="button" onClick={() => setError('')} className="shrink-0 p-1 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
@@ -855,20 +855,20 @@ export default function Cart() {
             <ErrorState error={loadError} onRetry={retryLoadCart} next="/cart" />
           </div>
         ) : items.length === 0 ? (
-          <div className="mx-4 mt-6 text-center py-16 text-zinc-500 bg-zinc-900/40 rounded-2xl border border-zinc-800/70 flex flex-col items-center gap-4">
+          <div className="lv-surface mx-4 mt-6 flex flex-col items-center gap-4 py-14 text-center text-text-muted">
             <ShoppingCart className="w-10 h-10 text-zinc-700" />
             <p>{loc('سلتك فارغة', 'Your cart is empty.', 'سەبەتەکەت بەتاڵە.')}</p>
             <button
               type="button"
               onClick={() => navigate('/products')}
-              className="bg-gold text-black font-black min-h-[44px] px-6 rounded-xl text-sm hover:brightness-110 transition-[filter] duration-150"
+              className="lv-button lv-button-primary px-6"
             >
               {loc('تسوق الآن', 'Shop now', 'ئێستا بکڕە')}
             </button>
           </div>
         ) : (
         <>
-        <div className="bg-zinc-900/40 border-y border-zinc-800/70 pb-4">
+        <div className="bg-surface pb-3 sm:mx-4 sm:mt-4 sm:rounded-xl">
           {/* Group Header */}
           <div className="px-4 py-3 flex items-center gap-2">
             <span className="text-zinc-300 text-[15px] font-medium">
@@ -894,7 +894,7 @@ export default function Cart() {
               // A hairline between rows: the list had no separation at all, so
               // three products read as one dense block. `last:` keeps the
               // group's own bottom edge clean.
-              <div key={item.id} className="px-4 py-4 flex gap-3 border-b border-white/[0.06] last:border-b-0">
+              <div key={item.id} className="px-3 sm:px-4 py-4 flex gap-2 sm:gap-3 border-b border-border-subtle last:border-b-0">
                 {/* A 22px dot inside a 44px target: the dot is the design, the
                     target is what a thumb actually hits. It was a bare <div>
                     with an onClick — unreachable by keyboard and silent to a
@@ -909,17 +909,17 @@ export default function Cart() {
                 >
                   <span
                     aria-hidden="true"
-                    className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors ${
-                      selected ? 'bg-gold border-gold' : 'border-zinc-600'
+                    className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+                      selected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
                     }`}
                   >
-                    {selected && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />}
+                    {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
                   </span>
                 </button>
 
                 {/* Product Image */}
                 <div
-                  className="w-[100px] h-[100px] shrink-0 rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
+                  className="w-[88px] h-[88px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-lg overflow-hidden bg-black cursor-pointer"
                   onClick={() => navigate(`/product/${item.slug}`)}
                 >
                   <SafeImage
@@ -1066,10 +1066,8 @@ export default function Cart() {
                     const current = plans.find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
                     const panelId = `ext-warranty-${item.id}`;
                     const saving = warrantySavingId === item.id;
-                    const radio = (checked: boolean) =>
-                      `w-full min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-start text-[13px] transition-colors press-scale disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
-                        checked ? 'border-gold bg-gold/15 text-gold font-bold' : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                      }`;
+                    const radio = (_checked: boolean) =>
+                      'lv-choice w-full px-3 py-2 flex items-center justify-between gap-3 text-start text-[13px] press-scale disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
                     return (
                       <div className="mb-2" data-cart-ext-warranty={item.id}>
                         <button
@@ -1077,9 +1075,8 @@ export default function Cart() {
                           aria-expanded={open}
                           aria-controls={panelId}
                           onClick={() => toggleWarranty(item.id)}
-                          className={`w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
-                            current ? 'border-gold/40 bg-gold/[0.06]' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
-                          }`}
+                          className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          data-selected={!!current}
                         >
                           <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-zinc-400'}`} aria-hidden="true" />
                           <span className="min-w-0 flex-1">
@@ -1126,7 +1123,7 @@ export default function Cart() {
                                   >
                                     <span className="min-w-0">
                                       <span className="block truncate">{ew.none}</span>
-                                      <span className={`block text-[11px] font-normal ${!current ? 'text-gold/80' : 'text-zinc-500'}`}>{ew.noneHint}</span>
+                                      <span className="block text-[11px] font-normal text-text-muted">{ew.noneHint}</span>
                                     </span>
                                     {saving && warrantyPendingPlan === '' ? <Spinner size="xs" delayMs={0} decorative /> : null}
                                   </button>
@@ -1242,19 +1239,19 @@ export default function Cart() {
                           places. The minus no longer doubles as a delete: the
                           Delete button beside it is the one removal path, so a
                           mis-tap at qty 1 can no longer empty a line. */}
-                      <div className="flex items-center rounded-xl border border-zinc-800 bg-zinc-900/70 overflow-hidden">
+                      <div className="flex items-center rounded-lg bg-surface-raised overflow-hidden">
                         <button
                           type="button"
                           aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
                           onClick={() => updateQuantity(item, -1)}
                           disabled={item.qty <= 1}
-                          className="w-11 h-11 flex items-center justify-center text-zinc-300 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+                          className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           <Minus aria-hidden="true" className="w-4 h-4" />
                         </button>
                         <span
                           aria-live="polite"
-                          className="w-9 h-11 flex items-center justify-center text-[15px] font-bold text-white tabular-nums border-x border-zinc-800"
+                          className="w-9 h-11 flex items-center justify-center text-[15px] font-bold text-white tabular-nums border-x border-border-subtle"
                         >
                           {item.qty}
                         </span>
@@ -1263,7 +1260,7 @@ export default function Cart() {
                           aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
                           onClick={() => updateQuantity(item, 1)}
                           disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
-                          className="w-11 h-11 flex items-center justify-center text-zinc-300 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+                          className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           <Plus aria-hidden="true" className="w-4 h-4" />
                         </button>
@@ -1290,7 +1287,7 @@ export default function Cart() {
                     <button
                       type="button"
                       onClick={() => deleteItem(item)}
-                      className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/70 text-[13px] font-medium text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors [touch-action:manipulation]"
+                      className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
                     >
                       {loc('حذف', 'Delete', 'سڕینەوە')}
                     </button>
@@ -1302,7 +1299,7 @@ export default function Cart() {
         </div>
 
         {/* Deals Row */}
-        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 flex flex-col">
+        <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
           <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-zinc-900/30 transition-colors">
             <div className="flex items-center gap-2">
               <svg viewBox="0 0 24 24" className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1388,7 +1385,7 @@ export default function Cart() {
             §3.3: separate from the discount coupon and from points, shown
             automatically when a share link brought one, removable for good,
             enterable by hand, and with ZERO effect on any amount below. */}
-        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 flex flex-col">
+        <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
           <button
             type="button"
             onClick={() => setSupportOpen((v) => !v)}
@@ -1547,7 +1544,7 @@ export default function Cart() {
         </div>
 
         {/* Summary Details */}
-        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 p-4 mb-4 flex flex-col gap-3">
+        <div className="mt-2 bg-surface p-4 mb-4 flex flex-col gap-3 sm:mx-4 sm:rounded-xl">
           <h3 className="text-white font-bold text-[16px] mb-1">{loc('ملخص الطلب', 'Order Summary', 'کورتەی داواکاری')}</h3>
 
           <div className="flex justify-between items-center">
@@ -1624,7 +1621,7 @@ export default function Cart() {
       {!loading && items.length > 0 && (
         <div
           data-testid="cart-summary-bar"
-          className="fixed inset-x-3 bottom-[var(--nav-stack)] md:inset-x-0 md:mx-auto md:w-auto md:max-w-md z-[130] rounded-2xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.55)] px-4 py-3"
+          className="fixed inset-x-3 bottom-[var(--nav-stack)] z-[130] rounded-xl border border-border-subtle bg-surface-raised/98 px-3 py-3 shadow-2xl sm:px-4 md:inset-x-0 md:mx-auto md:w-auto md:max-w-md"
         >
           {/* A FIXED ROW HEIGHT. The savings line used to mount and unmount as
               items were ticked, so the bar grew and shrank while being used. */}
@@ -1638,11 +1635,11 @@ export default function Cart() {
             >
               <span
                 aria-hidden="true"
-                className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors ${
-                  allSelected ? 'bg-gold border-gold' : 'border-zinc-600'
+                className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+                  allSelected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
                 }`}
               >
-                {allSelected && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />}
+                {allSelected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
               </span>
               <span className="text-zinc-300 text-[14px] whitespace-nowrap">
                 {loc('الكل', 'All', 'هەموو')}
@@ -1676,7 +1673,7 @@ export default function Cart() {
                   state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
                 })
               }
-              className="col-span-2 w-full bg-gold text-black font-black min-h-[48px] px-5 rounded-xl text-[15px] tabular-nums shrink-0 whitespace-nowrap hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,opacity] duration-150 active:scale-[0.985] [touch-action:manipulation] sm:col-auto sm:w-auto"
+              className="lv-button lv-button-primary col-span-2 w-full min-h-[48px] px-5 text-[15px] tabular-nums shrink-0 whitespace-nowrap active:scale-[0.985] [touch-action:manipulation] sm:col-auto sm:w-auto"
               disabled={
                 selectedCount === 0 ||
                 // The server refuses an incomplete line at checkout; say so here
@@ -1773,13 +1770,15 @@ export default function Cart() {
                         key={c.id}
                         type="button"
                         onClick={() => setPendingColorId(active ? '' : c.id)}
-                        className={`px-4 py-2 rounded-lg border text-sm flex items-center gap-2 ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
+                        aria-pressed={active}
+                        className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
                       >
                         <span
                           className="w-3.5 h-3.5 rounded-full border border-zinc-600 inline-block"
                           style={c.gradient ? { background: c.gradient } : { backgroundColor: c.hex || '#333' }}
                         ></span>
-                        {cName}
+                        <span>{cName}</span>
+                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
                     );
                   })}
@@ -1799,10 +1798,11 @@ export default function Cart() {
                         key={o.id}
                         type="button"
                         onClick={() => setPendingOptionId(active ? '' : o.id)}
-                        className={`px-4 py-2 rounded-lg border text-sm ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
+                        aria-pressed={active}
+                        className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
                       >
-                        {oName}
-                        {typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${formatIqd(o.price_iqd)}` : ''}
+                        <span>{oName}{typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${formatIqd(o.price_iqd)}` : ''}</span>
+                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
                     );
                   })}
@@ -1818,7 +1818,7 @@ export default function Cart() {
               type="button"
               onClick={confirmVariant}
               disabled={variantSaving}
-              className="w-full mt-4 bg-gold text-black font-black min-h-[48px] rounded-xl hover:brightness-110 transition-[filter] duration-150 disabled:opacity-45 flex items-center justify-center gap-2"
+              className="lv-button lv-button-primary mt-4 w-full min-h-[48px]"
             >
               {variantSaving && <Spinner size="xs" delayMs={0} decorative />}
               {variantSaving ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('تأكيد', 'Confirm', 'دڵنیاکردنەوە')}
@@ -1892,24 +1892,23 @@ export default function Cart() {
                     // already retired.
                     onClick={() => shippingItem && chooseShipping(shippingItem, sm.id)}
                     disabled={shippingSaving}
-                    className={`flex items-start justify-between p-4 rounded-xl border transition-all text-left w-full disabled:opacity-60 ${active ? 'border-gold/60 bg-gold/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600'}`}
+                    aria-pressed={active}
+                    className="lv-choice flex w-full items-start justify-between gap-3 p-4 text-start disabled:opacity-60"
                   >
                     <div className="flex-1">
-                      <p className={`font-bold text-[15px] ${active ? 'text-gold' : 'text-zinc-200'}`}>
+                      <p className="font-bold text-[15px] text-text-primary">
                         {title}
                       </p>
                       {desc && (
                         <p className="text-zinc-500 text-xs mt-1">{desc}</p>
                       )}
                       {typeof sm.price_iqd === 'number' && sm.price_iqd > 0 && (
-                        <p className={`text-[13px] mt-1.5 font-bold ${active ? 'text-gold' : 'text-zinc-300'}`}>
+                        <p className="text-[13px] mt-1.5 font-bold text-text-secondary">
                           {formatIqd(sm.price_iqd)}
                         </p>
                       )}
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${active ? 'border-gold' : 'border-zinc-600'}`}>
-                      {active && <div className="w-2.5 h-2.5 rounded-full bg-gold" />}
-                    </div>
+                    <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
                   </button>
                 );
               })}

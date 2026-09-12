@@ -342,6 +342,31 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
   return out;
 }
 
+/**
+ * THE AUTHORITATIVE STOREFRONT IMAGE ORDER.
+ *
+ * `order` controls the gallery after the lead image; `primary` controls the
+ * lead image everywhere. Keeping this as a pure helper means cards, bundles,
+ * cart snapshots and support search cannot quietly fall back to whichever row
+ * happened to have sort_order=0. The sort is stable for equal values and does
+ * not mutate the admin document.
+ */
+export function primaryMediaFirst<T extends Pick<MediaV2, 'primary' | 'order'>>(media: readonly T[]): T[] {
+  return media
+    .map((item, index) => ({ item, index }))
+    .sort(
+      (a, b) =>
+        Number(!!b.item.primary) - Number(!!a.item.primary) ||
+        a.item.order - b.item.order ||
+        a.index - b.index
+    )
+    .map(({ item }) => item);
+}
+
+export function primaryMedia(media: readonly MediaV2[]): MediaV2 | undefined {
+  return primaryMediaFirst(media)[0];
+}
+
 // Compare-at is gone (mandate §4). A stored v2 option/color may still carry
 // compare_at_iqd from before 0018 — it is simply not read, and prime_price_iqd
 // takes its place in the four-price ladder.
@@ -1255,6 +1280,7 @@ const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
  * GETs around a confirmation still identified the drawn colour exactly.
  */
 export function projectPublic(doc: ProductDoc, coarse = false) {
+  const media = primaryMediaFirst(doc.media);
   return {
     id: doc.id,
     slug: doc.slug,
@@ -1282,8 +1308,8 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     template_family: doc.template_family,
     sku: doc.sku,
     spec_fields: doc.spec_fields,
-    media: doc.media,
-    images: doc.media.map((m) => m.url), // legacy string[] compatibility
+    media,
+    images: media.map((m) => m.url), // legacy string[] compatibility
     options: doc.options
       .filter((o) => o.active)
       .map(stripCostFields)

@@ -267,10 +267,10 @@ const STRINGS = {
 type SupportStrings = (typeof STRINGS)['en'];
 
 const STATE_STYLES: Record<Ticket['state'], string> = {
-  open: 'bg-blue-500/10 text-blue-400',
-  waiting_customer: 'bg-amber-500/10 text-amber-400',
-  waiting_staff: 'bg-purple-500/10 text-purple-400',
-  resolved: 'bg-emerald-500/10 text-emerald-400',
+  open: 'bg-info/10 text-blue-300',
+  waiting_customer: 'bg-warning/10 text-amber-300',
+  waiting_staff: 'bg-white/[0.06] text-text-secondary',
+  resolved: 'bg-success/10 text-emerald-300',
 };
 
 function stateLabel(s: SupportStrings, state: Ticket['state']): string {
@@ -292,19 +292,19 @@ function fmtDate(iso: string, lang: string): string {
 
 function ReplyCard({ card, onNavigate }: { card: AsstCard; onNavigate: (to: string) => void }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex gap-3 items-start">
+    <div className="lv-surface flex items-start gap-3 p-3">
       {card.image && (
         <img
           referrerPolicy="no-referrer"
           src={card.image}
           alt=""
-          className="w-12 h-12 rounded-lg object-cover border border-zinc-800 shrink-0"
+          className="w-12 h-12 rounded-lg object-cover bg-black shrink-0"
         />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold text-white break-words">{card.title}</span>
-          {card.badge && <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 font-bold">{card.badge}</span>}
+          {card.badge && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-text-secondary font-bold">{card.badge}</span>}
         </div>
         {card.subtitle && <div className="text-xs text-zinc-400 mt-0.5 break-words">{card.subtitle}</div>}
         {card.fields && card.fields.length > 0 && (
@@ -320,7 +320,7 @@ function ReplyCard({ card, onNavigate }: { card: AsstCard; onNavigate: (to: stri
         {card.link && (
           <button
             onClick={() => onNavigate(card.link!.to)}
-            className="mt-2 text-xs font-bold text-[#2CE59B] hover:underline"
+            className="mt-2 text-xs font-bold text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
           >
             {card.link.label} ←
           </button>
@@ -363,6 +363,7 @@ function TicketForm({
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [step, setStep] = useState<'form' | 'confirm'>('form');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ subject?: string; body?: string }>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -395,13 +396,14 @@ function TicketForm({
 
   const goConfirm = () => {
     if (subject.trim().length < 3) {
-      setError(s.subjectRequired);
+      setFieldErrors({ subject: s.subjectRequired });
       return;
     }
     if (body.trim().length < 5) {
-      setError(s.messageRequired);
+      setFieldErrors({ body: s.messageRequired });
       return;
     }
+    setFieldErrors({});
     setError('');
     setStep('confirm');
   };
@@ -426,7 +428,7 @@ function TicketForm({
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 space-y-3">
+    <div className="lv-surface p-4 space-y-4" data-support-ticket-form>
       <div className="flex items-center justify-between">
         <h3 className="text-white font-bold text-sm">{step === 'form' ? s.ticketFormTitle : s.confirmTitle}</h3>
         <button onClick={onClose} className="text-xs text-zinc-500 hover:text-zinc-300">
@@ -436,28 +438,46 @@ function TicketForm({
 
       {step === 'form' ? (
         <>
-          <input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            maxLength={200}
-            placeholder={s.subject}
-            className="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
-          />
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={4000}
-            rows={4}
-            placeholder={s.message}
-            className="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
-          />
+          <div>
+            <label htmlFor="support-ticket-subject" className="mb-1.5 block text-xs font-bold text-text-secondary">{s.subject}</label>
+            <input
+              id="support-ticket-subject"
+              value={subject}
+              onChange={(e) => {
+                setSubject(e.target.value);
+                if (fieldErrors.subject) setFieldErrors((current) => ({ ...current, subject: undefined }));
+              }}
+              maxLength={200}
+              aria-invalid={!!fieldErrors.subject}
+              aria-describedby={fieldErrors.subject ? 'support-ticket-subject-error' : undefined}
+              className="lv-input text-sm"
+            />
+            {fieldErrors.subject && <p id="support-ticket-subject-error" role="alert" className="lv-field-error">{fieldErrors.subject}</p>}
+          </div>
+          <div>
+            <label htmlFor="support-ticket-message" className="mb-1.5 block text-xs font-bold text-text-secondary">{s.message}</label>
+            <textarea
+              id="support-ticket-message"
+              value={body}
+              onChange={(e) => {
+                setBody(e.target.value);
+                if (fieldErrors.body) setFieldErrors((current) => ({ ...current, body: undefined }));
+              }}
+              maxLength={4000}
+              rows={4}
+              aria-invalid={!!fieldErrors.body}
+              aria-describedby={fieldErrors.body ? 'support-ticket-message-error' : undefined}
+              className="lv-input min-h-28 resize-y py-2.5 text-sm"
+            />
+            {fieldErrors.body && <p id="support-ticket-message-error" role="alert" className="lv-field-error">{fieldErrors.body}</p>}
+          </div>
           <div>
             <label className="text-xs text-zinc-500 block mb-1">{s.linkOrder}</label>
             <div className="relative">
               <select
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                className="w-full appearance-none bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"
+                className="lv-input w-full appearance-none pe-9 text-sm"
               >
                 <option value="">{s.noLink}</option>
                 {orderOptions.map((o) => (
@@ -467,7 +487,7 @@ function TicketForm({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="w-4 h-4 text-zinc-600 absolute top-3 ltr:right-3 rtl:left-3 pointer-events-none" />
+              <ChevronDown className="w-4 h-4 text-text-muted absolute top-3 end-3 pointer-events-none" />
             </div>
           </div>
           <div>
@@ -476,7 +496,7 @@ function TicketForm({
               <select
                 value={unitId}
                 onChange={(e) => setUnitId(e.target.value)}
-                className="w-full appearance-none bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"
+                className="lv-input w-full appearance-none pe-9 text-sm"
               >
                 <option value="">{s.noLink}</option>
                 {deviceOptions.map((d) => (
@@ -485,21 +505,18 @@ function TicketForm({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="w-4 h-4 text-zinc-600 absolute top-3 ltr:right-3 rtl:left-3 pointer-events-none" />
+              <ChevronDown className="w-4 h-4 text-text-muted absolute top-3 end-3 pointer-events-none" />
             </div>
           </div>
           {error && <div className="text-xs text-red-400">{error}</div>}
-          <button
-            onClick={goConfirm}
-            className="w-full py-2.5 rounded-xl bg-[#2CE59B] text-black text-sm font-black hover:opacity-90 transition-opacity"
-          >
+          <button onClick={goConfirm} className="lv-button lv-button-primary w-full">
             {s.next}
           </button>
         </>
       ) : (
         <>
           <p className="text-xs text-zinc-400">{s.confirmBody}</p>
-          <div className="bg-black border border-zinc-800 rounded-xl p-3 space-y-1">
+          <div className="rounded-lg bg-black/30 p-3 space-y-1">
             <div className="text-sm text-white font-bold break-words">{subject}</div>
             <div className="text-xs text-zinc-400 whitespace-pre-wrap break-words">{body}</div>
             {orderId && <div className="text-xs text-zinc-500 font-mono">{orderId}</div>}
@@ -509,14 +526,14 @@ function TicketForm({
             <button
               onClick={() => setStep('form')}
               disabled={busy}
-              className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-sm font-bold disabled:opacity-50"
+              className="lv-button lv-button-secondary flex-1"
             >
               {s.back}
             </button>
             <button
               onClick={create}
               disabled={busy}
-              className="flex-1 py-2.5 rounded-xl bg-[#2CE59B] text-black text-sm font-black disabled:opacity-50"
+              className="lv-button lv-button-primary flex-1"
             >
               {busy ? s.creating : s.confirmSend}
             </button>
@@ -599,9 +616,9 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
 
   if (!isAuthenticated) {
     return (
-      <div className="text-center py-12 text-zinc-400 bg-zinc-900/50 rounded-xl border border-zinc-800/50 space-y-3">
+      <div className="lv-surface space-y-3 py-12 text-center text-text-secondary">
         <p>{s.ticketsSignIn}</p>
-        <button onClick={() => signIn()} className="px-4 py-2 rounded-xl bg-[#2CE59B] text-black text-sm font-black">
+        <button onClick={() => signIn()} className="lv-button lv-button-primary px-4">
           {s.signIn}
         </button>
       </div>
@@ -618,7 +635,7 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
           <div className="text-center py-8 text-zinc-500">{s.loading}</div>
         ) : thread ? (
           <>
-            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3">
+            <div className="lv-surface p-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-white font-bold text-sm break-words">{thread.ticket.subject}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATE_STYLES[thread.ticket.state]}`}>
@@ -635,7 +652,7 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
                 <div key={m.id} className={`flex ${m.is_staff ? 'justify-start' : 'justify-end'}`}>
                   <div
                     className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                      m.is_staff ? 'bg-zinc-900 border border-zinc-800 text-zinc-200' : 'bg-[#2CE59B]/10 border border-[#2CE59B]/20 text-zinc-100'
+                      m.is_staff ? 'bg-surface text-text-secondary' : 'bg-surface-selected border border-border-subtle text-text-primary'
                     }`}
                   >
                     <div className="text-[10px] text-zinc-500 mb-0.5">
@@ -656,12 +673,13 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
                 }}
                 maxLength={4000}
                 placeholder={s.replyPlaceholder}
-                className="flex-1 min-w-0 bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+                aria-label={s.replyPlaceholder}
+                className="lv-input flex-1 min-w-0 text-sm"
               />
               <button
                 onClick={sendReply}
                 disabled={replyBusy || replyText.trim().length === 0}
-                className="px-4 rounded-xl bg-[#2CE59B] text-black text-sm font-black disabled:opacity-50"
+                className="lv-button lv-button-primary px-4"
               >
                 {s.reply}
               </button>
@@ -677,7 +695,7 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={load} className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white">
+        <button onClick={load} aria-label={s.retry} className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface text-text-secondary hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
@@ -691,13 +709,13 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
           </button>
         </div>
       ) : tickets.length === 0 ? (
-        <div className="text-center py-12 text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800/50">{s.ticketsEmpty}</div>
+        <div className="lv-surface py-12 text-center text-text-muted">{s.ticketsEmpty}</div>
       ) : (
         tickets.map((t) => (
           <button
             key={t.id}
             onClick={() => openThread(t.id)}
-            className="w-full text-start bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 hover:bg-zinc-900 transition-colors"
+            className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-bold text-white break-words flex-1 min-w-0">{t.subject}</span>
@@ -823,26 +841,40 @@ export default function Support() {
     setTab('tickets');
   };
 
+  // Suggestions belong to the current turn, not to every historical message.
+  // Keeping only the latest assistant reply avoids a wall of duplicate chips
+  // and gives the server room to return context-specific next actions.
+  const latestAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
+  const activeChoices = latestAssistant?.reply?.choices ?? [];
+
   return (
-    <div className="w-full pb-28 text-zinc-300 min-h-screen">
+    <div className="flex h-full min-h-0 w-full flex-col bg-canvas text-text-secondary" data-support-layout>
       {/* header */}
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
+      <div className="z-40 flex shrink-0 items-center gap-3 border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label={s.back}
+          className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
-        <LifeBuoy className="w-5 h-5 text-[#2CE59B]" />
-        <h1 className="text-white font-bold text-lg flex-1">{s.title}</h1>
+        <LifeBuoy className="w-5 h-5 text-gold" aria-hidden="true" />
+        <h1 className="text-text-primary font-bold text-lg flex-1">{s.title}</h1>
       </div>
 
       {/* tabs */}
-      <div className="px-4 pt-3">
-        <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
+      <div className="shrink-0 px-4 pt-3">
+        <div className="mx-auto flex max-w-3xl rounded-lg bg-surface p-1" role="tablist" aria-label={s.title}>
           {(['assistant', 'tickets'] as const).map((tabId) => (
             <button
               key={tabId}
+              type="button"
+              role="tab"
+              aria-selected={tab === tabId}
               onClick={() => setTab(tabId)}
-              className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
-                tab === tabId ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+              className={`min-h-10 flex-1 rounded-md px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                tab === tabId ? 'bg-white/[0.07] text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
               }`}
             >
               {tabId === 'assistant' ? s.tabAssistant : s.tabTickets}
@@ -852,23 +884,26 @@ export default function Support() {
       </div>
 
       {tab === 'tickets' ? (
-        <div className="p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-3xl">
           <TicketsTab s={s} lang={lang} refreshKey={ticketsRefresh} />
+          </div>
         </div>
       ) : (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col">
           {/* conversation */}
-          <div className="p-4 space-y-3">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-support-conversation>
+            <div className="mx-auto max-w-3xl space-y-3 p-4 pb-5">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[92%] space-y-2 ${m.role === 'user' ? '' : 'w-full'}`}>
+                <div className="max-w-[92%] space-y-2 sm:max-w-[82%]">
                   <div
-                    className={`rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words inline-block ${
+                    className={`inline-block rounded-xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                       m.role === 'user'
-                        ? 'bg-[#2CE59B]/10 border border-[#2CE59B]/20 text-zinc-100'
+                        ? 'bg-surface-selected border border-border-subtle text-text-primary'
                         : m.error
-                          ? 'bg-red-500/10 border border-red-500/30 text-red-300'
-                          : 'bg-zinc-900 border border-zinc-800 text-zinc-200'
+                          ? 'lv-alert lv-alert-danger text-red-200'
+                          : 'bg-surface text-text-secondary'
                     }`}
                   >
                     {m.error && <AlertTriangle className="w-3.5 h-3.5 inline-block me-1 -mt-0.5" />}
@@ -883,28 +918,13 @@ export default function Support() {
                     </div>
                   )}
 
-                  {m.reply?.choices && m.reply.choices.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {m.reply.choices.map((ch, j) => (
-                        <button
-                          key={j}
-                          onClick={() => send({ intent: ch.intent, params: ch.params }, ch.label)}
-                          disabled={busy}
-                          className="px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-700 text-xs font-bold text-zinc-200 hover:border-[#2CE59B]/50 hover:text-white transition-colors disabled:opacity-50"
-                        >
-                          {ch.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
                   {m.reply?.links && m.reply.links.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {m.reply.links.map((l, j) => (
                         <button
                           key={j}
                           onClick={() => navigate(l.to)}
-                          className="px-3 py-1.5 rounded-full bg-[#2CE59B]/10 border border-[#2CE59B]/30 text-xs font-bold text-[#2CE59B] hover:bg-[#2CE59B]/20 transition-colors"
+                          className="lv-button lv-button-ghost min-h-9 rounded-full px-3 py-1.5 text-xs text-gold"
                         >
                           {l.label}
                         </button>
@@ -915,7 +935,7 @@ export default function Support() {
                   {m.reply?.handoff && !showTicketForm && (
                     <button
                       onClick={() => (isAuthenticated ? setShowTicketForm(true) : signIn())}
-                      className="px-3 py-2 rounded-xl bg-[#2CE59B] text-black text-xs font-black flex items-center gap-1.5"
+                      className="lv-button lv-button-primary min-h-10 px-3 text-xs"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       {isAuthenticated ? s.openTicketCta : s.signIn}
@@ -931,11 +951,29 @@ export default function Support() {
               <TicketForm s={s} lang={lang} loc={loc} initial={prefill} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
             )}
             <div ref={bottomRef} />
+            </div>
           </div>
 
-          {/* input */}
-          <div className="fixed bottom-0 inset-x-0 z-40 bg-black/90 backdrop-blur-xl border-t border-zinc-800/60 p-3">
-            <div className="max-w-2xl mx-auto flex gap-2">
+          {/* Suggestions and composer form one persistent control. They stay in
+              flex flow, so the keyboard resizes the conversation instead of
+              covering its final message. */}
+          <div className="z-40 shrink-0 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-support-composer>
+            {!showTicketForm && activeChoices.length > 0 && (
+              <div className="mx-auto mb-2 flex max-w-3xl gap-2 overflow-x-auto pb-0.5 hide-scrollbar" data-support-suggestions>
+                {activeChoices.map((choice, index) => (
+                  <button
+                    key={`${choice.intent}:${index}`}
+                    type="button"
+                    onClick={() => send({ intent: choice.intent, params: choice.params }, choice.label)}
+                    disabled={busy}
+                    className="shrink-0 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-selected hover:text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="max-w-3xl mx-auto flex gap-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -944,19 +982,21 @@ export default function Support() {
                 }}
                 maxLength={500}
                 placeholder={s.inputPlaceholder}
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+                aria-label={s.inputPlaceholder}
+                className="lv-input flex-1 min-w-0 text-sm"
               />
               <button
+                type="button"
                 onClick={sendText}
                 disabled={busy || input.trim().length === 0}
-                className="px-4 rounded-xl bg-[#2CE59B] text-black font-black disabled:opacity-50"
+                className="lv-button lv-button-primary w-12 shrink-0 px-0"
                 aria-label={s.send}
               >
                 <Send className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
