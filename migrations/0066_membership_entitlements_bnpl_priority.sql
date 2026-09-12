@@ -22,30 +22,30 @@ WHEN NEW.kind = 'charge' AND NOT EXISTS (
   SELECT 1 FROM bnpl_ledger l WHERE l.idempotency_key = NEW.idempotency_key
 )
 BEGIN
-  SELECT CASE WHEN NEW.amount_iqd <= 0 THEN RAISE(ABORT, 'BNPL_AMOUNT_INVALID') END;
-  SELECT CASE WHEN NEW.order_id IS NULL THEN RAISE(ABORT, 'BNPL_ORDER_REQUIRED') END;
-  SELECT CASE WHEN NOT EXISTS (
+  SELECT RAISE(ABORT, 'BNPL_AMOUNT_INVALID') WHERE NEW.amount_iqd <= 0;
+  SELECT RAISE(ABORT, 'BNPL_ORDER_REQUIRED') WHERE NEW.order_id IS NULL;
+  SELECT RAISE(ABORT, 'BNPL_ORDER_INVALID') WHERE NOT EXISTS (
     SELECT 1 FROM orders o
      WHERE o.id = NEW.order_id AND o.user_id = NEW.user_id AND o.payment_method_id = 'bnpl'
-  ) THEN RAISE(ABORT, 'BNPL_ORDER_INVALID') END;
-  SELECT CASE WHEN NOT EXISTS (
+  );
+  SELECT RAISE(ABORT, 'BNPL_PRO_REQUIRED') WHERE NOT EXISTS (
     SELECT 1 FROM memberships m
      WHERE m.user_id = NEW.user_id AND m.tier = 'pro' AND m.state = 'active'
        AND (m.expires_at IS NULL OR m.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  ) THEN RAISE(ABORT, 'BNPL_PRO_REQUIRED') END;
-  SELECT CASE WHEN EXISTS (
+  );
+  SELECT RAISE(ABORT, 'BNPL_RESTRICTED') WHERE EXISTS (
     SELECT 1 FROM restriction_cases r, json_each(r.benefit_flags) f
      WHERE r.user_id = NEW.user_id AND r.state = 'active'
        AND f.value IN ('bnpl')
-  ) THEN RAISE(ABORT, 'BNPL_RESTRICTED') END;
-  SELECT CASE WHEN NOT EXISTS (
+  );
+  SELECT RAISE(ABORT, 'BNPL_NOT_APPROVED') WHERE NOT EXISTS (
     SELECT 1 FROM bnpl_accounts a
      WHERE a.user_id = NEW.user_id AND a.state = 'approved' AND a.credit_limit_iqd > 0
-  ) THEN RAISE(ABORT, 'BNPL_NOT_APPROVED') END;
-  SELECT CASE WHEN NOT EXISTS (
+  );
+  SELECT RAISE(ABORT, 'BNPL_IDENTITY_REQUIRED') WHERE NOT EXISTS (
     SELECT 1 FROM kyc_cases k WHERE k.user_id = NEW.user_id AND k.state = 'verified'
-  ) THEN RAISE(ABORT, 'BNPL_IDENTITY_REQUIRED') END;
-  SELECT CASE WHEN NOT EXISTS (
+  );
+  SELECT RAISE(ABORT, 'BNPL_APPROVED_ADDRESS_REQUIRED') WHERE NOT EXISTS (
     SELECT 1
       FROM orders o JOIN approved_addresses a ON a.user_id = o.user_id AND a.state = 'approved'
      WHERE o.id = NEW.order_id
@@ -56,8 +56,8 @@ BEGIN
            AND lower(trim(a.address)) = lower(trim(json_extract(o.address_snapshot, '$.address')))
          )
        )
-  ) THEN RAISE(ABORT, 'BNPL_APPROVED_ADDRESS_REQUIRED') END;
-  SELECT CASE WHEN (
+  );
+  SELECT RAISE(ABORT, 'BNPL_LIMIT_EXCEEDED') WHERE (
     SELECT MAX(0, COALESCE(SUM(CASE
       WHEN l.kind = 'charge' THEN l.amount_iqd
       WHEN l.kind = 'repayment' THEN -l.amount_iqd
@@ -65,7 +65,7 @@ BEGIN
       FROM bnpl_ledger l WHERE l.user_id = NEW.user_id
   ) + NEW.amount_iqd > (
     SELECT a.credit_limit_iqd FROM bnpl_accounts a WHERE a.user_id = NEW.user_id
-  ) THEN RAISE(ABORT, 'BNPL_LIMIT_EXCEEDED') END;
+  );
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_bnpl_repayment_guard
@@ -74,14 +74,14 @@ WHEN NEW.kind = 'repayment' AND NOT EXISTS (
   SELECT 1 FROM bnpl_ledger l WHERE l.idempotency_key = NEW.idempotency_key
 )
 BEGIN
-  SELECT CASE WHEN NEW.amount_iqd <= 0 THEN RAISE(ABORT, 'BNPL_AMOUNT_INVALID') END;
-  SELECT CASE WHEN NEW.amount_iqd > (
+  SELECT RAISE(ABORT, 'BNPL_AMOUNT_INVALID') WHERE NEW.amount_iqd <= 0;
+  SELECT RAISE(ABORT, 'BNPL_REPAYMENT_EXCEEDS_DEBT') WHERE NEW.amount_iqd > (
     SELECT MAX(0, COALESCE(SUM(CASE
       WHEN l.kind = 'charge' THEN l.amount_iqd
       WHEN l.kind = 'repayment' THEN -l.amount_iqd
       ELSE l.amount_iqd END), 0))
       FROM bnpl_ledger l WHERE l.user_id = NEW.user_id
-  ) THEN RAISE(ABORT, 'BNPL_REPAYMENT_EXCEEDS_DEBT') END;
+  );
 END;
 
 INSERT OR IGNORE INTO admin_settings(key, value) VALUES
