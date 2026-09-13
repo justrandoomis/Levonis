@@ -1,0 +1,97 @@
+name: 44 - Verify authorized live release (read-only)
+
+on:
+  push:
+    branches: [codex/live-release-20260913]
+    paths: ['.github/workflows/verify-release-live-once.yml']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Wait for the exact gated deployment to complete
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/live-proof
+          for attempt in $(seq 1 66); do
+            gh api repos/justrandoomis/Levonis/actions/runs/34776491047 > /tmp/deployment.json
+            jq -e '.head_sha == "66de31c93ac2ef601b1c3bf9442ee10e19b6ea4c" and .path == ".github/workflows/deploy-staging-code.yml"' /tmp/deployment.json > /dev/null
+            if [ "$(jq -r .status /tmp/deployment.json)" = completed ]; then
+              jq '{id,head_sha,status,conclusion,html_url}' /tmp/deployment.json > /tmp/live-proof/deployment.json
+              jq -e '.conclusion == "success"' /tmp/deployment.json > /dev/null
+              exit 0
+            fi
+            sleep 20
+          done
+          echo 'Deployment did not complete within this observation window.'
+          exit 1
+      - name: Verify public APIs and the new served assets without writing data
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, re, time, urllib.request
+          from pathlib import Path
+          root = 'https://levonis-iq.com'
+          def get(path):
+              assert path.startswith('/') and not path.startswith('//')
+              request = urllib.request.Request(root + path, headers={'User-Agent': 'Levonis-Release-Verification/1.0', 'Cache-Control': 'no-cache'})
+              with urllib.request.urlopen(request, timeout=40) as response:
+                  assert response.status == 200, (path, response.status)
+                  return response.read().decode('utf-8')
+          html = get('/?release=66de31c93ac2')
+          css_files = sorted(set(re.findall(r'/assets/[A-Za-z0-9_.-]+\.css', html)))
+          js_files = sorted(set(re.findall(r'/assets/[A-Za-z0-9_.-]+\.js', html)))
+          assert css_files and js_files, 'Live HTML did not expose its built assets'
+          css = '\n'.join(get(path) for path in css_files)
+          js = '\n'.join(get(path) for path in js_files)
+          for marker in ['lv-character-anchor', 'lv-character-header', 'lv-character-home', 'lv-app-intro']:
+              assert marker in css, f'Missing live CSS marker: {marker}'
+          for marker in ['data-bloub-anchor', 'data-bloub-rendered', 'levonis:bloub-state']:
+              assert marker in js, f'Missing live character marker: {marker}'
+          chunks = {}
+          for name, markers in [('Policies', ['prepare-terms','published_at','effective_at']), ('Checkout',['policyLocale'])]:
+              match = re.search(r'\b' + name + r'-[A-Za-z0-9_-]+\.js', js)
+              assert match, f'Missing {name} chunk reference'
+              path = '/assets/' + match.group(0)
+              body = get(path)
+              for marker in markers:
+                  assert marker in body, f'Missing {name} marker: {marker}'
+              chunks[name] = path
+          statuses = {}
+          for path in ['/api/health','/api/home','/api/products?limit=1','/api/memberships/plans','/api/policies?lang=ar','/api/policies?lang=en','/api/policies?lang=ckb','/policy']:
+              get(path)
+              statuses[path] = 200
+              time.sleep(0.2)
+          proof = {'source':'66de31c93ac2ef601b1c3bf9442ee10e19b6ea4c','site':root,'apis':statuses,'stylesheets':css_files,'entrypoints':js_files,'verified_chunks':chunks,'writes':0}
+          Path('/tmp/live-proof/public-proof.json').write_text(json.dumps(proof,indent=2))
+          print(json.dumps(proof,indent=2))
+          PY
+      - name: Extract a bounded deployment summary
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api repos/justrandoomis/Levonis/actions/jobs/103775441897/logs > /tmp/deploy.log
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('/tmp/deploy.log').read_text(errors='replace')
+          wanted = [line for line in text.splitlines() if re.search(r'Current Version ID:|0070_policy_publication_acceptance|# (tests|pass|fail) [0-9]|test:unit: root and workspace suites both green|foreign_key_check violations:', line)]
+          Path('/tmp/live-proof/deployment-summary.txt').write_text('\n'.join(wanted[-35:])+'\n')
+          print('\n'.join(wanted[-35:]))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: live-release-proof-${{ github.run_id }}
+          path: /tmp/live-proof/
+          retention-days: 14
