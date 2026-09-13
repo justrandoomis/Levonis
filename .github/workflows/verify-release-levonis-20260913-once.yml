@@ -1,12 +1,12 @@
-# Isolated read-only release proof; no application source or Main changes.
-# The first probe incorrectly expected /policy to redirect; it is a working
-# render alias. Assert its visible contents instead. Home product shelves load
-# on intersection, so browse the real catalog before testing a product link.
+# Isolated read-only release proof; never modifies Main or application data.
+# Assert /policy's rendered reader (it is not a redirect). Catalog coverage is
+# data-dependent: compare the real anonymous API with the rendered empty state
+# rather than create a test product on a customer's live database.
 name: 43 - Verify published Levonis release (read-only)
 on:
   push:
     branches: [codex/release-levonis-20260913]
-    paths: ['.github/workflows/verify-release-levonis-20260913-once.yml']
+    paths: ['.github/workflows/verify-release-levonis-20260913-once.yml', '.github/levonis-release-live-proof.cjs']
 permissions:
   contents: read
   actions: read
