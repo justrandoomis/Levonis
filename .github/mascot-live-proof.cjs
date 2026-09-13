@@ -6,14 +6,33 @@ fs.mkdirSync(out,{recursive:true});
 const report={origin,time:new Date().toISOString(),api:[],profiles:[],scope:'Anonymous read-only checks; no live users, orders or typing messages created. Device profiles are emulation, not physical hardware.'};
 const save=()=>fs.writeFileSync(out+'/report.json',JSON.stringify(report,null,2));
 async function state(page,name){await page.waitForFunction(s=>document.querySelector('.lv-app-intro')?.dataset.mascotState===s,name,{timeout:15000});}
-async function settle(page){await page.waitForFunction(()=>document.querySelector('.lv-app-intro')?.dataset.phase==='docked',null,{timeout:60000});await state(page,'idle');}
-async function geometry(page,kind){
+// A controller state swap precedes its 230ms SVG interpolation. In particular,
+// the real not-found request raises an error before returning to idle. Measure
+// the settled IDLE path, not an intermediate error shape with an idle label.
+// All existing minimum-size, padding, hit-target and clearance assertions stay.
+const idlePath=[50,7,74,6,91,23,92,47,94,71,78,91,52,93,26,95,7,80,8,53,9,25,24,8,50,7];
+async function settle(page){
+  await page.evaluate(()=>window.__mascotIdlePaintAt=null);
+  await page.waitForFunction(expected=>{
+    const shell=document.querySelector('.lv-app-intro'),svg=document.querySelector('svg.lv-bloub');
+    const d=document.querySelector('[data-bloub-body]')?.getAttribute('d')??'';
+    const values=(d.match(/[-+]?(?:\d*\.)?\d+(?:e[-+]?\d+)?/gi)??[]).map(Number);
+    const valid=shell?.dataset.phase==='docked'&&shell.dataset.mascotState==='idle'&&svg?.dataset.expression==='idle'
+      &&values.length===expected.length&&values.every((n,i)=>Math.abs(n-expected[i])<.01);
+    if(!valid){window.__mascotIdlePaintAt=null;return false;}
+    window.__mascotIdlePaintAt??=performance.now();
+    return performance.now()-window.__mascotIdlePaintAt>=320;
+  },idlePath,{timeout:60000,polling:'raf'});
+}
+async function geometry(page,kind,item){
   const g=await page.evaluate(()=>{
     const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};};
     const a=document.querySelector('[data-bloub-occupied="true"]');
     const svg=document.querySelector('svg.lv-bloub'),body=document.querySelector('[data-bloub-body]');
-    return {kind:a?.dataset.bloubAnchor,svg:box(svg),body:box(body),anchor:box(a),hit:box(a.parentElement),viewBox:svg.getAttribute('viewBox'),capsules:[...document.querySelectorAll('[data-bottom-nav-group]')].map(box),overflow:document.documentElement.scrollWidth>innerWidth};
+    return {state:document.querySelector('.lv-app-intro')?.dataset.mascotState,expression:svg?.dataset.expression,path:body?.getAttribute('d'),kind:a?.dataset.bloubAnchor,svg:box(svg),body:box(body),anchor:box(a),hit:box(a.parentElement),viewBox:svg.getAttribute('viewBox'),capsules:[...document.querySelectorAll('[data-bottom-nav-group]')].map(box),overflow:document.documentElement.scrollWidth>innerWidth};
   });
+  item.geometry??=[];item.geometry.push(g);save();
+  assert.equal(g.state,'idle');assert.equal(g.expression,'idle');
   assert.equal(g.kind,kind);assert.equal(g.viewBox,'3 3 94 94');assert.equal(g.overflow,false);
   assert.equal(await page.locator('svg.lv-bloub').count(),1);
   assert.ok(g.body.w>= (kind==='bottom-home'?48:44));assert.ok(g.body.w/g.svg.w>.78);assert.ok(g.body.w/g.hit.w>.70);
@@ -48,14 +67,14 @@ async function geometry(page,kind){
     const page=await context.newPage();page.on('pageerror',e=>item.errors.push(e.message));
     try{
       const r=await page.goto(origin,{waitUntil:'domcontentloaded',timeout:60000});assert.equal(r.status(),200);
-      await settle(page);item.home=await geometry(page,'bottom-home');
+      await settle(page);item.home=await geometry(page,'bottom-home',item);
       await page.screenshot({path:`${out}/${name}-home.png`});
       await page.evaluate(()=>window.__originalMascot=document.querySelector('svg.lv-bloub'));
       await page.locator('a[href="/products"]').first().click();await page.waitForURL(/\/products(?:\?|$)/);await settle(page);
       assert.ok(await page.evaluate(()=>window.__originalMascot===document.querySelector('svg.lv-bloub')));
       if(products){
         const product=page.locator('a[href^="/product/"]').first();await product.waitFor({timeout:30000});await product.click();await settle(page);
-        item.product=await geometry(page,'top-header');item.productScope='Published product';
+        item.product=await geometry(page,'top-header',item);item.productScope='Published product';
         assert.ok(await page.evaluate(()=>window.__originalMascot===document.querySelector('svg.lv-bloub')));
         await page.locator('a.lv-character-home').first().click();
       }else{
@@ -65,8 +84,7 @@ async function geometry(page,kind){
       }
       await page.waitForURL(origin+'/');await settle(page);
       assert.ok(await page.evaluate(()=>window.__originalMascot===document.querySelector('svg.lv-bloub')));
-      // Exercise the shipped public presentation-event adapter, not a real
-      // failed payment or a production write merely to provoke an expression.
+      // Presentation-event adapter, not real failed payments or live writes.
       for(const expression of ['loading','notify','success','error']){
         await page.evaluate(s=>window.dispatchEvent(new CustomEvent('levonis:bloub-state',{detail:{state:s,durationMs:650}})),expression);
         await state(page,expression);
@@ -75,11 +93,11 @@ async function geometry(page,kind){
           await page.waitForFunction(before=>getComputedStyle(document.querySelector('[data-bloub-gaze]')).transform!==before,before,{timeout:1500,polling:'raf'});
         }
         if(expression==='error'&&width===390)await page.screenshot({path:`${out}/${name}-error.png`});
-        await state(page,'idle');
+        await settle(page);
       }
       if(!products){
         await page.goto(origin+'/product/mascot-readonly-not-a-product',{waitUntil:'domcontentloaded'});await settle(page);
-        item.notFoundHeader=await geometry(page,'top-header');
+        item.notFoundHeader=await geometry(page,'top-header',item);
         await page.screenshot({path:`${out}/${name}-header.png`});
         await page.locator('a.lv-character-home').first().click();await page.waitForURL(origin+'/');await settle(page);
       }
@@ -87,7 +105,7 @@ async function geometry(page,kind){
       await page.waitForFunction(()=>document.querySelector('svg.lv-bloub')?.dataset.reduced==='true');
       for(const selector of ['.lv-bloub-breath','.lv-bloub-gaze','.lv-bloub-blink'])assert.equal(await page.locator(selector).evaluate(e=>getComputedStyle(e).animationName),'none');
       assert.deepEqual(item.errors,[]);item.result='passed';console.log(`PASS ${name}: actual body ${item.home.body.w.toFixed(1)}px, independent hit ${item.home.hit.w.toFixed(1)}px, live navigation/persistence, expressions and reduced motion`);
-    }catch(e){item.result='failed';item.error=String(e);await page.screenshot({path:`${out}/${name}-failure.png`}).catch(()=>{});throw e;}
+    }catch(e){item.result='failed';item.error=String(e);item.failureState=await page.evaluate(()=>({phase:document.querySelector('.lv-app-intro')?.dataset.phase,state:document.querySelector('.lv-app-intro')?.dataset.mascotState,path:document.querySelector('[data-bloub-body]')?.getAttribute('d')})).catch(()=>null);await page.screenshot({path:`${out}/${name}-failure.png`}).catch(()=>{});throw e;}
     finally{save();await browser.close();}
   }
   report.result='passed';save();console.log('All eight anonymous phone/tablet/desktop profiles passed without production writes.');
