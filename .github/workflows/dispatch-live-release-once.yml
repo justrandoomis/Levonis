@@ -1,0 +1,51 @@
+name: 42 - Dispatch owner-authorized live release once
+
+on:
+  push:
+    branches: [codex/live-release-20260913]
+    paths: ['.github/workflows/dispatch-live-release-once.yml']
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: levonis-authorized-live-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/live-release-20260913' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify the exact reviewed source and invoke the existing gated live workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 865492f7c6ac34b69b3828fa4b69236cdea0f344
+          DEPLOY_REF: codex/persistent-bloub-policy
+          REVIEWED_HEAD: 66de31c93ac2ef601b1c3bf9442ee10e19b6ea4c
+          BROWSER_SOURCE: 48ecfeb1431e451c5494bc988708c2e569d9f42c
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo='justrandoomis/Levonis'
+          actual=$(gh api "repos/$repo/git/ref/heads/Main" --jq '.object.sha')
+          test "$actual" = "$EXPECTED_MAIN" || { echo 'Main moved; refusing to deploy unreviewed code.'; exit 1; }
+          target=$(gh api "repos/$repo/git/ref/heads/$DEPLOY_REF" --jq '.object.sha')
+          test "$target" = "$REVIEWED_HEAD" || { echo 'Reviewed branch moved; refusing to deploy.'; exit 1; }
+          gh api "repos/$repo/actions/runs/34776176520" > /tmp/browser-review.json
+          jq -e '.head_sha == "9638fb8db2a64a41403a691c9e1515293b89b085" and .status == "completed" and .conclusion == "success"' /tmp/browser-review.json > /dev/null
+          gh api "repos/$repo/compare/$BROWSER_SOURCE...$REVIEWED_HEAD" > /tmp/changes.json
+          jq -e '.total_commits == 1 and ([.files[].filename] == ["migrations/0070_policy_publication_acceptance.sql"])' /tmp/changes.json > /dev/null
+          # This is the UNCHANGED deployment workflow, including its mandatory
+          # complete type/lint/unit/build checks BEFORE any migration or deploy.
+          workflow=$(gh api "repos/$repo/contents/.github/workflows/deploy-staging-code.yml?ref=$REVIEWED_HEAD" --jq '.sha')
+          test "$workflow" = '2637f3c5ec65e1ee398bb183b3363d8cd482af9a'
+          existing=$(gh api "repos/$repo/actions/runs?event=workflow_dispatch&head_sha=$REVIEWED_HEAD&per_page=100" --jq '[.workflow_runs[] | select(.path == ".github/workflows/deploy-staging-code.yml" and .conclusion != "cancelled")][0].html_url // empty')
+          if [ -n "$existing" ]; then
+            echo "Existing live deployment: $existing"
+            exit 0
+          fi
+          gh api --method POST "repos/$repo/actions/workflows/deploy-staging-code.yml/dispatches" -f "ref=$DEPLOY_REF" -f 'inputs[confirm]=DEPLOY-CODE'
+          echo "Started the existing code-only live pipeline for $REVIEWED_HEAD. Its complete checks must pass before any production change. No test, confirmation or migration gate has been removed."
