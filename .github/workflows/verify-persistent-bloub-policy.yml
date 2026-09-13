@@ -1,0 +1,57 @@
+name: 40 - Verify persistent Bloub and policies (no deployment)
+
+on:
+  push:
+    branches: [codex/persistent-bloub-policy]
+  pull_request:
+    branches: [Main]
+    paths:
+      - 'src/components/bloub/**'
+      - 'src/components/BottomNav.tsx'
+      - 'src/App.tsx'
+      - 'src/pages/Policies.tsx'
+      - 'worker/routes/policies.ts'
+      - 'worker/lib/policy*.ts'
+      - 'tests/*bloub*'
+      - 'tests/*Bloub*'
+      - 'tests/*policy*'
+      - 'tests/*Policy*'
+      - '.github/workflows/verify-persistent-bloub-policy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-bloub-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # Repository-only snapshot for reproducible review in sessions without
+      # git network access. No .git metadata, runner environment or secrets.
+      - name: Archive exact reviewed source
+        run: git archive --format=tar.gz HEAD -o /tmp/levonis-reviewed-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: levonis-reviewed-source-${{ github.sha }}
+          path: /tmp/levonis-reviewed-source.tar.gz
+          retention-days: 3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: TypeScript, lint and architecture checks
+        run: npm run check
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: npm run test:unit
+      - name: Build without deployment
+        if: ${{ !cancelled() }}
+        run: npm run build
