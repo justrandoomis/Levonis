@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { useReducedMotion } from 'motion/react';
+import { useMascotReducedMotion } from './useMascotReducedMotion';
 import { useLanguage } from '../../LanguageContext';
 import BloubHome from './BloubHome';
 import { mascot } from '../../lib/mascot';
@@ -32,7 +32,7 @@ type Phase = 'loading' | 'travelling' | 'docked' | 'hidden';
 export default function AppIntro({ ready }: { ready: boolean }) {
   const location = useLocation();
   const { loc } = useLanguage();
-  const reduced = !!useReducedMotion();
+  const reduced = useMascotReducedMotion();
   const [frame, setFrame] = React.useState<CharacterFrame>(centerFrame);
   const frameRef = React.useRef(frame);
   const [phase, setPhase] = React.useState<Phase>('loading');
@@ -53,6 +53,12 @@ export default function AppIntro({ ready }: { ready: boolean }) {
   React.useEffect(() => {
     if (failed) return;
     mascot.setVisible(!document.hidden);
+    // Reducing motion can cancel a CSS transition without transitionend.
+    // Settle that same persistent node instead of leaving phase=travelling.
+    if (reduced && completedRef.current) {
+      setPhase('docked');
+      mascot.navigationComplete();
+    }
     let frameId = 0;
     let settleTimer = 0;
     let animateNext = false;

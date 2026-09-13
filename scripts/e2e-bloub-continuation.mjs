@@ -133,6 +133,26 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
     await click(page,'#product');await aligned(page,'top-header');
     for(const element of ['svg.lv-bloub','.lv-bloub-gaze','.lv-bloub-blink','.lv-bloub-breath']) assert.equal(await page.locator(element).evaluate(e=>getComputedStyle(e).animationName),'none');
     await click(page,'#api-error');await state(page,'error');
+    await state(page,'idle');cases++;
+    // A preference changed while this page is OPEN must reach both React
+    // layers, not just the CSS query. No reload or replacement SVG allowed.
+    const preference=async(value)=>{
+      await page.emulateMedia({reducedMotion:value?'reduce':'no-preference'});
+      await page.waitForFunction(value=>
+        document.querySelector('svg.lv-bloub')?.dataset.reduced===String(value)
+        &&document.querySelector('.lv-app-intro')?.dataset.reducedMotion===String(value),value);
+      assert.ok(await page.evaluate(()=>window.__originalBloub===document.querySelector('svg.lv-bloub')));
+    };
+    await preference(false);
+    await click(page,'#api-load');await state(page,'loading');await animatedEyes(page);
+    await preference(true);await state(page,'loading');
+    for(const element of ['.lv-bloub-gaze','.lv-bloub-blink','.lv-bloub-breath']) assert.equal(await page.locator(element).evaluate(e=>getComputedStyle(e).animationName),'none');
+    await click(page,'#api-resolve');await state(page,'idle');await aligned(page,'top-header');
+    await preference(false);
+    await page.locator('.lv-character-home').click();
+    await page.waitForFunction(()=>document.querySelector('.lv-app-intro')?.dataset.phase==='travelling',null,{polling:'raf'});
+    await preference(true);await aligned(page,'bottom-home');await state(page,'idle');
+    console.log(`ok ${engineName}: runtime reduced motion toggles in both directions, preserves pending work/SVG, and settles interrupted travel`);
     await context.close();cases++;
   } finally {await browser.close();}
 }
