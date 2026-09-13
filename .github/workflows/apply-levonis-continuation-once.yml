@@ -1,0 +1,64 @@
+name: 41 - Apply reviewed continuation once (no deployment)
+
+on:
+  push:
+    branches: [codex/persistent-bloub-policy]
+    paths: ['.github/levonis-integration.patch']
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/persistent-bloub-policy' && github.event_name == 'push'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify exact authored integration and original parent
+        run: |
+          test "$(git rev-parse HEAD^)" = 'aa1951ccaf09a00778cda2bdae35c4c373b3892b'
+          sed 's/^ diff --git /diff --git /' .github/levonis-integration.patch > /tmp/levonis-integration.patch
+          echo 'fb123f2a56d920128ab3cc0e5ddcf8dcb61fe12098ca72a7b9b28d5605012a78  /tmp/levonis-integration.patch' | sha256sum --check
+          git apply --check --index /tmp/levonis-integration.patch
+          git apply --index /tmp/levonis-integration.patch
+          git diff --cached --check
+      - name: Save only the reviewed changes to the same draft branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: integrate persistent Bloub anchors and immutable policy reader'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/codex/persistent-bloub-policy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Focused regression tests
+        run: node --import tsx --test tests/bloubNavigation.test.ts tests/bloubGeometry.test.ts tests/policyReader.test.ts tests/policyPublication.test.ts
+      - name: Full type, lint and architecture checks
+        if: ${{ !cancelled() }}
+        run: npm run check
+      - name: All unit tests
+        if: ${{ !cancelled() }}
+        run: npm run test:unit
+      - name: Build without deployment
+        if: ${{ !cancelled() }}
+        run: npm run build
+      - name: Archive reviewed source only
+        if: ${{ always() }}
+        run: git archive --format=tar.gz HEAD -o /tmp/levonis-continuation-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: levonis-continuation-source
+          path: /tmp/levonis-continuation-source.tar.gz
+          retention-days: 7
