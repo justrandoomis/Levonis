@@ -14,7 +14,7 @@ jobs:
   verify:
     if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/release-interactive-mascot'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,12 +33,12 @@ jobs:
           mkdir -p /tmp/mascot-live-proof
           node --input-type=module <<'JS'
           import {writeFileSync} from 'node:fs';
-          const base='https://api.github.com/repos/justrandoomis/Levonis',source='a33dea17bd8119273dd2166ec269620ab27ff04e',previous='6b373ded26a1606fd4a545f9cf42c7dc5769094d';
+          const base='https://api.github.com/repos/justrandoomis/Levonis',source='fb2cc84415a8c218b91627c0e4465045a7404ba7',previous='fcc0717f6fd3b91b096afefea448c27a5a6533ec';
           const headers={Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json'};
           async function get(path){const r=await fetch(base+path,{headers});if(!r.ok)throw new Error('GitHub '+r.status);return r.json();}
           const reviewed=await get('/git/commits/'+source);
           let passed=false;
-          for(let attempt=0;attempt<85;attempt++){
+          for(let attempt=0;attempt<100;attempt++){
             const main=await get('/commits/Main');
             if(main.sha!==previous){
               if(main.commit.tree.sha!==reviewed.tree.sha||!main.parents.some(p=>p.sha===source))throw new Error('Unexpected Main source');
