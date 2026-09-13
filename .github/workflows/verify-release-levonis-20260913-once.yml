@@ -1,5 +1,7 @@
-# Isolated one-time release verification; never merged into Main.
-# Anonymous public GETs only. No users, carts, orders, payments or policies written.
+# Isolated read-only release proof; no application source or Main changes.
+# The first probe incorrectly expected /policy to redirect; it is a working
+# render alias. Assert its visible contents instead. Home product shelves load
+# on intersection, so browse the real catalog before testing a product link.
 name: 43 - Verify published Levonis release (read-only)
 on:
   push:
@@ -13,16 +15,15 @@ jobs:
   verify:
     if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/release-levonis-20260913' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install the same isolated browser driver used by the green regression gate
-        run: |
-          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
-          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
-      - name: Require successful deployment of the reviewed Main merge
+      - name: Require completed deployment and unchanged reviewed Main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -31,107 +32,21 @@ jobs:
           import {writeFileSync} from 'node:fs';
           const base='https://api.github.com/repos/justrandoomis/Levonis';
           const headers={Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json'};
+          async function get(path){const r=await fetch(base+path,{headers});if(!r.ok)throw new Error('GitHub '+r.status);return r.json();}
           const expected='6b373ded26a1606fd4a545f9cf42c7dc5769094d';
-          for(let i=0;i<88;i++) {
-            const r=await fetch(base+'/actions/runs?head_sha='+expected+'&event=workflow_dispatch&per_page=20',{headers});
-            if(!r.ok) throw new Error('Cannot read deployment state: '+r.status);
-            const data=await r.json();
-            const run=data.workflow_runs.find(r=>r.path==='.github/workflows/deploy-staging-code.yml'&&r.head_sha===expected);
-            if(run?.status==='completed') {
-              if(run.conclusion!=='success') throw new Error('Live deployment did not succeed: '+run.conclusion);
-              const mainResponse=await fetch(base+'/commits/Main',{headers});
-              if(!mainResponse.ok||(await mainResponse.json()).sha!==expected) throw new Error('Main moved during release verification');
-              writeFileSync('/tmp/levonis-live-proof/deployment.json',JSON.stringify({run_id:run.id,sha:expected,conclusion:run.conclusion,url:run.html_url},null,2));
-              console.log('Reviewed live deployment succeeded: '+run.id);
-              break;
-            }
-            if(i===87) throw new Error('Timed out awaiting the actual live deployment');
-            if(i%4===0) console.log('Awaiting reviewed deployment: '+(run?.status??'not yet dispatched'));
-            await new Promise(r=>setTimeout(r,15000));
-          }
+          const run=await get('/actions/runs/34779666070');
+          const main=await get('/commits/Main');
+          if(run.status!=='completed'||run.conclusion!=='success'||run.head_sha!==expected||main.sha!==expected)throw new Error('Deployment/source mismatch');
+          writeFileSync('/tmp/levonis-live-proof/deployment.json',JSON.stringify({run_id:run.id,sha:expected,result:run.conclusion,url:run.html_url},null,2));
           JS
-      - name: Public API and real mobile/desktop browser checks without mutations
+      - name: Install the same isolated browser driver as the green gate
         run: |
-          cat > /tmp/levonis-browser/live.cjs <<'JS'
-          const assert=require('node:assert/strict');
-          const fs=require('node:fs');
-          const {chromium,webkit}=require('playwright');
-          const origin='https://levonis-iq.com';
-          const out='/tmp/levonis-live-proof';
-          const report={origin,verified_at:new Date().toISOString(),api:[],browsers:[]};
-          function save(){fs.writeFileSync(out+'/report.json',JSON.stringify(report,null,2));}
-          async function settle(page){
-            await page.waitForFunction(()=>document.querySelector('.lv-app-intro')?.getAttribute('data-phase')==='docked',{},{timeout:60000});
-            await page.waitForTimeout(700);
-            assert.equal(await page.locator('svg.lv-bloub').count(),1,'One visible persistent SVG');
-            const geometry=await page.evaluate(()=>{
-              const target=document.querySelector('[data-bloub-occupied="true"]');
-              const svg=document.querySelector('.lv-app-intro__character');
-              if(!target||!svg)return null;
-              const a=target.getBoundingClientRect(),b=svg.getBoundingClientRect();
-              return {anchor:target.getAttribute('data-bloub-anchor'),dx:Math.abs(a.x+a.width/2-b.x-b.width/2),dy:Math.abs(a.y+a.height/2-b.y-b.height/2),size:b.width};
-            });
-            assert.ok(geometry&&geometry.dx<3&&geometry.dy<3,'Character must occupy measured live slot');
-            return geometry;
-          }
-          (async()=>{
-            fs.mkdirSync(out,{recursive:true});
-            for(const path of ['/api/health','/api/policies?lang=ar','/api/policies?lang=en','/api/policies?lang=ckb']){
-              const response=await fetch(origin+path,{signal:AbortSignal.timeout(30000)});
-              report.api.push({path,status:response.status});save();assert.equal(response.status,200,path);
-              const data=await response.json();
-              if(path.startsWith('/api/policies'))assert.ok(Array.isArray(data.policies),'Public policy list');
-            }
-            for(const [engine,language,width] of [[chromium,'ar',375],[webkit,'ar',375],[chromium,'en',1440],[webkit,'en',1440]]){
-              const name=engine.name()+'-'+language+'-'+width;
-              const browser=await engine.launch({headless:true});
-              const context=await browser.newContext({viewport:{width,height:812},locale:language==='ar'?'ar-IQ':'en-US'});
-              await context.addInitScript(lang=>localStorage.setItem('levo_lang',lang),language);
-              const blocked=[];
-              await context.route('**/*',route=>{
-                const method=route.request().method();
-                if(!['GET','HEAD','OPTIONS'].includes(method)){blocked.push(new URL(route.request().url()).pathname);return route.abort();}
-                return route.continue();
-              });
-              const page=await context.newPage();
-              const errors=[]; page.on('pageerror',e=>errors.push(e.message));
-              const item={name,blocked_write_requests:blocked,page_errors:errors};report.browsers.push(item);
-              try{
-                const home=await page.goto(origin+'/',{waitUntil:'domcontentloaded',timeout:60000});
-                assert.equal(home.status(),200);item.home=await settle(page);
-                await page.screenshot({path:out+'/'+name+'-home.png'});
-                await page.evaluate(()=>{window.__releaseSvg=document.querySelector('svg.lv-bloub');});
-                const product=page.locator('a[href^="/product/"]').first();
-                if(await product.count()){
-                  item.product_path=await product.getAttribute('href');
-                  await product.click({timeout:20000});
-                  await page.waitForURL(/\/product\//);
-                  item.product=await settle(page);
-                  assert.equal(await page.evaluate(()=>window.__releaseSvg===document.querySelector('svg.lv-bloub')),true,'Same SVG through real product navigation');
-                  assert.equal(item.product.anchor,'top-header');
-                  await page.screenshot({path:out+'/'+name+'-product.png'});
-                  await page.locator('a.lv-character-home').first().click();
-                  await page.waitForURL(origin+'/');await settle(page);
-                  assert.equal(await page.evaluate(()=>window.__releaseSvg===document.querySelector('svg.lv-bloub')),true,'Same SVG on Home return');
-                  item.home_navigation='passed';
-                }else item.product_navigation='No public product link present; not exercised';
-                await page.goto(origin+'/policy',{waitUntil:'domcontentloaded'});
-                await page.waitForURL(/\/policies/);await settle(page);
-                const heading=language==='ar'?'سياسات المتجر':'Store Policies';
-                await page.getByRole('heading',{name:heading,exact:true}).waitFor({timeout:30000});
-                await page.screenshot({path:out+'/'+name+'-policies.png'});
-                await page.goto(origin+'/policies/terms?version=0&lang='+language,{waitUntil:'domcontentloaded'});
-                await page.getByText(language==='ar'?'رقم نسخة السياسة غير صالح؛ لم تُعرض نسخة بديلة.':'Invalid policy version; no replacement version has been shown.',{exact:true}).waitFor({timeout:30000});
-                assert.equal(await page.locator('article').count(),0,'Invalid version must not display a replacement document');
-                assert.deepEqual(errors,[],'No unhandled frontend errors');
-                item.result='passed';console.log('PASS '+name+': actual public Home, same-SVG Product/Home, legacy policy route, invalid version');
-              }catch(error){item.result='failed';item.error=String(error);await page.screenshot({path:out+'/'+name+'-failure.png'}).catch(()=>{});throw error;}
-              finally{save();await browser.close();}
-            }
-            report.result='passed';save();console.log('All anonymous read-only live release probes passed.');
-          })().catch(error=>{report.result='failed';report.error=String(error);save();console.error(error);process.exitCode=1;});
-          JS
-          node /tmp/levonis-browser/live.cjs
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Actual published page contents and navigation, no mutations
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+        run: node .github/levonis-release-live-proof.cjs
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
