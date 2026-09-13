@@ -254,7 +254,8 @@ function StorefrontApp() {
         <Route path="/about" element={<Storefront store={store} />} />
         <Route path="/reviews" element={<Storefront store={store} />} />
         <Route path="/p/:productSlug" element={<StorefrontProduct />} />
-        <Route path="/policies" element={<Policies />} />
+        <Route path="/policy" element={<Policies />} />
+          <Route path="/policies" element={<Policies />} />
         <Route path="/policies/:key" element={<Policies />} />
         {/* Account, cart and checkout are the PLATFORM's, reached from the
             shop. They are deliberately not re-implemented per store: one
@@ -540,6 +541,7 @@ function AppContent() {
               call and reads no user object, so there was nothing for a
               sign-in to protect. */}
           <Route path="/tools" element={<Tools />} />
+          <Route path="/policy" element={<Policies />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/:key" element={<Policies />} />
           {/* §3.1 — referrals live on their own page, reached from the icon

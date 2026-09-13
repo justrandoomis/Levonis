@@ -1,12 +1,17 @@
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
-import { newSqlite, SqliteD1, createTableSql } from './fixtures/d1';
+import { newSqlite, SqliteD1, createTableSql, ROOT } from './fixtures/d1';
 import { policyPublicationBatch, isPolicyPublicationConflict, type PolicyPublicationRow } from '../worker/lib/policyPublication';
 import { policyDocHash } from '../worker/lib/policyOps';
 
 function fixture() {
   const raw = newSqlite();
+  raw.exec('CREATE TABLE users(id TEXT PRIMARY KEY); CREATE TABLE orders(id TEXT PRIMARY KEY);');
   raw.exec(createTableSql('0003_final_phase.sql','policy_documents'));
+  raw.exec(createTableSql('0003_final_phase.sql','policy_acceptances'));
+  raw.exec(readFileSync(join(ROOT, 'migrations/0070_policy_publication_acceptance.sql'), 'utf8'));
   const rows: PolicyPublicationRow[] = ['ar','en'].map((lang) => ({id:`p2_${lang}`,key:'terms',version:2,lang:lang as 'ar'|'en',title:'Title',body:'Reviewed body',hash:'draft-hash',status:'draft'}));
   const seed = (r: PolicyPublicationRow) => raw.prepare('INSERT INTO policy_documents(id,key,version,lang,title,body,hash,status) VALUES(?,?,?,?,?,?,?,?)').run(r.id,r.key,r.version,r.lang,r.title,r.body,r.hash,r.status);
   seed({...rows[0],id:'p1_ar',version:1,hash:'accepted-old-hash',body:'Accepted old body',status:'published'});
@@ -47,4 +52,17 @@ for (const change of ['edit','delete','add-locale','newer-published','same-publi
 test('publication requires an Arabic draft source',async () => {
   const {raw,rows,db}=fixture();
   try {await assert.rejects(policyPublicationBatch(db,'terms',2,[rows[1]]),/Arabic source/);} finally {raw.close();}
+});
+
+test('new publications record server dates and leave historical unknown dates untouched', async () => {
+  const {raw,rows,db}=fixture();
+  try {
+    const p=await policyPublicationBatch(db,'terms',2,rows);
+    await db.batch(p.statements);
+    const current=await db.prepare("SELECT published_at,effective_at FROM policy_documents WHERE id='p2_ar'").first<{published_at:string;effective_at:string}>();
+    assert.ok(current && Number.isFinite(Date.parse(current.published_at)));
+    assert.equal(current.published_at,current.effective_at);
+    const old=await db.prepare("SELECT published_at,effective_at FROM policy_documents WHERE id='p1_ar'").first<{published_at:null;effective_at:null}>();
+    assert.equal(old?.published_at,null); assert.equal(old?.effective_at,null);
+  } finally {raw.close();}
 });

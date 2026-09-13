@@ -33,12 +33,17 @@ const STRINGS = {
     back: 'رجوع',
     notPublished: 'هذه السياسة غير منشورة بعد — ستظهر هنا فور نشرها رسميًا.',
     contents: 'محتويات الوثيقة',
+    publishedAt: 'تاريخ النشر',
+    effectiveAt: 'تاريخ السريان',
+    unknownDate: 'غير موثّق في النسخة القديمة',
     invalidVersion: 'رقم نسخة السياسة غير صالح؛ لم تُعرض نسخة بديلة.',
     loadingDocument: 'جارٍ تحميل نسخة السياسة…',
     // admin
     adminTitle: 'المسودات (للإدارة فقط)',
     adminNote: 'هذه مسودات غير منشورة ولا يراها الزبائن. راجع الأحكام التجارية مع المالك والأحكام القانونية مع مختص محلي قبل النشر. النشر دائم ومدقَّق ولا يمثل إقرارًا تلقائيًا بالامتثال القانوني.',
     seed: 'إدراج مسودات LEVONIS الأصلية',
+    prepareTerms: 'إعداد مسودة الشروط المحدثة (25 قسمًا)',
+    termsPrepared: 'مسودة الشروط المحدثة جاهزة للمراجعة؛ لم تُنشر تلقائيًا.',
     seeded: (n: number) => `أُدرجت مسودات ${n} وثيقة.`,
     allSeeded: 'كل الوثائق لديها صفوف بالفعل — لم يُدرج شيء.',
     draft: 'مسودة',
@@ -69,11 +74,16 @@ const STRINGS = {
     back: 'Back',
     notPublished: 'This policy is not published yet — it will appear here as soon as it is officially published.',
     contents: 'On this page',
+    publishedAt: 'Published',
+    effectiveAt: 'Effective',
+    unknownDate: 'Not recorded for this historical version',
     invalidVersion: 'Invalid policy version; no replacement version has been shown.',
     loadingDocument: 'Loading this policy version…',
     adminTitle: 'Drafts (admin only)',
     adminNote: 'These drafts are not visible to customers. Confirm business rules with the owner and obtain qualified local legal review before publication. Publishing is permanent and audited, not an automatic certification of legal compliance.',
     seed: 'Seed the original LEVONIS drafts',
+    prepareTerms: 'Prepare updated terms draft (25 sections)',
+    termsPrepared: 'The revised terms draft is ready for review; it was not automatically published.',
     seeded: (n: number) => `Seeded drafts for ${n} document(s).`,
     allSeeded: 'Every document already has rows — nothing was seeded.',
     draft: 'Draft',
@@ -104,11 +114,16 @@ const STRINGS = {
     back: 'گەڕانەوە',
     notPublished: 'ئەم سیاسەتە هێشتا بڵاونەکراوەتەوە — هەر کە بە فەرمی بڵاوکرایەوە لێرە دەردەکەوێت.',
     contents: 'ناوەڕۆکی بەڵگەنامە',
+    publishedAt: 'بەرواری بڵاوکردنەوە',
+    effectiveAt: 'بەرواری جێبەجێبوون',
+    unknownDate: 'بۆ ئەم وەشانە کۆنە تۆمار نەکراوە',
     invalidVersion: 'ژمارەی وەشانی سیاسەت نادروستە؛ وەشانی جێگرەوە پیشان نەدرا.',
     loadingDocument: 'بارکردنی ئەم وەشانەی سیاسەت…',
     adminTitle: 'ڕەشنووسەکان (تەنها بۆ بەڕێوەبەرایەتی)',
     adminNote: 'ئەم ڕەشنووسانە کڕیاران نایانبینن. پێش بڵاوکردنەوە مەرجە بازرگانییەکان لەگەڵ خاوەن و مەرجە یاساییەکان لەگەڵ پسپۆڕێکی ناوخۆیی پێداچوونەوە بکە. بڵاوکردنەوە هەمیشەیی و تۆمارکراوە؛ بڕوانامەی پابەندبوونی یاسایی نییە.',
     seed: 'دانانی ڕەشنووسە ڕەسەنەکانی LEVONIS',
+    prepareTerms: 'ئامادەکردنی ڕەشنووسی نوێی مەرجەکان (25 بەش)',
+    termsPrepared: 'ڕەشنووسی نوێی مەرجەکان بۆ پێداچوونەوە ئامادەیە؛ بە خۆکار بڵاو نەکراوەتەوە.',
     seeded: (n: number) => `ڕەشنووسی ${n} بەڵگەنامە دانرا.`,
     allSeeded: 'هەموو بەڵگەنامەکان پێشتر ڕیزیان هەیە — هیچ دانەنرا.',
     draft: 'ڕەشنووس',
@@ -142,6 +157,8 @@ interface PolicyDoc {
   title: string;
   body: string;
   hash: string;
+  published_at: string | null;
+  effective_at: string | null;
 }
 interface AdminDocRow {
   id: string;
@@ -302,6 +319,19 @@ export default function Policies() {
     }
   };
 
+  const prepareTerms = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setActionError('');
+    try {
+      await api.post('/api/policies/admin/prepare-terms', { confirm: 'PREPARE TERMS DRAFT' });
+      setAdminMsg(t.termsPrepared);
+      await loadAdmin();
+    } catch (error) {
+      setActionError((error as Error)?.message || t.actionError);
+    } finally { setIsSaving(false); }
+  };
+
   const openAdminDoc = async (row: AdminDocRow, forEdit: boolean) => {
     setActionError('');
     try {
@@ -410,6 +440,15 @@ export default function Policies() {
               <span className="text-zinc-700">·</span>
               <span dir="ltr" className="font-mono">{selected.hash.slice(0, 12)}…</span>
             </div>
+            <dl className="mb-5 grid gap-2 text-xs text-text-secondary sm:grid-cols-2">
+              {([['published_at', t.publishedAt], ['effective_at', t.effectiveAt]] as const).map(([field, label]) => (
+                <div key={field}><dt className="font-medium">{label}</dt><dd>
+                  {selected[field] && Number.isFinite(Date.parse(selected[field]))
+                    ? <time dateTime={selected[field]}>{new Date(selected[field]).toLocaleString(documentLang === 'ckb' ? 'ckb-IQ' : documentLang)}</time>
+                    : t.unknownDate}
+                </dd></div>
+              ))}
+            </dl>
             {selected.lang !== selected.lang_requested && (
               <p className="bg-zinc-800/70 border border-zinc-700 text-zinc-300 text-[12px] rounded-xl p-3 mb-4">
                 {t.langFallback}
@@ -494,6 +533,10 @@ export default function Policies() {
                   className="mb-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-[13px] font-bold inline-flex items-center gap-2"
                 >
                   <UploadCloud className="w-4 h-4" /> {t.seed}
+                </button>
+                <button type="button" onClick={prepareTerms} disabled={isSaving}
+                  className="mb-4 ms-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[13px] font-medium disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                  {t.prepareTerms}
                 </button>
                 <div className="space-y-3">
                   {draftGroups.map((g) => (

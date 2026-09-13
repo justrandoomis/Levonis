@@ -310,6 +310,7 @@ export default function Checkout() {
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  useEffect(() => { setPolicyAccepted(false); }, [lang]);
   const [consentResetNote, setConsentResetNote] = useState(false);
   const quoteSignatureRef = useRef('');
   const quoteSeqRef = useRef(0);
@@ -705,6 +706,7 @@ export default function Checkout() {
         couponCode: couponCode || undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
+        policyLocale: lang,
         policyAcceptance: policyAccepted
           ? requiredPolicies.map((p) => ({ key: p.key, version: p.version }))
           : [],

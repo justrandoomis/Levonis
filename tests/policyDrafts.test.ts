@@ -56,3 +56,12 @@ test('policyDocHash is deterministic and content-sensitive', async () => {
   assert.notEqual(a, d);
   assert.match(a, /^[0-9a-f]{64}$/);
 });
+
+
+test('purchase terms cover all 25 sections in all three locales', () => {
+  const terms = POLICY_DRAFTS.find((d) => d.key === 'terms')!;
+  for (const lang of POLICY_LANGS) {
+    const sections = [...terms.body[lang].matchAll(/^## (\d+)\./gm)].map((m) => Number(m[1]));
+    assert.deepEqual(sections, Array.from({length:25}, (_, i) => i + 1), lang);
+  }
+});

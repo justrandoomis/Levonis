@@ -1,3 +1,4 @@
+import { PURCHASE_TERMS } from './purchaseTerms';
 import type { Env } from './types';
 import { badRequest } from './http';
 import { newId, sha256Hex } from './crypto';
@@ -64,46 +65,77 @@ export async function getRequiredCheckoutPolicies(env: Env): Promise<PolicyRef[]
   return (rows.results || []).map((r) => ({ key: r.key, version: Number(r.version) }));
 }
 
-/**
- * Verify that the client-supplied acceptance list covers every required
- * checkout policy at its current published version, then persist the
- * acceptance rows (idempotent via the table's UNIQUE constraint).
- * Throws 400 POLICY_ACCEPTANCE_REQUIRED when anything is missing/stale.
+/** Prepare consent in the SAME transaction as the order, never ahead of it.
+ * The read-time comparison produces a friendly refusal. The first statement
+ * asserts the complete current published set again inside D1's atomic batch,
+ * including a first-ever policy published while checkout was in flight.
  */
-export async function verifyAndRecordAcceptance(
+export async function preparePolicyAcceptance(
   env: Env,
   userId: string,
   context: string,
-  accepted: Array<{ key: string; version: number }> | undefined
-): Promise<PolicyRef[]> {
+  accepted: Array<{ key: string; version: number }> | undefined,
+  options: { locale?: unknown; orderId?: string | null } = {}
+): Promise<{ required: PolicyRef[]; statements: D1PreparedStatement[] }> {
   const required = await getRequiredCheckoutPolicies(env);
-  if (required.length === 0) return [];
   const list = Array.isArray(accepted) ? accepted : [];
-  const missing = required.filter(
-    (r) => !list.some((a) => a && a.key === r.key && Number(a.version) === r.version)
-  );
-  if (missing.length > 0) {
-    throw badRequest(
-      'Please review and accept the current policies',
-      'POLICY_ACCEPTANCE_REQUIRED'
-    );
+  const locale: PolicyLang = options.locale === 'en' || options.locale === 'ckb' ? options.locale : 'ar';
+  if (required.some((r) => !list.some((a) => a && a.key === r.key && Number(a.version) === r.version))) {
+    throw badRequest('Please review and accept the current policies', 'POLICY_ACCEPTANCE_REQUIRED');
   }
-  const now = new Date().toISOString();
+  const docs: Array<PolicyRef & { id: string; hash: string; lang: PolicyLang }> = [];
   for (const r of required) {
     const doc = await env.DB.prepare(
-      `SELECT hash FROM policy_documents WHERE key = ? AND version = ? AND status = 'published'
-       ORDER BY CASE lang WHEN 'ar' THEN 0 ELSE 1 END LIMIT 1`
-    )
-      .bind(r.key, r.version)
-      .first<{ hash: string }>();
-    await env.DB.prepare(
-      `INSERT OR IGNORE INTO policy_acceptances (id, user_id, policy_key, version, hash, context, accepted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(newId('pac'), userId, r.key, r.version, doc?.hash || '', context, now)
-      .run();
+      `SELECT id, hash, lang FROM policy_documents
+       WHERE key = ? AND version = ? AND status = 'published' AND lang IN (?, 'ar')
+       ORDER BY CASE WHEN lang = ? THEN 0 ELSE 1 END LIMIT 1`
+    ).bind(r.key, r.version, locale, locale).first<{ id: string; hash: string; lang: PolicyLang }>();
+    if (!doc) throw badRequest('Policies changed; reload and review them again', 'POLICY_ACCEPTANCE_REQUIRED');
+    docs.push({ ...r, ...doc });
   }
-  return required;
+  const now = new Date().toISOString();
+  const changedDocument = docs.map(() => `NOT EXISTS (
+    SELECT 1 FROM policy_documents WHERE id = ? AND hash = ? AND status = 'published'
+      AND version = (SELECT MAX(version) FROM policy_documents WHERE key = ? AND status = 'published')
+  )`).join(' OR ');
+  // An invalid NULL user_id deliberately aborts the whole transaction. On a
+  // matching snapshot this SELECT inserts zero rows; no sentinel is persisted.
+  const statements: D1PreparedStatement[] = [env.DB.prepare(
+    `INSERT INTO policy_acceptances (id, user_id, policy_key, version, hash, context, accepted_at)
+     SELECT ?, NULL, 'terms', 1, '', '', ?
+     WHERE (SELECT COUNT(DISTINCT key) FROM policy_documents
+            WHERE status = 'published' AND key IN ('terms','privacy')) != ?
+       ${changedDocument ? `OR (${changedDocument})` : ''}`
+  ).bind(newId('pacguard'), now, required.length, ...docs.flatMap((d) => [d.id, d.hash, d.key]))];
+  for (const d of docs) {
+    statements.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO policy_acceptances
+       (id, user_id, policy_key, version, hash, context, accepted_at, document_id, order_id, locale, requested_locale, event)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(newId('pac'), userId, d.key, d.version, d.hash, context, now, d.id,
+      options.orderId ?? null, d.lang, locale, options.orderId ? 'checkout.policy.accepted' : 'policy.accepted'));
+  }
+  return { required, statements };
+}
+
+export function isPolicyAcceptanceConflict(error: unknown): boolean {
+  const message = error instanceof Error ? `${error.message} ${String(error.cause ?? '')}` : String(error);
+  return /NOT NULL constraint failed:\s*policy_acceptances\.user_id/i.test(message);
+}
+
+/** Backward-compatible entry point for non-order acceptance callers. */
+export async function verifyAndRecordAcceptance(
+  env: Env, userId: string, context: string,
+  accepted: Array<{ key: string; version: number }> | undefined,
+  options: { locale?: unknown } = {}
+): Promise<PolicyRef[]> {
+  const prepared = await preparePolicyAcceptance(env, userId, context, accepted, options);
+  try { await env.DB.batch(prepared.statements); }
+  catch (error) {
+    if (isPolicyAcceptanceConflict(error)) throw badRequest('Policies changed; reload and review them again', 'POLICY_ACCEPTANCE_REQUIRED');
+    throw error;
+  }
+  return prepared.required;
 }
 
 // ---------------------------------------------------------------------------
@@ -672,55 +704,13 @@ export const POLICY_DRAFTS: PolicyDraft[] = [
     body: {
       ar: `${DRAFT_AR}
 
-## الطلب والقبول
-- إرسال الطلب عرض شراء؛ يُقبل الطلب عند تأكيده من المتجر. عرض السعر النهائي قبل التأكيد (البضاعة والتوصيل وعمولات الطلب المسبق ورسوم تمديد الضمان المختارة) هو الملزم، ويحتفظ الطلب المقبول بسعره حتى لو تغيرت الأسعار لاحقًا.
-- أسعار المنتجات تشمل التأمين والضرائب المطبقة؛ لا رسوم مخفية تُضاف لاحقًا، والرسوم المختارة صراحة تُعرض قبل الإتمام.
-
-## الموافقة على السياسات
-- إتمام الشراء يتطلب موافقة صريحة غير مؤشَّرة مسبقًا على النسخ المنشورة الحالية من شروط البيع وسياسة الخصوصية، وتُسجَّل نسخة الوثيقة وبصمتها ووقت الموافقة في الخادم. تغيّر جوهري في عرض السعر يتطلب إعادة تأكيد.
-- تعديل السياسات لاحقًا لا يغيّر حقوق طلب مقبول بأثر رجعي؛ النسخة الموافَق عليها تبقى محفوظة.
-
-## الفواتير والإلغاء
-- تصدر فاتورة لكل طلب بأرقام دقيقة وحالة دفع صادقة، ولا نختلق أرقام تسجيل ضريبي. لحظة إصدار الفاتورة الرسمية تُعلَن من الإدارة.
-- إلغاء الطلبات قبل الشحن وقواعد استرجاع المدفوع المسبق تتبع سياسة الإرجاع وقرارات الإدارة المعلنة.
-
-## التغطية والمسؤولية
-- الضمان والإرجاع وحماية السعر بحسب سياساتها المنشورة. تغطية LEVONIS تغطية بائع، منفصلة عن أي ضمان مصنّع.
-- لا تتنازل هذه الشروط عن حقوق نظامية ملزمة. الجهة القانونية للمتجر وبياناتها الرسمية تُعلَن ضمن هذه الشروط قبل النشر النهائي.`,
+${PURCHASE_TERMS.ar}`,
       en: `${DRAFT_EN}
 
-## Orders and acceptance
-- Submitting an order is an offer to buy; the order is accepted when the store confirms it. The final quote before confirmation (merchandise, delivery, preorder commissions and selected warranty-extension fees) is binding, and an accepted order keeps its price even if prices later change.
-- Product prices include insurance and applicable taxes; no hidden charges are added later, and explicitly selected fees are shown before completion.
-
-## Policy consent
-- Completing a purchase requires explicit, un-prechecked acceptance of the current published versions of the Terms of Sale and Privacy Policy; the document version, content hash and acceptance time are recorded server-side. A material quote change requires reconfirmation.
-- Later policy edits never retroactively change the rights of an accepted order; the accepted version is preserved.
-
-## Invoices and cancellation
-- Each order gets an invoice with accurate amounts and an honest payment status; we fabricate no tax registration numbers. The official invoice issuance moment is subject to announcement.
-- Pre-shipment cancellation and advance-payment refunds follow the Returns policy and announced administrative rules.
-
-## Coverage and liability
-- Warranty, returns and price protection follow their published policies. LEVONIS coverage is seller coverage, separate from any manufacturer warranty.
-- These terms waive no mandatory statutory rights. The store's legal entity and official details will be announced within these terms before final publication.`,
+${PURCHASE_TERMS.en}`,
       ckb: `${DRAFT_CKB}
 
-## داواکاری و پەسەندکردن
-- ناردنی داواکاری پێشنیاری کڕینە؛ داواکارییەکە پەسەند دەکرێت کاتێک فرۆشگاکە پشتڕاستی دەکاتەوە. نرخە کۆتاییەکەی پێش پشتڕاستکردنەوە (کاڵا و گەیاندن و کۆمیسیۆنی داواکاری پێشوەخت و کرێی درێژکردنەوەی گەرەنتی هەڵبژێردراو) پابەندکەرە، و داواکاری پەسەندکراو نرخەکەی دەپارێزێت تەنانەت ئەگەر نرخەکان دواتر بگۆڕدرێن.
-- نرخی بەرهەمەکان بیمە و باجە جێبەجێکراوەکان دەگرێتەوە؛ هیچ کرێیەکی شاراوە دواتر زیاد ناکرێت، و کرێیە بە ڕوونی هەڵبژێردراوەکان پێش تەواوکردن پیشان دەدرێن.
-
-## ڕازیبوون بە سیاسەتەکان
-- تەواوکردنی کڕین پێویستی بە ڕازیبوونی ڕوونی پێشتر نیشانە نەکراوە بە وەشانە بڵاوکراوە ئێستاکانی مەرجەکانی فرۆشتن و سیاسەتی تایبەتمەندی؛ وەشانی بەڵگەنامە و پەنجەمۆری ناوەڕۆک و کاتی ڕازیبوون لە سێرڤەردا تۆمار دەکرێن. گۆڕانی بنەڕەتی لە نرخەکەدا پێویستی بە دووبارە پشتڕاستکردنەوەیە.
-- دەستکاری سیاسەتەکان لە داهاتوودا مافەکانی داواکاری پەسەندکراو بە پاشەوپاش ناگۆڕێت؛ وەشانە ڕازیبوونپێدراوەکە پارێزراو دەمێنێتەوە.
-
-## پسوولەکان و هەڵوەشاندنەوە
-- بۆ هەر داواکارییەک پسوولەیەک دەردەچێت بە بڕی ورد و دۆخی پارەدانی ڕاستگۆ؛ هیچ ژمارەی تۆماری باجی داهێنراو نییە. ساتی دەرچوونی پسوولەی فەرمی دواتر ڕادەگەیەنرێت.
-- هەڵوەشاندنەوەی داواکاری پێش ناردن و یاساکانی گەڕاندنەوەی پارەی پێشوەخت دراو، سیاسەتی گەڕاندنەوە و بڕیارە ڕاگەیەنراوەکانی بەڕێوەبەرایەتی پەیڕەو دەکەن.
-
-## داپۆشین و بەرپرسیارێتی
-- گەرەنتی و گەڕاندنەوە و پاراستنی نرخ بەپێی سیاسەتە بڵاوکراوەکانیانن. داپۆشینی LEVONIS داپۆشینی فرۆشیارە، جیاوازە لە هەر گەرەنتییەکی دروستکەر.
-- ئەم مەرجانە هیچ مافێکی یاسایی پابەندکەر ناسڕنەوە. لایەنی یاسایی فرۆشگاکە و زانیارییە فەرمییەکانی پێش بڵاوکردنەوەی کۆتایی لەم مەرجانەدا ڕادەگەیەنرێن.`,
+${PURCHASE_TERMS.ckb}`,
     },
   },
   // ------------------------------------------------------------ site terms

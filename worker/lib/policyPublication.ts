@@ -25,10 +25,11 @@ export async function policyPublicationBatch(db: D1Database, key: string, versio
   ).bind(newId('polguard'), key, version, key, version, rows.length, key, version,
     ...rows.flatMap((row) => [row.id, row.lang, row.title, row.body, row.hash]), rows.length, key, version)];
   const hashes: Record<string, string> = {};
+  const publishedAt = new Date().toISOString();
   for (const row of rows) {
     const hash = await policyDocHash(key, version, row.lang, row.title, row.body);
     hashes[row.lang] = hash;
-    statements.push(db.prepare("UPDATE policy_documents SET status = 'published', hash = ? WHERE id = ? AND status = 'draft'").bind(hash, row.id));
+    statements.push(db.prepare("UPDATE policy_documents SET status = 'published', hash = ?, published_at = ?, effective_at = ? WHERE id = ? AND status = 'draft'").bind(hash, publishedAt, publishedAt, row.id));
   }
   statements.push(db.prepare("UPDATE policy_documents SET status = 'archived' WHERE key = ? AND version < ? AND status = 'published'").bind(key, version));
   return { statements, hashes };
