@@ -1,3 +1,4 @@
+import { setChatTyping, remoteChatTyping } from '../lib/chatPresence';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, notFound, forbidden, str } from '../lib/http';
@@ -151,6 +152,27 @@ chatRoutes.post('/open', async (c) => {
   return c.json({ success: true, chatId });
 });
 
+// Presence inherits authentication and the app's CSRF/host checks. Both
+// operations require membership; an admin is NOT implicitly a participant.
+chatRoutes.get('/:id/typing', async (c) => {
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  const user = c.get('user')!;
+  await assertParticipant(c.env.DB, chatId, user.id);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, ...await remoteChatTyping(c.env.DB, chatId, user.id) });
+});
+chatRoutes.post('/:id/typing', async (c) => {
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  const user = c.get('user')!;
+  await assertParticipant(c.env.DB, chatId, user.id);
+  await rateLimit(c, 'chat-typing', 90, 60);
+  const body = await c.req.json().catch(() => ({}));
+  if (typeof body.typing !== 'boolean') throw badRequest('typing must be a boolean');
+  await setChatTyping(c.env.DB, chatId, user.id, body.typing);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true });
+});
+
 chatRoutes.get('/:id/messages', async (c) => {
   const user = c.get('user')!;
   const chatId = c.req.param('id');
@@ -202,5 +224,6 @@ chatRoutes.post('/:id/messages', async (c) => {
   )
     .bind(id, chatId, user.id, kind, text, fileKey)
     .run();
+  await setChatTyping(c.env.DB, chatId, user.id, false).catch(() => {});
   return c.json({ success: true, id });
 });

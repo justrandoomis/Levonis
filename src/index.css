@@ -657,7 +657,7 @@ html[data-overlay-open='true'] [data-bottom-nav] {
 
    The fixed character is a single shared element. During bootstrap its frame
    is the viewport centre; when real critical work settles, React measures the
-   Home target and changes this same node's transform and dimensions. The veil
+   Home target and changes this same node's transform, not its canvas dimensions. The veil
    and character are independent so the page can reveal while the character
    travels. Nothing here owns clicks.
    --------------------------------------------------------------------------- */
@@ -708,25 +708,40 @@ html[data-overlay-open='true'] .lv-app-intro__character {
   opacity: 0;
 }
 
-.lv-bloub {
-  display: block;
-  overflow: visible;
-  transform-origin: center;
-  filter: drop-shadow(0 9px 13px rgb(0 0 0 / 0.32));
-}
-
-.lv-bloub--idle {
-  animation: lv-bloub-breathe 5.4s ease-in-out infinite;
-}
-
-.lv-app-intro[data-page-visible='false'] .lv-bloub {
-  animation-play-state: paused;
-}
-
-@keyframes lv-bloub-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.018); }
-}
+/* Root canvas never animates independently of measured travel. Nested groups
+   separate posture, breathing, gaze and blinking: no competing transforms. */
+.lv-bloub { display: block; overflow: visible; transform-origin: center; }
+.lv-bloub-breath, .lv-bloub-gaze { transform-origin: 50px 50px; }
+.lv-bloub-blink { transform-box: fill-box; transform-origin: center; }
+.lv-bloub--idle .lv-bloub-breath { animation: lv-mascot-breathe 6.4s ease-in-out infinite; }
+.lv-bloub--idle .lv-bloub-gaze { animation: lv-mascot-idle-look 9.7s ease-in-out infinite; }
+.lv-bloub--idle .lv-bloub-blink { animation: lv-mascot-blink 5.9s linear infinite; }
+.lv-bloub--loading .lv-bloub-breath { animation: lv-mascot-loading-body 3.1s ease-in-out infinite; }
+.lv-bloub--loading .lv-bloub-gaze { animation: lv-mascot-search 2.8s ease-in-out infinite; }
+.lv-bloub--loading .lv-bloub-blink { animation: lv-mascot-blink 3.8s linear infinite; }
+.lv-bloub--typing .lv-bloub-breath { animation: lv-mascot-breathe 1.7s ease-in-out infinite; }
+.lv-bloub--typing .lv-bloub-gaze { animation: lv-mascot-typing-look 1.25s ease-in-out infinite; }
+.lv-bloub--typing .lv-bloub-blink { animation: lv-mascot-blink 3.6s linear infinite; }
+.lv-bloub--navigating .lv-bloub-blink, .lv-bloub--returning .lv-bloub-blink { animation: lv-mascot-travel-blink 480ms ease-out; }
+.lv-bloub--tap .lv-bloub-breath { animation: lv-mascot-tap 210ms ease-out; }
+.lv-bloub--tap .lv-bloub-blink { animation: lv-mascot-travel-blink 180ms ease-out; }
+.lv-bloub--success .lv-bloub-breath, .lv-bloub--arrival .lv-bloub-breath { animation: lv-mascot-settle 420ms ease-out; }
+.lv-bloub--notify .lv-bloub-breath { animation: lv-mascot-attentive 700ms ease-out; }
+.lv-bloub--notify .lv-bloub-gaze { animation: lv-mascot-typing-look 700ms ease-out; }
+.lv-bloub--warning .lv-bloub-breath { animation: lv-mascot-attentive 900ms ease-out; }
+.lv-bloub--error .lv-bloub-breath { animation: lv-mascot-alert 440ms ease-out; }
+.lv-app-intro[data-page-visible='false'] .lv-bloub *, html[data-overlay-open='true'] .lv-bloub * { animation-play-state: paused !important; }
+@keyframes lv-mascot-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.016, 1.022); } }
+@keyframes lv-mascot-loading-body { 0%,100% { transform: rotate(-1deg) scale(1); } 50% { transform: rotate(1deg) scale(1.018); } }
+@keyframes lv-mascot-idle-look { 0%,52%,100% { transform: translate(0,0); } 60%,68% { transform: translate(2px,-1px); } 77%,84% { transform: translate(-2px,0); } }
+@keyframes lv-mascot-search { 0%,100% { transform: translate(-3px,0) rotate(-3deg); } 25% { transform: translate(0,-3px); } 50% { transform: translate(4px,0) rotate(3deg); } 75% { transform: translate(0,2px); } }
+@keyframes lv-mascot-typing-look { 0%,100% { transform: translate(-3px,0); } 50% { transform: translate(3px,-1px); } }
+@keyframes lv-mascot-blink { 0%,46%,49%,100% { transform: scaleY(1); } 47.5% { transform: scaleY(0.1); } }
+@keyframes lv-mascot-travel-blink { 0%,100% { transform: scaleY(1); } 45% { transform: scaleY(0.15); } }
+@keyframes lv-mascot-tap { 0%,100% { transform: scale(1); } 45% { transform: scale(1.02,0.94); } }
+@keyframes lv-mascot-settle { 0%,100% { transform: scale(1); } 35% { transform: scale(1.02,0.97); } 68% { transform: scale(0.99,1.02); } }
+@keyframes lv-mascot-attentive { 0%,100% { transform: rotate(0) scale(1); } 30% { transform: rotate(-2deg) scale(1.022); } 65% { transform: rotate(1deg); } }
+@keyframes lv-mascot-alert { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 65% { transform: translateX(1.5px); } }
 
 @media (prefers-reduced-motion: reduce) {
   .lv-app-intro__veil {
@@ -736,18 +751,28 @@ html[data-overlay-open='true'] .lv-app-intro__character {
     transition: opacity 120ms ease-out !important;
     will-change: opacity;
   }
-  .lv-bloub {
+  .lv-bloub, .lv-bloub * {
     animation: none !important;
   }
 }
 
 /* Measured character slots reserve space; the animated layer never owns taps. */
-.lv-character-anchor { display: grid; place-items: center; width: 44px; height: 44px; }
+/* Visible canvas and input hit area are independent. The path occupies about
+   90% of this canvas after viewBox normalization, not 44px inside a 64px hit. */
+:root {
+  --lv-home-visual: clamp(58px, 15.5vw, 74px);
+  --lv-home-hit: clamp(68px, 18vw, 86px);
+  --lv-header-visual: clamp(52px, 13.6vw, 66px);
+  --lv-header-hit: calc(var(--lv-header-visual) + 8px);
+}
+.lv-character-anchor { display: grid; place-items: center; width: var(--lv-header-visual); height: var(--lv-header-visual); flex: none; }
+.lv-character-anchor[data-bloub-anchor='bottom-home'] { width: var(--lv-home-visual); height: var(--lv-home-visual); }
+.lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
 .lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
 .lv-character-anchor[data-bloub-occupied='true'] [data-bloub-fallback] { visibility: hidden; }
-.lv-character-home { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; }
-.lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); gap: 8px; padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }
+.lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) var(--lv-header-hit) minmax(0, 1fr); gap: 8px; padding-top: max(0.75rem, env(safe-area-inset-top)); }
 .lv-character-header > :first-child { justify-self: start; }
 .lv-character-header > .lv-character-home { grid-column: 2; }
 .lv-character-header > :last-child { justify-self: end; min-width: 0; max-width: 100%; }
-.lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: 52px; padding-top: env(safe-area-inset-top); background: var(--color-canvas); }
+.lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: var(--lv-header-hit); padding-top: env(safe-area-inset-top); background: var(--color-canvas); }

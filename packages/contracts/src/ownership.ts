@@ -66,7 +66,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts']),
-  ...owned('chat', ['chats', 'chat_participants', 'chat_messages']),
+  ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',
     'notify_deliveries',

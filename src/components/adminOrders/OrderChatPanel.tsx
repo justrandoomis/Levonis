@@ -1,3 +1,4 @@
+import { useChatPresence } from '../../lib/useChatPresence';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
@@ -38,6 +39,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const presence = useChatPresence(chatId, active && !error);
   const listRef = useRef<HTMLDivElement | null>(null);
   const openedFor = useRef<string | null>(null);
 
@@ -85,6 +87,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
   const send = async () => {
     const body = draft.trim();
     if (!body || !chatId || sending) return;
+    presence.onStop();
     setSending(true);
     setSendError(null);
     try {
@@ -152,6 +155,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
       </div>
 
       <div className="border-t border-zinc-800 p-3 shrink-0">
+        {presence.typing && <p role="status" className="text-xs text-text-secondary mb-2">{loc('يكتب الآن…', 'Typing…', 'دەنووسێت…')}</p>}
         {sendError && <p className="text-[12px] text-red-400 mb-2">{sendError}</p>}
         <form
           className="flex items-end gap-2"
@@ -162,7 +166,8 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
         >
           <textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { setDraft(e.target.value); presence.onEdit(e.target.value); }}
+            onBlur={presence.onStop}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

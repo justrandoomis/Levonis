@@ -68,7 +68,7 @@ export function measureCharacterAnchor(): (CharacterAnchor & { frame: CharacterF
 }
 
 export function bootstrapCharacterFrame(viewport: { width: number; height: number; offsetLeft?: number; offsetTop?: number }): CharacterFrame {
-  const size = Math.min(184, Math.max(112, viewport.width * 0.30), Math.max(44, viewport.height * 0.45));
+  const size = Math.min(240, Math.max(144, viewport.width * 0.38), Math.max(44, viewport.height * 0.45));
   return {
     x: (viewport.offsetLeft ?? 0) + (viewport.width - size) / 2,
     y: (viewport.offsetTop ?? 0) + (viewport.height - size) / 2,

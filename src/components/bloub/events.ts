@@ -1,8 +1,12 @@
-import type { BloubState } from './BloubHome';
+import { isMascotState, type MascotState } from '../../lib/mascot';
+/** Compatibility for the already-integrated Home controls/custom events. */
+export type BloubState = MascotState | 'thinking' | 'navigation';
 export const BLOUB_EVENT = 'levonis:bloub-state';
-const states = new Set<BloubState>(['idle', 'thinking', 'navigation', 'success', 'notify', 'tap', 'error']);
 export function isBloubState(value: unknown): value is BloubState {
-  return typeof value === 'string' && states.has(value as BloubState);
+  return value === 'thinking' || value === 'navigation' || isMascotState(value);
+}
+export function canonicalBloubState(state: BloubState): MascotState {
+  return state === 'thinking' ? 'loading' : state === 'navigation' ? 'navigating' : state;
 }
 export function bloubDuration(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.min(5000, Math.max(180, value)) : 650;

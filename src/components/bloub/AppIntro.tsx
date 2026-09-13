@@ -2,8 +2,9 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { useReducedMotion } from 'motion/react';
 import { useLanguage } from '../../LanguageContext';
-import BloubHome, { type BloubState } from './BloubHome';
-import { BLOUB_EVENT, bloubDuration, isBloubState } from './events';
+import BloubHome from './BloubHome';
+import { mascot } from '../../lib/mascot';
+import { BLOUB_EVENT, bloubDuration, isBloubState, canonicalBloubState } from './events';
 import {
   CHARACTER_CANVAS, bootstrapCharacterFrame, characterLayout, characterTransform,
   measureCharacterAnchor, type CharacterFrame,
@@ -35,28 +36,23 @@ export default function AppIntro({ ready }: { ready: boolean }) {
   const [frame, setFrame] = React.useState<CharacterFrame>(centerFrame);
   const frameRef = React.useRef(frame);
   const [phase, setPhase] = React.useState<Phase>('loading');
-  const [state, setState] = React.useState<BloubState>('thinking');
+  const expression = React.useSyncExternalStore(mascot.subscribe, mascot.snapshot, mascot.snapshot);
   const [failed, setFailed] = React.useState(false);
   const [pageVisible, setPageVisible] = React.useState(() => typeof document === 'undefined' || !document.hidden);
   const completedRef = React.useRef(false);
   const readyRef = React.useRef(ready);
   const scheduleRef = React.useRef<(animate?: boolean) => void>(() => {});
-  const transientTimer = React.useRef<number | null>(null);
-  const idleState = React.useRef<BloubState>('thinking');
   const firstPath = React.useRef(location.pathname);
-
-  const clearTransient = React.useCallback(() => {
-    if (transientTimer.current !== null) window.clearTimeout(transientTimer.current);
-    transientTimer.current = null;
-  }, []);
 
   React.useLayoutEffect(() => {
     readyRef.current = ready;
+    mascot.activity('bootstrap', ready ? null : 'loading');
     scheduleRef.current(true);
   }, [ready]);
 
   React.useEffect(() => {
     if (failed) return;
+    mascot.setVisible(!document.hidden);
     let frameId = 0;
     let settleTimer = 0;
     let animateNext = false;
@@ -67,7 +63,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       window.clearTimeout(settleTimer);
       if (!completedRef.current) return;
       setPhase('docked');
-      if (transientTimer.current === null) setState(idleState.current);
+      mascot.navigationComplete();
     };
     const measure = () => {
       frameId = 0;
@@ -80,8 +76,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         if (observed) resizeObserver?.observe(observed);
       }
       const pending = !readyRef.current || characterLayout.pending() || !!target?.busy;
-      idleState.current = pending ? 'thinking' : 'idle';
-      if (transientTimer.current === null) setState(idleState.current);
+      mascot.activity('anchor-loading', pending ? 'loading' : null);
       if (!completedRef.current && pending) {
         const center = centerFrame();
         frameRef.current = center;
@@ -102,17 +97,19 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       const boot = !completedRef.current;
       completedRef.current = true;
       if (!changed && !boot) return;
+      mascot.look(next.x + next.size / 2 - last.x - last.size / 2, next.y + next.size / 2 - last.y - last.size / 2);
       frameRef.current = next;
       setFrame(next);
       window.clearTimeout(settleTimer);
       if ((animate || boot) && !reduced && !document.hidden) {
         setPhase('travelling');
-        if (transientTimer.current === null) setState(pending ? 'thinking' : 'navigation');
+        mascot.activity('anchor-travel', target.kind === 'bottom-home' ? 'returning' : 'navigating');
         // Completion fallback only, never a readiness timer. Also covers a
         // cancelled CSS transition or identical rounded browser transforms.
         settleTimer = window.setTimeout(settle, 600);
       } else {
         setPhase('docked');
+        mascot.navigationComplete();
       }
     };
     function schedule(animate = false) {
@@ -124,18 +121,14 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     const onResize = () => schedule(false);
     const onVisibility = () => {
       setPageVisible(!document.hidden);
-      if (document.hidden) { clearTransient(); settle(); setState('idle'); }
+      mascot.setVisible(!document.hidden);
+      if (document.hidden) { window.clearTimeout(settleTimer); setPhase(completedRef.current ? 'docked' : 'loading'); mascot.activity('anchor-travel', null); }
       else schedule(false);
     };
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<{ state?: unknown; durationMs?: unknown }>).detail;
       if (!detail || !isBloubState(detail.state) || document.hidden) return;
-      clearTransient();
-      setState(detail.state);
-      if (detail.state !== 'idle') transientTimer.current = window.setTimeout(() => {
-        transientTimer.current = null;
-        setState(idleState.current);
-      }, bloubDuration(detail.durationMs));
+      mascot.trigger(canonicalBloubState(detail.state), bloubDuration(detail.durationMs));
     };
     const onTransition = (event: TransitionEvent) => {
       if (event.propertyName === 'transform' && (event.target as Element)?.classList?.contains('lv-app-intro__character')) settle();
@@ -153,7 +146,8 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       scheduleRef.current = () => {};
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(settleTimer);
-      clearTransient();
+      mascot.activity('anchor-loading', null);
+      mascot.activity('anchor-travel', null);
       occupied?.removeAttribute('data-bloub-occupied');
       resizeObserver?.disconnect();
       window.removeEventListener('resize', onResize);
@@ -164,24 +158,45 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       document.removeEventListener('transitionend', onTransition);
       window.removeEventListener(BLOUB_EVENT, onState);
     };
-  }, [reduced, failed, clearTransient]);
+  }, [reduced, failed]);
 
   React.useEffect(() => {
     if (firstPath.current === location.pathname) return;
     firstPath.current = location.pathname;
-    clearTransient();
-    if (completedRef.current) setState('navigation');
+    if (completedRef.current) mascot.trigger('navigating');
     scheduleRef.current(true);
-  }, [location.pathname, clearTransient]);
+  }, [location.pathname]);
+
+  React.useEffect(() => {
+    const beforeNavigate = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      const link = (event.target as Element)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
+      mascot.trigger('navigating');
+    };
+    const invalid = () => mascot.trigger('warning');
+    const offline = () => mascot.trigger('warning');
+    document.addEventListener('click', beforeNavigate, true);
+    document.addEventListener('invalid', invalid, true);
+    window.addEventListener('offline', offline);
+    return () => {
+      document.removeEventListener('click', beforeNavigate, true);
+      document.removeEventListener('invalid', invalid, true);
+      window.removeEventListener('offline', offline);
+      mascot.activity('bootstrap', null);
+    };
+  }, []);
 
   return (
     <div className="lv-app-intro" data-phase={failed ? 'hidden' : phase}
       data-reduced-motion={reduced ? 'true' : 'false'} data-page-visible={pageVisible ? 'true' : 'false'}
-      data-bloub-rendered={failed ? 'false' : 'true'} aria-live="polite" aria-busy={!failed && phase === 'loading'}>
+      data-bloub-rendered={failed ? 'false' : 'true'} data-mascot-state={expression.state} aria-live="polite" aria-busy={!failed && phase === 'loading'}>
       <div className="lv-app-intro__veil" aria-hidden="true" />
       <div className="lv-app-intro__character" style={{ width: CHARACTER_CANVAS, height: CHARACTER_CANVAS, transform: characterTransform(frame) }}>
         <CharacterBoundary onFailure={() => setFailed(true)}>
-          <BloubHome state={pageVisible ? state : 'idle'} className="h-full w-full" />
+          <BloubHome state={expression.state} direction={expression.direction} sequence={expression.sequence} className="h-full w-full" />
         </CharacterBoundary>
       </div>
       {!failed && phase === 'loading' ? <span className="sr-only">{loc('جارٍ تجهيز Levonis…', 'Preparing Levonis…', 'Levonis ئامادە دەکرێت…')}</span> : null}

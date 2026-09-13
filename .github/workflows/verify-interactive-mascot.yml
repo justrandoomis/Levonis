@@ -1,0 +1,78 @@
+name: 45 - Interactive mascot visual and state regression (no deployment)
+on:
+  push:
+    branches: [codex/interactive-mascot]
+  pull_request:
+    branches: [Main]
+    paths:
+      - 'src/components/bloub/**'
+      - 'src/lib/mascot*.ts'
+      - 'src/lib/useChatPresence.ts'
+      - 'src/components/BottomNav.tsx'
+      - 'src/index.css'
+      - 'tests/browser/**'
+      - 'scripts/e2e-bloub-continuation.mjs'
+      - '.github/workflows/verify-interactive-mascot.yml'
+permissions:
+  contents: read
+concurrency:
+  group: mascot-visual-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Controller, authorized typing routes and migrations
+        run: |
+          mkdir -p /tmp/mascot-proof
+          node --import tsx --test tests/mascotController.test.ts tests/chatPresence.test.ts tests/chatPresenceRoutes.test.ts tests/bloubGeometry.test.ts tests/bloubNavigation.test.ts > /tmp/mascot-proof/focused.log 2>&1
+          tail -20 /tmp/mascot-proof/focused.log
+          node scripts/migrate-check.mjs --twice > /tmp/mascot-proof/migrations.log 2>&1
+      - name: Build a standalone local fixture for reproducible offline review
+        run: |
+          node --input-type=module <<'JS'
+          import {build} from 'vite';
+          await build({publicDir:false,build:{outDir:'/tmp/mascot-proof/fixture',emptyOutDir:true,minify:false,rollupOptions:{input:'tests/browser/bloub.html'}}});
+          JS
+      - name: Install isolated browser engines
+        run: |
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Measure actual SVG paths and exercise real application event adapters
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+          OUT_DIR: /tmp/mascot-proof/browser
+        run: |
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4175 > /tmp/mascot-proof/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4175/tests/browser/bloub.html >/dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-bloub-continuation.mjs > /tmp/mascot-proof/browser.log 2>&1
+          result=$?
+          tail -80 /tmp/mascot-proof/browser.log
+          exit "$result"
+      - name: Save exact reviewed source
+        if: always()
+        run: |
+          mkdir -p /tmp/mascot-proof
+          git rev-parse HEAD > /tmp/mascot-proof/commit.txt
+          git archive --format=tar.gz HEAD -o /tmp/mascot-proof/source.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mascot-visual-${{ github.run_id }}
+          path: /tmp/mascot-proof/
+          retention-days: 7

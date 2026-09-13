@@ -1,3 +1,6 @@
+import { useChatPresence } from '../lib/useChatPresence';
+import { mascot } from '../lib/mascot';
+import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
@@ -44,7 +47,7 @@ function formatMsgTime(iso: string, lang: string): string {
 export default function Chat() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { dir, lang } = useLanguage();
+  const { dir, lang, loc } = useLanguage();
   const { user } = useAuth();
 
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
@@ -60,6 +63,11 @@ export default function Chat() {
   const [actionNotice, setActionNotice] = useState('');
   const [otherName, setOtherName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  const presence = useChatPresence(id, !!user && !notFound);
+  useCharacterBusy(loading || uploading);
+  const seenRemote = useRef<{ chat: string | undefined; ids: Set<string> | null }>({ chat: id, ids: null });
+  useEffect(() => { seenRemote.current = { chat: id, ids: null }; }, [id]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +88,11 @@ export default function Chat() {
   const fetchMessages = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${id}/messages`);
+      const data = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${id}/messages`, { mascot: 'silent' });
+      if (seenRemote.current.chat !== id) return;
+      const remoteIds = new Set((data.messages || []).filter(m => !m.mine).map(m => m.id));
+      if (seenRemote.current.ids && [...remoteIds].some(messageId => !seenRemote.current.ids!.has(messageId))) mascot.trigger('notify');
+      seenRemote.current.ids = remoteIds;
       setMessages(data.messages || []);
       // Drop optimistic messages the server now knows about.
       const serverIds = new Set((data.messages || []).map((m) => m.id));
@@ -107,7 +119,7 @@ export default function Chat() {
       if (!cancelled) setLoading(false);
     });
     const interval = setInterval(() => {
-      fetchMessages();
+      if (!document.hidden) fetchMessages();
     }, 5000);
     return () => {
       cancelled = true;
@@ -141,6 +153,7 @@ export default function Chat() {
   const sendText = async (text: string) => {
     const body = text.trim();
     if (!body || !id) return;
+    presence.onStop();
     setSendError(null);
     const tempId = nextTempId();
     setPending((prev) => [
@@ -353,7 +366,7 @@ export default function Chat() {
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
 
       {/* Header */}
-      <header className="shrink-0 bg-canvas px-3 sm:px-4 py-2 flex items-center justify-between border-b border-border-subtle/70">
+      <header className="lv-character-header shrink-0 bg-canvas px-3 sm:px-4 py-2 items-center border-b border-border-subtle/70">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -369,6 +382,10 @@ export default function Chat() {
             </h1>
           </div>
         </div>
+        <MotionCharacterHome busy={loading} />
+        <span role="status" aria-live="polite" className="text-xs text-text-secondary">
+          {presence.typing ? loc('يكتب الآن…', 'Typing…', 'دەنووسێت…') : ''}
+        </span>
       </header>
 
       {/* Chat Area */}
@@ -477,7 +494,8 @@ export default function Chat() {
             <input
               type="text"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => { setInputText(e.target.value); presence.onEdit(e.target.value); }}
+              onBlur={presence.onStop}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder={dir === 'rtl' ? 'اكتب رسالة...' : 'Type a message...'}
               aria-label={dir === 'rtl' ? 'نص الرسالة' : 'Message text'}

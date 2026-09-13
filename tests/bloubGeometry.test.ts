@@ -4,9 +4,9 @@ import { bootstrapCharacterFrame, frameFromRect, characterTransform, beginCharac
 import { isBloubState, bloubDuration, signalBloub } from '../src/components/bloub/events';
 
 test('bootstrap has a real large footprint centred in the visual viewport', () => {
-  for (const width of [320, 375, 390, 430, 768, 1440]) {
+  for (const width of [320, 360, 390, 430, 768, 1024, 1440]) {
     const f = bootstrapCharacterFrame({ width, height: 800, offsetLeft: 4, offsetTop: 16 });
-    assert.ok(f.size >= 112 && f.size <= 184);
+    assert.ok(f.size >= 144 && f.size <= 240);
     assert.equal(f.x + f.size / 2, width / 2 + 4);
     assert.equal(f.y + f.size / 2, 416);
   }
