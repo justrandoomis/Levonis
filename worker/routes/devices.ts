@@ -72,6 +72,7 @@ import {
 import { upgradeWarranty } from '../lib/productModel';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { sniff } from './uploads';
+import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import {
   coverageState,
   normalizeSerial,
@@ -636,9 +637,21 @@ deviceRoutes.post('/claims/upload', async (c) => {
   }
 
   const key = `claims/${user.id}/${newId()}.${kind.ext}`;
-  await c.env.BUCKET.put(key, buf, {
-    httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' },
-  });
+  await putMediaObject(
+    c.env,
+    {
+      key,
+      visibility: 'private',
+      domain: 'claims',
+      mime: kind.mime,
+      bytes: buf.byteLength,
+      ownerId: user.id,
+      entityId: user.id,
+      originalName: file.name,
+    },
+    buf,
+    { httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' } }
+  );
   return c.json({ success: true, key, url: `/api/devices/claim-files/${key}` });
 });
 
@@ -659,7 +672,7 @@ deviceRoutes.get('/claim-files/*', async (c) => {
     if (!viaMessage) throw forbidden('Not your file');
   }
 
-  const obj = await c.env.BUCKET.get(key);
+  const obj = await getMediaObject(c.env, 'private', key);
   if (!obj) throw notFound();
   const headers = new Headers();
   obj.writeHttpMetadata(headers);

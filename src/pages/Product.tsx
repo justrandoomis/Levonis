@@ -93,7 +93,7 @@ const STRINGS = {
     warrantyFee: 'رسوم الضمان', waivedPro: 'معفاة لعضوية PRO', lineTotal: 'إجمالي البنود',
     preorderCodHint: 'الدفع مقدمًا من المحفظة يُبقي هذا السعر؛ الدفع عند الاستلام يُسعَّر كبيع مباشر ويبقى الطلب طلبًا مسبقًا.',
     CART_WARRANTY_CONFLICT: 'هذه الطابعة في سلتك بخيار ضمان ممدد مختلف — غيّره من السلة.',
-    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
     description: 'وصف المنتج', noDescription: 'لا يوجد وصف لهذا المنتج بعد',
     specs: 'المواصفات التقنية', media: 'الصور والفيديو', reviews: 'التقييمات',
     howToUse: 'طريقة الاستخدام', inTheBox: 'محتويات العلبة', setupTitle: 'التركيب والتنصيب',
@@ -147,7 +147,7 @@ const STRINGS = {
     warrantyFee: 'Warranty fee', waivedPro: 'Waived for PRO', lineTotal: 'Line total',
     preorderCodHint: 'Paying in advance from the wallet keeps this price; cash on delivery is priced as a direct sale while the order stays a pre-order.',
     CART_WARRANTY_CONFLICT: 'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
-    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
     description: 'Description', noDescription: 'No description for this product yet',
     specs: 'Specifications', media: 'Photos & video', reviews: 'Reviews',
     howToUse: 'How to use', inTheBox: 'In the box', setupTitle: 'Setup & installation',
@@ -200,7 +200,7 @@ const STRINGS = {
     warrantyFee: 'کرێی گەرەنتی', waivedPro: 'بۆ PRO بەخشراوە', lineTotal: 'کۆی گشتی',
     preorderCodHint: 'پارەدانی پێشوەخت لە جزدانەوە ئەم نرخە دەهێڵێتەوە؛ پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت و داواکارییەکە وەک پێش-داواکاری دەمێنێتەوە.',
     CART_WARRANTY_CONFLICT: 'ئەم پرینتەرە پێشتر لە سەبەتەکەتدایە بە هەڵبژاردەیەکی جیاوازی گەرەنتی درێژکراوە — لە سەبەتەوە بیگۆڕە.',
-    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     description: 'باسکردن', noDescription: 'هێشتا باسکردنێک بۆ ئەم بەرهەمە نییە',
     specs: 'تایبەتمەندییە تەکنیکییەکان', media: 'وێنە و ڤیدیۆ', reviews: 'پێداچوونەوەکان',
     howToUse: 'شێوازی بەکارهێنان', inTheBox: 'ناو سندوقەکە', setupTitle: 'دامەزراندن و ڕێکخستن',
@@ -548,6 +548,8 @@ export default function Product() {
   const { isAuthenticated } = useAuth();
   const { settings: publicSettings } = useWallet();
   const s = STRINGS[lang as Lang];
+  const pageRef = useRef<HTMLDivElement>(null);
+  const pageHeaderRef = useRef<HTMLDivElement>(null);
   // The printer home-delivery note amount — the owner's public setting. null
   // when unset: the note is never shown with an invented figure.
   const printerNoteIqd = (() => {
@@ -570,6 +572,24 @@ export default function Product() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [retryToken, setRetryToken] = useState(0);
+
+  // The purchase column follows the measured page chrome, not a guessed
+  // pixel offset. ResizeObserver catches language wrapping, viewport changes
+  // and accessibility text scaling without causing React rerenders.
+  useEffect(() => {
+    const page = pageRef.current;
+    const header = pageHeaderRef.current;
+    if (!page || !header) return;
+    const update = () => page.style.setProperty('--app-header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    update();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(header);
+    window.addEventListener('resize', update, { passive: true });
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [loading, product?.id]);
 
   // Selection — nothing is guessed: a value is set only when the catalogue
   // leaves exactly one possibility (no randomness) or the user picks it.
@@ -1318,13 +1338,14 @@ export default function Product() {
         <button
           type="button"
           onClick={() => navigate('/subscription')}
-          className="lv-choice mt-3 flex w-full items-center justify-between gap-2 px-3 text-start"
+          className="group mt-3 flex min-h-11 w-full items-center justify-between gap-3 border-s-2 border-gold/55 py-1.5 ps-3 pe-1 text-start text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
-          <span className="text-gold text-[13px] font-bold flex items-center gap-1.5">
-            <Star aria-hidden="true" className="w-3.5 h-3.5" />
-            {s.proPrice}: <span className="tabular-nums">{formatIqd(proPrice)}</span>
+          <span className="text-[12.5px] font-medium flex min-w-0 items-center gap-1.5">
+            <Star aria-hidden="true" className="w-3.5 h-3.5 shrink-0 text-gold" />
+            <span className="truncate">{s.proPrice}</span>
+            <span className="shrink-0 tabular-nums font-bold text-gold">{formatIqd(proPrice)}</span>
           </span>
-          <span className="text-zinc-300 text-[12px] font-bold">{s.subscribe}</span>
+          <span className="shrink-0 text-[11.5px] font-semibold text-text-muted group-hover:text-text-secondary">{s.subscribe}</span>
         </button>
       ) : null}
 
@@ -1373,7 +1394,7 @@ export default function Product() {
           price, from the server's catalog flag and the server's amount. It is
           never added to any figure on this page. */}
       {source === 'catalog' && product.is_printer === true && printerNoteIqd !== null ? (
-        <Note tone="gold" animate={false} icon={<Truck className="w-4 h-4" />} className="mt-3" testId="product-printer-note">
+        <Note tone="zinc" compact animate={false} icon={<Truck className="w-4 h-4" />} className="mt-3" testId="product-printer-note">
           {s.printerNote(formatIqd(printerNoteIqd))}
         </Note>
       ) : null}
@@ -1697,13 +1718,13 @@ export default function Product() {
             type="button"
             onClick={() => setWarrantyOpen((o) => !o)}
             aria-expanded={warrantyOpen}
-            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-start hover:bg-white/[0.03] transition-colors [touch-action:manipulation]"
+            className="w-full min-h-12 px-3.5 py-2 flex items-center justify-between gap-3 text-start hover:bg-white/[0.03] transition-colors [touch-action:manipulation]"
           >
             <span className="min-w-0 flex items-center gap-2">
-              <ShieldCheck aria-hidden="true" className="w-4 h-4 text-gold shrink-0" />
+              <ShieldCheck aria-hidden="true" className="w-4 h-4 text-text-muted shrink-0" />
               <span className="min-w-0">
-                <span className="block text-white font-bold text-[14px]">{s.warranty}</span>
-                <span className={`block text-[12px] truncate ${warrantyPlanId ? 'text-text-secondary' : 'text-text-muted'}`}>
+                <span className="block text-white font-semibold text-[13.5px]">{s.warranty}</span>
+                <span className={`block text-[11.5px] truncate ${warrantyPlanId ? 'text-text-secondary' : 'text-text-muted'}`}>
                   {warrantySummary}
                 </span>
               </span>
@@ -1934,10 +1955,10 @@ export default function Product() {
 
   // ------------------------------------------------------------------ render
   return (
-    <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
+    <div ref={pageRef} className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
       {/* Sticky page chrome inside the app scroll container — never a fixed
           overlay that could land in the middle of the content. */}
-      <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
+      <div ref={pageHeaderRef} className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -2301,7 +2322,10 @@ export default function Product() {
           </div>
 
           {/* ------------------------------------------------- right column */}
-          <aside className="hidden lg:block lg:sticky lg:top-4 space-y-3">
+          <aside
+            className="hidden lg:block lg:sticky space-y-3"
+            style={{ top: 'calc(var(--app-header-height, 68px) + 0.75rem)' }}
+          >
             {priceBlock}
             {selectionBlocks}
             <div className="lv-surface space-y-3 p-4">

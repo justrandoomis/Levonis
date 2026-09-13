@@ -698,7 +698,8 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   const home = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash')))).quote;
   assert.equal(home.lines[0].is_printer, true);
   assert.equal(home.notes.printer_home_delivery_iqd, 50_000, 'the owner’s default, from settings');
-  assert.equal(home.total_iqd, 899_000 + 5_000, 'the note is NOT added to the total');
+  assert.equal(home.cod_tax_iqd, 6_000, 'COD delivery tax is a separate server-calculated line');
+  assert.equal(home.total_iqd, 899_000 + 5_000 + 6_000, 'the printer note is NOT added to the total');
 
   const pickup = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash', { deliveryMethodId: 'pickup' })))).quote;
   assert.equal(pickup.lines[0].is_printer, true);
@@ -707,9 +708,11 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   const placed = await json(await post(a, '/api/orders', orderBody('addr_b', 'cash')));
   assert.equal(placed.success, true, JSON.stringify(placed));
   assert.equal(placed.order.items[0].is_printer, true);
-  assert.equal(placed.order.total_iqd, 904_000);
+  assert.equal(placed.order.cod_tax_iqd, 6_000);
+  assert.equal(placed.order.total_iqd, 910_000);
   const detail = await json(await a.request(`/api/orders/${placed.order.id}`));
   assert.equal(detail.order.items[0].is_printer, true);
+  assert.equal(detail.order.cod_tax_iqd, 6_000, 'persisted order details use the COD tax snapshot');
 
   // The owner can change or clear the amount; a cleared amount means no note.
   raw.exec("INSERT INTO admin_settings (key, value) VALUES ('printerHomeDeliveryNoteIqd', '75000')");

@@ -15,6 +15,7 @@ import {
   type TgSendResult,
 } from './telegram';
 import { operationNumber } from './walletOps';
+import { getMediaObject, headMediaObject } from './mediaStorage';
 
 /**
  * Wallet ⇄ Telegram notification and approval-token mechanics
@@ -798,10 +799,10 @@ type ProofBytes = { ok: true; bytes: ArrayBuffer } | { ok: false; reason: string
 /** Reads the private R2 object. No URL is ever produced or handed out. */
 async function readProofBytes(env: Env, key: string): Promise<ProofBytes> {
   try {
-    const head = await env.BUCKET.head(key);
+    const head = await headMediaObject(env, 'private', key);
     if (!head) return { ok: false, reason: 'المرفق غير موجود في التخزين' };
     if (head.size > PHOTO_MAX_BYTES) return { ok: false, reason: 'حجم المرفق أكبر من حد تيليغرام' };
-    const obj = await env.BUCKET.get(key);
+    const obj = await getMediaObject(env, 'private', key);
     if (!obj) return { ok: false, reason: 'المرفق غير موجود في التخزين' };
     return { ok: true, bytes: await obj.arrayBuffer() };
   } catch (e) {

@@ -25,6 +25,7 @@ import {
 } from '../lib/printMatching';
 import { resolveModelLink, parseModelLink } from '../lib/externalModels';
 import { notifyStatement } from '../lib/notifications';
+import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -165,7 +166,7 @@ printRequestRoutes.post('/requests/:id/files/:fileId/analyze', requireAuth, asyn
     return c.json({ success: true, file_id: fileId, analysis: parseJson<ModelAnalysis | null>(file.analysis, null), cached: true });
   }
 
-  const object = await c.env.BUCKET.get(file.file_key);
+  const object = await getMediaObject(c.env, 'private', file.file_key);
   if (!object) throw notFound('The stored file is no longer available');
   const bytes = new Uint8Array(await object.arrayBuffer());
 
@@ -179,9 +180,20 @@ printRequestRoutes.post('/requests/:id/files/:fileId/analyze', requireAuth, asyn
     const mesh = viewerMesh(bytes, file.file_name);
     if (mesh) {
       previewKey = `request-previews/${requestId}/${fileId}.lvm`;
-      await c.env.BUCKET.put(previewKey, mesh, {
-        httpMetadata: { contentType: 'application/octet-stream', cacheControl: 'private, max-age=0' },
-      });
+      await putMediaObject(
+        c.env,
+        {
+          key: previewKey,
+          visibility: 'private',
+          domain: 'print-requests',
+          mime: 'application/octet-stream',
+          bytes: mesh.byteLength,
+          ownerId: user.id,
+          entityId: requestId,
+        },
+        mesh,
+        { httpMetadata: { contentType: 'application/octet-stream', cacheControl: 'private, max-age=0' } }
+      );
     }
   }
 
@@ -859,7 +871,7 @@ printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
     .bind(row.file_id)
     .first<{ preview_key: string }>();
   if (!file?.preview_key) throw notFound('No preview available');
-  const object = await c.env.BUCKET.get(file.preview_key);
+  const object = await getMediaObject(c.env, 'private', file.preview_key);
   if (!object) throw notFound('No preview available');
 
   await c.env.DB.prepare(
@@ -946,24 +958,49 @@ printRequestRoutes.post('/requests/:id/repeat', requireAuth, async (c) => {
 
   const fileIdMap = new Map<string, string>();
   for (const f of files ?? []) {
-    const object = await c.env.BUCKET.get(String(f.file_key));
+    const object = await getMediaObject(c.env, 'private', String(f.file_key));
     if (!object) continue; // a missing object is skipped, not fatal
     const ext = String(f.file_name).includes('.') ? String(f.file_name).split('.').pop()! : 'bin';
     const key = `requests/${user.id}/${newId()}.${ext}`;
-    await c.env.BUCKET.put(key, await object.arrayBuffer(), {
-      httpMetadata: { contentType: String(f.content_type || 'application/octet-stream'), cacheControl: 'private, max-age=0' },
-    });
+    const copiedBytes = await object.arrayBuffer();
+    await putMediaObject(
+      c.env,
+      {
+        key,
+        visibility: 'private',
+        domain: 'requests',
+        mime: String(f.content_type || 'application/octet-stream'),
+        bytes: copiedBytes.byteLength,
+        ownerId: user.id,
+        entityId: newRequestId,
+        originalName: String(f.file_name || ''),
+      },
+      copiedBytes,
+      { httpMetadata: { contentType: String(f.content_type || 'application/octet-stream'), cacheControl: 'private, max-age=0' } }
+    );
     const newFileId = newId('crf');
     fileIdMap.set(String(f.id), newFileId);
 
     let previewKey = '';
     if (f.preview_key) {
-      const prev = await c.env.BUCKET.get(String(f.preview_key));
+      const prev = await getMediaObject(c.env, 'private', String(f.preview_key));
       if (prev) {
         previewKey = `request-previews/${newRequestId}/${newFileId}.lvm`;
-        await c.env.BUCKET.put(previewKey, await prev.arrayBuffer(), {
-          httpMetadata: { contentType: 'application/octet-stream', cacheControl: 'private, max-age=0' },
-        });
+        const previewBytes = await prev.arrayBuffer();
+        await putMediaObject(
+          c.env,
+          {
+            key: previewKey,
+            visibility: 'private',
+            domain: 'print-requests',
+            mime: 'application/octet-stream',
+            bytes: previewBytes.byteLength,
+            ownerId: user.id,
+            entityId: newRequestId,
+          },
+          previewBytes,
+          { httpMetadata: { contentType: 'application/octet-stream', cacheControl: 'private, max-age=0' } }
+        );
       }
     }
 

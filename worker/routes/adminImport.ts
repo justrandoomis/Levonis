@@ -43,6 +43,7 @@ import { audit } from '../lib/audit';
 import { canViewFinancials } from '../lib/adminScope';
 import { rateLimit } from '../lib/ratelimit';
 import { sniff } from './uploads';
+import { headMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { ingestImageUrl } from './media';
 import { planRelationsWrite } from './adminProductRelations';
 import {
@@ -406,6 +407,7 @@ async function exportProducts(
       direct_surcharge_iqd: doc.direct_surcharge_iqd,
       stock: doc.stock,
       low_stock_threshold: doc.low_stock_threshold,
+      delivery_options: doc.delivery_options,
       warranty_base_months: doc.warranty_base_months,
       serialized: doc.serialized,
       payment_options: doc.payment_options,
@@ -651,10 +653,13 @@ async function storeAsset(env: Env, bytes: Uint8Array): Promise<string | null> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
   const sha = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
   const key = `products/import/${sha}.${kind.ext}`;
-  if (!(await env.BUCKET.head(key))) {
-    await env.BUCKET.put(key, bytes as unknown as ArrayBuffer | ArrayBufferView, {
-      httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' },
-    });
+  if (!(await headMediaObject(env, 'public', key))) {
+    await putMediaObject(
+      env,
+      { key, visibility: 'public', domain: 'products', entityId: 'import', mime: kind.mime, bytes: bytes.byteLength },
+      bytes as unknown as ArrayBuffer | ArrayBufferView,
+      { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
+    );
   }
   return `/files/${key}`;
 }

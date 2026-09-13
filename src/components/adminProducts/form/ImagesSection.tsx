@@ -80,7 +80,7 @@ export function ImagesSection({
   }, []);
 
   const addImage = useCallback(
-    (url: string, extra?: { alt?: string; source_url?: string; width?: number | null; height?: number | null }) =>
+    (url: string, extra?: { alt?: string; source_url?: string; width?: number | null; height?: number | null; r2_key?: string }) =>
       setRel((r) => ({
         ...r,
         images: [
@@ -102,6 +102,7 @@ export function ImagesSection({
             variant_id: null,
             width: extra?.width ?? null,
             height: extra?.height ?? null,
+            r2_key: extra?.r2_key ?? '',
           },
         ],
       })),
@@ -112,7 +113,7 @@ export function ImagesSection({
     async (file: File, key: string) => {
       try {
         const res = await uploadFile(file, 'product');
-        addImage(res.url);
+        addImage(res.url, { width: res.width, height: res.height, r2_key: res.key });
         setUploads((u) => u.filter((x) => x.key !== key));
       } catch (e) {
         setUploads((u) =>

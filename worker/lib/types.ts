@@ -4,7 +4,12 @@ import { maskPhone } from './phone';
 
 export interface Env {
   DB: D1Database;
+  /** Legacy mixed bucket. Kept during migration and as a local fallback. */
   BUCKET: R2Bucket;
+  /** New public-safe media bucket. Optional during rolling/local setup. */
+  R2_PUBLIC?: R2Bucket;
+  /** New authenticated/sensitive media bucket. Optional during rolling/local setup. */
+  R2_PRIVATE?: R2Bucket;
   ASSETS: Fetcher;
   GOOGLE_CLIENT_ID: string;
   INITIAL_ADMIN_EMAIL: string;

@@ -21,6 +21,7 @@ const BundlesShelf = React.lazy(() => import('../components/home/BundlesShelf'))
 import Spinner from '../components/ui/Spinner';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
+import { markHomeCriticalReady } from '../lib/appBootstrap';
 
 export default function Home() {
   const { t, loc } = useLanguage();
@@ -82,6 +83,12 @@ export default function Home() {
       homeReqRef.current += 1;
     };
   }, [fetchHome]);
+
+  // The app intro masks real bootstrap work, never a theatrical timeout.
+  // A settled error counts as ready because the page then has honest retry UI.
+  useEffect(() => {
+    if (!initialLoading) markHomeCriticalReady();
+  }, [initialLoading]);
 
   const loadMore = useCallback(
     async (retry = false) => {

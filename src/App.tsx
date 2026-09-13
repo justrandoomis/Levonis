@@ -205,6 +205,8 @@ const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
+import AppIntro from './components/bloub/AppIntro';
+import { homeCriticalReadyStore } from './lib/appBootstrap';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
@@ -262,6 +264,27 @@ function StorefrontApp() {
       </Suspense>
     </div>
   );
+}
+
+/**
+ * Readiness belongs to the app shell, not to a timer. On Home we wait for its
+ * critical request to settle (success or an actionable error); elsewhere the
+ * authenticated shell and hostname resolution are the critical work. This
+ * component is a sibling of AppContent so the SAME intro node survives the
+ * unresolved-host fallback becoming the real application.
+ */
+function AppBootstrapLayer() {
+  const location = useLocation();
+  const { isLoaded } = useAuth();
+  const { store, resolved, unknownStore } = useStore();
+  const homeReady = React.useSyncExternalStore(
+    homeCriticalReadyStore.subscribe,
+    homeCriticalReadyStore.snapshot,
+    homeCriticalReadyStore.serverSnapshot
+  );
+  const mainHomeNeedsData = !store && !unknownStore && location.pathname === '/';
+
+  return <AppIntro ready={resolved && isLoaded && (!mainHomeNeedsData || homeReady)} />;
 }
 
 function AppContent() {
@@ -544,6 +567,7 @@ export default function App() {
         <WalletProvider>
           <Router>
             <StoreProvider>
+              <AppBootstrapLayer />
               <AppContent />
             </StoreProvider>
           </Router>

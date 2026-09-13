@@ -416,6 +416,8 @@ test('an avatar key belonging to somebody else is refused', async () => {
   assert.equal(res.status, 400);
   const ok = await app(d1, 'u1').request('/api/profile', patch({ avatarKey: 'avatars/u1/mine.png' }));
   assert.equal(ok.status, 200);
+  const canonical = await app(d1, 'u1').request('/api/profile', patch({ avatarKey: 'users/u1/avatar/mine.webp' }));
+  assert.equal(canonical.status, 200);
 });
 
 test('the user object carries completion, so every surface reads one answer', async () => {

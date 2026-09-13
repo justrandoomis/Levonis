@@ -3,6 +3,7 @@ import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, notFound, forbidden, str } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
+import { headMediaObject } from '../lib/mediaStorage';
 
 /**
  * Direct chats. Only participants can read or write a conversation; there is
@@ -190,7 +191,7 @@ chatRoutes.post('/:id/messages', async (c) => {
   if (kind === 'image') {
     fileKey = str(body.fileKey, 'fileKey', { min: 5, max: 300 });
     if (!fileKey.startsWith(`chat/${user.id}/`)) throw badRequest('Invalid image reference');
-    const head = await c.env.BUCKET.head(fileKey);
+    const head = await headMediaObject(c.env, 'private', fileKey);
     if (!head) throw badRequest('Image upload not found');
   }
   if (kind === 'text' && !text) throw badRequest('Message cannot be empty');

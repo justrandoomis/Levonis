@@ -46,6 +46,7 @@ import { useAuth } from '../../AuthContext';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
 import {
   blankDoc,
+  defaultProductDeliveryOptions,
   importedTexts,
   preservedGroups,
   specIdsOutsideTemplate,
@@ -539,6 +540,7 @@ export default function ProductForm({
       rel,
       publishing: status === 'active',
       warranty: warrantyInput,
+      delivery_options: next.delivery_options,
     });
     if (Object.keys(check).length > 0) {
       setSaveErr('راجع الحقول المعلّمة بالأحمر قبل الحفظ.');
@@ -1253,6 +1255,96 @@ export default function ProductForm({
             </div>
           </div>
         )}
+
+        {/* Product-owned delivery tariffs. Existing products remain on the
+            global legacy tariff until an admin explicitly opts them in; this
+            prevents an unrelated edit from changing live checkout totals. */}
+        <div className="border-t border-zinc-800 pt-3 mb-4" data-form="delivery-options">
+          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+            <div className="min-w-0">
+              <h4 className="text-[13px] font-bold text-zinc-200">
+                خيارات التوصيل <span className="text-[11px] font-medium text-zinc-500">Delivery options</span>
+              </h4>
+              <p className="text-[11px] leading-relaxed text-zinc-500 mt-0.5">
+                الرسم = تقريب الكمية إلى الشريحة التالية × رسم الشريحة. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
+              </p>
+            </div>
+            {doc.delivery_options ? (
+              <button
+                type="button"
+                className={`${btnGhost} !h-8 text-[11px]`}
+                onClick={() => setDoc((d) => ({ ...d, delivery_options: null }))}
+                data-delivery-use-legacy
+              >
+                استخدام التعرفة العامة
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`${btnGhost} !h-8 text-[11px]`}
+                onClick={() => setDoc((d) => ({ ...d, delivery_options: defaultProductDeliveryOptions() }))}
+                data-delivery-configure
+              >
+                تخصيص لهذا المنتج
+              </button>
+            )}
+          </div>
+
+          {!doc.delivery_options ? (
+            <p className="rounded-md bg-zinc-800/35 px-3 py-2 text-[11px] text-zinc-400" data-delivery-legacy-note>
+              هذا المنتج يستخدم تعرفة التوصيل العامة الحالية للحفاظ على توافق الطلبات والمنتجات القديمة.
+            </p>
+          ) : (
+            <div className="divide-y divide-zinc-800 rounded-lg bg-zinc-900/45 px-3">
+              {([
+                ['standard', 'التوصيل العادي', 'Standard delivery'],
+                ['personal', 'التوصيل الشخصي', 'Personal delivery'],
+              ] as const).map(([method, ar, en]) => {
+                const rule = doc.delivery_options![method];
+                const setRule = (change: Partial<typeof rule>) =>
+                  setDoc((d) =>
+                    d.delivery_options
+                      ? {
+                          ...d,
+                          delivery_options: {
+                            ...d.delivery_options,
+                            [method]: { ...d.delivery_options[method], ...change },
+                          },
+                        }
+                      : d
+                  );
+                return (
+                  <div key={method} className="py-3" data-delivery-method={method}>
+                    <div className="max-w-sm mb-2">
+                      <Toggle
+                        checked={rule.enabled}
+                        onChange={(enabled) => setRule({ enabled })}
+                        label={ar}
+                        sub={en}
+                      />
+                    </div>
+                    <Grid cols={2}>
+                      <Field
+                        ar="عدد القطع لكل شريحة"
+                        en="Quantity per fee tier"
+                        error={showErrors ? errors[`delivery:${method}:quantity_step`] : undefined}
+                      >
+                        <Qty value={rule.quantity_step} onChange={(v) => setRule({ quantity_step: v ?? 1 })} />
+                      </Field>
+                      <Field
+                        ar="رسم الشريحة (د.ع)"
+                        en="Fee per tier (IQD)"
+                        error={showErrors ? errors[`delivery:${method}:fee_iqd`] : undefined}
+                      >
+                        <Money value={rule.fee_iqd} onChange={(v) => setRule({ fee_iqd: v ?? 0 })} />
+                      </Field>
+                    </Grid>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Extended warranty — printers only (owner mandate). Two switches
             (+12 → 24, +24 → 36), a percent of the printer price each, and the
