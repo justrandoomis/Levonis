@@ -1,134 +1,45 @@
-# OWNER-AUTHORIZED ONE-TIME RELEASE — 13 September 2026
-# levonis-iq.com -> levonis-staging [LIVE]; no Studio or alternate Worker writes.
-# The user explicitly requested completion and publication (DEPLOY-CODE).
-# This isolated branch is never merged. Keep Main unchanged until prepare succeeds.
-# It permits only the reviewed additive 0070 migration, then invokes the EXISTING
-# deploy-staging-code.yml with its confirmation, tests and settings preservation.
-name: 42 - Owner-authorized Levonis release (migration before Main)
-
+# One-time owner-authorized release control; isolated branch, never merged.
+# The additive live migration succeeded in run 34779443242, prepare job.
+# This invokes the existing safe live workflow without changing its safeguards.
+name: 42 - Owner-authorized Levonis release (dispatch verified Main)
 on:
   push:
     branches: [codex/release-levonis-20260913]
     paths: ['.github/workflows/release-levonis-20260913-once.yml']
-
 permissions:
   contents: read
-
 concurrency: staging-deploy
-
-env:
-  EXPECTED_SOURCE: 66de31c93ac2ef601b1c3bf9442ee10e19b6ea4c
-  EXPECTED_BASE: 865492f7c6ac34b69b3828fa4b69236cdea0f344
-  CONFIRM: DEPLOY-CODE
-
 jobs:
-  prepare:
+  dispatch:
     if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/release-levonis-20260913' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 66de31c93ac2ef601b1c3bf9442ee10e19b6ea4c
-          persist-credentials: false
-      - name: Require exact reviewed source, successful full CI and unchanged Main
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test "$CONFIRM" = DEPLOY-CODE
-          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
-          node --input-type=module <<'JS'
-          const base = 'https://api.github.com/repos/justrandoomis/Levonis';
-          const headers = {Authorization:`Bearer ${process.env.GH_TOKEN}`, Accept:'application/vnd.github+json'};
-          async function get(path) { const r=await fetch(base+path,{headers}); if(!r.ok) throw new Error(`GitHub ${r.status}`); return r.json(); }
-          const run=await get('/actions/runs/34776438988');
-          if(run.head_sha!==process.env.EXPECTED_SOURCE || run.conclusion!=='success' || run.status!=='completed') throw new Error('Exact-source complete CI is not green');
-          const main=await get('/commits/Main');
-          if(main.sha!==process.env.EXPECTED_BASE) throw new Error('Main changed: reconcile before production migration');
-          console.log('Exact source verified: 2,510 root + 361 workspace tests, build and browser gate succeeded.');
-          JS
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - name: Verify live database binding and resolve existing deployment config
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" -o /tmp/live-settings.json
-          jq -e '.success == true' /tmp/live-settings.json > /dev/null
-          LIVE_DB=$(jq -er '.result.bindings[] | select(.type=="d1" and .name=="DB") | .id' /tmp/live-settings.json)
-          NAMED_DB=$(npx wrangler d1 list --json | jq -er '.[] | select(.name=="levonis-db-staging") | .uuid')
-          echo "::add-mask::$LIVE_DB"
-          echo "::add-mask::$NAMED_DB"
-          test "$LIVE_DB" = "$NAMED_DB" || { echo '::error::Live binding differs from reviewed target'; exit 1; }
-          STAGING_DB_ID="$LIVE_DB" node scripts/set-deploy-ids.mjs --env staging
-          rm -f /tmp/live-settings.json
-          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
-            --command 'SELECT name FROM d1_migrations ORDER BY id' > /tmp/applied-migrations.json
-          node --input-type=module <<'JS'
-          import {readFileSync,readdirSync} from 'node:fs';
-          const records=JSON.parse(readFileSync('/tmp/applied-migrations.json','utf8'));
-          const applied=new Set(records.flatMap(r=>r.results??[]).map(r=>r.name));
-          if(!applied.size) throw new Error('Existing migration history missing: do not bootstrap a live database');
-          const pending=readdirSync('migrations').filter(n=>n.endsWith('.sql')&&!applied.has(n));
-          console.log('Pending migration names:',JSON.stringify(pending));
-          if(pending.some(n=>n!=='0070_policy_publication_acceptance.sql')) throw new Error('Unreviewed pending migrations: stop before any write');
-          JS
-      - name: Apply only the reviewed additive policy migration before Main can change
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
-          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
-            --command "SELECT name FROM d1_migrations WHERE name='0070_policy_publication_acceptance.sql'; SELECT name FROM sqlite_master WHERE type='trigger' AND name IN ('policy_documents_immutable_update','policy_documents_immutable_delete');" > /tmp/policy-schema.json
-          node --input-type=module <<'JS'
-          import {readFileSync} from 'node:fs';
-          const rows=JSON.parse(readFileSync('/tmp/policy-schema.json','utf8')).flatMap(r=>r.results??[]);
-          const names=new Set(rows.map(r=>r.name));
-          for(const name of ['0070_policy_publication_acceptance.sql','policy_documents_immutable_update','policy_documents_immutable_delete']) if(!names.has(name)) throw new Error('Schema verification missing '+name);
-          console.log('Additive migration and both policy history guards verified. No contractual document was published.');
-          JS
-
-  dispatch_existing_deployment:
-    needs: prepare
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 3
     permissions:
       contents: read
       actions: write
     steps:
-      - name: Require reviewed Main merge, then dispatch the existing safe live deployment
+      - name: Verify migrated schema gate and exact merged source before DEPLOY-CODE
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_SOURCE: 66de31c93ac2ef601b1c3bf9442ee10e19b6ea4c
+          EXPECTED_MAIN: 6b373ded26a1606fd4a545f9cf42c7dc5769094d
         run: |
           node --input-type=module <<'JS'
           const base='https://api.github.com/repos/justrandoomis/Levonis';
-          const headers={Authorization:`Bearer ${process.env.GH_TOKEN}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json'};
-          async function get(path) {const r=await fetch(base+path,{headers}); if(!r.ok) throw new Error(`GitHub ${r.status}`); return r.json();}
-          const source=await get('/git/commits/'+process.env.EXPECTED_SOURCE);
-          let main;
-          for(let i=0;i<66;i++) {
-            main=await get('/git/commits/Main');
-            if(main.sha!==process.env.EXPECTED_BASE) break;
-            if(i===0) console.log('Database is ready. Waiting for the authorized reviewed PR merge; this job never merges or force pushes.');
-            await new Promise(r=>setTimeout(r,10000));
-          }
-          if(main.sha===process.env.EXPECTED_BASE) throw new Error('Main was not merged: no deployment dispatched');
-          if(main.tree.sha!==source.tree.sha || !main.parents.some(p=>p.sha===process.env.EXPECTED_SOURCE)) throw new Error('Main is not the exact reviewed merge: no deployment dispatched');
+          const headers={Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'};
+          async function get(path) {const r=await fetch(base+path,{headers}); if(!r.ok) throw new Error(`GitHub ${r.status} at ${path}`); return r.json();}
+          const jobs=await get('/actions/runs/34779443242/jobs');
+          const prepare=jobs.jobs.find(j=>j.name==='prepare');
+          if(prepare?.conclusion!=='success') throw new Error('Live additive migration was not verified');
+          const ci=await get('/actions/runs/34776438988');
+          if(ci.head_sha!==process.env.EXPECTED_SOURCE || ci.conclusion!=='success') throw new Error('Exact-source full CI not green');
+          const source=await get('/commits/'+process.env.EXPECTED_SOURCE);
+          const main=await get('/commits/Main');
+          if(main.sha!==process.env.EXPECTED_MAIN || main.commit.tree.sha!==source.commit.tree.sha || !main.parents.some(p=>p.sha===process.env.EXPECTED_SOURCE)) throw new Error('Main differs from the reviewed owner-authorized merge');
           const r=await fetch(base+'/actions/workflows/deploy-staging-code.yml/dispatches',{
-            method:'POST',headers,body:JSON.stringify({ref:'Main',inputs:{confirm:process.env.CONFIRM}})
+            method:'POST',headers,body:JSON.stringify({ref:'Main',inputs:{confirm:'DEPLOY-CODE'}})
           });
-          if(!r.ok) throw new Error('Existing deployment dispatch failed with HTTP '+r.status);
-          console.log('Existing deploy-staging-code.yml dispatched with DEPLOY-CODE on reviewed Main '+main.sha);
-          console.log('Verify that run completes and the public site serves its exact bundle before declaring publication.');
+          if(!r.ok) throw new Error('Existing live deployment dispatch failed: HTTP '+r.status);
+          console.log('Existing deploy-staging-code.yml dispatched with DEPLOY-CODE on Main '+main.sha);
+          console.log('Live target: levonis-staging -> levonis-iq.com. No settings or policy content changed by this dispatcher.');
           JS
