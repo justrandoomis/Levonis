@@ -17,6 +17,11 @@ import type {
 /** The editor form state: the canonical doc + catalog placement. */
 export type EditorDoc = ProductDocV2 & { catalog_ids: string[] };
 
+export const defaultProductDeliveryOptions = () => ({
+  standard: { enabled: true, quantity_step: 1, fee_iqd: 5000 },
+  personal: { enabled: true, quantity_step: 1, fee_iqd: 10000 },
+});
+
 let localCounter = 0;
 export function uid(prefix: string): string {
   localCounter += 1;
@@ -56,6 +61,7 @@ export function blankDoc(): EditorDoc {
     warranty_plans: [],
     warranty_base_months: null,
     serialized: null,
+    delivery_options: defaultProductDeliveryOptions(),
     content_blocks: [],
     translation_meta: {},
     is_featured: false,
@@ -112,6 +118,7 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] 
     warranty_plans: list<EditorDoc['warranty_plans'][number]>(p.warranty_plans).map((w) => ({ ...w, fee_percent: w.fee_percent ?? null })),
     warranty_base_months: p.warranty_base_months ?? null,
     serialized: p.serialized ?? null,
+    delivery_options: p.delivery_options ?? null,
     content_blocks: list(p.content_blocks),
     translation_meta: p.translation_meta ?? {},
     payment_options: list<string>(p.payment_options).filter((x) => typeof x === 'string'),

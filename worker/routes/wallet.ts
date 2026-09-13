@@ -11,6 +11,7 @@ import {
   notifyAdminsOfDeposit,
 } from '../lib/walletNotify';
 import { audit } from '../lib/audit';
+import { headMediaObject } from '../lib/mediaStorage';
 import {
   MAX_AMOUNT_CENTS,
   WITHDRAWAL_FEE_POLICY,
@@ -256,7 +257,7 @@ walletRoutes.post('/deposits', async (c) => {
   if (!receiptKey.startsWith(`receipts/${user.id}/`)) {
     throw badRequest('Receipt upload is required for deposits');
   }
-  const obj = await c.env.BUCKET.head(receiptKey);
+  const obj = await headMediaObject(c.env, 'private', receiptKey);
   if (!obj) throw badRequest('Receipt upload not found — please upload it again');
 
   // Weak content fingerprint from the stored object (md5/etag). It flags a

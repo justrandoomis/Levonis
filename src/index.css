@@ -39,6 +39,9 @@ html, body, #root {
 
 html {
   color-scheme: dark;
+  /* Shared default for sticky content. Pages with dynamic chrome override
+     this token from the element's measured ResizeObserver height. */
+  --app-header-height: 68px;
 }
 
 
@@ -647,4 +650,91 @@ html[data-overlay-open='true'] [data-bottom-nav] {
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   APP INTRO / HOME CHARACTER
+
+   The fixed character is a single shared element. During bootstrap its frame
+   is the viewport centre; when real critical work settles, React measures the
+   Home target and changes this same node's transform and dimensions. The veil
+   and character are independent so the page can reveal while the character
+   travels. Nothing here owns clicks.
+   --------------------------------------------------------------------------- */
+.lv-app-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 121;
+  pointer-events: none;
+  contain: layout style;
+}
+
+.lv-app-intro__veil {
+  position: fixed;
+  inset: 0;
+  background: var(--color-canvas);
+  opacity: 1;
+  transition: opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lv-app-intro__character {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 1;
+  opacity: 1;
+  transform-origin: center;
+  will-change: transform, width, height;
+}
+
+.lv-app-intro[data-phase='travelling'] .lv-app-intro__veil,
+.lv-app-intro[data-phase='docked'] .lv-app-intro__veil,
+.lv-app-intro[data-phase='hidden'] .lv-app-intro__veil {
+  opacity: 0;
+}
+
+.lv-app-intro[data-phase='travelling'] .lv-app-intro__character {
+  transition:
+    transform 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
+    width 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
+    height 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
+    opacity 150ms ease-out;
+}
+
+.lv-app-intro[data-phase='hidden'] .lv-app-intro__character,
+html[data-overlay-open='true'] .lv-app-intro__character {
+  opacity: 0;
+}
+
+.lv-bloub {
+  display: block;
+  overflow: visible;
+  transform-origin: center;
+  filter: drop-shadow(0 9px 13px rgb(0 0 0 / 0.32));
+}
+
+.lv-bloub--idle {
+  animation: lv-bloub-breathe 5.4s ease-in-out infinite;
+}
+
+.lv-app-intro[data-page-visible='false'] .lv-bloub {
+  animation-play-state: paused;
+}
+
+@keyframes lv-bloub-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.018); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-app-intro__veil {
+    transition-duration: 120ms !important;
+  }
+  .lv-app-intro__character {
+    transition: opacity 120ms ease-out !important;
+    will-change: opacity;
+  }
+  .lv-bloub {
+    animation: none !important;
+  }
 }

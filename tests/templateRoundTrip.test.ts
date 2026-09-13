@@ -38,6 +38,30 @@ function baseRow() {
   };
 }
 
+test('TXT export/import preserves product delivery rules and partial edits merge safely', () => {
+  const doc = parseProductRow({
+    ...baseRow(),
+    ops_policy: JSON.stringify({
+      delivery_options: {
+        standard: { enabled: true, quantity_step: 10, fee_iqd: 5000 },
+        personal: { enabled: true, quantity_step: 1, fee_iqd: 50000 },
+      },
+    }),
+  });
+  const exported = exportProduct(doc);
+  assert.match(exported, /^standard_delivery_quantity_step=10$/m);
+  assert.match(exported, /^personal_delivery_fee_iqd=50000$/m);
+  const roundTrip = validateProductDoc(toDocBody(parseTemplate(exported), doc, { needs_review: [] }).body);
+  assert.deepEqual(roundTrip.delivery_options, doc.delivery_options);
+
+  const partial = parseTemplate('template_version=2\nstandard_delivery_fee_iqd=7000\n');
+  const edited = validateProductDoc(toDocBody(partial, doc, { needs_review: [] }).body);
+  assert.deepEqual(edited.delivery_options, {
+    standard: { enabled: true, quantity_step: 10, fee_iqd: 7000 },
+    personal: { enabled: true, quantity_step: 1, fee_iqd: 50000 },
+  });
+});
+
 /**
  * A product shaped the way the admin form stores one, including the three
  * things the old export threw away: an INACTIVE option, a colour linked to

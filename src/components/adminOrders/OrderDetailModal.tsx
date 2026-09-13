@@ -287,6 +287,12 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                         label={loc('التوصيل', 'Delivery', 'گەیاندن')}
                         value={fin.delivery_waived ? loc('مجاني', 'waived', 'بەخۆڕایی') : formatIqd(fin.shipping_iqd)}
                       />
+                      {fin.cod_tax_iqd > 0 && (
+                        <Row
+                          label={loc('ضريبة الدفع عند الاستلام', 'Cash on Delivery Tax', 'باجی پارەدان لە کاتی گەیاندن')}
+                          value={formatIqd(fin.cod_tax_iqd)}
+                        />
+                      )}
                       {detail.membership_tier_snapshot && detail.membership_tier_snapshot !== 'free' && (
                         <Row
                           label={loc('العضوية وقت الطلب', 'Membership at order time', 'ئەندامێتی لە کاتی داواکاری')}

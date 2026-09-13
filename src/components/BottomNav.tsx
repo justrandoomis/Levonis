@@ -1,10 +1,11 @@
 import React from 'react';
-import { Home, Users, MessageCircle, ShoppingCart, User } from 'lucide-react';
+import { Users, MessageCircle, ShoppingCart, User } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
 import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
+import { signalBloub } from './bloub/AppIntro';
 
 /**
  * Routes on which the floating bottom nav does not render. Exported so the
@@ -37,7 +38,7 @@ export function isBottomNavHidden(pathname: string): boolean {
 const PROTECTED_PATHS = new Set(['/cart']);
 
 export default function BottomNav() {
-  const { t } = useLanguage();
+  const { t, dir } = useLanguage();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   /**
@@ -70,13 +71,15 @@ export default function BottomNav() {
     };
   }, [isAuthenticated]);
 
-  const navItems = [
-    { icon: Users, label: t('community'), path: '/community' },
-    { icon: MessageCircle, label: t('webCenter'), path: '/chats' },
-    { icon: Home, label: t('home'), path: '/' },
-    { icon: ShoppingCart, label: t('cart'), path: '/cart' },
+  const leftItems = [
     { icon: User, label: t('profile'), path: '/profile' },
+    { icon: ShoppingCart, label: t('cart'), path: '/cart' },
   ];
+  const rightItems = [
+    { icon: MessageCircle, label: t('webCenter'), path: '/chats' },
+    { icon: Users, label: t('community'), path: '/community' },
+  ];
+  type NavItem = (typeof leftItems)[number];
 
   if (isBottomNavHidden(location.pathname)) return null;
 
@@ -85,16 +88,17 @@ export default function BottomNav() {
       ? `/auth?next=${encodeURIComponent(path)}`
       : path;
 
-  const renderItem = (item: (typeof navItems)[number]) => {
+  const renderItem = (item: NavItem) => {
     const isActive = location.pathname === item.path;
     const badge = item.path === '/cart' && cartCount ? cartCount : 0;
     return (
       <Link
         key={item.path}
         to={linkTarget(item.path)}
+        dir={dir}
         aria-label={badge > 0 ? `${item.label} (${badge})` : item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.98] ${
+        className={`relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 transition-[color,background-color,opacity,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.98] ${
           isActive ? 'bg-white/[0.07] text-text-primary' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-secondary'
         }`}
       >
@@ -122,7 +126,7 @@ export default function BottomNav() {
             </span>
           ) : null}
         </span>
-        <span className={`max-w-full truncate text-[9px] sm:text-[11px] ${isActive ? 'font-bold text-text-primary' : 'font-medium'}`}>{item.label}</span>
+        <span className={`max-w-full truncate text-[9px] sm:text-[10px] ${isActive ? 'font-bold text-text-primary' : 'font-medium'}`}>{item.label}</span>
       </Link>
     );
   };
@@ -131,7 +135,8 @@ export default function BottomNav() {
     <nav
       aria-label="LEVONIS"
       data-bottom-nav
-      className="fixed bottom-[max(0.625rem,env(safe-area-inset-bottom))] sm:bottom-[max(1rem,env(safe-area-inset-bottom))] inset-x-0 z-[120] flex items-center justify-center px-3 sm:px-4 pointer-events-none transition-[opacity,transform] duration-200"
+      dir="ltr"
+      className="fixed bottom-[max(0.625rem,env(safe-area-inset-bottom))] sm:bottom-[max(1rem,env(safe-area-inset-bottom))] inset-x-0 z-[120] flex items-center justify-center gap-1.5 px-2 pointer-events-none transition-[opacity,transform] duration-200 sm:gap-3 sm:px-4"
     >
       {/* A scrim under the whole bar. The page scrolls UNDER a floating nav by
           design, and at 20% black the text passing behind it stayed perfectly
@@ -144,10 +149,44 @@ export default function BottomNav() {
         className="pointer-events-none absolute inset-x-0 bottom-[calc(-1*max(0.625rem,env(safe-area-inset-bottom)))] sm:bottom-[calc(-1*max(1rem,env(safe-area-inset-bottom)))] h-[calc(100%+max(0.625rem,env(safe-area-inset-bottom))+20px)] -z-10 bg-gradient-to-t from-black via-black/94 to-transparent"
       />
 
-      {/* One calm navigation surface. The active tab uses hierarchy and a tiny
-          brand marker instead of turning a whole pill gold. */}
-      <div className="material material-thin grid h-16 w-full max-w-[520px] grid-cols-5 gap-1 rounded-2xl border border-border-subtle p-1.5 shadow-2xl pointer-events-auto sm:h-[68px] sm:p-2">
-        {navItems.map(renderItem)}
+      {/* Two compact groups restore Levonis' established navigation grammar.
+          The centre is deliberately independent, not a raised fifth cell in
+          one long bar. `dir=ltr` keeps the physical groups stable; each link
+          restores the document direction for its Arabic/English label. */}
+      <div
+        data-bottom-nav-group="account-cart"
+        className="material material-thin flex h-16 min-w-0 max-w-[160px] flex-1 items-center gap-0.5 rounded-2xl border border-border-subtle p-1.5 shadow-2xl pointer-events-auto sm:h-[68px] sm:max-w-[180px] sm:p-2"
+      >
+        {leftItems.map(renderItem)}
+      </div>
+
+      <Link
+        to="/"
+        dir={dir}
+        aria-label={t('home')}
+        aria-current={location.pathname === '/' ? 'page' : undefined}
+        onClick={() => signalBloub('tap', 480)}
+        className={`relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border shadow-2xl pointer-events-auto transition-[background-color,border-color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.96] sm:h-[68px] sm:w-[68px] ${
+          location.pathname === '/'
+            ? 'border-gold/30 bg-surface-selected'
+            : 'border-border-subtle bg-surface-raised hover:bg-surface-selected'
+        }`}
+      >
+        <span
+          data-bloub-home-target
+          aria-hidden="true"
+          className="block h-11 w-11 sm:h-12 sm:w-12"
+        />
+        {location.pathname === '/' ? (
+          <span aria-hidden="true" className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-gold" />
+        ) : null}
+      </Link>
+
+      <div
+        data-bottom-nav-group="messages-community"
+        className="material material-thin flex h-16 min-w-0 max-w-[160px] flex-1 items-center gap-0.5 rounded-2xl border border-border-subtle p-1.5 shadow-2xl pointer-events-auto sm:h-[68px] sm:max-w-[180px] sm:p-2"
+      >
+        {rightItems.map(renderItem)}
       </div>
     </nav>
   );

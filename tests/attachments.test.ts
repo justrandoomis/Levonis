@@ -161,8 +161,11 @@ test('a filename cannot inject a header, a path or a quote', () => {
 test('only this merchant\'s own uploads are accepted as image references', () => {
   assert.equal(ownedMediaKey('community/u1/abc123.jpg', 'u1'), 'community/u1/abc123.jpg');
   assert.equal(ownedMediaKey('/files/community/u1/abc123.jpg', 'u1'), 'community/u1/abc123.jpg');
+  assert.equal(ownedMediaKey('merchants/u1/public/abc123.webp', 'u1'), 'merchants/u1/public/abc123.webp');
+  assert.equal(ownedMediaKey('/files/merchants/u1/public/abc123.webp', 'u1'), 'merchants/u1/public/abc123.webp');
   // Another merchant's object.
   assert.equal(ownedMediaKey('community/u2/abc123.jpg', 'u1'), null);
+  assert.equal(ownedMediaKey('merchants/u2/public/abc123.webp', 'u1'), null);
   // A prefix that is not merchant media at all.
   assert.equal(ownedMediaKey('receipts/u1/abc123.jpg', 'u1'), null);
   assert.equal(ownedMediaKey('products/abc123.jpg', 'u1'), null);

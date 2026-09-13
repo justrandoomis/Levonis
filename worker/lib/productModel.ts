@@ -32,6 +32,7 @@ import {
 } from './availability';
 import { specGroupsFromFields } from './templateFamilies';
 import { isValidFeePercent, mergeOpsPolicy, parseFeePercent, readOpsWarranty } from './warrantyPlans';
+import type { ProductDeliveryOptions, ProductDeliveryRule } from './shipping';
 
 export const DOC_VERSION = 2;
 
@@ -249,6 +250,12 @@ export interface ProductDoc {
    */
   warranty_base_months: number | null;
   serialized: boolean | null;
+  /**
+   * Per-product last-mile rules stored canonically at
+   * `ops_policy.delivery_options`. null means a pre-feature product and keeps
+   * the legacy global shipping tariff; an object is an explicit allow-list.
+   */
+  delivery_options?: ProductDeliveryOptions | null;
   ops_policy: Record<string, unknown>;
   content_blocks: ContentBlockV2[];
   translation_meta: TranslationMeta;
@@ -709,7 +716,35 @@ function opsFromRow(raw: unknown): Pick<ProductDoc, 'warranty_base_months' | 'se
   return { warranty_base_months: ops.warranty_base_months, serialized: ops.serialized, ops_policy: ops.policy };
 }
 
+/** Defensive read used by products, cart and checkout. Invalid legacy data is
+ * treated as unconfigured, never as an enabled zero-fee promise. */
+export function readProductDeliveryOptions(raw: unknown): ProductDeliveryOptions | null {
+  const source =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : safeParse<Record<string, unknown>>(raw, {});
+  const value = source.delivery_options ?? source;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const parseRule = (candidate: unknown): ProductDeliveryRule | null => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+    const rule = candidate as Record<string, unknown>;
+    if (typeof rule.enabled !== 'boolean') return null;
+    if (!Number.isInteger(rule.quantity_step) || Number(rule.quantity_step) < 1) return null;
+    if (!Number.isInteger(rule.fee_iqd) || Number(rule.fee_iqd) < 0) return null;
+    return {
+      enabled: rule.enabled,
+      quantity_step: Number(rule.quantity_step),
+      fee_iqd: Number(rule.fee_iqd),
+    };
+  };
+  const standard = parseRule(obj.standard);
+  const personal = parseRule(obj.personal);
+  return standard && personal ? { standard, personal } : null;
+}
+
 export function parseProductRow(row: Record<string, unknown>): ProductDoc {
+  const ops = opsFromRow(row.ops_policy);
   return {
     id: String(row.id),
     slug: String(row.slug),
@@ -747,7 +782,8 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     spec_groups: upgradeSpecGroups(row.specifications),
     labels: upgradeLabels(row.labels),
     warranty_plans: upgradeWarranty(row.warranty_plans),
-    ...opsFromRow(row.ops_policy),
+    ...ops,
+    delivery_options: readProductDeliveryOptions(ops.ops_policy),
     content_blocks: upgradeContentBlocks(row.content_blocks),
     translation_meta: safeParse<TranslationMeta>(row.translation_meta, {}),
     is_featured: !!row.is_featured,
@@ -927,6 +963,18 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     typeof body.ops_policy === 'object' && body.ops_policy !== null && !Array.isArray(body.ops_policy)
       ? (body.ops_policy as Record<string, unknown>)
       : {};
+
+  const deliveryRaw = body.delivery_options === undefined ? opsCarried.delivery_options : body.delivery_options;
+  let deliveryOptions: ProductDeliveryOptions | null = null;
+  if (deliveryRaw !== undefined && deliveryRaw !== null && deliveryRaw !== '') {
+    deliveryOptions = readProductDeliveryOptions(deliveryRaw);
+    if (!deliveryOptions) {
+      fail(
+        'delivery_options',
+        'standard and personal must each contain enabled (boolean), quantity_step (integer >= 1), and fee_iqd (integer >= 0)'
+      );
+    }
+  }
 
   const stock = body.stock === null || body.stock === undefined || body.stock === '' ? null : body.stock;
   if (stock !== null && (!Number.isInteger(stock) || (stock as number) < 0)) fail('stock', 'must be a non-negative integer or null (untracked)');
@@ -1150,6 +1198,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     warranty_base_months:
       baseMonths === null || baseMonths === undefined || baseMonths === '' ? null : (baseMonths as number),
     serialized: typeof body.serialized === 'boolean' ? body.serialized : null,
+    delivery_options: deliveryOptions,
     ops_policy: opsCarried,
     content_blocks: blocks,
     translation_meta: (typeof body.translation_meta === 'object' && body.translation_meta !== null
@@ -1180,6 +1229,12 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
 /** Column map for INSERT/UPDATE. Legacy passthrough columns are preserved by
  *  the persistence layer via COALESCE-style partial update, not overwritten. */
 export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
+  const ops = mergeOpsPolicy(doc.ops_policy ?? {}, {
+    serialized: doc.serialized,
+    warranty_base_months: doc.warranty_base_months,
+  });
+  if (doc.delivery_options) ops.delivery_options = doc.delivery_options;
+  else delete ops.delivery_options;
   return {
     id: doc.id,
     slug: doc.slug,
@@ -1220,9 +1275,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     warranty_plans: JSON.stringify(doc.warranty_plans),
     // The device keys through the ONE ops_policy writer; every other key of
     // the stored JSON (size_class, is_spool, …) rides along untouched.
-    ops_policy: JSON.stringify(
-      mergeOpsPolicy(doc.ops_policy ?? {}, { serialized: doc.serialized, warranty_base_months: doc.warranty_base_months })
-    ),
+    ops_policy: JSON.stringify(ops),
     content_blocks: JSON.stringify(doc.content_blocks),
     translation_meta: JSON.stringify(doc.translation_meta),
     is_featured: doc.is_featured ? 1 : 0,
@@ -1336,6 +1389,7 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     /** Base coverage from delivery — a fact about the product, so the page can
      *  say "+12 months → 24 total" without inventing the 12. */
     warranty_base_months: doc.warranty_base_months,
+    delivery_options: doc.delivery_options,
     content_blocks: doc.content_blocks,
     is_featured: doc.is_featured,
     display_order: doc.display_order,

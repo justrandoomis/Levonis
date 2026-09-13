@@ -60,8 +60,8 @@ export default function ProfileIconGrid({
           className="flex flex-col items-center min-w-[56px] min-h-[56px] px-1 py-1.5 rounded-lg text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform"
         >
           {/* Fixed icon box — identical for every cell. */}
-          <span className="h-7 w-7 flex items-center justify-center shrink-0" aria-hidden="true">
-            <item.icon className="w-6 h-6" strokeWidth={1.5} />
+          <span className="h-6 w-6 flex items-center justify-center shrink-0" aria-hidden="true">
+            <item.icon className="w-5 h-5" strokeWidth={1.6} />
           </span>
           {/* Fixed 2-line label area: same height whether the text needs
               one line or two, in all three languages. */}

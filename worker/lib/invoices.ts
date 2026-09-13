@@ -40,6 +40,7 @@ interface OrderRow {
   payment_method_id: string;
   subtotal_iqd: number;
   shipping_iqd: number;
+  cod_tax_iqd?: number | null;
   points_discount_iqd: number;
   wallet_applied_iqd: number;
   exchange_rate: number;
@@ -95,6 +96,8 @@ export interface InvoiceSnapshotV1 {
   totals: {
     subtotal_iqd: number;
     delivery_fee_iqd: number;
+    /** Added in migration 0067; absent on immutable older invoice snapshots. */
+    cod_tax_iqd?: number;
     delivery_waived: boolean;
     coupon_code: string;
     coupon_discount_iqd: number;
@@ -234,6 +237,7 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
     totals: {
       subtotal_iqd: Number(order.subtotal_iqd) || 0,
       delivery_fee_iqd: Number(order.shipping_iqd) || 0,
+      cod_tax_iqd: Number(order.cod_tax_iqd) || 0,
       delivery_waived: !!order.delivery_waived,
       coupon_code: coupon?.code || '',
       coupon_discount_iqd: coupon ? Number(coupon.discount_iqd) || 0 : 0,
@@ -263,6 +267,7 @@ export function invoiceEmailData(
     lines: snapshot.lines,
     subtotal_iqd: snapshot.totals.subtotal_iqd,
     delivery_fee_iqd: snapshot.totals.delivery_fee_iqd,
+    cod_tax_iqd: snapshot.totals.cod_tax_iqd ?? 0,
     delivery_waived: snapshot.totals.delivery_waived,
     coupon_discount_iqd: snapshot.totals.coupon_discount_iqd,
     points_applied_iqd: snapshot.totals.points_applied_iqd,

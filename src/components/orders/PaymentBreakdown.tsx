@@ -23,6 +23,7 @@ const STRINGS = {
     coupon: 'كوبون',
     pointsUsed: 'نقاط مستخدمة',
     shipping: 'التوصيل',
+    codTax: 'ضريبة الدفع عند الاستلام',
     free: 'مجانًا',
     waived: 'معفى',
     total: 'المجموع',
@@ -50,6 +51,7 @@ const STRINGS = {
     coupon: 'Coupon',
     pointsUsed: 'Points used',
     shipping: 'Delivery',
+    codTax: 'Cash on Delivery Tax',
     free: 'Free',
     waived: 'waived',
     total: 'Total',
@@ -77,6 +79,7 @@ const STRINGS = {
     coupon: 'کۆپۆن',
     pointsUsed: 'خاڵی بەکارهاتوو',
     shipping: 'گەیاندن',
+    codTax: 'باجی پارەدان لە کاتی گەیاندن',
     free: 'بەخۆڕایی',
     waived: 'لێخۆشبوو',
     total: 'کۆی گشتی',
@@ -170,6 +173,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
           label={s.shipping}
           value={f.shipping_iqd === 0 ? (f.delivery_waived ? `${s.free} · ${s.waived}` : s.free) : formatIqd(f.shipping_iqd)}
         />
+        {f.cod_tax_iqd > 0 && <Row label={s.codTax} value={formatIqd(f.cod_tax_iqd)} />}
         <Row label={s.total} value={formatIqd(f.total_iqd)} strong />
       </dl>
 

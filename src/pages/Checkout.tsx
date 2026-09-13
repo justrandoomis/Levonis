@@ -32,7 +32,17 @@ const COUPON_FAILURES = new Set([
 // ---------------------------------------------------------------- server quote
 
 interface ShippingQuoteDto {
-  components: Array<{ kind: string; fee_iqd: number; waived: boolean; units: number; advance_required: boolean }>;
+  components: Array<{
+    kind: string;
+    fee_iqd: number;
+    waived: boolean;
+    units: number;
+    advance_required: boolean;
+    product_id?: string;
+    product_name?: string;
+    delivery_method?: 'standard' | 'personal';
+    quantity_step?: number;
+  }>;
   total_iqd: number;
   total_before_waiver_iqd: number;
   advance_due_iqd: number;
@@ -129,6 +139,8 @@ interface CheckoutQuoteDto {
   support: { referrer_username: string; ref: string; discount_iqd: number } | null;
   points: { balance: number; applied_iqd: number };
   wallet: { balance_iqd: number; applied_iqd: number; required_advance_iqd: number };
+  /** Authoritative server-side COD tax, already included in total_iqd. */
+  cod_tax_iqd: number;
   total_iqd: number;
   due_on_delivery_iqd: number;
   tier: { tier: string; active: boolean; at_approved_default_address: boolean; pro_benefits_context: boolean };
@@ -146,6 +158,7 @@ const STRINGS = {
     needsConfig: 'رسوم توصيل جزء من هذا الطلب (طابعة/كرتونة إضافية) لم تُهيَّأ من الإدارة بعد، لذلك لا يمكن إتمام الطلب حالياً. لا نختلق رسوماً.',
     advanceDue: (v: string) => `رسوم توصيل الطابعة (${v}) تُدفع مقدماً من المحفظة.`,
     freeShipping: 'مجاناً',
+    codTax: 'ضريبة الدفع عند الاستلام',
     whyTitle: 'تفاصيل التوصيل',
     policyTitle: 'الموافقة على السياسات',
     policyAgree: 'قرأتُ وأوافق على:',
@@ -168,7 +181,7 @@ const STRINGS = {
     codDirectPricing: 'اختيار الدفع عند الاستلام يُسعَّر كبيع مباشر؛ يبقى طلبك طلبًا مسبقًا بمراحله ووسيلة نقله كما هي.',
     prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
     prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
-    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -176,6 +189,7 @@ const STRINGS = {
     needsConfig: 'Delivery fees for part of this order (printer / extra carton) are not configured by the store yet, so the order cannot be completed right now. We never invent a fee.',
     advanceDue: (v: string) => `Printer delivery fees (${v}) are paid in advance from your wallet.`,
     freeShipping: 'Free',
+    codTax: 'Cash on Delivery Tax',
     whyTitle: 'Delivery details',
     policyTitle: 'Policy consent',
     policyAgree: 'I have read and agree to:',
@@ -198,7 +212,7 @@ const STRINGS = {
     codDirectPricing: 'Cash on delivery is priced as a direct sale; your order stays a pre-order, on its journey and its stages.',
     prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
     prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
-    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -206,6 +220,7 @@ const STRINGS = {
     needsConfig: 'کرێی گەیاندنی بەشێک لەم داواکارییە (پرینتەر/کارتۆنی زیادە) هێشتا لەلایەن بەڕێوەبەرایەتییەوە ڕێکنەخراوە، بۆیە ئێستا داواکارییەکە تەواو ناکرێت.',
     advanceDue: (v: string) => `کرێی گەیاندنی پرینتەر (${v}) پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     freeShipping: 'بەخۆڕایی',
+    codTax: 'باجی پارەدان لە کاتی گەیاندن',
     whyTitle: 'وردەکاری گەیاندن',
     policyTitle: 'ڕەزامەندی لەسەر سیاسەتەکان',
     policyAgree: 'خوێندمەوە و ڕازیم بە:',
@@ -228,7 +243,7 @@ const STRINGS = {
     codDirectPricing: 'پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت؛ داواکارییەکەت وەک پێش-داواکاری دەمێنێتەوە بە قۆناغەکانی و شێوازی گواستنەوەی خۆی.',
     prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
     prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
-    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
   },
 };
 
@@ -378,10 +393,30 @@ export default function Checkout() {
 
   useFreshOnReturn(refreshLines, { enabled: !submitting, minIntervalMs: 8_000, pollWhileVisibleMs: 60_000 });
 
-  // Default the selectors once settings arrive.
+  // Product delivery options are an allow-list. A method disabled by any
+  // selected physical line is not presented as valid; pickup remains a
+  // separate no-last-mile choice. The server repeats this check at the door.
+  const availableDeliveryMethods = checkoutDeliveryMethods.filter((method) => {
+    if (method.id === 'pickup') return true;
+    if (method.id !== 'standard' && method.id !== 'personal') {
+      return !items.some((item) => item.delivery_availability !== undefined);
+    }
+    return items.every((item) => item.delivery_availability?.[method.id] !== false);
+  });
+  const availableDeliveryKey = availableDeliveryMethods.map((method) => method.id).join(',');
+
+  // Default the selector once settings/items arrive, and move away from a
+  // method that became unavailable after a quantity/cart refresh.
   useEffect(() => {
-    if (!deliveryMethod && checkoutDeliveryMethods.length > 0) setDeliveryMethod(checkoutDeliveryMethods[0].id);
-  }, [checkoutDeliveryMethods, deliveryMethod]);
+    if (availableDeliveryMethods.length === 0) {
+      if (deliveryMethod) setDeliveryMethod('');
+      return;
+    }
+    if (!deliveryMethod || !availableDeliveryMethods.some((method) => method.id === deliveryMethod)) {
+      setDeliveryMethod(availableDeliveryMethods[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableDeliveryKey, deliveryMethod]);
 
   // THE SCREEN OFFERS EXACTLY WHAT THE SERVER ALLOWS. The owner's rule is two
   // ways to pay — in advance from the wallet, or cash on delivery — for every
@@ -593,6 +628,7 @@ export default function Checkout() {
   const selectedDelivery = checkoutDeliveryMethods.find(m => m.id === deliveryMethod);
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
+  const codTaxIqd = quote?.cod_tax_iqd ?? 0;
   const shippingWaived = !!quote && quote.shipping.total_iqd < quote.shipping.total_before_waiver_iqd;
   const shippingNeedsConfig = !!quote && quote.shipping.needs_config.length > 0;
   const requiredPolicies = quote?.policies ?? [];
@@ -951,7 +987,7 @@ export default function Checkout() {
               {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
             </h2>
             <div className="grid grid-cols-1 gap-3">
-              {checkoutDeliveryMethods.map(method => {
+              {availableDeliveryMethods.map(method => {
                 const selected = deliveryMethod === method.id;
                 const selectedQuote = selected ? quote?.shipping : null;
                 const displayedPrice = selectedQuote?.total_iqd ?? method.price_iqd;
@@ -1121,6 +1157,13 @@ export default function Checkout() {
               <span className="font-light">{dir === 'rtl' ? 'المجموع الفرعي' : 'Subtotal'}</span>
               <span className="text-white font-normal tabular-nums">{formatIqd(total)}</span>
             </div>
+
+            {codTaxIqd > 0 && (
+              <div className="flex justify-between items-center text-zinc-400" data-checkout-cod-tax>
+                <span className="font-light">{S.codTax}</span>
+                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxIqd)}</span>
+              </div>
+            )}
             {/* One line about the pricing rule in force on a pre-order cart:
                 cash on delivery prices the lines as a direct sale while the
                 order keeps its journey; paying in advance keeps the configured
@@ -1169,8 +1212,11 @@ export default function Checkout() {
                     printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery'],
                     printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery'],
                     carton: ['كرتونة كمية إضافية', 'Extra quantity carton'],
+                    product: ['توصيل حسب المنتج', 'Product delivery'],
                   };
-                  const name = names[component.kind] ?? [component.kind, component.kind];
+                  const name = component.product_name
+                    ? [component.product_name, component.product_name]
+                    : names[component.kind] ?? [component.kind, component.kind];
                   return (
                     <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3 text-xs">
                       <span className="text-zinc-500">
@@ -1237,7 +1283,7 @@ export default function Checkout() {
                 (settings), echoed on the quote only for a printer line going
                 to a home address; a store pickup gets no note. */}
             {printerNoteIqd !== null && summaryLines.some((l) => l.isPrinter) && (
-              <Note tone="gold" icon={<Truck className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-printer-note">
+              <Note tone="zinc" icon={<Truck className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-printer-note">
                 <span className="font-light">{S.printerNote(formatIqd(printerNoteIqd))}</span>
               </Note>
             )}

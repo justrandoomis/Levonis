@@ -225,6 +225,11 @@ export interface ApiProduct {
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
   sale_types?: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   shipping_methods: Array<{ id: string; method?: string; delivery_time?: string; price_iqd?: number }>;
+  /** null on legacy products that still use the global delivery tariff. */
+  delivery_options?: {
+    standard: { enabled: boolean; quantity_step: number; fee_iqd: number };
+    personal: { enabled: boolean; quantity_step: number; fee_iqd: number };
+  } | null;
   price_iqd: number;
   prime_price_iqd?: number | null;
   pro_price_iqd?: number | null;
@@ -366,6 +371,8 @@ export interface CartItem {
   options: ApiProduct['options'];
   colors: ApiProduct['colors'];
   shipping_methods: ApiProduct['shipping_methods'];
+  /** Server-derived method availability for this exact physical line. */
+  delivery_availability?: { standard: boolean; personal: boolean };
   /** 'bundle' / 'mystery' for a composition line; absent on an ordinary one. */
   kind?: 'bundle' | 'mystery';
   /**
@@ -631,6 +638,8 @@ export interface ApiOrder {
   payment_method_id: string;
   subtotal_iqd: number;
   shipping_iqd: number;
+  /** Frozen cash-on-delivery tax. Zero for pickup and non-COD payments. */
+  cod_tax_iqd: number;
   points_discount_iqd: number;
   wallet_applied_iqd: number;
   total_iqd: number;
@@ -709,6 +718,8 @@ export interface OrderFinancial {
   points_used: number;
   points_value_iqd: number;
   shipping_iqd: number;
+  /** Server-calculated and snapshotted; clients must never recompute it. */
+  cod_tax_iqd: number;
   delivery_waived: boolean;
   total_iqd: number;
   wallet_applied_iqd: number;
@@ -971,9 +982,25 @@ export function newIdempotencyKey(): string {
 export async function uploadFile(
   file: File,
   purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community'
-): Promise<{ key: string; url: string }> {
+): Promise<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }> {
+  const originalName = file.name;
+  let prepared = file;
+  let width: number | undefined;
+  let height: number | undefined;
+  if (purpose === 'product') {
+    // Lazy because image conversion belongs only to admin product workflows,
+    // not to the entry bundle used by every shopper.
+    const { prepareProductImage } = await import('./imagePreprocess');
+    const result = await prepareProductImage(file);
+    prepared = result.file;
+    width = result.width;
+    height = result.height;
+  }
   const form = new FormData();
   form.append('purpose', purpose);
-  form.append('file', file);
-  return api.post<{ key: string; url: string }>('/api/uploads', form);
+  form.append('file', prepared);
+  form.append('originalName', originalName);
+  if (width) form.append('width', String(width));
+  if (height) form.append('height', String(height));
+  return api.post<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }>('/api/uploads', form);
 }

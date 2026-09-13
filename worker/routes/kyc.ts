@@ -16,6 +16,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { safeParse } from '../lib/types';
 import { sniff } from './uploads';
+import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 
 /**
  * PRO KYC (final-phase brief §9) + approved-address versioning.
@@ -189,9 +190,21 @@ kycRoutes.post('/upload', async (c) => {
   }
 
   const key = `kyc/${user.id}/${newId()}.${kind.ext}`;
-  await c.env.BUCKET.put(key, buf, {
-    httpMetadata: { contentType: kind.mime, cacheControl: 'private, no-store' },
-  });
+  await putMediaObject(
+    c.env,
+    {
+      key,
+      visibility: 'private',
+      domain: 'kyc',
+      mime: kind.mime,
+      bytes: buf.byteLength,
+      ownerId: user.id,
+      entityId: user.id,
+      originalName: file.name,
+    },
+    buf,
+    { httpMetadata: { contentType: kind.mime, cacheControl: 'private, no-store' } }
+  );
   return c.json({ success: true, key });
 });
 
@@ -681,7 +694,7 @@ kycRoutes.get('/admin/cases/:id/evidence/:idx', async (c) => {
   const key = keys[idx];
   if (!key || !key.startsWith('kyc/')) throw notFound('No evidence at this index');
 
-  const obj = await c.env.BUCKET.get(key);
+  const obj = await getMediaObject(c.env, 'private', key);
   if (!obj) throw notFound('Evidence file is missing from storage');
 
   await audit(c.env.DB, admin.id, 'kyc.evidence.view', id, { idx });

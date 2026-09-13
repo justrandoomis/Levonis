@@ -4,7 +4,7 @@ import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
-import { primaryMedia } from '../lib/productModel';
+import { primaryMedia, readProductDeliveryOptions } from '../lib/productModel';
 import { getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
 import {
@@ -112,7 +112,9 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { notifyAdmins } from '../lib/telegram';
 import { quoteShipping } from '../lib/shipping';
-import type { ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
+import { productDeliveryMethodAvailable } from '../lib/shipping';
+import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
+import { codDeliveryTaxIqd } from '../lib/codTax';
 import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
 import { cartShippingType, typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
@@ -178,6 +180,7 @@ function financialSnapshot(
       : Number(o.merchandise_iqd) || 0;
   const pointsUsed = Number(o.points_discount_iqd) || 0;
   const walletIqd = Number(o.wallet_applied_iqd) || 0;
+  const codTax = Number(o.cod_tax_iqd) || 0;
   const total = Number(o.total_iqd) || 0;
   const due = Number(o.due_on_delivery_iqd) || 0;
   const bnplDue = Number(o.bnpl_due_iqd) || 0;
@@ -196,6 +199,7 @@ function financialSnapshot(
     points_used: pointsUsed,
     points_value_iqd: pointsUsed,
     shipping_iqd: Number(o.shipping_iqd) || 0,
+    cod_tax_iqd: codTax,
     delivery_waived: !!o.delivery_waived,
     total_iqd: total,
     // Payment means, with its ledger reference.
@@ -376,6 +380,7 @@ export function orderPublic(
     payment_method_id: o.payment_method_id,
     subtotal_iqd: o.subtotal_iqd,
     shipping_iqd: o.shipping_iqd,
+    cod_tax_iqd: Number(o.cod_tax_iqd) || 0,
     delivery_waived: !!o.delivery_waived,
     membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
     priority: Number(o.priority) || 0,
@@ -630,7 +635,7 @@ function persistedItemRef(l: ComputedLine, all: ComputedLine[]) {
 }
 
 /** products.ops_policy facts the shipping engine needs (explicit config only). */
-function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['size_class']; is_spool: boolean } {
+function shippingFactsFrom(opsPolicyRaw: unknown): Pick<ShippingItem, 'size_class' | 'is_spool' | 'delivery'> {
   const o = safeParse<Record<string, unknown>>(
     typeof opsPolicyRaw === 'string' ? opsPolicyRaw : JSON.stringify(opsPolicyRaw ?? {}),
     {}
@@ -639,6 +644,7 @@ function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['s
   return {
     size_class: sc === 'printer_small' || sc === 'printer_large' || sc === 'ordinary' ? sc : null,
     is_spool: o.is_spool === true,
+    delivery: readProductDeliveryOptions(o) ?? undefined,
   };
 }
 
@@ -859,7 +865,7 @@ function priceCompositionLine(
      * other shipping fact.
      */
     const facts = shippingFactsFrom(b.row.ops_policy);
-    shippingItems.push({ product_id: String(b.doc.id), qty: 1, size_class: facts.size_class, is_spool: facts.is_spool });
+    shippingItems.push({ product_id: String(b.doc.id), qty: 1, ...facts });
   });
   included.forEach((k, i) => {
     const componentQty = k.qty_per_bundle * qty;
@@ -906,8 +912,7 @@ function priceCompositionLine(
     shippingItems.push({
       product_id: k.member_product_id,
       qty: componentQty,
-      size_class: facts.size_class,
-      is_spool: facts.is_spool,
+      ...facts,
     });
     composition.items.push({
       order_item_id: lines[lines.length - 1].id,
@@ -1252,6 +1257,8 @@ interface CheckoutComputation {
   requiredAdvance: number;
   totalIqd: number; // payable after coupon+points (before wallet)
   dueOnDelivery: number;
+  /** Frozen cash-on-delivery tax; zero for pickup and non-COD payments. */
+  codTaxIqd: number;
   policies: PolicyRef[];
   printerGiftConfig: unknown;
   preorderGiftConfig: unknown;
@@ -1632,7 +1639,7 @@ async function computeCheckout(
       merchandise += resolved.applied_iqd * qty;
       productIds.push(String(row.id));
       const facts = shippingFactsFrom(row.ops_policy);
-      shippingItems.push({ product_id: String(row.id), qty, size_class: facts.size_class, is_spool: facts.is_spool });
+      shippingItems.push({ product_id: String(row.id), qty, ...facts });
       // Persisted resolver snapshot: cost fields must NEVER be stored on the
       // order (it is served back to the buyer). It carries `direct.waived`,
       // `transport.waived_by` and `pricing_basis`, so an invoice, a refund or
@@ -1730,6 +1737,28 @@ async function computeCheckout(
 
   // Store pickup: no last-mile delivery happens, so no delivery fees at all.
   const isPickup = delivery.id === 'pickup';
+  const productDeliveryMethod: ProductDeliveryMethod | null =
+    delivery.id === 'standard' || delivery.id === 'personal' ? delivery.id : null;
+  if (!isPickup && priced.shippingItems.some((item) => item.delivery !== undefined)) {
+    if (!productDeliveryMethod) {
+      throw badRequest(
+        'This delivery method is not configured for one or more products in the cart.',
+        'DELIVERY_METHOD_UNAVAILABLE',
+        { delivery_method_id: delivery.id }
+      );
+    }
+    const availability = productDeliveryMethodAvailable(priced.shippingItems, productDeliveryMethod);
+    if (!availability.available) {
+      throw badRequest(
+        'The selected delivery method is unavailable for one or more products in the cart.',
+        'DELIVERY_METHOD_UNAVAILABLE',
+        {
+          delivery_method_id: productDeliveryMethod,
+          unavailable_product_ids: availability.unavailable_product_ids,
+        }
+      );
+    }
+  }
 
   // The selected delivery method's configured price is the ORDINARY tariff
   // for this order (standard = the confirmed 5,000 IQD default); printer and
@@ -1771,6 +1800,7 @@ async function computeCheckout(
     const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
       quoteShipping({
         items: shippingItems,
+        deliveryMethod: productDeliveryMethod ?? undefined,
         merchandiseIqd: basisIqd,
         primeMerchandiseIqd: primeBasisIqd,
         tier: tierStatus.tier,
@@ -1881,8 +1911,14 @@ async function computeCheckout(
     }
     const finalWalletUsdCents =
       walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
-    const financedIqd = isBnpl(input.paymentMethodId) ? Math.max(0, afterPoints - walletApplied) : 0;
-    const dueOnDelivery = isBnpl(input.paymentMethodId) ? 0 : afterPoints - walletApplied;
+    const payableBeforeCodTax = Math.max(0, afterPoints - walletApplied);
+    const codTaxIqd = codDeliveryTaxIqd({
+      paymentMethodId: input.paymentMethodId,
+      deliveryMethodId: delivery.id,
+      payableBeforeTaxIqd: payableBeforeCodTax,
+    });
+    const financedIqd = isBnpl(input.paymentMethodId) ? payableBeforeCodTax : 0;
+    const dueOnDelivery = isBnpl(input.paymentMethodId) ? 0 : payableBeforeCodTax + codTaxIqd;
 
     return {
       shipping,
@@ -1896,8 +1932,9 @@ async function computeCheckout(
       walletApplied,
       walletUsdCents: finalWalletUsdCents,
       requiredAdvance,
-      totalIqd: afterPoints,
+      totalIqd: afterPoints + codTaxIqd,
       dueOnDelivery,
+      codTaxIqd,
       financedIqd,
     };
   };
@@ -1986,6 +2023,7 @@ async function computeCheckout(
     requiredAdvance: settled.requiredAdvance,
     totalIqd: settled.totalIqd,
     dueOnDelivery: settled.dueOnDelivery,
+    codTaxIqd: settled.codTaxIqd,
     policies,
     printerGiftConfig: settings.printerGiftConfig,
     preorderGiftConfig: settings.preorderGiftConfig,
@@ -2299,6 +2337,7 @@ orderRoutes.post('/quote', async (c) => {
       },
       merchandise_after_coupon_iqd: comp.eligibleMerchandise,
       total_iqd: comp.totalIqd,
+      cod_tax_iqd: comp.codTaxIqd,
       due_on_delivery_iqd: comp.dueOnDelivery,
       tier: {
         tier: comp.tierStatus.tier,
@@ -2446,15 +2485,15 @@ orderRoutes.post('/', async (c) => {
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
-         payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
+         payment_method_id, subtotal_iqd, shipping_iqd, cod_tax_iqd, points_discount_iqd, wallet_applied_iqd,
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, client_idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
          support_snapshot, shipping_type, membership_gift, referral_delivery_waived,
          fulfillment_service, priority_due_at, bnpl_due_iqd, bnpl_due_at, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
-      input.paymentMethodId, comp.subtotal, shippingTotal, comp.pointsDiscount, comp.walletApplied,
+      input.paymentMethodId, comp.subtotal, shippingTotal, comp.codTaxIqd, comp.pointsDiscount, comp.walletApplied,
       comp.walletUsdCents, comp.exchangeRate, comp.totalIqd, comp.dueOnDelivery, idempotencyKey,
       comp.tierStatus.active ? comp.tierStatus.tier : 'free', deliveryWaived, priority, comp.couponSnapshot,
       // §5: merchandise is stored apart from fees so every screen and the
@@ -2903,6 +2942,7 @@ orderRoutes.post('/', async (c) => {
     tier: comp.tierStatus.active ? comp.tierStatus.tier : 'free',
     pro_context: comp.proContext, at_approved_default: comp.atApprovedDefault,
     shipping_iqd: shippingTotal, delivery_waived: deliveryWaived,
+    cod_tax_iqd: comp.codTaxIqd,
     merchandise_iqd: comp.merchandise, points_eligible_iqd: comp.netEligible,
     points_pending: accrual.points, points_rule: comp.pointsRule.version,
     points_available_at: accrual.available_at, settled_at_purchase: settledAtPurchase,

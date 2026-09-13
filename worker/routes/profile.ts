@@ -6,6 +6,7 @@ import { newId } from '../lib/crypto';
 import { allCountries } from '../lib/phone';
 import { computeCompletion, nextPromptAt, shouldPromptCompletion } from '../lib/profileCompletion';
 import { rateLimit } from '../lib/ratelimit';
+import { isSafeMediaKey } from '../lib/mediaStorage';
 
 export const profileRoutes = new Hono<AppContext>();
 profileRoutes.use('*', requireAuth);
@@ -66,7 +67,11 @@ profileRoutes.patch('/', async (c) => {
   // OWNERSHIP, not just shape: an avatar key is an R2 object path, and
   // without this prefix check a person could point their avatar at somebody
   // else's uploaded object.
-  if (avatarKey && !avatarKey.startsWith(`avatars/${user.id}/`)) {
+  const ownsAvatar =
+    avatarKey &&
+    isSafeMediaKey(avatarKey) &&
+    (avatarKey.startsWith(`avatars/${user.id}/`) || avatarKey.startsWith(`users/${user.id}/avatar/`));
+  if (avatarKey && !ownsAvatar) {
     throw badRequest('Invalid avatar reference');
   }
 

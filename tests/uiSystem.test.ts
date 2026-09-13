@@ -105,3 +105,22 @@ test('addresses and settings group rows with restrained shared surfaces', () => 
   assert.match(settings, /lv-surface overflow-hidden divide-y/);
   assert.doesNotMatch(settings, /border-gold bg-gold\/15 text-gold/);
 });
+
+test('product purchase chrome uses measured header geometry and restrained secondary controls', () => {
+  const product = read('src/pages/Product.tsx');
+  assert.match(product, /new ResizeObserver\(update\)/);
+  assert.match(product, /--app-header-height/);
+  assert.match(product, /top:\s*'calc\(var\(--app-header-height, 68px\) \+ 0\.75rem\)'/);
+  assert.match(product, /data-extended-warranty/);
+  assert.match(product, /aria-expanded=\{warrantyOpen\}/);
+  assert.match(product, /<Note tone="zinc" compact animate=\{false\}/);
+  assert.match(product, /border-s-2 border-gold\/55/);
+  assert.doesNotMatch(product, /data-extended-warranty[^>]*bg-gold/);
+});
+
+test('profile shortcuts keep compact artwork inside accessible hit targets', () => {
+  const profile = read('src/components/profile/ProfileIconGrid.tsx');
+  assert.match(profile, /min-w-\[56px\] min-h-\[56px\]/);
+  assert.match(profile, /<item\.icon className="w-5 h-5" strokeWidth=\{1\.6\}/);
+  assert.match(profile, /aria-label=\{item\.label\}/);
+});

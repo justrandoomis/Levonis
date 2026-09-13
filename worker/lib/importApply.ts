@@ -731,6 +731,10 @@ export function resolveProduct(
     warranty_plans: warrantyPlans,
     warranty_base_months: coverage.warranty_base_months,
     serialized: coverage.serialized,
+    delivery_options:
+      p.delivery_options === null
+        ? (existing?.doc.delivery_options ?? undefined)
+        : p.delivery_options,
     ops_policy: storedOps.policy,
     content_blocks: contentBlocks,
     usage_guide: usageGuide,

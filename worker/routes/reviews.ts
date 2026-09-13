@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { isPrinterProduct } from '../lib/printerIdentity';
-import type { AppContext } from '../lib/types';
+import type { AppContext, Env } from '../lib/types';
 import { safeParse } from '../lib/types';
 import {
   requireAuth,
@@ -17,6 +17,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { sniff } from './uploads';
+import { getMediaObject, headMediaObject, putMediaObject } from '../lib/mediaStorage';
 
 /**
  * Product reviews with evidence, admin quality scoring and the five printer
@@ -149,12 +150,12 @@ function publicMedia(raw: unknown): Array<{ url: string; kind: 'image' | 'video'
     .map((m) => ({ url: mediaUrl(m.key), kind: m.kind === 'video' ? 'video' : 'image' }));
 }
 
-async function assertOwnKeys(env: { BUCKET: R2Bucket }, keys: string[], prefix: string): Promise<void> {
+async function assertOwnKeys(env: Env, keys: string[], prefix: string): Promise<void> {
   for (const key of keys) {
     if (!key.startsWith(prefix) || key.includes('..')) {
       throw badRequest('Invalid media reference', 'BAD_MEDIA_KEY');
     }
-    const head = await env.BUCKET.head(key);
+    const head = await headMediaObject(env, 'private', key);
     if (!head) throw badRequest('Uploaded file not found — please re-upload', 'MEDIA_MISSING');
   }
 }
@@ -192,7 +193,7 @@ interface ReviewInput {
 }
 
 async function parseReviewInput(
-  c: { env: { BUCKET: R2Bucket } },
+  c: { env: Env },
   userId: string,
   raw: Record<string, unknown>,
   /** On EDIT: omitted fields keep what the review already has (never a silent wipe). */
@@ -553,7 +554,21 @@ reviewRoutes.post('/uploads', requireAuth, async (c) => {
 
   const prefix = purpose === 'evidence' ? `reviews-evidence/${user.id}` : `reviews/${user.id}`;
   const key = `${prefix}/${newId()}.${kind.ext}`;
-  await c.env.BUCKET.put(key, buf, { httpMetadata: { contentType: kind.mime } });
+  await putMediaObject(
+    c.env,
+    {
+      key,
+      visibility: 'private',
+      domain: purpose === 'evidence' ? 'reviews-evidence' : 'reviews',
+      mime: kind.mime,
+      bytes: buf.byteLength,
+      ownerId: user.id,
+      entityId: user.id,
+      originalName: file.name,
+    },
+    buf,
+    { httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' } }
+  );
   return c.json({ success: true, key, kind: isVideo ? 'video' : 'image', url: mediaUrl(key) });
 });
 
@@ -592,7 +607,7 @@ reviewRoutes.get('/media/*', async (c) => {
   }
   if (!allowed) throw notFound();
 
-  const obj = await c.env.BUCKET.get(key);
+  const obj = await getMediaObject(c.env, 'private', key);
   if (!obj) throw notFound();
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
