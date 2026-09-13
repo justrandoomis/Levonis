@@ -1,0 +1,114 @@
+# Branch-only source transfer. Never deploys, never reads production secrets.
+name: 44 - Integrate reviewed mascot source once (no deployment)
+on:
+  push:
+    branches: [codex/interactive-mascot]
+    paths: ['.github/mascot-transfer/**']
+permissions:
+  contents: read
+jobs:
+  integrate:
+    if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/interactive-mascot' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify all before and after images and the complete source tree
+        run: |
+          test "$(git rev-parse HEAD^)" = '6b373ded26a1606fd4a545f9cf42c7dc5769094d'
+          python3 - <<'PY'
+          import base64, gzip, hashlib, json, pathlib, subprocess
+          parts=[pathlib.Path(f'.github/mascot-transfer/{i}.b64').read_text() for i in range(1,5)]
+          # Correct transport-only transcription; decoded payload and output are hash-pinned.
+          for old,new in [('RywMmWfTk8L8Bj','RywMmWfTk8Bj'),('NV4avvRR7','NV4avvR7'),('Z5DhxmvhuXhu4','Z5Dhxmvhu4')]:
+              assert parts[1].count(old)==1
+              parts[1]=parts[1].replace(old,new)
+          assert parts[2].count('DTnpps4R06')==1
+          parts[2]=parts[2].replace('DTnpps4R06','DTnpps4sR06')
+          data=gzip.decompress(base64.b64decode(''.join(parts),validate=True))
+          assert hashlib.sha256(data).hexdigest()=='ab01c01a0620a08ddcf883afbb82f77094b7868fbd08f22545292e4610d13b07'
+          files=json.loads(data)
+          assert len(files)==26
+          for item in files:
+              p=pathlib.Path(item['path'])
+              assert not p.is_absolute() and '..' not in p.parts
+              original=p.read_bytes() if p.exists() else None
+              assert (hashlib.sha256(original).hexdigest() if original is not None else None)==item['before'],str(p)
+              lines=(original or b'').decode().splitlines(keepends=True)
+              for start,stop,text in reversed(item['edits']): lines[start:stop]=[text]
+              updated=''.join(lines).encode()
+              assert hashlib.sha256(updated).hexdigest()==item['after'],str(p)
+              p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(updated)
+          subprocess.run(['git','add','--',*[i['path'] for i in files]],check=True)
+          PY
+          git rm -r .github/mascot-transfer .github/workflows/apply-interactive-mascot-once.yml
+          git diff --cached --check
+          test "$(git write-tree)" = 'b2e1eba5e78ee1bb0f775243291b84cd133d3e51'
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/Chat.tsx');s=p.read_text()
+          old="presence.typing ? (dir === 'rtl' ? 'يكتب الآن…' : 'Typing…') : ''"
+          assert s.count(old)==1
+          p.write_text(s.replace(old,"presence.typing ? loc('يكتب الآن…', 'Typing…', 'دەنووسێت…') : ''"))
+          PY
+          git add src/pages/Chat.tsx
+          test "$(git write-tree)" = 'fd01edd023dcc60c91cd344a466f0ca73ffd6f89'
+      - name: Save only the reviewed application source, without force push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: animate persistent mascot with responsive path sizing and remote typing'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/codex/interactive-mascot
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Focused controller, real route, presence and migration tests
+        run: |
+          mkdir -p /tmp/mascot-proof
+          node --import tsx --test tests/mascotController.test.ts tests/chatPresence.test.ts tests/chatPresenceRoutes.test.ts tests/bloubGeometry.test.ts tests/bloubNavigation.test.ts > /tmp/mascot-proof/focused.log 2>&1
+          tail -20 /tmp/mascot-proof/focused.log
+          node scripts/migrate-check.mjs --twice > /tmp/mascot-proof/migrations.log 2>&1
+      - name: Install isolated browser driver
+        run: |
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Actual SVG path size, state machine and persistent navigation
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+          OUT_DIR: /tmp/mascot-proof/browser
+        run: |
+          mkdir -p /tmp/mascot-proof
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4175 > /tmp/mascot-proof/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4175/tests/browser/bloub.html >/dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-bloub-continuation.mjs > /tmp/mascot-proof/browser.log 2>&1
+          result=$?
+          tail -80 /tmp/mascot-proof/browser.log
+          exit "$result"
+      - name: Save diagnostics and exact reviewed source
+        if: always()
+        run: |
+          mkdir -p /tmp/mascot-proof
+          git rev-parse HEAD > /tmp/mascot-proof/commit.txt
+          git archive --format=tar.gz HEAD -o /tmp/mascot-proof/source.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interactive-mascot-first-proof
+          path: /tmp/mascot-proof/
+          retention-days: 7
