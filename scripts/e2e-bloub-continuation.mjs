@@ -12,6 +12,16 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function state(page, name, timeout=6000) {
   await page.waitForFunction(name=>document.querySelector('.lv-app-intro')?.getAttribute('data-mascot-state')===name,name,{timeout});
 }
+/** Poll painted animation frames, not Node wall-clock sleeps. A loaded CI
+ * runner may defer a WebKit paint; the gaze must still measurably change. */
+async function animatedEyes(page) {
+  const before=await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform);
+  await page.waitForFunction(before=>{
+    const eyes=document.querySelector('[data-bloub-gaze]');
+    return eyes && getComputedStyle(eyes).transform!==before;
+  },before,{polling:'raf',timeout:1500});
+  assert.notEqual(await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform),before,'eyes really moved');
+}
 async function aligned(page,kind) {
   await page.waitForFunction(kind=>{
     const a=document.querySelector(`[data-bloub-anchor="${kind}"]`)?.getBoundingClientRect();
@@ -58,10 +68,7 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
         const intro=await page.locator('.lv-app-intro__character').boundingBox();
         assert.ok(intro.width>=144 && intro.width<=240);
         assert.ok(Math.abs(intro.x+intro.width/2-width/2)<1.5);
-        const gaze1=await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform);
-        await delay(180);
-        const gaze2=await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform);
-        assert.notEqual(gaze1,gaze2,'loading eyes visibly move');
+        await animatedEyes(page);
         if(width===390&&lang==='ar') await page.screenshot({path:`${out}/${engineName}-${lang}-intro.png`});
         await click(page,'#ready'); await aligned(page,'bottom-home'); await state(page,'idle');
         const home=await dimensions(page,'bottom-home');
@@ -104,8 +111,7 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
           await page.locator('#own-message').fill('My own typing does not animate the remote state');
           await delay(300); assert.notEqual(await page.locator('.lv-app-intro').getAttribute('data-mascot-state'),'typing');
           await click(page,'#remote-start'); await state(page,'typing');
-          const first=await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform);await delay(180);
-          assert.notEqual(first,await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform));
+          await animatedEyes(page);
           await page.screenshot({path:`${out}/${engineName}-${lang}-typing.png`});
           await click(page,'#remote-stop'); await state(page,'idle');
           await page.locator('#force-rest').evaluate(e=>e.click()); await state(page,'sleep');
@@ -113,6 +119,9 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
           assert.deepEqual(errors,[]); cases++;
         }
       } catch(e) {
+        const diagnostic=await page.evaluate(()=>({state:document.querySelector('.lv-app-intro')?.getAttribute('data-mascot-state'),phase:document.querySelector('.lv-app-intro')?.getAttribute('data-phase'),history:window.__states,html:document.querySelector('.lv-app-intro')?.outerHTML}));
+        await writeFile(`${out}/${engineName}-${lang}-${width}-failure.json`,JSON.stringify({error:String(e),pageErrors:errors,...diagnostic},null,2));
+        console.error('Browser diagnostics:',JSON.stringify({state:diagnostic.state,phase:diagnostic.phase,history:diagnostic.history,pageErrors:errors}));
         await page.screenshot({path:`${out}/${engineName}-${lang}-${width}-failure.png`}); throw e;
       } finally {await context.close();}
     }
