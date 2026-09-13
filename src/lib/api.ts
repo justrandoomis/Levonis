@@ -1,3 +1,4 @@
+import { beginRequestFeedback, type MascotFeedback } from './mascotRequest';
 /**
  * Typed API client. All requests go to the Worker backend with cookie
  * credentials; the browser never builds SQL and never holds tokens.
@@ -46,6 +47,8 @@ export function isNotConfigured(e: unknown): boolean {
 export interface RequestOptions {
   /** The caller's own cancellation — a React effect cleanup, typically. */
   signal?: AbortSignal;
+  /** Silent background polling must not animate loading/success on every tick. */
+  mascot?: MascotFeedback;
   /** Deadline in ms. Defaults to DEFAULT_TIMEOUT_MS; 0 disables it. */
   timeoutMs?: number;
 }
@@ -58,7 +61,7 @@ export interface RequestOptions {
  */
 const DEFAULT_TIMEOUT_MS = 20000;
 
-async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+async function requestRaw<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
   const init: RequestInit = { method, credentials: 'same-origin', headers: {} };
   if (body !== undefined && !(body instanceof FormData)) {
     init.headers = { 'Content-Type': 'application/json' };
@@ -109,6 +112,18 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
     );
   }
   return data;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+  const feedback = beginRequestFeedback(method, path, opts?.mascot);
+  try {
+    const result = await requestRaw<T>(method, path, body, opts);
+    feedback.finish();
+    return result;
+  } catch (error) {
+    feedback.finish(error instanceof ApiError ? error : { status: 0 });
+    throw error;
+  }
 }
 
 export const api = {

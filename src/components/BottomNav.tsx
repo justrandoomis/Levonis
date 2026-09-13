@@ -64,7 +64,7 @@ export default function BottomNav() {
     if (cartCountStore.snapshot() !== null) return;
     let cancelled = false;
     api
-      .get<{ items: Array<{ qty?: number | null }> }>('/api/cart')
+      .get<{ items: Array<{ qty?: number | null }> }>('/api/cart', { mascot: 'silent' })
       .then((d) => {
         if (!cancelled) setCartCount(countCartItems(d.items ?? []));
       })
@@ -84,7 +84,7 @@ export default function BottomNav() {
     }
     let cancelled = false;
     api
-      .get<{ chats: Array<{ unread?: number | null }> }>('/api/chats')
+      .get<{ chats: Array<{ unread?: number | null }> }>('/api/chats', { mascot: 'silent' })
       .then((d) => {
         if (cancelled) return;
         setMessageUnreadCount(
@@ -196,11 +196,11 @@ export default function BottomNav() {
         dir={dir}
         aria-label={t('home')}
         aria-current={location.pathname === '/' ? 'page' : undefined}
-        onClick={() => signalBloub('tap', 480)}
+        onClick={() => signalBloub('tap', 210)}
         data-bloub-home-button
-        className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-xl pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:h-[68px] sm:w-[68px]"
+        className="lv-character-bottom-home relative shrink-0 rounded-xl pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <MotionCharacterAnchor kind="bottom-home" className="h-11 w-11 sm:h-12 sm:w-12" />
+        <MotionCharacterAnchor kind="bottom-home" />
         {location.pathname === '/' ? (
           <span aria-hidden="true" className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-gold" />
         ) : null}

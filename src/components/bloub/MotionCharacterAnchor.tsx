@@ -23,7 +23,7 @@ export function MotionCharacterAnchor({ kind = 'top-header', busy = false, class
 export function MotionCharacterHome({ busy = false, kind = 'top-header' }: { busy?: boolean; kind?: AnchorKind }) {
   const { t } = useLanguage();
   return (
-    <Link to="/" aria-label={t('home')} onClick={() => signalBloub('tap', 480)}
+    <Link to="/" aria-label={t('home')} onClick={() => signalBloub('tap', 210)}
       className="lv-character-home focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
       <MotionCharacterAnchor kind={kind} busy={busy} />
     </Link>
