@@ -1,0 +1,124 @@
+# One-time continuation of the owner's requested live Levonis deployment.
+# LIVE: levonis-iq.com -> levonis-staging. Never touches Studio/alternate Workers.
+# Isolated release branch only; remove this file after verification, never merge it.
+name: 46 - Release verified interactive mascot
+on:
+  push:
+    branches: [codex/release-interactive-mascot]
+    paths: ['.github/workflows/release-interactive-mascot-once.yml']
+permissions:
+  contents: read
+concurrency:
+  group: interactive-mascot-release
+  cancel-in-progress: false
+env:
+  SOURCE: a33dea17bd8119273dd2166ec269620ab27ff04e
+  BASE: 6b373ded26a1606fd4a545f9cf42c7dc5769094d
+  CONFIRM: DEPLOY-CODE
+jobs:
+  gate:
+    if: github.repository == 'justrandoomis/Levonis' && github.ref == 'refs/heads/codex/release-interactive-mascot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require full CI, both browser engines and unchanged source/base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          const base='https://api.github.com/repos/justrandoomis/Levonis';
+          const headers={Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json'};
+          async function get(path){const r=await fetch(base+path,{headers});if(!r.ok)throw new Error(`GitHub ${r.status}`);return r.json();}
+          for(const id of [34784338258,34784338283]) {
+            let complete=false;
+            for(let i=0;i<48;i++) {
+              const run=await get('/actions/runs/'+id);
+              if(run.head_sha!==process.env.SOURCE)throw new Error('Wrong source in verification run');
+              if(run.status==='completed') {if(run.conclusion!=='success')throw new Error('Verification failed: '+id);complete=true;break;}
+              await new Promise(r=>setTimeout(r,20000));
+            }
+            if(!complete)throw new Error('Verification did not complete; no release');
+          }
+          const [main,pr]=await Promise.all([get('/commits/Main'),get('/pulls/4')]);
+          if(main.sha!==process.env.BASE || pr.head.sha!==process.env.SOURCE || pr.base.ref!=='Main')throw new Error('Source or Main changed; reconcile first');
+          console.log('Exact-source full checks, all unit tests, build and 34 browser cases passed.');
+          JS
+  prepare:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency: staging-deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: a33dea17bd8119273dd2166ec269620ab27ff04e
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify the live DB binding and permit only additive migration 0071
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" -o /tmp/live-settings.json
+          jq -e '.success == true' /tmp/live-settings.json >/dev/null
+          LIVE_DB=$(jq -er '.result.bindings[] | select(.type=="d1" and .name=="DB") | .id' /tmp/live-settings.json)
+          NAMED_DB=$(npx wrangler d1 list --json | jq -er '.[] | select(.name=="levonis-db-staging") | .uuid')
+          echo "::add-mask::$LIVE_DB"
+          echo "::add-mask::$NAMED_DB"
+          test "$LIVE_DB" = "$NAMED_DB"
+          STAGING_DB_ID="$LIVE_DB" node scripts/set-deploy-ids.mjs --env staging
+          rm -f /tmp/live-settings.json
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command 'SELECT name FROM d1_migrations ORDER BY id' > /tmp/applied.json
+          node --input-type=module <<'JS'
+          import {readFileSync,readdirSync} from 'node:fs';
+          const applied=new Set(JSON.parse(readFileSync('/tmp/applied.json','utf8')).flatMap(r=>r.results??[]).map(r=>r.name));
+          if(!applied.has('0070_policy_publication_acceptance.sql'))throw new Error('Unexpected live schema baseline');
+          const pending=readdirSync('migrations').filter(n=>n.endsWith('.sql')&&!applied.has(n));
+          if(pending.some(n=>n!=='0071_chat_typing_presence.sql'))throw new Error('Unreviewed pending migration');
+          console.log('Permitted pending migrations:',JSON.stringify(pending));
+          JS
+          npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "SELECT name FROM d1_migrations WHERE name='0071_chat_typing_presence.sql'; SELECT name FROM sqlite_master WHERE name IN ('chat_typing_presence','idx_chat_typing_expiry');" > /tmp/presence-schema.json
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const names=new Set(JSON.parse(readFileSync('/tmp/presence-schema.json','utf8')).flatMap(r=>r.results??[]).map(r=>r.name));
+          for(const n of ['0071_chat_typing_presence.sql','chat_typing_presence','idx_chat_typing_expiry'])if(!names.has(n))throw new Error('Missing schema object '+n);
+          console.log('Additive presence schema verified. No users, orders, messages or policies created or edited.');
+          JS
+  dispatch:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Wait for the reviewed PR merge, then use the existing safe live deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          const base='https://api.github.com/repos/justrandoomis/Levonis';
+          const headers={Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'};
+          async function get(path){const r=await fetch(base+path,{headers});if(!r.ok)throw new Error(`GitHub ${r.status}`);return r.json();}
+          const source=await get('/git/commits/'+process.env.SOURCE);
+          let main;
+          for(let i=0;i<60;i++){
+            main=await get('/commits/Main');
+            if(main.sha!==process.env.BASE)break;
+            await new Promise(r=>setTimeout(r,10000));
+          }
+          if(main.sha===process.env.BASE || main.commit.tree.sha!==source.tree.sha || !main.parents.some(p=>p.sha===process.env.SOURCE) || !main.parents.some(p=>p.sha===process.env.BASE))throw new Error('Main is not the exact reviewed merge; no deployment');
+          const response=await fetch(base+'/actions/workflows/deploy-staging-code.yml/dispatches',{method:'POST',headers,body:JSON.stringify({ref:'Main',inputs:{confirm:process.env.CONFIRM}})});
+          if(!response.ok)throw new Error('Deployment dispatch failed: '+response.status);
+          console.log('Existing live deployment dispatched on Main '+main.sha+'. Verify completion and public bundle before claiming publication.');
+          JS
