@@ -1,28 +1,31 @@
-# Levonis continuation checkpoint — 13 September 2026
+# Levonis continuation — 13 September 2026
 
-Repository: justrandoomis/Levonis. Draft PR: #3. Branch: codex/persistent-bloub-policy.
+Repository: justrandoomis/Levonis. PR #3. Branch: codex/persistent-bloub-policy.
 Original Main: 865492f7c6ac34b69b3828fa4b69236cdea0f344.
-Saved integration commit: aa30a8bd08ff59db9914778afbb5cde43fa4c903.
-Requirement source: Pasted text(3).txt from the preceding project conversation.
+Final code integration: c31313c0751bf4a802311025847a4642e3d9f010.
+Requirements: Pasted text(3).txt from the project conversation. The owner explicitly requested completion and live deployment.
 
-## Implemented in this checkpoint
+## Implemented
 
-- One existing app-level Bloub SVG, physical transform-only geometry, measured header/bottom slots, genuine bootstrap and route loading, bounded event timers, reduced-motion and visibility handling, static accessible Home fallback, removed outer Home circle.
-- Product, bundle, platform checkout and merchant checkout header integration; no order/payment/reward rules replaced.
-- Policy links pin version and locale; stale fetch results are discarded; invalid version never silently selects current text; historical reading and heading navigation retained.
-- Atomic publication assertion protects reviewed content from concurrent edit/delete/added locale/newer publication. Prior accepted text and hashes remain unchanged. No schema migration and no production data write.
-- 20 focused tests passed locally with Node 22 and TypeScript transpilation, including real SQLite constraints. Focused regression tests also passed in GitHub Actions run 34770973479 after the integration commit was pushed.
+- One persistent global Bloub SVG; measured bottom/header/fallback slots, larger genuine loading state, compositor-only travel, reduced motion, visibility handling and accessible Home controls. Product, bundle and both checkouts retain existing business logic.
+- Version- and locale-pinned policy reader, stale-response protection, invalid-version rejection, heading navigation, legacy /policy alias and display of publication/effective dates. Unrecorded historical dates remain unknown.
+- Twenty-five original purchase-policy sections in Arabic, English and Sorani, aligned to the existing warranty, seven-day eligible item return and order workflows. Existing admin action prepares a fresh trilingual draft version without overwriting owner edits or already published text.
+- Additive migration 0070 records publication/effective timestamps and consent document ID, order ID, actual/requested locale and event. Database triggers prevent changes/deletion/revival of published/archived text.
+- Checkout acceptance and its current-policy concurrency guard execute in the SAME transaction as order/inventory/payment writes. A failed order or concurrent policy change rolls back the consent too. Language/quote changes require renewed acknowledgement.
+- Real-component browser regression fixture covering Chromium/WebKit, 320–1440 widths, Arabic/English, actual SVG identity, routes, late headers, resize, overlays, focus, Home and reduced motion. The fixture calls no production API.
 
-## Still outstanding — do not mark complete
+## Verified before this checkpoint
 
-- Complete the requested 25-section policy content and approved business rules in Arabic, English and Sorani; qualified local legal review before publication.
-- Publication/effective-date fields and full locale/order-bound acceptance improvements requested in the original brief.
-- Full browser/device QA: iOS/Android, RTL/LTR, overlay/focus, route handoff and actual SVG identity/geometry.
-- Check the full CI results and resolve any failures. Do not infer TypeScript/build success from the focused tests.
-- No Main merge, deployment, policy publication or production database migration has been performed.
+- CI run 34773859534 passed complete type/lint/architecture checks, 2,502 root + 361 workspace tests (2,863 total) and production build after the missing Studio installation was corrected.
+- The subsequent new policy code passed 32 focused offline Node/real-SQLite tests and syntax diagnostics. These are NOT a substitute for the new complete CI/browser run.
+- Final source transfer verified SHA-256 of the entire payload and the before/after image of every existing file. No force push or production write was used. The temporary transport and write workflow are now removed.
 
-## Recovery and verification
+## Release gate and live target
 
-Resume directly from this branch, not a fresh system. The one-time branch-only integration workflow successfully applied the hash-pinned patch and saved the separate integration commit without force pushing. Its workflow and transport patch were removed afterwards; only the read-only verification workflow remains. No production secrets or databases were accessed by it. The PR remains a draft.
+Run and inspect the read-only verification workflow on this checkpoint, including both browser engines. Resolve failures before merging. Do not infer current CI success from the preceding green run.
 
-Run npm ci, npm run check, npm run test:unit, and npm run build; inspect all results before considering merge or deployment. Preserve existing data and accepted policy history.
+The existing deploy-staging-code.yml workflow deploys the actual live main site levonis-iq.com (historically named Worker levonis-staging). It preserves current vars and data and applies additive migrations before deployment. Dispatch on Main with confirm=DEPLOY-CODE after merge. Do NOT use deploy-production.yml: that is the alternate Worker without the live domain.
+
+## Policy approval boundary
+
+Code deployment does not silently publish new contractual text or change a previously accepted version. The owner prepares/reviews/publishes policy drafts through the existing audited admin flow. The qualified-local-counsel review note remains visible; no statutory claim or completed legal review is asserted. Real-device hardware testing remains distinct from Chromium/WebKit emulation.
