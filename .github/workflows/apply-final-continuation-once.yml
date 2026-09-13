@@ -3,7 +3,7 @@ name: 41 - Integrate reviewed final continuation once (no deployment)
 on:
   push:
     branches: [codex/persistent-bloub-policy]
-    paths: ['.github/continuation-parts/**']
+    paths: ['.github/continuation-parts/**', '.github/workflows/apply-final-continuation-once.yml']
 
 permissions:
   contents: read
@@ -20,18 +20,17 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - name: Verify exact source and apply reviewed changes
+      - name: Verify exact source and apply reviewed code only
         shell: bash
         run: |
-          test "$(git rev-parse HEAD^)" = 'd0bc666c582686300dcca4740861d8caeec0f56b'
+          test "$(git rev-parse HEAD^)" = 'ec6fff4946751772356a65c05eeef5a661806547'
           python3 - <<'PY'
           import base64, gzip, hashlib, json
           from pathlib import Path
-          directory = Path('.github/continuation-parts')
-          parts = sorted(directory.glob('*.b64'))
+          parts = sorted(Path('.github/continuation-parts').glob('*.b64'))
           assert [p.name for p in parts] == [f'{i:03}.b64' for i in range(33)]
           data = b''.join(base64.b64decode(p.read_text(), validate=True) for p in parts)
-          assert hashlib.sha256(data).hexdigest() == '08ce61a376cc25aab09c0b0bd353749b4095243a9246029b9561f16bfb815782', 'Source transfer checksum mismatch'
+          assert hashlib.sha256(data).hexdigest() == '08ce61a376cc25aab09c0b0bd353749b4095243a9246029b9561f16bfb815782'
           payload = json.loads(gzip.decompress(data))
           allowed = {
               '.github/workflows/verify-persistent-bloub-policy.yml',
@@ -50,6 +49,11 @@ jobs:
           for entry in entries:
               path = Path(entry['path'])
               assert not path.is_symlink()
+              if entry['path'].startswith('.github/workflows/'):
+                  # Workflow updates require the authorized connector, not this token.
+                  # The reviewed workflow was already saved through that connector.
+                  assert hashlib.sha256(path.read_bytes()).hexdigest() == entry['after']
+                  continue
               if 'before' in entry:
                   raw = path.read_bytes()
                   assert hashlib.sha256(raw).hexdigest() == entry['before'], f'Concurrent change: {path}'
@@ -67,10 +71,9 @@ jobs:
               path.write_bytes(result)
               print(f'Verified and applied: {path}')
           PY
-          git rm -r .github/continuation-parts .github/workflows/apply-final-continuation-once.yml
-          git add .github/workflows/verify-persistent-bloub-policy.yml src worker tests scripts/e2e-bloub-continuation.mjs migrations/0070_policy_publication_acceptance.sql
+          git add src worker tests scripts/e2e-bloub-continuation.mjs migrations/0070_policy_publication_acceptance.sql
           git diff --cached --check
-      - name: Save exact reviewed source to the same branch without force pushing
+      - name: Save reviewed code only to the same branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
