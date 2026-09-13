@@ -49,6 +49,7 @@ export default function BottomNav() {
    * never an optimistic guess.
    */
   const cartCount = React.useSyncExternalStore(cartCountStore.subscribe, cartCountStore.snapshot, () => null);
+  const [messageUnreadCount, setMessageUnreadCount] = React.useState(0);
 
   // One small request, once, and only for someone who can have a cart. A
   // failure is silent by design: a missing badge is a badge that is merely
@@ -71,6 +72,29 @@ export default function BottomNav() {
     };
   }, [isAuthenticated]);
 
+  // Chats already return an authoritative unread count per conversation.
+  // Reuse that contract for the shell badge instead of introducing a second
+  // counter or guessing from the most recent message.
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setMessageUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<{ chats: Array<{ unread?: number | null }> }>('/api/chats')
+      .then((d) => {
+        if (cancelled) return;
+        setMessageUnreadCount(
+          (d.chats ?? []).reduce((sum, chat) => sum + Math.max(0, Math.trunc(Number(chat.unread) || 0)), 0)
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, location.pathname]);
+
   const leftItems = [
     { icon: User, label: t('profile'), path: '/profile' },
     { icon: ShoppingCart, label: t('cart'), path: '/cart' },
@@ -90,7 +114,11 @@ export default function BottomNav() {
 
   const renderItem = (item: NavItem) => {
     const isActive = location.pathname === item.path;
-    const badge = item.path === '/cart' && cartCount ? cartCount : 0;
+    const badge = item.path === '/cart'
+      ? (cartCount ?? 0)
+      : item.path === '/chats'
+        ? messageUnreadCount
+        : 0;
     return (
       <Link
         key={item.path}
@@ -120,6 +148,7 @@ export default function BottomNav() {
             // decorative.
             <span
               aria-hidden="true"
+              data-nav-badge={item.path === '/cart' ? 'cart' : item.path === '/chats' ? 'messages' : undefined}
               className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-black leading-[16px] text-center tabular-nums"
             >
               {badge > 99 ? '99+' : badge}

@@ -21,6 +21,9 @@ interface MyReview {
   status: 'pending' | 'published' | 'rejected' | string;
   moderation_note: string;
   created_at: string;
+  source?: 'user' | 'system';
+  system_generated?: boolean;
+  fallback_points_awarded?: number;
   reward: {
     kind: 'printer_gift' | 'points' | string;
     state: string;
@@ -38,6 +41,7 @@ const STRINGS = {
     status: { pending: 'قيد المراجعة', published: 'منشورة', rejected: 'مرفوضة' } as Record<string, string>,
     pointsAwarded: (n: number) => `+${n} نقطة`,
     giftReward: 'مكافأة هدية',
+    systemGenerated: 'تم التقييم تلقائياً بواسطة النظام',
     viewProduct: 'عرض المنتج',
   },
   en: {
@@ -49,6 +53,7 @@ const STRINGS = {
     status: { pending: 'Under review', published: 'Published', rejected: 'Rejected' } as Record<string, string>,
     pointsAwarded: (n: number) => `+${n} points`,
     giftReward: 'Gift reward',
+    systemGenerated: 'Automatically rated by the system',
     viewProduct: 'View product',
   },
   ckb: {
@@ -60,6 +65,7 @@ const STRINGS = {
     status: { pending: 'لە پێداچوونەوەدایە', published: 'بڵاوکراوەتەوە', rejected: 'ڕەتکراوەتەوە' } as Record<string, string>,
     pointsAwarded: (n: number) => `+${n} خاڵ`,
     giftReward: 'خەڵاتی دیاری',
+    systemGenerated: 'خۆکارانە لەلایەن سیستەمەوە هەڵسەنگێنراوە',
     viewProduct: 'بینینی بەرهەم',
   },
 };
@@ -191,7 +197,9 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
                 />
               ))}
             </div>
-            <p className="text-[12px] text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-snug mb-1.5">{r.body}</p>
+            <p className="text-[12px] text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-snug mb-1.5">
+              {r.system_generated || r.source === 'system' ? s.systemGenerated : r.body}
+            </p>
             <div className="flex items-center justify-between text-[10px] text-zinc-500">
               <span>{fmtDate(r.created_at)}</span>
               <span className="flex items-center gap-1">
@@ -202,6 +210,11 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
                 )}
                 {r.reward?.state === 'approved' && r.reward.kind === 'printer_gift' && (
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">{s.giftReward}</span>
+                )}
+                {!r.reward && Number(r.fallback_points_awarded) > 0 && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    {s.pointsAwarded(Number(r.fallback_points_awarded))}
+                  </span>
                 )}
                 {r.product_slug && (
                   <span className="flex items-center gap-0.5">

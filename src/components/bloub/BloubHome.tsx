@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { CROSS_FADE, SPRING } from '../../lib/motion';
 
-export type BloubState = 'idle' | 'thinking' | 'navigation' | 'success' | 'notify' | 'tap';
+export type BloubState = 'idle' | 'thinking' | 'navigation' | 'success' | 'notify' | 'tap' | 'error';
 
 const SHAPES: Record<BloubState, string> = {
   idle: 'M50 7 C74 6 91 23 92 47 C94 71 78 91 52 93 C26 95 7 80 8 53 C9 25 24 8 50 7 Z',
@@ -11,6 +11,7 @@ const SHAPES: Record<BloubState, string> = {
   success: 'M50 8 C75 5 92 20 93 45 C95 70 77 88 53 94 C29 98 9 79 8 54 C7 29 25 11 50 8 Z',
   notify: 'M50 5 C74 7 93 25 91 50 C89 75 77 94 50 94 C23 94 9 77 9 50 C9 23 26 3 50 5 Z',
   tap: 'M50 13 C71 10 87 25 90 48 C93 71 76 86 52 88 C28 90 11 76 11 52 C11 28 29 16 50 13 Z',
+  error: 'M50 8 C76 9 91 27 89 52 C87 78 70 92 46 91 C21 90 8 73 11 47 C14 22 28 7 50 8 Z',
 };
 
 const FACE_Y: Record<BloubState, number> = {
@@ -20,6 +21,7 @@ const FACE_Y: Record<BloubState, number> = {
   success: 50,
   notify: 46,
   tap: 51,
+  error: 48,
 };
 
 /**
@@ -103,8 +105,8 @@ export default function BloubHome({ state = 'idle', className = '' }: { state?: 
       )}
 
       <motion.path
-        d={isSuccess ? 'M42 66 Q50 73 59 65' : state === 'notify' ? 'M45 67 Q50 63 55 67' : 'M44 65 Q50 68 56 65'}
-        animate={{ d: isSuccess ? 'M42 66 Q50 73 59 65' : state === 'notify' ? 'M45 67 Q50 63 55 67' : 'M44 65 Q50 68 56 65' }}
+        d={isSuccess ? 'M42 66 Q50 73 59 65' : state === 'error' ? 'M42 69 Q50 63 58 69' : state === 'notify' ? 'M45 67 Q50 63 55 67' : 'M44 65 Q50 68 56 65'}
+        animate={{ d: isSuccess ? 'M42 66 Q50 73 59 65' : state === 'error' ? 'M42 69 Q50 63 58 69' : state === 'notify' ? 'M45 67 Q50 63 55 67' : 'M44 65 Q50 68 56 65' }}
         fill="none"
         stroke="#f3ead0"
         strokeOpacity="0.82"
@@ -115,4 +117,3 @@ export default function BloubHome({ state = 'idle', className = '' }: { state?: 
     </motion.svg>
   );
 }
-

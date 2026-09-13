@@ -11,6 +11,7 @@ test('the bottom navigation is two groups with an independent Home target', () =
   assert.match(source, /data-bottom-nav-group="messages-community"/);
   assert.match(source, /data-bloub-home-target/);
   assert.match(source, /signalBloub\('tap'/);
+  assert.match(source, /data-nav-badge=\{item\.path === '\/cart' \? 'cart' : item\.path === '\/chats' \? 'messages'/);
   assert.doesNotMatch(source, /grid-cols-5/);
 });
 
@@ -35,8 +36,12 @@ test('one shared character travels only during bootstrap and respects reduced mo
   assert.equal((intro.match(/<BloubHome\b/g) ?? []).length, 1);
   assert.match(intro, /completedRef\.current/);
   assert.match(intro, /measureHomeTarget\(\)/);
+  assert.match(intro, /attempts < 5/);
+  assert.match(intro, /data-bloub-rendered/);
   assert.match(app, /<AppBootstrapLayer\s*\/>[\s\S]{0,100}<AppContent\s*\/>/);
   assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]+\.lv-app-intro__character/);
+  assert.match(css, /\.lv-app-intro__character\s*\{[^}]*left:\s*0/);
+  assert.doesNotMatch(css, /\.lv-app-intro__character\s*\{[^}]*inset-inline-start:/);
 });
 
 test('Home readiness is driven by the real critical request settling', () => {
@@ -44,4 +49,3 @@ test('Home readiness is driven by the real critical request settling', () => {
   assert.match(home, /if \(!initialLoading\) markHomeCriticalReady\(\)/);
   assert.doesNotMatch(home, /setTimeout\([^)]*markHomeCriticalReady/);
 });
-

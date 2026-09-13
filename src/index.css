@@ -679,8 +679,12 @@ html[data-overlay-open='true'] [data-bottom-nav] {
 
 .lv-app-intro__character {
   position: fixed;
-  inset-block-start: 0;
-  inset-inline-start: 0;
+  top: 0;
+  /* getBoundingClientRect() returns physical viewport coordinates. Using
+     inline-start here made x=0 mean the RIGHT edge in Arabic and translated
+     the character off-screen. This physical origin is intentionally paired
+     with physical measured coordinates and is direction-independent. */
+  left: 0;
   z-index: 1;
   opacity: 1;
   transform-origin: center;

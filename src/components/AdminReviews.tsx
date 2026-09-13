@@ -248,6 +248,18 @@ interface QueueRow {
   kind: 'printer_gift' | 'points';
   reward_state: 'submitted' | 'revision_needed' | 'approved' | 'rejected';
   quality_score: number | null;
+  quality: {
+    score: number;
+    tier: 1 | 2 | 3 | 4 | 5 | null;
+    reasons: string[];
+    textQuality: number;
+    imageCount: number;
+    imageQuality: number;
+    videoPresent: boolean;
+    videoQuality: number;
+    suspiciousSignals: string[];
+    rewardEligible: boolean;
+  } | null;
   reason: string;
   points_awarded: number;
   entitlement_id: string | null;
@@ -408,7 +420,9 @@ export default function AdminReviews() {
       if (!reason) return;
     }
     const payload: Record<string, unknown> = { action, reason };
-    if (action === 'approve' && row.kind === 'printer_gift') payload.qualityScore = scoreDraft[row.review_id];
+    if (action === 'approve' && row.kind === 'printer_gift') {
+      payload.qualityScore = scoreDraft[row.review_id] ?? row.quality_score ?? row.quality?.tier;
+    }
     setBusyId(row.review_id);
     setRowError(null);
     try {
@@ -584,6 +598,7 @@ export default function AdminReviews() {
           {queue.map((row) => {
             const open = expanded === row.review_id;
             const undecided = row.reward_state === 'submitted' || row.reward_state === 'revision_needed';
+            const selectedTier = scoreDraft[row.review_id] ?? row.quality_score ?? row.quality?.tier ?? undefined;
             return (
               <div key={row.review_id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
                 <button
@@ -646,6 +661,26 @@ export default function AdminReviews() {
                         <FactBadge ok={row.facts.written_detail} label={`${S.factLabels.written_detail} (${row.facts.text_chars})`} />
                       </div>
                     </div>
+
+                    {row.quality && (
+                      <div className="rounded-lg bg-white/[0.035] px-3 py-2.5 text-[11.5px] text-zinc-400">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span>{loc('درجة الجودة', 'Quality score', 'نمرەی کوالیتی')}: <b className="text-zinc-200">{row.quality.score}/100</b></span>
+                          <span>{loc('المستوى المتوقع', 'Predicted level', 'ئاستی پێشبینیکراو')}: <b className="text-zinc-200">{row.quality.tier ?? '—'}</b></span>
+                          <span>{loc('جودة النص', 'Text quality', 'کوالیتی دەق')}: {row.quality.textQuality}/42</span>
+                          <span>{loc('الصور الفريدة', 'Unique images', 'وێنە ڕەسەنەکان')}: {row.quality.imageCount}</span>
+                          <span>{loc('جودة الفيديو', 'Video quality', 'کوالیتی ڤیدیۆ')}: {row.quality.videoQuality}/18</span>
+                        </div>
+                        {row.quality.reasons.length > 0 && (
+                          <p className="mt-1 break-words">{loc('الأسباب', 'Reasons', 'هۆکارەکان')}: {row.quality.reasons.join(' · ')}</p>
+                        )}
+                        {row.quality.suspiciousSignals.length > 0 && (
+                          <p className="mt-1 text-amber-300 break-words">
+                            {loc('إشارات تحتاج فحصًا', 'Signals to inspect', 'نیشانە پێویستە بپشکنرێت')}: {row.quality.suspiciousSignals.join(' · ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div>
                       <div className="text-[11px] font-bold text-zinc-500 mb-1 flex items-center gap-1">
@@ -738,7 +773,7 @@ export default function AdminReviews() {
                                     type="button"
                                     onClick={() => setScoreDraft((m) => ({ ...m, [row.review_id]: n }))}
                                     className={`w-9 h-9 rounded-lg border text-sm font-black transition-colors ${
-                                      scoreDraft[row.review_id] === n
+                                      selectedTier === n
                                         ? 'bg-[#6B46FF] border-[#6B46FF] text-white'
                                         : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
                                     }`}
@@ -764,7 +799,7 @@ export default function AdminReviews() {
                               <button
                                 disabled={
                                   busyId === row.review_id ||
-                                  !scoreDraft[row.review_id] ||
+                                  !selectedTier ||
                                   (rubricDraft[row.review_id]?.trim().length ?? 0) < 10
                                 }
                                 onClick={() => decideReward(row, 'approve')}

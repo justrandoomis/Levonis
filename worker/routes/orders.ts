@@ -5,6 +5,7 @@ import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
 import { primaryMedia, readProductDeliveryOptions } from '../lib/productModel';
+import { productImageForSelection } from '../lib/productSelectionImage';
 import { getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
 import {
@@ -1677,7 +1678,10 @@ async function computeCheckout(
         stock_targets: stockRes.targets,
         name: String(row.name),
         name_ar: String(row.name_ar ?? ''),
-        image: primaryMedia(doc.media)?.url ?? '',
+        image: productImageForSelection(doc, {
+          optionValueIds: sel.optionValueIds ?? [],
+          colorId: sel.colorId || null,
+        }, view),
         variant: variantLabel,
         option_id: String(row.option_id ?? ''),
         color_id: String(row.color_id ?? ''),
