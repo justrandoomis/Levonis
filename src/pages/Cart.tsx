@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
 import { useLanguage } from '../LanguageContext';
 import {
-  ArrowLeft, ArrowRight, ChevronRight, ChevronDown, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
+  ArrowLeft, ArrowRight, ChevronRight, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
   ShieldCheck, FileText, Sparkles,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
-import { useMotion } from '../lib/motion';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
@@ -227,7 +225,6 @@ export default function Cart() {
   const printerNoteText = PRINTER_NOTE[lang] ?? PRINTER_NOTE.ar;
   const codHint = COD_HINT[asLang(lang)];
   const ew = EXT_WARRANTY[asLang(lang)];
-  const m = useMotion();
   // "+12 months → 24 months total": the arrow follows the reading direction,
   // so it points from the extension to the total in both scripts.
   const arrow = dir === 'rtl' ? '←' : '→';
@@ -290,10 +287,10 @@ export default function Cart() {
   const [dealsExpanded, setDealsExpanded] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
 
-  // Extended-warranty disclosures: which lines are open, which one is saving
-  // (the PATCH re-prices the line, so the group waits for the server), and
-  // the last refusal per line — shown inside the panel, next to the choice.
-  const [warrantyOpen, setWarrantyOpen] = useState<Set<string>>(() => new Set());
+  // A mobile-safe, portalled sheet owns the warranty choices. Keeping this
+  // out of the narrow product-detail column prevents RTL text or a long price
+  // from widening the cart beyond the viewport.
+  const [warrantyPickerId, setWarrantyPickerId] = useState<string | null>(null);
   const [warrantySavingId, setWarrantySavingId] = useState<string | null>(null);
   const [warrantyPendingPlan, setWarrantyPendingPlan] = useState<string>('');
   const [warrantyErrors, setWarrantyErrors] = useState<Record<string, string>>({});
@@ -639,17 +636,12 @@ export default function Cart() {
   // fee already resolved against the line's regular price; a plan is set or
   // cleared with the same PATCH the variant and shipping sheets use, and the
   // returned cart (re-priced by the resolver) is what the screen paints.
-  const toggleWarranty = (itemId: string) =>
-    setWarrantyOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-
   const chooseWarranty = async (item: CartItem, planId: string) => {
     if (warrantySavingId !== null) return;
-    if ((item.warranty_plan_id ?? '') === planId) return;
+    if ((item.warranty_plan_id ?? '') === planId) {
+      setWarrantyPickerId(null);
+      return;
+    }
     setWarrantySavingId(item.id);
     setWarrantyPendingPlan(planId);
     setWarrantyErrors((prev) => {
@@ -661,6 +653,7 @@ export default function Cart() {
     try {
       const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { warrantyPlanId: planId });
       applyItems(data.items || []);
+      setWarrantyPickerId(null);
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
       const text = err instanceof Error ? err.message : '';
@@ -772,6 +765,7 @@ export default function Cart() {
 
   const variantItem = items.find((i) => i.id === variantItemId) ?? null;
   const shippingItem = items.find((i) => i.id === shippingItemId) ?? null;
+  const warrantyItem = items.find((i) => i.id === warrantyPickerId) ?? null;
 
   // THE SHEETS NOW HAVE AN EXIT, SO THEY NEED SOMETHING TO LEAVE WITH.
   //
@@ -808,7 +802,7 @@ export default function Cart() {
     // short page. The bottom padding clears the summary bar (≈76px) and the
     // safe area, and nothing more — `pb-48` (192px) was reserving room for a
     // nav that is no longer on this route.
-    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh bg-canvas flex flex-col font-sans">
+    <div className="w-full max-w-full overflow-x-clip pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh bg-canvas flex flex-col font-sans">
       {/* Header */}
       {/* `backdrop-blur-xl` behind a fully opaque `bg-black` was a compositing
           layer blurring nothing. Translucent, like the product page's bar, so
@@ -894,7 +888,7 @@ export default function Cart() {
               // A hairline between rows: the list had no separation at all, so
               // three products read as one dense block. `last:` keeps the
               // group's own bottom edge clean.
-              <div key={item.id} className="px-3 sm:px-4 py-4 flex gap-2 sm:gap-3 border-b border-border-subtle last:border-b-0">
+              <div key={item.id} className="max-w-full px-2.5 sm:px-4 py-3.5 flex gap-1.5 sm:gap-3 border-b border-border-subtle last:border-b-0">
                 {/* A 22px dot inside a 44px target: the dot is the design, the
                     target is what a thumb actually hits. It was a bare <div>
                     with an onClick — unreachable by keyboard and silent to a
@@ -905,7 +899,7 @@ export default function Cart() {
                   aria-checked={selected}
                   aria-label={itemName(item)}
                   onClick={() => toggleSelect(item.id)}
-                  className="shrink-0 w-11 min-h-[44px] pt-6 flex items-start justify-center -ms-2 [touch-action:manipulation]"
+                  className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
                 >
                   <span
                     aria-hidden="true"
@@ -919,7 +913,8 @@ export default function Cart() {
 
                 {/* Product Image */}
                 <div
-                  className="w-[88px] h-[88px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-lg overflow-hidden bg-black cursor-pointer"
+                  data-cart-item-image
+                  className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-zinc-900 cursor-pointer"
                   onClick={() => navigate(`/product/${item.slug}`)}
                 >
                   <SafeImage
@@ -939,9 +934,9 @@ export default function Cart() {
                 </div>
 
                 {/* Product Details */}
-                <div className="flex-1 flex flex-col justify-between">
+                <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="text-zinc-200 text-[14px] leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+                    <h3 data-cart-item-title className="text-zinc-200 text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
 
                     <div className="flex flex-wrap gap-1.5 mb-1.5">
                       {hasVariants && (
@@ -986,8 +981,8 @@ export default function Cart() {
                     </div>
                   </div>
 
-                  <div className="flex items-baseline gap-1.5 mb-2 mt-1">
-                    <span className="text-white font-bold text-[17px] tabular-nums">{formatIqd(item.unit_price_iqd)}</span>
+                  <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
+                    <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{formatIqd(item.unit_price_iqd)}</span>
                     {hasSale && (
                       <>
                         <span className="text-zinc-500 text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
@@ -1061,20 +1056,13 @@ export default function Cart() {
                   )}
 
                   {(item.warranty_plans ?? []).length > 0 && (() => {
-                    const plans = item.warranty_plans ?? [];
-                    const open = warrantyOpen.has(item.id);
-                    const current = plans.find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
-                    const panelId = `ext-warranty-${item.id}`;
-                    const saving = warrantySavingId === item.id;
-                    const radio = (_checked: boolean) =>
-                      'lv-choice w-full px-3 py-2 flex items-center justify-between gap-3 text-start text-[13px] press-scale disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
+                    const current = (item.warranty_plans ?? []).find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
                     return (
                       <div className="mb-2" data-cart-ext-warranty={item.id}>
                         <button
                           type="button"
-                          aria-expanded={open}
-                          aria-controls={panelId}
-                          onClick={() => toggleWarranty(item.id)}
+                          aria-haspopup="dialog"
+                          onClick={() => setWarrantyPickerId(item.id)}
                           className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                           data-selected={!!current}
                         >
@@ -1085,89 +1073,8 @@ export default function Cart() {
                               {current ? `${warrantyPlanLabel(current)} · +${formatIqd(current.fee_iqd)}` : ew.none}
                             </span>
                           </span>
-                          <ChevronDown
-                            className={`w-3.5 h-3.5 text-zinc-500 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
-                            aria-hidden="true"
-                          />
+                          <ChevronRight className={`w-3.5 h-3.5 text-zinc-500 shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
                         </button>
-
-                        {/* The panel unfolds on the house `quick` spring and folds
-                            back the same way; under reduced motion it cross-fades.
-                            The id lives on the always-present wrapper so
-                            aria-controls resolves whether the panel is open or not. */}
-                        <div id={panelId}>
-                          <AnimatePresence initial={false}>
-                            {open && (
-                              <motion.div
-                                key="panel"
-                                initial={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                                animate={m.reduced ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
-                                exit={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                                transition={m.spring('quick')}
-                                className="overflow-hidden"
-                              >
-                                <div
-                                  role="radiogroup"
-                                  aria-label={ew.title}
-                                  aria-busy={saving || undefined}
-                                  className="mt-1.5 rounded-xl border border-zinc-800 bg-black/30 p-2 flex flex-col gap-1.5"
-                                >
-                                  <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={!current}
-                                    disabled={saving}
-                                    onClick={() => chooseWarranty(item, '')}
-                                    className={radio(!current)}
-                                    data-cart-warranty-plan=""
-                                  >
-                                    <span className="min-w-0">
-                                      <span className="block truncate">{ew.none}</span>
-                                      <span className="block text-[11px] font-normal text-text-muted">{ew.noneHint}</span>
-                                    </span>
-                                    {saving && warrantyPendingPlan === '' ? <Spinner size="xs" delayMs={0} decorative /> : null}
-                                  </button>
-                                  {plans.map((w) => {
-                                    const checked = current?.id === w.id;
-                                    return (
-                                      <button
-                                        key={w.id}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={checked}
-                                        disabled={saving}
-                                        onClick={() => chooseWarranty(item, w.id)}
-                                        className={radio(checked)}
-                                        data-cart-warranty-plan={w.id}
-                                      >
-                                        <span className="min-w-0 truncate tabular-nums">{warrantyPlanLabel(w)}</span>
-                                        <span className="tabular-nums shrink-0 text-[12.5px]">
-                                          {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${formatIqd(w.fee_iqd)}`}
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                  <p className="text-[11px] text-zinc-500 leading-relaxed px-0.5">
-                                    {ew.perLine(item.qty)} {ew.beforeOrder}
-                                  </p>
-                                  {warrantyErrors[item.id] && (
-                                    <p role="alert" className="text-[11.5px] text-red-400 px-0.5">
-                                      {warrantyErrors[item.id]}
-                                    </p>
-                                  )}
-                                  <Link
-                                    to="/policies/extended_warranty"
-                                    className="inline-flex items-center gap-1.5 self-start px-0.5 min-h-[32px] text-[11.5px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
-                                    data-cart-warranty-policy
-                                  >
-                                    <FileText className="w-3.5 h-3.5" aria-hidden="true" />
-                                    {ew.policy}
-                                  </Link>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
                       </div>
                     );
                   })()}
@@ -1185,7 +1092,7 @@ export default function Cart() {
                       added to the total. Gold: the store's own terms, the
                       same tone the product page and the order use. */}
                   {item.is_printer && printerNoteIqd !== null && (
-                    <Note tone="gold" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2" testId="cart-printer-note">
+                    <Note tone="zinc" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2 !border-x-0 !border-e-0 !border-y-0 !rounded-none !bg-transparent !py-1.5 !ps-2.5 !pe-0 !text-[11px] text-text-muted" testId="cart-printer-note">
                       {printerNoteText(formatIqd(printerNoteIqd))}
                     </Note>
                   )}
@@ -1690,6 +1597,104 @@ export default function Cart() {
           </div>
         </div>
       )}
+
+      {/* Warranty choices are portalled above the bottom navigation and use
+          the visual viewport instead of the narrow cart row. This is the
+          shared mobile-safe selector path for 320px screens and RTL labels. */}
+      <Sheet
+        open={!!warrantyItem}
+        onClose={() => warrantySavingId === null && setWarrantyPickerId(null)}
+        label={ew.title}
+        dismissOnEscape={warrantySavingId === null}
+        dismissOnScrim={warrantySavingId === null}
+        testId="cart-warranty-sheet"
+        panelClassName="w-full max-w-full sm:max-w-md max-h-[min(82dvh,42rem)] overflow-hidden"
+      >
+        {warrantyItem && (() => {
+          const plans = warrantyItem.warranty_plans ?? [];
+          const current = plans.find((w) => w.id === (warrantyItem.warranty_plan_id ?? '')) ?? null;
+          const saving = warrantySavingId === warrantyItem.id;
+          const radio = (checked: boolean) =>
+            `lv-choice w-full min-w-0 min-h-[48px] px-3 py-2.5 flex items-center justify-between gap-3 text-start text-[13px] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${checked ? 'bg-surface-selected' : ''}`;
+          return (
+            <div className="flex max-h-[min(78dvh,39rem)] min-w-0 flex-col">
+              <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-1">
+                <div className="min-w-0">
+                  <h2 className="truncate text-[15px] font-semibold text-text-primary">{ew.title}</h2>
+                  <p className="truncate text-[11px] text-text-muted">{itemName(warrantyItem)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWarrantyPickerId(null)}
+                  disabled={saving}
+                  aria-label={loc('إغلاق', 'Close', 'داخستن')}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div
+                role="radiogroup"
+                aria-label={ew.title}
+                aria-busy={saving || undefined}
+                className="min-w-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!current}
+                  disabled={saving}
+                  onClick={() => chooseWarranty(warrantyItem, '')}
+                  className={radio(!current)}
+                  data-cart-warranty-plan=""
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-text-primary">{ew.none}</span>
+                    <span className="block truncate text-[11px] font-normal text-text-muted">{ew.noneHint}</span>
+                  </span>
+                  {saving && warrantyPendingPlan === '' ? <Spinner size="xs" delayMs={0} decorative /> : <Check className={`h-4 w-4 shrink-0 ${!current ? 'text-text-primary' : 'invisible'}`} aria-hidden="true" />}
+                </button>
+                {plans.map((w) => {
+                  const checked = current?.id === w.id;
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={checked}
+                      disabled={saving}
+                      onClick={() => chooseWarranty(warrantyItem, w.id)}
+                      className={radio(checked)}
+                      data-cart-warranty-plan={w.id}
+                    >
+                      <span className="min-w-0 truncate tabular-nums text-text-primary">{warrantyPlanLabel(w)}</span>
+                      <span className="flex shrink-0 items-center gap-2 tabular-nums text-[12px] text-text-secondary">
+                        {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${formatIqd(w.fee_iqd)}`}
+                        <Check className={`h-4 w-4 ${checked ? 'text-text-primary' : 'invisible'}`} aria-hidden="true" />
+                      </span>
+                    </button>
+                  );
+                })}
+                <p className="px-1 pt-1 text-[11px] leading-relaxed text-text-muted">
+                  {ew.perLine(warrantyItem.qty)} {ew.beforeOrder}
+                </p>
+                {warrantyErrors[warrantyItem.id] && (
+                  <p role="alert" className="px-1 text-[11.5px] text-danger">{warrantyErrors[warrantyItem.id]}</p>
+                )}
+                <Link
+                  to="/policies/extended_warranty"
+                  onClick={() => setWarrantyPickerId(null)}
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded px-1 text-[11.5px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  data-cart-warranty-policy
+                >
+                  <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                  {ew.policy}
+                </Link>
+              </div>
+            </div>
+          );
+        })()}
+      </Sheet>
 
       {/* ------------------------------------------------------ variant sheet
           A SHEET, NOT A DIALOG. This is a customer reconsidering the colour

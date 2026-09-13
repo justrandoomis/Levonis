@@ -17,6 +17,7 @@ import type { OrderExpiryReport } from './orderExpirySweep';
 import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
+import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -74,6 +75,8 @@ export interface DurableJobsReport {
   delivery_sync: { configured: boolean; scanned: number; moved: number; unmapped: number; errors: number };
   /** PRO BNPL accounts whose oldest unpaid instalment passed its due date. */
   bnpl_overdue: BnplOverdueReport;
+  /** Seven-day system ratings; these never create reward records. */
+  automatic_reviews: AutomaticReviewSweepReport;
   errors: string[];
 }
 
@@ -101,6 +104,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
+    automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
     errors: [],
   };
 
@@ -273,6 +277,12 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   //     never an order-state transition, and is safe under overlapping crons.
   await step('bnpl_overdue', async () => {
     report.bnpl_overdue = await sweepBnplOverdue(env.DB, nowIso, 100);
+  });
+
+  // 14. Add the clearly marked system rating once a delivered line has gone
+  //     seven days without a customer review. It never enters reward logic.
+  await step('automatic_reviews', async () => {
+    report.automatic_reviews = await sweepAutomaticReviews(env.DB, nowIso, 200);
   });
 
   return report;

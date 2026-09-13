@@ -24,6 +24,7 @@ const STRINGS = {
     write: 'اكتب مراجعتك',
     edit: 'تعديل مراجعتك',
     incentivized: 'مراجعة ضمن برنامج المكافآت',
+    systemGenerated: 'تم التقييم تلقائياً بواسطة النظام',
     verified: 'شراء مؤكد',
     notEligible: 'المراجعات متاحة لمن استلم المنتج ضمن طلب مُسلَّم.',
     signInToReview: 'سجّل الدخول لكتابة مراجعة بعد استلام طلبك.',
@@ -40,8 +41,8 @@ const STRINGS = {
     rewardReason: 'سبب القرار',
     qualityScore: 'درجة الجودة',
     printerNotice:
-      'هذا المنتج ضمن برنامج هدايا الطابعات: مراجعة مكتوبة مفصّلة + صور + فيديو + دليل ستوري إنستغرام (خاص، للمراجعة الإدارية فقط). درجة الجودة مستقلة عن عدد النجوم — المراجعة النقدية الصادقة لا تُنقص المكافأة.',
-    pointsNotice: (n: number) => `المراجعات المقبولة لهذا المنتج تمنح ${n.toLocaleString()} نقطة.`,
+      'تُقيَّم جودة مراجعة الطابعة من فائدة النص وأصالة الصور وجودتها، وتزيد المستويات الأعلى مع الوسائط المفيدة والفيديو. درجة الجودة مستقلة عن عدد النجوم.',
+    pointsNotice: (n: number) => `المراجعة اليدوية الصالحة غير المؤهلة لهدية تحصل على ضعفي نقاط الأساس (${(n * 2).toLocaleString()} نقطة).`,
     pointsUnconfigured: 'قيمة نقاط المراجعة لم تُحدَّد بعد من الإدارة — ستظهر هنا عند إعدادها.',
     order: 'الطلب',
     stars: 'التقييم بالنجوم',
@@ -64,6 +65,8 @@ const STRINGS = {
     remove: 'إزالة',
     reviewsCount: (n: number) => `${n.toLocaleString()} مراجعة`,
     disclosure: 'قد يحصل أصحاب المراجعات المؤهلة على مكافآت (هدايا أو نقاط) — يُفصح عن ذلك في المراجعات المنشورة.',
+    publishedImmediately: 'تُنشر مراجعتك فورًا، ثم تُراجع المكافأة بشكل منفصل.',
+    noTierReward: 'لم تدخل مراجعتك قائمة الهدايا؛ تم تطبيق نقاط المراجعة الأساسية المضاعفة عند توفر إعدادها.',
     keptNote: 'وسائطك الحالية تبقى محفوظة ما لم ترفع بديلاً عنها.',
   },
   en: {
@@ -75,6 +78,7 @@ const STRINGS = {
     write: 'Write your review',
     edit: 'Edit your review',
     incentivized: 'Rewards-program review',
+    systemGenerated: 'Automatically rated by the system',
     verified: 'Verified purchase',
     notEligible: 'Reviews are open to customers with a delivered order containing this product.',
     signInToReview: 'Sign in to review after your order is delivered.',
@@ -91,8 +95,8 @@ const STRINGS = {
     rewardReason: 'Decision reason',
     qualityScore: 'Quality score',
     printerNotice:
-      'This product is in the printer gift program: a detailed written review + photos + video + an Instagram story proof (private, for admin review only). The quality score is independent of your star rating — an honest critical review never lowers the reward.',
-    pointsNotice: (n: number) => `Approved reviews of this product earn ${n.toLocaleString()} points.`,
+      'Printer-review quality uses useful writing plus relevant, original media. Higher levels add stronger images and useful video. Quality is independent of the star rating.',
+    pointsNotice: (n: number) => `A valid manual review outside a gift level earns twice the base review points (${(n * 2).toLocaleString()} points).`,
     pointsUnconfigured: 'The review-points value has not been configured by the store yet — it will appear here once set.',
     order: 'Order',
     stars: 'Star rating',
@@ -115,6 +119,8 @@ const STRINGS = {
     remove: 'Remove',
     reviewsCount: (n: number) => `${n.toLocaleString()} reviews`,
     disclosure: 'Eligible reviews may receive rewards (gifts or points) — published reviews disclose this.',
+    publishedImmediately: 'Your review is published immediately; reward review is separate.',
+    noTierReward: 'This review did not enter the gift queue; the configured base review points were doubled.',
     keptNote: 'Your current media is kept unless you upload replacements.',
   },
   ckb: {
@@ -126,6 +132,7 @@ const STRINGS = {
     write: 'پێداچوونەوەکەت بنووسە',
     edit: 'دەستکاری پێداچوونەوەکەت بکە',
     incentivized: 'پێداچوونەوەی بەرنامەی خەڵات',
+    systemGenerated: 'خۆکارانە لەلایەن سیستەمەوە هەڵسەنگێنراوە',
     verified: 'کڕینی پشتڕاستکراو',
     notEligible: 'پێداچوونەوە بۆ ئەو کڕیارانەیە کە داواکارییەکی گەیشتوویان هەیە لەگەڵ ئەم بەرهەمە.',
     signInToReview: 'بچۆ ژوورەوە بۆ نووسینی پێداچوونەوە دوای گەیشتنی داواکارییەکەت.',
@@ -142,8 +149,8 @@ const STRINGS = {
     rewardReason: 'هۆکاری بڕیار',
     qualityScore: 'نمرەی کوالیتی',
     printerNotice:
-      'ئەم بەرهەمە لە بەرنامەی دیاری پرینتەرەکاندایە: پێداچوونەوەی نووسراوی وردەکاری + وێنە + ڤیدیۆ + بەڵگەی ستۆری ئینستاگرام (تایبەت، تەنها بۆ پێداچوونەوەی بەڕێوەبەرایەتی). نمرەی کوالیتی سەربەخۆیە لە ئەستێرەکان — پێداچوونەوەی ڕەخنەگرانەی ڕاستگۆ خەڵاتەکە کەم ناکاتەوە.',
-    pointsNotice: (n: number) => `پێداچوونەوە پەسەندکراوەکانی ئەم بەرهەمە ${n.toLocaleString()} خاڵ بەدەست دەهێنن.`,
+      'کوالیتی پێداچوونەوەی پرینتەر بە نووسینی بەسوود و میدیای پەیوەندیدار و ڕەسەن هەڵدەسەنگێندرێت؛ ئاستە بەرزەکان وێنە و ڤیدیۆی باشتر دەوێت.',
+    pointsNotice: (n: number) => `پێداچوونەوەی دەستی شیاو کە دیاری وەرناگرێت دوو هێندەی خاڵی بنەڕەت وەردەگرێت (${(n * 2).toLocaleString()} خاڵ).`,
     pointsUnconfigured: 'بەهای خاڵی پێداچوونەوە هێشتا لەلایەن فرۆشگاوە دیاری نەکراوە — کاتێک ڕێکخرا لێرە دەردەکەوێت.',
     order: 'داواکاری',
     stars: 'هەڵسەنگاندن بە ئەستێرە',
@@ -166,6 +173,8 @@ const STRINGS = {
     remove: 'لابردن',
     reviewsCount: (n: number) => `${n.toLocaleString()} پێداچوونەوە`,
     disclosure: 'پێداچوونەوە شایستەکان لەوانەیە خەڵات وەربگرن (دیاری یان خاڵ) — لە پێداچوونەوە بڵاوکراوەکاندا ئەمە ڕوون دەکرێتەوە.',
+    publishedImmediately: 'پێداچوونەوەکەت دەستبەجێ بڵاودەکرێتەوە؛ خەڵاتەکە بە جیا پێداچوونەوەی بۆ دەکرێت.',
+    noTierReward: 'ئەم پێداچوونەوەیە نەچووە ڕیزی دیاری؛ خاڵی بنەڕەتی ڕێکخراو دوو هێندە کرا.',
     keptNote: 'میدیاکانی ئێستات دەمێننەوە مەگەر جێگرەوەیان بار بکەیت.',
   },
 };
@@ -180,6 +189,8 @@ interface PublicReview {
   reviewer: string;
   incentivized: boolean;
   verified_purchase: boolean;
+  source: 'user' | 'system';
+  system_generated: boolean;
 }
 interface MyReview {
   id: string;
@@ -189,6 +200,9 @@ interface MyReview {
   media: MediaRef[];
   status: 'pending' | 'published' | 'rejected';
   moderation_note: string;
+  source: 'user' | 'system';
+  system_generated: boolean;
+  fallback_points_awarded: number;
   reward: {
     kind: 'printer_gift' | 'points';
     state: 'submitted' | 'revision_needed' | 'approved' | 'rejected';
@@ -196,13 +210,14 @@ interface MyReview {
     reason: string;
     points_awarded: number;
     instagram: { link: string; file_url: string | null } | null;
-  };
+  } | null;
 }
 interface Eligibility {
   eligible_orders: Array<{ id: string; delivered_at: string | null }>;
   existing_review: MyReview | null;
   is_printer: boolean;
   review_points: number | null;
+  can_replace_system_review: boolean;
 }
 interface UploadedFile { key: string; url: string; kind: 'image' | 'video' }
 
@@ -303,12 +318,13 @@ export default function ReviewSection({ productId }: { productId: string }) {
   }, [loadEligibility]);
 
   const existing = eligibility?.existing_review ?? null;
-  const canEdit = !!existing && existing.status === 'pending' && ['submitted', 'revision_needed'].includes(existing.reward.state);
-  const canCreate = !existing && (eligibility?.eligible_orders.length ?? 0) > 0;
+  const canEdit = !!existing && !existing.system_generated && !!existing.reward && existing.status !== 'rejected' && ['submitted', 'revision_needed'].includes(existing.reward.state);
+  const canReplaceSystem = !!existing?.system_generated && (eligibility?.eligible_orders.length ?? 0) > 0;
+  const canCreate = (!existing || canReplaceSystem) && (eligibility?.eligible_orders.length ?? 0) > 0;
 
   const openForm = () => {
     setFormError('');
-    if (existing) {
+    if (existing && !canReplaceSystem) {
       setOrderId(existing.order_id ?? eligibility?.eligible_orders[0]?.id ?? '');
       setStars(existing.stars);
       setBody(existing.body);
@@ -316,7 +332,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
       // composition; the user re-attaches media on edit (server replaces).
       setPhotos([]);
       setVideo(null);
-      setIgLink(existing.reward.instagram?.link ?? '');
+      setIgLink(existing.reward?.instagram?.link ?? '');
       setIgShot(null);
     } else {
       setOrderId(eligibility?.eligible_orders[0]?.id ?? '');
@@ -355,17 +371,18 @@ export default function ReviewSection({ productId }: { productId: string }) {
       const payload: Record<string, unknown> = { productId, orderId, stars, body };
       // On EDIT, omitted media/evidence fields keep what the review already
       // has server-side — attaching new files replaces them.
-      if (!existing || photos.length > 0) payload.photoKeys = photos.map((p) => p.key);
-      if (!existing) {
+      const editing = !!existing && !canReplaceSystem;
+      if (!editing || photos.length > 0) payload.photoKeys = photos.map((p) => p.key);
+      if (!editing) {
         if (video) payload.videoKey = video.key;
         if (igLink || igShot) payload.instagram = { link: igLink || undefined, key: igShot?.key || undefined };
       } else {
         if (video) payload.videoKey = video.key;
-        const existingShotKey = existing.reward.instagram?.file_url?.replace('/api/reviews/media/', '') || undefined;
+        const existingShotKey = existing?.reward?.instagram?.file_url?.replace('/api/reviews/media/', '') || undefined;
         const mergedKey = igShot?.key || existingShotKey;
         if (igLink || mergedKey) payload.instagram = { link: igLink || undefined, key: mergedKey };
       }
-      if (existing) await api.put(`/api/reviews/${existing.id}`, payload);
+      if (editing) await api.put(`/api/reviews/${existing!.id}`, payload);
       else await api.post('/api/reviews', payload);
       setShowForm(false);
       await Promise.all([loadEligibility(), loadPage(1, true)]);
@@ -378,7 +395,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
 
   const statusLabel = (s: MyReview['status']) =>
     s === 'published' ? S.statusPublished : s === 'rejected' ? S.statusRejected : S.statusPending;
-  const rewardLabel = (s: MyReview['reward']['state']) =>
+  const rewardLabel = (s: NonNullable<MyReview['reward']>['state']) =>
     s === 'approved' ? S.rApproved : s === 'rejected' ? S.rRejected : s === 'revision_needed' ? S.rRevision : S.rSubmitted;
 
   return (
@@ -399,13 +416,14 @@ export default function ReviewSection({ productId }: { productId: string }) {
             onClick={openForm}
             className="flex items-center gap-2 bg-[#6B46FF] hover:bg-[#5A38E6] text-white text-sm font-bold px-4 py-2 rounded-full transition-colors"
           >
-            {existing ? <Pencil className="w-4 h-4" /> : <Star className="w-4 h-4" />}
-            {existing ? S.edit : S.write}
+            {canEdit ? <Pencil className="w-4 h-4" /> : <Star className="w-4 h-4" />}
+            {canEdit ? S.edit : S.write}
           </button>
         )}
       </div>
 
       <p className="text-[11px] text-zinc-500">{S.disclosure}</p>
+      {isAuthenticated && (canCreate || canEdit) && <p className="text-[11px] text-zinc-400">{S.publishedImmediately}</p>}
 
       {/* Program notice — honest states, no invented values */}
       {eligibility && (canCreate || canEdit) && (
@@ -443,13 +461,17 @@ export default function ReviewSection({ productId }: { productId: string }) {
             </span>
           </div>
           <Stars value={existing.stars} size="w-4 h-4" />
-          <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">{existing.body}</p>
+          {existing.system_generated ? (
+            <p className="text-[12px] text-zinc-400">{S.systemGenerated}</p>
+          ) : (
+            <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">{existing.body}</p>
+          )}
           {existing.moderation_note && (
             <p className="text-[12px] text-amber-400">
               {S.moderationNote}: {existing.moderation_note}
             </p>
           )}
-          <div className="text-[12px] text-zinc-400 flex flex-wrap items-center gap-2">
+          {existing.reward && <div className="text-[12px] text-zinc-400 flex flex-wrap items-center gap-2">
             <span>
               {S.rewardState}: <b className="text-zinc-200">{rewardLabel(existing.reward.state)}</b>
             </span>
@@ -458,11 +480,14 @@ export default function ReviewSection({ productId }: { productId: string }) {
                 {S.qualityScore}: <b className="text-zinc-200">{existing.reward.quality_score}/5</b>
               </span>
             )}
-          </div>
-          {existing.reward.reason && (
+          </div>}
+          {existing.reward?.reason && (
             <p className="text-[12px] text-zinc-500">
               {S.rewardReason}: {existing.reward.reason}
             </p>
+          )}
+          {!existing.reward && !existing.system_generated && (
+            <p className="text-[11.5px] text-zinc-500">{S.noTierReward}</p>
           )}
         </div>
       )}
@@ -638,7 +663,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
               disabled={submitting || uploadingWhat !== '' || stars < 1 || !body.trim() || !orderId}
               className="flex-1 bg-[#6B46FF] hover:bg-[#5A38E6] disabled:opacity-50 text-white text-sm font-bold py-2.5 rounded-full transition-colors"
             >
-              {submitting ? S.submitting : existing ? S.saveEdit : S.submit}
+              {submitting ? S.submitting : canEdit ? S.saveEdit : S.submit}
             </button>
             <button
               type="button"
@@ -680,7 +705,9 @@ export default function ReviewSection({ productId }: { productId: string }) {
               <span className="text-[11px] text-zinc-500">{new Date(r.created_at).toLocaleDateString()}</span>
             </div>
             <Stars value={r.stars} size="w-4 h-4" />
-            <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">{r.body}</p>
+            <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">
+              {r.system_generated ? S.systemGenerated : r.body}
+            </p>
             {r.media.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {r.media.map((m) =>

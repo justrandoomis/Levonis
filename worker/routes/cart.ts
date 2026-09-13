@@ -100,6 +100,7 @@ const OOS_REFUSALS = new Set(['OUT_OF_STOCK', 'QTY_UNAVAILABLE', 'MYSTERY_NO_ELI
 import { supportEligibleProductIds } from '../lib/membershipOps';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { pricedPlans, refuseNonPrinterWarranty } from '../lib/warrantyPlans';
+import { productImageForSelection } from '../lib/productSelectionImage';
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
@@ -657,7 +658,10 @@ async function loadCart(c: Context<AppContext>) {
       slug: row.slug,
       name: row.name,
       name_ar: row.name_ar,
-      image: primaryMedia(doc.media)?.url ?? '',
+      image: productImageForSelection(doc, {
+        optionValueIds: sel.optionValueIds ?? [],
+        colorId: sel.colorId || null,
+      }, view),
       qty: row.qty,
       option_id: row.option_id,
       color_id: row.color_id,

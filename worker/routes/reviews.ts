@@ -18,6 +18,13 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { sniff } from './uploads';
 import { getMediaObject, headMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { notifyStatement } from '../lib/notifications';
+import {
+  evaluateReviewQuality,
+  normalizeReviewText,
+  type ReviewQualityMedia,
+  type ReviewQualityResult,
+} from '../lib/reviewQuality';
 
 /**
  * Product reviews with evidence, admin quality scoring and the five printer
@@ -27,11 +34,10 @@ import { getMediaObject, headMediaObject, putMediaObject } from '../lib/mediaSto
  *  - PUBLIC review moderation (reviews.status) is a different decision from
  *    REWARD approval (review_rewards.state). A published review can have a
  *    rejected reward and vice versa.
- *  - Quality score (1..5) is a usefulness rubric — it is NEVER derived from
- *    stars or sentiment, and approval never requires praise. The server
- *    computes only a deterministic eligibility CHECKLIST (delivered order,
- *    written detail, photos, video, Instagram evidence present); a human
- *    assigns the score with a written rubric reason.
+ *  - Quality level (1..5) is a usefulness rubric — it is NEVER derived from
+ *    praise or sentiment. The server produces a deterministic, auditable
+ *    recommendation from text/media quality and anti-abuse signals; an admin
+ *    can approve, change or reject that reward without changing publication.
  *  - Distinct ledgers: printer gifts live in gift_entitlements (UNIQUE per
  *    reward → per review), review points in points_awards with source_ref
  *    'review:<id>' + a deterministic wallet_transactions id. Purchase points
@@ -49,11 +55,8 @@ reviewRoutes.use('/admin/*', requireAdmin);
 const MAX_PHOTOS = 6;
 const MAX_BODY_CHARS = 4000;
 /**
- * Deterministic "written detail" checklist threshold for the PRINTER reward
- * path (mandate §5: written detail + photos + video + Instagram evidence).
- * This is an eligibility fact shown to the admin, not a quality judgement —
- * the human rubric decision stays final. Rubric thresholds are decision
- * register row 5 material.
+ * Compatibility threshold used only for reward rows created before the
+ * structured quality snapshot existed. New reviews use reviewQuality.ts.
  */
 const MIN_DETAIL_CHARS = 80;
 const PAGE_SIZE = 10;
@@ -64,7 +67,7 @@ const VIDEO_MAX = 40 * 1024 * 1024;
 type GiftKind = 'accessory' | 'filament' | 'nozzle' | 'plate' | 'other';
 
 /** Composition of each gift box level (owner catalog, mandate §5). */
-const LEVEL_COMPOSITION: Record<number, GiftKind[]> = {
+export const LEVEL_COMPOSITION: Readonly<Record<number, readonly GiftKind[]>> = {
   1: ['accessory'],
   2: ['filament'],
   3: ['filament', 'accessory'],
@@ -91,10 +94,7 @@ interface EligibilityFacts {
   text_chars: number;
 }
 
-interface MediaEntry {
-  key: string;
-  kind: 'image' | 'video';
-}
+type MediaEntry = ReviewQualityMedia;
 
 /**
  * Per-review point value for NON-printer approved reviews. Read generically
@@ -150,14 +150,33 @@ function publicMedia(raw: unknown): Array<{ url: string; kind: 'image' | 'video'
     .map((m) => ({ url: mediaUrl(m.key), kind: m.kind === 'video' ? 'video' : 'image' }));
 }
 
-async function assertOwnKeys(env: Env, keys: string[], prefix: string): Promise<void> {
+async function ownMediaEntries(
+  env: Env,
+  keys: string[],
+  prefix: string,
+  kind: 'image' | 'video'
+): Promise<MediaEntry[]> {
+  const entries: MediaEntry[] = [];
   for (const key of keys) {
     if (!key.startsWith(prefix) || key.includes('..')) {
       throw badRequest('Invalid media reference', 'BAD_MEDIA_KEY');
     }
     const head = await headMediaObject(env, 'private', key);
     if (!head) throw badRequest('Uploaded file not found — please re-upload', 'MEDIA_MISSING');
+    entries.push({
+      key,
+      kind,
+      sha256: head.customMetadata?.sha256 || undefined,
+      bytes: Number(head.size) || undefined,
+      mime: head.httpMetadata?.contentType || undefined,
+    });
   }
+  return entries;
+}
+
+async function digestBytes(buf: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', buf as BufferSource);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -210,16 +229,14 @@ async function parseReviewInput(
     photos = existing.media.filter((m) => m.kind === 'image');
   } else {
     const photoKeys: string[] = Array.isArray(raw.photoKeys) ? raw.photoKeys.map(String).slice(0, MAX_PHOTOS) : [];
-    await assertOwnKeys(c.env, photoKeys, mediaPrefix);
-    photos = photoKeys.map((k): MediaEntry => ({ key: k, kind: 'image' }));
+    photos = await ownMediaEntries(c.env, photoKeys, mediaPrefix, 'image');
   }
   let videoEntry: MediaEntry | null;
   if (raw.videoKey === undefined && existing) {
     videoEntry = existing.media.find((m) => m.kind === 'video') ?? null;
   } else {
     const videoKey = str(raw.videoKey, 'videoKey', { max: 300, required: false });
-    if (videoKey) await assertOwnKeys(c.env, [videoKey], mediaPrefix);
-    videoEntry = videoKey ? { key: videoKey, kind: 'video' } : null;
+    videoEntry = videoKey ? (await ownMediaEntries(c.env, [videoKey], mediaPrefix, 'video'))[0] : null;
   }
   const media: MediaEntry[] = [...photos, ...(videoEntry ? [videoEntry] : [])];
 
@@ -236,7 +253,7 @@ async function parseReviewInput(
       throw badRequest('Instagram evidence link must be a URL', 'BAD_EVIDENCE_LINK');
     }
     const key = str(ig.key, 'instagram.key', { max: 300, required: false });
-    if (key) await assertOwnKeys(c.env, [key], `reviews-evidence/${userId}/`);
+    if (key) await ownMediaEntries(c.env, [key], `reviews-evidence/${userId}/`, 'image');
     if (link || key) evidence = { link, key };
   }
 
@@ -279,11 +296,63 @@ async function computeFacts(
   };
 }
 
+async function evaluateForUser(
+  db: D1Database,
+  userId: string,
+  input: ReviewInput,
+  facts: EligibilityFacts,
+  excludeReviewId?: string
+): Promise<ReviewQualityResult> {
+  const query = excludeReviewId
+    ? `SELECT body, media FROM reviews WHERE user_id = ? AND id != ? ORDER BY created_at DESC LIMIT 100`
+    : `SELECT body, media FROM reviews WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`;
+  const bound = excludeReviewId ? db.prepare(query).bind(userId, excludeReviewId) : db.prepare(query).bind(userId);
+  const { results } = await bound.all<{ body: string; media: string }>();
+  const previousBodies = (results ?? []).map((r) => normalizeReviewText(String(r.body ?? ''))).filter(Boolean);
+  const previousMediaHashes = (results ?? []).flatMap((r) =>
+    safeParse<MediaEntry[]>(r.media, []).map((m) => m.sha256 || '').filter(Boolean)
+  );
+  return evaluateReviewQuality({
+    stars: input.stars,
+    body: input.body,
+    media: input.media,
+    hasEvidence: !!input.evidence,
+    isPrinter: facts.is_printer,
+    previousBodies,
+    previousMediaHashes,
+  });
+}
+
+async function adminRewardNotifications(
+  db: D1Database,
+  reviewId: string,
+  input: ReviewInput,
+  quality: ReviewQualityResult
+): Promise<D1PreparedStatement[]> {
+  const { results } = await db.prepare("SELECT id FROM users WHERE role = 'admin'").all<{ id: string }>();
+  return (results ?? []).map(({ id }) =>
+    notifyStatement(db, {
+      userId: id,
+      kind: 'review_reward_pending',
+      title_ar: 'مراجعة مؤهلة لمكافأة',
+      title_en: 'Reward-eligible review',
+      body_ar: `المنتج ${input.productId} · المستوى المتوقع ${quality.tier} · الجودة ${quality.score}/100`,
+      body_en: `Product ${input.productId} · predicted level ${quality.tier} · quality ${quality.score}/100`,
+      link: '/admin',
+      entity_type: 'review',
+      entity_id: reviewId,
+      meta: { product_id: input.productId, predicted_tier: quality.tier, score: quality.score },
+      eventKey: `review-reward:${reviewId}`,
+    }).stmt
+  );
+}
+
 /**
  * POST /api/reviews — create a review for a delivered, owned order.
- * One review per (user, product): DB UNIQUE from 0003 (stricter than
- * one-per-order — documented). A review_rewards row is created with it
- * (kind by printer-catalog membership) in the same atomic batch.
+ * One review per (user, product): DB UNIQUE from 0003. A manual review is
+ * public immediately. A reward row is created ONLY when deterministic quality
+ * qualifies for one of the existing five levels; publication never waits for
+ * that separate admin decision.
  */
 reviewRoutes.post('/', requireAuth, async (c) => {
   await rateLimit(c, 'review_submit', 10, 3600);
@@ -291,62 +360,116 @@ reviewRoutes.post('/', requireAuth, async (c) => {
   const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const input = await parseReviewInput(c, user.id, raw);
   const facts = await computeFacts(c.env.DB, user.id, input);
+  const existing = await c.env.DB.prepare(
+    'SELECT id, source FROM reviews WHERE user_id = ? AND product_id = ? LIMIT 1'
+  ).bind(user.id, input.productId).first<{ id: string; source?: string }>();
+  if (existing && (existing.source ?? 'user') !== 'system') {
+    throw conflict('You already reviewed this product');
+  }
 
-  const reviewId = newId('rev');
-  const rewardId = newId('rr');
+  const reviewId = existing?.id ?? newId('rev');
   const now = new Date().toISOString();
-  const kind = facts.is_printer ? 'printer_gift' : 'points';
+  const quality = await evaluateForUser(c.env.DB, user.id, input, facts, existing?.id);
+  const statements: D1PreparedStatement[] = [];
+
+  if (existing) {
+    // A real review replaces the clearly marked seven-day system marker. The
+    // row identity remains stable, and no old reward exists to duplicate.
+    statements.push(c.env.DB.prepare(
+      `UPDATE reviews
+          SET order_item_id = ?, order_id = ?, stars = ?, body = ?, media = ?,
+              status = 'published', source = 'user', moderation_note = '',
+              quality_score = ?, quality_summary = ?, fallback_points_awarded = 0,
+              created_at = ?
+        WHERE id = ? AND user_id = ? AND source = 'system'`
+    ).bind(
+      facts.order_item_id, input.orderId, input.stars, input.body, JSON.stringify(input.media),
+      quality.score, JSON.stringify(quality), now, reviewId, user.id
+    ));
+  } else {
+    statements.push(c.env.DB.prepare(
+      `INSERT INTO reviews
+         (id, user_id, product_id, order_item_id, order_id, stars, body, media,
+          status, source, quality_score, quality_summary, fallback_points_awarded, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', 'user', ?, ?, 0, ?)`
+    ).bind(
+      reviewId, user.id, input.productId, facts.order_item_id, input.orderId,
+      input.stars, input.body, JSON.stringify(input.media), quality.score, JSON.stringify(quality), now
+    ));
+  }
+
+  if (quality.rewardEligible && quality.tier !== null) {
+    const rewardId = newId('rr');
+    statements.push(c.env.DB.prepare(
+      `INSERT INTO review_rewards
+         (id, review_id, user_id, kind, instagram_evidence, eligibility,
+          quality_score, quality_snapshot, state, created_at)
+       VALUES (?, ?, ?, 'printer_gift', ?, ?, ?, ?, 'submitted', ?)`
+    ).bind(
+      rewardId, reviewId, user.id,
+      input.evidence ? JSON.stringify(input.evidence) : '',
+      JSON.stringify(facts), quality.tier, JSON.stringify(quality), now
+    ));
+    statements.push(...(await adminRewardNotifications(c.env.DB, reviewId, input, quality)));
+  } else {
+    // A valid manual review outside the gift levels gets exactly twice the
+    // existing configured base review points. Missing configuration stays
+    // honest (zero); no value is invented in code.
+    const basePoints = await getReviewPointsValue(c.env.DB);
+    if (basePoints !== null) {
+      const points = basePoints * 2;
+      const sourceRef = `review-fallback:${reviewId}`;
+      statements.push(
+        c.env.DB.prepare('INSERT INTO points_awards (source_ref, user_id, points, created_at) VALUES (?, ?, ?, ?)')
+          .bind(sourceRef, user.id, points, now),
+        c.env.DB.prepare(
+          `INSERT INTO wallet_transactions
+             (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+           VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'system', ?)`
+        ).bind(`wtx_review_fallback_${reviewId}`, user.id, points, 'Valid manual review fallback (2x base)', sourceRef, now),
+        c.env.DB.prepare('UPDATE reviews SET fallback_points_awarded = ? WHERE id = ?')
+          .bind(points, reviewId)
+      );
+    }
+  }
 
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `INSERT INTO reviews (id, user_id, product_id, order_item_id, order_id, stars, body, media, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
-      ).bind(
-        reviewId, user.id, input.productId, facts.order_item_id, input.orderId,
-        input.stars, input.body, JSON.stringify(input.media), now
-      ),
-      c.env.DB.prepare(
-        `INSERT INTO review_rewards (id, review_id, user_id, kind, instagram_evidence, eligibility, state, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'submitted', ?)`
-      ).bind(
-        rewardId, reviewId, user.id, kind,
-        input.evidence ? JSON.stringify(input.evidence) : '',
-        JSON.stringify(facts), now
-      ),
-    ]);
+    await c.env.DB.batch(statements);
   } catch (e) {
     if (isUniqueViolation(e)) {
-      throw conflict('You already reviewed this product — you can edit your pending review instead');
+      throw conflict('You already reviewed this product');
     }
     console.error('review insert failed', e instanceof Error ? e.message : e);
     throw badRequest('Review could not be saved. Please try again.');
   }
 
-  return c.json({ success: true, review: await loadMyReview(c.env.DB, user.id, reviewId) });
+  return c.json({
+    success: true,
+    published: true,
+    quality,
+    review: await loadMyReview(c.env.DB, user.id, reviewId),
+  });
 });
 
 /**
- * PUT /api/reviews/:id — edit the OWN review while it is still pending and
- * its reward is undecided (submitted/revision_needed). Editing resubmits the
- * reward for evaluation; it can never duplicate rewards because approval
- * paths are keyed UNIQUE per review (gift_entitlements.reward_id,
- * points_awards.source_ref).
+ * PUT /api/reviews/:id — edit the OWN published review while its reward is
+ * still submitted or needs revision. Publication remains published; only the
+ * separate reward evaluation is resubmitted.
  */
 reviewRoutes.put('/:id', requireAuth, async (c) => {
   await rateLimit(c, 'review_submit', 10, 3600);
   const user = c.get('user')!;
   const id = c.req.param('id') ?? '';
   const existing = await c.env.DB.prepare(
-    `SELECT r.id, r.user_id, r.status, r.product_id, r.order_id, r.media,
+      `SELECT r.id, r.user_id, r.status, r.source, r.product_id, r.order_id, r.media,
             rr.id AS reward_id, rr.state AS reward_state, rr.instagram_evidence
        FROM reviews r JOIN review_rewards rr ON rr.review_id = r.id
       WHERE r.id = ?`
   )
     .bind(id)
-    .first<{ id: string; user_id: string; status: string; product_id: string; order_id: string | null; media: string; reward_id: string; reward_state: string; instagram_evidence: string }>();
+    .first<{ id: string; user_id: string; status: string; source?: string; product_id: string; order_id: string | null; media: string; reward_id: string; reward_state: string; instagram_evidence: string }>();
   if (!existing || existing.user_id !== user.id) throw notFound('Review not found');
-  if (existing.status !== 'pending' || !['submitted', 'revision_needed'].includes(existing.reward_state)) {
+  if ((existing.source ?? 'user') !== 'user' || existing.status === 'rejected' || !['submitted', 'revision_needed'].includes(existing.reward_state)) {
     throw conflict('This review has already been decided and can no longer be edited');
   }
 
@@ -359,30 +482,72 @@ reviewRoutes.put('/:id', requireAuth, async (c) => {
     evidence: parseEvidence(existing.instagram_evidence),
   });
   const facts = await computeFacts(c.env.DB, user.id, input);
+  const quality = await evaluateForUser(c.env.DB, user.id, input, facts, id);
   const now = new Date().toISOString();
-
-  await c.env.DB.batch([
+  const statements: D1PreparedStatement[] = [
     c.env.DB.prepare(
-      `UPDATE reviews SET stars = ?, body = ?, media = ?, order_id = ?, order_item_id = ?
-        WHERE id = ? AND user_id = ? AND status = 'pending'`
-    ).bind(input.stars, input.body, JSON.stringify(input.media), input.orderId, facts.order_item_id, id, user.id),
-    c.env.DB.prepare(
-      `UPDATE review_rewards SET instagram_evidence = ?, eligibility = ?, state = 'submitted', decided_by = NULL, decided_at = NULL
+      `UPDATE reviews
+          SET stars = ?, body = ?, media = ?, order_id = ?, order_item_id = ?,
+              status = 'published', quality_score = ?, quality_summary = ?
+        WHERE id = ? AND user_id = ? AND source = 'user' AND status != 'rejected'`
+    ).bind(
+      input.stars, input.body, JSON.stringify(input.media), input.orderId, facts.order_item_id,
+      quality.score, JSON.stringify(quality), id, user.id
+    ),
+  ];
+  if (quality.rewardEligible && quality.tier !== null) {
+    statements.push(c.env.DB.prepare(
+      `UPDATE review_rewards
+          SET instagram_evidence = ?, eligibility = ?, quality_score = ?, quality_snapshot = ?,
+              state = 'submitted', reason = '', decided_by = NULL, decided_at = NULL
         WHERE id = ? AND state IN ('submitted','revision_needed')`
-    ).bind(input.evidence ? JSON.stringify(input.evidence) : '', JSON.stringify(facts), existing.reward_id),
-  ]);
-  void now;
+    ).bind(
+      input.evidence ? JSON.stringify(input.evidence) : '', JSON.stringify(facts),
+      quality.tier, JSON.stringify(quality), existing.reward_id
+    ));
+    statements.push(...(await adminRewardNotifications(c.env.DB, id, input, quality)));
+  } else {
+    // The review stays public even when edited below a gift threshold. Its
+    // old queue record becomes an auditable rejected reward and it receives
+    // the same configured fallback as any other valid manual review.
+    statements.push(c.env.DB.prepare(
+      `UPDATE review_rewards
+          SET instagram_evidence = ?, eligibility = ?, quality_score = NULL, quality_snapshot = ?,
+              state = 'rejected', reason = 'Review no longer qualifies after edit',
+              decided_by = 'system', decided_at = ?
+        WHERE id = ? AND state IN ('submitted','revision_needed')`
+    ).bind(
+      input.evidence ? JSON.stringify(input.evidence) : '', JSON.stringify(facts),
+      JSON.stringify(quality), now, existing.reward_id
+    ));
+    const basePoints = await getReviewPointsValue(c.env.DB);
+    if (basePoints !== null) {
+      const points = basePoints * 2;
+      const sourceRef = `review-fallback:${id}`;
+      statements.push(
+        c.env.DB.prepare('INSERT INTO points_awards (source_ref, user_id, points, created_at) VALUES (?, ?, ?, ?)')
+          .bind(sourceRef, user.id, points, now),
+        c.env.DB.prepare(
+          `INSERT INTO wallet_transactions
+             (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+           VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'system', ?)`
+        ).bind(`wtx_review_fallback_${id}`, user.id, points, 'Valid manual review fallback (2x base)', sourceRef, now),
+        c.env.DB.prepare('UPDATE reviews SET fallback_points_awarded = ? WHERE id = ?').bind(points, id)
+      );
+    }
+  }
+  await c.env.DB.batch(statements);
   return c.json({ success: true, review: await loadMyReview(c.env.DB, user.id, id) });
 });
 
 async function loadMyReview(db: D1Database, userId: string, reviewId: string) {
   const row = await db
     .prepare(
-      `SELECT r.*, rr.kind, rr.state AS reward_state, rr.quality_score, rr.reason AS reward_reason,
-              rr.points_awarded, rr.instagram_evidence,
+      `SELECT r.*, rr.id AS reward_id, rr.kind, rr.state AS reward_state, rr.quality_score AS reward_quality_score,
+              rr.reason AS reward_reason, rr.points_awarded, rr.instagram_evidence, rr.quality_snapshot,
               p.name AS product_name, p.name_ar AS product_name_ar, p.slug AS product_slug
          FROM reviews r
-         JOIN review_rewards rr ON rr.review_id = r.id
+         LEFT JOIN review_rewards rr ON rr.review_id = r.id
          LEFT JOIN products p ON p.id = r.product_id
         WHERE r.id = ? AND r.user_id = ?`
     )
@@ -403,20 +568,25 @@ function myReviewView(r: Record<string, unknown>) {
     stars: r.stars,
     body: r.body,
     media: publicMedia(r.media),
+    source: r.source ?? 'user',
+    system_generated: (r.source ?? 'user') === 'system',
+    quality: safeParse<ReviewQualityResult | null>(r.quality_summary, null),
     status: r.status, // pending | published | rejected
     moderation_note: r.moderation_note ?? '',
     created_at: r.created_at,
-    reward: {
+    fallback_points_awarded: Number(r.fallback_points_awarded) || 0,
+    reward: r.reward_id ? {
       kind: r.kind,
       state: r.reward_state,
-      quality_score: r.quality_score ?? null,
+      quality_score: r.reward_quality_score ?? null,
+      quality: safeParse<ReviewQualityResult | null>(r.quality_snapshot, null),
       reason: r.reward_reason ?? '',
       points_awarded: Number(r.points_awarded) || 0,
       // Own evidence back to its owner only — never in public payloads.
       instagram: evidence
         ? { link: evidence.link, file_url: evidence.key ? mediaUrl(evidence.key) : null }
         : null,
-    },
+    } : null,
   };
 }
 
@@ -424,11 +594,11 @@ function myReviewView(r: Record<string, unknown>) {
 reviewRoutes.get('/mine', requireAuth, async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
-    `SELECT r.*, rr.kind, rr.state AS reward_state, rr.quality_score, rr.reason AS reward_reason,
-            rr.points_awarded, rr.instagram_evidence,
+    `SELECT r.*, rr.id AS reward_id, rr.kind, rr.state AS reward_state, rr.quality_score AS reward_quality_score,
+            rr.reason AS reward_reason, rr.points_awarded, rr.instagram_evidence, rr.quality_snapshot,
             p.name AS product_name, p.name_ar AS product_name_ar, p.slug AS product_slug
        FROM reviews r
-       JOIN review_rewards rr ON rr.review_id = r.id
+       LEFT JOIN review_rewards rr ON rr.review_id = r.id
        LEFT JOIN products p ON p.id = r.product_id
       WHERE r.user_id = ?
       ORDER BY r.created_at DESC LIMIT 100`
@@ -456,15 +626,17 @@ reviewRoutes.get('/eligibility/:productId', requireAuth, async (c) => {
   )
     .bind(user.id, productId)
     .all<{ id: string; delivered_at: string | null; created_at: string }>();
-  const existing = await c.env.DB.prepare('SELECT id FROM reviews WHERE user_id = ? AND product_id = ?')
+  const existing = await c.env.DB.prepare('SELECT id, source FROM reviews WHERE user_id = ? AND product_id = ?')
     .bind(user.id, productId)
-    .first<{ id: string }>();
+    .first<{ id: string; source?: string }>();
+  const existingView = existing ? await loadMyReview(c.env.DB, user.id, existing.id) : null;
   const isPrinter = await isPrinterProduct(c.env.DB, productId);
-  const points = isPrinter ? null : await getReviewPointsValue(c.env.DB);
+  const points = await getReviewPointsValue(c.env.DB);
   return c.json({
     success: true,
     eligible_orders: orders.map((o) => ({ id: o.id, delivered_at: o.delivered_at })),
-    existing_review: existing ? await loadMyReview(c.env.DB, user.id, existing.id) : null,
+    existing_review: existingView,
+    can_replace_system_review: (existing?.source ?? 'user') === 'system',
     is_printer: isPrinter,
     // null = not configured (honest state); a number = configured award.
     review_points: points,
@@ -494,9 +666,9 @@ reviewRoutes.get('/product/:idOrSlug', async (c) => {
     .first<{ n: number; avg_stars: number | null }>();
 
   const { results } = await c.env.DB.prepare(
-    `SELECT r.id, r.stars, r.body, r.media, r.created_at, r.order_id,
+    `SELECT r.id, r.stars, r.body, r.media, r.created_at, r.order_id, r.source,
             u.name, u.username,
-            (SELECT 1 FROM review_rewards rr WHERE rr.review_id = r.id LIMIT 1) AS has_reward
+            (SELECT 1 FROM review_rewards rr WHERE rr.review_id = r.id AND rr.state = 'approved' LIMIT 1) AS has_reward
        FROM reviews r JOIN users u ON u.id = r.user_id
       WHERE r.product_id = ? AND r.status = 'published'
       ORDER BY r.created_at DESC LIMIT ? OFFSET ?`
@@ -517,7 +689,11 @@ reviewRoutes.get('/product/:idOrSlug', async (c) => {
       body: r.body,
       media: publicMedia(r.media),
       created_at: r.created_at,
-      reviewer: maskName(r.name as string | null, r.username as string | null),
+      source: r.source ?? 'user',
+      system_generated: (r.source ?? 'user') === 'system',
+      reviewer: (r.source ?? 'user') === 'system'
+        ? 'Levonis'
+        : maskName(r.name as string | null, r.username as string | null),
       // Reviews in the rewards program may receive a gift/points — disclosed.
       incentivized: !!r.has_reward,
       verified_purchase: !!r.order_id,
@@ -554,6 +730,7 @@ reviewRoutes.post('/uploads', requireAuth, async (c) => {
 
   const prefix = purpose === 'evidence' ? `reviews-evidence/${user.id}` : `reviews/${user.id}`;
   const key = `${prefix}/${newId()}.${kind.ext}`;
+  const sha256 = await digestBytes(buf);
   await putMediaObject(
     c.env,
     {
@@ -567,9 +744,12 @@ reviewRoutes.post('/uploads', requireAuth, async (c) => {
       originalName: file.name,
     },
     buf,
-    { httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' } }
+    {
+      httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' },
+      customMetadata: { sha256 },
+    }
   );
-  return c.json({ success: true, key, kind: isVideo ? 'video' : 'image', url: mediaUrl(key) });
+  return c.json({ success: true, key, kind: isVideo ? 'video' : 'image', sha256, bytes: buf.byteLength, url: mediaUrl(key) });
 });
 
 /**
@@ -910,10 +1090,8 @@ reviewRoutes.post('/gifts/:entitlementId/redeem', requireAuth, async (c) => {
 // ---------------------------------------------------------- admin: queue
 
 /**
- * GET /api/reviews/admin/queue — review/reward queue with deterministic
- * eligibility FACTS (delivered order, printer product, media present,
- * Instagram evidence present). Facts inform the human decision; they never
- * auto-decide anything.
+ * GET /api/reviews/admin/queue — reward-only queue with the deterministic
+ * recommendation, its reasons, anti-abuse flags and compatibility facts.
  */
 reviewRoutes.get('/admin/queue', async (c) => {
   const stateQ = c.req.query('state') || 'submitted';
@@ -921,10 +1099,10 @@ reviewRoutes.get('/admin/queue', async (c) => {
   const state = allowed.includes(stateQ) ? stateQ : 'submitted';
 
   const { results } = await c.env.DB.prepare(
-    `SELECT r.id AS review_id, r.stars, r.body, r.media, r.status AS review_status, r.moderation_note,
+    `SELECT r.id AS review_id, r.stars, r.body, r.media, r.status AS review_status, r.source, r.moderation_note,
             r.created_at, r.order_id, r.product_id,
             rr.id AS reward_id, rr.kind, rr.instagram_evidence, rr.eligibility, rr.quality_score,
-            rr.state AS reward_state, rr.reason, rr.points_awarded, rr.decided_at, rr.decided_by,
+            rr.quality_snapshot, rr.state AS reward_state, rr.reason, rr.points_awarded, rr.decided_at, rr.decided_by,
             u.email, u.username,
             p.name AS product_name, p.name_ar AS product_name_ar,
             o.delivered_at AS order_delivered_at, o.status AS order_status,
@@ -972,10 +1150,12 @@ reviewRoutes.get('/admin/queue', async (c) => {
       body: r.body,
       media: publicMedia(r.media),
       review_status: r.review_status,
+      source: r.source ?? 'user',
       moderation_note: r.moderation_note ?? '',
       kind: r.kind,
       reward_state: r.reward_state,
       quality_score: r.quality_score ?? null,
+      quality: safeParse<ReviewQualityResult | null>(r.quality_snapshot, null),
       reason: r.reason ?? '',
       points_awarded: Number(r.points_awarded) || 0,
       decided_at: r.decided_at ?? null,
@@ -1042,8 +1222,8 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
   const action = oneOf(body.action, 'action', ['approve', 'reject', 'request_changes'] as const);
 
   const row = await c.env.DB.prepare(
-    `SELECT r.id AS review_id, r.user_id, r.body, r.media, r.order_id, r.product_id,
-            rr.id AS reward_id, rr.kind, rr.state, rr.instagram_evidence,
+    `SELECT r.id AS review_id, r.user_id, r.body, r.media, r.order_id, r.product_id, r.source,
+            rr.id AS reward_id, rr.kind, rr.state, rr.instagram_evidence, rr.quality_score, rr.quality_snapshot,
             o.delivered_at AS order_delivered_at, o.status AS order_status
        FROM reviews r
        JOIN review_rewards rr ON rr.review_id = r.id
@@ -1053,6 +1233,7 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
     .bind(id)
     .first<Record<string, unknown>>();
   if (!row) throw notFound('Review not found');
+  if ((row.source ?? 'user') === 'system') throw badRequest('System-generated reviews cannot receive rewards', 'SYSTEM_REVIEW_NO_REWARD');
   if (row.state === 'approved') {
     throw conflict('This reward was already approved — granted rewards are preserved, not re-decided');
   }
@@ -1073,20 +1254,29 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
 
   // ---- approve ----
   if (row.kind === 'printer_gift') {
-    const score = int(body.qualityScore, 'qualityScore', { min: 1, max: 5 });
+    const score = body.qualityScore === undefined
+      ? int(row.quality_score, 'qualityScore', { min: 1, max: 5 })
+      : int(body.qualityScore, 'qualityScore', { min: 1, max: 5 });
     const reason = str(body.reason, 'reason', { min: 10, max: 1000 });
-    // Deterministic checklist — NOT sentiment, NOT stars. A critical 1-star
-    // review with full evidence passes and can score 5.
+    const quality = safeParse<ReviewQualityResult | null>(row.quality_snapshot, null);
+    // New submissions are admitted to this queue only after deterministic
+    // evaluation. Historical pre-0069 rows retain the former checklist so a
+    // migration never silently upgrades an old pending reward.
     const media = safeParse<MediaEntry[]>(row.media, []);
-    const missing: string[] = [];
-    if (!(row.order_delivered_at || row.order_status === 'delivered')) missing.push('delivered_order');
-    if (String(row.body ?? '').length < MIN_DETAIL_CHARS) missing.push('written_detail');
-    if (media.filter((m) => m.kind === 'image').length < 1) missing.push('photos');
-    if (!media.some((m) => m.kind === 'video')) missing.push('video');
-    if (!parseEvidence(row.instagram_evidence)) missing.push('instagram_evidence');
-    if (missing.length > 0) {
+    const legacyMissing: string[] = [];
+    if (!quality) {
+      if (!(row.order_delivered_at || row.order_status === 'delivered')) legacyMissing.push('delivered_order');
+      if (String(row.body ?? '').length < MIN_DETAIL_CHARS) legacyMissing.push('written_detail');
+      if (media.filter((m) => m.kind === 'image').length < 1) legacyMissing.push('photos');
+      if (!media.some((m) => m.kind === 'video')) legacyMissing.push('video');
+      if (!parseEvidence(row.instagram_evidence)) legacyMissing.push('instagram_evidence');
+    }
+    if (quality && !quality.rewardEligible) {
+      throw badRequest('Review no longer meets reward-quality requirements', 'REWARD_NOT_ELIGIBLE');
+    }
+    if (legacyMissing.length > 0) {
       throw badRequest(
-        `Printer-gift checklist incomplete: ${missing.join(', ')} — use "request changes" instead`,
+        `Printer-gift checklist incomplete: ${legacyMissing.join(', ')} — use "request changes" instead`,
         'CHECKLIST_INCOMPLETE'
       );
     }

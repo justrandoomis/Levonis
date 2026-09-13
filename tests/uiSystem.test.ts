@@ -120,7 +120,26 @@ test('product purchase chrome uses measured header geometry and restrained secon
 
 test('profile shortcuts keep compact artwork inside accessible hit targets', () => {
   const profile = read('src/components/profile/ProfileIconGrid.tsx');
-  assert.match(profile, /min-w-\[56px\] min-h-\[56px\]/);
-  assert.match(profile, /<item\.icon className="w-5 h-5" strokeWidth=\{1\.6\}/);
+  const page = read('src/pages/Profile.tsx');
+  assert.match(profile, /min-h-\[44px\]/);
+  assert.match(profile, /<item\.icon className="h-\[18px\] w-\[18px\]" strokeWidth=\{1\.7\}/);
   assert.match(profile, /aria-label=\{item\.label\}/);
+  assert.match(page, /data-profile-header/);
+  assert.match(page, /data-profile-username/);
+  assert.match(page, /dir="auto" title=\{displayName\}/);
+  assert.doesNotMatch(page, /displayName\.slice|displayName\.substring/);
+});
+
+test('cart keeps compact rows and puts warranty choices in a mobile-safe sheet', () => {
+  const cart = read('src/pages/Cart.tsx');
+  assert.match(cart, /overflow-x-clip/);
+  assert.match(cart, /data-cart-item-image/);
+  assert.match(cart, /data-cart-item-title/);
+  assert.match(cart, /text-\[13px\][^\n]+font-medium/);
+  assert.match(cart, /item\.variantLabel\s*\|\|/);
+  assert.match(cart, /testId="cart-warranty-sheet"/);
+  assert.match(cart, /max-h-\[min\(82dvh,42rem\)\]/);
+  assert.match(cart, /overflow-y-auto overscroll-contain/);
+  assert.match(cart, /env\(safe-area-inset-bottom\)/);
+  assert.doesNotMatch(cart, /const \[warrantyOpen, setWarrantyOpen\]/);
 });

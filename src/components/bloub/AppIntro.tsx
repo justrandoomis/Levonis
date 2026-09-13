@@ -88,13 +88,30 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
   React.useEffect(() => {
     if (!ready || completedRef.current) return;
-    const frameId = window.requestAnimationFrame(() => {
+    let frameId = 0;
+    let attempts = 0;
+    const finishBootstrap = () => {
+      attempts += 1;
+      const target = measureHomeTarget();
+      // BottomNav and this sibling can commit on adjacent frames. A missing
+      // first measurement is not proof that the route has no Home target.
+      if (!target && attempts < 5) {
+        frameId = window.requestAnimationFrame(finishBootstrap);
+        return;
+      }
       completedRef.current = true;
-      const hasTarget = moveToCurrentTarget(true);
-      setState(hasTarget ? 'navigation' : 'idle');
-    });
+      if (!target) {
+        setPhase('hidden');
+        setState('idle');
+        return;
+      }
+      setFrame(target);
+      setPhase(reduced ? 'docked' : 'travelling');
+      setState('navigation');
+    };
+    frameId = window.requestAnimationFrame(finishBootstrap);
     return () => window.cancelAnimationFrame(frameId);
-  }, [ready, moveToCurrentTarget]);
+  }, [ready, reduced]);
 
   React.useEffect(() => {
     if (!completedRef.current || previousPathRef.current === location.pathname) return;
@@ -135,6 +152,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       data-phase={phase}
       data-reduced-motion={reduced ? 'true' : 'false'}
       data-page-visible={pageVisible ? 'true' : 'false'}
+      data-bloub-rendered={phase === 'hidden' ? 'false' : 'true'}
       aria-live="polite"
       aria-busy={phase === 'loading'}
     >

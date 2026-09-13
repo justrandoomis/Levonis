@@ -21,7 +21,8 @@ import { asLang, formatDate } from './format';
 
 interface Eligibility {
   eligible_orders: Array<{ id: string; delivered_at: string | null }>;
-  existing_review: { id: string; stars: number; status: string; created_at: string } | null;
+  existing_review: { id: string; stars: number; status: string; created_at: string; source?: 'user' | 'system'; system_generated?: boolean } | null;
+  can_replace_system_review?: boolean;
   is_printer: boolean;
   review_points: number | null;
 }
@@ -35,18 +36,18 @@ const STRINGS = {
     checking: 'جارٍ التحقق من الأهلية…',
     checkFailed: 'تعذر التحقق من الأهلية.',
     reviewed: (d: string) => `قيّمت هذا المنتج في ${d}.`,
-    reviewStatus: { pending: 'بانتظار الاعتماد', published: 'منشور', rejected: 'مرفوض' } as Record<string, string>,
-    giftHint: 'مراجعة الطابعات المؤهلة قد تمنحك هدية تقييم بعد الاعتماد.',
-    pointsHint: (n: number) => `تمنحك هذه المراجعة ${n} نقطة بعد الاعتماد.`,
+    reviewStatus: { pending: 'قيد المراجعة', published: 'منشور', rejected: 'مرفوض' } as Record<string, string>,
+    giftHint: 'تُنشر مراجعتك فورًا، وقد تدخل المراجعة الغنية قائمة اعتماد هدايا التقييم.',
+    pointsHint: (n: number) => `تُنشر فورًا؛ وإن لم تتأهل لهدية تحصل على ${(n * 2).toLocaleString()} نقطة وفق إعداد الأساس.`,
     stars: 'التقييم',
     star: (n: number) => (n === 1 ? 'نجمة واحدة' : n === 2 ? 'نجمتان' : `${n} نجوم`),
     bodyLabel: 'مراجعتك',
     bodyPlaceholder: 'ما الذي أعجبك؟ ما الذي كان يمكن أن يكون أفضل؟',
-    moderation: 'تُنشر المراجعات بعد اعتمادها.',
+    moderation: 'تُنشر المراجعة فورًا. اعتماد المكافأة قرار منفصل.',
     submit: 'إرسال المراجعة',
     submitting: 'جارٍ الإرسال…',
     close: 'إغلاق',
-    done: 'شكرًا لك — مراجعتك بانتظار الاعتماد.',
+    done: 'شكرًا لك — نُشرت مراجعتك.',
     failed: 'تعذر إرسال المراجعة.',
     noItems: 'لا توجد منتجات قابلة للتقييم في هذا الطلب.',
   },
@@ -56,18 +57,18 @@ const STRINGS = {
     checking: 'Checking eligibility…',
     checkFailed: 'Eligibility could not be checked.',
     reviewed: (d: string) => `You reviewed this product on ${d}.`,
-    reviewStatus: { pending: 'awaiting approval', published: 'published', rejected: 'rejected' } as Record<string, string>,
-    giftHint: 'An eligible printer review can earn a rating gift after approval.',
-    pointsHint: (n: number) => `This review earns ${n} points after approval.`,
+    reviewStatus: { pending: 'under review', published: 'published', rejected: 'rejected' } as Record<string, string>,
+    giftHint: 'Your review publishes immediately; a rich review may enter gift approval.',
+    pointsHint: (n: number) => `Published immediately; outside a gift level it earns ${(n * 2).toLocaleString()} configured fallback points.`,
     stars: 'Rating',
     star: (n: number) => (n === 1 ? '1 star' : `${n} stars`),
     bodyLabel: 'Your review',
     bodyPlaceholder: 'What did you like? What could be better?',
-    moderation: 'Reviews are published after approval.',
+    moderation: 'The review publishes immediately. Reward approval is separate.',
     submit: 'Submit review',
     submitting: 'Submitting…',
     close: 'Close',
-    done: 'Thank you — your review is awaiting approval.',
+    done: 'Thank you — your review is now published.',
     failed: 'The review could not be submitted.',
     noItems: 'No reviewable products in this order.',
   },
@@ -77,18 +78,18 @@ const STRINGS = {
     checking: 'پشکنینی شیاوی…',
     checkFailed: 'شیاوی نەپشکنرا.',
     reviewed: (d: string) => `لە ${d} ئەم کاڵات هەڵسەنگاندووە.`,
-    reviewStatus: { pending: 'چاوەڕێی پەسەندکردن', published: 'بڵاوکراوەتەوە', rejected: 'ڕەتکراوەتەوە' } as Record<string, string>,
-    giftHint: 'پێداچوونەوەی پرینتەری شیاو دەتوانێت دوای پەسەندکردن دیارییەک بدات.',
-    pointsHint: (n: number) => `ئەم پێداچوونەوە ${n} خاڵ دەدات دوای پەسەندکردن.`,
+    reviewStatus: { pending: 'لە پێداچوونەوەدایە', published: 'بڵاوکراوەتەوە', rejected: 'ڕەتکراوەتەوە' } as Record<string, string>,
+    giftHint: 'پێداچوونەوەکەت دەستبەجێ بڵاودەکرێتەوە و لەوانەیە بچێتە ڕیزی دیاری.',
+    pointsHint: (n: number) => `دەستبەجێ بڵاودەکرێتەوە؛ ئەگەر دیاری وەرنەگرێت ${(n * 2).toLocaleString()} خاڵ وەردەگرێت.`,
     stars: 'هەڵسەنگاندن',
     star: (n: number) => `${n} ئەستێرە`,
     bodyLabel: 'پێداچوونەوەکەت',
     bodyPlaceholder: 'چیت پێ باش بوو؟ چی دەکرا باشتر بێت؟',
-    moderation: 'پێداچوونەوەکان دوای پەسەندکردن بڵاودەکرێنەوە.',
+    moderation: 'پێداچوونەوەکە دەستبەجێ بڵاودەکرێتەوە؛ پەسەندی خەڵات جیاوازە.',
     submit: 'ناردنی پێداچوونەوە',
     submitting: 'ناردن…',
     close: 'داخستن',
-    done: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
+    done: 'سوپاس — پێداچوونەوەکەت بڵاوکرایەوە.',
     failed: 'پێداچوونەوەکە نەنێردرا.',
     noItems: 'هیچ کاڵایەکی هەڵسەنگاندن نییە لەم داواکارییە.',
   },
@@ -182,7 +183,8 @@ export default function ReviewSheet({
   };
 
   const existing = elig?.existing_review ?? null;
-  const canSubmit = !!productId && stars >= 1 && body.trim().length > 0 && !busy && !existing && eligState !== 'loading';
+  const replaceSystem = !!elig?.can_replace_system_review || !!existing?.system_generated || existing?.source === 'system';
+  const canSubmit = !!productId && stars >= 1 && body.trim().length > 0 && !busy && (!existing || replaceSystem) && eligState !== 'loading';
 
   return (
     <Sheet
@@ -249,23 +251,23 @@ export default function ReviewSheet({
                 </span>
               )}
               {eligState === 'failed' && <span className="text-amber-400">{s.checkFailed}</span>}
-              {existing && (
+              {existing && !replaceSystem && (
                 <span className="inline-flex items-center gap-1.5 text-emerald-300">
                   <CheckCircle2 className="w-4 h-4" aria-hidden />
                   {s.reviewed(formatDate(existing.created_at, lang))} {s.reviewStatus[existing.status] ?? existing.status}
                 </span>
               )}
-              {!existing && elig && elig.is_printer && (
+              {(!existing || replaceSystem) && elig && elig.is_printer && (
                 <span className="inline-flex items-center gap-1.5 text-zinc-300">
                   <Gift className="w-4 h-4 text-[#BAA369]" aria-hidden /> {s.giftHint}
                 </span>
               )}
-              {!existing && elig && !elig.is_printer && typeof elig.review_points === 'number' && elig.review_points > 0 && (
+              {(!existing || replaceSystem) && elig && !elig.is_printer && typeof elig.review_points === 'number' && elig.review_points > 0 && (
                 <span className="text-zinc-300">{s.pointsHint(elig.review_points)}</span>
               )}
             </div>
 
-            {!existing && (
+            {(!existing || replaceSystem) && (
               <>
                 <fieldset className="mt-3">
                   <legend className="text-[12px] text-zinc-400 mb-1.5">{s.stars}</legend>
@@ -336,7 +338,7 @@ export default function ReviewSheet({
           </>
         )}
 
-        {(done || (existing && !busy)) && (
+        {(done || (existing && !replaceSystem && !busy)) && (
           <button
             type="button"
             onClick={close}
