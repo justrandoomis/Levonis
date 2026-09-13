@@ -5,18 +5,6 @@ on:
     branches: [codex/persistent-bloub-policy]
   pull_request:
     branches: [Main]
-    paths:
-      - 'src/components/bloub/**'
-      - 'src/components/BottomNav.tsx'
-      - 'src/App.tsx'
-      - 'src/pages/Policies.tsx'
-      - 'worker/routes/policies.ts'
-      - 'worker/lib/policy*.ts'
-      - 'tests/*bloub*'
-      - 'tests/*Bloub*'
-      - 'tests/*policy*'
-      - 'tests/*Policy*'
-      - '.github/workflows/verify-persistent-bloub-policy.yml'
 
 permissions:
   contents: read
@@ -28,30 +16,58 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      # Repository-only snapshot for reproducible review in sessions without
-      # git network access. No .git metadata, runner environment or secrets.
-      - name: Archive exact reviewed source
-        run: git archive --format=tar.gz HEAD -o /tmp/levonis-reviewed-source.tar.gz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: levonis-reviewed-source-${{ github.sha }}
-          path: /tmp/levonis-reviewed-source.tar.gz
-          retention-days: 3
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Install Studio workspace required by the existing checks
+        working-directory: studio
+        run: npm ci --no-audit --no-fund
       - name: TypeScript, lint and architecture checks
-        run: npm run check
-      - name: Unit tests
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          set +e
+          npm run check > /tmp/levonis-diagnostics/check.log 2>&1
+          result=$?
+          tail -100 /tmp/levonis-diagnostics/check.log
+          exit "$result"
+      - name: All root and workspace unit tests
         if: ${{ !cancelled() }}
-        run: npm run test:unit
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          set +e
+          npm run test:unit > /tmp/levonis-diagnostics/unit.log 2>&1
+          result=$?
+          grep -n -A 18 '^not ok\|error:\|Error:' /tmp/levonis-diagnostics/unit.log | head -160
+          tail -25 /tmp/levonis-diagnostics/unit.log
+          exit "$result"
       - name: Build without deployment
         if: ${{ !cancelled() }}
-        run: npm run build
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          set +e
+          npm run build > /tmp/levonis-diagnostics/build.log 2>&1
+          result=$?
+          tail -60 /tmp/levonis-diagnostics/build.log
+          exit "$result"
+      - name: Archive exact source for reproducible review
+        if: ${{ always() }}
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          git rev-parse HEAD > /tmp/levonis-diagnostics/commit.txt
+          git archive --format=tar.gz HEAD -o /tmp/levonis-diagnostics/source.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: levonis-diagnostics-${{ github.run_id }}
+          path: /tmp/levonis-diagnostics/
+          retention-days: 7
