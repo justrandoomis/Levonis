@@ -35,7 +35,7 @@ export interface MascotClock {
   setTimer(fn: () => void, ms: number): ReturnType<typeof setTimeout>;
   clearTimer(id: ReturnType<typeof setTimeout>): void;
 }
-const CLOCK: MascotClock = { now: () => Date.now(), setTimer: (fn, ms) => setTimeout(fn, ms), clearTimer: clearTimeout };
+const CLOCK: MascotClock = { now: () => Date.now(), setTimer: (fn, ms) => setTimeout(fn, ms), clearTimer: (id) => clearTimeout(id) };
 type Reaction = { state: MascotState; until: number; sequence: number };
 
 export function createMascotController(clock: MascotClock = CLOCK) {
