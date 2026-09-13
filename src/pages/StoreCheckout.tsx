@@ -1,3 +1,4 @@
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 /**
  * Checkout for a MERCHANT-STORE cart — /store-checkout on both apps.
  *
@@ -155,10 +156,11 @@ export default function StoreCheckout() {
 
   return (
     <div className="h-full min-h-0 bg-canvas text-text-secondary flex flex-col">
-      <div className="shrink-0 bg-canvas/96 backdrop-blur border-b border-border-subtle/70 px-3 sm:px-4 py-2 flex items-center gap-3">
+      <div className="lv-character-header shrink-0 bg-canvas/96 backdrop-blur border-b border-border-subtle/70 px-3 sm:px-4 py-2 flex items-center gap-3">
         <button type="button" aria-label={loc('رجوع', 'Back', 'گەڕانەوە')} onClick={() => navigate(-1)} className="w-11 h-11 rounded-md flex items-center justify-center text-text-secondary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
         </button>
+        <MotionCharacterHome busy={!quote && !quoteError} />
         <h1 className="text-white font-bold text-[15px]">{loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')}</h1>
       </div>
 

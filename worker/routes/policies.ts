@@ -1,3 +1,4 @@
+import { policyPublicationBatch, isPolicyPublicationConflict } from '../lib/policyPublication';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
@@ -86,19 +87,12 @@ policiesRoutes.get('/:key', async (c) => {
   let row: PolicyRow | null;
   if (version === null) {
     row = await c.env.DB.prepare(
-      `SELECT * FROM policy_documents WHERE key = ? AND lang = ? AND status = 'published'
-       ORDER BY version DESC LIMIT 1`
+      `SELECT * FROM policy_documents WHERE key = ? AND lang IN (?, 'ar') AND status = 'published'
+       AND version = (SELECT MAX(version) FROM policy_documents WHERE key = ? AND status = 'published')
+       ORDER BY CASE WHEN lang = ? THEN 0 ELSE 1 END LIMIT 1`
     )
-      .bind(key, lang)
+      .bind(key, lang, key, lang)
       .first<PolicyRow>();
-    if (!row && lang !== 'ar') {
-      row = await c.env.DB.prepare(
-        `SELECT * FROM policy_documents WHERE key = ? AND lang = 'ar' AND status = 'published'
-         ORDER BY version DESC LIMIT 1`
-      )
-        .bind(key)
-        .first<PolicyRow>();
-    }
   } else {
     row = await c.env.DB.prepare(
       `SELECT * FROM policy_documents WHERE key = ? AND lang = ? AND version = ? AND status IN ${statusFilter}`
@@ -303,26 +297,18 @@ policiesRoutes.post('/admin/publish', async (c) => {
     throw badRequest('An Arabic (source-language) row is required before publishing', 'AR_REQUIRED');
   }
 
-  const stmts: D1PreparedStatement[] = [];
-  const hashes: Record<string, string> = {};
-  for (const r of rows) {
-    const hash = await policyDocHash(r.key, Number(r.version), r.lang, r.title, r.body);
-    hashes[r.lang] = hash;
-    stmts.push(
-      db.prepare(
-        "UPDATE policy_documents SET status = 'published', hash = ? WHERE id = ? AND status = 'draft'"
-      ).bind(hash, r.id)
-    );
+  const { statements, hashes } = await policyPublicationBatch(db, key, version, rows);
+  let results: D1Result[];
+  try {
+    results = await db.batch(statements);
+  } catch (error) {
+    if (isPolicyPublicationConflict(error)) {
+      throw badRequest('The draft or published version changed concurrently — reload and review before publishing', 'CONFLICT_RETRY');
+    }
+    throw error;
   }
-  // Prior published versions of this key become archived (still readable via
-  // ?version= for acceptance history — never deleted, never re-editable).
-  stmts.push(
-    db.prepare(
-      "UPDATE policy_documents SET status = 'archived' WHERE key = ? AND version < ? AND status = 'published'"
-    ).bind(key, version)
-  );
-  const results = await db.batch(stmts);
-  const published = results.slice(0, rows.length).reduce((n, r) => n + (r.meta.changes || 0), 0);
+  // Result zero is the atomic assertion, followed by one UPDATE per locale.
+  const published = results.slice(1, 1 + rows.length).reduce((n, r) => n + (r.meta.changes || 0), 0);
   if (published !== rows.length) {
     throw badRequest('A row changed concurrently during publish — reload and verify', 'CONFLICT_RETRY');
   }

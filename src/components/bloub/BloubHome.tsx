@@ -33,7 +33,7 @@ export default function BloubHome({ state = 'idle', className = '' }: { state?: 
   const reduced = !!useReducedMotion();
   const faceY = FACE_Y[state];
   const isSuccess = state === 'success';
-  const isThinking = state === 'thinking';
+  const isThinking = state === 'thinking' && !reduced;
 
   return (
     <motion.svg
@@ -89,6 +89,8 @@ export default function BloubHome({ state = 'idle', className = '' }: { state?: 
         <>
           <motion.ellipse
             cx="37"
+            cy={faceY}
+            ry={4}
             animate={{ cy: faceY, ry: isThinking ? [4, 1, 4] : 4 }}
             rx="3.4"
             fill="#f3ead0"
@@ -96,6 +98,8 @@ export default function BloubHome({ state = 'idle', className = '' }: { state?: 
           />
           <motion.ellipse
             cx="64"
+            cy={faceY}
+            ry={4}
             animate={{ cy: faceY, ry: isThinking ? [4, 1, 4] : 4 }}
             rx="3.4"
             fill="#f3ead0"

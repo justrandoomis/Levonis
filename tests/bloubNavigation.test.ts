@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { measureHomeTarget } from '../src/components/bloub/AppIntro';
+import { measureHomeTarget } from '../src/components/bloub/anchors';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -9,7 +9,8 @@ test('the bottom navigation is two groups with an independent Home target', () =
   const source = read('src/components/BottomNav.tsx');
   assert.match(source, /data-bottom-nav-group="account-cart"/);
   assert.match(source, /data-bottom-nav-group="messages-community"/);
-  assert.match(source, /data-bloub-home-target/);
+  assert.match(source, /MotionCharacterAnchor kind="bottom-home"/);
+  assert.match(read('src/components/bloub/MotionCharacterAnchor.tsx'), /data-bloub-home-target/);
   assert.match(source, /signalBloub\('tap'/);
   assert.match(source, /data-nav-badge=\{item\.path === '\/cart' \? 'cart' : item\.path === '\/chats' \? 'messages'/);
   assert.doesNotMatch(source, /grid-cols-5/);
@@ -29,14 +30,15 @@ test('intro geometry uses the real target bounds', () => {
   assert.deepEqual(measureHomeTarget(root), { x: 28, y: 700, size: 44 });
 });
 
-test('one shared character travels only during bootstrap and respects reduced motion', () => {
+test('one shared character persists between measured anchors and respects reduced motion', () => {
   const intro = read('src/components/bloub/AppIntro.tsx');
   const app = read('src/App.tsx');
   const css = read('src/index.css');
   assert.equal((intro.match(/<BloubHome\b/g) ?? []).length, 1);
   assert.match(intro, /completedRef\.current/);
-  assert.match(intro, /measureHomeTarget\(\)/);
-  assert.match(intro, /attempts < 5/);
+  assert.match(intro, /measureCharacterAnchor\(\)/);
+  assert.match(intro, /requestAnimationFrame\(measure\)/);
+  assert.doesNotMatch(intro, /attempts < 5/);
   assert.match(intro, /data-bloub-rendered/);
   assert.match(app, /<AppBootstrapLayer\s*\/>[\s\S]{0,100}<AppContent\s*\/>/);
   assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]+\.lv-app-intro__character/);

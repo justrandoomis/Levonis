@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, FileText, ScrollText, ShieldCheck, RefreshCw, Eye, Pencil, UploadCloud } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { parsePolicyVersion, policyDocumentUrl, policyHeadings } from '../lib/policyReader';
 import { Overlay, Sheet } from '../components/ui/Overlay';
 
 /**
@@ -31,9 +32,12 @@ const STRINGS = {
     langFallback: 'النص التالي بالعربية — الترجمة لهذه اللغة غير منشورة بعد.',
     back: 'رجوع',
     notPublished: 'هذه السياسة غير منشورة بعد — ستظهر هنا فور نشرها رسميًا.',
+    contents: 'محتويات الوثيقة',
+    invalidVersion: 'رقم نسخة السياسة غير صالح؛ لم تُعرض نسخة بديلة.',
+    loadingDocument: 'جارٍ تحميل نسخة السياسة…',
     // admin
     adminTitle: 'المسودات (للإدارة فقط)',
-    adminNote: 'هذه مسودات غير منشورة ولا يراها الزبائن. النشر إجراء دائم ومدقَّق.',
+    adminNote: 'هذه مسودات غير منشورة ولا يراها الزبائن. راجع الأحكام التجارية مع المالك والأحكام القانونية مع مختص محلي قبل النشر. النشر دائم ومدقَّق ولا يمثل إقرارًا تلقائيًا بالامتثال القانوني.',
     seed: 'إدراج مسودات LEVONIS الأصلية',
     seeded: (n: number) => `أُدرجت مسودات ${n} وثيقة.`,
     allSeeded: 'كل الوثائق لديها صفوف بالفعل — لم يُدرج شيء.',
@@ -64,8 +68,11 @@ const STRINGS = {
     langFallback: 'The text below is in Arabic — the translation for this language is not published yet.',
     back: 'Back',
     notPublished: 'This policy is not published yet — it will appear here as soon as it is officially published.',
+    contents: 'On this page',
+    invalidVersion: 'Invalid policy version; no replacement version has been shown.',
+    loadingDocument: 'Loading this policy version…',
     adminTitle: 'Drafts (admin only)',
-    adminNote: 'These drafts are unpublished and invisible to customers. Publishing is permanent and audited.',
+    adminNote: 'These drafts are not visible to customers. Confirm business rules with the owner and obtain qualified local legal review before publication. Publishing is permanent and audited, not an automatic certification of legal compliance.',
     seed: 'Seed the original LEVONIS drafts',
     seeded: (n: number) => `Seeded drafts for ${n} document(s).`,
     allSeeded: 'Every document already has rows — nothing was seeded.',
@@ -96,8 +103,11 @@ const STRINGS = {
     langFallback: 'دەقی خوارەوە بە عەرەبییە — وەرگێڕان بۆ ئەم زمانە هێشتا بڵاونەکراوەتەوە.',
     back: 'گەڕانەوە',
     notPublished: 'ئەم سیاسەتە هێشتا بڵاونەکراوەتەوە — هەر کە بە فەرمی بڵاوکرایەوە لێرە دەردەکەوێت.',
+    contents: 'ناوەڕۆکی بەڵگەنامە',
+    invalidVersion: 'ژمارەی وەشانی سیاسەت نادروستە؛ وەشانی جێگرەوە پیشان نەدرا.',
+    loadingDocument: 'بارکردنی ئەم وەشانەی سیاسەت…',
     adminTitle: 'ڕەشنووسەکان (تەنها بۆ بەڕێوەبەرایەتی)',
-    adminNote: 'ئەم ڕەشنووسانە بڵاونەکراونەتەوە و کڕیاران نایانبینن. بڵاوکردنەوە هەمیشەییە و تۆمار دەکرێت.',
+    adminNote: 'ئەم ڕەشنووسانە کڕیاران نایانبینن. پێش بڵاوکردنەوە مەرجە بازرگانییەکان لەگەڵ خاوەن و مەرجە یاساییەکان لەگەڵ پسپۆڕێکی ناوخۆیی پێداچوونەوە بکە. بڵاوکردنەوە هەمیشەیی و تۆمارکراوە؛ بڕوانامەی پابەندبوونی یاسایی نییە.',
     seed: 'دانانی ڕەشنووسە ڕەسەنەکانی LEVONIS',
     seeded: (n: number) => `ڕەشنووسی ${n} بەڵگەنامە دانرا.`,
     allSeeded: 'هەموو بەڵگەنامەکان پێشتر ڕیزیان هەیە — هیچ دانەنرا.',
@@ -153,7 +163,7 @@ function PolicyBody({ body }: { body: string }) {
         if (!t) return <div key={i} className="h-1" />;
         if (t.startsWith('## ')) {
           return (
-            <h2 key={i} className="text-[16px] font-bold text-gold pt-3">
+            <h2 key={i} id={`policy-section-${i}`} className="scroll-mt-24 text-[16px] font-semibold text-text-primary pt-5">
               {t.slice(3)}
             </h2>
           );
@@ -183,6 +193,11 @@ export default function Policies() {
   const navigate = useNavigate();
   const { key: routeKey } = useParams<{ key: string }>();
   const { lang } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const { version: requestedVersion, valid: validVersion } = parsePolicyVersion(searchParams.get('version'));
+  const langQuery = searchParams.get('lang');
+  const documentLang = langQuery === 'ar' || langQuery === 'en' || langQuery === 'ckb' ? langQuery : lang;
+  const requestSequence = React.useRef(0);
   const { user } = useAuth();
   const t = STRINGS[lang] || STRINGS.ar;
 
@@ -238,14 +253,18 @@ export default function Policies() {
 
   const openDoc = useCallback(
     async (key: string) => {
+      const sequence = ++requestSequence.current;
+      setSelected(null);
       setActionError('');
       setNotice('');
       setDocLoadingKey(key);
       try {
-        const data = await api.get<{ policy: PolicyDoc }>(`/api/policies/${encodeURIComponent(key)}?lang=${lang}`);
+        const data = await api.get<{ policy: PolicyDoc }>(policyDocumentUrl(key, requestedVersion, documentLang));
+        if (sequence !== requestSequence.current) return;
         setSelected(data.policy);
-        window.scrollTo({ top: 0 });
+        document.getElementById('main-scroll-container')?.scrollTo({ top: 0 });
       } catch (err) {
+        if (sequence !== requestSequence.current) return;
         // A deep link to a document that is not published yet (the
         // extended-warranty terms before the owner publishes them) is told
         // so in plain words, not with the server's English sentence — and as
@@ -253,19 +272,23 @@ export default function Policies() {
         if (err instanceof ApiError && err.status === 404) setNotice(t.notPublished);
         else setActionError((err as Error)?.message || t.actionError);
       } finally {
-        setDocLoadingKey('');
+        if (sequence === requestSequence.current) setDocLoadingKey('');
       }
     },
-    [lang, t.actionError, t.notPublished]
+    [documentLang, requestedVersion, t.actionError, t.notPublished]
   );
 
   // The URL is the source of truth for which document is open: /policies/:key
   // opens it (also on a language change, in that language); /policies shows
   // the list.
   useEffect(() => {
-    if (routeKey) void openDoc(routeKey);
-    else setSelected(null);
-  }, [routeKey, openDoc]);
+    setSelected(null);
+    setDocLoadingKey('');
+    setNotice('');
+    if (routeKey && !validVersion) setNotice(t.invalidVersion);
+    else if (routeKey) void openDoc(routeKey);
+    return () => { requestSequence.current += 1; };
+  }, [routeKey, openDoc, validVersion, t.invalidVersion]);
 
   const seedDrafts = async () => {
     setAdminMsg('');
@@ -376,8 +399,9 @@ export default function Policies() {
           </div>
         )}
 
+        {docLoadingKey && <p role="status" className="py-6 text-sm text-text-secondary">{t.loadingDocument}</p>}
         {selected ? (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+          <article className="py-2 sm:py-4" dir={selected.lang === 'en' ? 'ltr' : 'rtl'}>
             <div className="flex items-center gap-2 text-[12px] text-zinc-500 mb-4">
               <ScrollText className="w-4 h-4" />
               <span>
@@ -391,8 +415,18 @@ export default function Policies() {
                 {t.langFallback}
               </p>
             )}
+            {policyHeadings(selected.body).length > 1 && (
+              <nav aria-label={t.contents} className="mb-6 border-b border-border-subtle pb-5">
+                <h2 className="text-sm font-semibold text-text-primary mb-3">{t.contents}</h2>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {policyHeadings(selected.body).map((heading) => (
+                    <a key={heading.id} href={`#${heading.id}`} className="text-sm text-text-secondary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">{heading.title}</a>
+                  ))}
+                </div>
+              </nav>
+            )}
             <PolicyBody body={selected.body} />
-          </div>
+          </article>
         ) : (
           <>
             <p className="text-zinc-400 text-[13px] mb-5">{t.intro}</p>
