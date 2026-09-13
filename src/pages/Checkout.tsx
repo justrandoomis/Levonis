@@ -1,3 +1,4 @@
+import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
@@ -278,6 +279,7 @@ export default function Checkout() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [loading, setLoading] = useState(true);
+  useCharacterBusy(loading);
   const [loadError, setLoadError] = useState('');
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
@@ -308,6 +310,7 @@ export default function Checkout() {
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  useEffect(() => { setPolicyAccepted(false); }, [lang]);
   const [consentResetNote, setConsentResetNote] = useState(false);
   const quoteSignatureRef = useRef('');
   const quoteSeqRef = useRef(0);
@@ -703,6 +706,7 @@ export default function Checkout() {
         couponCode: couponCode || undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
+        policyLocale: lang,
         policyAcceptance: policyAccepted
           ? requiredPolicies.map((p) => ({ key: p.key, version: p.version }))
           : [],
@@ -765,7 +769,7 @@ export default function Checkout() {
               <React.Fragment key={p.key}>
                 {i > 0 && <span className="text-zinc-500"> · </span>}
                 <a
-                  href={`/policies/${p.key}`}
+                  href={`/policies/${encodeURIComponent(p.key)}?version=${p.version}&lang=${lang}`}
                   target="_blank"
                   rel="noreferrer"
                   className="underline text-white hover:text-zinc-300"
@@ -889,13 +893,14 @@ export default function Checkout() {
 
       {/* Left Form Area */}
       <div className="relative z-10 flex min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg sm:px-6 lg:px-12 lg:py-6">
+        <header className="lv-character-header sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg sm:px-6 lg:px-12 lg:py-6">
           <button
             onClick={handleBack}
             className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" strokeWidth={1.5} /> : <ArrowLeft className="w-5 h-5 text-white" strokeWidth={1.5} />}
           </button>
+          <MotionCharacterHome />
           <div className="flex items-center gap-2 text-text-secondary px-2 py-2">
             <Lock className="w-4 h-4" strokeWidth={1.5} />
             <span className="text-xs font-semibold tracking-widest uppercase">

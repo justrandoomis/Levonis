@@ -1,3 +1,4 @@
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 /**
  * Product detail (integrated mandate §7).
  *
@@ -1033,7 +1034,7 @@ export default function Product() {
   if (loading || !product) {
     return (
       <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
-        <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center">
+        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -1042,6 +1043,8 @@ export default function Product() {
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
           </button>
+          <MotionCharacterHome busy={loading} />
+          <span aria-hidden="true" />
         </div>
         <div className="pb-10">
           {loading ? (
@@ -1958,7 +1961,7 @@ export default function Product() {
     <div ref={pageRef} className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
       {/* Sticky page chrome inside the app scroll container — never a fixed
           overlay that could land in the middle of the content. */}
-      <div ref={pageHeaderRef} className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
+      <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -1967,6 +1970,7 @@ export default function Product() {
         >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
         </button>
+        <MotionCharacterHome />
         <div className="flex items-center gap-2">
           <button
             type="button"

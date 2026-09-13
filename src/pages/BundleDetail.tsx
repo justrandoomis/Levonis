@@ -1,3 +1,4 @@
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Lock, Package, Sparkles } from 'lucide-react';
@@ -417,7 +418,7 @@ export default function BundleDetail() {
   }, [bundle, qty, isMystery, familyId, mysteryMode, transportMethod, bundleChoicesBody, isAuthenticated, navigate, slug, lang, s.added, s.addFailed, load]);
 
   const header = (
-    <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
+    <div className="lv-character-header sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
       <button
         onClick={() => navigate(-1)}
         aria-label={s.back}
@@ -425,6 +426,7 @@ export default function BundleDetail() {
       >
         {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
       </button>
+      <MotionCharacterHome busy={loading && !bundle} />
       <h1 dir="ltr" className="text-white font-bold text-[15px] truncate text-start">
         {bundle?.name ?? ''}
       </h1>

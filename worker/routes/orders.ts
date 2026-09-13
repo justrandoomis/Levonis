@@ -116,7 +116,7 @@ import { quoteShipping } from '../lib/shipping';
 import { productDeliveryMethodAvailable } from '../lib/shipping';
 import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
 import { codDeliveryTaxIqd } from '../lib/codTax';
-import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
+import { getRequiredCheckoutPolicies, preparePolicyAcceptance, isPolicyAcceptanceConflict } from '../lib/policyOps';
 import { cartShippingType, typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
 import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
@@ -2449,7 +2449,9 @@ orderRoutes.post('/', async (c) => {
         version: Number(a?.version),
       }))
     : undefined;
-  await verifyAndRecordAcceptance(c.env, user.id, `order:${orderId}`, acceptanceList);
+  const policyAcceptance = await preparePolicyAcceptance(c.env, user.id, `order:${orderId}`, acceptanceList, {
+    locale: body.policyLocale ?? langOf(c), orderId,
+  });
 
   const shippingTotal = comp.shipping.total_iqd;
   const deliveryWaived = comp.shipping.total_iqd < comp.shipping.total_before_waiver_iqd ? 1 : 0;
@@ -2513,6 +2515,9 @@ orderRoutes.post('/', async (c) => {
       fulfillmentService, comp.priorityDelivery.due_at, comp.bnplAmount, comp.bnplDueAt, now, now
     ),
   ];
+
+  // Foreign-key order association and consent commit or roll back together.
+  stmts.push(...policyAcceptance.statements);
 
   if (comp.bnplAmount > 0 && comp.bnplDueAt) {
     // The database trigger re-checks membership, approval, KYC, address and
@@ -2847,6 +2852,9 @@ orderRoutes.post('/', async (c) => {
   try {
     await c.env.DB.batch(stmts);
   } catch (e) {
+    if (isPolicyAcceptanceConflict(e)) {
+      throw badRequest('Policies changed; reload and review them again', 'POLICY_ACCEPTANCE_REQUIRED');
+    }
     const msg = e instanceof Error ? e.message : String(e);
     // The ORDERS key, and nothing else. `inventory_ledger.idempotency_key` is
     // in this very batch (the reservation rows) and is also globally UNIQUE,

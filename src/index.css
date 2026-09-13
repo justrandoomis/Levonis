@@ -687,8 +687,8 @@ html[data-overlay-open='true'] [data-bottom-nav] {
   left: 0;
   z-index: 1;
   opacity: 1;
-  transform-origin: center;
-  will-change: transform, width, height;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
 .lv-app-intro[data-phase='travelling'] .lv-app-intro__veil,
@@ -700,8 +700,6 @@ html[data-overlay-open='true'] [data-bottom-nav] {
 .lv-app-intro[data-phase='travelling'] .lv-app-intro__character {
   transition:
     transform 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
-    width 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
-    height 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
     opacity 150ms ease-out;
 }
 
@@ -742,3 +740,14 @@ html[data-overlay-open='true'] .lv-app-intro__character {
     animation: none !important;
   }
 }
+
+/* Measured character slots reserve space; the animated layer never owns taps. */
+.lv-character-anchor { display: grid; place-items: center; width: 44px; height: 44px; }
+.lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
+.lv-character-anchor[data-bloub-occupied='true'] [data-bloub-fallback] { visibility: hidden; }
+.lv-character-home { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; }
+.lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); gap: 8px; padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.lv-character-header > :first-child { justify-self: start; }
+.lv-character-header > .lv-character-home { grid-column: 2; }
+.lv-character-header > :last-child { justify-self: end; min-width: 0; max-width: 100%; }
+.lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: 52px; padding-top: env(safe-area-inset-top); background: var(--color-canvas); }

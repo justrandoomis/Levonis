@@ -5,7 +5,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
 import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
-import { signalBloub } from './bloub/AppIntro';
+import { signalBloub } from './bloub/events';
+import { MotionCharacterAnchor } from './bloub/MotionCharacterAnchor';
 
 /**
  * Routes on which the floating bottom nav does not render. Exported so the
@@ -14,6 +15,7 @@ import { signalBloub } from './bloub/AppIntro';
  * Do not change the route set here without checking the shell's padding.
  */
 export function isBottomNavHidden(pathname: string): boolean {
+  pathname = pathname.toLowerCase();
   return (
     pathname === '/admin' ||
     pathname === '/edit-profile' ||
@@ -195,17 +197,10 @@ export default function BottomNav() {
         aria-label={t('home')}
         aria-current={location.pathname === '/' ? 'page' : undefined}
         onClick={() => signalBloub('tap', 480)}
-        className={`relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border shadow-2xl pointer-events-auto transition-[background-color,border-color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.96] sm:h-[68px] sm:w-[68px] ${
-          location.pathname === '/'
-            ? 'border-gold/30 bg-surface-selected'
-            : 'border-border-subtle bg-surface-raised hover:bg-surface-selected'
-        }`}
+        data-bloub-home-button
+        className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-xl pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:h-[68px] sm:w-[68px]"
       >
-        <span
-          data-bloub-home-target
-          aria-hidden="true"
-          className="block h-11 w-11 sm:h-12 sm:w-12"
-        />
+        <MotionCharacterAnchor kind="bottom-home" className="h-11 w-11 sm:h-12 sm:w-12" />
         {location.pathname === '/' ? (
           <span aria-hidden="true" className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-gold" />
         ) : null}

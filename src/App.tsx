@@ -60,11 +60,14 @@ const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
  * looks exactly like a session resolving and the page never flashes a second
  * kind of "loading".
  */
-const RouteFallback = () => (
-  <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
-    <span className="sr-only">…</span>
-  </div>
-);
+const RouteFallback = () => {
+  useCharacterBusy(true);
+  return (
+    <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
+      <span className="sr-only">…</span>
+    </div>
+  );
+};
 
 // -------------------------------------------------------------- prefetching
 
@@ -206,6 +209,7 @@ const Support = React.lazy(() => import('./pages/Support'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 import AppIntro from './components/bloub/AppIntro';
+import { MotionCharacterFallbackHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -242,6 +246,7 @@ function StorefrontApp() {
   const { store } = useStore();
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
+      <MotionCharacterFallbackHeader />
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Storefront store={store} />} />
@@ -249,6 +254,9 @@ function StorefrontApp() {
         <Route path="/about" element={<Storefront store={store} />} />
         <Route path="/reviews" element={<Storefront store={store} />} />
         <Route path="/p/:productSlug" element={<StorefrontProduct />} />
+        <Route path="/policy" element={<Policies />} />
+          <Route path="/policies" element={<Policies />} />
+        <Route path="/policies/:key" element={<Policies />} />
         {/* Account, cart and checkout are the PLATFORM's, reached from the
             shop. They are deliberately not re-implemented per store: one
             cart, one checkout, one order history (§94). */}
@@ -331,6 +339,7 @@ function AppContent() {
   if (isFullScreenRoute) {
     return (
       <div className="h-[100dvh] min-h-0 flex flex-col font-sans overflow-hidden bg-canvas text-text-primary">
+        <MotionCharacterFallbackHeader />
         <main className="flex-1 flex overflow-hidden">
           <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -450,6 +459,7 @@ function AppContent() {
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
       <Header />
+      {navHidden && <MotionCharacterFallbackHeader />}
       {/* Single intentional background: uniform LEVONIS black (matches
           html/body/#root in index.css). The previous diagonal gradient into
           olive-green (hex 1a210e) painted an unintended glow in the bottom
@@ -531,6 +541,7 @@ function AppContent() {
               call and reads no user object, so there was nothing for a
               sign-in to protect. */}
           <Route path="/tools" element={<Tools />} />
+          <Route path="/policy" element={<Policies />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/:key" element={<Policies />} />
           {/* §3.1 — referrals live on their own page, reached from the icon
