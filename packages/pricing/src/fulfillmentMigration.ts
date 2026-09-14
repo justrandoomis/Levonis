@@ -77,7 +77,8 @@ export function planLegacyModelNormalization(rows: LegacyModelInput[]): LegacyNo
     const base = pre[0] ?? canonical;
     const model = clone(base);
     model.id = canonical.id; // Keep the direct inventory target and its holds.
-    model.reserved = canonical.reserved;
+    if (canonical.reserved !== undefined) model.reserved = canonical.reserved;
+    else delete model.reserved;
     model.stock = direct[0]?.stock ?? null;
     model.active = legacy.some(row => row.active !== false && row.active !== 0);
     model.name_en = canonical.variant_label?.trim() || variantLabelFallback(canonical.name_en);

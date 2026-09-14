@@ -50,8 +50,11 @@ for (const [name, pre, pro, direct] of [['A1 mini',499000,449000,549000],['A1 mi
   for (const tier of ['regular','prime','pro'] as FulfillmentTier[]) {
     test(`${name} ${tier}: same model supports direct and preorder`, () => {
       const override: ModelFulfillment = { direct: { enabled: true, regular_price_iqd: direct, pro_price_iqd: pro }, preorder: { enabled: true, regular_price_iqd: pre, pro_price_iqd: pro } };
-      const p = resolve({ override, tier, tierActive: true });
-      const d = resolve({ override, tier, tierActive: true, fulfillmentType: 'direct_sale', transportMethod: null });
+      // The supplied A1 example has no PRIME discount; do not introduce the
+      // unrelated transport fixture's 50k PRIME discount into this product.
+      const modelPrices = { regular: pre, prime: pre, pro };
+      const p = resolve({ override, tier, tierActive: true, productRegularIqd: pre, modelPrices });
+      const d = resolve({ override, tier, tierActive: true, productRegularIqd: pre, modelPrices, fulfillmentType: 'direct_sale', transportMethod: null });
       assert.equal(p.prices?.regular,pre); assert.equal(d.prices?.regular,direct);
       assert.equal(p.prices?.pro,pro); assert.equal(d.prices?.pro,pro);
       assert.equal(p.snapshot?.model_id,d.snapshot?.model_id);

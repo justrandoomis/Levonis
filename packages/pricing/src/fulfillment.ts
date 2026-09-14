@@ -226,10 +226,8 @@ export function resolveModelFulfillment(input: {
   if (directStock !== null && directStock < quantity) errors.push('DIRECT_OUT_OF_STOCK');
   const ownTransport = method ? local.preorder?.transports?.[method] : undefined;
   const parentTransport = method ? defaults.preorder?.transports?.[method] : undefined;
-  const proActive = input.tier === 'pro' && input.tierActive;
   // All ladder prices include their corresponding benefit for preview. Charging
   // still selects the regular rung for an expired membership below.
-  void proActive;
   const directWaiver = !preorder && (local.direct?.pro_exempt ?? defaults.direct?.pro_exempt ?? true);
   const transportWaiver = ownTransport?.pro_exempt ?? parentTransport?.pro_exempt ?? local.preorder?.pro_exempt_transport ?? defaults.preorder?.pro_exempt_transport ?? true;
   const fulfillment = stage(input.modelPrices, ownOffer, parentOffer, directWaiver);
