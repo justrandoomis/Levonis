@@ -1,3 +1,4 @@
+import { parityMediaEnv } from './fixtures/media';
 /**
  * TXT TEMPLATE APPLY ↔ PRODUCT FORM PARITY — the persistence contract, judged
  * from the database and from the two endpoints ProductForm actually reads.
@@ -35,7 +36,7 @@ function setup(db?: unknown) {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const handle = db ?? asD1(raw);
-  return { raw, db: handle, app: stubApp(handle, OWNER, mount), assistant: stubApp(handle, ASSISTANT, mount) };
+  return { raw, db: handle, app: stubApp(handle, OWNER, mount, { env: parityMediaEnv() }), assistant: stubApp(handle, ASSISTANT, mount, { env: parityMediaEnv() }) };
 }
 
 const put = (a: App, path: string, body: unknown) =>
@@ -283,10 +284,10 @@ colors.1.name_en=Black
 colors.1.hex=#101010
 colors.1.option_ids=ov_a
 images.1.id=pi_1
-images.1.url=/files/one.jpg
+images.1.url=/files/products/one.jpg
 images.1.primary=true
 images.2.id=pi_2
-images.2.url=/files/two.jpg
+images.2.url=/files/products/two.jpg
 `;
   const { status, body } = await apply(app, upd, 'update');
   assert.equal(status, 200, JSON.stringify(body));
@@ -616,7 +617,7 @@ test('root cause 13: export → parse → apply is order-stable for groups, valu
     ],
     colors: [{ id: 'pc_black', name_en: 'Black', name_ar: 'أسود', hex: '#000000', sort: 0, active: true, option_value_ids: ['ov_a1', 'ov_combo'] }],
     variants: [],
-    images: [{ id: 'pi_front', url: '/files/a.jpg', alt_en: 'front', sort_order: 0, is_primary: true }],
+    images: [{ id: 'pi_front', url: '/files/products/a.jpg', alt_en: 'front', sort_order: 0, is_primary: true }],
   };
   assert.equal((await put(app, `/api/admin/products/${id}/relations`, relBody)).status, 200);
 
@@ -649,7 +650,7 @@ test('root cause 14: when the batch fails NOTHING lands — no product row, no r
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: parityMediaEnv() });
 
   failing.failWhen = (stmts) => stmts.some((s) => /INSERT INTO products/i.test(s.sql));
   const res = await post(app, '/api/admin/template/apply', { text: FULL, mode: 'draft', confirm: true });
@@ -704,7 +705,7 @@ test('a verification mismatch answers 5xx naming the section and the field, and 
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: parityMediaEnv() });
 
   // A batch that quietly drops the image statements: the write "succeeds",
   // the read-back does not match, and the route must say so rather than
@@ -886,7 +887,7 @@ test('the storefront and the admin form read the same structure after a TXT crea
 test('the form save is the same one batch: a failure leaves no product, no relations and no catalogs', async () => {
   const raw = freshDb();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: parityMediaEnv() });
 
   failing.failWhen = (stmts) => stmts.some((s) => /product_option_values/i.test(s.sql));
   const res = await post(app, '/api/admin/products-v2', {
@@ -895,7 +896,7 @@ test('the form save is the same one batch: a failure leaves no product, no relat
     relations: {
       inventory_mode: 'OPTION',
       groups: [{ id: 'og_x', name_en: 'Model', sort: 0, active: true, values: [{ id: 'ov_x', name_en: 'A', sort: 0, active: true, stock: 2 }] }],
-      colors: [], variants: [], images: [{ id: 'pi_x', url: '/files/x.jpg', sort_order: 0, is_primary: true }],
+      colors: [], variants: [], images: [{ id: 'pi_x', url: '/files/products/x.jpg', sort_order: 0, is_primary: true }],
     },
   });
   assert.equal(res.status, 500);

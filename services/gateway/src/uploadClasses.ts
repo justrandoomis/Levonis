@@ -16,8 +16,8 @@
  * be legitimate before an isolate reads it; it does not duplicate validation.
  *
  * JSON CLASSES EXIST FOR THE SAME REASON. `POST /api/admin/template/apply`
- * legitimately carries `MAX_TEMPLATE_CHARS` = 1,500,000 characters, which in
- * Arabic is several megabytes of UTF-8: a flat 1 MB cap would have refused a
+ * carries a self-contained TXT backup, including internal media bytes.
+ * Its explicit JSON byte limit matches core: a flat 1 MB cap would refuse a
  * real admin save at the edge, with no route ever seeing it. Admin bodies are
  * authenticated, apex-only and `admin-write` rate-limited, so a larger cap
  * there costs nothing an anonymous surface would pay.
@@ -56,8 +56,8 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
 ];
 
 export const JSON_CLASSES: readonly BodyClass[] = [
-  // 1,500,000 chars × up to 4 bytes/char, rounded up: the template text itself.
-  { prefix: '/api/admin/template', methods: ['POST'], kind: 'json', maxBytes: 6 * MB, source: 'worker/routes/template.ts#MAX_TEMPLATE_CHARS' },
+  // Self-contained TXT backups carry checked base64 assets; enforce the same JSON byte cap as core.
+  { prefix: '/api/admin/template', methods: ['POST'], kind: 'json', maxBytes: 48 * MB, source: 'worker/lib/templateMedia.ts#MAX_TEMPLATE_BODY_BYTES' },
   // Every other admin mutation: apex-only, admin-authenticated, admin-write
   // limited. A product save with every option, colour, variant and translation
   // is the biggest of them and stays far below this.

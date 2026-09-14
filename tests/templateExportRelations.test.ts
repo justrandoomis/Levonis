@@ -58,7 +58,7 @@ function relationalView(): ProductRelationsView {
         regular_price_iqd: 1_199_000, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: 950_000,
         regular_adjust_iqd: null, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: null,
         availability_type: 'pre_order', lead_time_text: '25-40 يوم', lead_time_min_days: 25,
-        lead_time_max_days: 40, variant_key: 'a1', variant_label: 'A1',
+        lead_time_max_days: 40, variant_key: 'a1-combo', variant_label: 'A1 Combo',
       },
     ],
     colors: [
@@ -112,11 +112,13 @@ test('the 0043 fields survive, so a re-import cannot reset the variant', () => {
   const doc = applyRelations(baseDoc(), relationalView());
   const entries = docToEntries(doc, { includeCost: true });
   const at = (k: string) => entries.find((e) => e.key === k)?.value;
-  assert.equal(at('options.1.availability_type'), 'direct_sale');
-  assert.equal(at('options.2.availability_type'), 'pre_order');
+  assert.equal(at('options.1.availability_type'), undefined);
+  assert.equal(at('options.2.availability_type'), undefined);
+  assert.equal(at('options.1.direct.enabled'), 'true');
+  assert.equal(at('options.2.preorder.enabled'), 'true');
   assert.equal(at('options.2.lead_time_text'), '25-40 يوم');
   assert.equal(at('options.1.variant_key'), 'a1');
-  assert.equal(at('options.2.variant_label'), 'A1');
+  assert.equal(at('options.2.variant_label'), 'A1 Combo');
 });
 
 test('a relational image no longer crashes the whole export', () => {

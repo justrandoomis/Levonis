@@ -126,6 +126,7 @@ export function stubTarget(reply?: (req: Request) => Response | Promise<Response
   return {
     calls,
     async fetch(request: Request): Promise<Response> {
+      if (new URL(request.url).pathname === '/api/products/cache-generation') return Response.json({ success: true, revision: 1 });
       calls.push({ url: request.url, method: request.method, headers: Object.fromEntries(request.headers.entries()) });
       if (reply) return reply(request);
       return new Response(JSON.stringify({ success: true, ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });

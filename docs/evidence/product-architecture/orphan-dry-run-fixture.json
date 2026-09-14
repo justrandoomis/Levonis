@@ -1,0 +1,126 @@
+{
+  "environment": "local SQLite via D1 adapter; in-memory R2 fixture",
+  "production": false,
+  "recorded_at": "2026-09-14T11:26:56.759Z",
+  "result": {
+    "dry_run": true,
+    "scan_id": "porphan_97cbaee43c9f47bcac2b",
+    "tables": [
+      {
+        "table": "product_option_transports",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_color_option_links",
+        "orphan_rows": 1
+      },
+      {
+        "table": "product_images",
+        "orphan_rows": 1
+      },
+      {
+        "table": "product_option_aliases",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_option_fulfillment",
+        "orphan_rows": 0
+      },
+      {
+        "table": "bundle_component_choices",
+        "orphan_rows": 0
+      },
+      {
+        "table": "cart_bundle_choices",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_option_values",
+        "orphan_rows": 1
+      },
+      {
+        "table": "bundle_components",
+        "orphan_rows": 0
+      },
+      {
+        "table": "bundle_config",
+        "orphan_rows": 0
+      },
+      {
+        "table": "bundle_items",
+        "orphan_rows": 0
+      },
+      {
+        "table": "cart_items",
+        "orphan_rows": 0
+      },
+      {
+        "table": "favorites",
+        "orphan_rows": 0
+      },
+      {
+        "table": "inventory_ledger",
+        "orphan_rows": 0
+      },
+      {
+        "table": "mystery_offer_secrets",
+        "orphan_rows": 0
+      },
+      {
+        "table": "mystery_offers",
+        "orphan_rows": 0
+      },
+      {
+        "table": "mystery_pool_entries",
+        "orphan_rows": 0
+      },
+      {
+        "table": "offer_limits",
+        "orphan_rows": 0
+      },
+      {
+        "table": "offer_windows",
+        "orphan_rows": 0
+      },
+      {
+        "table": "price_history",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_catalogs",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_colors",
+        "orphan_rows": 1
+      },
+      {
+        "table": "product_facets",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_option_groups",
+        "orphan_rows": 1
+      },
+      {
+        "table": "product_translations",
+        "orphan_rows": 0
+      },
+      {
+        "table": "product_variants",
+        "orphan_rows": 0
+      }
+    ],
+    "orphan_r2_files": [
+      {
+        "key": "products/orphan/x.webp",
+        "bucket": "public",
+        "bytes": 3
+      }
+    ],
+    "dangling_db_media_refs": [],
+    "r2_objects": 1,
+    "bytes": 3,
+    "complete": true
+  }
+}

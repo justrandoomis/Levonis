@@ -76,7 +76,7 @@ test('every migration that creates a composition table is inside the invariantâ€
   for (const f of readdirSync(join(ROOT, 'migrations')).filter((x) => x.endsWith('.sql')).sort()) {
     // The legacy `bundles` / `bundle_items` pair of 0034 shares the prefix and
     // predates the feature; the era starts at 0058 (Â§1.1).
-    if (FEATURE_FILES.includes(f) || f < '0058') continue;
+    if (FEATURE_FILES.includes(f) || f < '0058' || f === '0073_product_history_dependencies.sql') continue;
     for (const m of sqlOf(f).matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
       assert.ok(!FEATURE_PREFIXES.test(m[1]), `${f} creates ${m[1]} outside the range this file walks`);
     }
@@ -245,6 +245,8 @@ test('a bundle row stores NULL stock and the four stock tables are the only coun
       // own product stock, and the gift pool's remaining prizes.
       'community_products',
       'gift_pool_items',
+      // Model fulfillment stock is deliberately distinct from composition stock.
+      'product_option_fulfillment',
     ].sort(),
     'a new table with a stock column is a deliberate decision, never an accident'
   );

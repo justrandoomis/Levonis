@@ -9,15 +9,21 @@
  * finds one fault tells you least exactly when you need it most.
  */
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+// Unit suites must not send real notifications when a test misses a stub.
+// Preserve other Node options; the preload still permits local fixture servers.
+const offline = fileURLToPath(new URL('../tests/fixtures/offline.cjs', import.meta.url));
+const env = { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require=${JSON.stringify(offline)}`.trim() };
 
 const runs = [
-  { name: 'root', cmd: process.execPath, args: ['--import', 'tsx', '--test', 'tests/*.test.ts'], shell: true },
+  { name: 'root', cmd: process.execPath, args: ['--import', 'tsx', '--test', '--test-concurrency=6', 'tests/*.test.ts'], shell: true },
   { name: 'workspaces', cmd: 'node', args: ['scripts/test-workspaces.mjs'], shell: false },
 ];
 
 const failed = [];
 for (const run of runs) {
-  const res = spawnSync(run.cmd, run.args, { stdio: 'inherit', shell: run.shell });
+  const res = spawnSync(run.cmd, run.args, { stdio: 'inherit', shell: run.shell, env });
   if (res.status !== 0) failed.push(`${run.name} (exit ${res.status ?? 'signal ' + res.signal})`);
 }
 

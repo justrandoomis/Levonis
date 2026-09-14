@@ -127,10 +127,29 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build
 
+      - name: Product upgrade preflight (SELECT only)
+        run: |
+          mkdir -p /tmp/levonis-product-release
+          node scripts/product-release-preflight.mjs --database levonis-db-staging --env staging --before-migration --output /tmp/levonis-product-release/before.json
+
+      - name: Record the D1 recovery bookmark before migrating
+        run: npx wrangler d1 time-travel info levonis-db-staging --env staging --json > /tmp/levonis-product-release/recovery.json
+
       # Migrations first: code must never be ahead of its database again.
       # This is the exact failure that took the storefront down on 2026-08-30.
       - name: Apply any pending migrations BEFORE the code that needs them
         run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+
+      - name: Verify the product schema before deployment
+        run: node scripts/product-release-preflight.mjs --database levonis-db-staging --env staging --output /tmp/levonis-product-release/after.json
+
+      - name: Preserve the product release reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-release-${{ github.run_id }}
+          path: /tmp/levonis-product-release/
+          retention-days: 14
 
       # Carrying vars forward preserves what is already there, but it gives
       # the owner no way to SET one — and the Studio sign-in handoff needs a

@@ -620,7 +620,7 @@ test('a usage step with neither title nor body is warned about, not silently dro
 test('the transport surcharge may be written with the word the form uses', () => {
   const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
   const text = exportProduct(doc, { includeCost: true })
-    .replace(/^transports\.3\.commission_iqd=__NULL__$/m, 'transports.3.surcharge_iqd=15000')
+    .replace(/^transports\.3\.surcharge_iqd=__NULL__$/m, 'transports.3.surcharge_iqd=15000')
     .replace(/^transports\.3\.active=false$/m, 'transports.3.active=true');
   const parsed = parseTemplate(text);
   assert.deepEqual(parsed.errors, []);
@@ -628,7 +628,7 @@ test('the transport surcharge may be written with the word the form uses', () =>
   const land = built.preorder_transports.find((t) => t.method === 'land')!;
   assert.equal(land.commission_iqd, 15_000, 'surcharge_iqd is commission_iqd');
   assert.equal(land.active, true);
-  assert.ok(!/^transports\.\d+\.surcharge_iqd=/m.test(exportProduct(doc, { includeCost: true })), 'the alias is import-only, never exported');
+  assert.ok(/^transports\.\d+\.surcharge_iqd=/m.test(exportProduct(doc, { includeCost: true })), 'the canonical default surcharge is exported');
 });
 
 // ------------------------------------------------------------- the usage guide

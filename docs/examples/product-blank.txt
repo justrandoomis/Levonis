@@ -1,0 +1,539 @@
+# ============================================================
+# قالب منتج ليفونيس (فارغ) — الإصدار 2
+# Levonis product template (blank), version 2
+# ============================================================
+# القواعد / Rules:
+#  - كل سطر: key=value — الأسطر التي تبدأ بـ # تعليقات وتُتجاهل.
+#  - __NULL__ = لا قيمة/وراثة (explicit null). __CLEAR__ = مسح القيمة عند التحديث.
+#  - القيمة الفارغة تبقى فارغة. الحقول المحذوفة تحافظ على قيمتها عند التحديث.
+#  - النص متعدد الأسطر: key=<<<END ثم الأسطر ثم END في سطر مستقل.
+#  - المجموعات المتكررة مفهرسة: options.1.name_ar ثم options.2.name_ar وهكذا.
+#  - الأسعار أعداد صحيحة بالدينار العراقي فقط (بدون فواصل).
+#  - السعر الأساسي (price_iqd) هو الأرخص. الخيارات والألوان زيادات فوقه: regular_adjust_iqd=60000 أو regular_price_iqd=+60000.
+#  - options موديلات فقط. التوفر: options.N.direct.* وoptions.N.preorder.* والنقل: options.N.preorder.transports.*؛ transports.N قيم افتراضية فقط.
+#  - سعر ثابت (regular_price_iqd=رقم بلا إشارة) ما زال مقبولًا ويُعاد التعبير عنه كزيادة فوق الأساسي عند الاستيراد دون تغيير ما يدفعه الزبون.
+#  - لا تختلق قيماً — إذا كانت المعلومة غير معروفة اترك الحقل فارغاً أو __NULL__.
+
+template_version=2
+# product_id: اتركه محذوفاً لإنشاء منتج جديد (يُنشأ دائماً كمسودة draft).
+# product_id=
+# expected_updated_at: اختياري — فحص التقادم عند التحديث (يُنسخ من التصدير).
+# slug: حر عند الإنشاء؛ عند التحديث يتطلب allow_slug_change=true.
+slug=
+
+# ------------------------------ الهوية / Identity
+# name_ar — string, مطلوب/required, lang:ar — اسم المنتج (المصدر العربي) — Arabic source name; required unless name_en is given
+name_ar=
+# name_en — string, lang:en — English name
+name_en=
+# name_ckb — string, lang:ckb — ناوی کوردی (سۆرانی) — Kurdish (Sorani) name; stored in the *_ku DB column
+name_ckb=
+# status — enum, draft|active|hidden — draft | active | hidden — creation via template is ALWAYS forced to 'draft'
+status=draft
+
+# ------------------------------ الوصف / Description
+# description_ar — text, lang:ar — الوصف العربي (المصدر) — multiline allowed via heredoc
+description_ar=
+# description_en — text, lang:en — English description
+description_en=
+# description_ckb — text, lang:ckb — وەسفی کوردی — Kurdish description
+description_ckb=
+# how_to_use — text — طريقة الاستخدام — usage instructions (multiline allowed)
+how_to_use=
+
+# ------------------------------ التسعير / Pricing
+# price_iqd — iqd, مطلوب/required — السعر الأساسي بالدينار = أرخص صنف قابل للبيع؛ كل خيار أو لون أو طريقة توفر زيادة فوقه — base price = the CHEAPEST sellable item, REQUIRED integer
+price_iqd=
+# pro_price_iqd — iqd, nullable (__NULL__) — سعر PRO الصريح — explicit PRO price; __NULL__ = no explicit price (store policy applies, default: no discount)
+pro_price_iqd=__NULL__
+# prime_price_iqd — iqd, nullable (__NULL__) — سعر PRIME الصريح — explicit PRIME price; __NULL__ = none (regular applies)
+prime_price_iqd=__NULL__
+# original_price_iqd — iqd, nullable (__NULL__) — السعر قبل الخصم — compare-at price; shown only when above the selling price; __NULL__ = none
+original_price_iqd=__NULL__
+# product_cost_iqd — iqd, nullable (__NULL__) — الكلفة (داخلي) — internal cost, NEVER exposed publicly; __NULL__ = unknown
+product_cost_iqd=__NULL__
+
+# ------------------------------ التصنيف / Classification
+# brand — ref, nullable (__NULL__) — العلامة التجارية — brand slug or id, resolved against the brands table; unknown values need review; __NULL__ = no brand
+brand=__NULL__
+# catalogs — csv, nullable (__NULL__) — الكتالوجات — comma-separated catalog slugs or ids; unknown values need review; empty = in no catalog
+catalogs=
+# category — ref, nullable (__NULL__) — القسم الرئيسي — main section slug or id from the sections tree; __NULL__ = بلا قسم. مطلوب للنشر.
+category=__NULL__
+# sub_category — ref, nullable (__NULL__) — القسم الفرعي — sub-section slug or id; __NULL__ = بلا قسم فرعي
+sub_category=__NULL__
+# template_family — enum, |devices|materials — عائلة قالب المواصفات: devices | materials | فارغ — تحدد أي حقول spec.* تخصّ هذا المنتج
+template_family=
+# sku — string — رمز المنتج — SKU; فارغ = بلا رمز
+sku=
+# hashtags — csv — وسوم — comma-separated hashtags
+hashtags=
+# is_featured — bool — منتج مميز — featured flag (true/false)
+is_featured=false
+# display_order — int — ترتيب العرض — display order (integer, lower = earlier)
+display_order=
+
+# ------------------------------ البيع والمخزون / Selling & stock
+# selling_type — enum, direct_sale|pre_order|bundle|mixed — direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. كل خيار موديل حقيقي؛ direct وpreorder يحددان طرق التنفيذ.
+selling_type=direct_sale
+# stock — int, nullable (__NULL__) — المخزون — stock count; __NULL__ = not tracked
+stock=__NULL__
+# low_stock_threshold — int, nullable (__NULL__) — حد التنبيه لمخزون المنتج — __NULL__ = بلا تنبيه
+low_stock_threshold=__NULL__
+# inventory_mode — enum, |BASE|OPTION|COLOR|VARIANT_COMBINATION — مستوى المخزون المعتمد: فارغ = يُشتق من مكان الأرقام (stock على اللون → COLOR، على الخيار → OPTION، وإلا BASE) كما يفعل النموذج | BASE | OPTION | COLOR | VARIANT_COMBINATION
+inventory_mode=
+# direct_surcharge_iqd — iqd, nullable (__NULL__) — زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون، وعند الدفع عند الاستلام لطلب مسبق (يُعفى منها عضو PRO الفعّال كعمولة النقل)؛ __NULL__ أو 0 = بلا زيادة
+direct_surcharge_iqd=__NULL__
+# payment_options — csv — معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated
+payment_options=
+
+# ------------------------------ خيارات التوصيل / Delivery options
+# standard_delivery_enabled — bool — إتاحة التوصيل العادي لهذا المنتج — enable standard delivery for this product
+standard_delivery_enabled=false
+# standard_delivery_quantity_step — int — عدد القطع التي يغطيها كل رسم توصيل عادي — integer >= 1
+standard_delivery_quantity_step=1
+# standard_delivery_fee_iqd — iqd — رسم كل شريحة كمية للتوصيل العادي بالدينار — integer IQD >= 0
+standard_delivery_fee_iqd=0
+# personal_delivery_enabled — bool — إتاحة التوصيل الشخصي لهذا المنتج — enable personal delivery for this product
+personal_delivery_enabled=false
+# personal_delivery_quantity_step — int — عدد القطع التي يغطيها كل رسم توصيل شخصي — integer >= 1
+personal_delivery_quantity_step=1
+# personal_delivery_fee_iqd — iqd — رسم كل شريحة كمية للتوصيل الشخصي بالدينار — integer IQD >= 0
+personal_delivery_fee_iqd=0
+
+# ------------------------------ شحن الطلب المسبق / Pre-order transports
+# مجموعة متكررة "transports" — كرر بـ transports.2.… transports.3.…
+# لحذف كل العناصر عند التحديث: transports=__CLEAR__
+# method — enum, مطلوب/required, air|sea|land — air | sea | land — طريقة الطلب المسبق؛ زيادتها تُضاف فوق سعر الخيار/اللون المختار وتُعفى لأعضاء PRO الفعالين
+transports.1.method=air
+# commission_iqd — iqd, nullable (__NULL__) — الزيادة بالدينار فوق السعر عند الطلب المسبق بهذه الطريقة (البري مثلًا) — __NULL__ = القيمة الافتراضية من الإعدادات
+transports.1.commission_iqd=__NULL__
+# surcharge_iqd — int, nullable (__NULL__) — Product default fee; replaces commission_iqd when both are supplied. Model overrides replace this fee.
+transports.1.surcharge_iqd=__NULL__
+# active — bool — معروض للزبائن — offered to customers
+transports.1.active=true
+# enabled — bool — Enable product default method
+transports.1.enabled=false
+# regular_price_iqd — iqd, nullable (__NULL__) — Product transport fixed default
+transports.1.regular_price_iqd=__NULL__
+# regular_adjust_iqd — int, nullable (__NULL__) — Product transport adjustment default
+transports.1.regular_adjust_iqd=__NULL__
+# prime_price_iqd — iqd, nullable (__NULL__) — Product transport fixed default
+transports.1.prime_price_iqd=__NULL__
+# prime_adjust_iqd — int, nullable (__NULL__) — Product transport adjustment default
+transports.1.prime_adjust_iqd=__NULL__
+# pro_price_iqd — iqd, nullable (__NULL__) — Product transport fixed default
+transports.1.pro_price_iqd=__NULL__
+# pro_adjust_iqd — int, nullable (__NULL__) — Product transport adjustment default
+transports.1.pro_adjust_iqd=__NULL__
+# cost_iqd — iqd, nullable (__NULL__) — Product transport fixed default
+transports.1.cost_iqd=__NULL__
+# cost_adjust_iqd — int, nullable (__NULL__) — Product transport adjustment default
+transports.1.cost_adjust_iqd=__NULL__
+# lead_time_text — string — Default lead time
+transports.1.lead_time_text=
+# lead_time_min_days — int, nullable (__NULL__) — Minimum days
+transports.1.lead_time_min_days=__NULL__
+# lead_time_max_days — int, nullable (__NULL__) — Maximum days
+transports.1.lead_time_max_days=__NULL__
+
+# ------------------------------ الوسائط / Media
+# مجموعة متكررة "images" — كرر بـ images.2.… images.3.…
+# لحذف كل العناصر عند التحديث: images=__CLEAR__
+# id — string — معرف ثابت للدمج — stable id used for merge-by-id on update
+images.1.id=
+# url — string, مطلوب/required — رابط الصورة (/files/<key> أو رابط خارجي) — REQUIRED
+images.1.url=
+# key — string — مفتاح R2 الداخلي إن وجد — internal R2 key when stored internally
+images.1.key=
+# alt_ar — string, lang:ar — النص البديل بالعربية
+images.1.alt_ar=
+# alt_en — string, lang:en — Alt text (English)
+images.1.alt_en=
+# alt_ckb — string, lang:ckb — دەقی جێگرەوە بە کوردی
+images.1.alt_ckb=
+# primary — bool — الصورة الرئيسية — exactly one image should be primary
+images.1.primary=true
+# source_url — string — الرابط المصدر الأصلي عند الاستيراد — original remote source
+images.1.source_url=
+# option_value_id — string — صورة تخص هذا الخيار — bind to ONE option by its options.N.id; فارغ = صورة عامة
+images.1.option_value_id=
+# color_id — string — صورة تخص هذا اللون — bind to ONE colour by its colors.N.id; فارغ = صورة عامة
+images.1.color_id=
+# variant_id — string — صورة تخص تركيبة محددة — bind to one modelled combination by its id
+images.1.variant_id=
+# width — int, nullable (__NULL__) — عرض الصورة بالبكسل إن كان معروفًا — pixel width; فارغ = غير معروف
+images.1.width=__NULL__
+# height — int, nullable (__NULL__) — ارتفاع الصورة بالبكسل إن كان معروفًا — pixel height
+images.1.height=__NULL__
+
+# ------------------------------ الخيارات / Options
+# مجموعة متكررة "options" — كرر بـ options.2.… options.3.…
+# لحذف كل العناصر عند التحديث: options=__CLEAR__
+# id — string — معرف ثابت — stable id; needed for merge-by-id and for colors.*.option_id links
+options.1.id=
+# group — string — اسم مجموعة الخيارات التي ينتمي إليها هذا الصف (مثل Model أو التوفر) — الصفوف التي تحمل نفس الاسم تُجمع في مجموعة واحدة. فارغ = المجموعة الافتراضية.
+options.1.group=
+# name_ar — string, مطلوب/required, lang:ar — اسم الخيار بالعربية — مطلوب ما لم يُعطَ name_en (0055: يُخزَّن في صف الخيار ويعرضه المتجر)
+options.1.name_ar=
+# name_en — string, lang:en — Option name (English)
+options.1.name_en=
+# name_ckb — string, lang:ckb — ناوی هەڵبژاردە بە کوردی
+options.1.name_ckb=
+# image — string — صورة الخيار — option image URL
+options.1.image=
+# active — bool — فعال — active
+options.1.active=true
+# regular_price_iqd — iqd, nullable (__NULL__) — الزيادة فوق السعر الأساسي بصيغة +N (مثال +60000)، أو __NULL__ = نفس السعر الأساسي. رقم بلا إشارة = سعر ثابت، ويُعاد التعبير عنه كزيادة عند الاستيراد دون تغيير ما يدفعه الزبون.
+options.1.regular_price_iqd=__NULL__
+# pro_price_iqd — iqd, nullable (__NULL__) — سعر PRO للخيار — __NULL__ = وراثة لكل حقل (خيار ← أساسي)؛ +N/-N = فرق عن الموروث
+options.1.pro_price_iqd=__NULL__
+# prime_price_iqd — iqd, nullable (__NULL__) — سعر PRIME للخيار — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث
+options.1.prime_price_iqd=__NULL__
+# cost_iqd — iqd, nullable (__NULL__) — كلفة الخيار (داخلي، لا يُنشر أبداً) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة
+options.1.cost_iqd=__NULL__
+# regular_adjust_iqd — int, nullable (__NULL__) — الزيادة فوق السعر الأساسي بالدينار — الطريقة المعتمدة لتسعير الخيار: يتبع السعر الأساسي ويبقى الفرق ثابتًا (موجب عادةً؛ سالب مسموح). يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر الأساسي.
+options.1.regular_adjust_iqd=__NULL__
+# prime_adjust_iqd — int, nullable (__NULL__) — فرق إضافي لسعر PRIME فوق ما ينتقل تلقائيًا — سعر PRIME يتبع زيادة الخيار من تلقاء نفسه (أساسي 125,000 وخيار +25,000 = 150,000)، فلا تكرّر الزيادة هنا. يُستخدم فقط عندما يكون prime_price_iqd فارغًا؛ بدون سعر PRIME موروث يُحسب من السعر الاعتيادي لنفس الصف.
+options.1.prime_adjust_iqd=__NULL__
+# pro_adjust_iqd — int, nullable (__NULL__) — فرق إضافي لسعر PRO فوق ما ينتقل تلقائيًا — سعر PRO يتبع زيادة الخيار من تلقاء نفسه، فلا تكرّر الزيادة هنا. يُستخدم فقط عندما يكون pro_price_iqd فارغًا؛ بدون سعر PRO موروث يُحسب من السعر الاعتيادي لنفس الصف.
+options.1.pro_adjust_iqd=__NULL__
+# cost_adjust_iqd — int, nullable (__NULL__) — فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.
+options.1.cost_adjust_iqd=__NULL__
+# availability_type — enum, |direct_sale|pre_order — نوع التوفر لهذا الخيار — فارغ = حسب المنتج (الموصى به): يُباع كما يُباع المنتج، وفرق البيع المباشر/الطلب المسبق يأتي من direct_surcharge_iqd وزيادات النقل لا من خيارات منفصلة. direct_sale | pre_order فقط عندما يختلف هذا الخيار فعلًا عن المنتج.
+# options.1.availability_type=
+# stock — int, nullable (__NULL__) — مخزون هذا الخيار — __NULL__ = لا يُتتبع (الطلب المسبق عادةً). البيع المباشر يضع رقمًا.
+options.1.stock=__NULL__
+# lead_time_text — string — مدة الطلب المسبق كما تُعرض للزبون — مثال: 3-4 weeks. النص يسبق الأرقام دائمًا.
+options.1.lead_time_text=
+# lead_time_min_days — int, nullable (__NULL__) — أقل عدد أيام للطلب المسبق — للترتيب والتقدير، لا للعرض
+options.1.lead_time_min_days=__NULL__
+# lead_time_max_days — int, nullable (__NULL__) — أكثر عدد أيام للطلب المسبق
+options.1.lead_time_max_days=__NULL__
+# variant_key — string — مفتاح النسخة — a1 / a1-combo. هو ما يجمع «A1 طلب مسبق» و«A1 بيع مباشر» تحت نسخة واحدة؛ اتركه فارغًا ليُشتق من variant_label.
+options.1.variant_key=
+# variant_label — string — اسم النسخة كما يقرؤه الزبون — A1 / A1 Combo. فارغًا يُشتق من اسم الخيار بعد حذف لاحقة نوع التوفر.
+options.1.variant_label=
+# sku_part — string — الجزء الذي يضيفه هذا الخيار إلى رمز المنتج — SKU fragment
+options.1.sku_part=
+# low_stock_threshold — int, nullable (__NULL__) — حد التنبيه لمخزون هذا الخيار — __NULL__ = بلا تنبيه
+options.1.low_stock_threshold=__NULL__
+# direct.enabled — bool — Enable this fulfillment or inbound transport
+options.1.direct.enabled=false
+# direct.regular_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.direct.regular_price_iqd=__NULL__
+# direct.regular_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.direct.regular_adjust_iqd=__NULL__
+# direct.prime_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.direct.prime_price_iqd=__NULL__
+# direct.prime_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.direct.prime_adjust_iqd=__NULL__
+# direct.pro_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.direct.pro_price_iqd=__NULL__
+# direct.pro_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.direct.pro_adjust_iqd=__NULL__
+# direct.cost_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.direct.cost_iqd=__NULL__
+# direct.cost_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.direct.cost_adjust_iqd=__NULL__
+# direct.stock — int, nullable (__NULL__) — Stock of this model and fulfillment
+options.1.direct.stock=__NULL__
+# direct.lead_time_text — string — Lead time shown verbatim
+options.1.direct.lead_time_text=
+# direct.lead_time_min_days — int, nullable (__NULL__) — Minimum days
+options.1.direct.lead_time_min_days=__NULL__
+# direct.lead_time_max_days — int, nullable (__NULL__) — Maximum days
+options.1.direct.lead_time_max_days=__NULL__
+# direct.image — string — Fulfillment image override
+options.1.direct.image=
+# direct.sku_part — string — Fulfillment SKU fragment
+options.1.direct.sku_part=
+# preorder.enabled — bool — Enable this fulfillment or inbound transport
+options.1.preorder.enabled=false
+# preorder.regular_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.regular_price_iqd=__NULL__
+# preorder.regular_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.regular_adjust_iqd=__NULL__
+# preorder.prime_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.prime_price_iqd=__NULL__
+# preorder.prime_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.prime_adjust_iqd=__NULL__
+# preorder.pro_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.pro_price_iqd=__NULL__
+# preorder.pro_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.pro_adjust_iqd=__NULL__
+# preorder.cost_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.cost_iqd=__NULL__
+# preorder.cost_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.cost_adjust_iqd=__NULL__
+# preorder.stock — int, nullable (__NULL__) — Stock of this model and fulfillment
+options.1.preorder.stock=__NULL__
+# preorder.lead_time_text — string — Lead time shown verbatim
+options.1.preorder.lead_time_text=
+# preorder.lead_time_min_days — int, nullable (__NULL__) — Minimum days
+options.1.preorder.lead_time_min_days=__NULL__
+# preorder.lead_time_max_days — int, nullable (__NULL__) — Maximum days
+options.1.preorder.lead_time_max_days=__NULL__
+# preorder.image — string — Fulfillment image override
+options.1.preorder.image=
+# preorder.sku_part — string — Fulfillment SKU fragment
+options.1.preorder.sku_part=
+# preorder.transports.1.enabled — bool — Enable this fulfillment or inbound transport
+options.1.preorder.transports.1.enabled=false
+# preorder.transports.1.regular_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.1.regular_price_iqd=__NULL__
+# preorder.transports.1.regular_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.1.regular_adjust_iqd=__NULL__
+# preorder.transports.1.prime_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.1.prime_price_iqd=__NULL__
+# preorder.transports.1.prime_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.1.prime_adjust_iqd=__NULL__
+# preorder.transports.1.pro_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.1.pro_price_iqd=__NULL__
+# preorder.transports.1.pro_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.1.pro_adjust_iqd=__NULL__
+# preorder.transports.1.cost_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.1.cost_iqd=__NULL__
+# preorder.transports.1.cost_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.1.cost_adjust_iqd=__NULL__
+# preorder.transports.1.method — enum, air|sea|land — Inbound transport, independent of local delivery
+options.1.preorder.transports.1.method=air
+# preorder.transports.1.surcharge_iqd — int, nullable (__NULL__) — Inbound transport surcharge; zero is explicit
+options.1.preorder.transports.1.surcharge_iqd=__NULL__
+# preorder.transports.1.lead_time_text — string — Lead time shown verbatim
+options.1.preorder.transports.1.lead_time_text=
+# preorder.transports.1.lead_time_min_days — int, nullable (__NULL__) — Minimum days
+options.1.preorder.transports.1.lead_time_min_days=__NULL__
+# preorder.transports.1.lead_time_max_days — int, nullable (__NULL__) — Maximum days
+options.1.preorder.transports.1.lead_time_max_days=__NULL__
+# preorder.transports.2.enabled — bool — Enable this fulfillment or inbound transport
+options.1.preorder.transports.2.enabled=false
+# preorder.transports.2.regular_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.2.regular_price_iqd=__NULL__
+# preorder.transports.2.regular_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.2.regular_adjust_iqd=__NULL__
+# preorder.transports.2.prime_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.2.prime_price_iqd=__NULL__
+# preorder.transports.2.prime_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.2.prime_adjust_iqd=__NULL__
+# preorder.transports.2.pro_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.2.pro_price_iqd=__NULL__
+# preorder.transports.2.pro_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.2.pro_adjust_iqd=__NULL__
+# preorder.transports.2.cost_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.2.cost_iqd=__NULL__
+# preorder.transports.2.cost_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.2.cost_adjust_iqd=__NULL__
+# preorder.transports.2.method — enum, air|sea|land — Inbound transport, independent of local delivery
+options.1.preorder.transports.2.method=air
+# preorder.transports.2.surcharge_iqd — int, nullable (__NULL__) — Inbound transport surcharge; zero is explicit
+options.1.preorder.transports.2.surcharge_iqd=__NULL__
+# preorder.transports.2.lead_time_text — string — Lead time shown verbatim
+options.1.preorder.transports.2.lead_time_text=
+# preorder.transports.2.lead_time_min_days — int, nullable (__NULL__) — Minimum days
+options.1.preorder.transports.2.lead_time_min_days=__NULL__
+# preorder.transports.2.lead_time_max_days — int, nullable (__NULL__) — Maximum days
+options.1.preorder.transports.2.lead_time_max_days=__NULL__
+# preorder.transports.3.enabled — bool — Enable this fulfillment or inbound transport
+options.1.preorder.transports.3.enabled=false
+# preorder.transports.3.regular_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.3.regular_price_iqd=__NULL__
+# preorder.transports.3.regular_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.3.regular_adjust_iqd=__NULL__
+# preorder.transports.3.prime_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.3.prime_price_iqd=__NULL__
+# preorder.transports.3.prime_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.3.prime_adjust_iqd=__NULL__
+# preorder.transports.3.pro_price_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.3.pro_price_iqd=__NULL__
+# preorder.transports.3.pro_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.3.pro_adjust_iqd=__NULL__
+# preorder.transports.3.cost_iqd — iqd, nullable (__NULL__) — Fixed total override; __NULL__ inherits
+options.1.preorder.transports.3.cost_iqd=__NULL__
+# preorder.transports.3.cost_adjust_iqd — int, nullable (__NULL__) — Adjustment replaces the fallback; never stacks with it
+options.1.preorder.transports.3.cost_adjust_iqd=__NULL__
+# preorder.transports.3.method — enum, air|sea|land — Inbound transport, independent of local delivery
+options.1.preorder.transports.3.method=air
+# preorder.transports.3.surcharge_iqd — int, nullable (__NULL__) — Inbound transport surcharge; zero is explicit
+options.1.preorder.transports.3.surcharge_iqd=__NULL__
+# preorder.transports.3.lead_time_text — string — Lead time shown verbatim
+options.1.preorder.transports.3.lead_time_text=
+# preorder.transports.3.lead_time_min_days — int, nullable (__NULL__) — Minimum days
+options.1.preorder.transports.3.lead_time_min_days=__NULL__
+# preorder.transports.3.lead_time_max_days — int, nullable (__NULL__) — Maximum days
+options.1.preorder.transports.3.lead_time_max_days=__NULL__
+
+# ------------------------------ الألوان / Colors
+# مجموعة متكررة "colors" — كرر بـ colors.2.… colors.3.…
+# لحذف كل العناصر عند التحديث: colors=__CLEAR__
+# id — string — معرف ثابت — stable id for merge-by-id
+colors.1.id=
+# name_ar — string, مطلوب/required, lang:ar — اسم اللون بالعربية — مطلوب ما لم يُعطَ name_en (0055: يُخزَّن في صف اللون)
+colors.1.name_ar=
+# name_en — string, lang:en — Color name (English)
+colors.1.name_en=
+# name_ckb — string, lang:ckb — ناوی ڕەنگ بە کوردی
+colors.1.name_ckb=
+# hex — hex — رمز اللون #RRGGBB أو فارغ
+colors.1.hex=
+# image — string — صورة اللون — color image URL
+colors.1.image=
+# option_id — string, nullable (__NULL__) — ربط بخيار واحد عبر معرفه — link to ONE option by its id; __NULL__ = متاح لكل الخيارات
+colors.1.option_id=__NULL__
+# option_index — int — بديل استيراد فقط: رقم الخيار في هذا القالب (colors.N.option_index=2 يربط بالخيار options.2) — import-only, never exported
+# colors.1.option_index=
+# option_ids — csv — كل الخيارات التي يتوفر لها هذا اللون، مفصولة بفواصل — the FULL link set; يتقدّم على option_id. فارغ = متاح لكل الخيارات.
+colors.1.option_ids=
+# sku_part — string — الجزء الذي يضيفه هذا اللون إلى رمز المنتج — SKU fragment
+colors.1.sku_part=
+# stock — int, nullable (__NULL__) — مخزون هذا اللون — __NULL__ = لا يُتتبع على مستوى اللون
+colors.1.stock=__NULL__
+# low_stock_threshold — int, nullable (__NULL__) — حد التنبيه لمخزون هذا اللون — __NULL__ = بلا تنبيه
+colors.1.low_stock_threshold=__NULL__
+# active — bool — فعال — active
+colors.1.active=true
+# regular_price_iqd — iqd, nullable (__NULL__) — الزيادة فوق سعر الخيار المختار (أو الأساسي) بصيغة +N، أو __NULL__ = نفس سعر الخيار. رقم بلا إشارة = سعر ثابت يستبدل السعر (لون ← خيار ← أساسي).
+colors.1.regular_price_iqd=__NULL__
+# pro_price_iqd — iqd, nullable (__NULL__) — سعر PRO للون — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث
+colors.1.pro_price_iqd=__NULL__
+# prime_price_iqd — iqd, nullable (__NULL__) — سعر PRIME للون — __NULL__ = وراثة لكل حقل؛ +N/-N = فرق عن الموروث
+colors.1.prime_price_iqd=__NULL__
+# cost_iqd — iqd, nullable (__NULL__) — كلفة اللون (داخلي) — __NULL__ = inherit؛ +N/-N = فرق عن الكلفة الموروثة
+colors.1.cost_iqd=__NULL__
+# regular_adjust_iqd — int, nullable (__NULL__) — الزيادة فوق سعر الخيار المختار (أو الأساسي) بالدينار — الطريقة المعتمدة لتسعير اللون: يتبع ما تحته ويبقى الفرق ثابتًا. يُستخدم عندما يكون regular_price_iqd فارغًا. __NULL__ = نفس السعر.
+colors.1.regular_adjust_iqd=__NULL__
+# prime_adjust_iqd — int, nullable (__NULL__) — فرق إضافي لسعر PRIME فوق ما ينتقل تلقائيًا — زيادة اللون تصل إلى سعر PRIME من تلقاء نفسها، فلا تكرّرها هنا. يُستخدم فقط عندما يكون prime_price_iqd فارغًا.
+colors.1.prime_adjust_iqd=__NULL__
+# pro_adjust_iqd — int, nullable (__NULL__) — فرق إضافي لسعر PRO فوق ما ينتقل تلقائيًا — زيادة اللون تصل إلى سعر PRO من تلقاء نفسها، فلا تكرّرها هنا. يُستخدم فقط عندما يكون pro_price_iqd فارغًا.
+colors.1.pro_adjust_iqd=__NULL__
+# cost_adjust_iqd — int, nullable (__NULL__) — فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.
+colors.1.cost_adjust_iqd=__NULL__
+
+# ------------------------------ المواصفات / Specifications
+# مجموعة متكررة "spec_groups" — كرر بـ spec_groups.2.… spec_groups.3.…
+# لحذف كل العناصر عند التحديث: spec_groups=__CLEAR__
+# id — string — معرف ثابت للمجموعة — stable group id for merge-by-id
+spec_groups.1.id=
+# title_ar — string, مطلوب/required, lang:ar — عنوان مجموعة المواصفات بالعربية
+spec_groups.1.title_ar=
+# title_en — string, lang:en — Group title (English)
+spec_groups.1.title_en=
+# title_ckb — string, lang:ckb — ناونیشانی گروپ بە کوردی
+spec_groups.1.title_ckb=
+# أسطر المواصفات داخل المجموعة: spec_groups.1.rows.1.… spec_groups.1.rows.2.…
+# id — string — معرف ثابت للسطر — stable row id
+spec_groups.1.rows.1.id=
+# label_ar — string, مطلوب/required, lang:ar — اسم المواصفة بالعربية
+spec_groups.1.rows.1.label_ar=
+# label_en — string, lang:en — Spec label (English)
+spec_groups.1.rows.1.label_en=
+# label_ckb — string, lang:ckb — ناوی تایبەتمەندی بە کوردی
+spec_groups.1.rows.1.label_ckb=
+# value_ar — string, lang:ar — القيمة بالعربية
+spec_groups.1.rows.1.value_ar=
+# value_en — string, lang:en — Value (English)
+spec_groups.1.rows.1.value_en=
+# value_ckb — string, lang:ckb — بەها بە کوردی
+spec_groups.1.rows.1.value_ckb=
+# unit — string — الوحدة (mm، kg، W…) — measurement unit, language-neutral
+spec_groups.1.rows.1.unit=
+
+# ------------------------------ الشارات / Labels
+# مجموعة متكررة "labels" — كرر بـ labels.2.… labels.3.…
+# لحذف كل العناصر عند التحديث: labels=__CLEAR__
+# id — string — معرف ثابت — stable id
+labels.1.id=
+# key — string — مفتاح اختياري مضبوط: featured | warranty_included | free_returns | free_plus أو فارغ
+labels.1.key=
+# text_ar — string, lang:ar — نص الشارة بالعربية
+labels.1.text_ar=
+# text_en — string, lang:en — Label text (English)
+labels.1.text_en=
+# text_ckb — string, lang:ckb — دەقی نیشانە بە کوردی
+labels.1.text_ckb=
+# icon — string — اسم الأيقونة — icon name
+labels.1.icon=
+# visible — bool — ظاهرة للزبون — visible on storefront
+labels.1.visible=true
+
+# ------------------------------ خطط الضمان / Warranty plans
+# warranty_base_months — int, nullable (__NULL__) — مدة الضمان الأساسي بالأشهر من التسليم — للطابعات 12 افتراضيًا (التمديد +12 → 24 إجمالًا، +24 → 36)؛ __NULL__ = غير مُعدّة
+warranty_base_months=__NULL__
+# serialized — bool — جهاز مُرقَّم — تُنشأ وحدة لكل جهاز عند التسليم ويُربط بها الضمان (الطابعات true تلقائيًا)
+serialized=false
+# مجموعة متكررة "warranty_plans" — كرر بـ warranty_plans.2.… warranty_plans.3.…
+# لحذف كل العناصر عند التحديث: warranty_plans=__CLEAR__
+# id — string — معرف ثابت — stable id
+warranty_plans.1.id=
+# title_ar — string, مطلوب/required, lang:ar — عنوان الخطة بالعربية
+warranty_plans.1.title_ar=
+# title_en — string, lang:en — Plan title (English)
+warranty_plans.1.title_en=
+# title_ckb — string, lang:ckb — ناونیشانی پلان بە کوردی
+warranty_plans.1.title_ckb=
+# terms_ar — text, lang:ar — شروط الضمان بالعربية (heredoc للأسطر المتعددة)
+warranty_plans.1.terms_ar=
+# terms_en — text, lang:en — Terms (English)
+warranty_plans.1.terms_en=
+# terms_ckb — text, lang:ckb — مەرجەکان بە کوردی
+warranty_plans.1.terms_ckb=
+# duration_months — int, مطلوب/required — مدة التمديد بالأشهر — للطابعات 12 أو 24 فقط (+12 → 24 إجمالًا، +24 → 36 إجمالًا)
+warranty_plans.1.duration_months=
+# duration_kind — enum, extension|total — extension (تمديد فوق الضمان الأساسي — الوحيد المقبول للطابعات) | total (مدة كلية، بيانات قديمة)
+warranty_plans.1.duration_kind=extension
+# fee_percent — percent, nullable (__NULL__) — رسم التمديد كنسبة من سعر الطابعة الاعتيادي (مثال 7.5 أو 10 — الموصى به 7.5..10)؛ يُقرَّب إلى دينار صحيح ولا يُعفى بالعضوية؛ __NULL__ = رسم ثابت من fee_iqd
+warranty_plans.1.fee_percent=__NULL__
+# fee_iqd — iqd, مطلوب/required — رسم ثابت بالدينار — يُستخدم عندما لا توجد نسبة؛ يُضاف على السعر ولا يُعفى أبداً بالعضوية; 0 = مجاني صراحةً
+warranty_plans.1.fee_iqd=
+# active — bool — معروضة — offered
+warranty_plans.1.active=true
+
+# ------------------------------ كتل المحتوى / Content blocks
+# مجموعة متكررة "content_blocks" — كرر بـ content_blocks.2.… content_blocks.3.…
+# لحذف كل العناصر عند التحديث: content_blocks=__CLEAR__
+# id — string — معرف ثابت — stable id
+content_blocks.1.id=
+# kind — enum, مطلوب/required, text|image|video_embed — text | image | video_embed
+content_blocks.1.kind=text
+# body_ar — text, lang:ar — النص العربي (heredoc للأسطر المتعددة)
+content_blocks.1.body_ar=
+# body_en — text, lang:en — Body (English)
+content_blocks.1.body_en=
+# body_ckb — text, lang:ckb — دەق بە کوردی
+content_blocks.1.body_ckb=
+# caption_ar — string, lang:ar — التعليق بالعربية
+content_blocks.1.caption_ar=
+# caption_en — string, lang:en — Caption (English)
+content_blocks.1.caption_en=
+# caption_ckb — string, lang:ckb — سەردێر بە کوردی
+content_blocks.1.caption_ckb=
+# alt_ar — string, lang:ar — النص البديل بالعربية (للصور)
+content_blocks.1.alt_ar=
+# alt_en — string, lang:en — Alt text (English)
+content_blocks.1.alt_en=
+# alt_ckb — string, lang:ckb — دەقی جێگرەوە بە کوردی
+content_blocks.1.alt_ckb=
+# url — string — رابط التضمين للفيديو أو رابط الصورة — embed URL (video_embed) or image URL (image)
+content_blocks.1.url=
+# media_key — string — مفتاح R2 عند التخزين الداخلي — internal R2 key
+content_blocks.1.media_key=
+
+# ------------------------------ دليل التركيب والاستخدام / Setup & usage guide
+# usage_official_url — string — رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد
+usage_official_url=
+# مجموعة متكررة "usage_steps" — كرر بـ usage_steps.2.… usage_steps.3.…
+# لحذف كل العناصر عند التحديث: usage_steps=__CLEAR__
+# id — string — معرف ثابت — stable id for merge-by-id
+usage_steps.1.id=
+# kind — enum, مطلوب/required, setup|usage — setup (تركيب) | usage (استخدام)
+usage_steps.1.kind=setup
+# title — string — عنوان الخطوة (حتى 200 حرف) — step title
+usage_steps.1.title=
+# body — text — شرح الخطوة (حتى 2000 حرف؛ heredoc للأسطر المتعددة) — step body
+usage_steps.1.body=
+# images — urls — حتى 6 روابط صور — افصل بينها بمسافة (الفاصلة مقبولة أيضًا قبل رابط جديد). الفاصلة داخل الرابط نفسه لا تكسره. — up to six image URLs, space-separated
+usage_steps.1.images=
+# video_url — string — رابط فيديو (ملف مباشر أو صفحة YouTube/Vimeo) أو فارغ
+usage_steps.1.video_url=
+# link_url — string — رابط الوثيقة الرسمية لهذه الخطوة أو فارغ
+usage_steps.1.link_url=

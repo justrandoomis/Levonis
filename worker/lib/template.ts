@@ -16,6 +16,8 @@
  */
 
 import { newId } from './crypto';
+import { mergeLegacyModels } from './modelAvailability';
+import type { TransportOffer } from './pricing';
 import { localizableSlots } from './translationSlots';
 import { isMixed } from './availability';
 import { normalizeCheapestBase } from './cheapestBase';
@@ -178,7 +180,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('is_featured', 'bool', 'classification', 'منتج مميز — featured flag (true/false)'),
   f('display_order', 'int', 'classification', 'ترتيب العرض — display order (integer, lower = earlier)', { min: -100_000, max: 100_000 }),
   // selling
-  f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. والأدق أن تترك الخيارات تقرر: أنواع البيع تُشتق من availability_type لكل خيار.', { enumValues: ['direct_sale', 'pre_order', 'bundle', 'mixed'] as const }),
+  f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. كل خيار موديل حقيقي؛ direct وpreorder يحددان طرق التنفيذ.', { enumValues: ['direct_sale', 'pre_order', 'bundle', 'mixed'] as const }),
   f('stock', 'int', 'selling', 'المخزون — stock count; __NULL__ = not tracked', { nullable: true, min: 0, max: 1_000_000 }),
   f('low_stock_threshold', 'int', 'selling', 'حد التنبيه لمخزون المنتج — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
   // WHICH LEVEL COUNTS THE STOCK. The form derives it from where the numbers
@@ -219,7 +221,7 @@ const GROUP_SPECS: GroupSpec[] = [
       f('commission_iqd', 'iqd', 'transports', 'الزيادة بالدينار فوق السعر عند الطلب المسبق بهذه الطريقة (البري مثلًا) — __NULL__ = القيمة الافتراضية من الإعدادات', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
       // The form calls this number «الزيادة بالدينار». The file accepts that
       // word too, so the owner can write what the screen says.
-      f('surcharge_iqd', 'iqd', 'transports', 'مرادف لـ commission_iqd بكلمة الواجهة: الزيادة بالدينار لهذه الطريقة — import-only, never exported; يتقدّم على commission_iqd إذا وُجد الاثنان', { nullable: true, min: 0, max: IQD_MAX, exported: false, aliasOf: 'commission_iqd', plusIsPlain: true }),
+      f('surcharge_iqd', 'int', 'transports', 'Product default fee; replaces commission_iqd when both are supplied. Model overrides replace this fee.', { nullable: true, min: -IQD_MAX, max: IQD_MAX, aliasOf: 'commission_iqd', plusIsPlain: true }),
       f('active', 'bool', 'transports', 'معروض للزبائن — offered to customers'),
     ],
   },
@@ -422,6 +424,45 @@ const PROTECTED_FIELDS: ProtectedFieldSpec[] = [
   { key: 'legacy.*', notes: 'v1 passthrough columns (shipping_methods, features, stores, membership_prices, …) — preserved verbatim, not template-editable.' },
 ];
 
+// Nested option syntax uses the same field coercion/registry as the rest of
+// TXT. Only the object path changes; there is no second importer.
+const availabilityFields = (prefix: string, transport = false): FieldSpec[] => [
+  f(`${prefix}.enabled`, 'bool', 'options', 'Enable this fulfillment or inbound transport'),
+  ...['regular', 'prime', 'pro', 'cost'].flatMap((tier) => {
+    const pk = tier === 'cost' ? 'cost_iqd' : `${tier}_price_iqd`;
+    const ak = `${tier}_adjust_iqd`;
+    return [
+      f(`${prefix}.${pk}`, 'iqd', 'options', 'Fixed total override; __NULL__ inherits', { nullable: true, min: 0, max: IQD_MAX, adjustKey: `${prefix}.${ak}` }),
+      f(`${prefix}.${ak}`, 'int', 'options', 'Adjustment replaces the fallback; never stacks with it', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+    ];
+  }),
+  ...(transport ? [
+    f(`${prefix}.method`, 'enum', 'options', 'Inbound transport, independent of local delivery', { enumValues: ['air', 'sea', 'land'] }),
+    f(`${prefix}.surcharge_iqd`, 'int', 'options', 'Inbound transport surcharge; zero is explicit', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+  ] : [f(`${prefix}.stock`, 'int', 'options', 'Stock of this model and fulfillment', { nullable: true, min: 0, max: 10_000_000 })]),
+  f(`${prefix}.lead_time_text`, 'string', 'options', 'Lead time shown verbatim'),
+  f(`${prefix}.lead_time_min_days`, 'int', 'options', 'Minimum days', { nullable: true, min: 0, max: 3650 }),
+  f(`${prefix}.lead_time_max_days`, 'int', 'options', 'Maximum days', { nullable: true, min: 0, max: 3650 }),
+  ...(!transport ? [f(`${prefix}.image`, 'string', 'options', 'Fulfillment image override'), f(`${prefix}.sku_part`, 'string', 'options', 'Fulfillment SKU fragment')] : []),
+];
+const modelFields = [
+  ...availabilityFields('direct'), ...availabilityFields('preorder'),
+  ...[1, 2, 3].flatMap((i) => availabilityFields(`preorder.transports.${i}`, true)),
+];
+GROUP_SPECS.find((g) => g.name === 'options')!.fields.push(...modelFields);
+GROUP_SPECS.find((g) => g.name === 'options')!.fields.find((f) => f.key === 'availability_type')!.exported = false;
+GROUP_SPECS.find((g) => g.name === 'transports')!.fields.push(
+  f('enabled', 'bool', 'transports', 'Enable product default method', { aliasOf: 'active' }),
+  ...['regular', 'prime', 'pro', 'cost'].flatMap((tier) => {
+    const price = tier === 'cost' ? 'cost_iqd' : `${tier}_price_iqd`;
+    const adjust = `${tier}_adjust_iqd`;
+    return [f(price, 'iqd', 'transports', 'Product transport fixed default', { nullable: true, min: 0, max: IQD_MAX, adjustKey: adjust }), f(adjust, 'int', 'transports', 'Product transport adjustment default', { nullable: true, min: -IQD_MAX, max: IQD_MAX })];
+  }),
+  f('lead_time_text', 'string', 'transports', 'Default lead time'),
+  f('lead_time_min_days', 'int', 'transports', 'Minimum days', { nullable: true, min: 0, max: 3650 }),
+  f('lead_time_max_days', 'int', 'transports', 'Maximum days', { nullable: true, min: 0, max: 3650 }),
+);
+
 export const FIELD_REGISTRY = {
   version: TEMPLATE_VERSION,
   scalars: SCALAR_FIELDS,
@@ -468,7 +509,7 @@ export interface ParsedTemplate {
   warnings: string[];
 }
 
-const MAX_TEMPLATE_BYTES = 1_500_000;
+const MAX_TEMPLATE_BYTES = 40 * 1024 * 1024;
 const KEY_RE = /^([A-Za-z0-9_.]+)\s*=(.*)$/;
 const GROUP_KEY_RE = /^([a-z_]+)\.(\d+)\.(.+)$/;
 const ROW_KEY_RE = /^rows\.(\d+)\.(.+)$/;
@@ -896,6 +937,13 @@ export function orderedOptions(doc: ProductDoc): ProductDoc['options'] {
 }
 
 export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
+  const canonical = mergeLegacyModels(doc.options);
+  doc = { ...doc, options: canonical.options,
+    colors: doc.colors.map((c) => ({ ...c, option_id: c.option_id ? canonical.aliases.get(c.option_id) ?? c.option_id : c.option_id,
+      ...(c.option_ids ? { option_ids: [...new Set(c.option_ids.map((id) => canonical.aliases.get(id) ?? id))] } : {}),
+    })),
+    media: doc.media.map((m) => ({ ...m, option_value_id: canonical.aliases.get(m.option_value_id) ?? m.option_value_id })),
+  };
   const e: Entry[] = [];
   const push = (key: string, value: string | null) => e.push({ key, value });
   // §11: cost reaches no export an assistant admin can open. Absent means
@@ -1007,6 +1055,13 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.method`, t.method);
     push(`${p}.commission_iqd`, numStr(t.commission_iqd));
     push(`${p}.active`, boolStr(t.active));
+    for (const key of ['regular_price_iqd','prime_price_iqd','pro_price_iqd','cost_iqd','regular_adjust_iqd','prime_adjust_iqd','pro_adjust_iqd','cost_adjust_iqd'] as const) {
+      if ((t as TransportOffer)[key] != null) push(`${p}.${key}`, numStr((t as TransportOffer)[key] ?? null));
+    }
+    for (const key of ['surcharge_iqd', 'lead_time_text', 'lead_time_min_days', 'lead_time_max_days'] as const) {
+      const value = key === 'surcharge_iqd' ? (t as TransportOffer).surcharge_iqd ?? t.commission_iqd : (t as TransportOffer)[key];
+      push(`${p}.${key}`, key === 'lead_time_text' ? String(value ?? '') : numStr(value as number | null | undefined ?? null));
+    }
   });
 
   sorted(doc.media).forEach((mItem, i) => {
@@ -1047,7 +1102,19 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     // export is the bulk-EDIT path: a field the file omits is one the importer
     // PRESERVES, so a silently-absent availability could never be cleared by
     // editing the file the store itself produced.
-    push(`${p}.availability_type`, o.availability_type ?? '');
+    for (const spec of modelFields) {
+      if (!money && /cost/.test(spec.key)) continue;
+      let value: unknown = o;
+      for (const part of spec.key.split('.')) value = value == null ? undefined : (value as Record<string, unknown>)[/^\d+$/.test(part) ? String(Number(part) - 1) : part];
+      if (value === undefined) {
+        const parentPath = spec.key.split('.').slice(0, -1);
+        let parent: unknown = o;
+        for (const part of parentPath) parent = parent == null ? undefined : (parent as Record<string, unknown>)[/^\d+$/.test(part) ? String(Number(part) - 1) : part];
+        if (parent === undefined) continue;
+        value = spec.nullable ? null : spec.type === 'bool' ? false : '';
+      }
+      push(`${p}.${spec.key}`, typeof value === 'boolean' ? boolStr(value) : typeof value === 'number' || value === null ? numStr(value as number | null) : String(value));
+    }
     push(`${p}.stock`, numStr(o.stock ?? null));
     push(`${p}.lead_time_text`, o.lead_time_text ?? '');
     push(`${p}.lead_time_min_days`, numStr(o.lead_time_min_days ?? null));
@@ -1459,7 +1526,7 @@ export function generateBlankTemplate(): string {
     '#  - المجموعات المتكررة مفهرسة: options.1.name_ar ثم options.2.name_ar وهكذا.',
     '#  - الأسعار أعداد صحيحة بالدينار العراقي فقط (بدون فواصل).',
     '#  - السعر الأساسي (price_iqd) هو الأرخص. الخيارات والألوان زيادات فوقه: regular_adjust_iqd=60000 أو regular_price_iqd=+60000.',
-    '#  - التوفر حسب المنتج: اترك options.N.availability_type فارغًا. البيع المباشر زيادة (direct_surcharge_iqd) وكل طريقة طلب مسبق زيادة (transports.N.commission_iqd).',
+    '#  - options موديلات فقط. التوفر: options.N.direct.* وoptions.N.preorder.* والنقل: options.N.preorder.transports.*؛ transports.N قيم افتراضية فقط.',
     '#  - سعر ثابت (regular_price_iqd=رقم بلا إشارة) ما زال مقبولًا ويُعاد التعبير عنه كزيادة فوق الأساسي عند الاستيراد دون تغيير ما يدفعه الزبون.',
     '#  - لا تختلق قيماً — إذا كانت المعلومة غير معروفة اترك الحقل فارغاً أو __NULL__.',
     '',
@@ -1588,6 +1655,18 @@ function applyItemFields(target: LooseItem, specs: FieldSpec[], fields: Record<s
 
 function applyItemField(target: LooseItem, spec: FieldSpec, pf: ParsedField): void {
   const key = spec.aliasOf ?? spec.key;
+  if (key.includes('.')) {
+    const parts = key.split('.');
+    let cursor = target;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = /^\d+$/.test(parts[i]) ? String(Number(parts[i]) - 1) : parts[i];
+      const old = cursor[part];
+      const value = Array.isArray(old) ? [...old] : old && typeof old === 'object' ? { ...old } : /^\d+$/.test(parts[i + 1]) ? [] : {};
+      cursor[part] = value; cursor = value as LooseItem;
+    }
+    applyItemField(cursor, { ...spec, key: parts[parts.length - 1], aliasOf: undefined, adjustKey: spec.adjustKey?.split('.').pop() }, pf);
+    return;
+  }
   if (pf.adjust && spec.adjustKey) {
     // `regular_price_iqd=+60000`: this row FOLLOWS the level beneath by that
     // much. The price itself is cleared so the adjustment is what resolves.

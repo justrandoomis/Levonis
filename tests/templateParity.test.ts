@@ -1,3 +1,4 @@
+import { parityMediaEnv } from './fixtures/media';
 /**
  * TXT TEMPLATE ↔ PRODUCT FORM — the four integration tests of
  * docs/TXT_IMPORT_PARITY.md §5.5 (A create, B first relation on a legacy
@@ -55,7 +56,7 @@ function setup(db?: unknown) {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const handle = db ?? asD1(raw);
-  return { raw, db: handle, app: stubApp(handle, OWNER, mount), assistant: stubApp(handle, ASSISTANT, mount) };
+  return { raw, db: handle, app: stubApp(handle, OWNER, mount, { env: parityMediaEnv() }), assistant: stubApp(handle, ASSISTANT, mount, { env: parityMediaEnv() }) };
 }
 
 const put = (a: App, path: string, body: unknown) =>
@@ -638,7 +639,7 @@ test('TEST D: a dropped relation statement is caught by the read-back — the CR
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: parityMediaEnv() });
 
   // The batch "succeeds" with one statement quietly missing — the adversary
   // the old response could not see, because it counted the file, not the rows.
@@ -681,7 +682,7 @@ test('TEST D: a dropped relation statement on an UPDATE is refused and names the
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: parityMediaEnv() });
 
   const created = await json(await post(app, '/api/admin/template/apply', { text: A_TXT, mode: 'draft', confirm: true }));
   const id = created.product_id as string;

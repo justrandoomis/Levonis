@@ -546,15 +546,17 @@ test('the product editor refuses a composition row and names the panel that owns
   assert.equal(badge.composition, 'bundle', 'the grid badges it instead of opening an editor that will refuse');
 });
 
-test('deleting a member product is refused with the bundles that use it NAMED', async () => {
-  const { app } = setup();
-  await create(app);
-  const res = await del(app, '/api/admin/products-v2/prd_spool');
+test('permanent member deletion removes its relationships and hides affected bundles', async () => {
+  const { app, raw } = setup();
+  const bundleId = (await create(app)).body.product.id as string;
+  assert.equal((await del(app, '/api/admin/products-v2/prd_spool')).status, 400, 'permanence is explicit');
+  const res = await del(app, '/api/admin/products-v2/prd_spool?permanent=true');
   const body = await json(res);
-  assert.equal(res.status, 409, JSON.stringify(body));
-  assert.equal(body.code, 'COMPOSITION_PRODUCT');
-  assert.equal((body.details.bundles as unknown[]).length, 1);
-  assert.match(body.error, /Starter kit|حزمة البداية/);
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.product_deleted, true);
+  assert.equal(row(raw, "SELECT COUNT(*) n FROM products WHERE id='prd_spool'")!.n, 0);
+  assert.equal(row(raw, "SELECT COUNT(*) n FROM bundle_components WHERE member_product_id='prd_spool'")!.n, 0);
+  assert.equal(row(raw, 'SELECT status FROM products WHERE id=?', bundleId)!.status, 'hidden');
 });
 
 // ================================================================ §11.4 scope

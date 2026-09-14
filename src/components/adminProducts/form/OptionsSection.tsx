@@ -21,6 +21,7 @@
  */
 
 import React, { useId } from 'react';
+import { ModelAvailabilityEditor as AvailabilityRow } from './ModelAvailabilityEditor';
 import { Trash2, GripVertical } from 'lucide-react';
 import {
   Field,
@@ -897,122 +898,5 @@ function VariantsEditor({
   );
 }
 
-/**
- * HOW THIS ONE OPTION IS SOLD — the editor for the 0043 fields.
- *
- * The three states are deliberately three chips rather than a dropdown with a
- * blank entry: "inherit" is a real, common and correct answer (it is what
- * every option in the catalogue says today), and a select whose empty value
- * means something is a select people mis-read.
- *
- * The rest of the row follows the choice. Pre-order reveals the lead time,
- * because a customer waiting weeks must be told how many; direct sale hides it
- * and the server refuses one, because a thing shipping from the shelf has no
- * wait to describe. The model fields stay visible in both, since they are what
- * lets "A1 — pre-order" and "A1 — direct" appear to the customer as one A1
- * with two ways to buy it instead of two unrelated cards.
- */
-function AvailabilityRow({
-  value,
-  onChange,
-  error,
-}: {
-  value: FormValue;
-  onChange: (patch: Partial<FormValue>) => void;
-  error?: string;
-}) {
-  const CHOICES: Array<{ id: '' | 'direct_sale' | 'pre_order'; ar: string; en: string; hint: string }> = [
-    { id: '', ar: 'حسب المنتج', en: 'Inherit', hint: 'يتبع أنواع بيع المنتج — وهو ما تفعله كل الخيارات القديمة' },
-    { id: 'direct_sale', ar: 'بيع مباشر', en: 'Direct sale', hint: 'من المخزون، يُشحن الآن' },
-    { id: 'pre_order', ar: 'طلب مسبق', en: 'Pre-order', hint: 'يُطلب من المورّد ثم يُشحن' },
-  ];
-  const isPre = value.availability_type === 'pre_order';
-  return (
-    <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2" data-option-availability={value.id}>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-bold text-zinc-400 me-1">نوع التوفر / Availability</span>
-        {CHOICES.map((ch) => {
-          const on = value.availability_type === ch.id;
-          return (
-            <button
-              key={ch.id || 'inherit'}
-              type="button"
-              data-availability={ch.id || 'inherit'}
-              aria-pressed={on}
-              title={ch.hint}
-              onClick={() =>
-                onChange(
-                  ch.id === 'direct_sale'
-                    ? // Switching to direct sale clears the wait rather than
-                      // leaving a value the server would refuse on save.
-                      { availability_type: ch.id, lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null }
-                    : { availability_type: ch.id }
-                )
-              }
-              className={`min-h-9 px-2.5 rounded-lg border text-[12px] font-bold transition-colors ${
-                on
-                  ? 'border-violet-500 bg-violet-500/10 text-white'
-                  : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-600'
-              }`}
-            >
-              {ch.ar}
-            </button>
-          );
-        })}
-      </div>
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
-      <div className="mt-2">
-        <Grid cols={3}>
-          <Field ar="اسم النسخة" en="Model" hint="A1 / A1 Combo — ما يجمع طريقتَي الشراء تحت نسخة واحدة">
-            <TextInput
-              value={value.variant_label}
-              onChange={(e) => onChange({ variant_label: e.target.value })}
-              placeholder="A1 Combo"
-              aria-label="Model name"
-            />
-          </Field>
-          <Field ar="مفتاح النسخة" en="Model key" hint="فارغ = يُشتق من الاسم">
-            <TextInput
-              value={value.variant_key}
-              onChange={(e) => onChange({ variant_key: e.target.value })}
-              placeholder="a1-combo"
-              aria-label="Model key"
-            />
-          </Field>
-          {isPre ? (
-            <Field ar="مدة الانتظار" en="Lead time" hint="كما تُعرض للزبون — مثال: 3-4 أسابيع">
-              <TextInput
-                value={value.lead_time_text}
-                onChange={(e) => onChange({ lead_time_text: e.target.value })}
-                placeholder="3-4 weeks"
-                aria-label="Lead time"
-              />
-            </Field>
-          ) : (
-            <div />
-          )}
-          {isPre && (
-            <>
-              <Field ar="أقل عدد أيام" en="Min days" hint="للترتيب والتقدير — النص أعلاه هو ما يُعرض">
-                <Qty
-                  value={value.lead_time_min_days}
-                  onChange={(n) => onChange({ lead_time_min_days: n })}
-                  placeholder="21"
-                />
-              </Field>
-              <Field ar="أكثر عدد أيام" en="Max days">
-                <Qty
-                  value={value.lead_time_max_days}
-                  onChange={(n) => onChange({ lead_time_max_days: n })}
-                  placeholder="28"
-                />
-              </Field>
-            </>
-          )}
-        </Grid>
-      </div>
-    </div>
-  );
-}
 
 export { GripVertical };

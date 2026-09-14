@@ -42,6 +42,7 @@ import { execFileSync } from 'node:child_process';
 // applies exactly the same rule to every new Worker (02-MIGRATION-PLAN.md
 // §11.6). Behaviour here is unchanged — `tests/preserveVars.test.ts` pins it.
 import { liveVars, mergeVars } from './lib/preserve-vars.mjs';
+import { inspectProductRelease, assertProductRelease, remoteD1Reader } from './product-release-preflight.mjs';
 
 const CONFIG = new URL('../wrangler.jsonc', import.meta.url);
 const REPO = new URL('..', import.meta.url).pathname;
@@ -247,4 +248,10 @@ if (stillEmpty.length) {
 // The CI working copy is ephemeral; comments are not needed in it, and plain
 // JSON is valid in a .jsonc file.
 writeFileSync(CONFIG, `${JSON.stringify(cfg, null, 2)}\n`);
+// Workers Builds deploys immediately after this command. Unlike the gated
+// GitHub workflow it does not apply migrations, so a push must not put the
+// product code ahead of D1. This check only reads the resolved live database.
+const productDb = cfg.d1_databases?.find((db) => db.binding === 'DB');
+if (!productDb?.database_name) throw new Error('Product DB binding is missing; refusing to deploy');
+assertProductRelease(await inspectProductRelease(remoteD1Reader(productDb.database_name)));
 console.log('prepare-deploy-config: wrangler.jsonc resolved for this build.');

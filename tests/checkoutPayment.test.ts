@@ -44,6 +44,71 @@ import {
 } from '../worker/lib/paymentPolicy';
 import { printerProductIds, isPrinterProduct } from '../worker/lib/printerIdentity';
 import { SETTING_DEFAULTS, PUBLIC_SETTING_KEYS, printerNoteIqdFrom } from '../worker/lib/settings';
+import { modelAvailabilityStatements } from '../worker/lib/modelAvailability';
+
+async function canonicalModel(raw: DatabaseSync, db: D1Database) {
+  raw.exec(`
+    UPDATE products SET price_iqd=1000000,prime_price_iqd=950000,pro_price_iqd=900000 WHERE id='p_a1';
+    INSERT INTO product_option_groups(id,product_id,name_en) VALUES ('canonical-models','p_a1','Model');
+    INSERT INTO product_option_values(id,product_id,group_id,name_en,variant_key,regular_adjust_iqd)
+      VALUES ('combo','p_a1','canonical-models','A1 mini Combo','a1-mini-combo',200000);
+  `);
+  await db.batch(modelAvailabilityStatements(db, 'p_a1', 'combo', {
+    direct: { enabled: true, regular_adjust_iqd: 20000, stock: 2 },
+    preorder: { enabled: true, transports: [
+      { method: 'sea', enabled: true, surcharge_iqd: 0, lead_time_min_days: 21, lead_time_max_days: 28 },
+      { method: 'air', enabled: true, surcharge_iqd: 100000, lead_time_min_days: 7, lead_time_max_days: 12 },
+    ] },
+  }, true));
+}
+
+test('canonical model is repriced at product/cart/checkout/order boundaries; PRO exemption preserves Combo and immutable delivery/lead snapshots', async () => {
+  const { db, raw } = setup(); await canonicalModel(raw, db);
+  const a = appAs(db, 'pro');
+  const selection = { productId: 'p_a1', optionId: 'combo', fulfillmentType: 'pre_order', transportMethod: 'air', qty: 1 };
+  const pq = await json(await post(a, '/api/products/a1/quote', selection));
+  assert.equal(pq.quote.unit_subtotal_iqd, 1100000, JSON.stringify(pq));
+  const added = await json(await post(a, '/api/cart/items', { ...selection, finalPrice: 1, membershipTier: 'regular' }));
+  assert.equal(added.success, true, JSON.stringify(added));
+  const cart = await json(await a.request('/api/cart'));
+  assert.equal(cart.items[0].unit_price_iqd, 1100000);
+  const quoted = await json(await post(a, '/api/orders/quote', quoteBody('addr_p', 'cash')));
+  assert.equal(quoted.quote.lines[0].unit_price_iqd, 1100000, JSON.stringify(quoted));
+  const placed = await json(await post(a, '/api/orders', orderBody('addr_p', 'cash', { finalPrice: 1, membershipTier: 'pro' })));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  const item = raw.prepare('SELECT selection_snapshot,unit_price_iqd FROM order_items WHERE order_id=?').get(placed.order.id) as { selection_snapshot: string; unit_price_iqd: number };
+  assert.equal(item.unit_price_iqd, 1100000);
+  const frozen = JSON.parse(item.selection_snapshot);
+  assert.equal(frozen.membership_tier, 'pro'); assert.equal(frozen.option_id, 'combo');
+  assert.equal(frozen.fulfillment_type, 'pre_order'); assert.equal(frozen.transport_method, 'air');
+  assert.equal(frozen.local_delivery_method, 'standard'); assert.equal(frozen.resolved_option_delta, 200000);
+  assert.deepEqual(frozen.lead_time, { text: '', min_days: 7, max_days: 12 });
+  assert.equal(frozen.resolved_final_price, 1100000 + frozen.resolved_delivery_fee);
+  raw.exec("UPDATE product_option_transports SET surcharge_iqd=999999,lead_time_max_days=90 WHERE method='air'; UPDATE product_option_values SET name_en='Changed' WHERE id='combo'");
+  assert.equal((raw.prepare('SELECT selection_snapshot FROM order_items WHERE order_id=?').get(placed.order.id) as { selection_snapshot: string }).selection_snapshot, item.selection_snapshot);
+  await Promise.allSettled(pending);
+});
+
+test('checkout revalidates canonical model, fulfillment, transport, stock, membership and price after cart creation', async () => {
+  const { db, raw } = setup(); await canonicalModel(raw, db);
+  const a = appAs(db, 'buyer');
+  const added = await json(await post(a, '/api/cart/items', { productId: 'p_a1', optionId: 'combo', fulfillmentType: 'direct_sale', qty: 2 }));
+  assert.equal(added.success, true, JSON.stringify(added));
+  raw.exec("UPDATE product_option_fulfillment SET stock=1 WHERE fulfillment_type='direct_sale'");
+  assert.equal((await post(a, '/api/orders', orderBody('addr_b', 'cash'))).status, 400);
+  raw.exec("UPDATE product_option_fulfillment SET stock=3,regular_adjust_iqd=30000 WHERE fulfillment_type='direct_sale'");
+  const reprice = await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash', { membershipTier: 'pro', finalPrice: 1 })));
+  assert.equal(reprice.quote.lines[0].unit_price_iqd, 1230000, JSON.stringify(reprice));
+  raw.exec("UPDATE product_option_fulfillment SET enabled=0 WHERE fulfillment_type='direct_sale'");
+  assert.equal((await post(a, '/api/orders', orderBody('addr_b', 'cash'))).status, 400);
+  raw.exec("UPDATE product_option_fulfillment SET enabled=1 WHERE fulfillment_type='direct_sale'; UPDATE product_option_values SET active=0 WHERE id='combo'");
+  assert.equal((await post(a, '/api/orders', orderBody('addr_b', 'cash'))).status, 400);
+  raw.exec("UPDATE product_option_values SET active=1 WHERE id='combo'; DELETE FROM cart_items WHERE user_id='buyer'");
+  assert.equal((await post(a, '/api/cart/items', { productId: 'p_a1', optionId: 'combo', fulfillmentType: 'pre_order', transportMethod: 'air', qty: 1 })).status, 200);
+  raw.exec("UPDATE product_option_transports SET enabled=0 WHERE method='air'");
+  assert.equal((await post(a, '/api/orders', orderBody('addr_b', 'cash'))).status, 400);
+  assert.equal((raw.prepare("SELECT COUNT(*) n FROM orders WHERE user_id='buyer'").get() as { n: number }).n, 0);
+});
 
 // ------------------------------------------------------------------ fixture
 

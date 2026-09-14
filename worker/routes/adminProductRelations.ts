@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
+import { deleteProductPermanently } from '../lib/productDeletion';
+import { scanProductOrphans, confirmProductOrphanCleanup } from '../lib/productOrphans';
 import { audit } from '../lib/audit';
 import { parseProductRow } from '../lib/productModel';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
@@ -47,6 +49,25 @@ import {
 export const adminProductRelationsRoutes = new Hono<AppContext>();
 adminProductRelationsRoutes.use('*', requireAdmin);
 
+adminProductRelationsRoutes.post('/maintenance/orphans', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  if (body.dry_run === false) {
+    if (body.confirm !== 'CLEANUP_REVIEWED_ORPHANS' || typeof body.scan_id !== 'string') throw badRequest('Explicit confirmation of a reviewed dry run is required');
+    return c.json({ success: true, ...await confirmProductOrphanCleanup(c.env, body.scan_id, c.get('user')!.id) });
+  }
+  return c.json({ success: true, ...await scanProductOrphans(c.env, c.get('user')!.id) });
+});
+
+adminProductRelationsRoutes.delete('/:id/permanent', async (c) => {
+  const report = await deleteProductPermanently(c.env, c.req.param('id'), c.get('user')!.id);
+  return c.json({ success: true, ...report });
+});
+adminProductRelationsRoutes.delete('/:id', async (c) => {
+  if (c.req.query('permanent') !== 'true') throw badRequest('Use permanent=true for permanent deletion');
+  const report = await deleteProductPermanently(c.env, c.req.param('id'), c.get('user')!.id);
+  return c.json({ success: true, ...report });
+});
+
 // ------------------------------------------------------------------- reading
 
 /** Builds the snapshot the inventory resolver needs, straight from the DB. */
@@ -85,6 +106,8 @@ export async function inventorySnapshot(db: D1Database, productId: string): Prom
       low_stock_threshold: product.low_stock_threshold,
     },
     option_values: rel.values.map((v) => ({
+      direct: v.direct,
+      preorder: v.preorder,
       id: v.id,
       group_id: v.group_id,
       name_en: v.name_en,
@@ -277,9 +300,10 @@ adminProductRelationsRoutes.post('/:id/stock/adjust', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
   const scope = str(body.scope, 'scope', { max: 20 });
-  if (!['base', 'option', 'color', 'variant'].includes(scope)) throw badRequest('scope: unknown stock level');
-  const scopeId = str(body.scope_id, 'scope_id', { max: 60, required: false }) ?? '';
+  if (!['base', 'option', 'color', 'variant', 'fulfillment'].includes(scope)) throw badRequest('scope: unknown stock level');
+  const scopeId = str(body.scope_id, 'scope_id', { max: 100, required: false }) ?? '';
   if (scope !== 'base' && !scopeId) throw badRequest('scope_id: required for this stock level');
+  if (scope === 'fulfillment' && !(await c.env.DB.prepare('SELECT id FROM product_option_fulfillment WHERE id=? AND product_id=?').bind(scopeId,productId).first())) throw badRequest('Fulfillment does not belong to this product');
   const delta = int(body.delta, 'delta', { min: -10_000_000, max: 10_000_000 });
   if (delta === 0) throw badRequest('delta: nothing to change');
   const reason = str(body.reason, 'reason', { max: 200 });

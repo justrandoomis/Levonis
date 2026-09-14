@@ -1,0 +1,96 @@
+{
+  "recorded_at": "2026-09-14T12:22:01.249796+00:00",
+  "environment": "local isolated repository worktree; external network disabled for tests and native proof",
+  "production_deployed": false,
+  "production_orphan_dry_run": "not run: no authorized live D1/R2 or admin session connection available",
+  "production_orphan_cleanup_performed": false,
+  "typecheck": {
+    "exit_code": 0,
+    "commands": [
+      "tsc --noEmit",
+      "tsc --noEmit -p worker/tsconfig.json",
+      "tsc --noEmit -p tests/tsconfig.json",
+      "npm run check:workspaces"
+    ],
+    "workspaces_and_probes": 10
+  },
+  "tests": {
+    "total_pass": 2935,
+    "root_command": "node --import tsx --test --test-concurrency=6 tests/*.test.ts",
+    "workspaces_command": "npm run test:workspaces",
+    "network_preload": "tests/fixtures/offline.cjs",
+    "suites": [
+      {
+        "suite": "root",
+        "exit_code": 0,
+        "tests": 2573,
+        "pass": 2573,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      {
+        "suite": "workspaces",
+        "exit_code": 0,
+        "tests": 362,
+        "pass": 362,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      }
+    ],
+    "command": "npm run test:unit",
+    "offline_preload_is_automatic": true
+  },
+  "eslint": {
+    "command": "npm run lint",
+    "exit_code": 0,
+    "errors": 0,
+    "warnings": 116
+  },
+  "build": {
+    "command": "npm run build",
+    "exit_code": 0,
+    "asset_headers_generated": true
+  },
+  "native_d1_r2": {
+    "command": "node --import tsx scripts/verify-product-architecture.ts",
+    "exit_code": 0,
+    "migrations_applied": 75,
+    "evidence": "native-d1-r2.json",
+    "historical_order_items": 1,
+    "foreign_key_violations": 0,
+    "product_and_owned_rows_remaining": 0,
+    "unused_owned_r2_objects_remaining": 0,
+    "owned_r2_objects_deleted": 5,
+    "reimport": {
+      "success": true,
+      "fresh_product_id": true,
+      "restored_r2_objects": 5
+    },
+    "release_schema_ready": true
+  },
+  "log_sha256": {
+    "ownership-unit.log": "c70ba1bf39b5cf198be33cac3b2ab36f42c0c95ada86c9b36d40577cd54685e0",
+    "ownership-typecheck.log": "ea40baeba4bc494a6f31e9b558f1481c40e64637d060f74d9147ccdda65c3a0e",
+    "ownership-lint.log": "3ec97c869be2a85fdb4dba63d4cbfc530d80bb6c2dd7bcd4822230234b5636c7",
+    "ownership-build.log": "4ef1125d96c4b9bde44b269b7cbbff154386ae33d6fddd4dbf926c4de1c62271",
+    "ownership-native.log": "67456d7e020b65a239e4213b5ab5e67512f495f3dfab857939189172322c27fd"
+  },
+  "release_preflight": {
+    "queries": "SELECT only",
+    "local_native_d1_verified": true,
+    "blocks_automatic_deploy_before_migrations": true,
+    "existing_live_workflow_confirmation_preserved": true,
+    "live_preflight_run": false
+  },
+  "legacy_migration_orphan_isolation": {
+    "test": "tests/productModelMigration.test.ts",
+    "invalid_options_detected": 2,
+    "invalid_options_unchanged": true,
+    "canonical_models": 2,
+    "fulfillment_rows": 4,
+    "single_and_paged_reads_verified": true,
+    "production": false
+  }
+}

@@ -35,6 +35,7 @@
 import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
 import { newId } from './crypto';
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
 import { isInventoryMode, type InventoryMode } from './inventory';
 
 /** What the bridge decided on the file's behalf — surfaced by the route as
@@ -74,7 +75,7 @@ interface GroupOut {
   values: Record<string, unknown>[];
 }
 
-const priceBag = (o: {
+const priceBag = (o: ModelAvailability & {
   regular_price_iqd: number | null;
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
@@ -84,6 +85,8 @@ const priceBag = (o: {
   pro_adjust_iqd?: number | null;
   cost_adjust_iqd?: number | null;
 }) => ({
+  ...(o.direct !== undefined ? { direct: o.direct } : {}),
+  ...(o.preorder !== undefined ? { preorder: o.preorder } : {}),
   regular_price_iqd: o.regular_price_iqd,
   prime_price_iqd: o.prime_price_iqd,
   pro_price_iqd: o.pro_price_iqd,

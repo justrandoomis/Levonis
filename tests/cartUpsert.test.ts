@@ -50,7 +50,7 @@ const LEVONIS_ADD = `
   INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                           shipping_method_id, transport_method, warranty_plan_id, qty)
   VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
-  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id, COALESCE(fulfillment_type,''), transport_method)
     WHERE product_id IS NOT NULL
   DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                 option_value_ids = excluded.option_value_ids,
@@ -213,7 +213,7 @@ test('the conflict target 0030 left behind really does fail against this schema'
       raw.prepare(
         `INSERT INTO cart_items (id, user_id, product_id, option_id, color_id, qty)
          VALUES ('x','u1','p1','','',1)
-         ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+         ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id, COALESCE(fulfillment_type,''), transport_method)
          DO UPDATE SET qty = qty + 1`
       ).run(),
     /ON CONFLICT|no unique|does not match/i,
@@ -242,7 +242,7 @@ const BUNDLE_ADD = `
   INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                           shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
   VALUES (?, ?, ?, ?, '[]', '', '', ?, '', ?, ?)
-  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id, COALESCE(fulfillment_type,''), transport_method)
     WHERE product_id IS NOT NULL
   DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                 transport_method = excluded.transport_method`;

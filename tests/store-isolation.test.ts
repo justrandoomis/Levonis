@@ -352,7 +352,7 @@ test('runtimeSpecifiers erases type-only imports and keeps everything else', () 
   assert.deepEqual(kept("export * from 'a';"), ['a']);
 });
 
-test('no store or core source imports a service; the SPA imports @levonis packages type-only', () => {
+test('no store or core source imports a service; the SPA imports contracts type-only and the pure model availability helper', () => {
   let scanned = 0;
   for (const file of storeSourceFiles()) {
     const rel = file.slice(ROOT.length + 1);
@@ -370,7 +370,7 @@ test('no store or core source imports a service; the SPA imports @levonis packag
     if (!rel.startsWith(`src${sep}`)) continue;
     for (const spec of runtimeSpecifiers(source)) {
       assert.ok(
-        !spec.startsWith('@levonis/'),
+        !spec.startsWith('@levonis/') || spec === '@levonis/pricing/fulfillment',
         `${rel}: runtime-imports ${spec} — the SPA may only \`import type\` from @levonis/* (contract types are erased at build time)`
       );
     }

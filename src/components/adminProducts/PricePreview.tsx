@@ -5,6 +5,7 @@
  * version of the product; an honest note appears when the form is dirty.
  */
 
+import { modelSaleTypes } from '@levonis/pricing/fulfillment';
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
@@ -49,14 +50,19 @@ export default function PricePreview({
 }) {
   const fromRel = rel && hasRelationStructure(rel);
   const optionChoices = fromRel
-    ? rel.groups.flatMap((g) => g.values.map((v) => ({ id: v.id, label: v.name_en || v.name_ar || v.id, active: v.active })))
-    : (savedDoc.options ?? []).map((o) => ({ id: o.id, label: o.name_ar || o.name_en || o.id, active: o.active }));
+    ? rel.groups.flatMap((g) => g.values.map((v) => ({ direct: v.direct, preorder: v.preorder, id: v.id, label: v.name_en || v.name_ar || v.id, active: v.active })))
+    : (savedDoc.options ?? []).map((o) => ({ direct: o.direct, preorder: o.preorder, id: o.id, label: o.name_ar || o.name_en || o.id, active: o.active }));
   const colorChoices = fromRel
     ? rel.colors.map((c) => ({ id: c.id, label: c.name_en || c.name_ar || c.hex || c.id, active: c.active }))
     : (savedDoc.colors ?? []).map((c) => ({ id: c.id, label: c.name_ar || c.name_en || c.hex || c.id, active: c.active }));
   const [optionId, setOptionId] = useState('');
   const [colorId, setColorId] = useState('');
   const [transport, setTransport] = useState('');
+  const [requestedFulfillment, setFulfillment] = useState<'direct_sale' | 'pre_order'>('direct_sale');
+  const selected = optionChoices.find((o) => o.id === optionId);
+  const types = modelSaleTypes(selected, savedDoc.sale_types);
+  const fulfillmentType = types.length === 1 ? types[0] : requestedFulfillment;
+  const selectedTransport = fulfillmentType === 'pre_order' ? transport : '';
   const [warrantyId, setWarrantyId] = useState('');
   const [tier, setTier] = useState<'free' | 'prime' | 'pro'>('free');
   const [quote, setQuote] = useState<QuoteResponse['quote'] | null>(null);
@@ -72,7 +78,8 @@ export default function PricePreview({
         const data = await api.post<QuoteResponse>(`/api/admin/products-v2/${productId}/quote`, {
           optionId: optionId || undefined,
           colorId: colorId || undefined,
-          transportMethod: transport || undefined,
+          transportMethod: selectedTransport || undefined,
+          fulfillmentType,
           warrantyPlanId: warrantyId || undefined,
           tier: tier === 'free' ? undefined : tier,
         });
@@ -87,9 +94,10 @@ export default function PricePreview({
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [productId, optionId, colorId, transport, warrantyId, tier]);
+  }, [productId, optionId, colorId, selectedTransport, fulfillmentType, warrantyId, tier]);
 
-  const activeTransports = (savedDoc.preorder_transports ?? []).filter((t) => t.active);
+  const activeTransports = fulfillmentType !== 'pre_order' ? [] : selected?.preorder?.transports !== undefined
+    ? selected.preorder.transports.filter((t) => t.enabled) : (savedDoc.preorder_transports ?? []).filter((t) => t.active);
 
   return (
     <Section ar="معاينة السعر الحية" en="Live price preview" defaultOpen>
@@ -111,6 +119,12 @@ export default function PricePreview({
             {optionChoices.map((o) => (
               <option key={o.id} value={o.id}>{o.label + (o.active ? '' : ' (معطّل)')}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <L ar="نوع الطلب" en="Order type" />
+          <select value={fulfillmentType} onChange={(e) => { setFulfillment(e.target.value as 'direct_sale' | 'pre_order'); setTransport(''); }} className={inputCls}>
+            {types.map((type) => <option key={type} value={type}>{type === 'direct_sale' ? 'بيع مباشر / Direct' : 'طلب مسبق / Pre-order'}</option>)}
           </select>
         </div>
         <div>

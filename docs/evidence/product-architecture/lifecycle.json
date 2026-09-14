@@ -1,0 +1,267 @@
+{
+  "environment": "local SQLite via D1 adapter; in-memory R2 fixture",
+  "production": false,
+  "recorded_at": "2026-09-14T11:26:55.286Z",
+  "result": {
+    "deletion": {
+      "product_deleted": true,
+      "already_deleted": false,
+      "deletion_job_id": "pdel_6bbc5333dd6e4fa89071",
+      "rows_deleted_by_table": {
+        "product_option_transports": 6,
+        "product_color_option_links": 0,
+        "product_images": 5,
+        "product_option_aliases": 0,
+        "product_option_fulfillment": 4,
+        "bundle_component_choices": 0,
+        "cart_bundle_choices": 0,
+        "product_option_values": 2,
+        "bundle_components": 0,
+        "bundle_config": 0,
+        "bundle_items": 0,
+        "cart_items": 1,
+        "favorites": 0,
+        "inventory_ledger": 0,
+        "mystery_offer_secrets": 0,
+        "mystery_offers": 0,
+        "mystery_pool_entries": 0,
+        "offer_limits": 0,
+        "offer_windows": 0,
+        "price_history": 0,
+        "product_catalogs": 1,
+        "product_colors": 3,
+        "product_facets": 0,
+        "product_option_groups": 1,
+        "product_translations": 0,
+        "product_variants": 0,
+        "products": 1
+      },
+      "r2_objects_deleted": 5,
+      "r2_objects_shared_skipped": 0,
+      "r2_cleanup_pending": 0,
+      "cache_keys_invalidated": [
+        "catalog-generation:57:all-languages-all-queries-all-edge-locations",
+        "catalog-generation:24->57"
+      ]
+    },
+    "after_delete_counts": {
+      "product_option_transports": 0,
+      "product_color_option_links": 0,
+      "product_images": 0,
+      "product_option_aliases": 0,
+      "product_option_fulfillment": 0,
+      "bundle_component_choices": 0,
+      "cart_bundle_choices": 0,
+      "product_option_values": 0,
+      "bundle_components": 0,
+      "bundle_config": 0,
+      "bundle_items": 0,
+      "cart_items": 0,
+      "favorites": 0,
+      "inventory_ledger": 0,
+      "mystery_offer_secrets": 0,
+      "mystery_offers": 0,
+      "mystery_pool_entries": 0,
+      "offer_limits": 0,
+      "offer_windows": 0,
+      "price_history": 0,
+      "product_catalogs": 0,
+      "product_colors": 0,
+      "product_facets": 0,
+      "product_option_groups": 0,
+      "product_translations": 0,
+      "product_variants": 0,
+      "products": 0
+    },
+    "owned_old_r2_keys_remaining": 0,
+    "historical_orders": 1,
+    "reimport": {
+      "success": true,
+      "fresh_product_id": true,
+      "same_slug": true,
+      "models": 2,
+      "colors": 3,
+      "images": 5,
+      "spec_rows": 39,
+      "warranty_plans": 2,
+      "content_blocks": 5,
+      "usage_steps": 10,
+      "delivery_options": {
+        "standard": {
+          "enabled": true,
+          "quantity_step": 2,
+          "fee_iqd": 10000
+        },
+        "personal": {
+          "enabled": true,
+          "quantity_step": 1,
+          "fee_iqd": 25000
+        }
+      }
+    },
+    "schema": [
+      {
+        "table": "product_option_transports",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_option_transports\".\"product_id\" IS NOT NULL AND \"product_option_transports\".\"option_id\" IS NOT NULL AND \"product_option_transports\".\"fulfillment_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_fulfillment\" WHERE \"product_option_fulfillment\".\"product_id\"=\"product_option_transports\".\"product_id\" AND \"product_option_fulfillment\".\"option_id\"=\"product_option_transports\".\"option_id\" AND \"product_option_fulfillment\".\"id\"=\"product_option_transports\".\"fulfillment_id\" AND NOT ((\"product_option_fulfillment\".\"product_id\" IS NOT NULL AND \"product_option_fulfillment\".\"option_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_values\" WHERE \"product_option_values\".\"product_id\"=\"product_option_fulfillment\".\"product_id\" AND \"product_option_values\".\"id\"=\"product_option_fulfillment\".\"option_id\" AND NOT ((\"product_option_values\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_option_values\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_option_values\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_values\".\"product_id\" AND NOT (0)))))) OR (\"product_option_fulfillment\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_fulfillment\".\"product_id\" AND NOT (0)))))) OR (\"product_option_transports\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_transports\".\"product_id\" AND NOT (0)))",
+        "depth": 4
+      },
+      {
+        "table": "product_color_option_links",
+        "predicate": "(\"group_id\" IN (SELECT \"id\" FROM \"product_option_groups\" WHERE (\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))) OR \"option_value_id\" IN (SELECT \"id\" FROM \"product_option_values\" WHERE (\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))) OR \"color_id\" IN (SELECT \"id\" FROM \"product_colors\" WHERE (\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))))",
+        "orphanPredicate": "(\"product_color_option_links\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_color_option_links\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_color_option_links\".\"option_value_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_values\" WHERE \"product_option_values\".\"id\"=\"product_color_option_links\".\"option_value_id\" AND NOT ((\"product_option_values\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_option_values\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_option_values\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_values\".\"product_id\" AND NOT (0)))))) OR (\"product_color_option_links\".\"color_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_colors\" WHERE \"product_colors\".\"id\"=\"product_color_option_links\".\"color_id\" AND NOT ((\"product_colors\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_colors\".\"product_id\" AND NOT (0))))))",
+        "depth": 3
+      },
+      {
+        "table": "product_images",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_images\".\"variant_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_variants\" WHERE \"product_variants\".\"id\"=\"product_images\".\"variant_id\" AND NOT ((\"product_variants\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_variants\".\"product_id\" AND NOT (0)))))) OR (\"product_images\".\"color_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_colors\" WHERE \"product_colors\".\"id\"=\"product_images\".\"color_id\" AND NOT ((\"product_colors\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_colors\".\"product_id\" AND NOT (0)))))) OR (\"product_images\".\"option_value_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_values\" WHERE \"product_option_values\".\"id\"=\"product_images\".\"option_value_id\" AND NOT ((\"product_option_values\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_option_values\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_option_values\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_values\".\"product_id\" AND NOT (0)))))) OR (\"product_images\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_images\".\"product_id\" AND NOT (0)))",
+        "depth": 3
+      },
+      {
+        "table": "product_option_aliases",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_option_aliases\".\"option_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_values\" WHERE \"product_option_values\".\"id\"=\"product_option_aliases\".\"option_id\" AND NOT ((\"product_option_values\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_option_values\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_option_values\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_values\".\"product_id\" AND NOT (0)))))) OR (\"product_option_aliases\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_aliases\".\"product_id\" AND NOT (0)))",
+        "depth": 3
+      },
+      {
+        "table": "product_option_fulfillment",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_option_fulfillment\".\"product_id\" IS NOT NULL AND \"product_option_fulfillment\".\"option_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_values\" WHERE \"product_option_values\".\"product_id\"=\"product_option_fulfillment\".\"product_id\" AND \"product_option_values\".\"id\"=\"product_option_fulfillment\".\"option_id\" AND NOT ((\"product_option_values\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_option_values\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_option_values\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_values\".\"product_id\" AND NOT (0)))))) OR (\"product_option_fulfillment\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_fulfillment\".\"product_id\" AND NOT (0)))",
+        "depth": 3
+      },
+      {
+        "table": "bundle_component_choices",
+        "predicate": "(\"component_id\" IN (SELECT \"id\" FROM \"bundle_components\" WHERE (\"member_product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1) OR \"bundle_product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))))",
+        "orphanPredicate": "(\"bundle_component_choices\".\"component_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"bundle_components\" WHERE \"bundle_components\".\"id\"=\"bundle_component_choices\".\"component_id\" AND NOT ((\"bundle_components\".\"member_product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_components\".\"member_product_id\" AND NOT (0))) OR (\"bundle_components\".\"bundle_product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_components\".\"bundle_product_id\" AND NOT (0))))))",
+        "depth": 2
+      },
+      {
+        "table": "cart_bundle_choices",
+        "predicate": "(\"component_id\" IN (SELECT \"id\" FROM \"bundle_components\" WHERE (\"member_product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1) OR \"bundle_product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))) OR \"cart_item_id\" IN (SELECT \"id\" FROM \"cart_items\" WHERE (\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))))",
+        "orphanPredicate": "(\"cart_bundle_choices\".\"component_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"bundle_components\" WHERE \"bundle_components\".\"id\"=\"cart_bundle_choices\".\"component_id\" AND NOT ((\"bundle_components\".\"member_product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_components\".\"member_product_id\" AND NOT (0))) OR (\"bundle_components\".\"bundle_product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_components\".\"bundle_product_id\" AND NOT (0)))))) OR (\"cart_bundle_choices\".\"cart_item_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"cart_items\" WHERE \"cart_items\".\"id\"=\"cart_bundle_choices\".\"cart_item_id\" AND NOT ((\"cart_items\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"cart_items\".\"product_id\" AND NOT (0))))))",
+        "depth": 2
+      },
+      {
+        "table": "product_option_values",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_option_values\".\"group_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"product_option_groups\" WHERE \"product_option_groups\".\"id\"=\"product_option_values\".\"group_id\" AND NOT ((\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))))) OR (\"product_option_values\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_values\".\"product_id\" AND NOT (0)))",
+        "depth": 2
+      },
+      {
+        "table": "bundle_components",
+        "predicate": "(\"member_product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1) OR \"bundle_product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"bundle_components\".\"member_product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_components\".\"member_product_id\" AND NOT (0))) OR (\"bundle_components\".\"bundle_product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_components\".\"bundle_product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "bundle_config",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"bundle_config\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_config\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "bundle_items",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"bundle_items\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"bundle_items\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "cart_items",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"cart_items\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"cart_items\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "favorites",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"favorites\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"favorites\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "inventory_ledger",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"inventory_ledger\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"inventory_ledger\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "mystery_offer_secrets",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"mystery_offer_secrets\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"mystery_offer_secrets\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "mystery_offers",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"mystery_offers\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"mystery_offers\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "mystery_pool_entries",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"mystery_pool_entries\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"mystery_pool_entries\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "offer_limits",
+        "predicate": "subject_type='product' AND subject_id=?1",
+        "orphanPredicate": "subject_type='product' AND NOT EXISTS (SELECT 1 FROM products WHERE products.id=\"offer_limits\".subject_id)",
+        "depth": 1
+      },
+      {
+        "table": "offer_windows",
+        "predicate": "subject_type='product' AND subject_id=?1",
+        "orphanPredicate": "subject_type='product' AND NOT EXISTS (SELECT 1 FROM products WHERE products.id=\"offer_windows\".subject_id)",
+        "depth": 1
+      },
+      {
+        "table": "price_history",
+        "predicate": "product_id=?1",
+        "orphanPredicate": "NOT EXISTS (SELECT 1 FROM products WHERE products.id=price_history.product_id)",
+        "depth": 1
+      },
+      {
+        "table": "product_catalogs",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_catalogs\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_catalogs\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "product_colors",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_colors\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_colors\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "product_facets",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_facets\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_facets\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "product_option_groups",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_option_groups\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_option_groups\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "product_translations",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_translations\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_translations\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "product_variants",
+        "predicate": "(\"product_id\" IN (SELECT \"id\" FROM \"products\" WHERE id=?1))",
+        "orphanPredicate": "(\"product_variants\".\"product_id\" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM \"products\" WHERE \"products\".\"id\"=\"product_variants\".\"product_id\" AND NOT (0)))",
+        "depth": 1
+      },
+      {
+        "table": "products",
+        "predicate": "id=?1",
+        "orphanPredicate": "0",
+        "depth": 0
+      }
+    ]
+  }
+}

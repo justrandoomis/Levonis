@@ -24,6 +24,8 @@
  */
 
 import { derivedRung, type LadderRungs, type PriceFields } from './pricing';
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
+import { attachModelAvailability } from './modelAvailability';
 
 export interface OptionGroupRow {
   id: string;
@@ -33,7 +35,7 @@ export interface OptionGroupRow {
   active: number | boolean;
 }
 
-export interface OptionValueRow {
+export interface OptionValueRow extends ModelAvailability {
   id: string;
   product_id: string;
   group_id: string;
@@ -246,7 +248,7 @@ export interface ProductRelations {
  */
 export const VALUES_ORDER_SQL =
   `SELECT v.* FROM product_option_values v
-     LEFT JOIN product_option_groups g ON g.id = v.group_id
+     JOIN product_option_groups g ON g.id = v.group_id AND g.product_id = v.product_id
     WHERE v.product_id = ?
     ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`;
 
@@ -277,7 +279,7 @@ export async function loadProductRelations(
   ]);
   return {
     groups: groups.results,
-    values: values.results,
+    values: await attachModelAvailability(db, values.results),
     colors: colors.results,
     links: links.results,
   };
