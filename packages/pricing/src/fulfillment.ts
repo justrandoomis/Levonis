@@ -32,6 +32,7 @@ export interface ModelFulfillment {
 export type FulfillmentLadder = Record<FulfillmentTier, number>;
 export interface FulfillmentSnapshot {
   version: 2;
+  pricing_basis?: 'direct' | 'preorder';
   product_id: string;
   model_id: string | null;
   fulfillment_type: FulfillmentType;
@@ -51,6 +52,8 @@ export interface FulfillmentResolution {
   prices: FulfillmentLadder | null;
   snapshot: FulfillmentSnapshot | null;
   direct_stock: number | null;
+  fulfillment_fees: FulfillmentLadder | null;
+  transport_fees: FulfillmentLadder | null;
   pro_direct_waived_iqd: number;
   pro_transport_waived_iqd: number;
 }
@@ -166,11 +169,12 @@ function regularAmount(local: FulfillmentOffer | undefined, defaults: Fulfillmen
   if (parent) return parent;
   return present(defaults?.surcharge_iqd) ? { mode: 'adjust', amount: defaults!.surcharge_iqd!, source: 'product' } : null;
 }
-function stage(beneath: FulfillmentLadder, local: FulfillmentOffer | undefined, defaults: FulfillmentOffer | undefined, waivePro: boolean): { prices: FulfillmentLadder; waived: number } {
+function stage(beneath: FulfillmentLadder, local: FulfillmentOffer | undefined, defaults: FulfillmentOffer | undefined, waivePro: boolean): { prices: FulfillmentLadder; fees: FulfillmentLadder; waived: number } {
   const regular = regularAmount(local, defaults);
   const prices = { ...beneath };
   if (regular) prices.regular = regular.mode === 'fixed' ? regular.amount : beneath.regular + regular.amount;
   const regularDelta = prices.regular - beneath.regular;
+  const fees: FulfillmentLadder = { regular: regular?.mode === 'adjust' ? Math.max(0, regularDelta) : 0, prime: 0, pro: 0 };
   let waived = 0;
   for (const tier of ['prime', 'pro'] as const) {
     const exact = priceAt(local, tier, 'model') ?? priceAt(defaults, tier, 'product');
@@ -181,9 +185,10 @@ function stage(beneath: FulfillmentLadder, local: FulfillmentOffer | undefined, 
     const isFee = exact?.mode === 'adjust' || regular?.mode === 'adjust';
     const exempt = tier === 'pro' && waivePro && isFee && delta > 0;
     prices[tier] = beneath[tier] + (exempt ? 0 : delta);
+    fees[tier] = isFee && !exempt ? Math.max(0, delta) : 0;
     if (exempt) waived = delta;
   }
-  return { prices, waived };
+  return { prices, fees, waived };
 }
 
 /** The resolver consumes SERVER-VERIFIED membership activity and the existing
@@ -226,12 +231,13 @@ export function resolveModelFulfillment(input: {
   if (directStock !== null && directStock < quantity) errors.push('DIRECT_OUT_OF_STOCK');
   const ownTransport = method ? local.preorder?.transports?.[method] : undefined;
   const parentTransport = method ? defaults.preorder?.transports?.[method] : undefined;
+  if (method && !regularAmount(ownTransport, parentTransport)) errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
   // All ladder prices include their corresponding benefit for preview. Charging
   // still selects the regular rung for an expired membership below.
   const directWaiver = !preorder && (local.direct?.pro_exempt ?? defaults.direct?.pro_exempt ?? true);
   const transportWaiver = ownTransport?.pro_exempt ?? parentTransport?.pro_exempt ?? local.preorder?.pro_exempt_transport ?? defaults.preorder?.pro_exempt_transport ?? true;
   const fulfillment = stage(input.modelPrices, ownOffer, parentOffer, directWaiver);
-  const transported = method ? stage(fulfillment.prices, ownTransport, parentTransport, transportWaiver) : { prices: fulfillment.prices, waived: 0 };
+  const transported = method ? stage(fulfillment.prices, ownTransport, parentTransport, transportWaiver) : { prices: fulfillment.prices, fees: { regular: 0, prime: 0, pro: 0 }, waived: 0 };
   const lead = <K extends 'lead_time_text' | 'lead_time_min_days' | 'lead_time_max_days'>(key: K) =>
     ownTransport?.[key] ?? parentTransport?.[key] ?? ownOffer?.[key] ?? parentOffer?.[key] ?? null;
   const text = preorder ? lead('lead_time_text') ?? '' : '';
@@ -244,10 +250,11 @@ export function resolveModelFulfillment(input: {
   // regular and PRO never pays more than PRIME. No price is invented below 0.
   prices.prime = Math.min(prices.prime, prices.regular);
   prices.pro = Math.min(prices.pro, prices.prime);
-  if (errors.length) return { ok: false, errors: [...new Set(errors)], prices: null, snapshot: null, direct_stock: directStock, pro_direct_waived_iqd: 0, pro_transport_waived_iqd: 0 };
+  if (errors.length) return { ok: false, errors: [...new Set(errors)], prices: null, snapshot: null, direct_stock: directStock, fulfillment_fees: null, transport_fees: null, pro_direct_waived_iqd: 0, pro_transport_waived_iqd: 0 };
   const tier = input.tierActive ? input.tier : 'regular';
   return {
     ok: true, errors: [], prices, direct_stock: directStock,
+    fulfillment_fees: fulfillment.fees, transport_fees: transported.fees,
     pro_direct_waived_iqd: fulfillment.waived,
     pro_transport_waived_iqd: transported.waived,
     snapshot: {
