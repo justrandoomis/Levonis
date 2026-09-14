@@ -57,6 +57,8 @@
  */
 
 import { safeParse } from './json';
+import { resolveStructuredUnitPrice, canonicalModelSelection } from './fulfillmentPricing';
+import type { ModelFulfillment, FulfillmentType, FulfillmentSnapshot } from './fulfillment';
 import { effectiveAvailability } from './availability';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
 
@@ -117,6 +119,8 @@ export function priceMode(row: Partial<PriceFields> | null | undefined, field: P
 }
 
 export interface OptionV2 extends PriceFields {
+  fulfillment?: ModelFulfillment;
+  legacy_fulfillment_ids?: Array<{ id: string; fulfillment_type: FulfillmentType }>;
   id: string;
   name_ar: string;
   name_en: string;
@@ -225,6 +229,8 @@ export interface ProPricingPolicy {
 export const DEFAULT_PRO_POLICY: ProPricingPolicy = { mode: 'explicit_only', percent: null };
 
 export interface PricingProduct {
+  id?: string;
+  fulfillment?: ModelFulfillment;
   price_iqd: number; // base regular (required, canonical)
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
@@ -279,6 +285,7 @@ export interface ResolvedWarranty {
 }
 
 export interface ResolvedPrice {
+  fulfillment_snapshot?: FulfillmentSnapshot | null;
   regular_iqd: number;
   pro_iqd: number | null; // resolved explicit-or-policy PRO price (null = none applies)
   prime_iqd: number | null; // resolved explicit PRIME price (null = none applies)
@@ -518,7 +525,9 @@ function pick(
   return { value: value ?? null, source, at };
 }
 
-export function resolveUnitPrice(input: {
+function resolveLegacyUnitPrice(input: {
+  fulfillmentType?: FulfillmentType;
+  quantity?: number;
   product: PricingProduct;
   optionId?: string | null;
   colorId?: string | null;
@@ -754,6 +763,18 @@ export function resolveUnitPrice(input: {
     unit_subtotal_iqd: unitSubtotal,
     errors,
   };
+}
+
+/** The public entry point stays the one used by storefront, cart, checkout and admin. */
+export type UnitPriceInput = Parameters<typeof resolveLegacyUnitPrice>[0];
+export function resolveUnitPrice(input: UnitPriceInput): ResolvedPrice {
+  const canonical = canonicalModelSelection(input.product.options, input.optionId);
+  const model = input.product.options.find(row => row.id === canonical.id);
+  if (input.product.fulfillment || model?.fulfillment) return resolveStructuredUnitPrice(input, resolveLegacyUnitPrice);
+  const result = resolveLegacyUnitPrice(input);
+  if (input.fulfillmentType === 'direct_sale' && input.transportMethod) result.errors.push('TRANSPORT_NOT_APPLICABLE');
+  if (input.fulfillmentType === 'pre_order' && !input.transportMethod) result.errors.push('TRANSPORT_REQUIRED');
+  return result;
 }
 
 /** Reads the PRO pricing policy + transport defaults out of admin settings values. */
