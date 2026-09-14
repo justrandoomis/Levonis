@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+#   PRODUCT ORPHAN DRY RUN — READ ONLY, DELETES NOTHING
+# ---------------------------------------------------------------------------
+# The owner's condition before any cleanup of old residue:
+#
+#   "ولا تنفذ تنظيف البقايا القديمة destructive cleanup قبل dry-run/report."
+#
+# Every delete before worker/lib/productDeletion.ts ran two statements and left
+# the rest to cascades the runtime never enforces, so the live database holds
+# rows whose product is already gone. This reports them — table by table, with
+# counts and sample ids — and removes nothing.
+#
+# WHAT IT WRITES: nothing, anywhere. scripts/orphan-dry-run.ts refuses to issue
+# a statement that does not begin with SELECT, and refuses one that names
+# DELETE/UPDATE/INSERT/DROP/ALTER/CREATE at all. There is no destructive mode
+# in this workflow to turn on by mistake: clearing the residue is a separate,
+# admin-authenticated call that itself demands the numbers from a dry run.
+name: 23 - Product Orphan DRY RUN report (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      database:
+        description: 'D1 database name'
+        required: false
+        default: 'levonis-db-staging'
+
+concurrency: orphan-dry-run
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Dry run
+        run: npx tsx scripts/orphan-dry-run.ts --db "${{ github.event.inputs.database || 'levonis-db-staging' }}"
