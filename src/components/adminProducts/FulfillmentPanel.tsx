@@ -136,7 +136,7 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get<LoadResponse>(`/api/admin/products-v2/${productId}/fulfillment`);
+      const res = await api.get<LoadResponse>(`/api/admin/products/${productId}/fulfillment`);
       setModels(res.models ?? []);
       const map = new Map<string, Cell>();
       for (const raw of res.fulfillments ?? []) {
@@ -212,7 +212,7 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
         // server refuses them, and sending them would be asking to be refused.
         transports: cell.fulfillment_type === 'pre_order' ? cell.transports : undefined,
       }));
-      const res = await api.put<{ sale_types: string[] }>(`/api/admin/products-v2/${productId}/fulfillment`, {
+      const res = await api.put<{ sale_types: string[] }>(`/api/admin/products/${productId}/fulfillment`, {
         fulfillments: payload,
       });
       setNotice(
