@@ -2547,6 +2547,48 @@ orderRoutes.post('/quote', async (c) => {
       merchandise_after_coupon_iqd: comp.eligibleMerchandise,
       total_iqd: comp.totalIqd,
       cod_tax_iqd: comp.codTaxIqd,
+      /**
+       * §11 / §14 — THE CASH-ON-DELIVERY TAX, AND ITS EXEMPTION, AS TWO
+       * NUMBERS.
+       *
+       * The screen shows both: «ضريبة الدفع عند الاستلام 12,000» and
+       * «إعفاء عضوية PRO −12,000». A single zero would be cheaper to render
+       * and would tell the customer nothing about what their membership just
+       * did for them — and would leave a courier's cash sheet with nothing to
+       * reconcile against.
+       */
+      cod_tax_before_exemption_iqd: comp.codTaxBeforeExemptionIqd,
+      cod_tax_exemption_iqd: comp.codTaxExemptionIqd,
+      /**
+       * §11 — WHAT THE MEMBERSHIP IS WORTH ON THIS ORDER, itemised.
+       *
+       * `discount_total_iqd` is the whole saving on merchandise: the part
+       * already inside the line prices above plus `order_discount_iqd`, which
+       * is deducted after the subtotal the way a coupon is. Naming them apart
+       * is what lets the screen show a summary that adds up.
+       */
+      membership_benefits: {
+        tier: comp.benefits.tier,
+        active: comp.benefits.tier_active,
+        discount_total_iqd: comp.benefits.discount_total_iqd,
+        unit_discount_iqd: comp.benefits.unit_discount_iqd,
+        order_discount_iqd: comp.benefits.line_discount_iqd,
+        lines: comp.benefits.lines,
+        shipping: {
+          ...comp.benefits.shipping,
+          fee_before_benefit_iqd: comp.shipping.total_before_waiver_iqd,
+          fee_paid_iqd: comp.shipping.total_iqd,
+          subsidy_iqd: comp.shipping.membership_subsidy_iqd,
+          subsidy_capped: comp.shipping.membership_subsidy_capped,
+        },
+        cod_tax: {
+          rule_id: comp.codTaxExemptionRuleId,
+          exempt: comp.benefits.tax.cod_exempt,
+          before_exemption_iqd: comp.codTaxBeforeExemptionIqd,
+          exemption_iqd: comp.codTaxExemptionIqd,
+          charged_iqd: comp.codTaxIqd,
+        },
+      },
       due_on_delivery_iqd: comp.dueOnDelivery,
       tier: {
         tier: comp.tierStatus.tier,

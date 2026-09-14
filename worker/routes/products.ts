@@ -579,12 +579,14 @@ export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
     getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
   ]);
   const s = settings as Record<string, unknown>;
-  // A guest and a lapsed member earn nothing, so neither request pays for the
-  // two queries — the same bargain `loadPricingContext` strikes in the cart.
-  const member = !!tierInfo && tierInfo.tierStatus.active;
-  const [benefitRules, ancestry] = member
-    ? await Promise.all([activeBenefitRules(c.env.DB), catalogAncestry(c.env.DB)])
-    : [[] as BenefitRule[], null];
+  /**
+   * Loaded for EVERY viewer, member or not. A guest earns no benefit, but §9
+   * asks this page to say what a membership would be worth on this exact
+   * product — and a teaser computed from anything other than the live rules is
+   * the hardcoded promise this whole system exists to remove. Both tables are
+   * a few rows.
+   */
+  const [benefitRules, ancestry] = await Promise.all([activeBenefitRules(c.env.DB), catalogAncestry(c.env.DB)]);
   return {
     benefitRules,
     catalogAncestry: ancestry,
@@ -608,6 +610,69 @@ function viewerTier(ctx: PricingCtx) {
     pricing_active: ctx.tierActive,
     pro_benefits_context: ctx.proContext,
   };
+}
+
+/**
+ * §8 AND §9 — WHAT EACH MEMBERSHIP WOULD PAY FOR THIS EXACT SELECTION.
+ *
+ * A member sees their own price everywhere else on this page; this is the
+ * OTHER half — the honest, specific number that makes "PRO price 1,665,000,
+ * you save 185,000" a fact rather than a slogan. It is resolved through
+ * `resolveUnitPrice` with the same rules the checkout reads, so the figure a
+ * visitor is shown before subscribing is the figure they will be charged
+ * after.
+ *
+ * `null` for a tier means there is nothing to promise: no explicit member
+ * price on the line and no rule that fits in a unit price. Nothing here
+ * invents an "up to" number.
+ */
+export interface MembershipPreviewTier {
+  unit_iqd: number;
+  regular_iqd: number;
+  saving_iqd: number;
+  rule_id: string | null;
+}
+
+function previewStatus(tier: 'prime' | 'pro'): TierStatus {
+  return { tier, active: true, expires_at: null, pending_launch: null, gated_benefits: [] };
+}
+
+export function membershipPreview(
+  ctx: PricingCtx,
+  doc: ProductDoc,
+  sel: { optionId: string | null; colorId: string | null; transportMethod?: string | null },
+  isPrinter: boolean
+): { prime: MembershipPreviewTier | null; pro: MembershipPreviewTier | null } {
+  const target = {
+    product_id: doc.id,
+    category_id: doc.category_id,
+    sub_category_id: doc.sub_category_id,
+    ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id, doc.sub_category_id),
+  };
+  const forTier = (tier: 'prime' | 'pro'): MembershipPreviewTier | null => {
+    const r = resolveUnitPrice({
+      product: doc,
+      optionId: sel.optionId,
+      colorId: sel.colorId,
+      transportMethod: sel.transportMethod ?? null,
+      tier,
+      tierActive: true,
+      proPolicy: ctx.proPolicy,
+      transportDefaults: ctx.transportDefaults,
+      memberFallback: fallbackFor(ctx.benefitRules, previewStatus(tier), target, ctx.benefitNowIso),
+      isPrinter,
+    });
+    if (r.errors.length > 0) return null;
+    const saving = r.regular_iqd - r.applied_iqd;
+    if (saving <= 0) return null;
+    return {
+      unit_iqd: r.applied_iqd,
+      regular_iqd: r.regular_iqd,
+      saving_iqd: saving,
+      rule_id: tier === 'pro' ? r.member_rule.pro : r.member_rule.prime,
+    };
+  };
+  return { prime: forTier('prime'), pro: forTier('pro') };
 }
 
 /** Resolver output for public consumers — cost stripped, everything else kept. */
@@ -1556,6 +1621,10 @@ productRoutes.get('/:slug', async (c) => {
       // images. Null when the product has no relational rows at all.
       relations: publicRelations(relations, poolMember),
       pricing: publicQuote(resolved), // base-selection resolver result, cost-free
+      // §8/§9: the base selection's member prices, from the live rules, so the
+      // page can state the benefit on first paint rather than waiting for the
+      // debounced quote to say what a membership is worth here.
+      membership_preview: membershipPreview(ctx, doc, { optionId: null, colorId: null }, isPrinter),
       // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
       // The page paints the exact figure on the same frame as the tap, and the
       // debounced quote becomes a confirmation rather than a prerequisite.
@@ -1762,6 +1831,10 @@ productRoutes.post('/:slug/quote', async (c) => {
       qty,
       line_total_iqd: resolved.unit_subtotal_iqd * qty,
     },
+    // §8/§9: what PREMIUM and PRO pay for THIS selection, from the live rules.
+    // The page shows the viewer's own line as a price, and the other tier's as
+    // the one-line invitation §9 asks for — never a gold advertisement.
+    membership_preview: membershipPreview(ctx, doc, { optionId, colorId, transportMethod }, isPrinter),
     // The final price of every way to get THIS selection — direct, and each
     // pre-order journey paid in advance or cash on delivery — so the page's
     // pills show the server's numbers and never their own arithmetic.

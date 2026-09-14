@@ -57,7 +57,15 @@ import {
 } from '../lib/pricing';
 import { pricingTierContext, type TierStatus } from '../lib/entitlements';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from '../lib/offers';
-import { activeBenefitRules, ancestryFor, catalogAncestry, fallbackFor } from '../lib/membershipBenefits';
+import {
+  activeBenefitRules,
+  ancestryFor,
+  catalogAncestry,
+  fallbackFor,
+  resolveMembershipBenefits,
+  resolveOrderBenefits,
+} from '../lib/membershipBenefits';
+import type { BenefitLineInput } from '../lib/membershipBenefits';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { MemberFallback } from '@levonis/pricing/pricing';
 
@@ -710,6 +718,20 @@ async function loadCart(c: Context<AppContext>) {
     : new Set<string>();
 
   const items = [];
+  /**
+   * §10 — WHAT THE MEMBERSHIP IS WORTH ON THIS CART, computed HERE.
+   *
+   * The cart page used to work its own saving out of `regular − applied` per
+   * line, which can only ever see the part that fits in a unit price: a
+   * quantity limit or a per-order ceiling was invisible there, so the page
+   * promised a number the checkout then reduced. One server answer removes
+   * the possibility.
+   *
+   * Composition lines are left out on purpose — a bundle's price is already a
+   * composed discount and its components were resolved with the member's own
+   * rule inside them.
+   */
+  const benefitLines: BenefitLineInput[] = [];
   const unavailableDelivery = {
     standard: new Set<string>(),
     personal: new Set<string>(),
@@ -754,6 +776,15 @@ async function loadCart(c: Context<AppContext>) {
       offerInput
     );
     constrainDelivery(doc);
+    benefitLines.push({
+      product_id: String(row.id),
+      category_id: doc.category_id ?? null,
+      sub_category_id: doc.sub_category_id ?? null,
+      ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id ?? null, doc.sub_category_id ?? null),
+      regular_unit_iqd: resolved.regular_iqd,
+      applied_unit_iqd: resolved.applied_iqd,
+      qty: Number(row.qty) || 0,
+    });
     // Would cash on delivery change THIS line's price? Only when the product
     // carries a direct premium this customer pays — the same rule the checkout
     // applies — so the cart explains the cash rule only where it bites.
@@ -840,10 +871,54 @@ async function loadCart(c: Context<AppContext>) {
       },
     });
   }
+  /**
+   * The same resolver the checkout runs, over the cart as it stands. The
+   * delivery half is answered PER METHOD rather than for one chosen method,
+   * because the cart is where a customer is still deciding — "free with
+   * standard delivery" is the sentence that belongs on this screen.
+   */
+  const merchandise = benefitLines.reduce((n, l) => n + l.applied_unit_iqd * l.qty, 0);
+  const membership = ctx.benefitStatus
+    ? (() => {
+        const resolvedBenefits = resolveMembershipBenefits({
+          rules: ctx.benefitRules,
+          status: ctx.benefitStatus!,
+          lines: benefitLines,
+          shippingBasisIqd: merchandise,
+          deliveryMethod: null,
+          nowIso: ctx.nowIso,
+        });
+        const perMethod = (['standard', 'personal'] as const).map((method) => ({
+          method,
+          ...resolveOrderBenefits({
+            rules: ctx.benefitRules,
+            status: ctx.benefitStatus!,
+            shippingBasisIqd: merchandise,
+            deliveryMethod: method,
+            nowIso: ctx.nowIso,
+          }).shipping,
+        }));
+        return {
+          tier: ctx.benefitStatus!.tier,
+          active: ctx.benefitStatus!.active,
+          /** The saving already inside the unit prices above, plus the part
+           *  the checkout takes off the order — named apart so the page can
+           *  show a line total that adds up. */
+          discount_total_iqd: resolvedBenefits.discount_total_iqd,
+          order_discount_iqd: resolvedBenefits.line_discount_iqd,
+          merchandise_iqd: Math.max(0, merchandise - resolvedBenefits.line_discount_iqd),
+          lines: resolvedBenefits.lines,
+          free_shipping: perMethod,
+          cod_tax_exempt: resolvedBenefits.tax.cod_exempt,
+        };
+      })()
+    : null;
+
   return {
     items,
     tier,
     tierActive,
+    membership,
     delivery_methods: {
       standard: { available: unavailableDelivery.standard.size === 0, unavailable_product_ids: [...unavailableDelivery.standard] },
       personal: { available: unavailableDelivery.personal.size === 0, unavailable_product_ids: [...unavailableDelivery.personal] },
@@ -912,7 +987,7 @@ cartRoutes.post('/coupon-check', async (c) => {
 });
 
 cartRoutes.get('/', async (c) => {
-  const { items, tier, tierActive, delivery_methods } = await loadCart(c);
+  const { items, tier, tierActive, delivery_methods, membership } = await loadCart(c);
   // §1: the type the cart is locked to, so the storefront can say so before
   // the customer discovers it by being refused. null = empty, so any type may
   // still be started.
@@ -932,6 +1007,9 @@ cartRoutes.get('/', async (c) => {
     items,
     tier,
     tierActive,
+    // §10: the server's own answer about what this membership saved, so the
+    // page states it instead of subtracting two numbers and hoping.
+    membership,
     delivery_methods,
     shipping_type: shippingType,
     scope: cartSellerScope(items as unknown as SellerLine[]),
