@@ -262,6 +262,16 @@ export interface DeleteResponse {
   archived: boolean;
   deleted: boolean;
   reason?: string;
+  /** Permanent path only — measured by the server, not asserted by the client. */
+  permanent?: boolean;
+  already_deleted?: boolean;
+  product_deleted?: boolean;
+  rows_deleted_by_table?: Record<string, number>;
+  rows_unlinked_by_table?: Record<string, number>;
+  r2_objects_deleted?: string[];
+  r2_objects_shared_skipped?: string[];
+  r2_cleanup_pending?: number;
+  cache_keys_invalidated?: string[];
 }
 
 export interface BrandsResponse { brands: BrandV2[] }

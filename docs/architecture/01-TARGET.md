@@ -132,7 +132,7 @@ Intermediate rename artefacts inside rebuild migrations belong to the owner of t
 | Analytics | `merchant_store_analytics_daily` (dead today; re-owned), `analytics_events`, `analytics_daily_platform`, `analytics_daily_merchant` (new), `composition_daily_metrics` (new) |
 | Ads | `ads_providers`, `ads_event_map`, `ads_deliveries`, `ads_consent_snapshots`, `ads_dead_letters` (new) |
 | Search | `search_products`, `search_stores`, `search_index_state` (new) |
-| Files | `file_objects` (new) |
+| Files | `file_objects` (new), `media_cleanup_jobs` (new: deferred R2 deletions queued by a permanent product delete, retried until the bucket confirms) |
 | Platform (one set per service, in the service's own store) | `<svc>_outbox_events`, `<svc>_outbox_deliveries`, `<svc>_processed_events`, `<svc>_idempotency`, `<svc>_sagas` where the service orchestrates (new) |
 
 `tests/ownership.test.ts` (new) generates `TABLE_OWNER` from this table and fails if a migration creates a table absent from it or if two services claim one table.

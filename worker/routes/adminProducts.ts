@@ -43,6 +43,13 @@ import {
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
+  deleteProductPermanently,
+  invalidateMediaCache,
+  pendingMediaCleanup,
+  runMediaCleanup,
+  scanProductOrphans,
+} from '../lib/productDeletion';
+import {
   localizeRespectingAuthored,
   planProductSave,
   priceHistoryDeltas as sharedPriceHistoryDeltas,
@@ -617,6 +624,77 @@ adminProductsRoutes.get('/stats', async (c) => {
 });
 
 /**
+ * THE RESIDUE FROM EVERY DELETE THAT CAME BEFORE THIS ONE.
+ *
+ * A DRY RUN AND NOTHING ELSE. It reports the rows whose product is already
+ * gone, and the R2 objects under `products/` that no row references — table by
+ * table, with sample ids and a byte total — and it removes nothing.
+ *
+ * Destructive cleanup is a SEPARATE call which refuses to run unless it is
+ * handed the counts from a dry run it can still reproduce. That is not
+ * ceremony: it is what makes "I looked at the report first" a fact the server
+ * can check rather than a promise the client makes.
+ */
+adminProductsRoutes.get('/maintenance/orphans', async (c) => {
+  const report = await scanProductOrphans(c.env.DB, c.env.R2_PUBLIC ?? c.env.BUCKET ?? null, { dryRun: true });
+  return c.json({ success: true, ...report, scanned_at: new Date().toISOString() });
+});
+
+adminProductsRoutes.post('/maintenance/orphans/cleanup', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as { confirm?: unknown; expect?: unknown };
+  if (body.confirm !== 'DELETE-ORPHANS') {
+    throw badRequest('Run the dry run first, then send confirm: "DELETE-ORPHANS".', 'ORPHAN_CLEANUP_UNCONFIRMED');
+  }
+  const bucket = c.env.R2_PUBLIC ?? c.env.BUCKET ?? null;
+
+  // Re-scan and compare against what the admin was shown. If the database moved
+  // under them, the numbers differ and nothing is deleted.
+  const preview = await scanProductOrphans(c.env.DB, bucket, { dryRun: true });
+  const expect = (body.expect ?? {}) as { orphan_rows?: unknown; orphan_r2_objects?: unknown };
+  if (
+    Number(expect.orphan_rows) !== preview.totals.orphan_rows ||
+    Number(expect.orphan_r2_objects) !== preview.totals.orphan_r2_objects
+  ) {
+    throw new HttpError(
+      409,
+      'The database changed since the dry run — re-run the report and confirm the new numbers.',
+      'ORPHAN_REPORT_STALE',
+      { current: preview.totals, expected: { orphan_rows: expect.orphan_rows, orphan_r2_objects: expect.orphan_r2_objects } }
+    );
+  }
+
+  const report = await scanProductOrphans(c.env.DB, bucket, { dryRun: false });
+  await audit(c.env.DB, admin.id, 'product_v2.orphan_cleanup', 'maintenance', {
+    rows: report.removed?.rows_by_table ?? {},
+    r2_objects: report.removed?.r2_objects.length ?? 0,
+  });
+  return c.json({ success: true, ...report });
+});
+
+/** Retry every queued R2 removal a previous delete could not finish. */
+adminProductsRoutes.post('/maintenance/media-cleanup/retry', async (c) => {
+  const admin = c.get('user')!;
+  const jobs = await pendingMediaCleanup(c.env.DB);
+  const outcome = await runMediaCleanup(c.env, jobs);
+  const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, outcome.deleted);
+  if (jobs.length) {
+    await audit(c.env.DB, admin.id, 'product_v2.media_cleanup_retry', 'maintenance', {
+      attempted: jobs.length,
+      deleted: outcome.deleted.length,
+      failed: outcome.failed.length,
+    });
+  }
+  return c.json({
+    success: true,
+    attempted: jobs.length,
+    r2_objects_deleted: outcome.deleted,
+    r2_cleanup_pending: outcome.failed.length,
+    cache_keys_invalidated: invalidated,
+  });
+});
+
+/**
  * Status-only change for the management screen's quick hide/publish. The
  * full save demands the whole validated document and the legacy upsert
  * rewrites every column from whatever body it gets, so neither is safe for a
@@ -1060,17 +1138,51 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
 });
 
 /**
- * Archive policy: products referenced by any order become status='hidden'
- * (order history must keep resolving); otherwise a hard delete, including
- * catalog placements.
+ * DELETE, IN TWO HONEST MODES.
+ *
+ * WITHOUT `?permanent=true` — the historical behaviour, unchanged: a product
+ * named by a past order is hidden rather than removed, because that is the
+ * conservative thing to do when an admin presses a plain Delete.
+ *
+ * WITH `?permanent=true` — the owner's "حذف نهائي". The product and EVERY row
+ * that exists only to describe it are deleted; order history is kept and its
+ * product link nulled; the product's own R2 objects are removed unless another
+ * product still references them. What the response reports is measured, not
+ * asserted: `rows_deleted_by_table` comes from each statement's `meta.changes`,
+ * and `r2_objects_deleted` lists the keys the bucket actually accepted.
+ *
+ * PRESSING IT TWICE IS NOT AN ERROR. The second call finds no product and
+ * answers `already_deleted: true` with a 200 — an admin who did not see the
+ * first response must not be shown a 500.
  */
 adminProductsRoutes.delete('/:id', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
+  const permanent = /^(1|true|yes)$/i.test(c.req.query('permanent') ?? '');
+
   const row = await c.env.DB.prepare('SELECT id, name_ar, name FROM products WHERE id = ?')
     .bind(id)
     .first<Record<string, unknown>>();
-  if (!row) throw notFound('Product not found');
+
+  if (!row) {
+    // Idempotency, and only for the permanent path: a plain Delete on a
+    // missing id is still a 404, because nothing claims to have removed it.
+    if (permanent) {
+      return c.json({
+        success: true,
+        permanent: true,
+        already_deleted: true,
+        product_deleted: false,
+        rows_deleted_by_table: {},
+        rows_unlinked_by_table: {},
+        r2_objects_deleted: [],
+        r2_objects_shared_skipped: [],
+        r2_cleanup_pending: 0,
+        cache_keys_invalidated: [],
+      });
+    }
+    throw notFound('Product not found');
+  }
 
   // A MEMBER OF A BUNDLE IS NEVER DELETED SILENTLY.
   // `bundle_components.member_product_id` is ON DELETE RESTRICT on purpose, so
@@ -1089,6 +1201,44 @@ adminProductsRoutes.delete('/:id', async (c) => {
     );
   }
 
+  if (permanent) {
+    const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
+    if (result.blocked) {
+      throw new HttpError(409, result.blocked.remedy, result.blocked.code, {
+        table: result.blocked.table,
+        count: result.blocked.count,
+      });
+    }
+
+    // R2 AFTER THE COMMIT, NEVER INSIDE IT. A bucket failure here leaves a
+    // pending job, not a half-deleted product.
+    const cleanup = await runMediaCleanup(c.env, result.media_jobs);
+    const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
+
+    await audit(c.env.DB, admin.id, 'product_v2.delete_permanent', id, {
+      rows_deleted_by_table: result.rows_deleted_by_table,
+      rows_unlinked_by_table: result.rows_unlinked_by_table,
+      r2_objects_deleted: cleanup.deleted.length,
+      r2_objects_shared_skipped: result.r2_objects_shared_skipped.length,
+      r2_cleanup_pending: cleanup.failed.length,
+    });
+
+    return c.json({
+      success: true,
+      permanent: true,
+      already_deleted: false,
+      product_deleted: result.product_deleted,
+      rows_deleted_by_table: result.rows_deleted_by_table,
+      rows_unlinked_by_table: result.rows_unlinked_by_table,
+      media_keys_found: result.media_keys_found,
+      r2_objects_deleted: cleanup.deleted,
+      r2_objects_shared_skipped: result.r2_objects_shared_skipped,
+      r2_cleanup_pending: cleanup.failed.length,
+      ...(cleanup.failed.length ? { r2_cleanup_errors: cleanup.failed } : {}),
+      cache_keys_invalidated: invalidated,
+    });
+  }
+
   const ref = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM order_items WHERE product_id = ?')
     .bind(id)
     .first<{ n: number }>();
@@ -1105,16 +1255,38 @@ adminProductsRoutes.delete('/:id', async (c) => {
       success: true,
       archived: true,
       deleted: false,
+      order_item_refs: refs,
       reason: 'Referenced by past orders — hidden instead of deleted.',
     });
   }
 
-  await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id),
-  ]);
-  await audit(c.env.DB, admin.id, 'product_v2.delete', id, {});
-  return c.json({ success: true, archived: false, deleted: true });
+  // No order history: the same engine, so a plain Delete leaves no residue
+  // either. It is only the ARCHIVE decision above that differs between modes.
+  const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
+  if (result.blocked) {
+    throw new HttpError(409, result.blocked.remedy, result.blocked.code, {
+      table: result.blocked.table,
+      count: result.blocked.count,
+    });
+  }
+  const cleanup = await runMediaCleanup(c.env, result.media_jobs);
+  const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
+  await audit(c.env.DB, admin.id, 'product_v2.delete', id, {
+    rows_deleted_by_table: result.rows_deleted_by_table,
+    r2_objects_deleted: cleanup.deleted.length,
+  });
+  return c.json({
+    success: true,
+    archived: false,
+    deleted: true,
+    product_deleted: result.product_deleted,
+    rows_deleted_by_table: result.rows_deleted_by_table,
+    rows_unlinked_by_table: result.rows_unlinked_by_table,
+    r2_objects_deleted: cleanup.deleted,
+    r2_objects_shared_skipped: result.r2_objects_shared_skipped,
+    r2_cleanup_pending: cleanup.failed.length,
+    cache_keys_invalidated: invalidated,
+  });
 });
 
 /** Replace this product's catalog placements with exactly catalog_ids. */

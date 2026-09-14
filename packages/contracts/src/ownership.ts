@@ -98,7 +98,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
-  ...owned('files', ['file_objects', 'file_migration_log']),
+  // `media_cleanup_jobs` is a FILES table, not a catalogue one: it names an R2
+  // object key and a bucket, and the product that queued it is already gone by
+  // the time the row is read. Commerce writes a job the way it writes any
+  // cross-service intent — through the owner's delete path — and the Files
+  // service is what executes and retires it.
+  ...owned('files', ['file_objects', 'file_migration_log', 'media_cleanup_jobs']),
 ];
 
 export const TABLE_OWNER: Readonly<Record<string, Owner>> = Object.fromEntries(TABLE_OWNER_ENTRIES);

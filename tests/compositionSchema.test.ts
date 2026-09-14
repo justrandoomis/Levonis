@@ -194,17 +194,31 @@ test('the offer secret, once it exists, is referenced by exactly one module', ()
   // the alternative to naming it there is an unowned table — or a name spelled
   // in pieces to dodge a grep, which would be worse than the risk it hides.
   const OWNERSHIP = 'packages/contracts/src/ownership.ts';
+  // The DELETE REGISTRY is the third and last place the name may appear. A
+  // permanent product delete has to remove the seed with the product — leaving
+  // it behind would keep a live secret for an offer that no longer exists, and
+  // would let a re-import of the same id inherit a precomputable draw. Naming
+  // the table in a list of tables to delete is not a read of the secret, and
+  // the assertion below is what keeps it from becoming one.
+  const DELETION = 'worker/lib/productDeletion.ts';
   assert.deepEqual(
-    referencing.filter((p) => p !== 'worker/lib/mysteryDraw.ts' && p !== OWNERSHIP),
+    referencing.filter((p) => p !== 'worker/lib/mysteryDraw.ts' && p !== OWNERSHIP && p !== DELETION),
     [],
     'the offer secret is read by worker/lib/mysteryDraw.ts and nothing else'
   );
-  if (referencing.includes(OWNERSHIP)) {
+  for (const listing of [OWNERSHIP, DELETION]) {
+    if (!referencing.includes(listing)) continue;
     // ...and it stays a LIST there, never a query.
-    const src = readFileSync(join(ROOT, OWNERSHIP), 'utf8');
+    const src = readFileSync(join(ROOT, listing), 'utf8');
     for (const line of src.split('\n').filter((l) => l.includes('mystery_offer_secrets'))) {
-      assert.doesNotMatch(line, /SELECT|FROM|INSERT|prepare\(/i, 'the ownership registry lists the table, it never reads it');
+      assert.doesNotMatch(line, /SELECT|FROM|INSERT|prepare\(/i, `${listing} lists the table, it never reads it`);
     }
+  }
+  // The registry must not name the secret COLUMN at all, in any file but the
+  // one that draws with it: deleting a row never needs to mention `secret`.
+  for (const file of referencing.filter((p) => p !== 'worker/lib/mysteryDraw.ts')) {
+    const src = readFileSync(join(ROOT, file), 'utf8');
+    assert.doesNotMatch(src, /\bsecret\s*(?::|,|\)|\s+FROM)/i, `${file} must never touch the secret column`);
   }
 });
 

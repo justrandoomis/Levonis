@@ -243,6 +243,7 @@ export default function AdminProducts() {
   const pricingEscape = useRef<(() => boolean) | null>(null);
   // The §10 flow is the default tab; the TXT tools are one click away.
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ item: ListingItem; permanent: boolean; ack: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState('');
@@ -380,22 +381,48 @@ export default function AdminProducts() {
     setImportDirty(false);
   }, []);
 
-  const handleDelete = async (p: ListingItem) => {
+  /**
+   * DELETE OPENS A DIALOG, NOT A `window.confirm`.
+   *
+   * The permanent delete removes rows in nineteen tables and objects from R2,
+   * and it cannot be undone — a browser prompt that reads "OK / Cancel" is not
+   * a proportionate gate for that, and it cannot say what will survive. The
+   * dialog states both halves in the owner's words (the product and its own
+   * pictures go; past orders stay), makes the permanent option a deliberate
+   * second act, and afterwards shows the COUNTS the server actually measured.
+   */
+  const handleDelete = (p: ListingItem) => setConfirmDelete({ item: p, permanent: false, ack: false });
+
+  const runDelete = async (p: ListingItem, permanent: boolean) => {
     const name = p.name_ar || p.name_en || p.id;
-    const msg = dir === 'rtl'
-      ? `حذف/أرشفة المنتج «${name}»؟ المنتجات المرتبطة بطلبات سابقة تُخفى بدل الحذف.`
-      : `Delete/archive "${name}"? Products referenced by past orders are hidden, not deleted.`;
-    if (!window.confirm(msg)) return;
+    setConfirmDelete(null);
     setDeletingId(p.id);
     setNotice(null);
     try {
-      const res = await api.delete<DeleteResponse>(`/api/admin/products-v2/${p.id}`);
+      const res = await api.delete<DeleteResponse>(
+        `/api/admin/products-v2/${p.id}${permanent ? '?permanent=true' : ''}`
+      );
+      if (res.deleted === false && res.archived) {
+        setNotice(
+          dir === 'rtl'
+            ? `أُخفي «${name}» بدل حذفه — ${res.reason ?? 'مرتبط بطلبات سابقة.'}`
+            : `"${name}" was hidden instead of deleted — ${res.reason ?? 'referenced by past orders.'}`
+        );
+        reloadAll();
+        return;
+      }
+      // GONE FROM THE LIST THE MOMENT THE SERVER SAYS SO — no reload wait. The
+      // background refresh still runs, so anything else that moved catches up.
+      setItems((list) => list.filter((x) => x.id !== p.id));
+      const rows = Object.values(res.rows_deleted_by_table ?? {}).reduce((n, v) => n + Number(v || 0), 0);
+      const files = res.r2_objects_deleted?.length ?? 0;
+      const kept = Object.values(res.rows_unlinked_by_table ?? {}).reduce((n, v) => n + Number(v || 0), 0);
       setNotice(
-        res.deleted
-          ? (dir === 'rtl' ? `حُذف «${name}» نهائياً.` : `"${name}" was permanently deleted.`)
-          : (dir === 'rtl'
-              ? `أُخفي «${name}» بدل حذفه — ${res.reason ?? 'مرتبط بطلبات سابقة.'}`
-              : `"${name}" was hidden instead of deleted — ${res.reason ?? 'referenced by past orders.'}`)
+        dir === 'rtl'
+          ? `حُذف «${name}» نهائياً — ${rows} صف و${files} ملف.` +
+            (kept ? ` ${kept} سطر في الطلبات السابقة بقي كما هو.` : '')
+          : `"${name}" permanently deleted — ${rows} rows and ${files} files.` +
+            (kept ? ` ${kept} order line(s) kept.` : '')
       );
       reloadAll();
     } catch (e) {
@@ -1122,6 +1149,101 @@ export default function AdminProducts() {
               }}
             />
           </Suspense>
+        </Modal>
+      )}
+
+      {confirmDelete && (
+        <Modal
+          titleAr={confirmDelete.permanent ? 'حذف نهائي' : 'حذف المنتج'}
+          titleEn={confirmDelete.permanent ? 'Permanent delete' : 'Delete product'}
+          onClose={() => setConfirmDelete(null)}
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <button type="button" className={T.btnSecondary} onClick={() => setConfirmDelete(null)}>
+                {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
+              </button>
+              {!confirmDelete.permanent ? (
+                <button
+                  type="button"
+                  className={T.btnDanger}
+                  onClick={() => void runDelete(confirmDelete.item, false)}
+                >
+                  {loc('حذف', 'Delete', 'سڕینەوە')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={T.btnDanger}
+                  disabled={!confirmDelete.ack}
+                  onClick={() => void runDelete(confirmDelete.item, true)}
+                >
+                  {loc('حذف نهائي', 'Delete permanently', 'سڕینەوەی هەمیشەیی')}
+                </button>
+              )}
+            </div>
+          }
+        >
+          <div className="space-y-3 text-[13px] leading-relaxed">
+            <p className={T.text1}>
+              {loc(
+                `«${nameOf(confirmDelete.item)}»`,
+                `"${nameOf(confirmDelete.item)}"`,
+                `«${nameOf(confirmDelete.item)}»`
+              )}
+            </p>
+            {!confirmDelete.permanent ? (
+              <>
+                <p className={T.text2}>
+                  {loc(
+                    'المنتجات المرتبطة بطلبات سابقة تُخفى بدل حذفها، والباقي يُحذف مع بياناته.',
+                    'A product named by a past order is hidden instead of deleted; anything else is deleted with its data.',
+                    'بەرهەمێک کە لە داواکاریەکی پێشوودا ناوی هاتووە دەشاردرێتەوە.'
+                  )}
+                </p>
+                {/* The permanent path is a SEPARATE, deliberate act — never the
+                    default, and never one press away from a mis-tap. */}
+                <button
+                  type="button"
+                  className={`${T.btnGhostSm} text-[var(--ap-danger)]`}
+                  onClick={() => setConfirmDelete({ ...confirmDelete, permanent: true, ack: false })}
+                >
+                  {loc('أريد الحذف النهائي بدلاً من ذلك', 'I want a permanent delete instead', 'سڕینەوەی هەمیشەیی دەمەوێت')}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className={T.text1}>
+                  {loc(
+                    'سيتم حذف المنتج وبياناته وصوره الداخلية نهائيًا. الطلبات السابقة لن تُحذف.',
+                    'The product, its data and its own images are deleted permanently. Past orders are NOT deleted.',
+                    'بەرهەم و داتا و وێنەکانی بۆ هەمیشە دەسڕدرێنەوە. داواکاریە پێشووەکان نامێننەوە.'
+                  )}
+                </p>
+                <p className={T.text2}>
+                  {loc(
+                    'الصور المشتركة مع منتج آخر تبقى كما هي. لا يمكن التراجع عن هذا الإجراء.',
+                    'An image another product also uses is kept. This cannot be undone.',
+                    'ئەو وێنەیەی بەرهەمێکی تر بەکاری دەهێنێت دەمێنێتەوە. ناتوانرێت بگەڕێندرێتەوە.'
+                  )}
+                </p>
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={confirmDelete.ack}
+                    onChange={(e) => setConfirmDelete({ ...confirmDelete, ack: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 accent-[var(--ap-danger)]"
+                  />
+                  <span className={T.text2}>
+                    {loc(
+                      'أفهم أن الحذف نهائي ولا يمكن التراجع عنه.',
+                      'I understand this is permanent and cannot be undone.',
+                      'تێدەگەم کە ئەمە هەمیشەییە و ناگەڕێتەوە.'
+                    )}
+                  </span>
+                </label>
+              </>
+            )}
+          </div>
         </Modal>
       )}
 
