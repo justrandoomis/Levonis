@@ -37,7 +37,7 @@
  * /api/admin/products/:id/relations — the rows, never an echo.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
@@ -56,6 +56,10 @@ import {
   type SaveResponse,
 } from './types';
 import PinnedPriceNotice from './PinnedPriceNotice';
+// Lazy: the order-type editor is only reachable on a SAVED product, and it
+// carries its own load/save cycle. Keeping it out of the form's first chunk
+// costs a saved product one small fetch and saves every new product the code.
+const FulfillmentPanel = React.lazy(() => import('./FulfillmentPanel'));
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
   Banner,
@@ -1428,6 +1432,31 @@ export default function ProductForm({
           errors={showErrors ? errors : {}}
         />
       </SectionCard>
+
+      {/* 5b ── WHAT EACH MODEL DOES. Its own card, and its own save, because
+             the SERVER has two doors for the same reason: section 5 writes
+             MODELS, this writes their order types and routes. Neither payload
+             has a field that could create the other, which is what keeps
+             «لا تنشئ Pre-order / Direct / Air / Sea / Land كـProduct Options»
+             true by construction rather than by discipline.
+
+             Only on a SAVED product: a cell names a model by its id, and a
+             model that has never been written has no id to name. */}
+      {productId ? (
+        <SectionCard
+          n={12}
+          ar="نوع الطلب لكل موديل"
+          en="Order type per model"
+          summary={summarize([
+            doc.sale_types.map((t) => (t === 'pre_order' ? 'طلب مسبق' : t === 'direct_sale' ? 'بيع مباشر' : t)).join(' + '),
+          ])}
+          {...section(12)}
+        >
+          <Suspense fallback={<div className="py-6 text-center text-[13px] text-[var(--ap-text-2)]">…</div>}>
+            <FulfillmentPanel productId={productId} />
+          </Suspense>
+        </SectionCard>
+      ) : null}
 
       {/* 6 ───────────────────────────────────────────────────────── images */}
       <SectionCard

@@ -80,6 +80,43 @@ export function Section({
  * Nullable IQD integer input. EMPTY = null (placeholder shows the inherit
  * hint), explicit 0 allowed and preserved. Never uses truthiness on value.
  */
+/**
+ * The same control for a SIGNED difference. `NullableIqd` clamps at zero,
+ * which is right for a price and wrong for "this order type is 50,000 dearer
+ * — or cheaper": an adjustment is the one money field that may be negative,
+ * and silently refusing the minus sign would make a discount unenterable.
+ */
+export function SignedIqd({
+  value,
+  onChange,
+  placeholder = 'بلا فرق / no difference',
+  disabled,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      step={1}
+      disabled={disabled}
+      value={value === null || value === undefined ? '' : value}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (raw === '' || raw === '-') { onChange(null); return; }
+        const n = Math.trunc(Number(raw));
+        if (Number.isFinite(n)) onChange(n);
+      }}
+      className={inputCls + ' disabled:opacity-50'}
+      dir="ltr"
+    />
+  );
+}
+
 export function NullableIqd({
   value,
   onChange,
