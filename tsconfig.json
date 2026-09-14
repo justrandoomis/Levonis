@@ -28,6 +28,11 @@
     "node_modules",
     "worker",
     "tests",
+    // Maintenance scripts import worker/lib and therefore need the Workers
+    // types this browser config does not have. They are typechecked by
+    // tests/tsconfig.json, which does — excluding them here is a change of
+    // WHICH config reads them, never a hole: `npm run check` runs both.
+    "scripts",
     "studio",
     "packages",
     "services"

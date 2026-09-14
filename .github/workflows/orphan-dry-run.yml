@@ -15,7 +15,7 @@
 # DELETE/UPDATE/INSERT/DROP/ALTER/CREATE at all. There is no destructive mode
 # in this workflow to turn on by mistake: clearing the residue is a separate,
 # admin-authenticated call that itself demands the numbers from a dry run.
-name: 23 - Product Orphan DRY RUN report (read-only)
+name: 37 - Product Orphan DRY RUN report (read-only)
 
 on:
   workflow_dispatch:

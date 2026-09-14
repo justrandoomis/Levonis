@@ -186,7 +186,6 @@ lines.push(
 const report = lines.join('\n');
 console.log(report);
 if (process.env.GITHUB_STEP_SUMMARY) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { appendFileSync } = await import('node:fs');
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`);
 }
