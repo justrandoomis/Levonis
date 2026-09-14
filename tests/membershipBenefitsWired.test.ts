@@ -711,3 +711,38 @@ test('only enabled, in-window rules reach a checkout', async () => {
   // clock the caller freezes — and `selectRule` drops it.
   assert.ok(live.some((r) => r.label === 'expired'));
 });
+
+/* ------------------------------------------- recommended starting values */
+
+test('the recommended starting values are a starting point, not a decision', async () => {
+  const { raw, db } = setup();
+  // The store's own seeded root sections — this action works against the
+  // owner's real taxonomy, which is why it cannot live in a migration.
+  const admin = appAs(db, 'boss', 'admin');
+
+  const first = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended'));
+  assert.equal(first.success, true, JSON.stringify(first));
+  assert.ok(first.created.length > 0, 'the seeded taxonomy has printers and materials');
+  const printers = first.created.find((r: { label: string }) => r.label.includes('PRO'));
+  assert.equal(printers.scope, 'category');
+  assert.equal(printers.benefit_type, 'product_discount');
+
+  // Run it twice: it offers, it does not overwrite.
+  const again = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended'));
+  assert.equal(again.created.length, 0);
+  assert.ok(again.skipped.every((s: { reason: string }) => s.reason !== 'UNKNOWN'));
+  const rows = raw.prepare("SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE benefit_type = 'product_discount'").get() as { n: number };
+  assert.equal(rows.n, first.created.length, 'nothing duplicated');
+
+  // And an owner's own edit survives it.
+  const edited = await json(
+    await send(admin, 'PUT', `/api/admin/membership-benefits/${printers.id}`, {
+      tier: printers.tier, benefit_type: 'product_discount', scope: 'category',
+      category_id: printers.category_id, discount_mode: 'percent', percent: 3,
+    })
+  );
+  assert.equal(edited.success, true);
+  await send(admin, 'POST', '/api/admin/membership-benefits/recommended');
+  const after = raw.prepare('SELECT percent FROM membership_benefit_rules WHERE id = ?').get(printers.id) as { percent: number };
+  assert.equal(after.percent, 3, 'the action never overwrites a decision');
+});

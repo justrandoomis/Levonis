@@ -259,6 +259,124 @@ adminMembershipBenefitRoutes.delete('/:id', async (c) => {
   return c.json({ success: true, version_id: versionId });
 });
 
+/* ------------------------------------------------- recommended starting values */
+
+/**
+ * THE MANDATE'S INITIAL DEFAULTS, offered as a STARTING POINT.
+ *
+ * Migration 0074 deliberately seeds no product discount: a global "PRO 10%
+ * off" would discount the entire catalogue on the first deploy, and a section
+ * rule cannot be seeded because it must name sections whose ids a migration
+ * cannot know. So the owner presses a button instead, against the sections
+ * that actually exist in THEIR taxonomy, and then edits every number.
+ *
+ * Nothing here is permanent and nothing here is special: each rule it creates
+ * is an ordinary row the owner can change or delete, and running it twice
+ * creates nothing the second time.
+ */
+const RECOMMENDED: Array<{
+  key: string;
+  slugs: string[];
+  tier: 'pro' | 'prime';
+  label: string;
+  fields: Partial<RuleWrite>;
+}> = [
+  {
+    key: 'pro-printers',
+    slugs: ['printers', '3d-printers'],
+    tier: 'pro',
+    label: 'PRO — طابعات',
+    fields: { discount_mode: 'percent', percent: 10, max_discount_iqd: 100_000, cap_scope: 'per_unit' },
+  },
+  {
+    key: 'pro-materials',
+    slugs: ['materials', 'filament'],
+    tier: 'pro',
+    label: 'PRO — مواد',
+    fields: { discount_mode: 'percent', percent: 15 },
+  },
+  {
+    key: 'pro-accessories',
+    slugs: ['accessories', 'printer-accessories'],
+    tier: 'pro',
+    label: 'PRO — إكسسوارات',
+    fields: { discount_mode: 'percent', percent: 10 },
+  },
+  {
+    key: 'premium-printers',
+    slugs: ['printers', '3d-printers'],
+    tier: 'prime',
+    label: 'PREMIUM — طابعات',
+    fields: { discount_mode: 'fixed', fixed_iqd: 15_000, cap_scope: null },
+  },
+];
+
+const BLANK_RULE: Omit<RuleWrite, 'id' | 'tier' | 'benefit_type' | 'scope' | 'label'> = {
+  category_id: null,
+  sub_category_id: null,
+  product_id: null,
+  discount_mode: null,
+  percent: null,
+  fixed_iqd: null,
+  max_discount_iqd: null,
+  cap_scope: null,
+  max_quantity: null,
+  min_subtotal_iqd: null,
+  free_shipping_threshold_iqd: null,
+  shipping_methods: null,
+  max_shipping_subsidy_iqd: null,
+  cod_tax_exempt: null,
+  enabled: true,
+  priority: 0,
+  valid_from: null,
+  valid_until: null,
+  notes: null,
+};
+
+adminMembershipBenefitRoutes.post('/recommended', async (c) => {
+  const user = c.get('user')!;
+  const [existing, { results: catalogs }] = await Promise.all([
+    allBenefitRules(c.env.DB),
+    c.env.DB.prepare('SELECT id, slug FROM catalogs WHERE parent_id IS NULL').all<{ id: string; slug: string }>(),
+  ]);
+  const bySlug = new Map((catalogs ?? []).map((row) => [String(row.slug), String(row.id)]));
+
+  const created: RuleWrite[] = [];
+  const skipped: Array<{ key: string; reason: string }> = [];
+  let versionId = (await currentBenefitVersionId(c.env.DB)) ?? 0;
+
+  for (const rec of RECOMMENDED) {
+    const categoryId = rec.slugs.map((slug) => bySlug.get(slug)).find((id) => !!id) ?? null;
+    if (!categoryId) {
+      skipped.push({ key: rec.key, reason: 'NO_MATCHING_SECTION' });
+      continue;
+    }
+    // An owner who already wrote a rule for this tier and section keeps it.
+    // This action offers a starting point; it never overwrites a decision.
+    const taken = existing.some(
+      (r) => r.tier === rec.tier && r.benefit_type === 'product_discount' && r.scope === 'category' && r.category_id === categoryId
+    );
+    if (taken) {
+      skipped.push({ key: rec.key, reason: 'ALREADY_CONFIGURED' });
+      continue;
+    }
+    const rule: RuleWrite = {
+      ...BLANK_RULE,
+      ...rec.fields,
+      id: newId('mbr'),
+      tier: rec.tier,
+      benefit_type: 'product_discount',
+      scope: 'category',
+      category_id: categoryId,
+      label: rec.label,
+    };
+    versionId = await saveBenefitRule(c.env, user.id, rule, 'create');
+    created.push(rule);
+  }
+
+  return c.json({ success: true, created, skipped, version_id: versionId });
+});
+
 /* ------------------------------------------------------------ simulator */
 
 /** A membership the simulator prices AS IF — never read from any account. */
