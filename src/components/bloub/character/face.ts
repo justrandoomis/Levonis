@@ -187,15 +187,28 @@ const BLINK_RNG = createRng(0x1e0075);
  * second of the clock always produces the same frame, so nothing drifts when
  * the tab is hidden and resumed.
  */
+/**
+ * How long the schedules run before they wrap.
+ *
+ * They HAVE to wrap. A schedule that simply ends stops working — a storefront
+ * left open on a counter would blink for ten minutes and then stare — and a
+ * schedule scanned from the start every frame gets slower the longer the tab
+ * has been open, because the scan is as long as the elapsed time. Ten minutes
+ * of irregular rhythm repeating is not something anyone will ever notice; a
+ * character that stops blinking is.
+ */
+const SPAN = 600;
+
 const BLINKS: number[] = (() => {
   const out: number[] = [];
   let t = 1.1;
-  while (t < 1800) {
+  // Stop early enough that no blink is cut in half by the wrap.
+  while (t < SPAN - 1) {
     out.push(t);
     t += 2.0 + BLINK_RNG() * 3.0;
     // A double blink now and then. Without it the rhythm is irregular but
     // still uniform, and uniform irregularity is its own kind of pattern.
-    if (BLINK_RNG() < 0.17) {
+    if (BLINK_RNG() < 0.17 && t < SPAN - 1) {
       out.push(t);
       t += 0.26;
     }
@@ -203,21 +216,31 @@ const BLINKS: number[] = (() => {
   return out;
 })();
 
+/** Index of the last entry at or before `t`, or -1. Binary search rather than a
+ * scan so the cost is the same on the first frame and the millionth. */
+function lastAtOrBefore(times: readonly number[], t: number): number {
+  let lo = 0;
+  let hi = times.length - 1;
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid]! <= t) { found = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return found;
+}
+
 /** Blink duration. Closing is faster than opening, which is how eyelids
  * actually work and is the difference between a blink and a wince. */
 const BLINK_DUR = 0.19;
 const BLINK_CLOSE = 0.42;
 
 export function blinkLid(t: number, schedule: readonly number[] = BLINKS): number {
-  for (let i = 0; i < schedule.length; i++) {
-    const start = schedule[i]!;
-    if (t < start) break;
-    const k = (t - start) / BLINK_DUR;
-    if (k >= 0 && k <= 1) {
-      return k < BLINK_CLOSE ? 1 - k / BLINK_CLOSE : (k - BLINK_CLOSE) / (1 - BLINK_CLOSE);
-    }
-  }
-  return 1;
+  const now = ((t % SPAN) + SPAN) % SPAN;
+  const i = lastAtOrBefore(schedule, now);
+  if (i < 0) return 1;
+  const k = (now - schedule[i]!) / BLINK_DUR;
+  if (k > 1) return 1;
+  return k < BLINK_CLOSE ? 1 - k / BLINK_CLOSE : (k - BLINK_CLOSE) / (1 - BLINK_CLOSE);
 }
 
 /**
@@ -264,7 +287,7 @@ const SACCADE_RNG = createRng(0x5acc);
 const SACCADES: Array<{ at: number; yaw: number; pitch: number }> = (() => {
   const out: Array<{ at: number; yaw: number; pitch: number }> = [];
   let t = 2.4;
-  while (t < 1800) {
+  while (t < SPAN - 1) {
     out.push({
       at: t,
       yaw: (SACCADE_RNG() * 2 - 1) * 11,
@@ -278,23 +301,26 @@ const SACCADES: Array<{ at: number; yaw: number; pitch: number }> = (() => {
   return out;
 })();
 
+/** The flick times alone, hoisted so the per-frame lookup allocates nothing.
+ * Building this inside `saccade` cost one array per frame — sixty a second,
+ * for the lifetime of the tab, to answer a question whose answer never
+ * changes. */
+const SACCADE_TIMES: readonly number[] = SACCADES.map((s) => s.at);
+
 /** How long a flick takes. Eyes are quick — anything slower than this stops
  * being a saccade and becomes a pan. */
 const SACCADE_DUR = 0.13;
 
 export function saccade(t: number, schedule = SACCADES): { yaw: number; pitch: number } {
-  let prev = { yaw: 0, pitch: 0 };
-  for (let i = 0; i < schedule.length; i++) {
-    const s = schedule[i]!;
-    if (t < s.at) break;
-    const k = (t - s.at) / SACCADE_DUR;
-    if (k <= 1) {
-      // Ease-out on a flick: it leaves fast and arrives soft, so it lands
-      // rather than stopping dead.
-      const e = 1 - (1 - k) ** 3;
-      return { yaw: prev.yaw + (s.yaw - prev.yaw) * e, pitch: prev.pitch + (s.pitch - prev.pitch) * e };
-    }
-    prev = { yaw: s.yaw, pitch: s.pitch };
-  }
-  return prev;
+  const now = ((t % SPAN) + SPAN) % SPAN;
+  const i = lastAtOrBefore(schedule === SACCADES ? SACCADE_TIMES : schedule.map((s) => s.at), now);
+  if (i < 0) return { yaw: 0, pitch: 0 };
+  const cur = schedule[i]!;
+  const prev = i > 0 ? schedule[i - 1]! : { yaw: 0, pitch: 0 };
+  const k = (now - cur.at) / SACCADE_DUR;
+  if (k > 1) return { yaw: cur.yaw, pitch: cur.pitch };
+  // Ease-out on a flick: it leaves fast and arrives soft, so it lands rather
+  // than stopping dead.
+  const e = 1 - (1 - k) ** 3;
+  return { yaw: prev.yaw + (cur.yaw - prev.yaw) * e, pitch: prev.pitch + (cur.pitch - prev.pitch) * e };
 }

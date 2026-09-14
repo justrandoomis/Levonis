@@ -145,6 +145,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       if (journey) {
         const elapsed = (now - journey.startedAt) / 1000;
         travel = sampleTravel(journey.plan, elapsed);
+        // The preference can change WHILE a journey is in flight, and the plan
+        // carries the flag it was built with. Flattening the deformation here
+        // rather than re-planning keeps the character on its path — it must
+        // still arrive — while honouring the preference from this frame on.
+        if (reducedRef.current && !journey.plan.reduced) travel = { ...travel, stretch: 0, trail: 0, squash: 0 };
         writeFrame({ x: travel.x, y: travel.y, size: travel.size });
         if (travel.phase === 'done') finishJourney();
       }
@@ -202,17 +207,27 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       const last = frameRef.current;
       const boot = !completedRef.current;
       completedRef.current = true;
+
+      // WHERE THE CHARACTER IS ALREADY HEADED, not where it happens to be
+      // right now. Comparing against its live position instead meant that a
+      // re-measure taken while it was mid-flight and passing near the NEW
+      // anchor looked like "nothing to do" — and the journey then carried it
+      // on to the OLD one, past the dock it was supposed to take.
+      const inFlight = journeyRef.current;
+      const heading = inFlight ? inFlight.plan.to : last;
+      if (Math.abs(heading.x - next.x) < 0.5 && Math.abs(heading.y - next.y) < 0.5 && Math.abs(heading.size - next.size) < 0.5) return;
+
       const plan = planTravel(last, next, { reduced: reducedRef.current, boot });
-      if (!isTravelWorthAnimating(plan)) {
+      if (!inFlight && !isTravelWorthAnimating(plan)) {
         // A relayout of a few pixels is not a journey. Snapping here is
         // correct: animating it would launch the character across the screen
         // every time a keyboard opened.
-        if (!journeyRef.current) writeFrame(next);
+        writeFrame(next);
         return;
       }
-      if (!animate && !boot) {
+      if (!animate && !boot && !inFlight) {
         writeFrame(next);
-        if (!journeyRef.current) { setPhase('docked'); }
+        setPhase('docked');
         return;
       }
       if (document.hidden) {

@@ -108,6 +108,35 @@ test('blinks are irregular, occasionally doubled, and never on a metronome', () 
   assert.ok(Math.max(...gaps) > 3.5, 'and some long holds');
 });
 
+test('a tab left open for hours still blinks, and costs the same to sample', () => {
+  // Both schedules used to run out at the half-hour mark and then return a
+  // constant — a storefront left open on a counter would simply stop blinking
+  // — and both were scanned from index 0 every frame, so the work grew with
+  // the uptime. They wrap now, and the lookup is a binary search.
+  for (const hours of [0.2, 1, 6, 25]) {
+    const base = hours * 3600;
+    let blinked = false;
+    for (let i = 0; i < 60 * 40 && !blinked; i++) if (blinkLid(base + i / 60) < 0.5) blinked = true;
+    assert.ok(blinked, `still blinking after ${hours}h of uptime`);
+    const flicks = new Set<string>();
+    for (let i = 0; i < 60 * 40; i++) {
+      const s = saccade(base + i / 60);
+      flicks.add(`${s.yaw.toFixed(2)}|${s.pitch.toFixed(2)}`);
+    }
+    assert.ok(flicks.size > 20, `gaze still moving after ${hours}h (${flicks.size} distinct)`);
+  }
+  // Sampling a late moment must not cost more than an early one.
+  const time = (base: number) => {
+    const t0 = process.hrtime.bigint();
+    for (let i = 0; i < 60000; i++) { blinkLid(base + i / 60); saccade(base + i / 60); }
+    return Number(process.hrtime.bigint() - t0);
+  };
+  time(0);
+  const early = time(5);
+  const late = time(9 * 3600);
+  assert.ok(late < early * 4, `late sampling stayed cheap (${(late / early).toFixed(2)}x)`);
+});
+
 test('the gaze holds still between flicks instead of drifting continuously', () => {
   // Pauses are the point. A gaze that moves every frame reads as a balloon;
   // what makes it read as an eye is that it is mostly STILL and then jumps.
