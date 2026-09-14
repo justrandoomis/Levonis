@@ -22,7 +22,8 @@
     "db:migrate:local": "wrangler d1 migrations apply levonis-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply levonis-db --remote",
     "test:unit": "node scripts/test-all.mjs",
-    "test:workspaces": "node scripts/test-workspaces.mjs"
+    "test:workspaces": "node scripts/test-workspaces.mjs",
+    "mascot:preview": "tsx scripts/mascot-preview.ts"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",

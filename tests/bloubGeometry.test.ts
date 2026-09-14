@@ -4,12 +4,28 @@ import { bootstrapCharacterFrame, frameFromRect, characterTransform, beginCharac
 import { isBloubState, bloubDuration, signalBloub } from '../src/components/bloub/events';
 
 test('bootstrap has a real large footprint centred in the visual viewport', () => {
+  // The bounds moved deliberately (144-240 before). The old rule read from the
+  // WIDTH, so on a 390px phone it produced 148px and the character arrived
+  // about the size of an app icon — the brief calls that out by name. It now
+  // reads from the shorter viewport dimension, which is what actually
+  // constrains a centred circle, so a phone gets 203 and a tablet 320.
   for (const width of [320, 360, 390, 430, 768, 1024, 1440]) {
     const f = bootstrapCharacterFrame({ width, height: 800, offsetLeft: 4, offsetTop: 16 });
-    assert.ok(f.size >= 144 && f.size <= 240);
+    assert.ok(f.size >= 180 && f.size <= 320, `size ${f.size} at width ${width}`);
+    // It can never overflow the viewport it is centred in, at any aspect.
+    assert.ok(f.size <= Math.min(width, 800), `size ${f.size} exceeds viewport ${width}x800`);
     assert.equal(f.x + f.size / 2, width / 2 + 4);
     assert.equal(f.y + f.size / 2, 416);
   }
+});
+
+test('the first frame is larger than the docked frame it travels to', () => {
+  // The whole boot journey is "big in the middle, then small at home". If
+  // these ever crossed, the character would grow on arrival instead of
+  // shrinking and the sequence would read backwards.
+  const boot = bootstrapCharacterFrame({ width: 390, height: 844 });
+  const dockedHomeUpperBound = 104; // --lv-home-hit caps here; see src/index.css
+  assert.ok(boot.size > dockedHomeUpperBound * 1.5, `boot ${boot.size} vs dock ${dockedHomeUpperBound}`);
 });
 test('physical geometry centres the same in RTL and LTR and rejects invalid rectangles', () => {
   assert.deepEqual(frameFromRect({left:24,top:700,width:52,height:44}), {x:28,y:700,size:44});

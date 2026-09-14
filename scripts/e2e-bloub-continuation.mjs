@@ -13,15 +13,85 @@ async function state(page, name, timeout=6000) {
   await page.waitForFunction(name=>document.querySelector('.lv-app-intro')?.getAttribute('data-mascot-state')===name,name,{timeout});
 }
 /** Poll painted animation frames, not Node wall-clock sleeps. A loaded CI
- * runner may defer a WebKit paint; the gaze must still measurably change. */
+ * runner may defer a WebKit paint; the gaze must still measurably change.
+ *
+ * Reads the eye's own matrix rather than a wrapper's computed transform. The
+ * character no longer has a gaze wrapper to animate: each eye carries the
+ * whole head pose — where it sits on the sphere, how it is inclined, how far
+ * the lid has come down — in one matrix written per frame. That matrix IS the
+ * gaze, so this is a stricter check than the group transform it replaces. */
 async function animatedEyes(page) {
-  const before=await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform);
-  await page.waitForFunction(before=>{
-    const eyes=document.querySelector('[data-bloub-gaze]');
-    return eyes && getComputedStyle(eyes).transform!==before;
-  },before,{polling:'raf',timeout:1500});
-  assert.notEqual(await page.locator('[data-bloub-gaze]').evaluate(e=>getComputedStyle(e).transform),before,'eyes really moved');
+  const read=()=>page.locator('[data-bloub-eye="0"]').evaluate(e=>e.getAttribute('transform'));
+  const before=await read();
+  await page.waitForFunction(before=>
+    document.querySelector('[data-bloub-eye="0"]')?.getAttribute('transform')!==before,
+    before,{polling:'raf',timeout:2500});
+  assert.notEqual(await read(),before,'eyes really moved');
 }
+
+/** THE GAZE LEADS THE BODY.
+ *
+ * The brief's headline requirement, and the one thing a screenshot can never
+ * show: before the character goes anywhere, it looks where it is going. This
+ * samples the eye's position on the face and the character's position on
+ * screen every animation frame across a whole journey, then asserts three
+ * things about the ORDER they happen in.
+ *
+ * Deliberately not a threshold on degrees: idle drift and saccades move the
+ * eyes a few units on their own, so any fixed angle is either inside that
+ * noise or outside the lead. And deliberately not the argmin of the eye
+ * position either — the gaze TURNS and then HOLDS on the destination for the
+ * whole journey, so its extreme frame is wherever the last hundredth of a unit
+ * of jitter happened to land, which is meaningless. What is meaningful is when
+ * the turn was substantially complete.
+ */
+async function gazeLeads(page) {
+  const trace=await page.evaluate(()=>new Promise(resolve=>{
+    const frames=[]; const t0=performance.now();
+    const step=()=>{
+      const eye=document.querySelector('[data-bloub-eye="0"]');
+      const node=document.querySelector('.lv-app-intro__character');
+      const m=eye?.getAttribute('transform')?.match(/matrix\(([^)]+)\)/);
+      const c=node?.style.transform.match(/translate3d\(([-\d.]+)px,\s*([-\d.]+)px[^)]*\)\s*scale\(([\d.]+)\)/);
+      if(m&&c){const p=m[1].trim().split(/\s+/).map(Number);
+        frames.push({eyeY:p[5],charY:Number(c[2]),scale:Number(c[3])});}
+      if(performance.now()-t0<1500) requestAnimationFrame(step); else resolve(frames);
+    };
+    requestAnimationFrame(step);
+  }));
+  assert.ok(trace.length>20,`sampled the journey (${trace.length} frames)`);
+  const first=trace[0], last=trace[trace.length-1];
+  const travelled=last.charY-first.charY;
+  assert.ok(Math.abs(travelled)>40,`the character actually travelled (${travelled.toFixed(0)}px)`);
+  const up=travelled<0;                       // screen-up journey => gaze pitches up => eyeY falls
+
+  // 1. ANTICIPATION: the body gathers AWAY from the destination before it goes.
+  const wrongWay=Math.max(...trace.map(f=>up?f.charY-first.charY:first.charY-f.charY));
+  assert.ok(wrongWay>0.4&&wrongWay<10,`wound up away from the destination by ${wrongWay.toFixed(1)}px`);
+
+  // 2. THE GAZE LEADS: it has substantially turned before the body commits.
+  const eyes=trace.map(f=>f.eyeY);
+  const extreme=up?Math.min(...eyes):Math.max(...eyes);
+  const swing=extreme-first.eyeY;
+  assert.ok(Math.abs(swing)>2,`the gaze visibly turned (${swing.toFixed(2)} viewBox units)`);
+  const mark=first.eyeY+swing*0.9;
+  const turned=trace.findIndex(f=>up?f.eyeY<=mark:f.eyeY>=mark);
+  const moved=trace.findIndex(f=>Math.abs(f.charY-first.charY)>Math.abs(travelled)*0.1
+    &&Math.sign(f.charY-first.charY)===Math.sign(travelled));
+  assert.ok(moved>0,'found the frame the body committed to the journey');
+  assert.ok(turned>=0&&turned<moved,`gaze turned by frame ${turned}, body committed at ${moved} — eyes must lead`);
+
+  // 3. SIZE IS NOT POSITION: the character stays big as it sets off and does
+  //    its shrinking on the approach, rather than resizing linearly as it goes.
+  const scaleSpan=last.scale-first.scale;
+  if(Math.abs(scaleSpan)>0.01){
+    const at=trace[moved];
+    const scaleProgress=(at.scale-first.scale)/scaleSpan;
+    assert.ok(scaleProgress<0.08,`scale barely moved while the body committed (${(scaleProgress*100).toFixed(1)}%)`);
+  }
+  return {turned,moved,travelled};
+}
+
 async function aligned(page,kind) {
   await page.waitForFunction(kind=>{
     const a=document.querySelector(`[data-bloub-anchor="${kind}"]`)?.getBoundingClientRect();
@@ -53,7 +123,25 @@ async function dimensions(page,kind) {
   return m;
 }
 const click=async(page,id)=>page.locator(id).click();
-for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
+/** Under a reduced-motion preference the BODY must hold perfectly still: no
+ * breathing, no drift, no resting wobble. Blinking is intentionally still
+ * running — it is not vestibular, and a face that never blinks reads as broken
+ * rather than as calm — so this samples the outline and not the eyes. */
+async function stillBody(page) {
+  const paths=await page.evaluate(()=>new Promise(resolve=>{
+    const seen=new Set(); const t0=performance.now();
+    const step=()=>{
+      seen.add(document.querySelector('[data-bloub-body]')?.getAttribute('d'));
+      if(performance.now()-t0<600) requestAnimationFrame(step); else resolve([...seen]);
+    };
+    requestAnimationFrame(step);
+  }));
+  assert.equal(paths.length,1,`body outline is static under reduced motion (${paths.length} distinct paths)`);
+}
+// Both engines in CI. `BLOUB_ENGINES=chromium` lets a developer run one
+// locally without editing the file — it never narrows what CI runs.
+const engines=[['chromium',chromium],['webkit',webkit]].filter(([name])=>!process.env.BLOUB_ENGINES||process.env.BLOUB_ENGINES.split(',').includes(name));
+for(const [engineName,engine] of engines) {
   const browser=await engine.launch();
   try {
     for(const width of [320,360,390,430,768,1024,1440]) for(const lang of ['ar','en']) {
@@ -66,7 +154,7 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
           new MutationObserver(()=>{const e=document.querySelector('.lv-app-intro');window.__states.push(e?.getAttribute('data-mascot-state'));}).observe(document.querySelector('.lv-app-intro'),{attributes:true,attributeFilter:['data-mascot-state']});});
         await state(page,'loading');
         const intro=await page.locator('.lv-app-intro__character').boundingBox();
-        assert.ok(intro.width>=144 && intro.width<=240);
+        assert.ok(intro.width>=180 && intro.width<=320,`first frame ${intro.width}`);
         assert.ok(Math.abs(intro.x+intro.width/2-width/2)<1.5);
         await animatedEyes(page);
         if(width===390&&lang==='ar') await page.screenshot({path:`${out}/${engineName}-${lang}-intro.png`});
@@ -75,7 +163,8 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
         assert.ok(intro.width>=home.svg.w*1.9,'intro substantially larger than docked');
         await page.screenshot({path:`${out}/${engineName}-${lang}-${width}-home.png`});
         await click(page,'#product');
-        await page.waitForFunction(()=>document.querySelector('[data-bloub-direction]')?.getAttribute('style')?.includes('translate'));
+        await page.waitForFunction(()=>document.querySelector('.lv-app-intro')?.dataset.phase==='travelling',null,{polling:'raf',timeout:4000});
+        await gazeLeads(page);
         await aligned(page,'top-header'); await state(page,'idle');
         const header=await dimensions(page,'top-header');
         await page.screenshot({path:`${out}/${engineName}-${lang}-${width}-header.png`});
@@ -131,7 +220,8 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
     await click(page,'#ready');await aligned(page,'bottom-home');
     assert.equal(await page.locator('.lv-app-intro').getAttribute('data-reduced-motion'),'true');
     await click(page,'#product');await aligned(page,'top-header');
-    for(const element of ['svg.lv-bloub','.lv-bloub-gaze','.lv-bloub-blink','.lv-bloub-breath']) assert.equal(await page.locator(element).evaluate(e=>getComputedStyle(e).animationName),'none');
+    assert.equal(await page.locator('svg.lv-bloub').evaluate(e=>getComputedStyle(e).animationName),'none');
+    await stillBody(page);
     await click(page,'#api-error');await state(page,'error');
     await state(page,'idle');cases++;
     // A preference changed while this page is OPEN must reach both React
@@ -146,7 +236,7 @@ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]) {
     await preference(false);
     await click(page,'#api-load');await state(page,'loading');await animatedEyes(page);
     await preference(true);await state(page,'loading');
-    for(const element of ['.lv-bloub-gaze','.lv-bloub-blink','.lv-bloub-breath']) assert.equal(await page.locator(element).evaluate(e=>getComputedStyle(e).animationName),'none');
+    await stillBody(page);
     await click(page,'#api-resolve');await state(page,'idle');await aligned(page,'top-header');
     await preference(false);
     await page.locator('.lv-character-home').click();

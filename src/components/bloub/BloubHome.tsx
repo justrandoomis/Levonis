@@ -1,85 +1,146 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { useMascotReducedMotion } from './useMascotReducedMotion';
-import { type MascotDirection, type MascotState } from '../../lib/mascot';
+import { type MascotState } from '../../lib/mascot';
+import { VIEWBOX, sampleCharacter, type CharacterRender } from './character/engine';
 export type { BloubState } from './events';
 
-/** Same Bloub path topology and Levonis palette as the deployed character.
- * All curves have matching commands, allowing the existing morph engine to
- * interpolate rather than replacing an SVG or cross-fading two mascots.
+/**
+ * THE CHARACTER'S BODY. A renderer, and nothing else.
+ *
+ * Every frame arrives through `apply()` from the one animation loop in
+ * AppIntro. This component never schedules a frame, never reads a clock and
+ * never re-renders while the character is moving — it holds refs to six nodes
+ * and writes attributes onto them.
+ *
+ * That split is deliberate. The previous version drove the face through React
+ * state and a motion library, with one shared transition on every animated
+ * property, which had two consequences that no amount of tuning could fix: a
+ * component re-render for every visual change, and — because the transition
+ * was shared — a body, a pair of eyes and a mouth that were mathematically
+ * incapable of moving at different speeds. A character whose every part
+ * changes on the same curve is a diagram of a character.
  */
-const BASE = {
-  idle: 'M50 7 C74 6 91 23 92 47 C94 71 78 91 52 93 C26 95 7 80 8 53 C9 25 24 8 50 7 Z',
-  loading: 'M50 9 C76 5 94 28 89 53 C86 78 72 94 47 91 C22 89 5 74 10 47 C14 22 27 11 50 9 Z',
-  navigating: 'M50 11 C80 4 96 29 88 52 C80 75 67 91 43 89 C19 87 3 69 12 43 C20 20 30 16 50 11 Z',
-  success: 'M50 8 C75 5 92 20 93 45 C95 70 77 88 53 94 C29 98 9 79 8 54 C7 29 25 11 50 8 Z',
-  notify: 'M50 5 C74 7 93 25 91 50 C89 75 77 94 50 94 C23 94 9 77 9 50 C9 23 26 3 50 5 Z',
-  tap: 'M50 13 C71 10 87 25 90 48 C93 71 76 86 52 88 C28 90 11 76 11 52 C11 28 29 16 50 13 Z',
-  error: 'M50 8 C76 9 91 27 89 52 C87 78 70 92 46 91 C21 90 8 73 11 47 C14 22 28 7 50 8 Z',
-};
-export const BLOUB_SHAPES: Record<MascotState, string> = {
-  ...BASE, typing: BASE.loading, warning: BASE.error, returning: BASE.navigating,
-  arrival: BASE.success, sleep: BASE.tap,
-};
-// The union of the actual cubic-curve bounds (plus stroke and small breathing
-// excursions) fits here. Old viewBox 0 0 100 100 wasted space around the body.
-// Keep explicit breathing room; geometry tests inspect the PATH, not its box.
-export const BLOUB_VIEWBOX = '3 3 94 94';
 
-export default function BloubHome({ state = 'idle', direction = { x: 0, y: 0 }, sequence = 0, className = '' }: {
-  state?: MascotState; direction?: MascotDirection; sequence?: number; className?: string;
-}) {
-  const reduced = useMascotReducedMotion();
-  const travelling = state === 'navigating' || state === 'returning';
-  const happy = state === 'success';
-  const rest = state === 'sleep';
-  const transition = { duration: reduced ? 0.10 : 0.23, ease: 'easeInOut' as const };
-  const eyeY = state === 'loading' || state === 'typing' ? 47 : state === 'notify' ? 46 : 49;
-  const eyeHeight = rest ? 0.7 : state === 'error' ? 6.4 : state === 'warning' ? 5 : 4.8;
-  const mouth = happy ? 'M42 65 Q50 74 59 65' : state === 'error' ? 'M42 69 Q50 62 58 69'
-    : state === 'warning' ? 'M43 68 Q50 65 57 68' : rest ? 'M44 66 Q50 66 56 66' : 'M44 65 Q50 69 56 65';
+export const BLOUB_VIEWBOX = VIEWBOX;
+
+export interface CharacterHandle {
+  /** Write one sampled frame onto the DOM. Called from rAF; does no work
+   * beyond six attribute writes. */
+  apply(render: CharacterRender): void;
+}
+
+/** The frame the markup is born with, so the very first paint — before any
+ * loop has run — is already the character at rest rather than an empty box. */
+const FIRST: CharacterRender = sampleCharacter({ t: 0, state: 'idle', from: null, age: 9, travel: null, reduced: false });
+
+interface Props {
+  state?: MascotState;
+  /** Only used to publish `data-reduced`. The engine reads the preference
+   * itself, per frame, from the loop — this attribute is how the outside world
+   * (and the browser regression) can see which way the character is being
+   * drawn without sampling it. */
+  reduced?: boolean;
+  className?: string;
+}
+
+const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ state = 'idle', reduced = false, className = '' }, ref) {
+  const body = React.useRef<SVGPathElement>(null);
+  const gloss = React.useRef<SVGPathElement>(null);
+  const mouth = React.useRef<SVGPathElement>(null);
+  const eyeA = React.useRef<SVGEllipseElement>(null);
+  const eyeB = React.useRef<SVGEllipseElement>(null);
+  const alert = React.useRef<SVGGElement>(null);
+
+  React.useImperativeHandle(ref, (): CharacterHandle => ({
+    apply(r) {
+      body.current?.setAttribute('d', r.body);
+      gloss.current?.setAttribute('d', r.gloss);
+      mouth.current?.setAttribute('d', r.mouth);
+      mouth.current?.setAttribute('stroke-width', String(r.mouthWeight));
+      const eyes = [eyeA.current, eyeB.current];
+      for (let i = 0; i < 2; i++) {
+        const node = eyes[i];
+        const eye = r.eyes[i]!;
+        if (!node) continue;
+        node.setAttribute('transform', eye.matrix);
+        node.setAttribute('rx', String(eye.rx));
+        node.setAttribute('ry', String(eye.ry));
+        // An eye that has gone round the side of the head is not drawn small,
+        // it is not drawn. Scaling it to nothing leaves a sliver on the limb.
+        node.style.display = eye.visible ? '' : 'none';
+      }
+      if (alert.current) alert.current.style.opacity = String(r.alert);
+    },
+  }), []);
 
   return (
-    <svg viewBox={BLOUB_VIEWBOX} className={`lv-bloub lv-bloub--${state} ${className}`}
-      data-expression={state} data-expression-sequence={sequence} data-reduced={reduced ? 'true' : 'false'}
-      aria-hidden="true" focusable="false">
+    <svg
+      viewBox={VIEWBOX}
+      className={`lv-bloub ${className}`}
+      data-expression={state}
+      data-reduced={reduced ? 'true' : 'false'}
+      aria-hidden="true"
+      focusable="false"
+    >
       <defs>
+        {/* The established Levonis character: dark olive body, warm gold rim,
+            cream face. Unchanged — the brief asks for the same character
+            better animated, not a different one. */}
         <linearGradient id="levonis-bloub-fill" x1="18" y1="8" x2="82" y2="94" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#30391c" /><stop offset="0.58" stopColor="#1b2010" /><stop offset="1" stopColor="#10130a" />
+          <stop stopColor="#30391c" />
+          <stop offset="0.58" stopColor="#1b2010" />
+          <stop offset="1" stopColor="#10130a" />
         </linearGradient>
         <linearGradient id="levonis-bloub-edge" x1="20" y1="10" x2="80" y2="90" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#d0bd83" stopOpacity="0.72" /><stop offset="1" stopColor="#786b43" stopOpacity="0.22" />
+          <stop stopColor="#d0bd83" stopOpacity="0.72" />
+          <stop offset="1" stopColor="#786b43" stopOpacity="0.22" />
         </linearGradient>
       </defs>
-      <g className="lv-bloub-breath">
-        <motion.g className="lv-bloub-posture" initial={false}
-          animate={{ scaleX: !reduced && travelling ? 1 + Math.abs(direction.x) * 0.025 : 1,
-            scaleY: !reduced && travelling ? 1 + Math.abs(direction.y) * 0.025 : 1 }}
-          style={{ transformOrigin: '50px 50px' }} transition={transition}>
-          <motion.path data-bloub-body d={BASE.idle} initial={false} animate={{ d: BLOUB_SHAPES[state] }}
-            transition={transition} fill="url(#levonis-bloub-fill)" stroke="url(#levonis-bloub-edge)" strokeWidth="2" />
-          <path d="M24 28 C38 15 66 15 79 32" fill="none" stroke="#f2e7c6" strokeOpacity="0.12" strokeWidth="4" strokeLinecap="round" />
-          <motion.g data-bloub-direction initial={false} animate={{ x: travelling ? direction.x * 7 : 0, y: travelling ? direction.y * 7 : 0 }} transition={transition}>
-            <g className="lv-bloub-gaze" data-bloub-gaze>
-              <g className="lv-bloub-blink">
-                {[37, 64].map((x, i) => (
-                  <motion.ellipse key={x} data-bloub-eye={i} cx={x} cy={49} rx={3.8} ry={4.8}
-                    initial={false} animate={{ cy: eyeY, ry: eyeHeight, rx: state === 'error' ? 4.6 : 3.8, opacity: happy ? 0 : 1 }}
-                    transition={transition} fill="#f3ead0" />
-                ))}
-              </g>
-              <motion.g initial={false} animate={{ opacity: happy ? 1 : 0 }} transition={transition}>
-                <path d="M31 49 Q37 56 43 49 M57 49 Q63 56 69 49" fill="none" stroke="#f3ead0" strokeWidth="3" strokeLinecap="round" />
-              </motion.g>
-            </g>
-          </motion.g>
-          <motion.path d="M44 65 Q50 69 56 65" initial={false} animate={{ d: mouth }} transition={transition}
-            fill="none" stroke="#f3ead0" strokeOpacity="0.9" strokeWidth="2.4" strokeLinecap="round" />
-          <motion.g data-bloub-alert initial={false} animate={{ opacity: state === 'error' ? 1 : state === 'warning' ? 0.55 : 0 }} transition={transition}>
-            <path d="M76 35 V42 M76 46 V47" stroke="#f3ead0" strokeWidth="2.6" strokeLinecap="round" />
-          </motion.g>
-        </motion.g>
+
+      <path
+        ref={body}
+        data-bloub-body
+        d={FIRST.body}
+        fill="url(#levonis-bloub-fill)"
+        stroke="url(#levonis-bloub-edge)"
+        strokeWidth="2"
+      />
+      <path
+        ref={gloss}
+        data-bloub-gloss
+        d={FIRST.gloss}
+        fill="none"
+        stroke="#f2e7c6"
+        strokeOpacity="0.13"
+        strokeWidth="4.4"
+        strokeLinecap="round"
+      />
+
+      {/* Eyes carry no transform of their own in the markup: the whole pose,
+          including where each eye sits, how it is inclined and how far the lid
+          has come down, is one matrix written per frame. */}
+      <ellipse ref={eyeA} data-bloub-eye="0" rx={FIRST.eyes[0].rx} ry={FIRST.eyes[0].ry} transform={FIRST.eyes[0].matrix} fill="#f3ead0" />
+      <ellipse ref={eyeB} data-bloub-eye="1" rx={FIRST.eyes[1].rx} ry={FIRST.eyes[1].ry} transform={FIRST.eyes[1].matrix} fill="#f3ead0" />
+
+      <path
+        ref={mouth}
+        data-bloub-mouth
+        d={FIRST.mouth}
+        fill="none"
+        stroke="#f3ead0"
+        strokeOpacity="0.9"
+        strokeWidth={FIRST.mouthWeight}
+        strokeLinecap="round"
+      />
+
+      {/* Unread work waiting. The only mark the character wears that is not
+          part of its face — everything else it has to say, it says with the
+          face. */}
+      <g ref={alert} data-bloub-alert style={{ opacity: FIRST.alert }}>
+        <circle cx="79" cy="21" r="7.5" fill="#e8b84b" />
+        <circle cx="79" cy="21" r="7.5" fill="none" stroke="#10130a" strokeWidth="2.4" strokeOpacity="0.55" />
       </g>
     </svg>
   );
-}
+});
+
+export default BloubHome;

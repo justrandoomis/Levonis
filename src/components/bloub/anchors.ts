@@ -8,13 +8,33 @@ let revision = 0;
 let routeLoads = 0;
 const emit = () => { revision += 1; for (const listener of listeners) listener(); };
 
+/**
+ * Whether the drawn character is currently unavailable.
+ *
+ * This exists so the Home slot can show a plain letter when — and ONLY when —
+ * the SVG has genuinely failed to render. It used to show that letter all the
+ * time and merely hide it once the character docked, which meant the very
+ * first thing a visitor saw in the navigation bar was a second, competing Home
+ * mark that then blinked out as the character landed on it. That is the "one
+ * mascot disappears and another appears" the brief rules out, seen from the
+ * other side.
+ */
+let renderFailed = false;
+
 export const characterLayout = {
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   snapshot: () => revision,
   serverSnapshot: () => 0,
   pending: () => routeLoads > 0,
   hasPageAnchor: () => [...anchors.values()].some((a) => a.kind !== 'top-fallback'),
+  renderFailed: () => renderFailed,
 };
+
+export function setCharacterRenderFailed(value: boolean): void {
+  if (renderFailed === value) return;
+  renderFailed = value;
+  emit();
+}
 
 export function registerCharacterAnchor(element: HTMLElement, kind: AnchorKind, busy = false): () => void {
   const entry = { element, kind, busy };
@@ -67,8 +87,25 @@ export function measureCharacterAnchor(): (CharacterAnchor & { frame: CharacterF
   return null;
 }
 
+/**
+ * WHERE THE CHARACTER STANDS BEFORE THERE IS A PAGE.
+ *
+ * The first visit is the one moment it has the screen to itself, and the brief
+ * is explicit that it should be LARGE there. The previous sizing did not
+ * deliver that on the device it matters most on: `width * 0.38` on a 390px
+ * phone is 148px, so the floor decided the size and the character arrived
+ * about as big as a large app icon.
+ *
+ * Reading from the SHORTER dimension fixes it. A phone is tall and narrow, a
+ * tablet wide and short, and the thing that actually constrains a centred
+ * circle is whichever side is smaller — so that is what it is a fraction of.
+ * The cap is the only other guard, and it is there because past roughly this
+ * size the character stops reading as a character and starts reading as a
+ * splash screen.
+ */
 export function bootstrapCharacterFrame(viewport: { width: number; height: number; offsetLeft?: number; offsetTop?: number }): CharacterFrame {
-  const size = Math.min(240, Math.max(144, viewport.width * 0.38), Math.max(44, viewport.height * 0.45));
+  const short = Math.min(viewport.width, viewport.height);
+  const size = Math.min(320, Math.max(180, short * 0.52));
   return {
     x: (viewport.offsetLeft ?? 0) + (viewport.width - size) / 2,
     y: (viewport.offsetTop ?? 0) + (viewport.height - size) / 2,

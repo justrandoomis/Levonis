@@ -215,7 +215,7 @@ import { homeCriticalReadyStore } from './lib/appBootstrap';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
   const location = useLocation();
-  if (!isLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+  if (!isLoaded) return <RouteFallback />;
   // Carry the intended destination so Auth can return the user after login.
   // Auth.tsx sanitizes it via sanitizeNextPath (same-origin relative only).
   if (!isAuthenticated) return <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
@@ -227,7 +227,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoaded } = useAuth();
   const location = useLocation();
-  if (!isLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+  if (!isLoaded) return <RouteFallback />;
   if (!isAuthenticated) return <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
   if (!user?.isAdmin) return <Navigate to="/" />;
   return <>{children}</>;

@@ -686,11 +686,15 @@ html:lang(ckb) .leading-tight {
   bottom offset, and 28px is the scrim's overhang.
 */
 :root {
-  --nav-stack: calc(64px + max(0.625rem, env(safe-area-inset-bottom)) + 18px);
+  /* The bar is as tall as its tallest child, and that is now the character
+     rather than the 64px pill groups. Deriving the clearance from the same
+     token keeps the one-number promise above true; hard-coding 64px here
+     would leave every page short by the difference. */
+  --nav-stack: calc(max(64px, var(--lv-home-hit)) + max(0.625rem, env(safe-area-inset-bottom)) + 18px);
 }
 @media (min-width: 640px) {
   :root {
-    --nav-stack: calc(68px + max(1rem, env(safe-area-inset-bottom)) + 20px);
+    --nav-stack: calc(max(68px, var(--lv-home-hit)) + max(1rem, env(safe-area-inset-bottom)) + 20px);
   }
 }
 /* A modal owns the interaction. Hiding the persistent nav while one is open
@@ -746,10 +750,15 @@ html[data-overlay-open='true'] [data-bottom-nav] {
   opacity: 0;
 }
 
-.lv-app-intro[data-phase='travelling'] .lv-app-intro__character {
-  transition:
-    transform 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
-    opacity 150ms ease-out;
+/* NO transition on the character's transform.
+   Position, scale, the body's stretch and the direction of the gaze are four
+   parts of one movement, and CSS cannot see three of them. They are sampled
+   together, per frame, in AppIntro's loop (src/components/bloub/character/) —
+   a `transition` here would fight that loop for the same property and reduce
+   a journey back to one curve for everything, which is exactly what the
+   rebuild removed. Opacity is still CSS: it is not part of the movement. */
+.lv-app-intro__character {
+  transition: opacity 150ms ease-out;
 }
 
 .lv-app-intro[data-phase='hidden'] .lv-app-intro__character,
@@ -757,40 +766,15 @@ html[data-overlay-open='true'] .lv-app-intro__character {
   opacity: 0;
 }
 
-/* Root canvas never animates independently of measured travel. Nested groups
-   separate posture, breathing, gaze and blinking: no competing transforms. */
-.lv-bloub { display: block; overflow: visible; transform-origin: center; }
-.lv-bloub-breath, .lv-bloub-gaze { transform-origin: 50px 50px; }
-.lv-bloub-blink { transform-box: fill-box; transform-origin: center; }
-.lv-bloub--idle .lv-bloub-breath { animation: lv-mascot-breathe 6.4s ease-in-out infinite; }
-.lv-bloub--idle .lv-bloub-gaze { animation: lv-mascot-idle-look 9.7s ease-in-out infinite; }
-.lv-bloub--idle .lv-bloub-blink { animation: lv-mascot-blink 5.9s linear infinite; }
-.lv-bloub--loading .lv-bloub-breath { animation: lv-mascot-loading-body 3.1s ease-in-out infinite; }
-.lv-bloub--loading .lv-bloub-gaze { animation: lv-mascot-search 2.8s ease-in-out infinite; }
-.lv-bloub--loading .lv-bloub-blink { animation: lv-mascot-blink 3.8s linear infinite; }
-.lv-bloub--typing .lv-bloub-breath { animation: lv-mascot-breathe 1.7s ease-in-out infinite; }
-.lv-bloub--typing .lv-bloub-gaze { animation: lv-mascot-typing-look 1.25s ease-in-out infinite; }
-.lv-bloub--typing .lv-bloub-blink { animation: lv-mascot-blink 3.6s linear infinite; }
-.lv-bloub--navigating .lv-bloub-blink, .lv-bloub--returning .lv-bloub-blink { animation: lv-mascot-travel-blink 480ms ease-out; }
-.lv-bloub--tap .lv-bloub-breath { animation: lv-mascot-tap 210ms ease-out; }
-.lv-bloub--tap .lv-bloub-blink { animation: lv-mascot-travel-blink 180ms ease-out; }
-.lv-bloub--success .lv-bloub-breath, .lv-bloub--arrival .lv-bloub-breath { animation: lv-mascot-settle 420ms ease-out; }
-.lv-bloub--notify .lv-bloub-breath { animation: lv-mascot-attentive 700ms ease-out; }
-.lv-bloub--notify .lv-bloub-gaze { animation: lv-mascot-typing-look 700ms ease-out; }
-.lv-bloub--warning .lv-bloub-breath { animation: lv-mascot-attentive 900ms ease-out; }
-.lv-bloub--error .lv-bloub-breath { animation: lv-mascot-alert 440ms ease-out; }
-.lv-app-intro[data-page-visible='false'] .lv-bloub *, html[data-overlay-open='true'] .lv-bloub * { animation-play-state: paused !important; }
-@keyframes lv-mascot-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.016, 1.022); } }
-@keyframes lv-mascot-loading-body { 0%,100% { transform: rotate(-1deg) scale(1); } 50% { transform: rotate(1deg) scale(1.018); } }
-@keyframes lv-mascot-idle-look { 0%,52%,100% { transform: translate(0,0); } 60%,68% { transform: translate(2px,-1px); } 77%,84% { transform: translate(-2px,0); } }
-@keyframes lv-mascot-search { 0%,100% { transform: translate(-3px,0) rotate(-3deg); } 25% { transform: translate(0,-3px); } 50% { transform: translate(4px,0) rotate(3deg); } 75% { transform: translate(0,2px); } }
-@keyframes lv-mascot-typing-look { 0%,100% { transform: translate(-3px,0); } 50% { transform: translate(3px,-1px); } }
-@keyframes lv-mascot-blink { 0%,46%,49%,100% { transform: scaleY(1); } 47.5% { transform: scaleY(0.1); } }
-@keyframes lv-mascot-travel-blink { 0%,100% { transform: scaleY(1); } 45% { transform: scaleY(0.15); } }
-@keyframes lv-mascot-tap { 0%,100% { transform: scale(1); } 45% { transform: scale(1.02,0.94); } }
-@keyframes lv-mascot-settle { 0%,100% { transform: scale(1); } 35% { transform: scale(1.02,0.97); } 68% { transform: scale(0.99,1.02); } }
-@keyframes lv-mascot-attentive { 0%,100% { transform: rotate(0) scale(1); } 30% { transform: rotate(-2deg) scale(1.022); } 65% { transform: rotate(1deg); } }
-@keyframes lv-mascot-alert { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 65% { transform: translateX(1.5px); } }
+/* The character's drawing carries NO CSS animation at all.
+   Its outline, both eyes and its mouth are written as attributes once per
+   frame by the engine, which is the only way the face can stay in step with a
+   journey whose duration is not known until it is planned. The keyframes that
+   used to live here also had a second, quieter problem: every one of them had
+   a fixed period, and a fixed period is learnable — a viewer picks up a 5.9s
+   blink loop in about three repetitions, and from then on the character reads
+   as a decoration rather than as alive. */
+.lv-bloub { display: block; overflow: visible; }
 
 @media (prefers-reduced-motion: reduce) {
   .lv-app-intro__veil {
@@ -800,7 +784,12 @@ html[data-overlay-open='true'] .lv-app-intro__character {
     transition: opacity 120ms ease-out !important;
     will-change: opacity;
   }
-  .lv-bloub, .lv-bloub * {
+  /* The engine itself drops drift, wobble, stretch and squash under this
+     preference (see `reduced` in character/engine.ts), so there is nothing
+     here to switch off — blinking is left alone deliberately: it is not
+     vestibular, and a face that never blinks reads as broken rather than as
+     calm. */
+  .lv-bloub {
     animation: none !important;
   }
 }
@@ -808,20 +797,40 @@ html[data-overlay-open='true'] .lv-app-intro__character {
 /* Measured character slots reserve space; the animated layer never owns taps. */
 /* Visible canvas and input hit area are independent. The path occupies about
    90% of this canvas after viewBox normalization, not 44px inside a 64px hit. */
+/*
+  HOW BIG THE CHARACTER ACTUALLY IS.
+
+  These are the measured slots; the character is drawn into whichever one is
+  registered. Two things were wrong before and both are fixed here.
+
+  It was too small. At the bottom the visual slot was 58-74px against nav
+  groups 64-68px tall, so the character was the same size as the icons beside
+  it and read as a fifth tab rather than as the centre of the bar. It is now
+  clearly the largest thing in the navigation, which is what makes it the Home
+  identity without needing a ring, a halo or a second Home icon drawn around
+  it.
+
+  And the drawing inside the slot changed too. The body now occupies 84% of a
+  0-100 viewBox rather than 91% of a 3-97 one, because the outline has to be
+  free to stretch by a seventh of its radius mid-journey without clipping. The
+  slots are sized up by that ratio as well, so the visible increase is the
+  BODY getting bigger and not just its box.
+*/
 :root {
-  --lv-home-visual: clamp(58px, 15.5vw, 74px);
-  --lv-home-hit: clamp(68px, 18vw, 86px);
-  --lv-header-visual: clamp(52px, 13.6vw, 66px);
+  --lv-home-visual: clamp(82px, 21.5vw, 102px);
+  --lv-home-hit: clamp(88px, 23vw, 108px);
+  --lv-header-visual: clamp(66px, 17vw, 84px);
   --lv-header-hit: calc(var(--lv-header-visual) + 8px);
 }
 .lv-character-anchor { display: grid; place-items: center; width: var(--lv-header-visual); height: var(--lv-header-visual); flex: none; }
 .lv-character-anchor[data-bloub-anchor='bottom-home'] { width: var(--lv-home-visual); height: var(--lv-home-visual); }
 .lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
 .lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
-.lv-character-anchor[data-bloub-occupied='true'] [data-bloub-fallback] { visibility: hidden; }
 .lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }
 .lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) var(--lv-header-hit) minmax(0, 1fr); gap: 8px; padding-top: max(0.75rem, env(safe-area-inset-top)); }
 .lv-character-header > :first-child { justify-self: start; }
 .lv-character-header > .lv-character-home { grid-column: 2; }
 .lv-character-header > :last-child { justify-self: end; min-width: 0; max-width: 100%; }
-.lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: var(--lv-header-hit); padding-top: env(safe-area-inset-top); background: var(--color-canvas); }
+/* Transparent: it reserves a landing area, it is not a bar. Painting it made
+   a solid strip appear and vanish around a slot the viewer never sees used. */
+.lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: var(--lv-header-hit); padding-top: env(safe-area-inset-top); }
