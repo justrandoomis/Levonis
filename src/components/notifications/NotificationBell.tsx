@@ -1,3 +1,4 @@
+import { createUnreadObserver } from '../../lib/mascot';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -182,7 +183,7 @@ function Row({ n, asMenu, onOpen }: RowProps) {
 }
 
 export default function NotificationBell() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { loc, dir } = useLanguage();
   const navigate = useNavigate();
   const phone = usePhone();
@@ -204,9 +205,17 @@ export default function NotificationBell() {
 
   const live = isAuthenticated && !expired;
 
+  const mascotUnread = useRef(createUnreadObserver());
+  const mascotAccount = useRef(user?.id);
+  useEffect(() => { mascotAccount.current = user?.id; mascotUnread.current.reset(); }, [user?.id]);
+
   const refreshCount = useCallback(async () => {
+    const account = mascotAccount.current;
     try {
-      setUnread(await unreadCount());
+      const count = await unreadCount();
+      if (account !== mascotAccount.current) return;
+      mascotUnread.current.observe(count);
+      setUnread(count);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) setExpired(true);
       // Anything else is a bad minute on a phone network: the badge keeps the

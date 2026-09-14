@@ -10,8 +10,8 @@ One **Cloudflare Worker** (`levonis`) that:
 
 - serves the built React app as **static assets** with SPA routing,
 - serves the entire API (`/api/*`, `/files/*`) with **native bindings** to
-  **D1** (`levonis-db`, SQLite database) and **R2** (`levonis-files`, file
-  storage).
+  **D1** (`levonis-db`, SQLite database) and **R2** (legacy `levonis-files`
+  plus dedicated public/private media buckets; see `docs/MEDIA_STORAGE.md`).
 
 Why this shape: native bindings need **no API tokens or S3 keys inside the
 running app** (the old design shipped an account-level API token into the
@@ -28,6 +28,8 @@ replace a separate Pages project. Serverless = no server to maintain.
 | **Workers paid plan** ($5/mo) | Password hashing + real traffic headroom (free plan's 10 ms CPU limit can throttle logins) | plan | Dashboard → Workers & Pages → Plans | — | Strongly recommended | Plan badge shows "Paid" |
 | D1 database `levonis-db` | All application data | resource | Dashboard → Storage & Databases → D1 → Create database → name `levonis-db` | Copy its **Database ID** into `wrangler.jsonc` → `d1_databases[0].database_id` (edit the file on GitHub) | Required | D1 page shows the database; after first deploy `/api/health` returns ok |
 | R2 bucket `levonis-files` | Receipts, avatars, product media | resource | Dashboard → R2 → Create bucket → name `levonis-files` (R2 needs a card on file; free tier is generous) | Name already matches `wrangler.jsonc` | Required | Bucket appears in R2; uploads work in staging tests |
+| R2 bucket `levonis-media-public` | Public product/store/UI media | resource | Dashboard → R2 → Create bucket → name exactly `levonis-media-public` | Binding `R2_PUBLIC` in `wrangler.jsonc` | Required before the new config is deployed | Public upload/read smoke test succeeds through `/files/*` |
+| R2 bucket `levonis-media-private` | Receipts, chat/support evidence, claims and other authenticated files | resource | Dashboard → R2 → Create bucket → name exactly `levonis-media-private`; do **not** enable an `r2.dev` URL | Binding `R2_PRIVATE` in `wrangler.jsonc` | Required before the new config is deployed | Anonymous `/files/*` access is refused; an authorized owner route succeeds |
 | `INITIAL_ADMIN_EMAIL` | Which verified Google account becomes the first admin | public var | Your own Gmail address | Worker → Settings → Variables and Secrets → add as **Text** variable (it is already declared in `wrangler.jsonc`; you can also set it there) | Required (or use the SQL alternative below) | After you sign in with Google once, the Admin button appears |
 | `GOOGLE_CLIENT_ID` | Server-side audience check for Google Sign-In | public var | console.cloud.google.com → APIs & Services → Credentials → Create OAuth client ID (Web application). Authorized JavaScript origins: your `https://<worker>.workers.dev` URL and your custom domain | `wrangler.jsonc` `vars.GOOGLE_CLIENT_ID` **and** build variable `VITE_GOOGLE_CLIENT_ID` (see 2.3) | Optional (Google login hidden without it) | Google button renders and signs in on staging |
 | `GEMINI_API_KEY` | Admin product-translation tool | **secret** | aistudio.google.com → Get API key | Worker → Settings → Variables and Secrets → add as **Secret** | Optional | Admin → product editor → Translate works; without it the button shows "not configured" |
@@ -92,6 +94,10 @@ Repository secrets used vs. unused by the current implementation:
 
 When importing the repository (2.1 last row):
 
+- Install command: leave it empty/default, or use `npm ci`. **Never** create or
+  overwrite `node_modules/.bin/wrangler`. The repository build now verifies
+  that the executable reports the installed Wrangler package version and
+  intentionally fails if a silent `process.exit(0)` stub is present.
 - Build command: `npm run build`
 - Deploy command: `npx wrangler d1 migrations apply levonis-db --remote && npx wrangler deploy`
   (this applies pending migrations, then deploys — safe to re-run; already-

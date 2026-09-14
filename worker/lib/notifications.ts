@@ -29,7 +29,8 @@ export type NotificationKind =
   | 'print_request_match'
   | 'offer_received'
   | 'offer_accepted'
-  | 'order_update';
+  | 'order_update'
+  | 'review_reward_pending';
 
 export interface NotificationInput {
   userId: string;
@@ -40,7 +41,7 @@ export interface NotificationInput {
   body_en?: string;
   /** In-app path, e.g. `/requests?request=req_123`. */
   link: string;
-  entity_type?: 'request' | 'offer' | 'order' | '';
+  entity_type?: 'request' | 'offer' | 'order' | 'review' | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */

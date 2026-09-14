@@ -647,7 +647,12 @@ adminRoutes.get('/orders', async (c) => {
     c.env.DB.prepare(
       `SELECT o.*, u.email, u.username FROM orders o
          LEFT JOIN users u ON u.id = o.user_id${where}
-        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
+        ORDER BY o.priority DESC,
+                 CASE WHEN o.priority_due_at IS NULL THEN 1 ELSE 0 END,
+                 o.priority_due_at ASC,
+                 CASE WHEN o.priority = 1 THEN o.created_at END ASC,
+                 CASE WHEN o.priority = 0 THEN o.created_at END DESC
+        LIMIT ? OFFSET ?`
     )
       .bind(...params, limit, offset)
       .all<Record<string, unknown>>(),

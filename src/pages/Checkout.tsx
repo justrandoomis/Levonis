@@ -1,3 +1,4 @@
+import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
@@ -5,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Truck, Store,
   CreditCard, Wallet, Banknote,
   Check, Sparkles, MapPin, AlertCircle,
-  Lock, CheckCircle2, Plus, Receipt, ShoppingCart
+  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
@@ -32,11 +33,24 @@ const COUPON_FAILURES = new Set([
 // ---------------------------------------------------------------- server quote
 
 interface ShippingQuoteDto {
-  components: Array<{ kind: string; fee_iqd: number; waived: boolean; units: number; advance_required: boolean }>;
+  components: Array<{
+    kind: string;
+    fee_iqd: number;
+    waived: boolean;
+    units: number;
+    advance_required: boolean;
+    product_id?: string;
+    product_name?: string;
+    delivery_method?: 'standard' | 'personal';
+    quantity_step?: number;
+  }>;
   total_iqd: number;
   total_before_waiver_iqd: number;
   advance_due_iqd: number;
   pro_waiver_applied: boolean;
+  prime_waiver_applied: boolean;
+  waiver_source: 'none' | 'pro' | 'prime' | 'promotion';
+  waiver_basis_iqd: number;
   needs_config: string[];
   assumptions: string[];
   reasons: string[];
@@ -93,6 +107,14 @@ interface CheckoutQuoteDto {
   shipping_type?: 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land' | string;
   /** The payment ids the server allows for this cart; the screen offers exactly these. */
   allowed_payment_methods?: string[];
+  bnpl?: {
+    eligible: boolean;
+    available_iqd?: number;
+    outstanding_iqd?: number;
+    financed_iqd?: number;
+    due_at?: string | null;
+  };
+  priority_delivery?: { eligible: boolean; max_hours: 12; due_at: string | null; reason: string | null };
   /** 'direct' = priced by the direct-sale rule (a direct cart, or a pre-order
    *  paid cash on delivery); 'preorder' = the transport commission applies. */
   pricing_basis?: 'direct' | 'preorder';
@@ -117,10 +139,10 @@ interface CheckoutQuoteDto {
   /** §3.3 attribution — always `discount_iqd: 0`; it is not a discount. */
   support: { referrer_username: string; ref: string; discount_iqd: number } | null;
   /**
-   * The server sends all of this on every quote; the screen used to read two
-   * fields of it and render one read-only line. `eligible_merchandise_iqd` is
-   * the redemption CAP (points cannot pay for shipping or fees), and the two
-   * `earn_*` fields are what this order will pay back — none of which the
+   * The server sends all of this on every quote; the screen read two fields of
+   * it and rendered one read-only line. `eligible_merchandise_iqd` is the
+   * redemption CAP (points pay for merchandise, never shipping or fees), and
+   * the `earn_*` fields are what this order pays back — none of which the
    * customer could see at the moment they were deciding.
    */
   points: {
@@ -133,6 +155,8 @@ interface CheckoutQuoteDto {
     hold_days?: number;
   };
   wallet: { balance_iqd: number; applied_iqd: number; required_advance_iqd: number };
+  /** Authoritative server-side COD tax, already included in total_iqd. */
+  cod_tax_iqd: number;
   total_iqd: number;
   due_on_delivery_iqd: number;
   tier: { tier: string; active: boolean; at_approved_default_address: boolean; pro_benefits_context: boolean };
@@ -150,6 +174,7 @@ const STRINGS = {
     needsConfig: 'رسوم توصيل جزء من هذا الطلب (طابعة/كرتونة إضافية) لم تُهيَّأ من الإدارة بعد، لذلك لا يمكن إتمام الطلب حالياً. لا نختلق رسوماً.',
     advanceDue: (v: string) => `رسوم توصيل الطابعة (${v}) تُدفع مقدماً من المحفظة.`,
     freeShipping: 'مجاناً',
+    codTax: 'ضريبة الدفع عند الاستلام',
     whyTitle: 'تفاصيل التوصيل',
     policyTitle: 'الموافقة على السياسات',
     policyAgree: 'قرأتُ وأوافق على:',
@@ -167,11 +192,12 @@ const STRINGS = {
     paymentHint: {
       wallet: 'الدفع مقدمًا بالكامل من محفظتك',
       cash: 'تدفع المبلغ نقدًا عند الاستلام',
+      bnpl: 'حصري لـ PRO المؤهل — يُسجّل المبلغ والموعد في حسابك',
     } as Record<string, string>,
     codDirectPricing: 'اختيار الدفع عند الاستلام يُسعَّر كبيع مباشر؛ يبقى طلبك طلبًا مسبقًا بمراحله ووسيلة نقله كما هي.',
     prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
     prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
-    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -179,6 +205,7 @@ const STRINGS = {
     needsConfig: 'Delivery fees for part of this order (printer / extra carton) are not configured by the store yet, so the order cannot be completed right now. We never invent a fee.',
     advanceDue: (v: string) => `Printer delivery fees (${v}) are paid in advance from your wallet.`,
     freeShipping: 'Free',
+    codTax: 'Cash on Delivery Tax',
     whyTitle: 'Delivery details',
     policyTitle: 'Policy consent',
     policyAgree: 'I have read and agree to:',
@@ -196,11 +223,12 @@ const STRINGS = {
     paymentHint: {
       wallet: 'Pay the full amount in advance from your wallet',
       cash: 'Pay in cash when the order is delivered',
+      bnpl: 'For eligible PRO members — amount and due date are recorded on your account',
     } as Record<string, string>,
     codDirectPricing: 'Cash on delivery is priced as a direct sale; your order stays a pre-order, on its journey and its stages.',
     prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
     prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
-    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -208,6 +236,7 @@ const STRINGS = {
     needsConfig: 'کرێی گەیاندنی بەشێک لەم داواکارییە (پرینتەر/کارتۆنی زیادە) هێشتا لەلایەن بەڕێوەبەرایەتییەوە ڕێکنەخراوە، بۆیە ئێستا داواکارییەکە تەواو ناکرێت.',
     advanceDue: (v: string) => `کرێی گەیاندنی پرینتەر (${v}) پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     freeShipping: 'بەخۆڕایی',
+    codTax: 'باجی پارەدان لە کاتی گەیاندن',
     whyTitle: 'وردەکاری گەیاندن',
     policyTitle: 'ڕەزامەندی لەسەر سیاسەتەکان',
     policyAgree: 'خوێندمەوە و ڕازیم بە:',
@@ -225,11 +254,12 @@ const STRINGS = {
     paymentHint: {
       wallet: 'تەواوی بڕەکە پێشوەخت لە جزدانەکەتەوە بدە',
       cash: 'پارەکە بە کاش لە کاتی گەیاندن بدە',
+      bnpl: 'تایبەت بە ئەندامی PRO ی شیاو — بڕ و بەرواری دانەوە تۆمار دەکرێت',
     } as Record<string, string>,
     codDirectPricing: 'پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت؛ داواکارییەکەت وەک پێش-داواکاری دەمێنێتەوە بە قۆناغەکانی و شێوازی گواستنەوەی خۆی.',
     prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
     prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
-    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
   },
 };
 
@@ -254,14 +284,14 @@ export default function Checkout() {
   const routeState = (location.state ?? {}) as { itemIds?: string[]; usePoints?: boolean; supportRef?: string };
   const requestedItemIds = Array.isArray(routeState.itemIds) ? routeState.itemIds : null;
   /**
-   * POINTS ARE A DECISION, AND THIS IS WHERE THE DECISION IS MADE.
+   * POINTS ARE A DECISION, AND THIS IS WHERE IT IS MADE.
    *
    * This was a constant read once from router state and never settable: the
    * only control lived behind a collapsed accordion in the cart, a screen back.
    * Its sibling discount — the promo code — has always been on this page. The
-   * customer could see a "Points Discount" line and had no way to turn it off,
-   * no way to turn it on if they had arrived without it, and no sight of their
-   * balance or of what this order would earn them.
+   * customer could see a "Points Discount" line with no way to turn it off, no
+   * way to turn it on if they arrived without it, and no sight of their balance
+   * or of what this order would earn them.
    */
   const [usePoints, setUsePoints] = useState(routeState.usePoints === true);
   // §3.3 — the support code the cart resolved and the buyer kept. It is an
@@ -274,6 +304,7 @@ export default function Checkout() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [loading, setLoading] = useState(true);
+  useCharacterBusy(loading);
   const [loadError, setLoadError] = useState('');
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
@@ -304,6 +335,7 @@ export default function Checkout() {
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  useEffect(() => { setPolicyAccepted(false); }, [lang]);
   const [consentResetNote, setConsentResetNote] = useState(false);
   const quoteSignatureRef = useRef('');
   const quoteSeqRef = useRef(0);
@@ -389,10 +421,30 @@ export default function Checkout() {
 
   useFreshOnReturn(refreshLines, { enabled: !submitting, minIntervalMs: 8_000, pollWhileVisibleMs: 60_000 });
 
-  // Default the selectors once settings arrive.
+  // Product delivery options are an allow-list. A method disabled by any
+  // selected physical line is not presented as valid; pickup remains a
+  // separate no-last-mile choice. The server repeats this check at the door.
+  const availableDeliveryMethods = checkoutDeliveryMethods.filter((method) => {
+    if (method.id === 'pickup') return true;
+    if (method.id !== 'standard' && method.id !== 'personal') {
+      return !items.some((item) => item.delivery_availability !== undefined);
+    }
+    return items.every((item) => item.delivery_availability?.[method.id] !== false);
+  });
+  const availableDeliveryKey = availableDeliveryMethods.map((method) => method.id).join(',');
+
+  // Default the selector once settings/items arrive, and move away from a
+  // method that became unavailable after a quantity/cart refresh.
   useEffect(() => {
-    if (!deliveryMethod && checkoutDeliveryMethods.length > 0) setDeliveryMethod(checkoutDeliveryMethods[0].id);
-  }, [checkoutDeliveryMethods, deliveryMethod]);
+    if (availableDeliveryMethods.length === 0) {
+      if (deliveryMethod) setDeliveryMethod('');
+      return;
+    }
+    if (!deliveryMethod || !availableDeliveryMethods.some((method) => method.id === deliveryMethod)) {
+      setDeliveryMethod(availableDeliveryMethods[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableDeliveryKey, deliveryMethod]);
 
   // THE SCREEN OFFERS EXACTLY WHAT THE SERVER ALLOWS. The owner's rule is two
   // ways to pay — in advance from the wallet, or cash on delivery — for every
@@ -490,6 +542,7 @@ export default function Checkout() {
       case 'CreditCard': return <CreditCard className={className} strokeWidth={1.5} />;
       case 'Wallet': return <Wallet className={className} strokeWidth={1.5} />;
       case 'Banknote': return <Banknote className={className} strokeWidth={1.5} />;
+      case 'CalendarClock': return <CalendarClock className={className} strokeWidth={1.5} />;
       default: return <CheckCircle2 className={className} strokeWidth={1.5} />;
     }
   };
@@ -603,6 +656,7 @@ export default function Checkout() {
   const selectedDelivery = checkoutDeliveryMethods.find(m => m.id === deliveryMethod);
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
+  const codTaxIqd = quote?.cod_tax_iqd ?? 0;
   const shippingWaived = !!quote && quote.shipping.total_iqd < quote.shipping.total_before_waiver_iqd;
   const shippingNeedsConfig = !!quote && quote.shipping.needs_config.length > 0;
   const requiredPolicies = quote?.policies ?? [];
@@ -624,6 +678,7 @@ export default function Checkout() {
   // `full_advance` id means the same thing), and it covers the whole total —
   // the server refuses a half advance (worker/lib/paymentPolicy.ts).
   const isPrepaidMethod = paymentMethod === 'wallet' || paymentMethod === 'full_advance';
+  const isBnplMethod = paymentMethod === 'bnpl';
   const requiredAdvance = isPrepaidMethod ? orderTotal : 0;
   const isAdvanceRequired = requiredAdvance > 0;
 
@@ -634,31 +689,33 @@ export default function Checkout() {
     }
   }, [isAdvanceRequired]);
 
+  // Calculate wallet discount
   const isWalletActive = isAdvanceRequired || useWalletBalance;
-
-  /**
-   * THE WALLET NUMBER MUST BE THE ONE THE SERVER WILL CHARGE FROM.
-   *
-   * This screen computed sufficiency from `balanceUsdCents` — the SETTLED
-   * balance out of `WalletContext`, with no hold accounting at all. The server
-   * charges from the SPENDABLE balance (`getAvailableBalances`: "pending
-   * deposits and pending points are NEVER spendable") and refuses with
-   * INSUFFICIENT_BALANCE when the advance is not covered. So a customer with an
-   * open hold — a checkout they abandoned twenty minutes ago — saw a sufficient
-   * balance, an enabled Place Order button, and a refusal at the last step.
-   *
-   * The right number was already on the wire and unread: `quote.wallet` carries
-   * the balance, what was applied and what the advance requires, all computed
-   * by the same function that prices the order at creation. The context value
-   * survives only as the placeholder for the second before the first quote
-   * lands, exactly as `orderTotal` above does.
-   */
-  const walletBalanceShown = quote ? quote.wallet.balance_iqd : walletBalanceIQD;
   const walletDiscount = quote
     ? quote.wallet.applied_iqd
     : isWalletActive
       ? Math.min(walletBalanceIQD, orderTotal)
       : 0;
+
+  /**
+   * THE WALLET FIGURE MUST BE THE ONE THE SERVER WILL CHARGE FROM.
+   *
+   * `walletDiscount` above already prefers the quote. The BALANCE shown beside
+   * the toggle, and the toggle's own disabled test, still read
+   * `balanceUsdCents` — the SETTLED balance out of `WalletContext`, with no
+   * hold accounting at all. The server charges from the SPENDABLE balance
+   * (`getAvailableBalances`: "pending deposits and pending points are NEVER
+   * spendable") and refuses with INSUFFICIENT_BALANCE when the advance is not
+   * covered. A customer with an open hold — a checkout they abandoned twenty
+   * minutes ago — was shown a sufficient balance and an enabled button, and
+   * was refused at the last step.
+   *
+   * `quote.wallet` carries the spendable balance, what was applied and what
+   * the advance requires, all computed by the same function that prices the
+   * order at creation. The context value survives only as the placeholder for
+   * the second before the first quote lands.
+   */
+  const walletBalanceShown = quote ? quote.wallet.balance_iqd : walletBalanceIQD;
   const isBalanceSufficient = quote
     ? quote.wallet.applied_iqd >= quote.wallet.required_advance_iqd
     : walletDiscount >= requiredAdvance;
@@ -666,12 +723,12 @@ export default function Checkout() {
   /**
    * THE SERVER ALREADY ANSWERED "MAY THIS BE BOUGHT?".
    *
-   * `can_checkout` and `blockers` come back on every quote and were both
-   * unread, while the client re-derived the same verdict from its own pieces.
-   * Two implementations of one rule is how a screen comes to enable a button
-   * the door will refuse. The client conditions stay — they are what disables
-   * the button BEFORE the first quote lands, and what explains WHY — but the
-   * server's answer is now the last word.
+   * `can_checkout` comes back on every quote and was declared in the DTO but
+   * never read, while the client re-derived the same verdict from its own
+   * pieces. Two implementations of one rule is how a screen comes to enable a
+   * button the door will refuse. The client conditions stay — they are what
+   * disables the button BEFORE the first quote lands, and what explains why —
+   * but the server's answer is the last word.
    */
   const serverAllows = quote ? quote.can_checkout !== false : true;
   const canCompleteOrder =
@@ -679,24 +736,10 @@ export default function Checkout() {
     !quoteLoading && !shippingNeedsConfig && consentSatisfied && serverAllows;
 
   const amountRemainingOnDelivery = quote ? quote.due_on_delivery_iqd : orderTotal - walletDiscount;
+  const bnplFinancedIqd = isBnplMethod
+    ? quote?.bnpl?.financed_iqd ?? Math.max(0, orderTotal - walletDiscount)
+    : 0;
 
-  /**
-   * ONE PLACE-ORDER BUTTON.
-   *
-   * There were two, and they had drifted: the mobile copy was missing the
-   * "insufficient balance" explanation and the implicit-policy note, so a
-   * phone customer got a disabled button and no reason for it. Worse, the
-   * mobile copy lived INSIDE the form column, and below `lg` the root is
-   * `flex-col` — so DOM order was visual order and the button rendered ABOVE
-   * the entire order summary. The customer confirmed the purchase before ever
-   * seeing the price. Its own warning even read "the total above has been
-   * updated" while the total was below it.
-   *
-   * The messages stay in the document flow, where they can be read and
-   * scrolled to. The button itself is in the rail on a wide screen and in a
-   * fixed bottom bar on a phone, so it is always after the summary and always
-   * reachable.
-   */
   const placeOrder = async () => {
     if (!canCompleteOrder) return;
     setSubmitting(true);
@@ -719,6 +762,7 @@ export default function Checkout() {
         couponCode: couponCode || undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
+        policyLocale: lang,
         policyAcceptance: policyAccepted
           ? requiredPolicies.map((p) => ({ key: p.key, version: p.version }))
           : [],
@@ -762,9 +806,21 @@ export default function Checkout() {
   // published documents, resets on material quote changes. Rendered above
   // both CTAs. Nothing renders while no policy is published (honest empty).
   /**
-   * THE BUTTON ITSELF, written once and rendered in two places: the rail on a
-   * wide screen, the fixed action bar on a phone. Two copies had already
-   * drifted apart once.
+   * ONE PLACE-ORDER BUTTON.
+   *
+   * There were two, and they had drifted: the mobile copy was missing the
+   * "insufficient balance" explanation and the implicit-policy note, so a
+   * phone customer got a disabled button and no reason for it. Worse, the
+   * mobile copy lived INSIDE the form column, and below `lg` the root is
+   * `flex-col` — so DOM order was visual order and the button rendered ABOVE
+   * the entire order summary. The customer confirmed the purchase before ever
+   * seeing the price; its own warning even read "the total above has been
+   * updated" while the total was below it.
+   *
+   * The messages stay in the document flow, where they can be read and
+   * scrolled to. The button is in the rail on a wide screen and in a fixed
+   * bottom bar on a phone, so it is always after the summary and always
+   * reachable.
    */
   const orderButton = (
     <button
@@ -772,7 +828,7 @@ export default function Checkout() {
       data-testid="checkout-place-order"
       onClick={placeOrder}
       disabled={!canCompleteOrder}
-      className="w-full min-h-[52px] rounded-xl bg-gold text-black font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,opacity] duration-150 active:scale-[0.99] [touch-action:manipulation]"
+      className="lv-button lv-button-primary w-full min-h-[52px] text-base"
     >
       {submitting
         ? loc('جارٍ تأكيد الطلب…', 'Placing order…', 'داواکاری دەنێردرێت…')
@@ -800,7 +856,7 @@ export default function Checkout() {
               <React.Fragment key={p.key}>
                 {i > 0 && <span className="text-zinc-500"> · </span>}
                 <a
-                  href={`/policies/${p.key}`}
+                  href={`/policies/${encodeURIComponent(p.key)}?version=${p.version}&lang=${lang}`}
                   target="_blank"
                   rel="noreferrer"
                   className="underline text-white hover:text-zinc-300"
@@ -826,7 +882,7 @@ export default function Checkout() {
 
   if (placedOrder) {
     return (
-      <div className="w-full min-h-screen bg-[#030303] text-white flex flex-col font-sans selection:bg-white/20">
+      <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col font-sans selection:bg-white/20">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-700">
           <div className="w-24 h-24 mb-8 relative flex items-center justify-center">
             <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-50" />
@@ -877,15 +933,25 @@ export default function Checkout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#030303] text-white flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+      <div
+        className="grid h-full min-h-0 w-full flex-1 place-items-center bg-canvas text-text-primary"
+        data-testid="checkout-loading"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-text-muted border-t-transparent" aria-hidden="true" />
+          <p className="text-sm text-text-secondary">
+            {loc('جارٍ تجهيز صفحة الدفع…', 'Preparing checkout…', 'ئامادەکردنی پارەدان…')}
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!loading && items.length === 0) {
     return (
-      <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col items-center justify-center p-6 text-center font-sans">
         <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
           <ShoppingCart className="w-7 h-7 text-zinc-500" strokeWidth={1.5} />
         </div>
@@ -910,23 +976,19 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white font-sans selection:bg-white/20 flex flex-col lg:flex-row">
+    <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary font-sans selection:bg-white/20 flex flex-col lg:flex-row lg:overflow-hidden" data-checkout-viewport>
 
       {/* Left Form Area */}
-      {/* ONE PAGE SCROLLER, ONE RAIL SCROLLER. This column declared a third
-          (`lg:max-h-screen lg:overflow-y-auto`), which pinned the root row at
-          100vh and left the document with no scroller of its own — so on a
-          wide screen the rail's content could be pushed past the fold with
-          nothing to scroll it. */}
-      <div className="flex-1 flex flex-col relative z-10">
-        <header className="px-6 lg:px-12 py-8 flex items-center justify-between sticky top-0 bg-[#030303]/90 backdrop-blur-xl z-20 border-b border-white/5 lg:border-none">
+      <div className="relative z-10 flex min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
+        <header className="lv-character-header sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg sm:px-6 lg:px-12 lg:py-6">
           <button
             onClick={handleBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors border border-white/10 bg-white/5"
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" strokeWidth={1.5} /> : <ArrowLeft className="w-5 h-5 text-white" strokeWidth={1.5} />}
           </button>
-          <div className="flex items-center gap-2 text-zinc-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+          <MotionCharacterHome />
+          <div className="flex items-center gap-2 text-text-secondary px-2 py-2">
             <Lock className="w-4 h-4" strokeWidth={1.5} />
             <span className="text-xs font-semibold tracking-widest uppercase">
               {dir === 'rtl' ? 'دفع آمن' : 'Secure Checkout'}
@@ -934,10 +996,10 @@ export default function Checkout() {
           </div>
         </header>
 
-        <div className="px-6 lg:px-12 py-4 max-w-3xl mx-auto w-full space-y-12 pb-8 lg:pb-16">
+        <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-5 pb-10 sm:px-6 lg:space-y-10 lg:px-12 lg:pb-16">
 
           <div>
-            <h1 className="text-2xl lg:text-3xl font-medium tracking-tight mb-2">
+            <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight mb-2">
               {dir === 'rtl' ? 'إتمام الطلب' : 'Checkout'}
             </h1>
             <p className="text-sm text-zinc-500 font-light">
@@ -953,18 +1015,14 @@ export default function Checkout() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addresses.map(addr => (
-                <label key={addr.id} className={`relative p-4 rounded-xl border cursor-pointer transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[#030303] flex flex-col gap-2 ${
-                    selectedAddressId === addr.id ? 'border-gold/60 bg-gold/[0.06]' : 'border-white/10 bg-[#0a0a0a] hover:border-white/25'
-                }`}>
+                <label key={addr.id} data-selected={selectedAddressId === addr.id} className="lv-choice relative flex cursor-pointer flex-col gap-2 p-4">
                   <input type="radio" name="address" className="sr-only" checked={selectedAddressId === addr.id} onChange={() => setSelectedAddressId(addr.id)} />
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
-                      <MapPin className={`w-4 h-4 ${selectedAddressId === addr.id ? 'text-white' : 'text-zinc-500'}`} strokeWidth={1.5} />
+                      <MapPin className="w-4 h-4 text-text-muted" strokeWidth={1.5} />
                       <span className="font-normal text-white text-base">{addr.label}</span>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedAddressId === addr.id ? 'border-white' : 'border-zinc-700'}`}>
-                      {selectedAddressId === addr.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
+                    <span className="lv-choice-mark"><Check className="h-3 w-3" aria-hidden="true" /></span>
                   </div>
                   <p className="text-xs text-zinc-500 leading-relaxed pl-1 font-light">
                     {addr.name} — {addr.phone}
@@ -978,7 +1036,7 @@ export default function Checkout() {
                 <button
                   type="button"
                   onClick={() => setAddingAddress(true)}
-                  className="relative p-4 rounded-xl border border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-white/20 transition-colors flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-white min-h-[100px] [touch-action:manipulation]"
+                  className="relative flex min-h-[100px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-subtle bg-transparent p-4 text-text-muted transition-colors hover:bg-white/[0.03] hover:text-text-primary [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
                     <Plus aria-hidden="true" className="w-4 h-4" strokeWidth={1.5} />
@@ -990,7 +1048,7 @@ export default function Checkout() {
               ) : null}
             </div>
             {addingAddress ? (
-              <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+              <div className="lv-surface mt-3 p-4">
                 <AddressForm
                   dense
                   defaultWhenFirst={addresses.length === 0}
@@ -1021,33 +1079,55 @@ export default function Checkout() {
               {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
             </h2>
             <div className="grid grid-cols-1 gap-3">
-              {checkoutDeliveryMethods.map(method => (
-                <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[#030303] flex items-center gap-4 ${
-                  deliveryMethod === method.id ? 'border-gold/60 bg-gold/[0.06]' : 'border-white/10 bg-[#0a0a0a] hover:border-white/25'
-                }`}>
-                  <input type="radio" name="delivery" className="sr-only" checked={deliveryMethod === method.id} onChange={() => setDeliveryMethod(method.id)} />
+              {availableDeliveryMethods.map(method => {
+                const selected = deliveryMethod === method.id;
+                const selectedQuote = selected ? quote?.shipping : null;
+                const displayedPrice = selectedQuote?.total_iqd ?? method.price_iqd;
+                const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
+                return (
+                <label key={method.id} data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
+                  <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => setDeliveryMethod(method.id)} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${deliveryMethod === method.id ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
                         {getMethodIcon(method.icon || '', "w-5 h-5")}
                       </div>
-                      <div>
-                        <h3 className={`font-normal text-base ${deliveryMethod === method.id ? 'text-white' : 'text-zinc-300'}`}>
+                      <div className="min-w-0">
+                        <h3 className={`font-normal text-base ${selected ? 'text-white' : 'text-zinc-300'}`}>
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                         </h3>
                         <p className="text-xs text-zinc-500 mt-0.5 font-light">{dir === 'rtl' ? method.descAr : method.descEn}</p>
+                        {selectedQuote && (
+                          <p className={`mt-1 text-[11px] font-medium ${memberWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                            {memberWaiver
+                              ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
+                              : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <span className={`font-medium text-sm ${method.price_iqd === 0 ? 'text-gold' : 'text-white'}`}>
-                      {method.price_iqd === 0 ? (dir === 'rtl' ? 'مجاناً' : 'Free') : formatIqd(method.price_iqd)}
+                    <span className={`font-medium text-sm shrink-0 ${displayedPrice === 0 ? 'text-emerald-400' : 'text-white'}`}>
+                      {displayedPrice === 0 ? loc('مجاناً', 'Free', 'بەخۆڕایی') : formatIqd(displayedPrice)}
                     </span>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ml-2 ${deliveryMethod === method.id ? 'border-white' : 'border-zinc-700'}`}>
-                    {deliveryMethod === method.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
+                  <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
-              ))}
+                );
+              })}
             </div>
+            {quote?.priority_delivery?.eligible && (
+              <div className="mt-3 rounded-xl border border-[#d6b866]/35 bg-gradient-to-r from-[#d6b866]/10 to-[#b03142]/10 p-3 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-[#e8c97a] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-[#f2ddb0]">
+                    {loc('توصيل أولوية PRO خلال 12 ساعة', 'PRO priority delivery within 12 hours', 'گەیاندنی پێشینەیی PRO لە ١٢ کاتژمێردا')}
+                  </p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {loc('تم التحقق من العنوان وطريقة التوصيل لهذا الطلب.', 'Address and delivery method are eligible for this order.', 'ناونیشان و شێوازی گەیاندن بۆ ئەم داواکارییە شیاون.')}
+                  </p>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Section: Payment Method */}
@@ -1058,12 +1138,10 @@ export default function Checkout() {
             </h2>
             <div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
-                <label key={method.id} className={`relative p-4 rounded-xl border cursor-pointer transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[#030303] flex items-center gap-4 ${
-                  paymentMethod === method.id ? 'border-gold/60 bg-gold/[0.06]' : 'border-white/10 bg-[#0a0a0a] hover:border-white/25'
-                }`}>
+                <label key={method.id} data-selected={paymentMethod === method.id} className="lv-choice relative flex cursor-pointer items-center gap-4 p-4">
                   <input type="radio" name="payment" className="sr-only" checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} />
                   <div className="flex-1 flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${paymentMethod === method.id ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
                       {getMethodIcon(method.icon || '', 'w-5 h-5')}
                     </div>
                     <div>
@@ -1075,9 +1153,7 @@ export default function Checkout() {
                       )}
                     </div>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors shrink-0 ${paymentMethod === method.id ? 'border-white' : 'border-zinc-700'}`}>
-                      {paymentMethod === method.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
+                  <span className="lv-choice-mark"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
               ))}
             </div>
@@ -1086,26 +1162,20 @@ export default function Checkout() {
         </div>
       </div>
 
-      {/* Right Summary Area */}
-      {/* The phone's fixed action bar overlaps THIS column (it is last in
-          the flow below `lg`), so the clearance belongs here. */}
-      <div className="w-full lg:w-[460px] bg-[#0a0a0a] lg:border-s border-white/5 flex flex-col shrink-0 relative z-20 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-0">
-        {/* `lg:h-screen` with NO overflow was the bug: the ledger below the
-            item list is fixed-height content that can stack a dozen rows, so
-            the Place Order button at the end of it was simply pushed past the
-            bottom of a 100vh box that could not scroll. `min-h-0` is what lets
-            the scrolling child actually shrink inside a flex column. */}
-        <div className="p-6 lg:p-10 lg:sticky lg:top-0 lg:h-dvh lg:overflow-hidden flex flex-col min-h-0">
+      {/* Right Summary Area. The phone's fixed action bar overlaps THIS column
+          (it is last in the flow below `lg`), so the clearance belongs here. */}
+      <div className="relative z-20 flex w-full shrink-0 flex-col bg-surface pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:h-full lg:min-h-0 lg:w-[460px] lg:border-s lg:border-border-subtle">
+        <div className="flex min-h-0 flex-col p-4 sm:p-6 lg:h-full lg:p-10">
 
           <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-6">
             <Receipt className="w-5 h-5 text-zinc-400" strokeWidth={1.5} />
             {dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}
           </h2>
 
-          <div className="flex-1 min-h-0 lg:overflow-y-auto custom-scrollbar lg:pe-2 mb-8 space-y-3">
+          <div className="mb-6 space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-2 custom-scrollbar">
             {summaryLines.map((line) => (
-                <div key={line.key} data-checkout-line={line.key} className="flex gap-4 p-3 rounded-xl bg-[#050505] border border-white/5 relative overflow-hidden group">
-                  <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0 border border-white/5">
+                <div key={line.key} data-checkout-line={line.key} className="group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0">
+                  <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0">
                     {line.image ? (
                       <img referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
                     ) : (
@@ -1146,6 +1216,13 @@ export default function Checkout() {
               <span className="font-light">{dir === 'rtl' ? 'المجموع الفرعي' : 'Subtotal'}</span>
               <span className="text-white font-normal tabular-nums">{formatIqd(total)}</span>
             </div>
+
+            {codTaxIqd > 0 && (
+              <div className="flex justify-between items-center text-zinc-400" data-checkout-cod-tax>
+                <span className="font-light">{S.codTax}</span>
+                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxIqd)}</span>
+              </div>
+            )}
             {/* One line about the pricing rule in force on a pre-order cart:
                 cash on delivery prices the lines as a direct sale while the
                 order keeps its journey; paying in advance keeps the configured
@@ -1172,7 +1249,7 @@ export default function Checkout() {
               {quoteLoading ? (
                 <span className="text-zinc-500 font-light text-xs">{S.quoteLoading}</span>
               ) : shippingIqd === 0 ? (
-                <span className="text-gold font-normal">
+                <span className="text-emerald-400 font-normal">
                   {shippingWaived && quote && quote.shipping.total_before_waiver_iqd > 0 && (
                     <span className="text-zinc-500 line-through font-light mx-2 text-xs">
                       {formatIqd(quote.shipping.total_before_waiver_iqd)}
@@ -1185,6 +1262,35 @@ export default function Checkout() {
               )}
             </div>
 
+            {quote && quote.shipping.components.length > 0 && (
+              <div className="rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2 space-y-1.5">
+                {quote.shipping.components.map((component, index) => {
+                  const names: Record<string, [string, string]> = {
+                    ordinary: ['توصيل الطلب', 'Order delivery'],
+                    protected: ['حماية وتغليف', 'Protected handling'],
+                    printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery'],
+                    printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery'],
+                    carton: ['كرتونة كمية إضافية', 'Extra quantity carton'],
+                    product: ['توصيل حسب المنتج', 'Product delivery'],
+                  };
+                  const name = component.product_name
+                    ? [component.product_name, component.product_name]
+                    : names[component.kind] ?? [component.kind, component.kind];
+                  return (
+                    <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-zinc-500">
+                        {dir === 'rtl' ? name[0] : name[1]}
+                        {component.units > 1 ? ` × ${component.units}` : ''}
+                      </span>
+                      <span className={component.waived ? 'text-emerald-400' : 'text-zinc-300'}>
+                        {component.waived ? S.freeShipping : formatIqd(component.fee_iqd)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Protected delivery — offered only when the owner priced it, so
                 the customer never sees a switch that cannot be honoured. */}
             {quote?.protected_delivery?.available && (
@@ -1194,7 +1300,7 @@ export default function Checkout() {
               >
                 <input
                   type="checkbox"
-                  className="mt-1 shrink-0 accent-[#BAA369]"
+                  className="mt-1 shrink-0 accent-[#ef233c]"
                   checked={protectedDelivery}
                   onChange={(e) => setProtectedDelivery(e.target.checked)}
                 />
@@ -1203,7 +1309,7 @@ export default function Checkout() {
                     <span className="text-white font-normal">{S.protectedTitle}</span>
                     <span className="text-xs font-normal shrink-0">
                       {quote.protected_delivery.waived ? (
-                        <span className="text-gold">{S.protectedFree}</span>
+                        <span className="text-emerald-400">{S.protectedFree}</span>
                       ) : (
                         <span className="text-zinc-300">
                           + {formatIqd(quote.protected_delivery.fee_iqd ?? 0)}
@@ -1236,7 +1342,7 @@ export default function Checkout() {
                 (settings), echoed on the quote only for a printer line going
                 to a home address; a store pickup gets no note. */}
             {printerNoteIqd !== null && summaryLines.some((l) => l.isPrinter) && (
-              <Note tone="gold" icon={<Truck className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-printer-note">
+              <Note tone="zinc" icon={<Truck className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-printer-note">
                 <span className="font-light">{S.printerNote(formatIqd(printerNoteIqd))}</span>
               </Note>
             )}
@@ -1267,14 +1373,14 @@ export default function Checkout() {
                 }}
               />
               {couponError && (
-                <p role="alert" className="text-red-400 text-[11px] mt-2">
+                <p role="alert" className="text-[#e4899a] text-[11px] mt-2">
                   {couponError}
                 </p>
               )}
             </div>
 
             {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
-              <div className="flex justify-between items-center text-gold/90">
+              <div className="flex justify-between items-center text-emerald-400">
                 <span className="font-light">
                   {dir === 'rtl' ? 'خصم الكود' : 'Promo discount'}{' '}
                   <span dir="ltr" className="text-zinc-500 text-xs">{quote.coupon.code}</span>
@@ -1283,24 +1389,31 @@ export default function Checkout() {
               </div>
             )}
 
+            {pointsDiscount > 0 && (
+              <div className="flex justify-between items-center text-gold/90">
+                <span className="font-light">{dir === 'rtl' ? 'خصم النقاط' : 'Points Discount'}</span>
+                <span className="font-normal tabular-nums">-{formatIqd(pointsDiscount)}</span>
+              </div>
+            )}
+
             {/*
-              POINTS, AS A CONTROL. The customer could previously see a
-              "Points Discount" line with no way to turn it off, no way to turn
-              it on if they arrived without it, and no sight of their balance —
-              while the sibling discount, the promo code, sat two rows above
-              with a full input. Everything here comes from `quote.points`,
-              which the server has been sending all along: the spendable
-              balance, the redemption cap (points pay for merchandise, never
-              for shipping or fees) and what this order will earn back.
+              POINTS, AS A CONTROL. The customer could see the discount line
+              above with no way to turn it off, no way to turn it on if they
+              arrived without it, and no sight of their balance — while the
+              sibling discount, the promo code, sits two rows up with a full
+              input. Everything here comes from `quote.points`, which the
+              server has been sending all along: the spendable balance, the
+              redemption cap (points pay for merchandise, never for shipping or
+              fees) and what this order earns back.
             */}
             {(quote?.points.balance ?? pointBalance) > 0 || pointsDiscount > 0 ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-xl border border-border-subtle bg-surface p-3">
                 <label className="flex items-center justify-between gap-3 cursor-pointer">
                   <span className="min-w-0">
-                    <span className="block text-white text-[13px] font-medium">
+                    <span className="block text-text-primary text-[13px] font-medium">
                       {loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')}
                     </span>
-                    <span className="block text-[11.5px] text-zinc-500 tabular-nums">
+                    <span className="block text-[11.5px] text-text-muted tabular-nums">
                       {loc('الرصيد', 'Balance', 'باڵانس')}: {formatIqd(quote?.points.balance ?? pointBalance)}
                       {quote?.points.eligible_merchandise_iqd != null
                         ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${formatIqd(quote.points.eligible_merchandise_iqd)}`
@@ -1314,21 +1427,20 @@ export default function Checkout() {
                     onChange={() => setUsePoints((v) => !v)}
                     disabled={(quote?.points.balance ?? pointBalance) === 0}
                   />
+                  {/* The knob is a CHILD of the track, so `peer-checked:`
+                      cannot reach it directly — the nested `[&>span]` selector
+                      carries the state inward. It travels on
+                      `inset-inline-start` rather than a translate so the switch
+                      reads correctly in Arabic and Kurdish with one rule. */}
                   <span
                     aria-hidden="true"
-                    className="relative shrink-0 w-[46px] h-[28px] rounded-full bg-white/15 transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[#0a0a0a]"
+                    className="relative shrink-0 w-[46px] h-[28px] rounded-full bg-surface-selected transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-canvas"
                   >
                     <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-white transition-[inset-inline-start] duration-200 ease-out" />
                   </span>
                 </label>
-                {pointsDiscount > 0 ? (
-                  <p className="mt-2 flex justify-between items-center text-gold text-[13px]">
-                    <span>{loc('خصم النقاط', 'Points discount', 'داشکاندنی خاڵ')}</span>
-                    <span className="tabular-nums">−{formatIqd(pointsDiscount)}</span>
-                  </p>
-                ) : null}
                 {quote?.points.earn_pending ? (
-                  <p className="mt-1.5 text-[11.5px] text-zinc-500 tabular-nums">
+                  <p className="mt-2 text-[11.5px] text-text-muted tabular-nums">
                     {loc('ستكسب', 'You will earn', 'دەستت دەکەوێت')} {quote.points.earn_pending.toLocaleString()}{' '}
                     {loc('نقطة من هذا الطلب', 'points from this order', 'خاڵ لەم داواکارییە')}
                   </p>
@@ -1343,7 +1455,7 @@ export default function Checkout() {
             {quote?.support && (
               <div
                 data-testid="checkout-support-line"
-                className="flex justify-between items-center gap-3 text-[13px] text-zinc-300"
+                className="flex justify-between items-center gap-3 text-[13px] text-sky-300"
               >
                 <span className="font-light truncate">{S.supportLine(quote.support.referrer_username || quote.support.ref)}</span>
                 <span className="font-normal shrink-0 text-zinc-400">{S.supportZero}</span>
@@ -1354,7 +1466,7 @@ export default function Checkout() {
             <div className={`mt-4 pt-4 border-t border-white/5 transition-all`}>
                 <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWalletActive ? 'bg-gold text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWalletActive ? 'bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'bg-zinc-900 text-zinc-400'}`}>
                             <Wallet className="w-4 h-4" strokeWidth={1.5} />
                         </div>
                         <div>
@@ -1373,20 +1485,13 @@ export default function Checkout() {
                         aria-checked={isWalletActive}
                         disabled={isAdvanceRequired || walletBalanceShown === 0}
                         onClick={() => setUseWalletBalance(!useWalletBalance)}
-                        className={`relative inline-flex h-7 w-[46px] shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a] ${
-                            isWalletActive ? 'bg-gold' : 'bg-zinc-700'
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                            isWalletActive ? 'bg-white' : 'bg-zinc-800'
                         } ${(isAdvanceRequired || walletBalanceShown === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
-                        {/* `inset-inline-start`, not a translate: a physical
-                            translate has to be mirrored by hand for RTL, and
-                            the pair that did so had drifted to different
-                            distances (24px vs 4px on a 44px track). */}
-                        <span
-                            aria-hidden="true"
-                            className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white transition-[inset-inline-start] duration-200 ease-out ${
-                                isWalletActive ? 'start-[21px]' : 'start-[3px]'
-                            }`}
-                        />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
+                            isWalletActive ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')
+                        } ${!isWalletActive && 'bg-zinc-400'}`} />
                     </button>
                 </div>
 
@@ -1402,7 +1507,7 @@ export default function Checkout() {
                 )}
 
                 {!isAdvanceRequired && isWalletActive && walletDiscount > 0 && (
-                     <div className="mt-3 p-3 rounded-lg bg-gold/[0.08] border border-gold/20 flex gap-2 text-gold">
+                     <div className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex gap-2 text-emerald-400">
                         <Sparkles className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                         <p className="text-xs leading-relaxed font-light">
                             {dir === 'rtl'
@@ -1414,7 +1519,7 @@ export default function Checkout() {
             </div>
 
             {walletDiscount > 0 && (
-              <div className="flex justify-between items-center text-gold/90 bg-gold/[0.05] p-3 rounded-lg border border-gold/15">
+              <div className="flex justify-between items-center text-emerald-400 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10">
                 <span className="flex items-center gap-2 font-normal text-sm"><Sparkles className="w-4 h-4" /> {dir === 'rtl' ? 'رصيد مستخدم' : 'Used Balance'}</span>
                 <span className="font-medium text-sm">-{formatIqd(walletDiscount)}</span>
               </div>
@@ -1424,46 +1529,67 @@ export default function Checkout() {
               THE NUMBER THE CUSTOMER IS AGREEING TO PAY.
 
               It was not on this screen. The one headline figure was
-              `due_on_delivery_iqd` under the label "Amount Due" at text-3xl —
+              `due_on_delivery_iqd` (or the BNPL financed amount) at text-3xl —
               so a 100,000 order with 30,000 of wallet applied showed subtotal
               95,000, shipping 5,000, used balance −30,000, and then a 70,000
-              headline. The 100,000 the customer was committing to appeared
-              nowhere and had to be summed by hand across six rows.
+              headline. The 100,000 being committed to appeared nowhere and had
+              to be summed by hand across six rows.
 
               The total is the headline now, and what happens to it — paid from
-              the wallet, collected at the door — is the settlement line beneath
-              it, which is what those numbers actually are.
+              the wallet, financed, collected at the door — is the settlement
+              block beneath it, which is what those numbers actually are.
             */}
-            <div className="pt-5 mt-2 border-t border-white/10">
+            <div className="pt-5 mt-2 border-t border-border-subtle">
               <div className="flex justify-between items-baseline gap-3">
-                <span className="text-white font-bold text-[15px]">
+                <span className="text-text-primary font-bold text-[15px]">
                   {loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}
                 </span>
-                <span data-testid="checkout-order-total" className="text-2xl font-black text-white tabular-nums">
+                <span data-testid="checkout-order-total" className="text-2xl font-black text-text-primary tabular-nums">
                   {formatIqd(orderTotal)}
                 </span>
               </div>
 
               <div className="mt-3 space-y-1.5 text-[13px]">
                 {walletDiscount > 0 ? (
-                  <div className="flex justify-between items-center text-zinc-400">
+                  <div className="flex justify-between items-center text-text-secondary">
                     <span>{loc('مدفوع من المحفظة', 'Paid from your wallet', 'لە جزدان درا')}</span>
                     <span className="tabular-nums">−{formatIqd(walletDiscount)}</span>
                   </div>
                 ) : null}
-                <div className="flex justify-between items-center">
-                  <span className={amountRemainingOnDelivery === 0 ? 'text-gold' : 'text-zinc-300'}>
-                    {amountRemainingOnDelivery === 0
-                      ? loc('مدفوع بالكامل', 'Fully paid', 'بە تەواوی درا')
-                      : loc('يُدفع عند الاستلام', 'Due on delivery', 'لە کاتی وەرگرتن دەدرێت')}
-                  </span>
-                  <span
-                    data-testid="checkout-due-on-delivery"
-                    className={`tabular-nums font-bold ${amountRemainingOnDelivery === 0 ? 'text-gold' : 'text-white'}`}
-                  >
-                    {formatIqd(amountRemainingOnDelivery)}
-                  </span>
-                </div>
+
+                {isBnplMethod ? (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-text-secondary">
+                        {loc('المبلغ المموّل عبر BNPL', 'Financed with BNPL', 'دابین کراو بە BNPL')}
+                      </span>
+                      <span data-testid="checkout-bnpl-financed" className="tabular-nums font-bold text-text-primary">
+                        {formatIqd(bnplFinancedIqd)}
+                      </span>
+                    </div>
+                    {quote?.bnpl?.due_at ? (
+                      <div className="flex items-center gap-1.5 text-text-muted">
+                        <CalendarClock aria-hidden="true" className="w-4 h-4" />
+                        {loc('موعد السداد', 'Due', 'کاتی دانەوە')}{' '}
+                        {new Date(quote.bnpl.due_at).toLocaleDateString(lang === 'ar' ? 'ar-IQ' : 'en-US')}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <span className={amountRemainingOnDelivery === 0 ? 'text-gold' : 'text-text-secondary'}>
+                      {amountRemainingOnDelivery === 0
+                        ? loc('مدفوع بالكامل', 'Fully paid', 'بە تەواوی درا')
+                        : loc('يُدفع عند الاستلام', 'Due on delivery', 'لە کاتی وەرگرتن دەدرێت')}
+                    </span>
+                    <span
+                      data-testid="checkout-due-on-delivery"
+                      className={`tabular-nums font-bold ${amountRemainingOnDelivery === 0 ? 'text-gold' : 'text-text-primary'}`}
+                    >
+                      {formatIqd(amountRemainingOnDelivery)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1479,7 +1605,7 @@ export default function Checkout() {
                 it is placed, so the total shown is now the real one. */}
             {pricesMoved && (
               <p
-                className="text-sm text-amber-300 mb-3 font-medium flex items-center justify-center gap-2 text-center"
+                className="text-sm text-warning mb-3 font-medium flex items-center justify-center gap-2 text-center"
                 data-prices-moved
               >
                 <AlertCircle aria-hidden="true" className="w-4 h-4 shrink-0" />
@@ -1491,23 +1617,23 @@ export default function Checkout() {
               </p>
             )}
 
-            {/* The desktop button sits here, at the end of the rail. */}
+            {/* The wide-screen button sits here, at the end of the rail. */}
             <div className="hidden lg:block">{orderButton}</div>
 
             {submitError && (
-              <p role="alert" className="text-center text-sm text-red-400 mt-4 font-medium flex items-center justify-center gap-2">
+              <p role="alert" className="text-center text-sm text-danger mt-4 font-medium flex items-center justify-center gap-2">
                 <AlertCircle aria-hidden="true" className="w-4 h-4 shrink-0" />
                 {submitError}
               </p>
             )}
             {!submitError && !isBalanceSufficient && (
-              <p role="alert" className="text-center text-sm text-red-400 mt-4 font-medium flex items-center justify-center gap-2">
+              <p role="alert" className="text-center text-sm text-danger mt-4 font-medium flex items-center justify-center gap-2">
                 <AlertCircle aria-hidden="true" className="w-4 h-4" />
                 {loc('الرصيد غير كافٍ لإتمام الدفع', 'Your balance does not cover the advance', 'باڵانست بەشی پارەدانی پێشەکی ناکات')}
               </p>
             )}
             {requiredPolicies.length === 0 && (
-              <p className="text-center text-xs text-zinc-600 mt-5 max-w-xs mx-auto leading-relaxed">
+              <p className="text-center text-xs text-text-muted mt-5 max-w-xs mx-auto leading-relaxed">
                 {S.implicitNote}
               </p>
             )}
@@ -1519,13 +1645,13 @@ export default function Checkout() {
         THE PHONE'S ACTION BAR. Fixed, so it is outside the column order
         entirely and can never render above the summary again — and it carries
         the total, so the figure being agreed to is on screen at the moment of
-        agreeing. The page reserves its height below.
+        agreeing. The summary column reserves its height below.
       */}
-      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#050505]/95 backdrop-blur-xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-canvas/95 backdrop-blur-xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-[640px] flex items-center gap-3">
           <div className="min-w-0 basis-[8.5rem] shrink-0">
-            <div className="text-[11px] text-zinc-500">{loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}</div>
-            <div className="text-white font-black text-[15px] tabular-nums truncate">{formatIqd(orderTotal)}</div>
+            <div className="text-[11px] text-text-muted">{loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}</div>
+            <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{formatIqd(orderTotal)}</div>
           </div>
           <div className="flex-1 min-w-0">{orderButton}</div>
         </div>

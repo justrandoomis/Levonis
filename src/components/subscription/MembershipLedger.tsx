@@ -31,8 +31,10 @@ const BENEFIT_NAMES: Record<string, { ar: string; en: string; ckb: string }> = {
   merchantSubdomain: { ar: 'رابط المتجر الفرعي', en: 'Store subdomain', ckb: 'ژێردۆمەینی فرۆشگا' },
   exclusiveCoupons: { ar: 'كوبونات الأعضاء', en: 'Member coupons', ckb: 'کۆپۆنی ئەندامان' },
   exclusiveSections: { ar: 'الأقسام الحصرية', en: 'Exclusive sections', ckb: 'بەشە تایبەتەکان' },
-  verifiedMerchant: { ar: 'شارة التاجر الموثّق', en: 'Verified-merchant badge', ckb: 'نیشانەی بازرگانی پشتڕاستکراو' },
-  primeDeliveryEligible: { ar: 'توصيل PRIME المجاني', en: 'PRIME free delivery', ckb: 'گەیاندنی بێبەرامبەری PRIME' },
+  verifiedMerchant: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
+  proMerchantBadge: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
+  primeDeliveryEligible: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
+  premiumDelivery: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
 };
 
 export function MembershipLedger({ memberships, gatedBenefits }: MembershipLedgerProps) {

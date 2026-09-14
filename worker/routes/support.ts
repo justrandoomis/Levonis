@@ -22,7 +22,7 @@
  *
  * PRO operations (/api/support/admin/...): member search/detail (subscription
  * term, identity state via kyc_cases READ — never decrypted identity or
- * evidence keys —, benefit context, BNPL read-only [feature disabled],
+ * evidence keys —, benefit context, BNPL account and repayment history,
  * restriction cases) and restriction-case management. Restrictions only ever
  * gate BENEFIT COMPUTATION — never orders, wallet, points, warranty or
  * support access.
@@ -47,7 +47,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
-import { getTierStatus } from '../lib/entitlements';
+import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
+import { bnplEligibility } from '../lib/bnpl';
 import { coverageState, maskSerial } from '../lib/deviceOps';
 
 export const supportRoutes = new Hono<AppContext>();
@@ -55,22 +56,15 @@ export const supportRoutes = new Hono<AppContext>();
 // ============================================================ shared helpers
 
 /**
- * Benefit keys a restriction case may gate — mirrors the benefit names in
- * worker/lib/entitlements.ts so decisions here can be consumed wherever
- * benefits are computed. Support/warranty/data ACCESS is intentionally not
- * restrictable — only benefit computation.
+ * Benefit keys a restriction case may gate. They are generated from the
+ * canonical entitlement contract rather than copied here, so adding or
+ * renaming a membership capability cannot silently bypass support controls.
+ * Support/warranty/data ACCESS is intentionally not restrictable — only
+ * benefit computation.
  */
-export const RESTRICTABLE_BENEFITS = [
-  'proPricing',
-  'freeDelivery',
-  'noPreorderCommission',
-  'priorityService',
-  'proExclusive',
-  'merchantProfile',
-  'exclusiveSections',
-  'verifiedMerchant',
-  'exclusiveCoupons',
-] as const;
+export const RESTRICTABLE_BENEFITS = Object.freeze(
+  Object.keys(ENTITLEMENT_MINIMUM_TIER) as MembershipEntitlement[]
+);
 
 export const RESTRICTION_CASE_TYPES = [
   'dropshipping_suspected',
@@ -201,6 +195,9 @@ const T: Record<Locale, Record<string, string>> = {
     f_total: 'المجموع',
     f_date: 'التاريخ',
     f_delivered: 'تاريخ التسليم',
+    f_tracking: 'رقم التتبع',
+    f_delivery_status: 'تحديث شركة التوصيل',
+    f_priority_due: 'موعد خدمة الأولوية',
     f_serial: 'الرقم التسلسلي',
     f_warranty: 'الضمان',
     f_price: 'السعر',
@@ -210,6 +207,8 @@ const T: Record<Locale, Record<string, string>> = {
       'الطلب {id} حالته: {status}. لتوصيل الطابعات، النافذة الموثقة هي 12–48 ساعة حيثما تتوفر الخدمة. أنقل لك الحالة المسجلة فقط ولا أستطيع وعدك بتاريخ محدد.',
     est_generic:
       'الطلب {id} حالته: {status}. أنقل لك الحالة المسجلة فقط — لا أستطيع اختراع تاريخ توصيل. سيتواصل الفريق معك عند التسليم.',
+    est_priority:
+      'الطلب {id} مسجّل فعليًا بخدمة أولوية PRO خلال 12 ساعة. حالته: {status}، وموعد الخدمة المسجّل هو {due}.',
     est_preorder_note: 'يتضمن هذا الطلب بنود طلب مسبق؛ الوصول يعتمد على الشحن المختار (جوي/بحري/بري) الظاهر على الطلب.',
     devices_none: 'لا توجد أجهزة مسجلة في حسابك. سجّل جهازك بالرقم التسلسلي من صفحة الضمان.',
     devices_intro: 'أجهزتك المسجلة:',
@@ -273,6 +272,9 @@ const T: Record<Locale, Record<string, string>> = {
     f_total: 'Total',
     f_date: 'Date',
     f_delivered: 'Delivered',
+    f_tracking: 'Tracking number',
+    f_delivery_status: 'Courier update',
+    f_priority_due: 'Priority service due',
     f_serial: 'Serial',
     f_warranty: 'Warranty',
     f_price: 'Price',
@@ -282,6 +284,8 @@ const T: Record<Locale, Record<string, string>> = {
       'Order {id} is: {status}. For printer delivery, the documented window is 12–48 hours where the service is available. I can only relay the recorded status — I cannot promise an exact date.',
     est_generic:
       'Order {id} is: {status}. I can only relay the recorded status — I will not invent a delivery date. Staff will contact you for handover.',
+    est_priority:
+      'Order {id} is recorded for PRO 12-hour priority service. Its status is {status}, and the recorded service deadline is {due}.',
     est_preorder_note: 'This order includes pre-order items; arrival depends on the selected freight (air/sea/land) shown on the order.',
     devices_none: 'No registered devices on your account. Register a device with its serial number from the Warranty page.',
     devices_intro: 'Your registered devices:',
@@ -346,6 +350,9 @@ const T: Record<Locale, Record<string, string>> = {
     f_total: 'کۆی گشتی',
     f_date: 'بەروار',
     f_delivered: 'بەرواری گەیاندن',
+    f_tracking: 'ژمارەی بەدواداچوون',
+    f_delivery_status: 'نوێکاری گەیاندن',
+    f_priority_due: 'کاتی خزمەتگوزاری پێشینەیی',
     f_serial: 'ژمارەی زنجیرەیی',
     f_warranty: 'گەرەنتی',
     f_price: 'نرخ',
@@ -355,6 +362,8 @@ const T: Record<Locale, Record<string, string>> = {
       'داواکاری {id} دۆخی: {status}. بۆ گەیاندنی پرینتەر، ماوە بەڵگەدارەکە 12–48 کاتژمێرە لەو شوێنانەی خزمەتگوزارییەکە بەردەستە. تەنها دۆخی تۆمارکراو دەگوازمەوە — ناتوانم بەرواری دیاریکراو بەڵێن بدەم.',
     est_generic:
       'داواکاری {id} دۆخی: {status}. تەنها دۆخی تۆمارکراو دەگوازمەوە — بەرواری گەیاندن دانانێم. ستاف بۆ گەیاندن پەیوەندیت پێوە دەکات.',
+    est_priority:
+      'داواکاری {id} بە خزمەتگوزاری پێشینەیی ١٢ کاتژمێری PRO تۆمارکراوە. دۆخی: {status}، و کاتی تۆمارکراوی خزمەتگوزاری {due} ـە.',
     est_preorder_note: 'ئەم داواکارییە بڕگەی پێش-داواکاری لەخۆدەگرێت؛ گەیشتن بەستراوە بە شێوازی گواستنەوەی هەڵبژێردراو (ئاسمانی/دەریایی/وشکانی).',
     devices_none: 'هیچ ئامێرێکی تۆمارکراو لە هەژمارەکەتدا نییە. لە پەڕەی گەرەنتی ئامێرەکەت بە ژمارە زنجیرەییەکەی تۆمار بکە.',
     devices_intro: 'ئامێرە تۆمارکراوەکانت:',
@@ -498,11 +507,18 @@ interface OrderLite extends Record<string, unknown> {
   total_iqd: number;
   created_at: string;
   delivered_at: string | null;
+  fulfillment_service: string;
+  priority_due_at: string | null;
+  delivery_tracking_no: string;
+  delivery_status_text: string;
 }
+
+const ORDER_SUPPORT_COLUMNS =
+  'id, status, total_iqd, created_at, delivered_at, fulfillment_service, priority_due_at, delivery_tracking_no, delivery_status_text';
 
 async function ownOrders(db: D1Database, userId: string, limit = 5): Promise<OrderLite[]> {
   const { results } = await db
-    .prepare('SELECT id, status, total_iqd, created_at, delivered_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
+    .prepare(`SELECT ${ORDER_SUPPORT_COLUMNS} FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`)
     .bind(userId, limit)
     .all<OrderLite>();
   return results;
@@ -512,7 +528,7 @@ async function ownOrders(db: D1Database, userId: string, limit = 5): Promise<Ord
  *  or unknown id is indistinguishable (same not-found answer). */
 async function ownOrder(db: D1Database, userId: string, orderId: string): Promise<OrderLite | null> {
   const row = await db
-    .prepare('SELECT id, status, total_iqd, created_at, delivered_at FROM orders WHERE id = ? AND user_id = ?')
+    .prepare(`SELECT ${ORDER_SUPPORT_COLUMNS} FROM orders WHERE id = ? AND user_id = ?`)
     .bind(orderId, userId)
     .first<OrderLite>();
   return row ?? null;
@@ -620,6 +636,11 @@ async function handleOrderStatus(c: Context<AppContext>, user: SessionUser, para
     { label: tr(loc, 'f_date'), value: fmtDate(order.created_at) },
   ];
   if (order.delivered_at) fields.push({ label: tr(loc, 'f_delivered'), value: fmtDate(order.delivered_at) });
+  if (order.delivery_status_text) fields.push({ label: tr(loc, 'f_delivery_status'), value: order.delivery_status_text });
+  if (order.delivery_tracking_no) fields.push({ label: tr(loc, 'f_tracking'), value: order.delivery_tracking_no });
+  if (order.fulfillment_service === 'pro_priority_12h' && order.priority_due_at) {
+    fields.push({ label: tr(loc, 'f_priority_due'), value: fmtDate(order.priority_due_at) });
+  }
   return {
     intent: 'order_status',
     text,
@@ -641,6 +662,21 @@ async function handleDeliveryEstimate(c: Context<AppContext>, user: SessionUser,
   if (order.status === 'cancelled') return { intent: 'delivery_estimate', text: tr(loc, 'est_cancelled', { id: order.id }) };
   if (order.status === 'delivered') {
     return { intent: 'delivery_estimate', text: tr(loc, 'order_delivered_line', { id: order.id, date: fmtDate(order.delivered_at ?? order.created_at) }) };
+  }
+
+  // A PRO priority verdict is frozen on the order at checkout. Report that
+  // stored service and its stored deadline before considering generic product
+  // heuristics; the assistant never re-derives eligibility from a tier label.
+  const status = statusLabel(loc, order.status);
+  if (order.fulfillment_service === 'pro_priority_12h' && order.priority_due_at) {
+    const fields = [{ label: tr(loc, 'f_priority_due'), value: fmtDate(order.priority_due_at) }];
+    if (order.delivery_status_text) fields.push({ label: tr(loc, 'f_delivery_status'), value: order.delivery_status_text });
+    if (order.delivery_tracking_no) fields.push({ label: tr(loc, 'f_tracking'), value: order.delivery_tracking_no });
+    return {
+      intent: 'delivery_estimate',
+      text: tr(loc, 'est_priority', { id: order.id, status, due: fmtDate(order.priority_due_at) }),
+      cards: [{ title: order.id, badge: status, fields, link: { label: tr(loc, 'orders_link'), to: '/orders' } }],
+    };
   }
 
   // Qualification for the documented 12–48h printer window: the order holds a
@@ -665,7 +701,6 @@ async function handleDeliveryEstimate(c: Context<AppContext>, user: SessionUser,
     if (isPrinter && !isPreorder) printerDirect = true;
   }
 
-  const status = statusLabel(loc, order.status);
   let text = printerDirect
     ? tr(loc, 'est_printer', { id: order.id, status })
     : tr(loc, 'est_generic', { id: order.id, status });
@@ -752,7 +787,7 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
   );
   const cards: AssistantCard[] = results.map((row) => {
     const p = publicWithDisplayPrice(row, ctx, views.get(String(row.id))) as Record<string, unknown>;
-    const images = safeParse<unknown[]>(row.images, []);
+    const images = Array.isArray(p.images) ? p.images : [];
     const image = typeof images[0] === 'string' ? (images[0] as string) : undefined;
     const stock = p.stock;
     const badge = typeof stock === 'number' ? (stock > 0 ? tr(loc, 'in_stock') : tr(loc, 'out_of_stock')) : undefined;
@@ -837,6 +872,25 @@ function handleHandoff(intent: 'open_ticket' | 'human_handoff', loc: Locale): As
   };
 }
 
+/** Small, context-specific next steps. Required pickers (orders/policies) keep
+ * their own choices; these are added only after a resolved answer. */
+export function contextualChoices(loc: Locale, intent: string): AssistantChoice[] {
+  const followups: Partial<Record<Intent, Intent[]>> = {
+    order_status: ['delivery_estimate', 'return_help', 'human_handoff'],
+    delivery_estimate: ['order_status', 'human_handoff'],
+    my_devices: ['warranty_status', 'human_handoff'],
+    warranty_status: ['my_devices', 'human_handoff'],
+    points_balance: ['membership_status'],
+    membership_status: ['points_balance'],
+    return_help: ['order_status', 'human_handoff'],
+    password_help: ['human_handoff'],
+    product_search: ['human_handoff'],
+    policy_question: ['human_handoff'],
+  };
+  const next = followups[intent as Intent] ?? [];
+  return menuChoices(loc, next);
+}
+
 // ------------------------------------------------------------------- route
 
 supportRoutes.post('/assistant', async (c) => {
@@ -911,6 +965,10 @@ supportRoutes.post('/assistant', async (c) => {
     case 'human_handoff':
       reply = handleHandoff(intent, loc);
       break;
+  }
+  if (!reply.choices?.length && !reply.auth_required && !reply.handoff) {
+    const choices = contextualChoices(loc, reply.intent);
+    if (choices.length > 0) reply = { ...reply, choices };
   }
   return c.json({ success: true, reply });
 });
@@ -1002,8 +1060,8 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
 
   // REAL PRO priority snapshot: eligible active PRO, unless an active
   // restriction case gates the priorityService benefit.
-  const [tier, gated] = await Promise.all([getTierStatus(c.env.DB, user.id), activeRestrictionFlags(c.env.DB, user.id)]);
-  const priority = tier.active && tier.tier === 'pro' && !gated.has('priorityService') ? 1 : 0;
+  const tier = await getTierStatus(c.env.DB, user.id);
+  const priority = benefits.priorityService(tier) ? 1 : 0;
 
   const ticketId = newId('tkt');
   const now = new Date().toISOString();
@@ -1191,7 +1249,7 @@ supportRoutes.get('/admin/members', async (c) => {
     conds.push("(email LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\')");
     params.push(like, like, like);
   }
-  if (tier === 'pro' || tier === 'plus') {
+  if (tier === 'pro' || tier === 'prime' || tier === 'plus') {
     conds.push('m_tier = ?');
     params.push(tier);
   } else if (tier === 'free') {
@@ -1279,7 +1337,7 @@ function restrictionPublic(r: RestrictionRow) {
 /**
  * Member detail: subscription payment/term, identity STATE (kyc_cases read —
  * no decrypted fields, no evidence keys), benefit-eligibility context, BNPL
- * debt READ-ONLY (feature disabled — stated honestly), restriction cases.
+ * debt and live BNPL eligibility, plus restriction cases.
  */
 supportRoutes.get('/admin/members/:userId', async (c) => {
   const userId = c.req.param('userId');
@@ -1336,6 +1394,7 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
       for (const f of safeParse<unknown[]>(r.benefit_flags, [])) if (typeof f === 'string') gatedFlags.add(f);
     }
   }
+  const bnpl = await bnplEligibility(db, userId);
 
   return c.json({
     success: true,
@@ -1355,9 +1414,13 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
         note: 'Address selection is a per-order eligibility condition, never a sanction; restrictions gate benefit computation only.',
       },
       approved_addresses: addresses.results,
-      // 4) Debt — BNPL is DISABLED (owner decision pending); read-only ledger.
+      // 4) Debt — the ledger is immutable here; approval lives on the audited
+      // memberships admin endpoint.
       debt: {
-        bnpl_enabled: false,
+        bnpl_enabled: benefits.bnpl(tierStatus),
+        eligible: bnpl.eligible,
+        eligibility_reason: bnpl.reason,
+        available_iqd: bnpl.available_iqd,
         account_state: bnplAccount?.state ?? 'none',
         credit_limit_iqd: Number(bnplAccount?.credit_limit_iqd) || 0,
         outstanding_iqd: Number(bnplSum?.outstanding) || 0,

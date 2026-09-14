@@ -1,3 +1,4 @@
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 /**
  * Product detail (integrated mandate §7).
  *
@@ -55,6 +56,7 @@ import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { captureSupportRefFromSearch } from '../lib/supportRef';
+import { productGalleryForSelection } from '../lib/productImage';
 
 // ------------------------------------------------------------------ strings
 
@@ -92,7 +94,7 @@ const STRINGS = {
     warrantyFee: 'رسوم الضمان', waivedPro: 'معفاة لعضوية PRO', lineTotal: 'إجمالي البنود',
     preorderCodHint: 'الدفع مقدمًا من المحفظة يُبقي هذا السعر؛ الدفع عند الاستلام يُسعَّر كبيع مباشر ويبقى الطلب طلبًا مسبقًا.',
     CART_WARRANTY_CONFLICT: 'هذه الطابعة في سلتك بخيار ضمان ممدد مختلف — غيّره من السلة.',
-    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
     description: 'وصف المنتج', noDescription: 'لا يوجد وصف لهذا المنتج بعد',
     specs: 'المواصفات التقنية', media: 'الصور والفيديو', reviews: 'التقييمات',
     howToUse: 'طريقة الاستخدام', inTheBox: 'محتويات العلبة', setupTitle: 'التركيب والتنصيب',
@@ -146,7 +148,7 @@ const STRINGS = {
     warrantyFee: 'Warranty fee', waivedPro: 'Waived for PRO', lineTotal: 'Line total',
     preorderCodHint: 'Paying in advance from the wallet keeps this price; cash on delivery is priced as a direct sale while the order stays a pre-order.',
     CART_WARRANTY_CONFLICT: 'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
-    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
     description: 'Description', noDescription: 'No description for this product yet',
     specs: 'Specifications', media: 'Photos & video', reviews: 'Reviews',
     howToUse: 'How to use', inTheBox: 'In the box', setupTitle: 'Setup & installation',
@@ -199,7 +201,7 @@ const STRINGS = {
     warrantyFee: 'کرێی گەرەنتی', waivedPro: 'بۆ PRO بەخشراوە', lineTotal: 'کۆی گشتی',
     preorderCodHint: 'پارەدانی پێشوەخت لە جزدانەوە ئەم نرخە دەهێڵێتەوە؛ پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت و داواکارییەکە وەک پێش-داواکاری دەمێنێتەوە.',
     CART_WARRANTY_CONFLICT: 'ئەم پرینتەرە پێشتر لە سەبەتەکەتدایە بە هەڵبژاردەیەکی جیاوازی گەرەنتی درێژکراوە — لە سەبەتەوە بیگۆڕە.',
-    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     description: 'باسکردن', noDescription: 'هێشتا باسکردنێک بۆ ئەم بەرهەمە نییە',
     specs: 'تایبەتمەندییە تەکنیکییەکان', media: 'وێنە و ڤیدیۆ', reviews: 'پێداچوونەوەکان',
     howToUse: 'شێوازی بەکارهێنان', inTheBox: 'ناو سندوقەکە', setupTitle: 'دامەزراندن و ڕێکخستن',
@@ -547,6 +549,8 @@ export default function Product() {
   const { isAuthenticated } = useAuth();
   const { settings: publicSettings } = useWallet();
   const s = STRINGS[lang as Lang];
+  const pageRef = useRef<HTMLDivElement>(null);
+  const pageHeaderRef = useRef<HTMLDivElement>(null);
   // The printer home-delivery note amount — the owner's public setting. null
   // when unset: the note is never shown with an invented figure.
   const printerNoteIqd = (() => {
@@ -569,6 +573,24 @@ export default function Product() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [retryToken, setRetryToken] = useState(0);
+
+  // The purchase column follows the measured page chrome, not a guessed
+  // pixel offset. ResizeObserver catches language wrapping, viewport changes
+  // and accessibility text scaling without causing React rerenders.
+  useEffect(() => {
+    const page = pageRef.current;
+    const header = pageHeaderRef.current;
+    if (!page || !header) return;
+    const update = () => page.style.setProperty('--app-header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    update();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(header);
+    window.addEventListener('resize', update, { passive: true });
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [loading, product?.id]);
 
   // Selection — nothing is guessed: a value is set only when the catalogue
   // leaves exactly one possibility (no randomness) or the user picks it.
@@ -1012,14 +1034,17 @@ export default function Product() {
   if (loading || !product) {
     return (
       <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
-        <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center">
+        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center">
           <button
+            type="button"
             onClick={() => navigate(-1)}
             aria-label={s.back}
             className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
           </button>
+          <MotionCharacterHome busy={loading} />
+          <span aria-hidden="true" />
         </div>
         <div className="pb-10">
           {loading ? (
@@ -1052,22 +1077,12 @@ export default function Product() {
     const rImages = relations?.images ?? [];
     const optionObj = optionId ? (product.options ?? []).find((o) => o.id === optionId) : null;
     const colorObj = colorId ? (product.colors ?? []).find((c) => c.id === colorId) : null;
-    if (!rImages.length && !optionObj?.image && !colorObj?.image) return base;
-    const linkOf = new Map(rImages.map((i) => [i.url, i]));
-    const extras: MediaItem[] = [];
-    if (colorObj?.image && !base.some((m) => m.url === colorObj.image)) extras.push({ url: colorObj.image });
-    if (optionObj?.image && !base.some((m) => m.url === optionObj.image)) extras.push({ url: optionObj.image });
-    const score = (m: MediaItem): number => {
-      const l = linkOf.get(m.url);
-      if (colorId && (l?.color_id === colorId || m.url === colorObj?.image)) return 0;
-      if (optionId && (l?.option_value_id === optionId || m.url === optionObj?.image)) return 1;
-      if (l?.color_id || l?.option_value_id) return 3;
-      return 2;
-    };
-    return [...extras, ...base]
-      .map((m, i) => ({ m, i, s: score(m) }))
-      .sort((a, b) => a.s - b.s || a.i - b.i)
-      .map((x) => x.m);
+    return productGalleryForSelection(base, rImages, {
+      optionId,
+      colorId,
+      optionImage: optionObj?.image,
+      colorImage: colorObj?.image,
+    });
   })();
   const activeMedia = gallery[Math.min(galleryIndex, Math.max(0, gallery.length - 1))];
   const options = product.options ?? [];
@@ -1262,7 +1277,7 @@ export default function Product() {
 
   // ------------------------------------------------------------ sub-renders
   const priceBlock = (
-    <div className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+    <div className="lv-surface p-4">
       {shownPrice ? (
         <>
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -1281,8 +1296,8 @@ export default function Product() {
               {formatIqd(unitPrice!)}
             </span>
             {shownPrice.tier === 'pro' || shownPrice.tier === 'prime' ? (
-              <span className="inline-flex items-center gap-1.5 bg-gold text-black px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide">
-                <Star aria-hidden="true" className="w-3 h-3 fill-black" />
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-gold">
+                <Star aria-hidden="true" className="w-3 h-3 fill-gold" />
                 {shownPrice.tier === 'pro' ? s.proApplied : s.primeApplied}
               </span>
             ) : (
@@ -1326,13 +1341,14 @@ export default function Product() {
         <button
           type="button"
           onClick={() => navigate('/subscription')}
-          className="mt-3 w-full min-h-[44px] flex items-center justify-between gap-2 rounded-xl border border-gold/30 bg-gold/5 px-3 text-start hover:bg-gold/10 transition-colors"
+          className="group mt-3 flex min-h-11 w-full items-center justify-between gap-3 border-s-2 border-gold/55 py-1.5 ps-3 pe-1 text-start text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
-          <span className="text-gold text-[13px] font-bold flex items-center gap-1.5">
-            <Star aria-hidden="true" className="w-3.5 h-3.5" />
-            {s.proPrice}: <span className="tabular-nums">{formatIqd(proPrice)}</span>
+          <span className="text-[12.5px] font-medium flex min-w-0 items-center gap-1.5">
+            <Star aria-hidden="true" className="w-3.5 h-3.5 shrink-0 text-gold" />
+            <span className="truncate">{s.proPrice}</span>
+            <span className="shrink-0 tabular-nums font-bold text-gold">{formatIqd(proPrice)}</span>
           </span>
-          <span className="text-zinc-300 text-[12px] font-bold">{s.subscribe}</span>
+          <span className="shrink-0 text-[11.5px] font-semibold text-text-muted group-hover:text-text-secondary">{s.subscribe}</span>
         </button>
       ) : null}
 
@@ -1381,7 +1397,7 @@ export default function Product() {
           price, from the server's catalog flag and the server's amount. It is
           never added to any figure on this page. */}
       {source === 'catalog' && product.is_printer === true && printerNoteIqd !== null ? (
-        <Note tone="gold" animate={false} icon={<Truck className="w-4 h-4" />} className="mt-3" testId="product-printer-note">
+        <Note tone="zinc" compact animate={false} icon={<Truck className="w-4 h-4" />} className="mt-3" testId="product-printer-note">
           {s.printerNote(formatIqd(printerNoteIqd))}
         </Note>
       ) : null}
@@ -1393,7 +1409,7 @@ export default function Product() {
   const selectionBlocks = (
     <>
       {models ? (
-        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4" data-variant-chooser>
+        <fieldset className="lv-section" data-variant-chooser>
           <legend className="px-1 text-white font-bold text-[14px]">
             {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
             {!modelKey ? <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span> : null}
@@ -1413,29 +1429,27 @@ export default function Product() {
                     // under the previous one.
                     setOptionId('');
                   }}
-                  className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 text-sm font-bold transition-colors ${
-                    selected
-                      ? 'border-gold bg-gold/15 text-gold'
-                      : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                  }`}
+                  className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
                 >
                   {m.options[0]?.image ? (
-                    <img
+                    <SafeImage
                       src={m.options[0].image}
-                      alt=""
-                      aria-hidden="true"
-                      className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
-                      referrerPolicy="no-referrer"
+                      alt={m.label}
+                      aspect="square"
+                      fit="cover"
+                      className="h-10 w-10 shrink-0 rounded-md"
+                      bgClassName="bg-black"
                     />
                   ) : null}
                   <span className="block truncate max-w-[12rem] text-start">{m.label}</span>
+                  <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
               );
             })}
           </div>
 
           {activeModel ? (
-            <div className="mt-4 border-t border-zinc-800/70 pt-3" data-availability-chooser>
+            <div className="mt-4 border-t border-border-subtle pt-3" data-availability-chooser>
               <p className="text-white font-bold text-[13px] mb-2">
                 {tr('طريقة التوفر', 'How to get it', 'چۆنیەتی بەردەستبوون')}
               </p>
@@ -1462,23 +1476,22 @@ export default function Product() {
                         if (next && opt.availability_type === 'direct_sale') setTransportMethod('');
                         if (next) setWantPreorder(opt.availability_type === 'pre_order');
                       }}
-                      className={`min-h-[44px] px-3 rounded-xl border text-start transition-colors ${
-                        selected
-                          ? 'border-gold bg-gold/15 text-gold'
-                          : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                      }`}
+                      className="lv-choice flex min-h-[48px] items-center gap-3 px-3 py-2 text-start"
                     >
-                      <span className="block text-sm font-bold">
-                        {isPre
-                          ? tr('طلب مسبق', 'Pre-order', 'پێش-داواکاری')
-                          : tr('بيع مباشر', 'Direct sale', 'فرۆشتنی ڕاستەوخۆ')}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold">
+                          {isPre
+                            ? tr('طلب مسبق', 'Pre-order', 'پێش-داواکاری')
+                            : tr('بيع مباشر', 'Direct sale', 'فرۆشتنی ڕاستەوخۆ')}
+                        </span>
+                        {isPre && wait ? (
+                          <span className="block text-[11px] font-medium text-warning leading-tight">{wait}</span>
+                        ) : null}
+                        {chip ? (
+                          <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>
+                        ) : null}
                       </span>
-                      {isPre && wait ? (
-                        <span className="block text-[11px] font-medium text-amber-300/90 leading-tight">{wait}</span>
-                      ) : null}
-                      {chip ? (
-                        <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>
-                      ) : null}
+                      <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                     </button>
                   );
                 })}
@@ -1487,7 +1500,7 @@ export default function Product() {
           ) : null}
         </fieldset>
       ) : options.length > 0 ? (
-        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+        <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.options}
             {availability?.selection.option_required && !optionId ? (
@@ -1505,25 +1518,23 @@ export default function Product() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setOptionId(selected ? '' : opt.id)}
-                  className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 text-sm font-bold transition-colors ${
-                    selected
-                      ? 'border-gold bg-gold/15 text-gold'
-                      : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                  }`}
+                  className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {opt.image ? (
-                    <img
+                    <SafeImage
                       src={opt.image}
-                      alt=""
-                      aria-hidden="true"
-                      className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
-                      referrerPolicy="no-referrer"
+                      alt={label}
+                      aspect="square"
+                      fit="cover"
+                      className="h-10 w-10 shrink-0 rounded-md"
+                      bgClassName="bg-black"
                     />
                   ) : null}
                   <span className="min-w-0 text-start">
                     <span className="block truncate max-w-[10rem]">{label}</span>
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
                   </span>
+                  <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
               );
             })}
@@ -1532,7 +1543,7 @@ export default function Product() {
       ) : null}
 
       {colorsForOption.length > 0 ? (
-        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+        <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.colors}
             {availability?.selection.color_required && !colorId ? (
@@ -1550,19 +1561,16 @@ export default function Product() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setColorId(selected ? '' : col.id)}
-                  className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 text-sm font-bold transition-colors ${
-                    selected
-                      ? 'border-gold bg-gold/15 text-gold'
-                      : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                  }`}
+                  className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {col.image ? (
-                    <img
+                    <SafeImage
                       src={col.image}
-                      alt=""
-                      aria-hidden="true"
-                      className="w-7 h-7 rounded-md object-cover border border-zinc-700 shrink-0"
-                      referrerPolicy="no-referrer"
+                      alt={label}
+                      aspect="square"
+                      fit="cover"
+                      className="h-9 w-9 shrink-0 rounded-md"
+                      bgClassName="bg-black"
                     />
                   ) : (
                     <span
@@ -1575,6 +1583,7 @@ export default function Product() {
                     <span className="block truncate max-w-[9rem]">{label}</span>
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
                   </span>
+                  <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
               );
             })}
@@ -1583,7 +1592,7 @@ export default function Product() {
       ) : null}
 
       {bothUsable ? (
-        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+        <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
             {s.fulfilment}
@@ -1596,11 +1605,7 @@ export default function Product() {
                 setWantPreorder(false);
                 setTransportMethod('');
               }}
-              className={`min-h-[44px] px-3 py-2.5 rounded-xl border flex items-start text-sm text-start transition-colors ${
-                !wantPreorder
-                  ? 'border-gold bg-gold/15 text-gold font-bold'
-                  : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-              }`}
+              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start"
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{s.directSale}</span>
@@ -1609,6 +1614,7 @@ export default function Product() {
                   <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{formatIqd(directFinal)}</span>
                 ) : null}
               </span>
+              <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
             </button>
             <button
               type="button"
@@ -1618,11 +1624,7 @@ export default function Product() {
                 const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
                 if (usable.length === 1) setTransportMethod(usable[0].method);
               }}
-              className={`min-h-[44px] px-3 py-2.5 rounded-xl border flex items-start text-sm text-start transition-colors ${
-                wantPreorder
-                  ? 'border-gold bg-gold/15 text-gold font-bold'
-                  : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-              }`}
+              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start"
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{s.preorderMode}</span>
@@ -1634,6 +1636,7 @@ export default function Product() {
                   </span>
                 ) : null}
               </span>
+              <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
             </button>
           </div>
           {/* The pre-order price above is the PREPAID one. Paying cash on
@@ -1649,7 +1652,7 @@ export default function Product() {
       ) : null}
 
       {showTransports ? (
-        <fieldset className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+        <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
             {s.transport}
@@ -1665,15 +1668,12 @@ export default function Product() {
                   disabled={!t.configured}
                   aria-pressed={selected}
                   onClick={() => setTransportMethod(selected ? '' : t.method)}
-                  className={`min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-sm transition-colors ${
-                    !t.configured
-                      ? 'border-zinc-800 bg-zinc-900/60 text-zinc-500 cursor-not-allowed'
-                      : selected
-                        ? 'border-gold bg-gold/15 text-gold font-bold'
-                        : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                  }`}
+                  className="lv-choice flex min-h-[48px] items-center justify-between gap-3 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  <span>{transportLabel(s, t.method)}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
+                    <span>{transportLabel(s, t.method)}</span>
+                  </span>
                   {/* The FINAL unit price for this journey — never "+X". */}
                   <span className="tabular-nums text-[13px] font-bold">
                     {final !== null ? formatIqd(final) : s.transportUnset}
@@ -1716,18 +1716,18 @@ export default function Product() {
           not mean unanswered. The gold is spent on the one thing that is
           actually a decision: the plan that is selected.
         */
-        <fieldset className="min-w-0 rounded-2xl border border-zinc-800/70 bg-zinc-900/40 overflow-hidden" data-extended-warranty>
+        <fieldset className="lv-surface min-w-0 overflow-hidden" data-extended-warranty>
           <button
             type="button"
             onClick={() => setWarrantyOpen((o) => !o)}
             aria-expanded={warrantyOpen}
-            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-start hover:bg-white/[0.03] transition-colors [touch-action:manipulation]"
+            className="w-full min-h-12 px-3.5 py-2 flex items-center justify-between gap-3 text-start hover:bg-white/[0.03] transition-colors [touch-action:manipulation]"
           >
             <span className="min-w-0 flex items-center gap-2">
-              <ShieldCheck aria-hidden="true" className="w-4 h-4 text-gold shrink-0" />
+              <ShieldCheck aria-hidden="true" className="w-4 h-4 text-text-muted shrink-0" />
               <span className="min-w-0">
-                <span className="block text-white font-bold text-[14px]">{s.warranty}</span>
-                <span className={`block text-[12px] truncate ${warrantyPlanId ? 'text-gold' : 'text-zinc-500'}`}>
+                <span className="block text-white font-semibold text-[13.5px]">{s.warranty}</span>
+                <span className={`block text-[11.5px] truncate ${warrantyPlanId ? 'text-text-secondary' : 'text-text-muted'}`}>
                   {warrantySummary}
                 </span>
               </span>
@@ -1748,13 +1748,10 @@ export default function Product() {
                   role="radio"
                   aria-checked={!warrantyPlanId}
                   onClick={() => setWarrantyPlanId('')}
-                  className={`min-h-[44px] px-3 rounded-xl border text-sm text-start transition-colors press-scale ${
-                    !warrantyPlanId
-                      ? 'border-gold/60 bg-gold/10 text-gold font-bold'
-                      : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-600'
-                  }`}
+                  className="lv-choice flex items-center justify-between gap-3 px-3 text-sm text-start press-scale"
                 >
-                  {s.noWarranty}
+                  <span>{s.noWarranty}</span>
+                  <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
                 {warrantyPlans.map((w) => {
                   const selected = warrantyPlanId === w.id;
@@ -1771,11 +1768,7 @@ export default function Product() {
                       aria-checked={selected}
                       data-warranty-plan={w.id}
                       onClick={() => setWarrantyPlanId(selected ? '' : w.id)}
-                      className={`min-h-[44px] px-3 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-start transition-colors press-scale ${
-                        selected
-                          ? 'border-gold/60 bg-gold/10 text-gold font-bold'
-                          : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-600'
-                      }`}
+                      className="lv-choice flex min-h-[48px] flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-sm text-start press-scale"
                     >
                       {/* `flex-1 min-w-0` and NO nowrap: the label is what
                           gives way when the row runs out of room, and it wraps
@@ -1784,7 +1777,7 @@ export default function Product() {
                         <span className="block">
                           <span dir="ltr" className="tabular-nums">{headline}</span>
                           {total !== null ? (
-                            <span className={`ms-1.5 text-[12px] font-normal ${selected ? 'text-gold/80' : 'text-zinc-400'}`}>
+                            <span className="ms-1.5 text-[12px] font-normal text-text-secondary">
                               {/* The arrow follows the reading direction: from the
                                   extension to the total in both scripts. */}
                               {dir === 'rtl' ? '←' : '→'} {s.extendedTotal(monthsLabel(total, lang))}
@@ -1797,8 +1790,9 @@ export default function Product() {
                           </span>
                         ) : null}
                       </span>
-                      <span className="tabular-nums text-[13px] shrink-0 ms-auto" aria-busy={quoteLoading || undefined}>
-                        +{formatIqd(w.fee_iqd)}
+                      <span className="ms-auto flex shrink-0 items-center gap-2 tabular-nums text-[13px]" aria-busy={quoteLoading || undefined}>
+                        <span>+{formatIqd(w.fee_iqd)}</span>
+                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </span>
                     </button>
                   );
@@ -1822,13 +1816,13 @@ export default function Product() {
   const qtyControl = (
     <div className="flex items-center justify-between gap-3">
       <span className="text-zinc-300 text-sm font-bold">{s.qty}</span>
-      <div className="flex items-center gap-1 bg-zinc-800/60 border border-zinc-700 rounded-xl p-1">
+      <div className="flex items-center gap-1 rounded-lg bg-surface-raised p-1">
         <button
           type="button"
           aria-label={s.decrease}
           onClick={() => setQty((q) => Math.max(1, q - 1))}
           disabled={qty <= 1}
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-zinc-200 hover:bg-zinc-700 disabled:opacity-40 transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.06] disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Minus aria-hidden="true" className="w-4 h-4" />
         </button>
@@ -1838,7 +1832,7 @@ export default function Product() {
           aria-label={s.increase}
           onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
           disabled={qty >= maxQty}
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-zinc-200 hover:bg-zinc-700 disabled:opacity-40 transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.06] disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Plus aria-hidden="true" className="w-4 h-4" />
         </button>
@@ -1858,13 +1852,13 @@ export default function Product() {
    */
   const barStepper =
     maxQty > 1 ? (
-      <div className="flex items-center rounded-xl border border-zinc-800 bg-zinc-900/70 shrink-0">
+      <div className="flex shrink-0 items-center rounded-lg bg-surface">
         <button
           type="button"
           aria-label={s.decrease}
           onClick={() => setQty((q) => Math.max(1, q - 1))}
           disabled={qty <= 1}
-          className="w-11 h-11 flex items-center justify-center rounded-s-xl text-zinc-200 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+          className="w-11 h-11 flex items-center justify-center rounded-s-lg text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Minus aria-hidden="true" className="w-4 h-4" />
         </button>
@@ -1876,7 +1870,7 @@ export default function Product() {
           aria-label={s.increase}
           onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
           disabled={qty >= maxQty}
-          className="w-11 h-11 flex items-center justify-center rounded-e-xl text-zinc-200 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+          className="w-11 h-11 flex items-center justify-center rounded-e-lg text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Plus aria-hidden="true" className="w-4 h-4" />
         </button>
@@ -1886,24 +1880,24 @@ export default function Product() {
   const statusMessages = (
     <div className="space-y-2" aria-live="polite">
       {mode === 'unavailable' && availability?.reason ? (
-        <p className="text-red-300 text-[13px] bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+        <p className="lv-alert lv-alert-danger text-red-200 text-[13px]">
           {reasonText(s, availability.reason)}
         </p>
       ) : null}
       {source === 'community' ? (
-        <p className="text-amber-200 text-[13px] bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+        <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
           {s.COMMUNITY_LISTING_NOT_SELLABLE}
         </p>
       ) : null}
       {mode !== 'unavailable' && blockingCodes.length > 0
         ? blockingCodes.map((code) => (
-            <p key={code} className="text-amber-200 text-[13px] bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+            <p key={code} className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
               {reasonText(s, code)}
             </p>
           ))
         : null}
       {availability && !availability.qty_ok && mode !== 'unavailable' ? (
-        <p className="text-amber-200 text-[13px] bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+        <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
           {s.qtyCapped.replace('{n}', String(availability.stock.max_qty))}
         </p>
       ) : null}
@@ -1913,12 +1907,12 @@ export default function Product() {
         </div>
       ) : null}
       {actionError ? (
-        <p role="alert" className="text-red-300 text-[13px] bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+        <p role="alert" className="lv-alert lv-alert-danger text-red-200 text-[13px]">
           {actionError}
         </p>
       ) : null}
       {notice ? (
-        <div className="text-emerald-300 text-[13px] bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-3 py-2 flex items-center justify-between gap-3">
+        <div className="lv-alert lv-alert-success flex items-center justify-between gap-3 text-[13px] text-emerald-200">
           <span className="flex items-center gap-2">
             <Check aria-hidden="true" className="w-4 h-4" />
             {notice}
@@ -1951,7 +1945,7 @@ export default function Product() {
       data-testid="product-cta"
       onClick={handleAddToCart}
       disabled={addingToCart || (isAuthenticated && !canBuy)}
-      className="w-full min-h-[52px] rounded-2xl bg-gold text-black font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,transform] duration-150 active:scale-[0.985] [touch-action:manipulation]"
+      className="lv-button lv-button-primary w-full min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
     >
       {justAdded ? (
         <Check aria-hidden="true" className="w-5 h-5" />
@@ -1964,19 +1958,22 @@ export default function Product() {
 
   // ------------------------------------------------------------------ render
   return (
-    <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
+    <div ref={pageRef} className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
       {/* Sticky page chrome inside the app scroll container — never a fixed
           overlay that could land in the middle of the content. */}
-      <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
+      <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           aria-label={s.back}
           className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
         >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
         </button>
+        <MotionCharacterHome />
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={handleShare}
             aria-label={s.share}
             className="w-11 h-11 rounded-full bg-zinc-900/60 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -1984,6 +1981,7 @@ export default function Product() {
             <Share2 aria-hidden="true" className="w-5 h-5" />
           </button>
           <button
+            type="button"
             onClick={toggleFavorite}
             disabled={favBusy || source !== 'catalog'}
             aria-label={favorite ? s.unfavorite : s.favorite}
@@ -2000,7 +1998,7 @@ export default function Product() {
       {/* Bottom clearance equals the phone purchase bar (its height + safe
           area). BottomNav does not render on /product/*, so this is the only
           reserved space and nothing is covered. */}
-      <div className="mx-auto w-full max-w-[1240px] px-4 pt-2 pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
+      <div className="mx-auto w-full max-w-[1240px] px-4 pt-2 pb-[calc(156px+env(safe-area-inset-bottom))] sm:pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
         {/*
           THE LEFT COLUMN NEEDED A CEILING. With a single `minmax(0,1fr)` track
           against a fixed 400px panel inside a 1240px shell, the content side
@@ -2055,7 +2053,7 @@ export default function Product() {
                       aria-label={s.imageOf.replace('{n}', String(i + 1)).replace('{total}', String(gallery.length))}
                       onClick={() => setGalleryIndex(i)}
                       className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border transition-colors ${
-                        i === galleryIndex ? 'border-gold' : 'border-zinc-800 hover:border-zinc-600'
+                        i === galleryIndex ? 'border-white/30 bg-surface-selected' : 'border-border-subtle hover:border-zinc-600'
                       }`}
                     >
                       <SafeImage
@@ -2328,10 +2326,13 @@ export default function Product() {
           </div>
 
           {/* ------------------------------------------------- right column */}
-          <aside className="hidden lg:block lg:sticky lg:top-4 space-y-3">
+          <aside
+            className="hidden lg:block lg:sticky space-y-3"
+            style={{ top: 'calc(var(--app-header-height, 68px) + 0.75rem)' }}
+          >
             {priceBlock}
             {selectionBlocks}
-            <div className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4 space-y-3">
+            <div className="lv-surface space-y-3 p-4">
               {qtyControl}
               {buyButton}
               <p className="text-[11px] text-zinc-500 leading-relaxed">{s.serverChecks}</p>
@@ -2342,7 +2343,7 @@ export default function Product() {
       </div>
 
       {/* ------------------------------------------------ phone purchase bar */}
-      <div data-testid="product-buybar" className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-black/95 backdrop-blur-xl border-t border-zinc-800 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div data-testid="product-buybar" className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_-12px_36px_-24px_rgb(0_0_0/.9)]">
         {/*
           THE CONFIRMATION LIVES WHERE THE TAP HAPPENED. On a phone the CTA is
           this fixed bar while the status panel is hundreds of pixels above the
@@ -2352,7 +2353,7 @@ export default function Product() {
         {notice ? (
           <div
             role="status"
-            className="mx-auto w-full max-w-[640px] mb-2 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[13px] text-emerald-300"
+            className="lv-alert lv-alert-success mx-auto mb-2 flex w-full max-w-[640px] items-center justify-between gap-3 text-[13px] text-emerald-200"
           >
             <span className="flex items-center gap-2 min-w-0">
               <Check aria-hidden="true" className="w-4 h-4 shrink-0" />
@@ -2363,14 +2364,14 @@ export default function Product() {
             </Link>
           </div>
         ) : null}
-        <div className="mx-auto w-full max-w-[640px] flex items-center gap-2.5">
+        <div className="mx-auto grid w-full max-w-[640px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:gap-2.5">
           {/*
             A FIXED FOOTPRINT. This cell used to be auto-sized, so its width
             followed whichever string it held — a number, «يجري تحديث السعر…»,
             or an em dash — and the `flex-1` CTA beside it visibly grew and
             shrank on every quote. Reserving the space keeps the bar still.
           */}
-          <div className="min-w-0 basis-[7.5rem] shrink-0">
+          <div className="min-w-0 sm:basis-[7.5rem] sm:shrink-0">
             <div className="text-[11px] text-zinc-500">{s.price}</div>
             <div
               aria-busy={priceIsPending || undefined}
@@ -2382,7 +2383,7 @@ export default function Product() {
             </div>
           </div>
           {barStepper}
-          <div className="flex-1 min-w-0">{buyButton}</div>
+          <div className="col-span-2 min-w-0 sm:flex-1">{buyButton}</div>
         </div>
       </div>
 

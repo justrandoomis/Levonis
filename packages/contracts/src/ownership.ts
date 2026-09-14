@@ -66,7 +66,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts']),
-  ...owned('chat', ['chats', 'chat_participants', 'chat_messages']),
+  ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',
     'notify_deliveries',
@@ -98,7 +98,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
-  ...owned('files', ['file_objects']),
+  ...owned('files', ['file_objects', 'file_migration_log']),
 ];
 
 export const TABLE_OWNER: Readonly<Record<string, Owner>> = Object.fromEntries(TABLE_OWNER_ENTRIES);

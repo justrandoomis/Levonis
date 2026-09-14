@@ -5,6 +5,7 @@ import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import OfferBadge from '../ui/OfferBadge';
 import Countdown from '../ui/Countdown';
+import { productPrimaryImage } from '../../lib/productImage';
 
 /**
  * The home product card — presentation only; every price shown here is the
@@ -20,8 +21,7 @@ import Countdown from '../ui/Countdown';
  * keep one height and the price row sits on one line across the shelf.
  */
 export default function ProductCard({ p, widthClass = 'w-[160px]' }: { p: ApiProduct; widthClass?: string }) {
-  const images = Array.isArray(p.images) ? p.images : [];
-  const firstImage = images[0] || '';
+  const firstImage = productPrimaryImage(p);
   const name = p.name;
 
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
@@ -31,9 +31,9 @@ export default function ProductCard({ p, widthClass = 'w-[160px]' }: { p: ApiPro
   return (
     <Link
       to={`/product/${p.slug || p.id}`}
-      className={`${widthClass} shrink-0 rounded-xl overflow-hidden flex flex-col group bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-600 transition-colors min-w-0`}
+      className={`${widthClass} shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
     >
-      <div className="relative aspect-square overflow-hidden bg-zinc-950">
+      <div className="relative aspect-square overflow-hidden bg-black">
         <SafeImage
           src={firstImage}
           alt={name}

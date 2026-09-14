@@ -79,6 +79,7 @@ export default function Profile() {
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [orderCounts, setOrderCounts] = useState<Record<string, number>>({});
   const [latestOrder, setLatestOrder] = useState<ApiOrder | null>(null);
+  const [followedStoreCount, setFollowedStoreCount] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('suggested');
   const [scrolled, setScrolled] = useState(false);
   const [mine, setMine] = useState<MembershipMine | null>(null);
@@ -149,6 +150,7 @@ export default function Profile() {
       setOrderCounts({});
       setLatestOrder(null);
       setFavorites([]);
+      setFollowedStoreCount(null);
       setFavoritesLoaded(true);
       return;
     }
@@ -166,6 +168,10 @@ export default function Profile() {
       .then((res) => setFavorites(res.favorites || []))
       .catch(() => setFavorites([]))
       .finally(() => setFavoritesLoaded(true));
+    api
+      .get<{ merchants: unknown[] }>('/api/community/followed')
+      .then((res) => setFollowedStoreCount(Array.isArray(res.merchants) ? res.merchants.length : 0))
+      .catch(() => setFollowedStoreCount(null));
   }, [isAuthenticated, user?.id]);
 
   // Real membership + referral state from the memberships ledger.
@@ -177,8 +183,7 @@ export default function Profile() {
     api
       .get<MembershipMine>('/api/memberships/mine')
       .then((res) => setMine(res))
-      .catch(() => setMine(null))
-      .catch(() => {});
+      .catch(() => setMine(null));
   }, [isAuthenticated, user?.id]);
 
   // Membership from the ledger (authoritative once loaded); the legacy
@@ -294,8 +299,9 @@ export default function Profile() {
   return (
     <div className="w-full bg-[#f2f2f2] dark:bg-[#111] min-h-screen font-sans pb-[80px] text-[#333] dark:text-[#ddd] relative">
 
-      {/* Top Background Gradient */}
-      <div className="absolute top-0 left-0 right-0 h-[240px] bg-gradient-to-b from-[#ffe3cc] via-[#ffebd9] to-[#f2f2f2] dark:from-[#2a1a10] dark:via-[#1a0f08] dark:to-[#111] z-0 pointer-events-none"></div>
+      {/* A restrained warm wash keeps Levonis' identity without competing
+          with the actual profile information. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[180px] bg-gradient-to-b from-[#f2e6d7] to-transparent dark:from-[#1c1711] dark:to-transparent" />
 
       {/* Sticky Header */}
       <div className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-300 flex items-center justify-between ${scrolled ? 'bg-[#ffe3cc] dark:bg-[#2a1a10] shadow-md py-1 px-3 opacity-100 pointer-events-auto' : 'bg-transparent py-3 px-3 opacity-0 pointer-events-none'}`}>
@@ -307,65 +313,67 @@ export default function Profile() {
                <UserRound className="w-4 h-4 text-zinc-500" aria-hidden="true" />
              )}
            </div>
-           <span className="font-bold text-[13px] truncate max-w-[100px] text-black dark:text-white">{displayName}</span>
+           <span dir="auto" title={displayName} className="max-w-[min(48vw,220px)] truncate text-start text-[13px] font-semibold text-black dark:text-white">{displayName}</span>
         </div>
         <ProfileIconGrid items={iconActions} compact />
       </div>
 
       <div className="max-w-3xl mx-auto px-3 relative z-10 pt-4">
 
-        {/* User Info Header (In Flow) */}
-        <div className="flex items-start justify-between mb-4 gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-[64px] h-[64px] rounded-full bg-[#fce5a1] border border-white/50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative">
+        {/* Identity keeps the full first row; shortcuts follow below instead
+            of squeezing mixed-direction usernames into only their suffix. */}
+        <section data-profile-header className="mb-4 flex min-w-0 flex-col gap-2">
+          <div className="flex w-full min-w-0 items-center gap-3">
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e7d9b2] ring-1 ring-black/5 dark:bg-[#25271e] dark:ring-white/10">
               {avatarUrl ? (
                 <img referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
-                <UserRound className="w-8 h-8 text-zinc-500" aria-hidden="true" />
+                <UserRound className="h-7 w-7 text-zinc-500" aria-hidden="true" />
               )}
             </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-0.5 mb-1.5">
-                <h1 className="font-bold text-[17px] leading-tight text-black dark:text-white truncate">{displayName}</h1>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-0 items-center gap-0.5">
+                <h1 dir="auto" title={displayName} data-profile-username className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-start text-[17px] font-semibold leading-6 text-black dark:text-white">{displayName}</h1>
                 {isAuthenticated && (
                   <button
                     type="button"
                     onClick={() => setQrOpen(true)}
                     aria-label={loc('عرض رمز QR للدعوة', 'Show invite QR code', 'پیشاندانی کۆدی QR بانگهێشت')}
-                    className="w-11 h-11 -my-2 flex items-center justify-center rounded-full text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform shrink-0"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-zinc-600 hover:bg-black/5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:text-zinc-300 dark:hover:bg-white/[0.06]"
                   >
-                    <QrCode className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+                    <QrCode className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5 mt-1">
+              <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden">
                 {!isAuthenticated ? (
                   /* Honest guest badge — never a member chip for a guest. */
-                  <span className="bg-white/50 dark:bg-black/30 text-[10px] px-1.5 py-0.5 rounded-[4px] font-bold shadow-sm text-black dark:text-white">
+                  <span className="rounded-sm bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold text-black dark:bg-white/[0.07] dark:text-white">
                     {loc('زائر', 'Guest', 'میوان')}
                   </span>
                 ) : (
                   <>
                     {memTier !== 'free' ? (
-                      <button type="button" onClick={() => navigate('/subscription')} className="bg-[#ebd197] text-[#5c3e03] text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-1 font-bold shadow-sm hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity">
+                      <button type="button" onClick={() => navigate('/subscription')} className="flex h-6 min-w-0 shrink-0 items-center gap-1 rounded-sm bg-gold/10 px-1.5 text-[10px] font-semibold text-gold hover:bg-gold/15 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                         <span>{loc(`عضو ${tierLabel(memTier)}`, `${tierLabel(memTier)} Member`, `ئەندامی ${tierLabel(memTier)}`)}</span>
                         {memExpiry && (
-                          <span className="font-medium opacity-80">· {loc('حتى', 'until', 'تا')} {fmtDate(memExpiry)}</span>
+                          <span className="hidden font-normal opacity-75 sm:inline">· {loc('حتى', 'until', 'تا')} {fmtDate(memExpiry)}</span>
                         )}
                       </button>
                     ) : (
-                      <button type="button" onClick={() => navigate('/subscription')} className="bg-white/50 dark:bg-black/30 text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm text-black dark:text-white hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity">
+                      <button type="button" onClick={() => navigate('/subscription')} className="flex h-6 shrink-0 items-center rounded-sm bg-black/5 px-1.5 text-[10px] font-semibold text-black hover:bg-black/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:bg-white/[0.07] dark:text-white dark:hover:bg-white/10">
                         <span>{loc('عضو', 'Member', 'ئەندام')}</span>
                       </button>
                     )}
                     {memPendingLaunch && (
-                      <button type="button" onClick={() => navigate('/subscription')} className="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-0.5 font-bold shadow-sm hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity">
+                      <button type="button" onClick={() => navigate('/subscription')} className="hidden h-6 items-center rounded-sm bg-sky-500/10 px-1.5 text-[10px] font-semibold text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:text-sky-300 sm:flex">
                         <span>{tierLabel(memPendingLaunch.tier) + ' — ' + t('pendingLaunch')}</span>
                       </button>
                     )}
-                    <button type="button" onClick={() => navigate('/followed-stores')} className="bg-white/50 dark:bg-black/30 backdrop-blur-sm text-[10px] px-1.5 py-1 rounded-[4px] flex items-center gap-1 font-medium shadow-sm text-black dark:text-white hover:bg-white/70 dark:hover:bg-black/50 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors">
-                      <Store className="w-[10px] h-[10px]" strokeWidth={2} aria-hidden="true" />
-                      {loc('المتاجر التي يتابعها', 'Followed Stores', 'فرۆشگا شوێنکەوتووەکان')}
+                    <button type="button" onClick={() => navigate('/followed-stores')} className="flex h-6 min-w-0 items-center gap-1 rounded-sm px-1 text-[10px] font-medium text-zinc-600 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:text-zinc-400 dark:hover:bg-white/[0.06]">
+                      <Store className="h-3 w-3 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                      {followedStoreCount !== null && <span className="shrink-0 font-semibold tabular-nums text-zinc-800 dark:text-zinc-200">{followedStoreCount}</span>}
+                      <span className="truncate whitespace-nowrap">{loc('متاجر أتابعها', 'Following', 'شوێنکەوتن')}</span>
                     </button>
                   </>
                 )}
@@ -373,11 +381,10 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Utility icons — aligned grid (fixed icon box + clamped 2-line labels) */}
-          <div className={`mt-1 transition-opacity duration-300 shrink-0 ${scrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <div className={`w-full border-t border-black/[0.06] pt-1 transition-opacity duration-300 dark:border-white/[0.07] ${scrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             <ProfileIconGrid items={iconActions} />
           </div>
-        </div>
+        </section>
 
         {/* Guest: honest signed-out card, no member fabrications below. */}
         {!isAuthenticated && <GuestCard />}

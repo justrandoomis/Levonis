@@ -194,7 +194,7 @@ export const translations = {
     alreadyRecorded: "This purchase was already recorded",
     pausedBenefits: "Paused benefits",
     pausedBenefitsNote: "An account review has paused these benefits. Your membership itself is unchanged.",
-    primeBenefits: "PRIME benefits",
+    primeBenefits: "PREMIUM benefits",
     expired: "Expired",
 
     // LEVO Studio entry (plain navigation to the standalone subdomain —
@@ -414,7 +414,7 @@ export const translations = {
     alreadyRecorded: "هذا الشراء مسجّل مسبقًا",
     pausedBenefits: "مزايا موقوفة مؤقتًا",
     pausedBenefitsNote: "أوقفت مراجعةٌ للحساب هذه المزايا مؤقتًا. اشتراكك نفسه لم يتغير.",
-    primeBenefits: "مزايا PRIME",
+    primeBenefits: "مزايا PREMIUM",
     expired: "منتهية",
 
     // مدخل LEVO Studio (تنقّل عادي إلى النطاق الفرعي المستقل —
@@ -629,7 +629,7 @@ export const translations = {
     alreadyRecorded: "ئەم کڕینە پێشتر تۆمارکراوە",
     pausedBenefits: "سوودە ڕاگیراوەکان",
     pausedBenefitsNote: "پێداچوونەوەی هەژمار ئەم سوودانە ڕاگرتووە. ئەندامێتیەکەت خۆی نەگۆڕاوە.",
-    primeBenefits: "سوودەکانی PRIME",
+    primeBenefits: "سوودەکانی PREMIUM",
     expired: "بەسەرچووە",
 
     // دەروازەی LEVO Studio (گواستنەوەیەکی ئاسایی بۆ ساب-دۆمەینی سەربەخۆ —

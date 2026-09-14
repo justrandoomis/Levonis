@@ -90,7 +90,7 @@ export function listNotifications(opts: ListNotificationsOptions = {}): Promise<
  * one call that gets polled, and every call site wants the integer.
  */
 export async function unreadCount(): Promise<number> {
-  const r = await api.get<{ success: true; unread: number }>('/api/notifications/unread-count');
+  const r = await api.get<{ success: true; unread: number }>('/api/notifications/unread-count', { mascot: 'silent' });
   return r.unread;
 }
 

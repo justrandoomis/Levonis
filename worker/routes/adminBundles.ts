@@ -47,6 +47,7 @@ import { audit, auditStatements } from '../lib/audit';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import {
   parseProductRow,
+  primaryMedia,
   projectAdmin,
   validateProductDoc,
   type ProductDoc,
@@ -272,7 +273,7 @@ adminBundlesRoutes.get('/', async (c) => {
       name: doc.name_en,
       name_ar: doc.name_ar,
       name_ku: doc.name_ckb,
-      image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
+      image: primaryMedia(doc.media)?.url ?? '',
       display_order: doc.display_order,
       is_featured: doc.is_featured,
       price_iqd: doc.price_iqd,
@@ -819,4 +820,3 @@ adminBundlesRoutes.delete('/:productId', async (c) => {
   await audit(c.env.DB, admin.id, 'bundle.archive', id, { deleted: true, slug: loaded.doc.slug });
   return c.json({ success: true, archived: false, deleted: true });
 });
-

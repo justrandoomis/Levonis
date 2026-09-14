@@ -48,11 +48,65 @@
  * hide the ones that do.
  */
 
-import React, { useCallback, useEffect, useId, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, type PanInfo } from 'motion/react';
 import { useLanguage } from '../../LanguageContext';
 import { project, useMotion } from '../../lib/motion';
+
+/** One documented stacking contract for the app chrome and every floating UI. */
+export const UI_LAYERS = Object.freeze({
+  header: 100,
+  bottomNav: 120,
+  popover: 160,
+  overlay: 200,
+});
+
+/**
+ * Old callers passed local z-values such as 50/60. Those values made sense
+ * inside their page but sat below the global bottom navigation. Preserve their
+ * relative ordering while lifting every real overlay above app chrome.
+ */
+export function overlayLayer(z: number): number {
+  return z < UI_LAYERS.overlay ? UI_LAYERS.overlay + Math.max(0, z) : z;
+}
+
+let modalLockCount = 0;
+let modalLockState:
+  | {
+      bodyOverflow: string;
+      main: HTMLElement | null;
+      mainOverflow: string;
+      alreadyMarked: boolean;
+    }
+  | undefined;
+
+/** The app scrolls in #main-scroll-container, not body. Lock both, once, and
+ * keep the lock alive when one modal opens over another. */
+function acquireModalLock(): () => void {
+  if (modalLockCount === 0) {
+    const main = document.getElementById('main-scroll-container');
+    modalLockState = {
+      bodyOverflow: document.body.style.overflow,
+      main,
+      mainOverflow: main?.style.overflow ?? '',
+      alreadyMarked: document.documentElement.dataset.overlayOpen === 'true',
+    };
+    document.body.style.overflow = 'hidden';
+    if (main) main.style.overflow = 'hidden';
+    document.documentElement.dataset.overlayOpen = 'true';
+  }
+  modalLockCount += 1;
+
+  return () => {
+    modalLockCount = Math.max(0, modalLockCount - 1);
+    if (modalLockCount !== 0 || !modalLockState) return;
+    document.body.style.overflow = modalLockState.bodyOverflow;
+    if (modalLockState.main) modalLockState.main.style.overflow = modalLockState.mainOverflow;
+    if (!modalLockState.alreadyMarked) delete document.documentElement.dataset.overlayOpen;
+    modalLockState = undefined;
+  };
+}
 
 // ------------------------------------------------------------------ scrim
 
@@ -205,11 +259,7 @@ export function Overlay({
   // the flow alone, which is the whole reason it is a different mode.
   useEffect(() => {
     if (!open || mode !== 'modal') return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return acquireModalLock();
   }, [open, mode]);
 
   useEffect(() => {
@@ -225,7 +275,7 @@ export function Overlay({
       {open && (
         <div
           className={`fixed inset-0 flex ${PLACEMENT[placement]} ${className}`}
-          style={{ zIndex: z }}
+          style={{ zIndex: overlayLayer(z) }}
           data-overlay={testId ?? true}
           data-overlay-mode={mode}
         >
@@ -249,8 +299,8 @@ export function Overlay({
             transition={m.spring(placement === 'bottom' ? 'sheet' : 'ui')}
             style={{ transformOrigin: originRef.current, outline: 'none' }}
             {...panelMotionRest}
-            className={`relative min-w-0 ${solid ? 'shadow-2xl' : 'material material-thick border border-white/10'} ${
-              placement === 'bottom' ? 'rounded-t-3xl sm:rounded-3xl' : 'rounded-3xl'
+            className={`relative min-w-0 ${solid ? 'shadow-2xl' : 'bg-surface-raised border border-border-subtle shadow-2xl'} ${
+              placement === 'bottom' ? 'rounded-t-xl sm:rounded-xl' : 'rounded-xl'
             } ${panelClassName}`}
           >
             {children}
@@ -321,7 +371,7 @@ export function Sheet({ open, onClose, children, height, panelClassName = '', ..
       open={open}
       onClose={onClose}
       placement="bottom"
-      panelClassName={panelClassName}
+      panelClassName={`pb-[env(safe-area-inset-bottom)] sm:pb-0 ${panelClassName}`}
       panelMotion={panelMotion}
       {...rest}
     >
@@ -360,9 +410,10 @@ export interface AnchoredProps {
  * button. Scaling from the trigger's edge is what makes it read as the button's
  * own content unfolding.
  *
- * It stays in the caller's DOM (no portal) so it inherits the trigger's
- * stacking and RTL context — a menu is part of its control, not a separate
- * window.
+ * It is positioned from the trigger but portalled to body. That is the only
+ * reliable way to escape header transforms, search stacking contexts and
+ * overflow clipping. Direction is copied explicitly, so portal placement does
+ * not trade away RTL correctness.
  */
 export function Anchored({
   open,
@@ -372,36 +423,101 @@ export function Anchored({
   label,
   className = '',
   align = 'end',
-  z = 50,
+  z = UI_LAYERS.popover,
   testId,
 }: AnchoredProps) {
   const m = useMotion();
   const id = useId();
+  const { dir } = useLanguage();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+    origin: string;
+  } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    const trigger = anchor.current;
+    if (!trigger) return;
+    const a = trigger.getBoundingClientRect();
+    const panel = panelRef.current;
+    const width = panel?.offsetWidth || 160;
+    const height = panel?.offsetHeight || 160;
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const gap = 8;
+    const edge = 8;
+
+    // Logical alignment, expressed in physical viewport coordinates only at
+    // this final boundary.
+    const rawLeft =
+      align === 'end'
+        ? dir === 'rtl'
+          ? a.left
+          : a.right - width
+        : dir === 'rtl'
+          ? a.right - width
+          : a.left;
+    const left = Math.min(Math.max(edge, rawLeft), Math.max(edge, viewportWidth - width - edge));
+
+    const roomBelow = viewportHeight - a.bottom;
+    const opensAbove = roomBelow < height + gap + edge && a.top > roomBelow;
+    const rawTop = opensAbove ? a.top - height - gap : a.bottom + gap;
+    const top = Math.min(Math.max(edge, rawTop), Math.max(edge, viewportHeight - height - edge));
+    const anchorX = Math.min(Math.max(a.left + a.width / 2 - left, 12), Math.max(12, width - 12));
+
+    setPosition({ top, left, origin: `${Math.round(anchorX)}px ${opensAbove ? '100%' : '0%'}` });
+  }, [align, anchor, dir]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+    updatePosition();
+    const frame = requestAnimationFrame(updatePosition);
+    const viewport = window.visualViewport;
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    viewport?.addEventListener('resize', updatePosition);
+    viewport?.addEventListener('scroll', updatePosition);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      viewport?.removeEventListener('resize', updatePosition);
+      viewport?.removeEventListener('scroll', updatePosition);
+    };
+  }, [open, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    const onDown = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
       if (anchor.current?.contains(t)) return;
       if (document.getElementById(id)?.contains(t)) return;
       onClose();
     };
     document.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onDown);
+    document.addEventListener('pointerdown', onDown);
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('pointerdown', onDown);
     };
   }, [open, onClose, anchor, id]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={panelRef}
           id={id}
+          dir={dir}
           role="menu"
           aria-label={label}
           data-anchored={testId ?? true}
@@ -409,17 +525,19 @@ export function Anchored({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}
           transition={m.spring('quick')}
-          // The origin is the top edge on the side the trigger sits on, stated
-          // logically so it mirrors with the writing direction instead of
-          // needing a second rule for Arabic.
-          className={`material material-thin absolute top-full mt-1.5 origin-top border border-white/10 rounded-2xl shadow-xl ${
-            align === 'end' ? 'end-0 [transform-origin:100%_0%] rtl:[transform-origin:0%_0%]' : 'start-0 [transform-origin:0%_0%] rtl:[transform-origin:100%_0%]'
-          } ${className}`}
-          style={{ zIndex: z }}
+          className={`fixed overflow-hidden rounded-md border border-border-subtle bg-surface-raised shadow-2xl ${className}`}
+          style={{
+            zIndex: Math.max(z, UI_LAYERS.popover),
+            top: position?.top ?? 0,
+            left: position?.left ?? 0,
+            visibility: position ? 'visible' : 'hidden',
+            transformOrigin: position?.origin,
+          }}
         >
           {children}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

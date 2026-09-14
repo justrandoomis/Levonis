@@ -10,6 +10,7 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import CardPrice from '../components/CardPrice';
 import OfferBadge from '../components/ui/OfferBadge';
 import Countdown from '../components/ui/Countdown';
+import { productPrimaryImage } from '../lib/productImage';
 
 export default function Products() {
   const { t, dir, loc } = useLanguage();
@@ -95,7 +96,7 @@ export default function Products() {
             className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}
           >
             {products.map(p => {
-              const firstImage = (Array.isArray(p.images) ? p.images : [])[0] || '';
+              const firstImage = productPrimaryImage(p);
               // §3/§12: the product name is English in every language and is never translated.
               const name = p.name;
               // §4: compare-at is gone; the SALE badge appears only when the
@@ -117,7 +118,7 @@ export default function Products() {
                 <Link
                   to={p.product_slug ? `/bundles/${p.product_slug}` : `/product/${p.slug || p.id}`}
                   key={p.id}
-                  className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors"
+                  className="bg-surface border border-border-subtle rounded-xl overflow-hidden flex flex-col group hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <div className="relative aspect-square overflow-hidden bg-black">
                     <SafeImage

@@ -65,15 +65,15 @@ export default function Header() {
   }
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-[100] flex flex-col pointer-events-none transition-all duration-500 px-4 ${
-      isScrolled ? 'bg-black/80 backdrop-blur-2xl pt-2.5 pb-2.5 shadow-lg' : 'bg-gradient-to-b from-black/80 via-black/40 to-transparent pt-4 pb-2'
+    <header className={`fixed top-0 inset-x-0 z-[100] flex flex-col pointer-events-none transition-all duration-500 px-4 ${
+      isScrolled ? 'material material-thin pt-2.5 pb-2.5 shadow-lg' : 'bg-gradient-to-b from-black/88 via-black/48 to-transparent pt-4 pb-2'
     }`}>
       <div className={`flex items-center justify-between pointer-events-auto transition-all duration-500 ease-in-out origin-top ${
         isScrolled ? 'h-0 opacity-0 mb-0 scale-95 overflow-hidden' : 'h-11 opacity-100 mb-3 scale-100'
       }`}>
         {/* Left: Profile/Brand Pill + Admin Button */}
         <div className="flex items-center gap-2">
-          <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex items-center gap-2.5 bg-zinc-900/80 rounded-full p-1.5 pe-4 border border-zinc-800/60 hover:border-olive/50 transition-colors shadow-sm min-w-0 shrink">
+          <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex min-w-0 shrink items-center gap-2.5 rounded-xl bg-surface/95 p-1.5 pe-3.5 text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <div className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden">
               {isAuthenticated ? (
                  <img
@@ -115,7 +115,7 @@ export default function Header() {
           <NotificationBell />
 
           {/* Language Toggle */}
-          <div className="relative">
+          <div>
             <button
               ref={langButtonRef}
               type="button"
@@ -123,24 +123,10 @@ export default function Header() {
               aria-label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
               aria-expanded={isLangOpen}
               aria-haspopup="menu"
-              className="w-11 h-11 rounded-full bg-zinc-900/80 border border-zinc-800/60 flex items-center justify-center text-zinc-300 hover:text-white hover:border-olive/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-all shadow-sm"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/95 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Globe className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
             </button>
-
-            {/* NOT A WINDOW. This transparent full-screen layer is the pointer
-                click-catcher that makes "tap anywhere else to dismiss" work,
-                and it also swallows the press that would otherwise reach the
-                page behind the open menu. It has no material, no content and
-                nothing to arrive from, so it stays a plain div rather than
-                being forced through the overlay primitive. It sits at z-40,
-                below the menu's z-50, exactly as before. */}
-            {isLangOpen && (
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setIsLangOpen(false)}
-              />
-            )}
 
             {/* THE LANGUAGE MENU. It used to be a hand-rolled motion.div that
                 animated its own HEIGHT from 0 with an eased 200ms tween — an
@@ -151,8 +137,9 @@ export default function Header() {
                 `Anchored` is the right primitive here rather than `Overlay`.
                 This is not a task that takes the page over — it is three
                 radio-ish choices that belong to the globe button, so it must
-                stay welded to that button: no scrim, no page dimming, no
-                portal, and it scales OUT OF the trigger (`anchor`) so the
+                stay welded to that button: no scrim and no page dimming. The
+                shared primitive portals past header/search clipping while it
+                still scales OUT OF the trigger (`anchor`), so the
                 relationship between the control and what it produced is
                 visible. Routing it through `Overlay` would have centred it in
                 the viewport and dimmed the store behind it, which is a much
@@ -174,14 +161,35 @@ export default function Header() {
               align="end"
               label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
               testId="header-language-menu"
-              className="w-32 overflow-hidden"
+              className="w-36 p-1"
             >
               {/* role=menuitem to match the role=menu the primitive supplies —
                   the trigger already advertised aria-haspopup="menu", so this
                   finishes a pairing the old markup only half-declared. */}
-              <button role="menuitem" onClick={() => { setLang('en'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'en' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>English</button>
-              <button role="menuitem" onClick={() => { setLang('ar'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ar' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>العربية</button>
-              <button role="menuitem" onClick={() => { setLang('ckb'); setIsLangOpen(false); }} className={`block w-full text-left px-4 py-2.5 text-sm ${lang === 'ckb' ? 'bg-olive/20 text-gold font-bold' : 'text-zinc-300 hover:bg-zinc-800 transition-colors'}`}>کوردی</button>
+              {([
+                ['en', 'English'],
+                ['ar', 'العربية'],
+                ['ckb', 'کوردی'],
+              ] as const).map(([code, label]) => {
+                const selected = lang === code;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    onClick={() => { setLang(code); setIsLangOpen(false); }}
+                    className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-start text-sm transition-colors ${
+                      selected
+                        ? 'bg-white/[0.07] font-bold text-text-primary'
+                        : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <Check className={`h-4 w-4 text-gold transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
+                  </button>
+                );
+              })}
             </Anchored>
           </div>
 
@@ -206,8 +214,8 @@ export default function Header() {
             
             <div className={`relative h-full px-4 rounded-full flex items-center gap-1.5 z-10 w-full transition-colors ${
               subTier !== 'free' 
-                ? 'bg-black hover:bg-zinc-900' 
-                : 'bg-zinc-900/80 hover:bg-zinc-800/80'
+                ? 'bg-surface hover:bg-surface-raised'
+                : 'bg-surface/95 hover:bg-surface-raised'
             }`}>
               <span className={`text-[13px] tracking-wide capitalize ${
                 subTier !== 'free' ? 'text-white font-bold' : 'text-zinc-300 font-medium'
@@ -232,12 +240,12 @@ export default function Header() {
             setSearchQuery('');
           }
         }}
-        className={`relative w-full max-w-4xl mx-auto pointer-events-auto transition-all duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}
+          className={`relative w-full max-w-4xl mx-auto pointer-events-auto transition-all duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}
       >
         <button
           type="submit"
           aria-label={t('search')}
-          className="absolute top-1/2 -translate-y-1/2 start-0 w-11 h-11 flex items-center justify-center text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-full transition-colors"
+          className="absolute top-1/2 -translate-y-1/2 start-0 w-11 h-11 flex items-center justify-center text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg transition-colors"
         >
           <Search className={`transition-all duration-500 ${isScrolled ? 'w-4 h-4' : 'w-5 h-5'}`} strokeWidth={2.5} aria-hidden="true" />
         </button>
@@ -248,10 +256,10 @@ export default function Header() {
           aria-label={t('search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full backdrop-blur-xl border border-white/10 rounded-full pe-4 text-white placeholder-zinc-400 focus:border-olive focus:ring-1 focus:ring-olive focus:outline-none transition-all duration-500 font-medium shadow-sm ${
+          className={`w-full border border-border-subtle rounded-xl pe-4 text-text-primary placeholder-text-muted focus:border-focus focus:ring-2 focus:ring-focus/20 focus:outline-none transition-all duration-500 font-medium shadow-sm ${
             isScrolled
-              ? 'h-[44px] ps-11 text-[14px] bg-zinc-900/60 focus:bg-zinc-800/80'
-              : 'h-[52px] ps-12 text-[15px] bg-black/40 focus:bg-black/60'
+              ? 'h-[44px] ps-11 text-[14px] bg-surface/95 focus:bg-surface-raised'
+              : 'h-[50px] ps-12 text-[15px] bg-surface/86 focus:bg-surface-raised'
           }`}
         />
       </form>

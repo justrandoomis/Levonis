@@ -17,13 +17,13 @@
  * platform issued to THIS merchant — which is what makes "linked to a real
  * record" true rather than "a key someone typed in".
  *
- * The uploads route issues merchant media as `community/<user id>/<id>.<ext>`
- * (worker/routes/uploads.ts), so ownership is legible from the key itself and
- * needs no second lookup.
+ * New uploads use `merchants/<user id>/public/<id>.<ext>`. The previous
+ * `community/<user id>/<id>.<ext>` shape stays accepted while stored products
+ * migrate, so editing an old listing never strips its working media.
  */
 
 /** `<hex id>.<ext>` — exactly what `newId()` + the sniffer produce. */
-const OBJECT_RE = /^[a-z0-9]{4,40}\.(jpg|png|gif|webp)$/;
+const OBJECT_RE = /^[a-z0-9]{4,40}\.(jpg|jpeg|png|gif|webp|avif)$/;
 
 /**
  * The storage key behind a reference, if it belongs to `userId`.
@@ -46,10 +46,10 @@ export function ownedMediaKey(value: unknown, userId: string): string | null {
   if (key.includes('..') || key.includes('\\')) return null;
 
   const parts = key.split('/');
-  if (parts.length !== 3) return null;
-  const [prefix, owner, object] = parts;
-  if (prefix !== 'community') return null;
-  if (owner !== userId) return null;
+  const legacy = parts.length === 3 && parts[0] === 'community' && parts[1] === userId;
+  const canonical = parts.length === 4 && parts[0] === 'merchants' && parts[1] === userId && parts[2] === 'public';
+  if (!legacy && !canonical) return null;
+  const object = parts[parts.length - 1];
   if (!OBJECT_RE.test(object)) return null;
   return key;
 }

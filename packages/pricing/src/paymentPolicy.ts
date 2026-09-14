@@ -40,9 +40,12 @@ import type { ShippingType } from './shippingType';
 /** 400 code for a payment id the policy refuses. */
 export const PAYMENT_METHOD_NOT_ALLOWED = 'PAYMENT_METHOD_NOT_ALLOWED';
 
-/** The two ways the owner allows a customer to pay, for EVERY shipping type. */
-export function allowedPaymentMethods(_shippingType: ShippingType | null): string[] {
-  return ['wallet', 'cash'];
+/** Base methods plus BNPL only after the server proves this checkout eligible. */
+export function allowedPaymentMethods(
+  _shippingType: ShippingType | null,
+  options: { bnplEligible?: boolean } = {}
+): string[] {
+  return options.bnplEligible ? ['wallet', 'cash', 'bnpl'] : ['wallet', 'cash'];
 }
 
 /** Cash on delivery — the platform id is 'cash'. */
@@ -55,13 +58,22 @@ export function isPrepaid(paymentMethodId: string): boolean {
   return paymentMethodId === 'wallet' || paymentMethodId === 'full_advance';
 }
 
+/** PRO financing; eligibility is deliberately outside this pure id parser. */
+export function isBnpl(paymentMethodId: string): boolean {
+  return paymentMethodId === 'bnpl';
+}
+
 /**
  * May this cart be paid with this id? The offered list is what the storefront
  * shows; the accepted set is that list plus the tolerated alias, so an old
  * client or script keeps working without the alias ever being advertised.
  */
-export function isPaymentMethodAllowed(paymentMethodId: string, _shippingType: ShippingType | null): boolean {
-  return isCod(paymentMethodId) || isPrepaid(paymentMethodId);
+export function isPaymentMethodAllowed(
+  paymentMethodId: string,
+  shippingType: ShippingType | null,
+  options: { bnplEligible?: boolean } = {}
+): boolean {
+  return isCod(paymentMethodId) || isPrepaid(paymentMethodId) || (isBnpl(paymentMethodId) && allowedPaymentMethods(shippingType, options).includes('bnpl'));
 }
 
 /**

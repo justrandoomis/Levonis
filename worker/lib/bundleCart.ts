@@ -51,6 +51,7 @@ import {
 } from './bundleRead';
 import { MAX_PHYSICAL_LINES, type BundleComponentRow } from './bundleComposition';
 import { transportForType, typeForTransport, type ShippingType } from './shippingType';
+import { primaryMedia } from './productModel';
 import {
   publicMysteryBlock,
   resolveMysteryLines,
@@ -625,7 +626,7 @@ export function cartCompositionBlock(b: ResolvedBundle, mystery?: MysteryContext
         : b.components.map((c) => ({
             component_id: c.component_id,
             product_id: c.member_product_id,
-            product: { slug: c.doc.slug, name: c.doc.name_en, name_ar: c.doc.name_ar, image: c.doc.media[0]?.url ?? '' },
+            product: { slug: c.doc.slug, name: c.doc.name_en, name_ar: c.doc.name_ar, image: primaryMedia(c.doc.media)?.url ?? '' },
             variant: componentVariantLabel(c),
             qty_per_bundle: c.qty_per_bundle,
             optional: c.optional,

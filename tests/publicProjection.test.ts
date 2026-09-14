@@ -13,8 +13,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProductRow, projectPublic } from '../worker/lib/productModel';
-import type { ProductDoc } from '../worker/lib/productModel';
+import { parseProductRow, primaryMediaFirst, projectPublic } from '../worker/lib/productModel';
+import type { MediaV2, ProductDoc } from '../worker/lib/productModel';
 
 /**
  * A real doc, built by the REAL parser from a row shaped like the products
@@ -88,6 +88,49 @@ test('and it still carries the selling prices and adjustments it should', () => 
   assert.equal(out.options[0].regular_price_iqd, 100_000);
   assert.equal(out.options[0].regular_adjust_iqd, 5_000);
   assert.equal(out.colors[0].pro_price_iqd, 90_000);
+});
+
+function media(id: string, order: number, primary = false): MediaV2 {
+  return {
+    id,
+    url: `https://cdn.example.com/${id}.jpg`,
+    key: '',
+    role: 'gallery',
+    alt_ar: '',
+    alt_en: '',
+    alt_ckb: '',
+    order,
+    primary,
+    width: null,
+    height: null,
+    source_url: '',
+    option_value_id: '',
+    color_id: '',
+    variant_id: '',
+  };
+}
+
+test('the explicit primary image leads every public image view without mutating admin order', () => {
+  const doc = docWithCosts();
+  const firstByGalleryOrder = media('gallery-first', 0);
+  const chosenPrimary = media('chosen-primary', 9, true);
+  const sameOrderA = media('same-a', 3);
+  const sameOrderB = media('same-b', 3);
+  doc.media = [firstByGalleryOrder, chosenPrimary, sameOrderA, sameOrderB];
+
+  const originalIds = doc.media.map((item) => item.id);
+  const out = projectPublic(doc) as unknown as { media: MediaV2[]; images: string[] };
+
+  assert.equal(out.media[0].id, 'chosen-primary');
+  assert.equal(out.images[0], chosenPrimary.url);
+  assert.deepEqual(doc.media.map((item) => item.id), originalIds, 'projection must not rewrite the editor document');
+  assert.deepEqual(out.media.slice(2).map((item) => item.id), ['same-a', 'same-b'], 'equal gallery orders stay stable');
+});
+
+test('primaryMediaFirst gives a deterministic gallery-order fallback when no primary exists', () => {
+  const unordered = [media('later', 8), media('first', 1), media('middle', 4)];
+  assert.deepEqual(primaryMediaFirst(unordered).map((item) => item.id), ['first', 'middle', 'later']);
+  assert.deepEqual(unordered.map((item) => item.id), ['later', 'first', 'middle']);
 });
 
 // ---------------------------------------------------------------------------

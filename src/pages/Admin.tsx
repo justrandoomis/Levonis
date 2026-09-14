@@ -356,6 +356,11 @@ function AdminOrders() {
               </span>
             </div>
             <p className="text-[12px] text-zinc-400 mt-2 truncate">{o.email || o.username || o.user_id || '—'}</p>
+            {o.priority === 1 && (
+              <p className="mt-2 w-fit rounded-full border border-[#B03142]/35 bg-[#B03142]/10 px-2 py-0.5 text-[10px] font-black text-[#f3bdc5]">
+                {o.fulfillment_service === 'pro_priority_12h' ? 'PRO · 12H' : 'PRO · PRIORITY'}
+              </p>
+            )}
             <p className="text-[11px] text-zinc-500 mt-0.5">
               {new Date(o.created_at).toLocaleDateString()} · {o.items?.length ?? 0}{' '}
               {loc('صنف', 'items', 'شت')}
@@ -408,7 +413,10 @@ function AdminOrders() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
-                  <td className="py-2.5 px-3 font-mono text-[11px] text-zinc-300" dir="ltr">{o.id}</td>
+                  <td className="py-2.5 px-3 font-mono text-[11px] text-zinc-300" dir="ltr">
+                    <span className="block">{o.id}</span>
+                    {o.priority === 1 && <span className="mt-1 inline-flex rounded-full border border-[#B03142]/35 bg-[#B03142]/10 px-1.5 py-0.5 text-[9px] font-black text-[#f3bdc5]">{o.fulfillment_service === 'pro_priority_12h' ? 'PRO · 12H' : 'PRO · PRIORITY'}</span>}
+                  </td>
                   <td className="py-2.5 px-3 text-[13px] text-zinc-300">{o.email || o.username || o.user_id || '—'}</td>
                   <td className="py-2.5 px-3 text-[13px] text-zinc-400">{o.items?.length ?? 0}</td>
                   <td className="py-2.5 px-3 text-[13px] font-bold text-white whitespace-nowrap" dir="ltr">

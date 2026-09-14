@@ -17,7 +17,7 @@ import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
-import { parseProductRow, type ProductDoc } from '../lib/productModel';
+import { parseProductRow, primaryMedia, type ProductDoc } from '../lib/productModel';
 import {
   applyRelations,
   EMPTY_RELATIONS,
@@ -100,6 +100,7 @@ const OOS_REFUSALS = new Set(['OUT_OF_STOCK', 'QTY_UNAVAILABLE', 'MYSTERY_NO_ELI
 import { supportEligibleProductIds } from '../lib/membershipOps';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { pricedPlans, refuseNonPrinterWarranty } from '../lib/warrantyPlans';
+import { productImageForSelection } from '../lib/productSelectionImage';
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
@@ -431,6 +432,11 @@ function compositionCartItem(
 ) {
   const unit = b.pricing.unit_subtotal_iqd + componentFeesIqd(b);
   const qty = Number(row.qty) || 1;
+  const deliveryDocs = b.doc.composition === 'mystery' ? [b.doc] : b.components.filter((k) => k.included).map((k) => k.doc);
+  const deliveryAvailability = {
+    standard: deliveryDocs.every((d) => !d.delivery_options || d.delivery_options.standard.enabled),
+    personal: deliveryDocs.every((d) => !d.delivery_options || d.delivery_options.personal.enabled),
+  };
   return {
     id: row.cart_item_id,
     kind: b.doc.composition === 'mystery' ? 'mystery' : 'bundle',
@@ -439,7 +445,7 @@ function compositionCartItem(
     name: b.doc.name_en,
     name_ar: b.doc.name_ar,
     name_ku: b.doc.name_ckb,
-    image: b.doc.media[0]?.url ?? '',
+    image: primaryMedia(b.doc.media)?.url ?? '',
     qty,
     // Line identity, echoed as it is stored. Nothing derives a selection from
     // it — `selectionFromCartRow` returns an empty selection for this row.
@@ -491,6 +497,7 @@ function compositionCartItem(
     warranty_plans: [],
     preorder_transports: [],
     shipping_methods: [],
+    delivery_availability: deliveryAvailability,
   };
 }
 
@@ -576,12 +583,26 @@ async function loadCart(c: Context<AppContext>) {
     : new Set<string>();
 
   const items = [];
+  const unavailableDelivery = {
+    standard: new Set<string>(),
+    personal: new Set<string>(),
+  };
+  const constrainDelivery = (doc: Pick<ProductDoc, 'id' | 'delivery_options'>) => {
+    if (!doc.delivery_options) return; // legacy global tariff supports both
+    if (!doc.delivery_options.standard.enabled) unavailableDelivery.standard.add(doc.id);
+    if (!doc.delivery_options.personal.enabled) unavailableDelivery.personal.add(doc.id);
+  };
   for (const row of results) {
     if (row.status !== 'active') continue; // hidden products drop out of the cart view
     const composition = String(row.composition ?? '');
     if (composition !== '') {
       const b = resolvedBundles.get(String(row.cart_item_id));
       if (!b) continue; // the composition rows vanished under us; nothing honest to render
+      // Fixed bundles ship their included components; mystery offers expose
+      // only the offer row's shipping facts, matching the checkout anti-leak
+      // rule in orders.ts.
+      if (b.doc.composition === 'mystery') constrainDelivery(b.doc);
+      else b.components.filter((k) => k.included).forEach((k) => constrainDelivery(k.doc));
       items.push(
         compositionCartItem(row, b, bundlePrinterIds, mysteryCtxs.get(String(row.cart_item_id)), user.locale ?? 'ar')
       );
@@ -605,6 +626,7 @@ async function loadCart(c: Context<AppContext>) {
       isPrinter,
       offerInput
     );
+    constrainDelivery(doc);
     // Would cash on delivery change THIS line's price? Only when the product
     // carries a direct premium this customer pays — the same rule the checkout
     // applies — so the cart explains the cash rule only where it bites.
@@ -636,7 +658,10 @@ async function loadCart(c: Context<AppContext>) {
       slug: row.slug,
       name: row.name,
       name_ar: row.name_ar,
-      image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
+      image: productImageForSelection(doc, {
+        optionValueIds: sel.optionValueIds ?? [],
+        colorId: sel.colorId || null,
+      }, view),
       qty: row.qty,
       option_id: row.option_id,
       color_id: row.color_id,
@@ -679,9 +704,23 @@ async function loadCart(c: Context<AppContext>) {
       warranty_plans: pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
       preorder_transports: doc.preorder_transports.filter((t) => t.active),
       shipping_methods: safeParse(row.shipping_methods, []), // legacy UI compatibility
+      delivery_options: doc.delivery_options ?? null,
+      delivery_availability: {
+        standard: !doc.delivery_options || doc.delivery_options.standard.enabled,
+        personal: !doc.delivery_options || doc.delivery_options.personal.enabled,
+      },
     });
   }
-  return { items, tier, tierActive };
+  return {
+    items,
+    tier,
+    tierActive,
+    delivery_methods: {
+      standard: { available: unavailableDelivery.standard.size === 0, unavailable_product_ids: [...unavailableDelivery.standard] },
+      personal: { available: unavailableDelivery.personal.size === 0, unavailable_product_ids: [...unavailableDelivery.personal] },
+      pickup: { available: true, unavailable_product_ids: [] as string[] },
+    },
+  };
 }
 
 /**
@@ -744,7 +783,7 @@ cartRoutes.post('/coupon-check', async (c) => {
 });
 
 cartRoutes.get('/', async (c) => {
-  const { items, tier, tierActive } = await loadCart(c);
+  const { items, tier, tierActive, delivery_methods } = await loadCart(c);
   // §1: the type the cart is locked to, so the storefront can say so before
   // the customer discovers it by being refused. null = empty, so any type may
   // still be started.
@@ -764,6 +803,7 @@ cartRoutes.get('/', async (c) => {
     items,
     tier,
     tierActive,
+    delivery_methods,
     shipping_type: shippingType,
     scope: cartSellerScope(items as unknown as SellerLine[]),
   });

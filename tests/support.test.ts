@@ -8,7 +8,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchIntents, RESTRICTABLE_BENEFITS, RESTRICTION_CASE_TYPES } from '../worker/routes/support';
+import { contextualChoices, matchIntents, RESTRICTABLE_BENEFITS, RESTRICTION_CASE_TYPES } from '../worker/routes/support';
+import { ENTITLEMENT_MINIMUM_TIER } from '../worker/lib/entitlements';
 
 test('single keyword resolves to exactly one intent (en)', () => {
   assert.deepEqual(matchIntents('what is my warranty?'), ['warranty_status']);
@@ -58,18 +59,16 @@ test('restriction allowlists cover the mandated shapes', () => {
   // Only benefit-computation flags are restrictable (matching the benefit
   // names in worker/lib/entitlements.ts) — never an access-level switch:
   // support/warranty/orders/wallet ACCESS must not be gateable here.
-  assert.deepEqual(
-    [...RESTRICTABLE_BENEFITS].sort(),
-    [
-      'exclusiveCoupons',
-      'exclusiveSections',
-      'freeDelivery',
-      'merchantProfile',
-      'noPreorderCommission',
-      'priorityService',
-      'proExclusive',
-      'proPricing',
-      'verifiedMerchant',
-    ]
-  );
+  assert.deepEqual([...RESTRICTABLE_BENEFITS].sort(), Object.keys(ENTITLEMENT_MINIMUM_TIER).sort());
+});
+
+test('resolved support answers offer only context-relevant next steps', () => {
+  const delivery = contextualChoices('en', 'delivery_estimate').map((choice) => choice.intent);
+  assert.deepEqual(delivery, ['order_status', 'human_handoff']);
+  assert.ok(!delivery.includes('points_balance'));
+  assert.ok(!delivery.includes('warranty_status'));
+
+  const device = contextualChoices('ar', 'my_devices').map((choice) => choice.intent);
+  assert.deepEqual(device, ['warranty_status', 'human_handoff']);
+  assert.deepEqual(contextualChoices('en', 'clarify'), []);
 });

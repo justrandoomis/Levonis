@@ -63,13 +63,45 @@ fieldset {
 }
 
 html, body, #root {
-  background-color: #000;
-  color: #fff;
+  min-height: 100%;
+  background-color: #0b0c0f;
+  color: #f2f3f5;
+}
+
+html {
+  color-scheme: dark;
+  /* Shared default for sticky content. Pages with dynamic chrome override
+     this token from the element's measured ResizeObserver height. */
+  --app-header-height: 68px;
 }
 
 
 
 @theme {
+  /*
+    LEVONIS DARK SYSTEM
+
+    Black and white remain useful *names* throughout the existing codebase,
+    but their values are deliberately softened here. This removes the harsh
+    #000/#fff contrast without a risky page-by-page rewrite. New/refined
+    primitives use the semantic slots below; old utility classes inherit the
+    same calmer palette automatically.
+  */
+  --color-black: #0b0c0f;
+  --color-white: #f2f3f5;
+  --color-canvas: #0b0c0f;
+  --color-surface: #131519;
+  --color-surface-raised: #191c21;
+  --color-surface-selected: #20242a;
+  --color-border-subtle: #2a2e35;
+  --color-text-primary: #f2f3f5;
+  --color-text-secondary: #b7bbc3;
+  --color-text-muted: #858b95;
+  --color-success: #42b77a;
+  --color-warning: #d79b45;
+  --color-danger: #dc6363;
+  --color-info: #6f9bd1;
+  --color-focus: #d2c392;
   /* The LEVONIS green. The token is still called `olive` because ~100 call
      sites across the store and the Studio name it, and renaming them all to
      re-point one colour would be churn with real regression risk for no
@@ -85,6 +117,10 @@ html, body, #root {
   --color-olive-light: #2B3318;
   --color-gold: #BAA369;
   --color-gold-light: #ffe55c;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
   --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
   /* Tailwind v4's preflight sets the <html> font to var(--default-font-family,
      <system stack>) — defining --font-sans alone only creates the `font-sans`
@@ -93,6 +129,185 @@ html, body, #root {
      a component happened to carry `font-sans`. This makes Cairo the actual
      sitewide default (the owner's explicit ask). */
   --default-font-family: var(--font-sans);
+}
+
+/* ---------------------------------------------------------------------------
+   SHARED SURFACES, CONTROLS AND STATES
+
+   These classes refine the design system that is already in use. They are
+   intentionally few and semantic: pages should communicate hierarchy with
+   spacing/type first, a solid tonal surface second, and a border only when it
+   clarifies an interactive boundary. Gold is a small brand cue, not a fill.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .lv-surface {
+    background-color: var(--color-surface);
+    border: 1px solid color-mix(in oklab, var(--color-border-subtle) 78%, transparent);
+    border-radius: var(--radius-lg);
+  }
+
+  .lv-surface-raised {
+    background-color: var(--color-surface-raised);
+    border: 1px solid color-mix(in oklab, var(--color-border-subtle) 82%, transparent);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 42px -30px rgb(0 0 0 / 0.9);
+  }
+
+  .lv-section {
+    padding-block: 1rem;
+    border-block-end: 1px solid color-mix(in oklab, var(--color-border-subtle) 64%, transparent);
+  }
+
+  .lv-section:last-child {
+    border-block-end: 0;
+  }
+
+  .lv-choice {
+    position: relative;
+    min-block-size: 44px;
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface);
+    border: 1px solid color-mix(in oklab, var(--color-border-subtle) 82%, transparent);
+    border-radius: var(--radius-md);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .lv-choice:hover:not(:disabled):not([aria-disabled='true']) {
+    color: var(--color-text-primary);
+    background-color: color-mix(in oklab, var(--color-surface-raised) 92%, white 8%);
+  }
+
+  .lv-choice[aria-pressed='true'],
+  .lv-choice[aria-checked='true'],
+  .lv-choice[data-selected='true'] {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-selected);
+    border-color: color-mix(in oklab, var(--color-text-muted) 55%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-gold);
+  }
+
+  [dir='rtl'] .lv-choice[aria-pressed='true'],
+  [dir='rtl'] .lv-choice[aria-checked='true'],
+  [dir='rtl'] .lv-choice[data-selected='true'] {
+    box-shadow: inset -2px 0 0 var(--color-gold);
+  }
+
+  .lv-choice-mark {
+    display: inline-flex;
+    inline-size: 18px;
+    block-size: 18px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--color-gold);
+    background-color: color-mix(in oklab, var(--color-gold) 12%, transparent);
+    opacity: 0;
+    transform: scale(0.82);
+    transition: opacity 140ms ease, transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .lv-choice[aria-pressed='true'] .lv-choice-mark,
+  .lv-choice[aria-checked='true'] .lv-choice-mark,
+  .lv-choice[data-selected='true'] .lv-choice-mark {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .lv-button {
+    display: inline-flex;
+    min-block-size: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding-inline: 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.25;
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease,
+      opacity 150ms ease;
+  }
+
+  .lv-button-primary {
+    color: #101114;
+    background-color: #ece8dc;
+    border: 1px solid transparent;
+  }
+
+  .lv-button-primary:hover:not(:disabled) {
+    background-color: #fffaf0;
+  }
+
+  .lv-button-secondary {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .lv-button-ghost {
+    color: var(--color-text-secondary);
+    background-color: transparent;
+    border: 1px solid transparent;
+  }
+
+  .lv-button-danger {
+    color: #ffdada;
+    background-color: color-mix(in oklab, var(--color-danger) 14%, var(--color-surface));
+    border: 1px solid color-mix(in oklab, var(--color-danger) 35%, transparent);
+  }
+
+  .lv-button:disabled,
+  .lv-button[aria-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .lv-input {
+    inline-size: 100%;
+    min-block-size: 46px;
+    color: var(--color-text-primary);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    padding-inline: 0.875rem;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  }
+
+  .lv-input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .lv-input:focus-visible {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus) 22%, transparent);
+    background-color: var(--color-surface-raised);
+  }
+
+  .lv-input[aria-invalid='true'] {
+    border-color: var(--color-danger);
+  }
+
+  .lv-field-error {
+    margin-block-start: 0.375rem;
+    color: #f2a4a4;
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .lv-alert {
+    border-inline-start: 3px solid var(--alert-color, var(--color-info));
+    border-radius: var(--radius-sm);
+    background-color: color-mix(in oklab, var(--alert-color, var(--color-info)) 10%, var(--color-surface));
+    padding: 0.75rem 0.875rem;
+  }
+
+  .lv-alert-success { --alert-color: var(--color-success); }
+  .lv-alert-warning { --alert-color: var(--color-warning); }
+  .lv-alert-danger { --alert-color: var(--color-danger); }
+  .lv-alert-info { --alert-color: var(--color-info); }
 }
 
 /* ---------------------------------------------------------------------------
@@ -189,18 +404,18 @@ html, body, #root {
    passed through untouched, and declaring only the standard property lets
    Lightning add whatever prefix the browser targets actually need. */
 .material {
-  background-color: color-mix(in oklab, var(--material-tint, #18181b) var(--material-opacity, 72%), transparent);
-  backdrop-filter: var(--material-filter, blur(20px) saturate(160%));
+  background-color: color-mix(in oklab, var(--material-tint, var(--color-surface-raised)) var(--material-opacity, 90%), transparent);
+  backdrop-filter: var(--material-filter, blur(18px) saturate(125%));
 }
 /* Bigger surfaces read THICKER: more blur, deeper shadow. A sheet is not a chip. */
 .material-thick {
-  --material-filter: blur(32px) saturate(160%);
-  --material-opacity: 82%;
-  box-shadow: 0 -18px 48px -16px rgb(0 0 0 / 0.72);
+  --material-filter: blur(24px) saturate(125%);
+  --material-opacity: 97%;
+  box-shadow: 0 -18px 48px -22px rgb(0 0 0 / 0.78);
 }
 .material-thin {
-  --material-filter: blur(12px) saturate(160%);
-  --material-opacity: 64%;
+  --material-filter: blur(12px) saturate(120%);
+  --material-opacity: 94%;
 }
 
 /* SCROLL EDGE, NOT A DIVIDER. A 1px border under floating chrome is a line the
@@ -436,7 +651,7 @@ html:lang(ckb) .leading-tight {
    silently never existed and the spacer had zero height. */
 .nav-clearance {
   flex: 0 0 auto;
-  height: calc(76px + max(1rem, env(safe-area-inset-bottom)));
+  height: var(--nav-stack);
 }
 
 /*
@@ -453,15 +668,142 @@ html:lang(ckb) .leading-tight {
   bottom offset, and 28px is the scrim's overhang.
 */
 :root {
-  --nav-stack: calc(60px + max(1rem, env(safe-area-inset-bottom)) + 28px);
+  --nav-stack: calc(64px + max(0.625rem, env(safe-area-inset-bottom)) + 18px);
 }
 @media (min-width: 640px) {
   :root {
-    --nav-stack: calc(72px + max(1.5rem, env(safe-area-inset-bottom)) + 28px);
+    --nav-stack: calc(68px + max(1rem, env(safe-area-inset-bottom)) + 20px);
   }
 }
-@media (min-width: 640px) {
-  .nav-clearance {
-    height: calc(88px + max(1.5rem, env(safe-area-inset-bottom)));
+/* A modal owns the interaction. Hiding the persistent nav while one is open
+   avoids two competing bottom controls and is shared by every Overlay/Sheet. */
+html[data-overlay-open='true'] [data-bottom-nav] {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   APP INTRO / HOME CHARACTER
+
+   The fixed character is a single shared element. During bootstrap its frame
+   is the viewport centre; when real critical work settles, React measures the
+   Home target and changes this same node's transform, not its canvas dimensions. The veil
+   and character are independent so the page can reveal while the character
+   travels. Nothing here owns clicks.
+   --------------------------------------------------------------------------- */
+.lv-app-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 121;
+  pointer-events: none;
+  contain: layout style;
+}
+
+.lv-app-intro__veil {
+  position: fixed;
+  inset: 0;
+  background: var(--color-canvas);
+  opacity: 1;
+  transition: opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lv-app-intro__character {
+  position: fixed;
+  top: 0;
+  /* getBoundingClientRect() returns physical viewport coordinates. Using
+     inline-start here made x=0 mean the RIGHT edge in Arabic and translated
+     the character off-screen. This physical origin is intentionally paired
+     with physical measured coordinates and is direction-independent. */
+  left: 0;
+  z-index: 1;
+  opacity: 1;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.lv-app-intro[data-phase='travelling'] .lv-app-intro__veil,
+.lv-app-intro[data-phase='docked'] .lv-app-intro__veil,
+.lv-app-intro[data-phase='hidden'] .lv-app-intro__veil {
+  opacity: 0;
+}
+
+.lv-app-intro[data-phase='travelling'] .lv-app-intro__character {
+  transition:
+    transform 520ms cubic-bezier(0.2, 0.82, 0.24, 1),
+    opacity 150ms ease-out;
+}
+
+.lv-app-intro[data-phase='hidden'] .lv-app-intro__character,
+html[data-overlay-open='true'] .lv-app-intro__character {
+  opacity: 0;
+}
+
+/* Root canvas never animates independently of measured travel. Nested groups
+   separate posture, breathing, gaze and blinking: no competing transforms. */
+.lv-bloub { display: block; overflow: visible; transform-origin: center; }
+.lv-bloub-breath, .lv-bloub-gaze { transform-origin: 50px 50px; }
+.lv-bloub-blink { transform-box: fill-box; transform-origin: center; }
+.lv-bloub--idle .lv-bloub-breath { animation: lv-mascot-breathe 6.4s ease-in-out infinite; }
+.lv-bloub--idle .lv-bloub-gaze { animation: lv-mascot-idle-look 9.7s ease-in-out infinite; }
+.lv-bloub--idle .lv-bloub-blink { animation: lv-mascot-blink 5.9s linear infinite; }
+.lv-bloub--loading .lv-bloub-breath { animation: lv-mascot-loading-body 3.1s ease-in-out infinite; }
+.lv-bloub--loading .lv-bloub-gaze { animation: lv-mascot-search 2.8s ease-in-out infinite; }
+.lv-bloub--loading .lv-bloub-blink { animation: lv-mascot-blink 3.8s linear infinite; }
+.lv-bloub--typing .lv-bloub-breath { animation: lv-mascot-breathe 1.7s ease-in-out infinite; }
+.lv-bloub--typing .lv-bloub-gaze { animation: lv-mascot-typing-look 1.25s ease-in-out infinite; }
+.lv-bloub--typing .lv-bloub-blink { animation: lv-mascot-blink 3.6s linear infinite; }
+.lv-bloub--navigating .lv-bloub-blink, .lv-bloub--returning .lv-bloub-blink { animation: lv-mascot-travel-blink 480ms ease-out; }
+.lv-bloub--tap .lv-bloub-breath { animation: lv-mascot-tap 210ms ease-out; }
+.lv-bloub--tap .lv-bloub-blink { animation: lv-mascot-travel-blink 180ms ease-out; }
+.lv-bloub--success .lv-bloub-breath, .lv-bloub--arrival .lv-bloub-breath { animation: lv-mascot-settle 420ms ease-out; }
+.lv-bloub--notify .lv-bloub-breath { animation: lv-mascot-attentive 700ms ease-out; }
+.lv-bloub--notify .lv-bloub-gaze { animation: lv-mascot-typing-look 700ms ease-out; }
+.lv-bloub--warning .lv-bloub-breath { animation: lv-mascot-attentive 900ms ease-out; }
+.lv-bloub--error .lv-bloub-breath { animation: lv-mascot-alert 440ms ease-out; }
+.lv-app-intro[data-page-visible='false'] .lv-bloub *, html[data-overlay-open='true'] .lv-bloub * { animation-play-state: paused !important; }
+@keyframes lv-mascot-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.016, 1.022); } }
+@keyframes lv-mascot-loading-body { 0%,100% { transform: rotate(-1deg) scale(1); } 50% { transform: rotate(1deg) scale(1.018); } }
+@keyframes lv-mascot-idle-look { 0%,52%,100% { transform: translate(0,0); } 60%,68% { transform: translate(2px,-1px); } 77%,84% { transform: translate(-2px,0); } }
+@keyframes lv-mascot-search { 0%,100% { transform: translate(-3px,0) rotate(-3deg); } 25% { transform: translate(0,-3px); } 50% { transform: translate(4px,0) rotate(3deg); } 75% { transform: translate(0,2px); } }
+@keyframes lv-mascot-typing-look { 0%,100% { transform: translate(-3px,0); } 50% { transform: translate(3px,-1px); } }
+@keyframes lv-mascot-blink { 0%,46%,49%,100% { transform: scaleY(1); } 47.5% { transform: scaleY(0.1); } }
+@keyframes lv-mascot-travel-blink { 0%,100% { transform: scaleY(1); } 45% { transform: scaleY(0.15); } }
+@keyframes lv-mascot-tap { 0%,100% { transform: scale(1); } 45% { transform: scale(1.02,0.94); } }
+@keyframes lv-mascot-settle { 0%,100% { transform: scale(1); } 35% { transform: scale(1.02,0.97); } 68% { transform: scale(0.99,1.02); } }
+@keyframes lv-mascot-attentive { 0%,100% { transform: rotate(0) scale(1); } 30% { transform: rotate(-2deg) scale(1.022); } 65% { transform: rotate(1deg); } }
+@keyframes lv-mascot-alert { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 65% { transform: translateX(1.5px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-app-intro__veil {
+    transition-duration: 120ms !important;
+  }
+  .lv-app-intro__character {
+    transition: opacity 120ms ease-out !important;
+    will-change: opacity;
+  }
+  .lv-bloub, .lv-bloub * {
+    animation: none !important;
   }
 }
+
+/* Measured character slots reserve space; the animated layer never owns taps. */
+/* Visible canvas and input hit area are independent. The path occupies about
+   90% of this canvas after viewBox normalization, not 44px inside a 64px hit. */
+:root {
+  --lv-home-visual: clamp(58px, 15.5vw, 74px);
+  --lv-home-hit: clamp(68px, 18vw, 86px);
+  --lv-header-visual: clamp(52px, 13.6vw, 66px);
+  --lv-header-hit: calc(var(--lv-header-visual) + 8px);
+}
+.lv-character-anchor { display: grid; place-items: center; width: var(--lv-header-visual); height: var(--lv-header-visual); flex: none; }
+.lv-character-anchor[data-bloub-anchor='bottom-home'] { width: var(--lv-home-visual); height: var(--lv-home-visual); }
+.lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
+.lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
+.lv-character-anchor[data-bloub-occupied='true'] [data-bloub-fallback] { visibility: hidden; }
+.lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }
+.lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) var(--lv-header-hit) minmax(0, 1fr); gap: 8px; padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.lv-character-header > :first-child { justify-self: start; }
+.lv-character-header > .lv-character-home { grid-column: 2; }
+.lv-character-header > :last-child { justify-self: end; min-width: 0; max-width: 100%; }
+.lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: var(--lv-header-hit); padding-top: env(safe-area-inset-top); background: var(--color-canvas); }

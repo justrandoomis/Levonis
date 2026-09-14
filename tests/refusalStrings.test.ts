@@ -107,6 +107,8 @@ test('every code the table translates is one the server can actually emit', () =
     // The address book refuses on the money path too: a parcel with an
     // undialable number or no governorate is a delivery that fails.
     'worker/routes/addresses.ts',
+    'worker/routes/memberships.ts',
+    'worker/lib/bnpl.ts',
     'worker/lib/bundleCart.ts',
     'worker/lib/offers.ts',
   ]

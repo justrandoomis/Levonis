@@ -220,13 +220,14 @@ test('a bundle walks the whole mandate: composed, listed, gated, carted, reserve
 
   // ------------------------------------------ 3. eligibility, at the door
   //
-  // PRIME is not PLUS. The list may show a lock; the purchase API is the
-  // decision, and it refuses independently of anything the browser did.
+  // PREMIUM inherits PLUS. The purchase API — not the browser card — is the
+  // decision and must admit it independently of anything the client claims.
   const primeAdd = await post(appAs(db, prime), '/api/cart/items', { productId: bundleId, qty: 1 });
   const primeBody = await json(primeAdd);
-  assert.equal(primeAdd.status, 403, JSON.stringify(primeBody));
-  assert.equal(primeBody.code, 'MEMBERSHIP_REQUIRED');
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0, 'a refused add writes nothing');
+  assert.equal(primeAdd.status, 200, JSON.stringify(primeBody));
+  assert.equal(primeBody.success, true);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 1, 'the inherited PLUS purchase is stored once');
+  raw.prepare('DELETE FROM cart_items').run();
 
   // A guest is refused too, and PRO — which inherits PLUS — is not.
   const proAdd = await json(await post(appAs(db, pro), '/api/cart/items', { productId: bundleId, qty: 1 }));

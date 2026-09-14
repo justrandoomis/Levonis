@@ -185,13 +185,13 @@ test('the gate decides the PRICE as well as the purchase, and PRO inherits PLUS'
   assert.equal(refused.success, false);
   assert.equal(refused.code, 'MEMBERSHIP_REQUIRED');
 
-  // PLUS gets it; PRO inherits PLUS; PRIME is a delivery tier and does NOT.
+  // PLUS gets it; PREMIUM and PRO inherit PLUS.
   assert.equal(await cardPrice(db, plusUser), offerPrice);
   assert.equal(await cardPrice(db, proUser), offerPrice);
-  assert.equal(await cardPrice(db, primeUser), LADDER, 'PRIME was handed a PLUS-exclusive price');
+  assert.equal(await cardPrice(db, primeUser), offerPrice, 'PREMIUM inherits a PLUS offer');
   assert.equal(
-    (await json(await post(appFor(db, primeUser), '/api/cart/items', { productId: SUBJECT, qty: 1 }))).code,
-    'MEMBERSHIP_REQUIRED'
+    (await json(await post(appFor(db, primeUser), '/api/cart/items', { productId: SUBJECT, qty: 1 }))).success,
+    true
   );
 
   // And the member's own cart charges the same number the card showed.

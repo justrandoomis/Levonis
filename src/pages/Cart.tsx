@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
 import { useLanguage } from '../LanguageContext';
 import {
-  ArrowLeft, ArrowRight, ChevronRight, ChevronDown, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
+  ArrowLeft, ArrowRight, ChevronRight, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
   ShieldCheck, FileText, Sparkles,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
-import { useMotion } from '../lib/motion';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
@@ -227,7 +225,6 @@ export default function Cart() {
   const printerNoteText = PRINTER_NOTE[lang] ?? PRINTER_NOTE.ar;
   const codHint = COD_HINT[asLang(lang)];
   const ew = EXT_WARRANTY[asLang(lang)];
-  const m = useMotion();
   // "+12 months → 24 months total": the arrow follows the reading direction,
   // so it points from the extension to the total in both scripts.
   const arrow = dir === 'rtl' ? '←' : '→';
@@ -290,10 +287,10 @@ export default function Cart() {
   const [dealsExpanded, setDealsExpanded] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
 
-  // Extended-warranty disclosures: which lines are open, which one is saving
-  // (the PATCH re-prices the line, so the group waits for the server), and
-  // the last refusal per line — shown inside the panel, next to the choice.
-  const [warrantyOpen, setWarrantyOpen] = useState<Set<string>>(() => new Set());
+  // A mobile-safe, portalled sheet owns the warranty choices. Keeping this
+  // out of the narrow product-detail column prevents RTL text or a long price
+  // from widening the cart beyond the viewport.
+  const [warrantyPickerId, setWarrantyPickerId] = useState<string | null>(null);
   const [warrantySavingId, setWarrantySavingId] = useState<string | null>(null);
   const [warrantyPendingPlan, setWarrantyPendingPlan] = useState<string>('');
   const [warrantyErrors, setWarrantyErrors] = useState<Record<string, string>>({});
@@ -639,17 +636,12 @@ export default function Cart() {
   // fee already resolved against the line's regular price; a plan is set or
   // cleared with the same PATCH the variant and shipping sheets use, and the
   // returned cart (re-priced by the resolver) is what the screen paints.
-  const toggleWarranty = (itemId: string) =>
-    setWarrantyOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-
   const chooseWarranty = async (item: CartItem, planId: string) => {
     if (warrantySavingId !== null) return;
-    if ((item.warranty_plan_id ?? '') === planId) return;
+    if ((item.warranty_plan_id ?? '') === planId) {
+      setWarrantyPickerId(null);
+      return;
+    }
     setWarrantySavingId(item.id);
     setWarrantyPendingPlan(planId);
     setWarrantyErrors((prev) => {
@@ -661,6 +653,7 @@ export default function Cart() {
     try {
       const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { warrantyPlanId: planId });
       applyItems(data.items || []);
+      setWarrantyPickerId(null);
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
       const text = err instanceof Error ? err.message : '';
@@ -772,6 +765,7 @@ export default function Cart() {
 
   const variantItem = items.find((i) => i.id === variantItemId) ?? null;
   const shippingItem = items.find((i) => i.id === shippingItemId) ?? null;
+  const warrantyItem = items.find((i) => i.id === warrantyPickerId) ?? null;
 
   // THE SHEETS NOW HAVE AN EXIT, SO THEY NEED SOMETHING TO LEAVE WITH.
   //
@@ -808,19 +802,20 @@ export default function Cart() {
     // short page. The bottom padding clears the summary bar (≈76px) and the
     // safe area, and nothing more — `pb-48` (192px) was reserving room for a
     // nav that is no longer on this route.
-    <div className="w-full pt-16 pb-[calc(var(--nav-stack)+92px)] text-zinc-300 min-h-dvh bg-black flex flex-col font-sans">
+    <div className="w-full max-w-full overflow-x-clip pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh bg-canvas flex flex-col font-sans">
       {/* Header */}
       {/* `backdrop-blur-xl` behind a fully opaque `bg-black` was a compositing
           layer blurring nothing. Translucent, like the product page's bar, so
           content passing underneath actually frosts. */}
-      <div className="fixed inset-x-0 top-0 z-40 bg-black/85 backdrop-blur-xl border-b border-zinc-900 px-4 py-4 flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="p-1 hover:text-white transition-colors">
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg">
+        <button type="button" onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>
         <h1 className="text-white font-bold text-[17px]">
           {t('cart' as any) || loc('السلة', 'Cart', 'سەبەتە')}
         </h1>
         <button
+          type="button"
           onClick={() => navigate('/profile')}
           className="text-[15px] text-zinc-300 hover:text-white font-medium"
         >
@@ -833,11 +828,11 @@ export default function Cart() {
           scroll container while its flex parent had an indefinite height, so
           it never actually scrolled — dead weight that disabled scroll
           anchoring and would silently break any `position: sticky` child. */}
-      <div className="flex-1">
+      <div className="mx-auto w-full max-w-4xl flex-1">
         {error && (
-          <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between gap-3">
+          <div className="lv-alert lv-alert-danger mx-4 mt-3 flex items-center justify-between gap-3 text-sm text-red-300">
             <span>{error}</span>
-            <button onClick={() => setError('')} className="shrink-0 p-1 hover:text-white"><X className="w-4 h-4" /></button>
+            <button type="button" onClick={() => setError('')} className="shrink-0 p-1 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
         )}
 
@@ -854,19 +849,20 @@ export default function Cart() {
             <ErrorState error={loadError} onRetry={retryLoadCart} next="/cart" />
           </div>
         ) : items.length === 0 ? (
-          <div className="mx-4 mt-6 text-center py-16 text-zinc-500 bg-zinc-900/40 rounded-2xl border border-zinc-800/70 flex flex-col items-center gap-4">
+          <div className="lv-surface mx-4 mt-6 flex flex-col items-center gap-4 py-14 text-center text-text-muted">
             <ShoppingCart className="w-10 h-10 text-zinc-700" />
             <p>{loc('سلتك فارغة', 'Your cart is empty.', 'سەبەتەکەت بەتاڵە.')}</p>
             <button
+              type="button"
               onClick={() => navigate('/products')}
-              className="bg-gold text-black font-black min-h-[44px] px-6 rounded-xl text-sm hover:brightness-110 transition-[filter] duration-150"
+              className="lv-button lv-button-primary px-6"
             >
               {loc('تسوق الآن', 'Shop now', 'ئێستا بکڕە')}
             </button>
           </div>
         ) : (
         <>
-        <div className="bg-zinc-900/40 border-y border-zinc-800/70 pb-4">
+        <div className="bg-surface pb-3 sm:mx-4 sm:mt-4 sm:rounded-xl">
           {/* Group Header */}
           <div className="px-4 py-3 flex items-center gap-2">
             <span className="text-zinc-300 text-[15px] font-medium">
@@ -892,7 +888,7 @@ export default function Cart() {
               // A hairline between rows: the list had no separation at all, so
               // three products read as one dense block. `last:` keeps the
               // group's own bottom edge clean.
-              <div key={item.id} className="px-4 py-4 flex gap-3 border-b border-white/[0.06] last:border-b-0">
+              <div key={item.id} className="max-w-full px-2.5 sm:px-4 py-3.5 flex gap-1.5 sm:gap-3 border-b border-border-subtle last:border-b-0">
                 {/* A 22px dot inside a 44px target: the dot is the design, the
                     target is what a thumb actually hits. It was a bare <div>
                     with an onClick — unreachable by keyboard and silent to a
@@ -903,21 +899,22 @@ export default function Cart() {
                   aria-checked={selected}
                   aria-label={itemName(item)}
                   onClick={() => toggleSelect(item.id)}
-                  className="shrink-0 w-11 min-h-[44px] pt-6 flex items-start justify-center -ms-2 [touch-action:manipulation]"
+                  className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
                 >
                   <span
                     aria-hidden="true"
-                    className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors ${
-                      selected ? 'bg-gold border-gold' : 'border-zinc-600'
+                    className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+                      selected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
                     }`}
                   >
-                    {selected && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />}
+                    {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
                   </span>
                 </button>
 
                 {/* Product Image */}
                 <div
-                  className="w-[100px] h-[100px] shrink-0 rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
+                  data-cart-item-image
+                  className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-zinc-900 cursor-pointer"
                   onClick={() => navigate(`/product/${item.slug}`)}
                 >
                   <SafeImage
@@ -937,13 +934,14 @@ export default function Cart() {
                 </div>
 
                 {/* Product Details */}
-                <div className="flex-1 flex flex-col justify-between">
+                <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="text-zinc-200 text-[14px] leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+                    <h3 data-cart-item-title className="text-zinc-200 text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
 
                     <div className="flex flex-wrap gap-1.5 mb-1.5">
                       {hasVariants && (
                         <button
+                          type="button"
                           onClick={() => openVariantModal(item)}
                           aria-invalid={incomplete || undefined}
                           className={`rounded px-2 py-1 flex items-center gap-1 w-max border ${
@@ -983,8 +981,8 @@ export default function Cart() {
                     </div>
                   </div>
 
-                  <div className="flex items-baseline gap-1.5 mb-2 mt-1">
-                    <span className="text-white font-bold text-[17px] tabular-nums">{formatIqd(item.unit_price_iqd)}</span>
+                  <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
+                    <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{formatIqd(item.unit_price_iqd)}</span>
                     {hasSale && (
                       <>
                         <span className="text-zinc-500 text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
@@ -1058,25 +1056,15 @@ export default function Cart() {
                   )}
 
                   {(item.warranty_plans ?? []).length > 0 && (() => {
-                    const plans = item.warranty_plans ?? [];
-                    const open = warrantyOpen.has(item.id);
-                    const current = plans.find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
-                    const panelId = `ext-warranty-${item.id}`;
-                    const saving = warrantySavingId === item.id;
-                    const radio = (checked: boolean) =>
-                      `w-full min-h-[44px] px-3 py-2 rounded-xl border flex items-center justify-between gap-3 text-start text-[13px] transition-colors press-scale disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
-                        checked ? 'border-gold bg-gold/15 text-gold font-bold' : 'border-zinc-700 bg-zinc-800/40 text-zinc-200 hover:border-zinc-500'
-                      }`;
+                    const current = (item.warranty_plans ?? []).find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;
                     return (
                       <div className="mb-2" data-cart-ext-warranty={item.id}>
                         <button
                           type="button"
-                          aria-expanded={open}
-                          aria-controls={panelId}
-                          onClick={() => toggleWarranty(item.id)}
-                          className={`w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
-                            current ? 'border-gold/40 bg-gold/[0.06]' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
-                          }`}
+                          aria-haspopup="dialog"
+                          onClick={() => setWarrantyPickerId(item.id)}
+                          className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          data-selected={!!current}
                         >
                           <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-zinc-400'}`} aria-hidden="true" />
                           <span className="min-w-0 flex-1">
@@ -1085,89 +1073,8 @@ export default function Cart() {
                               {current ? `${warrantyPlanLabel(current)} · +${formatIqd(current.fee_iqd)}` : ew.none}
                             </span>
                           </span>
-                          <ChevronDown
-                            className={`w-3.5 h-3.5 text-zinc-500 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
-                            aria-hidden="true"
-                          />
+                          <ChevronRight className={`w-3.5 h-3.5 text-zinc-500 shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
                         </button>
-
-                        {/* The panel unfolds on the house `quick` spring and folds
-                            back the same way; under reduced motion it cross-fades.
-                            The id lives on the always-present wrapper so
-                            aria-controls resolves whether the panel is open or not. */}
-                        <div id={panelId}>
-                          <AnimatePresence initial={false}>
-                            {open && (
-                              <motion.div
-                                key="panel"
-                                initial={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                                animate={m.reduced ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
-                                exit={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                                transition={m.spring('quick')}
-                                className="overflow-hidden"
-                              >
-                                <div
-                                  role="radiogroup"
-                                  aria-label={ew.title}
-                                  aria-busy={saving || undefined}
-                                  className="mt-1.5 rounded-xl border border-zinc-800 bg-black/30 p-2 flex flex-col gap-1.5"
-                                >
-                                  <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={!current}
-                                    disabled={saving}
-                                    onClick={() => chooseWarranty(item, '')}
-                                    className={radio(!current)}
-                                    data-cart-warranty-plan=""
-                                  >
-                                    <span className="min-w-0">
-                                      <span className="block truncate">{ew.none}</span>
-                                      <span className={`block text-[11px] font-normal ${!current ? 'text-gold/80' : 'text-zinc-500'}`}>{ew.noneHint}</span>
-                                    </span>
-                                    {saving && warrantyPendingPlan === '' ? <Spinner size="xs" delayMs={0} decorative /> : null}
-                                  </button>
-                                  {plans.map((w) => {
-                                    const checked = current?.id === w.id;
-                                    return (
-                                      <button
-                                        key={w.id}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={checked}
-                                        disabled={saving}
-                                        onClick={() => chooseWarranty(item, w.id)}
-                                        className={radio(checked)}
-                                        data-cart-warranty-plan={w.id}
-                                      >
-                                        <span className="min-w-0 truncate tabular-nums">{warrantyPlanLabel(w)}</span>
-                                        <span className="tabular-nums shrink-0 text-[12.5px]">
-                                          {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${formatIqd(w.fee_iqd)}`}
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                  <p className="text-[11px] text-zinc-500 leading-relaxed px-0.5">
-                                    {ew.perLine(item.qty)} {ew.beforeOrder}
-                                  </p>
-                                  {warrantyErrors[item.id] && (
-                                    <p role="alert" className="text-[11.5px] text-red-400 px-0.5">
-                                      {warrantyErrors[item.id]}
-                                    </p>
-                                  )}
-                                  <Link
-                                    to="/policies/extended_warranty"
-                                    className="inline-flex items-center gap-1.5 self-start px-0.5 min-h-[32px] text-[11.5px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
-                                    data-cart-warranty-policy
-                                  >
-                                    <FileText className="w-3.5 h-3.5" aria-hidden="true" />
-                                    {ew.policy}
-                                  </Link>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
                       </div>
                     );
                   })()}
@@ -1185,7 +1092,7 @@ export default function Cart() {
                       added to the total. Gold: the store's own terms, the
                       same tone the product page and the order use. */}
                   {item.is_printer && printerNoteIqd !== null && (
-                    <Note tone="gold" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2" testId="cart-printer-note">
+                    <Note tone="zinc" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2 !border-x-0 !border-e-0 !border-y-0 !rounded-none !bg-transparent !py-1.5 !ps-2.5 !pe-0 !text-[11px] text-text-muted" testId="cart-printer-note">
                       {printerNoteText(formatIqd(printerNoteIqd))}
                     </Note>
                   )}
@@ -1222,8 +1129,8 @@ export default function Cart() {
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* THE CAP IS THE SERVER'S, AND THE STEPPER DISABLES AT IT
                           (§10). A composition line's `stock` is NULL for ever by
                           design (§1.2), so the scarcity line below could never
@@ -1239,19 +1146,19 @@ export default function Cart() {
                           places. The minus no longer doubles as a delete: the
                           Delete button beside it is the one removal path, so a
                           mis-tap at qty 1 can no longer empty a line. */}
-                      <div className="flex items-center rounded-xl border border-zinc-800 bg-zinc-900/70 overflow-hidden">
+                      <div className="flex items-center rounded-lg bg-surface-raised overflow-hidden">
                         <button
                           type="button"
                           aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
                           onClick={() => updateQuantity(item, -1)}
                           disabled={item.qty <= 1}
-                          className="w-11 h-11 flex items-center justify-center text-zinc-300 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+                          className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           <Minus aria-hidden="true" className="w-4 h-4" />
                         </button>
                         <span
                           aria-live="polite"
-                          className="w-9 h-11 flex items-center justify-center text-[15px] font-bold text-white tabular-nums border-x border-zinc-800"
+                          className="w-9 h-11 flex items-center justify-center text-[15px] font-bold text-white tabular-nums border-x border-border-subtle"
                         >
                           {item.qty}
                         </span>
@@ -1260,7 +1167,7 @@ export default function Cart() {
                           aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
                           onClick={() => updateQuantity(item, 1)}
                           disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
-                          className="w-11 h-11 flex items-center justify-center text-zinc-300 disabled:opacity-35 active:bg-zinc-800 transition-colors [touch-action:manipulation]"
+                          className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           <Plus aria-hidden="true" className="w-4 h-4" />
                         </button>
@@ -1287,7 +1194,7 @@ export default function Cart() {
                     <button
                       type="button"
                       onClick={() => deleteItem(item)}
-                      className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/70 text-[13px] font-medium text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors [touch-action:manipulation]"
+                      className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
                     >
                       {loc('حذف', 'Delete', 'سڕینەوە')}
                     </button>
@@ -1299,7 +1206,7 @@ export default function Cart() {
         </div>
 
         {/* Deals Row */}
-        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 flex flex-col">
+        <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
           <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-zinc-900/30 transition-colors">
             <div className="flex items-center gap-2">
               <svg viewBox="0 0 24 24" className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1385,7 +1292,7 @@ export default function Cart() {
             §3.3: separate from the discount coupon and from points, shown
             automatically when a share link brought one, removable for good,
             enterable by hand, and with ZERO effect on any amount below. */}
-        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 flex flex-col">
+        <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
           <button
             type="button"
             onClick={() => setSupportOpen((v) => !v)}
@@ -1544,7 +1451,7 @@ export default function Cart() {
         </div>
 
         {/* Summary Details */}
-        <div className="mt-2 bg-zinc-900/40 border-y border-zinc-800/70 p-4 mb-4 flex flex-col gap-3">
+        <div className="mt-2 bg-surface p-4 mb-4 flex flex-col gap-3 sm:mx-4 sm:rounded-xl">
           <h3 className="text-white font-bold text-[16px] mb-1">{loc('ملخص الطلب', 'Order Summary', 'کورتەی داواکاری')}</h3>
 
           <div className="flex justify-between items-center">
@@ -1621,11 +1528,11 @@ export default function Cart() {
       {!loading && items.length > 0 && (
         <div
           data-testid="cart-summary-bar"
-          className="fixed inset-x-3 bottom-[var(--nav-stack)] md:inset-x-0 md:mx-auto md:w-auto md:max-w-md z-[130] rounded-2xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.55)] px-4 py-3"
+          className="fixed inset-x-3 bottom-[var(--nav-stack)] z-[130] rounded-xl border border-border-subtle bg-surface-raised/98 px-3 py-3 shadow-2xl sm:px-4 md:inset-x-0 md:mx-auto md:w-auto md:max-w-md"
         >
           {/* A FIXED ROW HEIGHT. The savings line used to mount and unmount as
               items were ticked, so the bar grew and shrank while being used. */}
-          <div className="w-full min-h-[48px] flex items-center justify-between gap-3">
+          <div className="grid w-full min-h-[48px] grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
             <button
               type="button"
               role="checkbox"
@@ -1635,11 +1542,11 @@ export default function Cart() {
             >
               <span
                 aria-hidden="true"
-                className={`w-[22px] h-[22px] rounded-full border flex items-center justify-center transition-colors ${
-                  allSelected ? 'bg-gold border-gold' : 'border-zinc-600'
+                className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+                  allSelected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
                 }`}
               >
-                {allSelected && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3} />}
+                {allSelected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
               </span>
               <span className="text-zinc-300 text-[14px] whitespace-nowrap">
                 {loc('الكل', 'All', 'هەموو')}
@@ -1673,7 +1580,7 @@ export default function Cart() {
                   state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
                 })
               }
-              className="bg-gold text-black font-black min-h-[48px] px-5 rounded-xl text-[15px] tabular-nums shrink-0 whitespace-nowrap hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed transition-[filter,opacity] duration-150 active:scale-[0.985] [touch-action:manipulation]"
+              className="lv-button lv-button-primary col-span-2 w-full min-h-[48px] px-5 text-[15px] tabular-nums shrink-0 whitespace-nowrap active:scale-[0.985] [touch-action:manipulation] sm:col-auto sm:w-auto"
               disabled={
                 selectedCount === 0 ||
                 // The server refuses an incomplete line at checkout; say so here
@@ -1690,6 +1597,104 @@ export default function Cart() {
           </div>
         </div>
       )}
+
+      {/* Warranty choices are portalled above the bottom navigation and use
+          the visual viewport instead of the narrow cart row. This is the
+          shared mobile-safe selector path for 320px screens and RTL labels. */}
+      <Sheet
+        open={!!warrantyItem}
+        onClose={() => warrantySavingId === null && setWarrantyPickerId(null)}
+        label={ew.title}
+        dismissOnEscape={warrantySavingId === null}
+        dismissOnScrim={warrantySavingId === null}
+        testId="cart-warranty-sheet"
+        panelClassName="w-full max-w-full sm:max-w-md max-h-[min(82dvh,42rem)] overflow-hidden"
+      >
+        {warrantyItem && (() => {
+          const plans = warrantyItem.warranty_plans ?? [];
+          const current = plans.find((w) => w.id === (warrantyItem.warranty_plan_id ?? '')) ?? null;
+          const saving = warrantySavingId === warrantyItem.id;
+          const radio = (checked: boolean) =>
+            `lv-choice w-full min-w-0 min-h-[48px] px-3 py-2.5 flex items-center justify-between gap-3 text-start text-[13px] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${checked ? 'bg-surface-selected' : ''}`;
+          return (
+            <div className="flex max-h-[min(78dvh,39rem)] min-w-0 flex-col">
+              <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-1">
+                <div className="min-w-0">
+                  <h2 className="truncate text-[15px] font-semibold text-text-primary">{ew.title}</h2>
+                  <p className="truncate text-[11px] text-text-muted">{itemName(warrantyItem)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWarrantyPickerId(null)}
+                  disabled={saving}
+                  aria-label={loc('إغلاق', 'Close', 'داخستن')}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div
+                role="radiogroup"
+                aria-label={ew.title}
+                aria-busy={saving || undefined}
+                className="min-w-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!current}
+                  disabled={saving}
+                  onClick={() => chooseWarranty(warrantyItem, '')}
+                  className={radio(!current)}
+                  data-cart-warranty-plan=""
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-text-primary">{ew.none}</span>
+                    <span className="block truncate text-[11px] font-normal text-text-muted">{ew.noneHint}</span>
+                  </span>
+                  {saving && warrantyPendingPlan === '' ? <Spinner size="xs" delayMs={0} decorative /> : <Check className={`h-4 w-4 shrink-0 ${!current ? 'text-text-primary' : 'invisible'}`} aria-hidden="true" />}
+                </button>
+                {plans.map((w) => {
+                  const checked = current?.id === w.id;
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={checked}
+                      disabled={saving}
+                      onClick={() => chooseWarranty(warrantyItem, w.id)}
+                      className={radio(checked)}
+                      data-cart-warranty-plan={w.id}
+                    >
+                      <span className="min-w-0 truncate tabular-nums text-text-primary">{warrantyPlanLabel(w)}</span>
+                      <span className="flex shrink-0 items-center gap-2 tabular-nums text-[12px] text-text-secondary">
+                        {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${formatIqd(w.fee_iqd)}`}
+                        <Check className={`h-4 w-4 ${checked ? 'text-text-primary' : 'invisible'}`} aria-hidden="true" />
+                      </span>
+                    </button>
+                  );
+                })}
+                <p className="px-1 pt-1 text-[11px] leading-relaxed text-text-muted">
+                  {ew.perLine(warrantyItem.qty)} {ew.beforeOrder}
+                </p>
+                {warrantyErrors[warrantyItem.id] && (
+                  <p role="alert" className="px-1 text-[11.5px] text-danger">{warrantyErrors[warrantyItem.id]}</p>
+                )}
+                <Link
+                  to="/policies/extended_warranty"
+                  onClick={() => setWarrantyPickerId(null)}
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded px-1 text-[11.5px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  data-cart-warranty-policy
+                >
+                  <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                  {ew.policy}
+                </Link>
+              </div>
+            </div>
+          );
+        })()}
+      </Sheet>
 
       {/* ------------------------------------------------------ variant sheet
           A SHEET, NOT A DIALOG. This is a customer reconsidering the colour
@@ -1752,7 +1757,7 @@ export default function Cart() {
                   )}
                 </div>
               </div>
-              <button onClick={() => setVariantModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setVariantModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1768,14 +1773,17 @@ export default function Cart() {
                     return (
                       <button
                         key={c.id}
+                        type="button"
                         onClick={() => setPendingColorId(active ? '' : c.id)}
-                        className={`px-4 py-2 rounded-lg border text-sm flex items-center gap-2 ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
+                        aria-pressed={active}
+                        className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
                       >
                         <span
                           className="w-3.5 h-3.5 rounded-full border border-zinc-600 inline-block"
                           style={c.gradient ? { background: c.gradient } : { backgroundColor: c.hex || '#333' }}
                         ></span>
-                        {cName}
+                        <span>{cName}</span>
+                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
                     );
                   })}
@@ -1793,11 +1801,13 @@ export default function Cart() {
                     return (
                       <button
                         key={o.id}
+                        type="button"
                         onClick={() => setPendingOptionId(active ? '' : o.id)}
-                        className={`px-4 py-2 rounded-lg border text-sm ${active ? 'border-gold/60 text-gold bg-gold/10' : 'border-zinc-800 text-zinc-300 bg-zinc-900/60 hover:border-zinc-600'}`}
+                        aria-pressed={active}
+                        className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
                       >
-                        {oName}
-                        {typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${formatIqd(o.price_iqd)}` : ''}
+                        <span>{oName}{typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${formatIqd(o.price_iqd)}` : ''}</span>
+                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
                     );
                   })}
@@ -1810,9 +1820,10 @@ export default function Cart() {
             )}
 
             <button
+              type="button"
               onClick={confirmVariant}
               disabled={variantSaving}
-              className="w-full mt-4 bg-gold text-black font-black min-h-[48px] rounded-xl hover:brightness-110 transition-[filter] duration-150 disabled:opacity-45 flex items-center justify-center gap-2"
+              className="lv-button lv-button-primary mt-4 w-full min-h-[48px]"
             >
               {variantSaving && <Spinner size="xs" delayMs={0} decorative />}
               {variantSaving ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('تأكيد', 'Confirm', 'دڵنیاکردنەوە')}
@@ -1857,7 +1868,7 @@ export default function Cart() {
                 <h3 id="cart-shipping-sheet-title" className="text-white font-bold text-[17px]">{loc('طريقة الشحن', 'Shipping Method', 'شێوازی گەیاندن')}</h3>
                 <p className="text-zinc-400 text-sm mt-1">{loc('اختر طريقة الشحن المفضلة لهذا المنتج', 'Choose your preferred shipping method for this item', 'شێوازی گەیاندنی دڵخوازت بۆ ئەم بەرهەمە دیاری بکە')}</p>
               </div>
-              <button onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1879,30 +1890,30 @@ export default function Cart() {
                 return (
                   <button
                     key={sm.id}
+                    type="button"
                     // The LIVE line, not the one being rendered: the panel
                     // stays on screen for the length of its exit, and a tap
                     // that lands there must not patch a row the cart has
                     // already retired.
                     onClick={() => shippingItem && chooseShipping(shippingItem, sm.id)}
                     disabled={shippingSaving}
-                    className={`flex items-start justify-between p-4 rounded-xl border transition-all text-left w-full disabled:opacity-60 ${active ? 'border-gold/60 bg-gold/10' : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-600'}`}
+                    aria-pressed={active}
+                    className="lv-choice flex w-full items-start justify-between gap-3 p-4 text-start disabled:opacity-60"
                   >
                     <div className="flex-1">
-                      <p className={`font-bold text-[15px] ${active ? 'text-gold' : 'text-zinc-200'}`}>
+                      <p className="font-bold text-[15px] text-text-primary">
                         {title}
                       </p>
                       {desc && (
                         <p className="text-zinc-500 text-xs mt-1">{desc}</p>
                       )}
                       {typeof sm.price_iqd === 'number' && sm.price_iqd > 0 && (
-                        <p className={`text-[13px] mt-1.5 font-bold ${active ? 'text-gold' : 'text-zinc-300'}`}>
+                        <p className="text-[13px] mt-1.5 font-bold text-text-secondary">
                           {formatIqd(sm.price_iqd)}
                         </p>
                       )}
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${active ? 'border-gold' : 'border-zinc-600'}`}>
-                      {active && <div className="w-2.5 h-2.5 rounded-full bg-gold" />}
-                    </div>
+                    <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
                   </button>
                 );
               })}

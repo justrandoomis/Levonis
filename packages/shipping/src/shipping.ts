@@ -61,14 +61,41 @@ export interface ShippingItem {
   size_class: 'ordinary' | 'printer_small' | 'printer_large' | null | undefined;
   /** filament spools count toward the carton threshold */
   is_spool?: boolean;
+  /**
+   * Product-owned last-mile rules. `undefined` is deliberately different
+   * from an object whose methods are disabled: undefined is a legacy product
+   * and keeps the pre-existing global tariff, while an explicit object is the
+   * product's authoritative allow-list for standard/personal delivery.
+   */
+  delivery?: ProductDeliveryOptions;
+}
+
+export type ProductDeliveryMethod = 'standard' | 'personal';
+
+export interface ProductDeliveryRule {
+  enabled: boolean;
+  /** Number of units covered by one fee block. Integer >= 1. */
+  quantity_step: number;
+  /** Integer IQD charged for each started block. */
+  fee_iqd: number;
+}
+
+export interface ProductDeliveryOptions {
+  standard: ProductDeliveryRule;
+  personal: ProductDeliveryRule;
 }
 
 export interface ShippingComponent {
-  kind: 'ordinary' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
+  kind: 'ordinary' | 'product' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
   fee_iqd: number;
   waived: boolean;
   units: number;
   advance_required: boolean;
+  /** Present only for a product-owned delivery component. */
+  product_id?: string;
+  method?: ProductDeliveryMethod;
+  quantity_step?: number;
+  fee_per_step_iqd?: number;
 }
 
 export interface ShippingQuote {
@@ -88,12 +115,42 @@ export interface ShippingQuote {
   reasons: string[];            // human-readable why lines (for the UI)
 }
 
+/** Integer-only implementation of ceil(qty / step) * fee. */
+export function productDeliveryFeeIqd(quantity: number, rule: ProductDeliveryRule): number {
+  const qty = Math.max(0, Math.trunc(quantity));
+  if (!rule.enabled || qty === 0) return 0;
+  const step = Math.max(1, Math.trunc(rule.quantity_step));
+  const fee = Math.max(0, Math.trunc(rule.fee_iqd));
+  return Math.ceil(qty / step) * fee;
+}
+
+/**
+ * Whether a cart can use a product-scoped delivery method. Legacy items do
+ * not constrain the method because they are priced by the existing global
+ * policy. A configured product is an explicit allow-list and fails closed.
+ */
+export function productDeliveryMethodAvailable(
+  items: ShippingItem[],
+  method: ProductDeliveryMethod
+): { available: boolean; unavailable_product_ids: string[] } {
+  const unavailable = items
+    .filter((item) => item.qty > 0 && item.delivery !== undefined && item.delivery[method]?.enabled !== true)
+    .map((item) => item.product_id);
+  return { available: unavailable.length === 0, unavailable_product_ids: [...new Set(unavailable)] };
+}
+
 export function quoteShipping(input: {
   items: ShippingItem[];
+  /** Standard/personal checkout method. Omitted by legacy pure callers. */
+  deliveryMethod?: ProductDeliveryMethod;
   /** merchandise value per the configured basis (integer IQD) */
   merchandiseIqd: number;
   tier: 'free' | 'plus' | 'pro' | 'prime';
   tierActive: boolean;
+  /** Canonical server entitlement flags. Older pure callers may omit them;
+   *  production checkout always supplies them from entitlements.ts. */
+  proShippingEntitled?: boolean;
+  premiumShippingEntitled?: boolean;
   atApprovedDefaultAddress: boolean;
   /** PRIME basis (§5): merchandise AFTER product discounts, coupons and
    *  points, BEFORE delivery. It is a distinct number from `merchandiseIqd`,
@@ -117,23 +174,28 @@ export function quoteShipping(input: {
   let spoolUnits = 0;
   for (const it of input.items) {
     const qty = Math.max(0, Math.trunc(it.qty));
-    if (it.size_class === 'printer_small') printers.printer_small += qty;
-    else if (it.size_class === 'printer_large') printers.printer_large += qty;
-    else ordinaryUnits += qty;
+    // A product with explicit delivery options is priced below by its own
+    // rule. It must never also enter the legacy ordinary/printer tariff.
+    if (it.delivery === undefined) {
+      if (it.size_class === 'printer_small') printers.printer_small += qty;
+      else if (it.size_class === 'printer_large') printers.printer_large += qty;
+      else ordinaryUnits += qty;
+    }
     if (it.is_spool) spoolUnits += qty;
   }
 
   // PRO waiver eligibility — CONFIRMED: PRO only, approved default address
   // only, strictly greater than the threshold.
+  const proEntitled = input.proShippingEntitled ?? (input.tier === 'pro' && input.tierActive);
+  const premiumEntitled = input.premiumShippingEntitled ?? (input.tier === 'prime' && input.tierActive);
   const proEligible =
-    input.tier === 'pro' &&
-    input.tierActive &&
+    proEntitled &&
     input.atApprovedDefaultAddress &&
     input.merchandiseIqd > config.pro_threshold_iqd;
-  if (input.tier === 'pro' && input.tierActive && input.atApprovedDefaultAddress && !proEligible) {
+  if (proEntitled && input.atApprovedDefaultAddress && !proEligible) {
     reasons.push(`PRO free delivery requires order value above ${config.pro_threshold_iqd.toLocaleString()} IQD (strictly greater).`);
   }
-  if (input.tier === 'pro' && input.tierActive && !input.atApprovedDefaultAddress) {
+  if (proEntitled && !input.atApprovedDefaultAddress) {
     reasons.push('Alternate delivery address selected — ordinary pricing applies for this order (PRO benefits restore automatically at your approved address).');
   }
 
@@ -142,9 +204,8 @@ export function quoteShipping(input: {
   // requirement is imposed: the owner stated that rule for PRO alone, and
   // inventing an extra condition would silently deny a paid benefit.
   const primeBasis = input.primeMerchandiseIqd ?? input.merchandiseIqd;
-  const primeEligible =
-    input.tier === 'prime' && input.tierActive && primeBasis > config.prime_threshold_iqd;
-  if (input.tier === 'prime' && input.tierActive && !primeEligible) {
+  const primeEligible = premiumEntitled && primeBasis > config.prime_threshold_iqd;
+  if (premiumEntitled && !primeEligible) {
     reasons.push(
       `LEVO PRIME free delivery needs an order above ${config.prime_threshold_iqd.toLocaleString()} IQD (strictly greater; ${config.prime_threshold_iqd.toLocaleString()} itself does not qualify).`
     );
@@ -161,6 +222,39 @@ export function quoteShipping(input: {
     assumptions.push('prime_waiver_covers=all (owner has not extended PRIME beyond ordinary delivery)');
   }
   const independent = input.independentFreeDelivery === true;
+
+  // Product-owned fees. The server supplies deliveryMethod from the selected
+  // checkout method; callers that omit it keep the historical quote exactly.
+  if (input.deliveryMethod) {
+    for (const item of input.items) {
+      if (item.delivery === undefined || item.qty <= 0) continue;
+      const rule = item.delivery[input.deliveryMethod];
+      if (!rule?.enabled) {
+        needs.push(`product:${item.product_id}:${input.deliveryMethod}_unavailable`);
+        reasons.push(`${input.deliveryMethod} delivery is unavailable for product ${item.product_id}.`);
+        continue;
+      }
+      const fee = productDeliveryFeeIqd(item.qty, rule);
+      // PREMIUM covers standard delivery only. PRO can cover a personal rule
+      // only when the owner's existing policy explicitly says "all".
+      const waived =
+        independent ||
+        (input.deliveryMethod === 'standard'
+          ? waiverOrdinary
+          : proEligible && config.pro_waiver_covers === 'all');
+      components.push({
+        kind: 'product',
+        product_id: item.product_id,
+        method: input.deliveryMethod,
+        quantity_step: Math.max(1, Math.trunc(rule.quantity_step)),
+        fee_per_step_iqd: Math.max(0, Math.trunc(rule.fee_iqd)),
+        fee_iqd: fee,
+        waived,
+        units: Math.max(0, Math.trunc(item.qty)),
+        advance_required: false,
+      });
+    }
+  }
 
   // Ordinary component: one flat fee per order when any ordinary unit ships.
   if (ordinaryUnits > 0) {

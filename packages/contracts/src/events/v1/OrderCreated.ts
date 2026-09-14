@@ -9,7 +9,7 @@ const shape = {
   seller_type: sellerType,
   merchant_id: idOrNull,
   store_id: idOrNull,
-  payment_state: oneOf('authorized', 'cod'), // authorized = hold placed, debit not yet committed; paid arrives as OrderPaid
+  payment_state: oneOf('authorized', 'cod', 'financed'), // financed = approved PRO BNPL ledger charge
   items: orderItemRefs, // references, not snapshots (queue-message cap)
   totals: obj({ merchandise_iqd: nonNegInt, delivery_iqd: nonNegInt, discount_iqd: nonNegInt, total_iqd: nonNegInt }),
   payment: obj({ method: paymentMethod, wallet_usd_cents: nonNegInt, points: nonNegInt, cod_iqd: nonNegInt, exchange_rate: num }),

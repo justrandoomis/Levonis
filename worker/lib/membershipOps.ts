@@ -12,8 +12,7 @@
 import type { Env } from './types';
 import { printerProductIds } from './printerIdentity';
 import { getSetting } from './settings';
-import { benefits, getLaunchConfig, getTierStatus } from './entitlements';
-import { TIER_RANK } from './pricing';
+import { benefits, getLaunchConfig, getTierStatus, tierInherits } from './entitlements';
 import { newId } from './crypto';
 import { audit } from './audit';
 import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
@@ -339,7 +338,8 @@ export async function validateCoupon(env: Env, userId: string, code: string, tot
     const status = await getTierStatus(env.DB, userId);
     const tierOk =
       benefits.exclusiveCoupons(status) &&
-      (TIER_RANK[status.tier] ?? 0) >= (TIER_RANK[coupon.tier_required] ?? Number.POSITIVE_INFINITY);
+      (coupon.tier_required === 'plus' || coupon.tier_required === 'prime' || coupon.tier_required === 'pro') &&
+      tierInherits(status.tier, coupon.tier_required);
     if (!tierOk) return { ok: false, reason: 'TIER_REQUIRED' };
   }
 

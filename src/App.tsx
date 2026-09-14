@@ -60,11 +60,14 @@ const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
  * looks exactly like a session resolving and the page never flashes a second
  * kind of "loading".
  */
-const RouteFallback = () => (
-  <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
-    <span className="sr-only">…</span>
-  </div>
-);
+const RouteFallback = () => {
+  useCharacterBusy(true);
+  return (
+    <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
+      <span className="sr-only">…</span>
+    </div>
+  );
+};
 
 // -------------------------------------------------------------- prefetching
 
@@ -205,6 +208,9 @@ const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
+import AppIntro from './components/bloub/AppIntro';
+import { MotionCharacterFallbackHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
+import { homeCriticalReadyStore } from './lib/appBootstrap';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
@@ -240,6 +246,7 @@ function StorefrontApp() {
   const { store } = useStore();
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
+      <MotionCharacterFallbackHeader />
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Storefront store={store} />} />
@@ -247,6 +254,9 @@ function StorefrontApp() {
         <Route path="/about" element={<Storefront store={store} />} />
         <Route path="/reviews" element={<Storefront store={store} />} />
         <Route path="/p/:productSlug" element={<StorefrontProduct />} />
+        <Route path="/policy" element={<Policies />} />
+          <Route path="/policies" element={<Policies />} />
+        <Route path="/policies/:key" element={<Policies />} />
         {/* Account, cart and checkout are the PLATFORM's, reached from the
             shop. They are deliberately not re-implemented per store: one
             cart, one checkout, one order history (§94). */}
@@ -262,6 +272,27 @@ function StorefrontApp() {
       </Suspense>
     </div>
   );
+}
+
+/**
+ * Readiness belongs to the app shell, not to a timer. On Home we wait for its
+ * critical request to settle (success or an actionable error); elsewhere the
+ * authenticated shell and hostname resolution are the critical work. This
+ * component is a sibling of AppContent so the SAME intro node survives the
+ * unresolved-host fallback becoming the real application.
+ */
+function AppBootstrapLayer() {
+  const location = useLocation();
+  const { isLoaded } = useAuth();
+  const { store, resolved, unknownStore } = useStore();
+  const homeReady = React.useSyncExternalStore(
+    homeCriticalReadyStore.subscribe,
+    homeCriticalReadyStore.snapshot,
+    homeCriticalReadyStore.serverSnapshot
+  );
+  const mainHomeNeedsData = !store && !unknownStore && location.pathname === '/';
+
+  return <AppIntro ready={resolved && isLoaded && (!mainHomeNeedsData || homeReady)} />;
 }
 
 function AppContent() {
@@ -303,11 +334,12 @@ function AppContent() {
   // it to the other <Routes> block and render a different tree for the same
   // page. Comparing the way the router does keeps the two in step.
   const pathForShell = location.pathname.toLowerCase();
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/model-viewer'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
 
   if (isFullScreenRoute) {
     return (
-      <div className="h-[100dvh] flex flex-col font-sans overflow-hidden bg-white dark:bg-black">
+      <div className="h-[100dvh] min-h-0 flex flex-col font-sans overflow-hidden bg-canvas text-text-primary">
+        <MotionCharacterFallbackHeader />
         <main className="flex-1 flex overflow-hidden">
           <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -374,6 +406,12 @@ function AppContent() {
               }
             />
             <Route path="/support" element={<Support />} />
+            {/* A conversation owns the mobile viewport: its message list is
+                the one scroll region and its composer stays in normal flex
+                flow above the keyboard/safe area. Keeping it in the regular
+                page shell used to create two scroll owners and forced a fixed
+                composer to cover the last messages. */}
+            <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             {/* PUBLIC BY DESIGN, AND THAT IS THE WHOLE POINT OF THE TOKEN.
                 A print model belongs to the customer, so the preview is not
                 gated on being signed in — it is gated on holding a token that
@@ -421,6 +459,7 @@ function AppContent() {
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
       <Header />
+      {navHidden && <MotionCharacterFallbackHeader />}
       {/* Single intentional background: uniform LEVONIS black (matches
           html/body/#root in index.css). The previous diagonal gradient into
           olive-green (hex 1a210e) painted an unintended glow in the bottom
@@ -486,7 +525,6 @@ function AppContent() {
               state for the private conversation list, and every /api/chats
               read is still authorised server-side. */}
           <Route path="/chats" element={<Chats />} />
-          <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
           <Route path="/bundles" element={<Bundles />} />
@@ -503,6 +541,7 @@ function AppContent() {
               call and reads no user object, so there was nothing for a
               sign-in to protect. */}
           <Route path="/tools" element={<Tools />} />
+          <Route path="/policy" element={<Policies />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/policies/:key" element={<Policies />} />
           {/* §3.1 — referrals live on their own page, reached from the icon
@@ -539,6 +578,7 @@ export default function App() {
         <WalletProvider>
           <Router>
             <StoreProvider>
+              <AppBootstrapLayer />
               <AppContent />
             </StoreProvider>
           </Router>

@@ -1,11 +1,15 @@
 import { Hono } from 'hono';
 import type { AppContext, Env } from '../lib/types';
-import { requireAdmin, badRequest, str } from '../lib/http';
+import { requireAdmin, badRequest, notFound, str, unavailable } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { validateOutboundUrl } from '../lib/fetchGuard';
 import { sniff } from './uploads';
 import { extractPageImages, imageCandidates, isVendorHost } from '../lib/pageImages';
+import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, putMediaObject } from '../lib/mediaStorage';
+import { currentMediaReferences, hasDedicatedBucket, inventoryLegacyMedia, planLegacyMediaKey } from '../lib/mediaMigration';
+import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
+import { newId } from '../lib/crypto';
 
 /**
  * Image ingestion — POST /api/admin/media/ingest.
@@ -183,11 +187,22 @@ export async function ingestImageUrl(
     const sha = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
     const key = `products/import/${sha}.${kind.ext}`;
 
-    const existing = await env.BUCKET.head(key);
+    const existing = await headMediaObject(env, 'public', key);
     if (!existing) {
-      await env.BUCKET.put(key, buf, {
-        httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' },
-      });
+      await putMediaObject(
+        env,
+        {
+          key,
+          visibility: 'public',
+          domain: 'products',
+          entityId: 'import',
+          mime: kind.mime,
+          bytes: buf.byteLength,
+          originalName: new URL(sourceUrl).pathname.split('/').pop() ?? null,
+        },
+        buf,
+        { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
+      );
     }
     return { source_url: sourceUrl, key, url: `/files/${key}`, status: 'stored' };
   } catch (e) {
@@ -311,4 +326,217 @@ mediaRoutes.post('/ingest', requireAdmin, async (c) => {
   });
 
   return c.json({ success: true, results });
+});
+
+// ------------------------------------------------------- safe R2 migration
+
+/**
+ * Read-only, cursor-based inventory. It names orphan CANDIDATES but never
+ * deletes them; every known DB/JSON reference source is considered first.
+ */
+mediaRoutes.get('/migration/inventory', requireAdmin, async (c) => {
+  await rateLimit(c, 'media_migration_inventory', 30, 3600);
+  if (!c.env.BUCKET) throw unavailable('Legacy R2 binding is not configured', 'R2_NOT_CONFIGURED');
+  const cursor = c.req.query('cursor') || undefined;
+  const limitRaw = Number(c.req.query('limit') || 250);
+  const page = await inventoryLegacyMedia(c.env, cursor, Number.isInteger(limitRaw) ? limitRaw : 250);
+  return c.json({ success: true, dry_run: true, ...page });
+});
+
+function replaceExactMedia(value: unknown, oldKey: string, newKey: string): unknown {
+  const oldUrl = `/files/${oldKey}`;
+  const newUrl = `/files/${newKey}`;
+  if (typeof value === 'string') return value === oldKey ? newKey : value === oldUrl ? newUrl : value;
+  if (Array.isArray(value)) return value.map((item) => replaceExactMedia(item, oldKey, newKey));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, replaceExactMedia(v, oldKey, newKey)]));
+  }
+  return value;
+}
+
+async function convertedWebp(env: Env, oldKey: string): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  if (!env.APP_ORIGIN) throw unavailable('APP_ORIGIN is required for Cloudflare image conversion', 'MEDIA_TRANSFORM_NOT_CONFIGURED');
+  const origin = new URL(env.APP_ORIGIN).origin;
+  const encoded = oldKey.split('/').map(encodeURIComponent).join('/');
+  const init = {
+    redirect: 'error',
+    cf: { image: { format: 'webp', quality: 87, fit: 'scale-down', width: 3000 } },
+  } as RequestInit & { cf: { image: Record<string, string | number> } };
+  const response = await fetch(`${origin}/files/${encoded}`, init);
+  if (!response.ok) throw unavailable(`Image transform failed with HTTP ${response.status}`, 'MEDIA_TRANSFORM_UNAVAILABLE');
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > IMAGE_CAP) throw badRequest('Converted image exceeds the 4 MB migration limit');
+  const kind = sniff(bytes);
+  const dimensions = kind?.mime === 'image/webp' ? rasterDimensions(bytes, kind.mime) : null;
+  if (kind?.mime !== 'image/webp' || !validRasterDimensions(dimensions)) {
+    // If Image Resizing is not enabled Cloudflare may return the original PNG.
+    // Nothing is written and references remain untouched.
+    throw unavailable('Cloudflare returned no valid WebP; enable Image Resizing before applying conversion', 'MEDIA_TRANSFORM_UNAVAILABLE');
+  }
+  return { bytes, width: dimensions.width, height: dimensions.height };
+}
+
+/**
+ * Copy one referenced object to its dedicated bucket, or convert a referenced
+ * product PNG/JPEG to WebP. `confirm:true` is mandatory; the default response
+ * is a dry-run plan. The old object is NEVER deleted here.
+ */
+mediaRoutes.post('/migration/apply', requireAdmin, async (c) => {
+  await rateLimit(c, 'media_migration_apply', 40, 3600);
+  if (!c.env.BUCKET) throw unavailable('Legacy R2 binding is not configured', 'R2_NOT_CONFIGURED');
+  const body = (await c.req.json().catch(() => ({}))) as { key?: unknown; confirm?: unknown };
+  const key = str(body.key, 'key', { min: 5, max: 500 });
+  if (!isSafeMediaKey(key)) throw badRequest('Unsafe media key');
+  const refs = await currentMediaReferences(c.env.DB);
+  const plan = planLegacyMediaKey(key, refs.has(key));
+  if (plan.action === 'orphan_candidate' || plan.action === 'manual_review') {
+    return c.json({ success: true, dry_run: true, plan, applied: false });
+  }
+  if (body.confirm !== true) return c.json({ success: true, dry_run: true, plan, applied: false });
+  if (!hasDedicatedBucket(c.env, plan.visibility)) {
+    throw unavailable(`The ${plan.visibility} R2 binding is not provisioned`, 'MEDIA_BUCKET_NOT_CONFIGURED');
+  }
+
+  const oldObject = await c.env.BUCKET.get(key);
+  if (!oldObject) throw notFound('Legacy media object not found');
+  const actor = c.get('user')!;
+
+  if (plan.action === 'copy') {
+    const bytes = await oldObject.arrayBuffer();
+    const mime = oldObject.httpMetadata?.contentType || sniff(new Uint8Array(bytes))?.mime || 'application/octet-stream';
+    const targetKey = plan.destinationKey;
+    await putMediaObject(
+      c.env,
+      {
+        key: targetKey,
+        visibility: plan.visibility,
+        domain: plan.domain,
+        mime,
+        bytes: bytes.byteLength,
+      },
+      bytes,
+      { httpMetadata: { ...oldObject.httpMetadata, contentType: mime } }
+    );
+    const verified = await mediaBucket(c.env, plan.visibility).head(targetKey);
+    if (!verified || verified.size !== bytes.byteLength) throw unavailable('Destination verification failed', 'MEDIA_VERIFY_FAILED');
+    try {
+      const statements: D1PreparedStatement[] = [];
+      // The existing UIUx/Animation|Icons|Logo folders are copied into the
+      // canonical public ui/levonis/* taxonomy. Settings are their source of
+      // truth, so update exact references only; unrelated text is untouched.
+      if (targetKey !== key) {
+        const { results: settings } = await c.env.DB.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>();
+        for (const setting of settings ?? []) {
+          if (!setting.value.includes(key)) continue;
+          let value: unknown = setting.value;
+          try { value = JSON.parse(setting.value); } catch { /* a plain setting */ }
+          const before = typeof value === 'string' ? value : JSON.stringify(value);
+          const nextValue = replaceExactMedia(value, key, targetKey);
+          const serialized = typeof nextValue === 'string' ? nextValue : JSON.stringify(nextValue);
+          if (serialized !== before) {
+            statements.push(c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(serialized, setting.key));
+          }
+        }
+      }
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO file_migration_log (id, old_key, new_key, action, state, actor_id)
+           VALUES (?, ?, ?, 'copy', 'verified_pending_cleanup', ?)`
+        ).bind(newId('mm'), key, targetKey, actor.id)
+      );
+      await c.env.DB.batch(statements);
+    } catch (error) {
+      if (targetKey !== key) await mediaBucket(c.env, plan.visibility).delete(targetKey).catch(() => {});
+      throw error;
+    }
+    await audit(c.env.DB, actor.id, 'media.migration.copy', key, {
+      new_key: targetKey,
+      visibility: plan.visibility,
+      bytes: bytes.byteLength,
+    });
+    return c.json({ success: true, dry_run: false, applied: true, old_key: key, new_key: targetKey, old_deleted: false });
+  }
+
+  const rows = await c.env.DB.prepare(
+    'SELECT product_id FROM product_images WHERE r2_key = ? OR url = ?'
+  ).bind(key, `/files/${key}`).all<{ product_id: string }>();
+  const productIds = [...new Set((rows.results ?? []).map((row) => row.product_id).filter(Boolean))];
+  if (productIds.length === 0) throw badRequest('No product image row references this object; manual review required');
+
+  const converted = await convertedWebp(c.env, key);
+  const digest = await crypto.subtle.digest('SHA-256', converted.bytes as unknown as BufferSource);
+  const objectId = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
+  const entityId = productIds.length === 1 ? productIds[0] : 'shared';
+  const newKey = buildMediaKey({
+    visibility: 'public',
+    domain: 'products',
+    entityId,
+    kind: 'gallery',
+    extension: 'webp',
+    objectId,
+  });
+  await putMediaObject(
+    c.env,
+    {
+      key: newKey,
+      visibility: 'public',
+      domain: 'products',
+      mime: 'image/webp',
+      bytes: converted.bytes.byteLength,
+      entityId,
+      width: converted.width,
+      height: converted.height,
+    },
+    converted.bytes,
+    { httpMetadata: { contentType: 'image/webp', cacheControl: 'public, max-age=31536000, immutable' } }
+  );
+  const verified = await mediaBucket(c.env, 'public').head(newKey);
+  if (!verified || verified.size !== converted.bytes.byteLength) {
+    await mediaBucket(c.env, 'public').delete(newKey).catch(() => {});
+    throw unavailable('Converted object verification failed', 'MEDIA_VERIFY_FAILED');
+  }
+
+  try {
+    const statements: D1PreparedStatement[] = [
+      c.env.DB.prepare(
+        `UPDATE product_images
+            SET url = ?, r2_key = ?, content_type = 'image/webp', bytes = ?, width = ?, height = ?
+          WHERE r2_key = ? OR url = ?`
+      ).bind(`/files/${newKey}`, newKey, converted.bytes.byteLength, converted.width, converted.height, key, `/files/${key}`),
+    ];
+    for (const productId of productIds) {
+      const product = await c.env.DB.prepare(
+        'SELECT images, options, colors, description_images FROM products WHERE id = ?'
+      ).bind(productId).first<Record<string, unknown>>();
+      if (!product) continue;
+      const next = ['images', 'options', 'colors', 'description_images'].map((column) => {
+        const raw = String(product[column] ?? '[]');
+        try { return JSON.stringify(replaceExactMedia(JSON.parse(raw), key, newKey)); }
+        catch { return raw; }
+      });
+      statements.push(
+        c.env.DB.prepare(
+          `UPDATE products SET images = ?, options = ?, colors = ?, description_images = ?,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+        ).bind(...next, productId)
+      );
+    }
+    statements.push(
+      c.env.DB.prepare(
+        `INSERT INTO file_migration_log (id, old_key, new_key, action, state, actor_id)
+         VALUES (?, ?, ?, 'convert_webp', 'verified_pending_cleanup', ?)`
+      ).bind(newId('mm'), key, newKey, actor.id)
+    );
+    await c.env.DB.batch(statements);
+  } catch (error) {
+    await mediaBucket(c.env, 'public').delete(newKey).catch(() => {});
+    throw error;
+  }
+
+  await audit(c.env.DB, actor.id, 'media.migration.convert_webp', key, {
+    new_key: newKey,
+    products: productIds,
+    bytes: converted.bytes.byteLength,
+  });
+  return c.json({ success: true, dry_run: false, applied: true, old_key: key, new_key: newKey, old_deleted: false });
 });

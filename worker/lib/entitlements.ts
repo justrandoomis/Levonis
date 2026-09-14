@@ -17,7 +17,7 @@
 
 import type { Env, SessionUser } from './types';
 import { safeParse } from './types';
-import type { Tier } from './pricing';
+import { TIER_RANK, type Tier } from './pricing';
 import { normalizePhone } from './phone';
 
 export interface LaunchConfig {
@@ -49,6 +49,143 @@ export interface TierStatus {
    *  final phase §10). Gates benefit computation only — never data access,
    *  support, warranty, repayment or login. */
   gated_benefits: string[];
+}
+
+/**
+ * The canonical membership contract.  A benefit is introduced once, at the
+ * lowest tier that owns it; higher tiers inherit it through TIER_RANK.
+ *
+ * Database values keep the historical `prime` id for compatibility, while
+ * every customer-facing surface calls that tier PREMIUM.  Nothing may infer
+ * access from the label sent by a browser: routes resolve TierStatus from the
+ * memberships ledger and ask this table.
+ */
+export const ENTITLEMENT_MINIMUM_TIER = {
+  merchantProfile: 'plus',
+  merchantStore: 'plus',
+  merchantProducts: 'plus',
+  merchantOrders: 'plus',
+  communityOffers: 'plus',
+  merchantAnalytics: 'plus',
+  merchantSubdomain: 'plus',
+  exclusiveCoupons: 'plus',
+  exclusiveSections: 'plus',
+  memberOffers: 'plus',
+
+  premiumPricing: 'prime',
+  premiumDelivery: 'prime',
+  premiumRewards: 'prime',
+
+  proPricing: 'pro',
+  freeDelivery: 'pro',
+  noPreorderCommission: 'pro',
+  proMerchantBadge: 'pro',
+  priorityService: 'pro',
+  priorityDelivery12h: 'pro',
+  bnpl: 'pro',
+  proExclusive: 'pro',
+} as const satisfies Record<string, Exclude<Tier, 'free'>>;
+
+export type MembershipEntitlement = keyof typeof ENTITLEMENT_MINIMUM_TIER;
+
+/** The inheritance relation exposed to offer/configuration tooling. */
+export const TIER_INHERITANCE: Record<Tier, Tier[]> = {
+  free: ['free'],
+  plus: ['free', 'plus'],
+  prime: ['free', 'plus', 'prime'],
+  pro: ['free', 'plus', 'prime', 'pro'],
+};
+
+export function tierInherits(tier: Tier, required: Tier): boolean {
+  return TIER_INHERITANCE[tier].includes(required);
+}
+
+/** True only for a live server-resolved membership with this entitlement. */
+export function hasEntitlement(status: TierStatus, entitlement: MembershipEntitlement): boolean {
+  if (!status.active) return false;
+  const minimum = ENTITLEMENT_MINIMUM_TIER[entitlement];
+  if ((TIER_RANK[status.tier] ?? 0) < TIER_RANK[minimum]) return false;
+  const gated = status.gated_benefits ?? [];
+  // `verifiedMerchant` was the old restriction flag.  Honour it as an alias
+  // during the rename so an existing safety restriction cannot be bypassed.
+  if (entitlement === 'proMerchantBadge' && gated.includes('verifiedMerchant')) return false;
+  if (entitlement === 'premiumDelivery' && gated.includes('primeDeliveryEligible')) return false;
+  return !gated.includes(entitlement);
+}
+
+/** Safe public snapshot: facts derived on the server, never accepted back. */
+export function entitlementSnapshot(status: TierStatus): Record<MembershipEntitlement, boolean> {
+  return Object.fromEntries(
+    (Object.keys(ENTITLEMENT_MINIMUM_TIER) as MembershipEntitlement[]).map((name) => [name, hasEntitlement(status, name)])
+  ) as Record<MembershipEntitlement, boolean>;
+}
+
+/**
+ * Resolve one entitlement for a page of users without moving membership
+ * lifecycle/ranking logic into a route. This is the bulk counterpart of
+ * `getTierStatus`; community/store lists use it for the PRO status badge.
+ */
+export async function usersWithEntitlement(
+  db: D1Database,
+  userIds: unknown[],
+  entitlement: MembershipEntitlement
+): Promise<Set<string>> {
+  const ids = [...new Set(userIds.filter((id): id is string => typeof id === 'string' && id.length > 0))];
+  const entitled = new Set<string>();
+  if (ids.length === 0) return entitled;
+
+  const placeholders = ids.map(() => '?').join(',');
+  const nowIso = new Date().toISOString();
+  await db
+    .prepare(
+      `UPDATE memberships SET state = 'expired'
+        WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at < ?
+          AND user_id IN (${placeholders})`
+    )
+    .bind(nowIso, ...ids)
+    .run();
+
+  const [{ results: memberships }, { results: restrictions }] = await Promise.all([
+    db
+      .prepare(
+        `SELECT user_id, tier, expires_at FROM memberships
+          WHERE state = 'active' AND (expires_at IS NULL OR expires_at >= ?)
+            AND user_id IN (${placeholders})`
+      )
+      .bind(nowIso, ...ids)
+      .all<{ user_id: string; tier: Exclude<Tier, 'free'>; expires_at: string | null }>(),
+    db
+      .prepare(`SELECT user_id, benefit_flags FROM restriction_cases WHERE state = 'active' AND user_id IN (${placeholders})`)
+      .bind(...ids)
+      .all<{ user_id: string; benefit_flags: string }>(),
+  ]);
+
+  const flagsByUser = new Map<string, Set<string>>();
+  for (const row of restrictions) {
+    const flags = flagsByUser.get(row.user_id) ?? new Set<string>();
+    for (const flag of safeParse<unknown[]>(row.benefit_flags, [])) if (typeof flag === 'string') flags.add(flag);
+    flagsByUser.set(row.user_id, flags);
+  }
+  const statusByUser = new Map<string, TierStatus>();
+  for (const row of memberships) {
+    const previous = statusByUser.get(row.user_id);
+    if (previous && TIER_RANK[previous.tier] >= TIER_RANK[row.tier]) continue;
+    statusByUser.set(row.user_id, {
+      tier: row.tier,
+      active: true,
+      expires_at: row.expires_at,
+      pending_launch: null,
+      gated_benefits: [...(flagsByUser.get(row.user_id) ?? [])],
+    });
+  }
+  for (const [userId, status] of statusByUser) if (hasEntitlement(status, entitlement)) entitled.add(userId);
+  return entitled;
+}
+
+/** Reward multiplier in hundredths: PLUS 1×, PREMIUM 1.5×, PRO 2×. */
+export function dailyRewardMultiplierX100(status: TierStatus): number {
+  if (!status.active || !hasEntitlement(status, 'premiumRewards')) return 100;
+  return hasEntitlement(status, 'priorityService') ? 200 : 150;
 }
 
 export async function getLaunchConfig(db: D1Database): Promise<LaunchConfig> {
@@ -225,100 +362,63 @@ export async function pricingTierContext(
     const judged = address === undefined ? await defaultAddressOf(db, userId) : address;
     atApprovedDefault = judged ? await isApprovedDefaultAddress(db, userId, judged) : false;
   }
-  const gated = new Set(tierStatus.gated_benefits ?? []);
   const proContext =
-    tierStatus.tier === 'pro' &&
-    tierStatus.active &&
     atApprovedDefault &&
-    !gated.has('proPricing') &&
-    !gated.has('noPreorderCommission');
+    benefits.proPricing(tierStatus) &&
+    benefits.noPreorderCommission(tierStatus);
   return {
     tierStatus,
     atApprovedDefault,
     proContext,
-    pricingTierActive: tierStatus.tier === 'pro' ? proContext : tierStatus.active,
+    pricingTierActive:
+      tierStatus.tier === 'pro'
+        ? proContext
+        : tierStatus.tier === 'prime'
+          ? benefits.premiumPricing(tierStatus)
+          : tierStatus.active,
   };
 }
 
-// Benefit checks — single definitions so PLUS/PRO gates never drift apart.
-// Every check honors gated_benefits: an active restriction case pauses the
-// specific benefit without touching the paid membership record itself.
-const notGated = (t: TierStatus, name: string) => !(t.gated_benefits ?? []).includes(name);
+// Backward-compatible named helpers. All of them delegate to the matrix above;
+// routes do not own tier comparisons.
 export const benefits = {
-  /** PLUS+PRO: professional merchant profile in the community. */
-  merchantProfile: (t: TierStatus) => t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantProfile'),
-
-  // ---------------------------------------------------------------------
-  // LEVO PLUS merchant stores (§83). PRO INHERITS every PLUS merchant
-  // benefit — a PRO member is a more privileged merchant, not a lesser one.
-  // PRIME does NOT: it is a delivery/priority tier for buyers, and granting
-  // it selling rights would let someone open a shop on a plan that was never
-  // sold as one. That exclusion is deliberate and is asserted in
-  // tests/entitlements.test.ts so it cannot be "tidied up" later.
-  //
-  // Each is a separate name rather than one merchant flag, because
-  // gated_benefits works per name: an admin must be able to suspend exactly
-  // one capability — say, publishing products — over a complaint, without
-  // cancelling a paid membership or locking the merchant out of their own
-  // order history (§84).
-  // ---------------------------------------------------------------------
-
-  /** May own and operate a storefront. The gate for everything commercial. */
-  merchantStore: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantStore'),
-  /** May publish products to that storefront. */
-  merchantProducts: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantProducts'),
-  /** May receive and fulfil store orders. */
-  merchantOrders: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantOrders'),
-  /** May submit offers on customer requests in the community marketplace. */
-  communityOffers: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'communityOffers'),
-  /** May see their own store analytics. */
-  merchantAnalytics: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantAnalytics'),
-  /** Gets a dedicated storefront subdomain. */
-  merchantSubdomain: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'pro') && notGated(t, 'merchantSubdomain'),
-  /** PLUS+PRIME+PRO: eligibility for tier-required coupons where the owner
-   *  configures them (coupons.tier_required plus|prime|pro). WHICH tier a
-   *  coupon needs is the ladder in worker/lib/membershipOps.ts validateCoupon
-   *  (pricing.TIER_RANK: pro > prime > plus); this gate only says whether the
-   *  member's coupon benefit is switched on at all, so an admin restriction
-   *  on 'exclusiveCoupons' pauses every member coupon at once. */
-  exclusiveCoupons: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'prime' || t.tier === 'pro') && notGated(t, 'exclusiveCoupons'),
-  /** PLUS+PRIME+PRO: exclusive sections (bundles, random filament, special
-   *  offers). PRIME was added by the owner's bundles mandate: «هذه الميزه
-   *  تظهر لمشتركين فقط البلس والبريميوم والبرو» — every paid tier sees the
-   *  bundles section; PRIME still gets no merchant/selling rights. */
-  exclusiveSections: (t: TierStatus) =>
-    t.active && (t.tier === 'plus' || t.tier === 'prime' || t.tier === 'pro') && notGated(t, 'exclusiveSections'),
-  /** PRO: explicit/policy product discounts (resolver applies pricing). */
-  proPricing: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proPricing'),
-  /** PRO: free last-mile delivery — worker/lib/shipping.ts applies the owner's
-   *  conditions (approved default address, merchandise STRICTLY above the
-   *  configured pro_threshold_iqd); this flag only says the member is eligible
-   *  to be tested against them. */
-  freeDelivery: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'freeDelivery'),
-  /** PRO: preorder transport commission waived. */
-  noPreorderCommission: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'noPreorderCommission'),
-  /** PRO: verified/distinguished merchant + advertising eligibility. */
-  verifiedMerchant: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'verifiedMerchant'),
-  /** PRO: priority service/preparation flag on orders and support. */
-  priorityService: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'priorityService'),
-  /** PRO: PRO-only products/offers/coupons eligibility. */
-  proExclusive: (t: TierStatus) => t.active && t.tier === 'pro' && notGated(t, 'proExclusive'),
-  /** PRIME: CONDITIONAL free last-mile delivery. Unlike PRO's unconditional
-   *  waiver this only says the member is eligible to be TESTED against the
-   *  150,000 IQD threshold — worker/lib/shipping.ts applies the comparison,
-   *  and 150,000 itself does not qualify (mandate §5). PRIME grants no other
-   *  PRO benefit: no preorder-commission waiver, no priority service, no
-   *  PRO-exclusive catalog. */
-  primeDeliveryEligible: (t: TierStatus) =>
-    t.active && t.tier === 'prime' && notGated(t, 'primeDeliveryEligible'),
+  merchantProfile: (t: TierStatus) => hasEntitlement(t, 'merchantProfile'),
+  merchantStore: (t: TierStatus) => hasEntitlement(t, 'merchantStore'),
+  merchantProducts: (t: TierStatus) => hasEntitlement(t, 'merchantProducts'),
+  merchantOrders: (t: TierStatus) => hasEntitlement(t, 'merchantOrders'),
+  communityOffers: (t: TierStatus) => hasEntitlement(t, 'communityOffers'),
+  merchantAnalytics: (t: TierStatus) => hasEntitlement(t, 'merchantAnalytics'),
+  merchantSubdomain: (t: TierStatus) => hasEntitlement(t, 'merchantSubdomain'),
+  exclusiveCoupons: (t: TierStatus) => hasEntitlement(t, 'exclusiveCoupons'),
+  exclusiveSections: (t: TierStatus) => hasEntitlement(t, 'exclusiveSections'),
+  memberOffers: (t: TierStatus) => hasEntitlement(t, 'memberOffers'),
+  premiumPricing: (t: TierStatus) => hasEntitlement(t, 'premiumPricing'),
+  premiumDelivery: (t: TierStatus) => hasEntitlement(t, 'premiumDelivery'),
+  premiumRewards: (t: TierStatus) => hasEntitlement(t, 'premiumRewards'),
+  proPricing: (t: TierStatus) => hasEntitlement(t, 'proPricing'),
+  freeDelivery: (t: TierStatus) => hasEntitlement(t, 'freeDelivery'),
+  noPreorderCommission: (t: TierStatus) => hasEntitlement(t, 'noPreorderCommission'),
+  /** Compatibility name; this is a PRO status badge, never KYC verification. */
+  verifiedMerchant: (t: TierStatus) => hasEntitlement(t, 'proMerchantBadge'),
+  proMerchantBadge: (t: TierStatus) => hasEntitlement(t, 'proMerchantBadge'),
+  priorityService: (t: TierStatus) => hasEntitlement(t, 'priorityService'),
+  priorityDelivery12h: (t: TierStatus) => hasEntitlement(t, 'priorityDelivery12h'),
+  bnpl: (t: TierStatus) => hasEntitlement(t, 'bnpl'),
+  proExclusive: (t: TierStatus) => hasEntitlement(t, 'proExclusive'),
+  primeDeliveryEligible: (t: TierStatus) => hasEntitlement(t, 'premiumDelivery'),
 };
+
+/** PRO shipping rules supersede the inherited PREMIUM rule for a PRO order. */
+export function shippingEntitlementContext(t: TierStatus): {
+  proShippingEntitled: boolean;
+  premiumShippingEntitled: boolean;
+} {
+  const pro = benefits.freeDelivery(t);
+  return {
+    proShippingEntitled: pro,
+    premiumShippingEntitled: !pro && benefits.primeDeliveryEligible(t),
+  };
+}
 
 /**
  * «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية» — the whole rule, in one

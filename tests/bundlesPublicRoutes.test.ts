@@ -463,15 +463,15 @@ test('a locked card carries a price teaser ONLY when locked_preview is on', asyn
   assert.equal(body.bundles[0].locked, true);
 });
 
-test('PRIME does not satisfy a PLUS gate, and PLUS does — the same verdict on card and detail', async () => {
+test('PREMIUM inherits a PLUS gate — the same verdict on card and detail', async () => {
   const raw = seed();
   addBundle(raw, { id: 'b1', slug: 'plus-only', window: { required_tiers: '["plus"]' } });
   const db = new SqliteD1(raw) as unknown as D1Database;
 
   const prime = await json(await get(appFor(db, PRIME), '/api/bundles'));
-  assert.equal(prime.bundles[0].locked, true, 'PRIME was handed a PLUS-exclusive offer');
+  assert.equal(prime.bundles[0].locked, false, 'PREMIUM did not inherit the PLUS offer');
   const primeDetail = await json(await get(appFor(db, PRIME), '/api/bundles/plus-only'));
-  assert.equal(primeDetail.bundle.locked, true, 'the card and the detail page disagreed about PRIME');
+  assert.equal(primeDetail.bundle.locked, false, 'the card and the detail page disagreed about PREMIUM');
 
   const plus = await json(await get(appFor(db, PLUS), '/api/bundles'));
   assert.equal(plus.bundles[0].locked, false);

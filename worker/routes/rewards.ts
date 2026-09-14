@@ -5,8 +5,8 @@ import { requireAuth, badRequest, conflict, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { getBalances } from '../lib/wallet';
 import { getSetting } from '../lib/settings';
-import { planIsActive } from './cart';
 import { rateLimit } from '../lib/ratelimit';
+import { benefits, dailyRewardMultiplierX100, getTierStatus } from '../lib/entitlements';
 
 export const rewardRoutes = new Hono<AppContext>();
 rewardRoutes.use('*', requireAuth);
@@ -20,12 +20,12 @@ export function baghdadDay(offsetDays = 0): string {
 const BROWSE_REQUIRED_SECS = 180;
 const MISSION_POINTS = { push: 50, video: 20, browse: 20 } as const;
 
-function checkinPoints(streakDay: number, pro: boolean): number {
+export function checkinPoints(streakDay: number, multiplierX100 = 100): number {
   let pts = 20;
   if (streakDay <= 2) pts = 5;
   else if (streakDay <= 4) pts = 10;
   else if (streakDay <= 6) pts = 15;
-  return pro ? pts * 2 : pts;
+  return Math.floor((pts * Math.max(100, multiplierX100)) / 100);
 }
 
 /**
@@ -63,13 +63,14 @@ async function claim(
 rewardRoutes.get('/', async (c) => {
   const user = c.get('user')!;
   const today = baghdadDay();
-  const [balances, claims, adVideoUrl, browse] = await Promise.all([
+  const [balances, claims, adVideoUrl, browse, tierStatus] = await Promise.all([
     getBalances(c.env.DB, user.id),
     c.env.DB.prepare("SELECT mission, day FROM reward_claims WHERE user_id = ? AND (day = ? OR mission = 'push')")
       .bind(user.id, today)
       .all<{ mission: string; day: string }>(),
     getSetting(c.env.DB, 'adVideoUrl'),
     c.env.DB.prepare('SELECT day, seconds FROM browse_sessions WHERE user_id = ?').bind(user.id).first<{ day: string; seconds: number }>(),
+    getTierStatus(c.env.DB, user.id),
   ]);
   const claimed = new Set(claims.results.map((r) => r.mission));
   return c.json({
@@ -88,7 +89,8 @@ rewardRoutes.get('/', async (c) => {
         progress_seconds: browse && browse.day === today ? browse.seconds : 0,
       },
     },
-    is_pro: planIsActive(user.membership_tier, user.subscription_expiry) && user.membership_tier === 'pro',
+    is_pro: benefits.priorityService(tierStatus),
+    membership_reward_multiplier_x100: dailyRewardMultiplierX100(tierStatus),
   });
 });
 
@@ -98,8 +100,8 @@ rewardRoutes.post('/checkin', async (c) => {
   const today = baghdadDay();
   if (user.last_checkin_day === today) throw conflict('You have already checked in today');
   const streak = user.last_checkin_day === baghdadDay(-1) ? user.checkin_streak + 1 : 1;
-  const pro = planIsActive(user.membership_tier, user.subscription_expiry) && user.membership_tier === 'pro';
-  const points = checkinPoints(streak, pro);
+  const tierStatus = await getTierStatus(c.env.DB, user.id);
+  const points = checkinPoints(streak, dailyRewardMultiplierX100(tierStatus));
   await claim(c, 'checkin', today, points, `Daily Check-in (Day ${streak})`, [
     c.env.DB.prepare('UPDATE users SET checkin_streak = ?, last_checkin_day = ? WHERE id = ? AND (last_checkin_day IS NULL OR last_checkin_day <> ?)').bind(
       streak, today, user.id, today

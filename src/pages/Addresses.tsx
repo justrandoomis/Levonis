@@ -165,13 +165,13 @@ export default function Addresses() {
   const Back = dir === 'rtl' ? ChevronRight : ChevronLeft;
 
   return (
-    <div className="min-h-dvh bg-black text-white w-full font-sans flex flex-col">
-      <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 bg-black/85 backdrop-blur-xl z-10 border-b border-zinc-900">
+    <div className="min-h-dvh bg-canvas text-text-primary w-full font-sans flex flex-col">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 bg-canvas/96 backdrop-blur-lg z-10 border-b border-border-subtle">
         <button
           type="button"
           onClick={() => navigate(-1)}
           aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors [touch-action:manipulation]"
+          className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/[0.05] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Back aria-hidden="true" className="w-6 h-6" />
         </button>
@@ -187,7 +187,7 @@ export default function Addresses() {
             <button
               type="button"
               onClick={() => navigate('/auth?next=%2Faddresses')}
-              className="mt-4 min-h-[44px] px-6 rounded-xl bg-gold text-black font-black text-sm hover:brightness-110 transition-[filter]"
+              className="lv-button lv-button-primary mt-4 px-6"
             >
               {loc('تسجيل الدخول', 'Sign in', 'چوونەژوورەوە')}
             </button>
@@ -197,19 +197,19 @@ export default function Addresses() {
             <button
               type="button"
               onClick={openAdd}
-              className="w-full min-h-[52px] rounded-2xl border border-zinc-800 bg-zinc-900/40 text-gold flex items-center justify-center gap-2 font-bold hover:border-gold/40 hover:bg-gold/[0.06] transition-colors mb-5 [touch-action:manipulation]"
+              className="lv-button lv-button-primary mb-5 w-full min-h-[50px] [touch-action:manipulation]"
             >
               <Plus aria-hidden="true" className="w-5 h-5" />
               {loc('إضافة عنوان', 'Add an address', 'زیادکردنی ناونیشان')}
             </button>
 
             {actionError ? (
-              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300 mb-4">
+              <p role="alert" className="lv-alert lv-alert-danger mb-4 text-[13px] text-red-200">
                 {actionError}
               </p>
             ) : null}
             {listError ? (
-              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300 mb-4">
+              <p role="alert" className="lv-alert lv-alert-danger mb-4 text-[13px] text-red-200">
                 {listError}
               </p>
             ) : null}
@@ -219,7 +219,7 @@ export default function Addresses() {
               // cards will be — not a spinner floating in an empty page.
               <div className="space-y-3" aria-busy="true">
                 {[0, 1].map((i) => (
-                  <div key={i} className="rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4">
+                  <div key={i} className="lv-surface p-4">
                     <div className="h-4 w-28 rounded bg-zinc-800 animate-pulse" />
                     <div className="h-3 w-full rounded bg-zinc-800/70 animate-pulse mt-3" />
                     <div className="h-3 w-2/3 rounded bg-zinc-800/70 animate-pulse mt-2" />
@@ -233,16 +233,15 @@ export default function Addresses() {
                 <p className="text-sm mt-1">{loc('أضف عنوان التوصيل الأول من الزر أعلاه.', 'Add your first delivery address with the button above.', 'یەکەم ناونیشانی گەیاندن بە دوگمەی سەرەوە زیاد بکە.')}</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="lv-surface divide-y divide-border-subtle overflow-hidden" data-address-list>
                 {addresses.map((addr) => {
                   const isDefault = addr.is_default === 1;
                   const diverged = addr.matches_approved_snapshot === false;
                   return (
                     <div
                       key={addr.id}
-                      className={`rounded-2xl border p-4 transition-colors ${
-                        isDefault ? 'border-gold/40 bg-gold/[0.04]' : 'border-zinc-800/70 bg-zinc-900/40'
-                      } ${busyId === addr.id ? 'opacity-60' : ''}`}
+                      data-default={isDefault}
+                      className={`relative p-4 transition-colors ${isDefault ? 'bg-white/[0.025]' : ''} ${busyId === addr.id ? 'opacity-60' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -256,12 +255,13 @@ export default function Addresses() {
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
                           {isDefault ? (
-                            <span className="rounded-lg bg-gold/15 text-gold text-[10px] font-black px-2 py-1 uppercase tracking-wider">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-bold text-text-secondary">
+                              <CheckCircle aria-hidden="true" className="h-3 w-3 text-gold" />
                               {loc('افتراضي', 'Default', 'بنەڕەت')}
                             </span>
                           ) : null}
                           {addr.backs_approved_snapshot ? (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 text-zinc-300 text-[10px] font-bold px-2 py-1">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-white/[0.05] text-text-secondary text-[10px] font-bold px-2 py-1">
                               <ShieldCheck aria-hidden="true" className="w-3 h-3" />
                               {loc('العنوان المعتمد', 'Approved address', 'ناونیشانی پەسەندکراو')}
                             </span>
@@ -285,7 +285,7 @@ export default function Addresses() {
                       </p>
 
                       {diverged ? (
-                        <p className="mt-2.5 flex items-start gap-1.5 rounded-xl border-s-2 border-amber-500/60 bg-amber-500/[0.06] px-3 py-2 text-[12px] text-amber-200">
+                        <p className="lv-alert lv-alert-warning mt-2.5 flex items-start gap-1.5 text-[12px] text-amber-100">
                           <AlertTriangle aria-hidden="true" className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                           {loc(
                             'هذا العنوان لم يعد مطابقًا للعنوان المعتمد لعضوية PRO.',
@@ -295,11 +295,11 @@ export default function Addresses() {
                         </p>
                       ) : null}
 
-                      <div className="flex items-center flex-wrap gap-2 mt-3.5 pt-3.5 border-t border-white/[0.06]">
+                      <div className="flex items-center flex-wrap gap-1 mt-3">
                         <button
                           type="button"
                           onClick={() => openEdit(addr)}
-                          className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-300 text-[12px] font-bold hover:text-white hover:border-zinc-600 transition-colors [touch-action:manipulation]"
+                          className="lv-button lv-button-ghost min-h-[40px] px-2.5 text-[12px] [touch-action:manipulation]"
                         >
                           <Edit2 aria-hidden="true" className="w-3.5 h-3.5" />
                           {loc('تعديل', 'Edit', 'دەستکاری')}
@@ -311,7 +311,7 @@ export default function Addresses() {
                             deleteAnchor.current = e.currentTarget;
                             setDeleteConfirmId(addr.id);
                           }}
-                          className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 text-[12px] font-bold hover:text-red-300 hover:border-red-500/40 disabled:opacity-40 transition-colors [touch-action:manipulation]"
+                          className="lv-button lv-button-ghost min-h-[40px] px-2.5 text-[12px] hover:text-danger disabled:opacity-40 [touch-action:manipulation]"
                         >
                           <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                           {loc('حذف', 'Delete', 'سڕینەوە')}
@@ -321,7 +321,7 @@ export default function Addresses() {
                             type="button"
                             disabled={busyId !== null}
                             onClick={() => handleSetDefault(addr.id)}
-                            className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-400 text-[12px] font-bold hover:text-gold hover:border-gold/40 disabled:opacity-40 transition-colors ms-auto [touch-action:manipulation]"
+                            className="lv-button lv-button-ghost min-h-[40px] px-2.5 text-[12px] hover:text-text-primary disabled:opacity-40 ms-auto [touch-action:manipulation]"
                           >
                             <CheckCircle aria-hidden="true" className="w-3.5 h-3.5" />
                             {loc('اجعله الافتراضي', 'Set as default', 'بیکە بە بنەڕەت')}
@@ -380,14 +380,14 @@ export default function Addresses() {
             <button
               type="button"
               onClick={() => setDeleteConfirmId(null)}
-              className="flex-1 min-h-[48px] rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-colors"
+              className="lv-button lv-button-secondary flex-1 min-h-[48px]"
             >
               {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
             </button>
             <button
               type="button"
               onClick={handleDelete}
-              className="flex-1 min-h-[48px] rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors"
+              className="lv-button lv-button-danger flex-1 min-h-[48px]"
             >
               {loc('حذف', 'Delete', 'سڕینەوە')}
             </button>
@@ -421,14 +421,14 @@ export default function Addresses() {
         solid
         z={50}
         testId="address-editor"
-        panelClassName="w-full sm:max-w-lg h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-black"
+        panelClassName="w-full sm:max-w-lg h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-canvas"
       >
-        <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-black/85 backdrop-blur-xl z-10 border-b border-zinc-900">
+        <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-canvas/96 backdrop-blur-lg z-10 border-b border-border-subtle">
           <button
             type="button"
             onClick={() => setEditorOpen(false)}
             aria-label={loc('إغلاق', 'Close', 'داخستن')}
-            className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors [touch-action:manipulation]"
+            className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/[0.05] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <Back aria-hidden="true" className="w-6 h-6" />
           </button>

@@ -24,6 +24,7 @@ import {
   parseProductRow,
   validateProductDoc,
   projectAdmin,
+  primaryMedia,
   upgradeMedia,
 } from '../lib/productModel';
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
@@ -492,7 +493,7 @@ adminProductsRoutes.get('/', async (c) => {
     offset,
     products: list.results.map((r) => {
       const media = upgradeMedia(r.images);
-      const primary = media.find((m) => m.primary) ?? media[0] ?? null;
+      const primary = primaryMedia(media) ?? null;
       return {
         id: r.id,
         slug: r.slug,

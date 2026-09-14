@@ -9,6 +9,7 @@ import { Sheet } from '../components/ui/Overlay';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import { useRail } from '../lib/useRail';
+import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import {
   ArrowLeft, ArrowRight, Search, Box, Calculator,
   MessageSquare, Plus, Store,
@@ -34,6 +35,7 @@ interface CommunityMerchant {
   bio: string;
   avatarUrl: string | null;
   verified: boolean;
+  pro_badge?: boolean;
   created_at: string;
   store_slug?: string | null;
   /** The shop's own address — a card click is a full navigation there. */
@@ -380,6 +382,7 @@ export default function Community() {
                               <div className="flex items-center gap-1.5">
                                 <h3 className="text-white font-bold text-sm">{m.name}</h3>
                                 {m.verified && <BadgeCheck className="w-4 h-4 text-gold" />}
+                                {m.pro_badge && <ProMerchantBadge compact />}
                               </div>
                               {m.bio && <div className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{m.bio}</div>}
                             </div>

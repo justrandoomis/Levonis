@@ -39,6 +39,11 @@ export interface PlansResponse {
   launch: LaunchInfo;
   features?: PlanFeatures;
   delivery?: DeliveryThresholds;
+  /** Public capability contract generated from the canonical server matrix. */
+  entitlement_contract?: {
+    minimum_tier: Record<string, PaidTier>;
+    tiers: Record<PaidTier, Record<string, boolean>>;
+  };
 }
 
 export interface ApiMembership {
@@ -65,6 +70,8 @@ export interface TierStatus {
 
 export interface MineResponse {
   status: TierStatus;
+  /** The authenticated user's server-derived capability snapshot. */
+  entitlements?: Record<string, boolean>;
   memberships: ApiMembership[];
   referral?: { code: string; rewards: unknown[] };
   launch: LaunchInfo;

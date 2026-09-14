@@ -94,6 +94,7 @@ interface Copy {
   subtotalLabel: string;
   deliveryLabel: string;
   deliveryWaivedLabel: string;
+  codTaxLabel: string;
   couponLabel: string;
   pointsLabel: string;
   walletLabel: string;
@@ -155,6 +156,7 @@ const COPY_AR: Copy = {
   subtotalLabel: 'مجموع المنتجات',
   deliveryLabel: 'رسوم التوصيل',
   deliveryWaivedLabel: 'رسوم التوصيل (مُعفاة)',
+  codTaxLabel: 'ضريبة الدفع عند الاستلام',
   couponLabel: 'خصم الكوبون',
   pointsLabel: 'نقاط مستخدمة',
   walletLabel: 'مدفوع من المحفظة',
@@ -224,6 +226,7 @@ const COPY_EN: Copy = {
   subtotalLabel: 'Items subtotal',
   deliveryLabel: 'Delivery fee',
   deliveryWaivedLabel: 'Delivery fee (waived)',
+  codTaxLabel: 'Cash on Delivery Tax',
   couponLabel: 'Coupon discount',
   pointsLabel: 'Points applied',
   walletLabel: 'Paid from wallet',
@@ -295,6 +298,7 @@ const COPY_CKB: Copy = {
   subtotalLabel: 'کۆی کاڵاکان',
   deliveryLabel: 'کرێی گەیاندن',
   deliveryWaivedLabel: 'کرێی گەیاندن (بەخۆڕایی)',
+  codTaxLabel: 'باجی پارەدان لە کاتی وەرگرتن',
   couponLabel: 'داشکاندنی کۆپۆن',
   pointsLabel: 'خاڵی بەکارهێنراو',
   walletLabel: 'لە جزدانەوە دراوە',
@@ -468,6 +472,7 @@ export interface InvoiceEmailData {
   lines: InvoiceEmailLine[];
   subtotal_iqd: number;
   delivery_fee_iqd: number;
+  cod_tax_iqd?: number;
   delivery_waived: boolean;
   coupon_discount_iqd: number;
   points_applied_iqd: number;
@@ -543,6 +548,7 @@ function invoiceTotalsHtml(t: Copy, inv: InvoiceEmailData): string {
   rows += inv.delivery_waived
     ? row(t.deliveryWaivedLabel, iqd(0))
     : row(t.deliveryLabel, iqd(inv.delivery_fee_iqd));
+  if ((inv.cod_tax_iqd ?? 0) > 0) rows += row(t.codTaxLabel, iqd(inv.cod_tax_iqd ?? 0));
   if (inv.coupon_discount_iqd > 0) rows += row(t.couponLabel, `-${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) rows += row(t.pointsLabel, `-${iqd(inv.points_applied_iqd)}`);
   rows += row(t.totalLabel, iqd(inv.total_iqd), { bold: true });
@@ -568,6 +574,7 @@ function invoiceText(t: Copy, inv: InvoiceEmailData): string {
   out.push('');
   out.push(`${t.subtotalLabel}: ${iqd(inv.subtotal_iqd)}`);
   out.push(inv.delivery_waived ? `${t.deliveryWaivedLabel}: ${iqd(0)}` : `${t.deliveryLabel}: ${iqd(inv.delivery_fee_iqd)}`);
+  if ((inv.cod_tax_iqd ?? 0) > 0) out.push(`${t.codTaxLabel}: ${iqd(inv.cod_tax_iqd ?? 0)}`);
   if (inv.coupon_discount_iqd > 0) out.push(`${t.couponLabel}: -${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) out.push(`${t.pointsLabel}: -${iqd(inv.points_applied_iqd)}`);
   out.push(`${t.totalLabel}: ${iqd(inv.total_iqd)}`);

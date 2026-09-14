@@ -36,6 +36,14 @@
     {
       "binding": "BUCKET",
       "bucket_name": "levonis-files"
+    },
+    {
+      "binding": "R2_PUBLIC",
+      "bucket_name": "levonis-media-public"
+    },
+    {
+      "binding": "R2_PRIVATE",
+      "bucket_name": "levonis-media-private"
     }
   ],
 
@@ -96,6 +104,14 @@
         {
           "binding": "BUCKET",
           "bucket_name": "levonis-files-staging"
+        },
+        {
+          "binding": "R2_PUBLIC",
+          "bucket_name": "levonis-media-public-staging"
+        },
+        {
+          "binding": "R2_PRIVATE",
+          "bucket_name": "levonis-media-private-staging"
         }
       ],
       "vars": {
@@ -154,6 +170,14 @@
         {
           "binding": "BUCKET",
           "bucket_name": "levonis-files-dark"
+        },
+        {
+          "binding": "R2_PUBLIC",
+          "bucket_name": "levonis-media-public-dark"
+        },
+        {
+          "binding": "R2_PRIVATE",
+          "bucket_name": "levonis-media-private-dark"
         }
       ],
       "vars": {

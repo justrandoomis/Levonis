@@ -41,6 +41,7 @@ import { isLowStock, resolveStock, type StockResolution, type StockTarget } from
 import { clampMemberLadder, resolveUnitPrice, type ProPricingPolicy, type ResolvedPrice, type Tier } from './pricing';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
+import { tierInherits } from './entitlements';
 import type { OfferCheck } from './offers';
 import { newId } from './crypto';
 import { HttpError } from './http';
@@ -400,13 +401,13 @@ export function resolveBundlePrice(input: {
 
   let applied = regular;
   let appliedTier: BundlePriceResult['applied_tier'] = 'regular';
-  if (input.tier === 'pro' && input.tierActive && pro !== null) {
-    applied = pro;
+  if (input.tier === 'pro' && input.tierActive && (pro !== null || prime !== null || plus !== null)) {
+    applied = pro ?? prime ?? plus!;
     appliedTier = 'pro';
-  } else if (input.tier === 'prime' && input.tierActive && prime !== null) {
-    applied = prime;
+  } else if (input.tier === 'prime' && input.tierActive && (prime !== null || plus !== null)) {
+    applied = prime ?? plus!;
     appliedTier = 'prime';
-  } else if (input.tier === 'plus' && input.tierActive && plus !== null) {
+  } else if (input.tierActive && tierInherits(input.tier, 'plus') && plus !== null) {
     applied = plus;
     appliedTier = 'plus';
   }

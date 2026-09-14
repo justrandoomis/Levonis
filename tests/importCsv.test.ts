@@ -218,6 +218,10 @@ const sample: ExportProduct = {
   direct_surcharge_iqd: 5000,
   stock: 12,
   low_stock_threshold: 3,
+  delivery_options: {
+    standard: { enabled: true, quantity_step: 10, fee_iqd: 5000 },
+    personal: { enabled: true, quantity_step: 1, fee_iqd: 50000 },
+  },
   // Device coverage (products.ops_policy): the 12-month base the extended
   // warranty adds to, and one unit per printer at delivery.
   warranty_base_months: 12,
@@ -452,6 +456,7 @@ test('export then import reproduces every field, order and relation', () => {
   assert.equal(p.direct_surcharge_iqd, sample.direct_surcharge_iqd);
   assert.equal(p.stock, sample.stock);
   assert.equal(p.low_stock_threshold, sample.low_stock_threshold);
+  assert.deepEqual(p.delivery_options, sample.delivery_options);
   assert.deepEqual(p.payment_options, sample.payment_options);
   assert.equal(p.how_to_use, sample.how_to_use);
   assert.equal(p.usage_url, sample.usage_url);
@@ -534,6 +539,38 @@ const parseOne = (rows: string[][]) => parseImport(toCsv([devices.columns, ...ro
 
 /** Builds one row from a partial map of column -> value. */
 const row = (v: Record<string, string>) => devices.columns.map((c) => v[c] ?? '');
+
+test('per-product delivery columns parse and validate both methods', () => {
+  const res = parseOne([row({
+    row_type: 'product', key: 'SHIP-1', name: 'Shipping product', price_iqd: '1000',
+    standard_delivery_enabled: 'yes', standard_delivery_quantity_step: '10', standard_delivery_fee_iqd: '5000',
+    personal_delivery_enabled: 'no', personal_delivery_quantity_step: '1', personal_delivery_fee_iqd: '50000',
+  })]);
+  assert.deepEqual(res.issues.filter((i) => i.severity === 'error'), []);
+  assert.deepEqual(res.products[0].delivery_options, {
+    standard: { enabled: true, quantity_step: 10, fee_iqd: 5000 },
+    personal: { enabled: false, quantity_step: 1, fee_iqd: 50000 },
+  });
+});
+
+test('invalid or partial delivery tiers are refused with their column names', () => {
+  const res = parseOne([row({
+    row_type: 'product', key: 'SHIP-BAD', name: 'Bad shipping', price_iqd: '1000',
+    standard_delivery_enabled: 'yes', standard_delivery_quantity_step: '0', standard_delivery_fee_iqd: '5000',
+  })]);
+  assert.ok(res.issues.some((i) => i.message.includes('standard_delivery_quantity_step')));
+  assert.ok(res.issues.some((i) => i.message.includes('personal_delivery_enabled')));
+});
+
+test('old CSV files without delivery columns remain backward compatible', () => {
+  const oldShape = {
+    ...devices,
+    columns: devices.columns.filter((c) => !c.startsWith('standard_delivery_') && !c.startsWith('personal_delivery_')),
+  };
+  const parsed = parseImport(serializeProducts([sample], oldShape), oldShape);
+  assert.deepEqual(parsed.issues.filter((i) => i.severity === 'error'), []);
+  assert.equal(parsed.products[0].delivery_options, null);
+});
 
 test('a price ladder violation names the product and the rule', () => {
   const res = parseOne([
@@ -1091,6 +1128,7 @@ test('every field of the product form is expressible in the sheet', () => {
     price_iqd: 'price_iqd', prime_price_iqd: 'prime_price_iqd', pro_price_iqd: 'pro_price_iqd',
     product_cost_iqd: 'cost_iqd', direct_surcharge_iqd: 'direct_surcharge_iqd',
     stock: 'stock', low_stock_threshold: 'low_stock_threshold', payment_options: 'payment_options',
+    delivery_options: 'standard_delivery_enabled',
     how_to_use: 'how_to_use', spec_fields: 'spec.*',
     // device coverage (products.ops_policy) — the base the extended warranty adds to
     warranty_base_months: 'warranty_base_months', serialized: 'serialized',

@@ -1,20 +1,10 @@
 /**
- * What each card actually gives — written from what the server ENFORCES
- * (worker/lib/entitlements.ts, shipping.ts, pricing.ts, rewards.ts,
- * membershipOps.ts, community.ts) and nothing else.
- *
- * Two kinds of line are conditional and appear only when the server says the
- * switch is on right now (`features` from GET /api/memberships/plans): the
- * PLUS gift on a printer purchase and the PRO filament gift on a prepaid
- * pre-order. The free-delivery thresholds are the server's too (`delivery`),
- * so the copy can never disagree with the checkout.
- *
- * Removed as fake, and not to be reintroduced without code behind them: game
- * tickets, a PRO-exclusive catalogue, ad eligibility, the two sections that
- * never existed, and the printable card block.
+ * Compact, inheritance-first membership comparison. The customer sees only
+ * what the Worker enforces; the expanded list makes inherited benefits
+ * accessible without stretching every card on phones and tablets.
  */
-import React from 'react';
-import { Check, Clock, Info, Truck } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Check, ChevronDown, Info, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { formatIqd } from '../../lib/api';
 import { TIER_META, type PaidTier } from './tierMeta';
@@ -26,318 +16,147 @@ export interface BenefitsSectionProps {
   loading: boolean;
 }
 
-interface Line {
-  text: string;
-  soon?: boolean;
+interface BenefitCardProps {
+  tier: PaidTier;
+  title: string;
+  subtitle: string;
+  inheritance?: string;
+  lines: string[];
+  inheritedLines?: string[];
+  inheritedLabel?: string;
+  note?: ReactNode;
+  loading: boolean;
 }
 
-function SoonChip() {
-  const { t } = useLanguage();
+function BenefitList({ tier, lines, compact = false }: { tier: PaidTier; lines: string[]; compact?: boolean }) {
+  const meta = TIER_META[tier];
   return (
-    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 whitespace-nowrap shrink-0">
-      {t('comingSoon')}
-    </span>
+    <ul className={compact ? 'space-y-2' : 'space-y-2.5'}>
+      {lines.map((line) => (
+        <li key={line} className={`flex items-start gap-2.5 ${compact ? 'text-[12px]' : 'text-[13px]'} leading-relaxed text-zinc-300`}>
+          <Check className={`mt-0.5 h-4 w-4 shrink-0 ${meta.check}`} strokeWidth={2.6} aria-hidden="true" />
+          <span>{line}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function BenefitCard({
-  tier,
-  title,
-  lines,
-  note,
-  loading,
-}: {
-  tier: PaidTier;
-  title: string;
-  lines: Line[];
-  note?: React.ReactNode;
-  loading: boolean;
-}) {
+function BenefitCard({ tier, title, subtitle, inheritance, lines, inheritedLines, inheritedLabel, note, loading }: BenefitCardProps) {
   const meta = TIER_META[tier];
   return (
-    <div
-      data-benefits={tier}
-      className={`bg-zinc-900/30 border ${meta.panelBorder} rounded-[24px] p-5 sm:p-6 shadow-lg relative overflow-hidden`}
-    >
-      <div
-        className="absolute top-0 end-0 w-32 h-32 rounded-es-[100px] pointer-events-none mix-blend-screen blur-xl opacity-70"
-        style={{ background: `${meta.hex}22` }}
-        aria-hidden
-      />
-      <h4 className={`${meta.heading} font-bold mb-4 flex items-center gap-2.5 text-[16px] relative z-10`}>
-        <meta.Icon className="w-5 h-5" aria-hidden /> {title}
-      </h4>
+    <article data-benefits={tier} className={`relative self-start overflow-hidden rounded-[22px] border ${meta.panelBorder} bg-zinc-900/35 p-4 shadow-lg sm:p-5`}>
+      <div className="pointer-events-none absolute end-0 top-0 h-24 w-24 rounded-es-[100px] opacity-70 blur-xl mix-blend-screen" style={{ background: `${meta.hex}22` }} aria-hidden="true" />
+      <div className="relative z-10 mb-3 flex items-start gap-3">
+        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${meta.panelBorder} bg-black/35`}>
+          <meta.Icon className={`h-[18px] w-[18px] ${meta.heading}`} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h4 className={`text-[15px] font-black ${meta.heading}`}>{title}</h4>
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-500">{subtitle}</p>
+        </div>
+      </div>
+
+      {inheritance && !loading && (
+        <p className={`relative z-10 mb-3 rounded-xl border px-3 py-2 text-[11.5px] font-bold ${meta.chip}`} data-membership-inheritance={tier}>
+          {inheritance}
+        </p>
+      )}
+
       {loading ? (
-        <ul className="space-y-3" role="status" aria-busy="true">
-          {[0, 1, 2, 3].map((i) => (
-            <li key={i} className="h-4 rounded bg-zinc-800/60 animate-pulse motion-reduce:animate-none" aria-hidden />
-          ))}
+        <ul className="relative z-10 space-y-2.5" role="status" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => <li key={i} className="h-3.5 animate-pulse rounded bg-zinc-800/60 motion-reduce:animate-none" />)}
         </ul>
       ) : (
-        <ul className="space-y-3.5 relative z-10">
-          {lines.map((l, i) => (
-            <li key={i} className={`flex items-start gap-3 text-[14px] leading-normal ${l.soon ? 'text-zinc-500' : 'text-zinc-300'}`}>
-              {l.soon ? (
-                <Clock className="w-5 h-5 text-amber-500/70 shrink-0 mt-0.5" strokeWidth={2.5} aria-hidden />
-              ) : (
-                <Check className={`w-5 h-5 ${meta.check} shrink-0 mt-0.5`} strokeWidth={2.5} aria-hidden />
-              )}
-              <span className="min-w-0">{l.text}</span>
-              {l.soon && <SoonChip />}
-            </li>
-          ))}
-        </ul>
+        <div className="relative z-10">
+          <BenefitList tier={tier} lines={lines} />
+          {!!inheritedLines?.length && (
+            <details className="group mt-3 rounded-xl border border-white/[0.07] bg-black/20 px-3 py-2">
+              <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 text-[11.5px] font-semibold text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 [&::-webkit-details-marker]:hidden">
+                <span>{inheritedLabel}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="border-t border-white/[0.06] pt-2.5">
+                <BenefitList tier={tier} lines={inheritedLines} compact />
+              </div>
+            </details>
+          )}
+          {note && <div className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] leading-relaxed text-zinc-500">{note}</div>}
+        </div>
       )}
-      {note && !loading && (
-        <div className="mt-5 pt-4 border-t border-white/5 text-[11.5px] text-zinc-500 leading-relaxed space-y-2 relative z-10">{note}</div>
-      )}
-    </div>
+    </article>
   );
 }
 
 export function BenefitsSection({ features, delivery, loading }: BenefitsSectionProps) {
   const { t, loc } = useLanguage();
-  // The thresholds are the server's. When the plans fetch failed (`delivery`
-  // is null) the lines are written WITHOUT a figure — a wording that needs
-  // none — never with an empty gap where a number should be.
-  const pro = delivery ? formatIqd(delivery.pro_threshold_iqd) : null;
-  const prime = delivery ? formatIqd(delivery.prime_threshold_iqd) : null;
+  const premiumThreshold = delivery ? formatIqd(delivery.prime_threshold_iqd) : null;
+  const proThreshold = delivery ? formatIqd(delivery.pro_threshold_iqd) : null;
 
-  const bnpl: Line = {
-    soon: true,
-    text: loc('اشترِ الآن وادفع لاحقًا (BNPL)', 'Buy now, pay later (BNPL)', 'ئێستا بکڕە و دواتر پارە بدە (BNPL)'),
-  };
-
-  // ---------------------------------------------------------------- PLUS
-  const plusLines: Line[] = [
-    {
-      text: loc(
-        'متجرك الخاص برابطه الفرعي (اسمك.levonis-iq.com)',
-        'Your own storefront with its own address (yourname.levonis-iq.com)',
-        'فرۆشگای تایبەتی خۆت بە ناونیشانی خۆی (ناوەکەت.levonis-iq.com)'
-      ),
-    },
-    {
-      text: loc(
-        'لوحة تحكم كاملة: المنتجات، الطلبات، الرسائل، التحليلات',
-        'A full merchant dashboard: products, orders, messages, analytics',
-        'داشبۆردی تەواوی بازرگان: بەرهەم، داواکاری، نامە، شیکاری'
-      ),
-    },
-    {
-      text: loc(
-        'استقبال الطلبات والدفع عبر منصة ليفونيس',
-        'Take orders and payments through the LEVONIS platform',
-        'وەرگرتنی داواکاری و پارەدان لە ڕێگەی پلاتفۆرمی LEVONIS'
-      ),
-    },
-    {
-      text: loc(
-        'تقديم عروض على طلبات العملاء في المجتمع',
-        'Submit offers on customer requests in the community',
-        'پێشکەشکردنی ئۆفەر بۆ داواکارییەکانی کڕیاران لە کۆمەڵگە'
-      ),
-    },
-    {
-      text: loc('ملف تاجر احترافي في مجتمع ليفو', 'A professional merchant profile in the Levo community', 'پڕۆفایلی بازرگانی پیشەیی لە کۆمەڵگەی Levo'),
-    },
-    { text: loc('الوصول إلى قسم البندلات', 'Access to the bundles section', 'دەستگەیشتن بە بەشی پاکێجەکان') },
-    {
-      text: loc(
-        'كوبونات مخصصة لأعضاء PLUS عندما يوفرها المتجر',
-        'PLUS-only coupons whenever the store issues them',
-        'کۆپۆنی تایبەت بە ئەندامانی PLUS کاتێک فرۆشگا دەریدەکات'
-      ),
-    },
+  const plusLines = [
+    loc('متجر شخصي على username.levonis-iq.com', 'Personal storefront at username.levonis-iq.com', 'فرۆشگای تایبەتی لە username.levonis-iq.com'),
+    loc('لوحة تاجر كاملة: المنتجات والطلبات والرسائل والتحليلات', 'Full merchant dashboard: products, orders, messages and analytics', 'داشبۆردی تەواوی بازرگان: بەرهەم، داواکاری، نامە و شیکاری'),
+    loc('استقبال طلبات العملاء ومدفوعاتهم عبر ليفونيس', 'Receive customer orders and payments through Levonis', 'وەرگرتنی داواکاری و پارەدانی کڕیار لە ڕێگەی Levonis'),
+    loc('تقديم عروض احترافية على طلبات المجتمع', 'Professional merchant offers on Community requests', 'پێشکەشکردنی ئۆفەری پیشەیی لە داواکارییەکانی کۆمەڵگە'),
+    loc('الوصول إلى البندلات وأدواتها المؤهلة', 'Access to Bundles and eligible bundle tools', 'دەستگەیشتن بە پاکێج و ئامرازە گونجاوەکانی'),
+    loc('عروض وكوبونات PLUS عند توفيرها', 'PLUS offers and coupons when provided', 'ئۆفەر و کۆپۆنی PLUS کاتێک بەردەست بن'),
   ];
-  plusLines.push(bnpl);
-  // How one OBTAINS PLUS is not a PLUS benefit: it sits under the card, and
-  // only while the gift is actually switched on (features.printer_gift).
+
+  const premiumLines = [
+    loc('أسعار PREMIUM/PRIME على المنتجات المؤهلة وخصومات أفضل من PLUS عند ضبطها', 'PREMIUM/PRIME pricing on eligible products and better configured discounts than PLUS', 'نرخی PREMIUM/PRIME بۆ بەرهەمی گونجاو و داشکاندنی باشتر لە PLUS'),
+    loc('عروض وكوبونات حصرية للعضوية', 'Membership-exclusive offers and PREMIUM coupons', 'ئۆفەر و کۆپۆنی تایبەت بە PREMIUM'),
+    premiumThreshold
+      ? loc(`توصيل عادي مجاني فوق ${premiumThreshold} بعد الكوبونات والنقاط ووفق القواعد المطبقة`, `Free standard delivery above ${premiumThreshold} after coupons and points, subject to shipping rules`, `گەیاندنی ئاسایی بێبەرامبەر لە سەرووی ${premiumThreshold} دوای کۆپۆن و خاڵ`)
+      : loc('توصيل عادي مجاني فوق حد المتجر المعتمد ووفق قواعد الشحن', "Free standard delivery above the store's approved threshold and shipping rules", 'گەیاندنی ئاسایی بێبەرامبەر لە سەرووی سنووری پەسەندکراوی فرۆشگا'),
+    loc('عروض بندلات خاصة بـ PREMIUM', 'PREMIUM-specific bundle offers', 'ئۆفەری پاکێجی تایبەت بە PREMIUM'),
+    loc('نقاط تسجيل الدخول اليومية أعلى من PLUS (×1.5)', 'Higher daily login rewards than PLUS (1.5×)', 'خاڵی ڕۆژانەی زیاتر لە PLUS (×1.5)'),
+  ];
+
+  const proLines = [
+    loc('أفضل أسعار وخصومات وعروض وكوبونات PRO المؤهلة', 'Best eligible PRO prices, discounts, offers and coupons', 'باشترین نرخ و داشکاندن و ئۆفەر و کۆپۆنی PRO'),
+    proThreshold
+      ? loc(`توصيل مؤهل مجاني فوق ${proThreshold} وإعفاء رسوم الشحن المطبقة على العنوان المعتمد`, `Eligible free delivery above ${proThreshold}, including applicable shipping-surcharge exemptions at the approved address`, `گەیاندنی گونجاوی بێبەرامبەر لە سەرووی ${proThreshold} لە ناونیشانی پەسەندکراو`)
+      : loc('توصيل مؤهل مجاني وإعفاءات الشحن المطبقة على العنوان المعتمد', 'Eligible free delivery and applicable shipping exemptions at the approved address', 'گەیاندنی گونجاوی بێبەرامبەر لە ناونیشانی پەسەندکراو'),
+    loc('أولوية تجهيز وتوصيل خلال 12 ساعة حيث تتوفر الخدمة', 'Priority preparation and delivery within 12 hours where available', 'پێشینەیی ئامادەکردن و گەیاندن لە ١٢ کاتژمێردا لە شوێنی بەردەست'),
+    loc('أعلى أولوية للدعم وطلبات الضمان', 'Highest support and warranty-request priority', 'بەرزترین پێشینەیی پشتیوانی و داواکاری گەرەنتی'),
+    loc('مضاعفة نقاط تسجيل الدخول اليومية (×2)', 'Double daily login reward points (2×)', 'دووقاتکردنی خاڵی چوونەژوورەوەی ڕۆژانە (×2)'),
+    loc('مكافأة إحالة عند شراء المدعو عضوية PRO مؤهلة', 'Referral reward when an invited user buys an eligible PRO membership', 'خەڵاتی بانگهێشت کاتێک بانگهێشتکراوێک PRO ی گونجاو دەکڕێت'),
+    loc('بندلات وعروض PRO حصرية ومعاملة تاجر مميزة', 'PRO-exclusive bundles and premium merchant/community treatment', 'پاکێجی تایبەتی PRO و مامەڵەی بازرگانی تایبەت'),
+    loc('شارة تاجر PRO مميزة في المجتمع وملف المتجر', 'Distinctive PRO merchant badge in Community and the store profile', 'نیشانەی تایبەتی بازرگانی PRO لە کۆمەڵگە و پڕۆفایلی فرۆشگا'),
+    loc('اشترِ الآن وادفع لاحقًا (BNPL) — حصريًا لـ PRO المؤهل', 'Buy Now, Pay Later (BNPL) — exclusively for eligible PRO members', 'ئێستا بکڕە و دواتر بدە (BNPL) — تەنها بۆ PRO ی گونجاو'),
+  ];
+
+  if (features?.preorder_gift) {
+    proLines.push(loc('بكرة فلمنت هدية مع الطلب المسبق المدفوع بالكامل', 'A filament-spool gift with a fully prepaid pre-order', 'دیاریی لوولەی فیلامێنت لەگەڵ پێش-داواکاری تەواو پێشپارەدراو'));
+  }
+
   const plusNote = features?.printer_gift ? (
-    <>
-      <p className="font-bold text-zinc-400">{loc('كيف تحصل على PLUS مجانًا', 'How to get PLUS free', 'چۆن PLUS بە بێبەرامبەر وەربگریت')}</p>
-      <p>
-        {loc(
-          'عضوية PLUS مجانية هديةً مع شراء طابعة.',
-          'A free PLUS membership comes as a gift with a printer purchase.',
-          'ئەندامێتیی PLUS ی بێبەرامبەر وەک دیاری لەگەڵ کڕینی پرینتەر دەدرێت.'
-        )}
-      </p>
-    </>
+    <p>{loc('يمكن منح PLUS هديةً مع شراء طابعة مؤهلة وفق إعداد المتجر.', 'PLUS may be gifted with an eligible printer purchase under the store setting.', 'PLUS دەتوانرێت وەک دیاری لەگەڵ کڕینی پرینتەری گونجاو بدرێت.')}</p>
   ) : undefined;
 
-  // --------------------------------------------------------------- PRIME
-  const primeLines: Line[] = [
-    {
-      text: loc(
-        'أسعار PRIME على المنتجات التي حُدد لها سعر PRIME — وتتبع أسعار الأعضاء كل رسوم المنتج',
-        'PRIME prices on products that state one — member prices follow every product surcharge',
-        'نرخی PRIME بۆ ئەو بەرهەمانەی نرخی PRIME یان دانراوە — نرخی ئەندامان هەموو زیادکراوەکانی بەرهەم دەگرێتەوە'
-      ),
-    },
-    {
-      text: prime
-        ? loc(
-            `توصيل مجاني للطلبات فوق ${prime} بعد الكوبونات والنقاط (رسوم التوصيل الاعتيادية فقط)`,
-            `Free delivery on orders above ${prime} after coupons and points (ordinary delivery fee only)`,
-            `گەیاندنی بێبەرامبەر بۆ داواکارییەکانی سەرووی ${prime} دوای کۆپۆن و خاڵ (تەنها کرێی گەیاندنی ئاسایی)`
-          )
-        : loc(
-            'توصيل مجاني للطلبات فوق حد التوصيل المجاني للمتجر بعد الكوبونات والنقاط (رسوم التوصيل الاعتيادية فقط)',
-            "Free delivery on orders above the store's free-delivery threshold, after coupons and points (ordinary delivery fee only)",
-            'گەیاندنی بێبەرامبەر بۆ داواکارییەکانی سەرووی سنووری گەیاندنی بێبەرامبەری فرۆشگا دوای کۆپۆن و خاڵ (تەنها کرێی گەیاندنی ئاسایی)'
-          ),
-    },
-    { text: loc('الوصول إلى قسم البندلات', 'Access to the bundles section', 'دەستگەیشتن بە بەشی پاکێجەکان') },
-    {
-      text: loc(
-        'كوبونات مخصصة لأعضاء PRIME عندما يوفرها المتجر',
-        'PRIME coupons whenever the store issues them',
-        'کۆپۆنی PRIME کاتێک فرۆشگا دەریدەکات'
-      ),
-    },
-  ];
+  const premiumNote = (
+    <p className="flex items-start gap-2">
+      <Truck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{loc('يشمل الإعفاء رسم التوصيل العادي فقط، ويُحتسب بعد الخصومات والكوبونات والنقاط.', 'The waiver covers standard delivery only and is evaluated after discounts, coupons and points.', 'لێبوردنەکە تەنها گەیاندنی ئاسایی دەگرێتەوە و دوای داشکاندن و کۆپۆن و خاڵ هەژمار دەکرێت.')}</span>
+    </p>
+  );
 
-  // ----------------------------------------------------------------- PRO
-  const proLines: Line[] = [
-    { text: t('benefitPro1') },
-    {
-      text: loc(
-        'أسعار PRO على المنتجات التي حُدد لها سعر PRO — على عنوانك الافتراضي المعتمد',
-        'PRO prices on products that state one — at your approved default address',
-        'نرخی PRO بۆ ئەو بەرهەمانەی نرخی PRO یان دانراوە — لە ناونیشانی بنەڕەتی پەسەندکراوت'
-      ),
-    },
-    {
-      text: pro
-        ? loc(
-            `توصيل مجاني (عادي ومحمي) للطلبات فوق ${pro} على العنوان المعتمد`,
-            `Free delivery (standard and protected) on orders above ${pro} at the approved address`,
-            `گەیاندنی بێبەرامبەر (ئاسایی و پارێزراو) بۆ داواکارییەکانی سەرووی ${pro} لە ناونیشانی پەسەندکراو`
-          )
-        : loc(
-            'توصيل مجاني (عادي ومحمي) للطلبات فوق حد التوصيل المجاني للمتجر على العنوان المعتمد',
-            "Free delivery (standard and protected) on orders above the store's free-delivery threshold at the approved address",
-            'گەیاندنی بێبەرامبەر (ئاسایی و پارێزراو) بۆ داواکارییەکانی سەرووی سنووری گەیاندنی بێبەرامبەری فرۆشگا لە ناونیشانی پەسەندکراو'
-          ),
-    },
-    {
-      text: loc(
-        'بلا رسوم إضافية بحسب نوع الشحن (عمولة الطلب المسبق أو علاوة البيع المباشر) على العنوان المعتمد',
-        'No shipping-type surcharge (pre-order commission or direct-sale premium) at the approved address',
-        'بەبێ زیادکراوی جۆری گەیاندن (کۆمیشنی پێش-داواکاری یان زیادەی فرۆشتنی ڕاستەوخۆ) لە ناونیشانی پەسەندکراو'
-      ),
-    },
-    {
-      text: loc(
-        'أولوية الخدمة في طلبات الضمان والدعم',
-        'Priority service on warranty claims and support',
-        'پێشینەی خزمەتگوزاری لە داواکاری گەرەنتی و پشتیوانی'
-      ),
-    },
-    { text: loc('نقاط تسجيل الدخول اليومي مضاعفة', 'Double daily check-in points', 'خاڵی چوونەژوورەوەی ڕۆژانە دووقات') },
-    {
-      text: loc(
-        'مكافأة إحالة عندما يشتري صديق دعوته اشتراك PRO',
-        'A referral reward when an invited friend buys PRO',
-        'خەڵاتی بانگهێشت کاتێک هاوڕێیەکی بانگهێشتکراو PRO دەکڕێت'
-      ),
-    },
-  ];
-  if (features?.preorder_gift) {
-    proLines.push({
-      text: loc(
-        'بكرة فلمنت هدية مع كل طلب مسبق مدفوع بالكامل',
-        'A free filament spool with every fully prepaid pre-order',
-        'لوولەیەکی فیلامێنتی بێبەرامبەر لەگەڵ هەر پێش-داواکارییەکی تەواو پێشپارەدراو'
-      ),
-    });
-  }
-  proLines.push(
-    {
-      text: loc('كوبونات مخصصة لأعضاء PRO عندما يوفرها المتجر', 'PRO coupons whenever the store issues them', 'کۆپۆنی PRO کاتێک فرۆشگا دەریدەکات'),
-    },
-    {
-      text: loc('شارة تاجر موثّق على متجرك في المجتمع', 'A verified-merchant badge on your community store', 'نیشانەی بازرگانی پشتڕاستکراو لەسەر فرۆشگاکەت لە کۆمەڵگە'),
-    },
-    bnpl,
-    { soon: true, text: loc('توصيل خلال 12 ساعة', '12-hour delivery', 'گەیاندن لە ماوەی ١٢ کاتژمێردا') },
-    { soon: true, text: loc('نطاق خاص لمتجرك', 'A custom domain for your store', 'دۆمەینی تایبەت بۆ فرۆشگاکەت') }
+  const proNote = (
+    <div className="space-y-1.5">
+      <p>{loc('خدمة 12 ساعة تُثبّت على الطلب فقط عند توفر التوصيل الشخصي ونوع الشحن والمنطقة والعنوان المعتمد.', 'The 12-hour service is stamped on an order only when its personal-delivery method, shipping type, service area and approved address qualify.', 'خزمەتی ١٢ کاتژمێر تەنها کاتێک لەسەر داواکاری تۆمار دەکرێت کە ڕێگا و ناوچە و ناونیشان گونجاو بن.')}</p>
+      <p>{loc('يتطلب BNPL حسابًا معتمدًا وهوية مستوفية وعنوانًا معتمدًا، ويخضع للحد الائتماني وسجل السداد.', 'BNPL also requires an approved account, eligible verified identity and approved address, and enforces the credit limit and repayment ledger.', 'BNPL هەژماری پەسەندکراو و ناسنامە و ناونیشانی پەسەندکراو و سنووری قەرز و تۆماری گەڕاندنەوە دەوێت.')}</p>
+    </div>
   );
 
   return (
     <section aria-labelledby="benefits-title" className="relative z-10">
-      <h3 id="benefits-title" className="text-[17px] font-bold text-white mb-5 flex items-center justify-center gap-2 px-1">
-        {t('planComparisons')} <Info className="w-4 h-4 text-zinc-500" aria-hidden />
+      <h3 id="benefits-title" className="mb-4 flex items-center justify-center gap-2 px-1 text-[16px] font-bold text-white">
+        {t('planComparisons')} <Info className="h-4 w-4 text-zinc-500" aria-hidden="true" />
       </h3>
-
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-        <BenefitCard tier="plus" title={t('plusBenefits')} lines={plusLines} loading={loading} note={plusNote} />
-        <BenefitCard
-          tier="prime"
-          title={t('primeBenefits')}
-          lines={primeLines}
-          loading={loading}
-          note={
-            <>
-              {/* The exact threshold, said plainly rather than rounded in prose:
-                  the threshold itself is NOT free, one dinar above it is. */}
-              <p className="flex items-start gap-2">
-                <Truck className="w-4 h-4 shrink-0 mt-0.5 text-zinc-600" aria-hidden />
-                <span>
-                  {prime
-                    ? loc(
-                        `الإعفاء يشمل رسوم التوصيل الاعتيادية فقط ويبدأ فوق ${prime} تمامًا — طلب بقيمة ${prime} لا يُعفى.`,
-                        `The waiver covers ordinary delivery only and starts strictly above ${prime} — an order of exactly ${prime} is not waived.`,
-                        `لێبوردنەکە تەنها گەیاندنی ئاسایی دەگرێتەوە و بە تەواوی لە سەرووی ${prime} دەست پێدەکات — داواکاریی ${prime} لێی نابوردرێت.`
-                      )
-                    : loc(
-                        'الإعفاء يشمل رسوم التوصيل الاعتيادية فقط ويبدأ فوق حد التوصيل المجاني للمتجر تمامًا — الطلب بقيمة الحد نفسه لا يُعفى.',
-                        "The waiver covers ordinary delivery only and starts strictly above the store's free-delivery threshold — an order of exactly the threshold is not waived.",
-                        'لێبوردنەکە تەنها گەیاندنی ئاسایی دەگرێتەوە و بە تەواوی لە سەرووی سنووری گەیاندنی بێبەرامبەری فرۆشگا دەست پێدەکات — داواکاریی هەر بەقەد سنوورەکە لێی نابوردرێت.'
-                      )}
-                </span>
-              </p>
-              <p>
-                {loc(
-                  'PRIME بطاقة للمشترين: لا تتضمن متجر PLUS ولا حقوق البيع.',
-                  "PRIME is a buyer's card: it does not include the PLUS storefront or selling rights.",
-                  'PRIME کارتی کڕیارانە: فرۆشگای PLUS و مافی فرۆشتن ناگرێتەوە.'
-                )}
-              </p>
-            </>
-          }
-        />
-        <BenefitCard
-          tier="pro"
-          title={t('proBenefits')}
-          lines={proLines}
-          loading={loading}
-          note={
-            <>
-              <p>
-                {pro
-                  ? loc(
-                      `مزايا الشراء في PRO (الأسعار، التوصيل، إعفاء الرسوم) تُطبَّق على العنوان الافتراضي المعتمد بعد التحقق من الهوية، والتوصيل المجاني يبدأ فوق ${pro} تمامًا.`,
-                      `PRO purchase benefits (prices, delivery, surcharge waiver) apply at the approved default address after identity verification; free delivery starts strictly above ${pro}.`,
-                      `سوودەکانی کڕینی PRO (نرخ، گەیاندن، لێبوردنی زیادکراو) لە ناونیشانی بنەڕەتی پەسەندکراو دوای پشتڕاستکردنەوەی ناسنامە جێبەجێ دەبن؛ گەیاندنی بێبەرامبەر بە تەواوی لە سەرووی ${pro} دەست پێدەکات.`
-                    )
-                  : loc(
-                      'مزايا الشراء في PRO (الأسعار، التوصيل، إعفاء الرسوم) تُطبَّق على العنوان الافتراضي المعتمد بعد التحقق من الهوية، والتوصيل المجاني يبدأ فوق حد التوصيل المجاني للمتجر تمامًا.',
-                      "PRO purchase benefits (prices, delivery, surcharge waiver) apply at the approved default address after identity verification; free delivery starts strictly above the store's free-delivery threshold.",
-                      'سوودەکانی کڕینی PRO (نرخ، گەیاندن، لێبوردنی زیادکراو) لە ناونیشانی بنەڕەتی پەسەندکراو دوای پشتڕاستکردنەوەی ناسنامە جێبەجێ دەبن؛ گەیاندنی بێبەرامبەر بە تەواوی لە سەرووی سنووری گەیاندنی بێبەرامبەری فرۆشگا دەست پێدەکات.'
-                    )}
-              </p>
-              <p>
-                {loc(
-                  'رسوم الضمان تُضاف دائمًا ولا تُعفى لأي فئة عضوية.',
-                  'Warranty fees are always added and are never waived for any membership tier.',
-                  'کرێی گەرەنتی هەمیشە زیاد دەکرێت و بۆ هیچ ئاستێکی ئەندامێتی نابەخشرێت.'
-                )}
-              </p>
-            </>
-          }
-        />
+      <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <BenefitCard tier="plus" title={t('plusBenefits')} subtitle={loc('العضوية الأساسية للتاجر والمجتمع', 'Base merchant and Community membership', 'ئەندامێتی بنەڕەتی بازرگان و کۆمەڵگە')} lines={plusLines} note={plusNote} loading={loading} />
+        <BenefitCard tier="prime" title={t('primeBenefits')} subtitle={loc('تسوق وعضوية بمزايا محسّنة', 'Enhanced shopping and member benefits', 'کڕین و ئەندامێتی بە سوودی باشتر')} inheritance={loc('يشمل جميع مزايا PLUS', 'Includes all PLUS benefits', 'هەموو سوودەکانی PLUS دەگرێتەوە')} lines={premiumLines} inheritedLines={plusLines} inheritedLabel={loc('عرض مزايا PLUS الموروثة', 'View inherited PLUS benefits', 'بینینی سوودە میراتکراوەکانی PLUS')} note={premiumNote} loading={loading} />
+        <BenefitCard tier="pro" title={t('proBenefits')} subtitle={loc('أعلى مستوى من المزايا الحصرية', 'Highest-level exclusive benefits', 'بەرزترین ئاستی سوودە تایبەتەکان')} inheritance={loc('يشمل جميع مزايا PLUS وPREMIUM', 'Includes all PLUS and PREMIUM benefits', 'هەموو سوودەکانی PLUS و PREMIUM دەگرێتەوە')} lines={proLines} inheritedLines={[...plusLines, ...premiumLines]} inheritedLabel={loc('عرض جميع المزايا الموروثة', 'View all inherited benefits', 'بینینی هەموو سوودە میراتکراوەکان')} note={proNote} loading={loading} />
       </div>
     </section>
   );

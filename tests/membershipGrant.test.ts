@@ -182,7 +182,7 @@ test('a grant over a paid membership is refused — the customer is not silently
   const res = await grant(app(db), { ...ok, planId: 'pro_12mo' });
   assert.equal(res.status, 409);
   const body = (await res.json()) as Record<string, unknown>;
-  assert.match(String(body.error), /PRIME/);
+  assert.match(String(body.error), /PREMIUM/);
   assert.deepEqual(body.details, { membership_id: 'paid', tier: 'prime', state: 'active' });
   // A replay of an EARLIER grant is still a replay, whatever the account holds now.
   raw.exec("INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months) VALUES ('mem_grant_grantkey1', 'u1', 'plus_1mo', 'plus', 'expired', 1)");

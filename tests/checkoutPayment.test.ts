@@ -598,6 +598,93 @@ test('a direct cart: cash and wallet are both allowed, the premium is charged (n
   await Promise.allSettled(pending);
 });
 
+test('an eligible PRO checkout finances with BNPL and freezes the 12-hour fulfilment SLA on the order', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO kyc_cases (id,user_id,state,decided_at)
+      VALUES ('kyc_pro','pro','verified','2026-01-01T00:00:00.000Z');
+    INSERT INTO bnpl_accounts (user_id,state,credit_limit_iqd,approved_by)
+      VALUES ('pro','approved',300000,'boss');
+  `);
+  cartLine(raw, 'ci_pro_bnpl', 'pro', 'p_a1', '');
+  const pro = appAs(db, 'pro');
+  const quote = (await json(await post(
+    pro,
+    '/api/orders/quote',
+    quoteBody('addr_p', 'bnpl', { deliveryMethodId: 'personal' })
+  ))).quote;
+  assert.deepEqual(quote.allowed_payment_methods, ['wallet', 'cash', 'bnpl']);
+  assert.equal(quote.bnpl.eligible, true);
+  assert.equal(quote.bnpl.financed_iqd, 100_000);
+  assert.equal(quote.due_on_delivery_iqd, 0);
+  assert.equal(quote.shipping.total_iqd, 0, 'eligible PRO delivery is waived at the approved address');
+  assert.equal(quote.priority_delivery.eligible, true);
+  assert.equal(quote.priority_delivery.max_hours, 12);
+
+  const placed = await json(await post(
+    pro,
+    '/api/orders',
+    orderBody('addr_p', 'bnpl', { deliveryMethodId: 'personal' })
+  ));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  assert.equal(placed.order.payment_method_id, 'bnpl');
+  assert.equal(placed.order.fulfillment_service, 'pro_priority_12h');
+  assert.equal(placed.order.priority, 1);
+  assert.ok(placed.order.priority_due_at);
+  assert.equal(placed.order.bnpl_due_iqd, 100_000);
+  assert.ok(placed.order.bnpl_due_at);
+  assert.equal(placed.order.due_on_delivery_iqd, 0);
+  assert.equal(placed.order.financial.payment_state, 'bnpl_due');
+  assert.equal(
+    (raw.prepare("SELECT amount_iqd FROM bnpl_ledger WHERE order_id=? AND kind='charge'").get(placed.order.id) as { amount_iqd: number }).amount_iqd,
+    100_000
+  );
+  const stored = raw.prepare('SELECT fulfillment_service, priority_due_at, bnpl_due_iqd FROM orders WHERE id=?')
+    .get(placed.order.id) as { fulfillment_service: string; priority_due_at: string; bnpl_due_iqd: number };
+  assert.equal(stored.fulfillment_service, 'pro_priority_12h');
+  assert.ok(stored.priority_due_at);
+  assert.equal(stored.bnpl_due_iqd, 100_000);
+  await Promise.allSettled(pending);
+});
+
+test('forged BNPL payment ids are rejected for PLUS and PREMIUM even with approval records', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash) VALUES
+      ('plus_bnpl','Plus','plus-bnpl@x.co','h'),
+      ('premium_bnpl','Premium','premium-bnpl@x.co','h');
+    INSERT INTO addresses (id,user_id,label,name,phone,address,is_default) VALUES
+      ('addr_plus_bnpl','plus_bnpl','Home','Plus','+9647700000001','Baghdad Plus',1),
+      ('addr_premium_bnpl','premium_bnpl','Home','Premium','+9647700000002','Baghdad Premium',1);
+    INSERT INTO approved_addresses
+      (id,user_id,version,name,phone_e164,address,state,source_address_id,approved_by,approved_at) VALUES
+      ('ap_plus_bnpl','plus_bnpl',1,'Plus','+9647700000001','Baghdad Plus','approved','addr_plus_bnpl','boss','2026-01-01T00:00:00.000Z'),
+      ('ap_premium_bnpl','premium_bnpl',1,'Premium','+9647700000002','Baghdad Premium','approved','addr_premium_bnpl','boss','2026-01-01T00:00:00.000Z');
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at) VALUES
+      ('m_plus_bnpl','plus_bnpl','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),
+      ('m_premium_bnpl','premium_bnpl','prime_12mo','prime','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
+    INSERT INTO kyc_cases (id,user_id,state,decided_at) VALUES
+      ('kyc_plus_bnpl','plus_bnpl','verified','2026-01-01T00:00:00.000Z'),
+      ('kyc_premium_bnpl','premium_bnpl','verified','2026-01-01T00:00:00.000Z');
+    INSERT INTO bnpl_accounts (user_id,state,credit_limit_iqd,approved_by) VALUES
+      ('plus_bnpl','approved',300000,'boss'),
+      ('premium_bnpl','approved',300000,'boss');
+  `);
+  cartLine(raw, 'ci_plus_bnpl', 'plus_bnpl', 'p_a1', '');
+  cartLine(raw, 'ci_premium_bnpl', 'premium_bnpl', 'p_a1', '');
+
+  for (const [user, addressId] of [['plus_bnpl', 'addr_plus_bnpl'], ['premium_bnpl', 'addr_premium_bnpl']] as const) {
+    const a = appAs(db, user);
+    const open = (await json(await post(a, '/api/orders/quote', quoteBody(addressId, undefined)))).quote;
+    assert.deepEqual(open.allowed_payment_methods, ['wallet', 'cash']);
+    const refused = await post(a, '/api/orders', orderBody(addressId, 'bnpl'));
+    const body = await json(refused);
+    assert.equal(refused.status, 400);
+    assert.equal(body.code, 'PRO_REQUIRED');
+  }
+  assert.equal((raw.prepare("SELECT COUNT(*) AS n FROM orders WHERE payment_method_id='bnpl'").get() as { n: number }).n, 0);
+});
+
 // ------------------------------------------------------------ printer note
 
 test('the printer note: is_printer on the quote lines and the order items, the amount echoed only for a home delivery', async () => {
@@ -611,7 +698,8 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   const home = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash')))).quote;
   assert.equal(home.lines[0].is_printer, true);
   assert.equal(home.notes.printer_home_delivery_iqd, 50_000, 'the owner’s default, from settings');
-  assert.equal(home.total_iqd, 899_000 + 5_000, 'the note is NOT added to the total');
+  assert.equal(home.cod_tax_iqd, 6_000, 'COD delivery tax is a separate server-calculated line');
+  assert.equal(home.total_iqd, 899_000 + 5_000 + 6_000, 'the printer note is NOT added to the total');
 
   const pickup = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash', { deliveryMethodId: 'pickup' })))).quote;
   assert.equal(pickup.lines[0].is_printer, true);
@@ -620,9 +708,11 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   const placed = await json(await post(a, '/api/orders', orderBody('addr_b', 'cash')));
   assert.equal(placed.success, true, JSON.stringify(placed));
   assert.equal(placed.order.items[0].is_printer, true);
-  assert.equal(placed.order.total_iqd, 904_000);
+  assert.equal(placed.order.cod_tax_iqd, 6_000);
+  assert.equal(placed.order.total_iqd, 910_000);
   const detail = await json(await a.request(`/api/orders/${placed.order.id}`));
   assert.equal(detail.order.items[0].is_printer, true);
+  assert.equal(detail.order.cod_tax_iqd, 6_000, 'persisted order details use the COD tax snapshot');
 
   // The owner can change or clear the amount; a cleared amount means no note.
   raw.exec("INSERT INTO admin_settings (key, value) VALUES ('printerHomeDeliveryNoteIqd', '75000')");

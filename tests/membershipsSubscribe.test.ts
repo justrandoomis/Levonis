@@ -2,8 +2,8 @@
  * Buying a membership — the rules the confirmation window relies on.
  *
  * ONE MEMBERSHIP AT A TIME. A lower tier upgrades into a higher one with the
- * unused value credited (PLUS→PRIME, PLUS→PRO, PRIME→PRO), a higher tier is
- * never downgraded while it runs, PRIME is called PRIME, a replay never
+ * unused value credited (PLUS→PREMIUM, PLUS→PRO, PREMIUM→PRO), a higher tier is
+ * never downgraded while it runs, PREMIUM keeps the legacy `prime` id, a replay never
  * charges twice, and an empty wallet is refused before anything is written.
  * The quote endpoint must say exactly what the purchase then does.
  *
@@ -36,7 +36,7 @@ function setup(launched = true) {
   }
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash) VALUES
-      ('u1','Sara','s@x.co','h'), ('u2','Omar','o@x.co','h'), ('boss','Admin','ad@x.co','h');
+      ('u1','Sara','s@x.co','h'), ('u2','Omar','o@x.co','h'), ('u3','Lina','l@x.co','h'), ('boss','Admin','ad@x.co','h');
   `);
   raw.exec(
     `INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('launchConfig','${
@@ -167,9 +167,9 @@ test('an empty wallet is refused with INSUFFICIENT_BALANCE and nothing is writte
   assert.equal(walletRows(raw, 'u1').length, 0);
 });
 
-// ----------------------------------------------------------- PRIME wording
+// --------------------------------------------------------- PREMIUM wording
 
-test('PRIME is called PRIME in every refusal, never PLUS', async () => {
+test('the legacy prime tier is called PREMIUM in every customer refusal, never PLUS', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
   const a = app(db, 'u1');
@@ -177,13 +177,13 @@ test('PRIME is called PRIME in every refusal, never PLUS', async () => {
 
   const again = await json(await subscribe(a, 'prime_12mo', 'prime-0002'));
   assert.equal(again.code, 'ALREADY_SUBSCRIBED');
-  assert.match(String(again.error), /PRIME/);
+  assert.match(String(again.error), /PREMIUM/);
   assert.doesNotMatch(String(again.error), /PLUS/);
 });
 
 // -------------------------------------------------------------- upgrades
 
-test('PLUS → PRIME is a prorated upgrade: credit for the unused PLUS, old row ended, one active row', async () => {
+test('PLUS → PREMIUM is a prorated upgrade: credit for the unused PLUS, old row ended, one active row', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
   const a = app(db, 'u1');
@@ -208,7 +208,7 @@ test('PLUS → PRIME is a prorated upgrade: credit for the unused PLUS, old row 
   );
   const u = raw.prepare('SELECT membership_tier FROM users WHERE id = ?').get('u1') as { membership_tier: string };
   assert.equal(u.membership_tier, 'prime');
-  // The PRIME row is worth its PRICE to a later upgrade, not the 70,000 it
+  // The PREMIUM row is worth its PRICE to a later upgrade, not the 70,000 it
   // cost after the credit — and it remembers the credit it consumed.
   const prime = all[1];
   assert.equal(Number(prime.price_paid_iqd), 70000);
@@ -216,7 +216,7 @@ test('PLUS → PRIME is a prorated upgrade: credit for the unused PLUS, old row 
   assert.equal(Number(prime.credit_applied_iqd), 29000);
 });
 
-test('two hops keep the first credit: PLUS → PRIME → PRO on one day charges the PRO price in total, and a replay reports the same credit', async () => {
+test('two hops keep the first credit: PLUS → PREMIUM → PRO on one day charges the PRO price in total, and a replay reports the same credit', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
   // A 199,000 PRO makes the arithmetic of the finding visible: 29,000 +
@@ -230,7 +230,7 @@ test('two hops keep the first credit: PLUS → PRIME → PRO on one day charges 
   assert.equal(hop1.charged_iqd, 29000);
   assert.equal(hop2.charged_iqd, 70000);
   assert.equal(hop2.credit_iqd, 29000);
-  assert.equal(hop3.credit_iqd, 99000, 'the second hop credits the PRIME price, not the post-credit charge');
+  assert.equal(hop3.credit_iqd, 99000, 'the second hop credits the PREMIUM price, not the post-credit charge');
   assert.equal(hop3.charged_iqd, 100000);
   assert.equal(Number(hop1.charged_iqd) + Number(hop2.charged_iqd) + Number(hop3.charged_iqd), 199000);
   assert.equal(rows(raw, 'u1').filter((m) => m.state === 'active').length, 1);
@@ -244,7 +244,7 @@ test('two hops keep the first credit: PLUS → PRIME → PRO on one day charges 
   assert.equal(walletRows(raw, 'u1').length, 3, 'three debits, never a fourth');
 });
 
-test('PRIME → PRO is a prorated upgrade too — the rule is any lower → higher', async () => {
+test('PREMIUM → PRO is a prorated upgrade too — the rule is any lower → higher', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
   const a = app(db, 'u1');
@@ -281,20 +281,20 @@ test('a lower tier cannot be bought under a running higher one', async () => {
   const toPrime = await json(await subscribe(a, 'prime_12mo', 'dg-prime-0001'));
   assert.equal(toPrime.code, 'DOWNGRADE_BLOCKED');
   assert.match(String(toPrime.error), /PRO/);
-  assert.match(String(toPrime.error), /PRIME/);
+  assert.match(String(toPrime.error), /PREMIUM/);
   const toPlus = await json(await subscribe(a, 'plus_12mo', 'dg-plus-0001'));
   assert.equal(toPlus.code, 'DOWNGRADE_BLOCKED');
   assert.equal(rows(raw, 'u1').length, 1, 'nothing was written');
 });
 
-test('PRIME → PLUS is a downgrade and is refused', async () => {
+test('PREMIUM → PLUS is a downgrade and is refused', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
   const a = app(db, 'u1');
   assert.equal((await subscribe(a, 'prime_12mo', 'dg2-prime-0001')).status, 200);
   const r = await json(await subscribe(a, 'plus_3mo', 'dg2-plus-0001'));
   assert.equal(r.code, 'DOWNGRADE_BLOCKED');
-  assert.match(String(r.error), /PRIME/);
+  assert.match(String(r.error), /PREMIUM/);
   assert.match(String(r.error), /PLUS/);
 });
 
@@ -314,7 +314,7 @@ test('before the launch a purchase is reserved at full price and a lower tier ca
   assert.equal(lower.code, 'DOWNGRADE_BLOCKED');
 
   // The quote for a higher tier says it will be reserved — and that it
-  // REPLACES the PRIME reservation, crediting its whole value: one
+  // REPLACES the PREMIUM reservation, crediting its whole value: one
   // reservation per account, never two waiting for the launch.
   const q = (await json(await a.request('/api/memberships/quote?planId=pro_12mo'))).quote as Record<string, unknown>;
   assert.equal(q.ok, true);
@@ -497,21 +497,30 @@ test('the memberships admin surface exists only on the main host — a merchant 
 
 // ---------------------------------------------------------- coupon ladder
 
-test('the coupon ladder follows TIER_RANK and honours a paused exclusiveCoupons benefit', async () => {
+test('the coupon ladder follows inheritance and honours a paused exclusiveCoupons benefit', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
   seedBalance(raw, 'u2', 1_000_000);
+  seedBalance(raw, 'u3', 1_000_000);
   await subscribe(app(db, 'u1'), 'pro_12mo', 'cp-pro-0001');
   await subscribe(app(db, 'u2'), 'plus_12mo', 'cp-plus-0001');
+  await subscribe(app(db, 'u3'), 'prime_12mo', 'cp-premium-0001');
   raw.prepare(
     "INSERT INTO coupons (id, code, tier_required, kind, value, max_per_user) VALUES ('c1', 'PRIMEONLY', 'prime', 'fixed_iqd', 1000, 5)"
+  ).run();
+  raw.prepare(
+    "INSERT INTO coupons (id, code, tier_required, kind, value, max_per_user) VALUES ('c2', 'PLUSONLY', 'plus', 'fixed_iqd', 1000, 5)"
   ).run();
   const env = { DB: db } as unknown as Env;
 
   // PRO is above PRIME on the ladder, so a PRO member may use a PRIME coupon.
   assert.equal((await validateCoupon(env, 'u1', 'PRIMEONLY', 50000)).ok, true);
+  assert.equal((await validateCoupon(env, 'u3', 'PRIMEONLY', 50000)).ok, true, 'PREMIUM receives its own coupon');
   // PLUS is below it.
   assert.equal((await validateCoupon(env, 'u2', 'PRIMEONLY', 50000)).reason, 'TIER_REQUIRED');
+  assert.equal((await validateCoupon(env, 'u2', 'PLUSONLY', 50000)).ok, true);
+  assert.equal((await validateCoupon(env, 'u3', 'PLUSONLY', 50000)).ok, true, 'PREMIUM inherits PLUS coupons');
+  assert.equal((await validateCoupon(env, 'u1', 'PLUSONLY', 50000)).ok, true, 'PRO inherits PLUS coupons');
 
   // An admin restriction on exclusiveCoupons pauses the coupon for the PRO member.
   raw.prepare(

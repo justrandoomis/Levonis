@@ -238,7 +238,7 @@ test('a component that does not belong to this bundle is refused as a changed co
   assert.equal(res.code, 'BUNDLE_COMPOSITION_CHANGED');
 });
 
-test('a members-only bundle refuses a free account with MEMBERSHIP_REQUIRED, and admits a PRO', async () => {
+test('a PLUS bundle refuses a free account and admits inherited PREMIUM/PRO members', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', window: { required_tiers: '["plus"]' } });
   const db = asD1(raw);
@@ -247,8 +247,8 @@ test('a members-only bundle refuses a free account with MEMBERSHIP_REQUIRED, and
   assert.equal(refused.status, 403);
   assert.equal((await json(refused)).code, 'MEMBERSHIP_REQUIRED');
 
-  // PRO inherits PLUS; PRIME does not (§9) — the matrix itself lives in
-  // tests/offerEligibility.test.ts, and this is the DOOR agreeing with it.
+  // PREMIUM and PRO both inherit PLUS — this is the purchase door agreeing
+  // with the canonical matrix rather than keeping its own tier policy.
   const pro = await json(
     await post(appFor(db, { id: 'u_pro', role: 'customer', email: 'r@x.co' }), '/api/cart/items', {
       productId: 'prd_b1',
@@ -262,7 +262,7 @@ test('a members-only bundle refuses a free account with MEMBERSHIP_REQUIRED, and
       qty: 1,
     })
   );
-  assert.equal(prime.code, 'MEMBERSHIP_REQUIRED');
+  assert.equal(prime.success, true);
 });
 
 test('an expired window and an unopened one are refused by their own codes', async () => {

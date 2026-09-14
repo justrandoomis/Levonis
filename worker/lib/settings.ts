@@ -22,6 +22,22 @@ export interface CheckoutPaymentMethod {
   titleEn: string;
   icon: string;
 }
+export interface BnplPolicy {
+  enabled: boolean;
+  due_days: number;
+  min_order_iqd: number;
+  max_order_iqd: number | null;
+  require_verified_identity: boolean;
+  require_approved_address: boolean;
+}
+export interface ProPriorityDeliveryConfig {
+  enabled: boolean;
+  max_hours: 12;
+  delivery_method_ids: string[];
+  shipping_types: string[];
+  /** Empty means every address already served by the selected method. */
+  governorates: string[];
+}
 export interface CartShippingMethod {
   id: string;
   titleAr: string;
@@ -54,9 +70,29 @@ export const SETTING_DEFAULTS = {
   checkoutPaymentMethods: [
     { id: 'wallet', titleAr: 'محفظة ليفو', titleEn: 'Levo Wallet', icon: 'Wallet' },
     { id: 'cash', titleAr: 'الدفع عند الاستلام', titleEn: 'Cash on Delivery', icon: 'Banknote' },
+    { id: 'bnpl', titleAr: 'اشترِ الآن وادفع لاحقًا', titleEn: 'Buy Now, Pay Later', icon: 'CalendarClock' },
     { id: 'full_advance', titleAr: 'الدفع مقدما بالكامل', titleEn: 'Full Payment in Advance', icon: 'CreditCard' },
     { id: 'half_advance', titleAr: 'دفع نصف المبلغ مقدما', titleEn: '50% Payment in Advance', icon: 'CreditCard' },
   ] as CheckoutPaymentMethod[],
+  // PRO-only financing. Access also requires an individually approved account,
+  // verified identity and the approved default address; no fee is invented.
+  bnplPolicy: {
+    enabled: true,
+    due_days: 30,
+    min_order_iqd: 10000,
+    max_order_iqd: null,
+    require_verified_identity: true,
+    require_approved_address: true,
+  } as BnplPolicy,
+  // The existing same-day personal-delivery method is the initially supported
+  // 12-hour service area. Admin configuration can add methods/regions later.
+  proPriorityDelivery: {
+    enabled: true,
+    max_hours: 12,
+    delivery_method_ids: ['personal'],
+    shipping_types: ['direct'],
+    governorates: [],
+  } as ProPriorityDeliveryConfig,
   cartShippingMethods: [
     { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days' },
     { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days' },
@@ -314,6 +350,22 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
 
+function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
+  if (key === 'checkoutPaymentMethods') {
+    const configured = Array.isArray(value) ? value : [];
+    const bnpl = SETTING_DEFAULTS.checkoutPaymentMethods.find((m) => m.id === 'bnpl')!;
+    return (configured.some((m) => typeof m === 'object' && m !== null && (m as { id?: unknown }).id === 'bnpl')
+      ? configured
+      : [...configured, bnpl]) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'bnplPolicy' || key === 'proPriorityDelivery') {
+    const object: Record<string, unknown> =
+      typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    return { ...(SETTING_DEFAULTS[key] as Record<string, unknown>), ...object } as (typeof SETTING_DEFAULTS)[K];
+  }
+  return value as (typeof SETTING_DEFAULTS)[K];
+}
+
 export async function getSettings(db: D1Database, keys?: SettingKey[]): Promise<Record<string, unknown>> {
   const wanted = keys ?? SETTING_KEYS;
   const placeholders = wanted.map(() => '?').join(',');
@@ -324,7 +376,8 @@ export async function getSettings(db: D1Database, keys?: SettingKey[]): Promise<
   const map = new Map(results.map((r) => [r.key, r.value]));
   const out: Record<string, unknown> = {};
   for (const k of wanted) {
-    out[k] = map.has(k) ? safeParse(map.get(k), SETTING_DEFAULTS[k]) : SETTING_DEFAULTS[k];
+    const value = map.has(k) ? safeParse(map.get(k), SETTING_DEFAULTS[k]) : SETTING_DEFAULTS[k];
+    out[k] = normalizedSetting(k, value);
   }
   return out;
 }
@@ -332,7 +385,7 @@ export async function getSettings(db: D1Database, keys?: SettingKey[]): Promise<
 export async function getSetting<K extends SettingKey>(db: D1Database, key: K): Promise<(typeof SETTING_DEFAULTS)[K]> {
   const row = await db.prepare('SELECT value FROM admin_settings WHERE key = ?').bind(key).first<{ value: string }>();
   if (!row) return SETTING_DEFAULTS[key];
-  return safeParse(row.value, SETTING_DEFAULTS[key]);
+  return normalizedSetting(key, safeParse(row.value, SETTING_DEFAULTS[key]));
 }
 
 export async function setSetting(db: D1Database, key: SettingKey, value: unknown): Promise<void> {

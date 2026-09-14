@@ -52,6 +52,8 @@ const STRINGS = {
     orderNo: 'رقم الطلب',
     placed: 'تاريخ الطلب',
     total: 'المجموع',
+    priority12h: 'طلب PRO مؤهل للتجهيز والتوصيل خلال 12 ساعة',
+    priority: 'طلب PRO بأولوية التجهيز والتوصيل',
     tabsLabel: 'أقسام الطلب',
     tabs: { tracking: 'التتبع', items: 'المنتجات', payment: 'الدفع والنقاط', support: 'الدعم' } as Record<Tab, string>,
     trackingNo: 'رقم التتبع',
@@ -80,6 +82,8 @@ const STRINGS = {
     orderNo: 'Order number',
     placed: 'Placed',
     total: 'Total',
+    priority12h: 'PRO order eligible for preparation and delivery within 12 hours',
+    priority: 'PRO order with preparation and delivery priority',
     tabsLabel: 'Order sections',
     tabs: { tracking: 'Tracking', items: 'Items', payment: 'Payment & points', support: 'Support' } as Record<Tab, string>,
     trackingNo: 'Tracking number',
@@ -106,6 +110,8 @@ const STRINGS = {
     orderNo: 'ژمارەی داواکاری',
     placed: 'بەرواری داواکاری',
     total: 'کۆی گشتی',
+    priority12h: 'داواکاری PRO ی گونجاو بۆ ئامادەکردن و گەیاندن لە ١٢ کاتژمێردا',
+    priority: 'داواکاری PRO بە پێشینەیی ئامادەکردن و گەیاندن',
     tabsLabel: 'بەشەکانی داواکاری',
     tabs: { tracking: 'بەدواداچوون', items: 'کاڵاکان', payment: 'پارەدان و خاڵ', support: 'پشتگیری' } as Record<Tab, string>,
     trackingNo: 'ژمارەی بەدواداچوون',
@@ -338,6 +344,15 @@ export default function OrderDetail() {
                   {tracking?.shipping_type_label && <span className="block text-zinc-600">{tracking.shipping_type_label}</span>}
                 </p>
               </div>
+              {order.priority === 1 && (
+                <div data-pro-priority className="mt-3 flex items-start gap-2 rounded-xl border border-[#B03142]/35 bg-[#B03142]/10 px-3 py-2 text-[12px] font-bold text-[#f3bdc5]">
+                  <Truck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    {order.fulfillment_service === 'pro_priority_12h' ? s.priority12h : s.priority}
+                    {order.priority_due_at && <time dateTime={order.priority_due_at} className="mt-0.5 block font-normal text-[#f3bdc5]/75">{new Date(order.priority_due_at).toLocaleString()}</time>}
+                  </span>
+                </div>
+              )}
             </section>
 
             <TabStrip

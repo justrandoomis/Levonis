@@ -13,16 +13,9 @@
  *    instants and a clock. No cron flips an `active` flag: a fifteen-minute
  *    job would make a countdown lie by up to fifteen minutes.
  *
- * 2. WHO. `offerEligible` gates on an explicit SET of tiers, not on a ladder
- *    minimum, and that is a deliberate departure from `validateCoupon`.
- *    `TIER_RANK` is { free: 0, plus: 1, prime: 2, pro: 3 }, so a minimum of
- *    'plus' would silently admit PRIME to every PLUS-exclusive offer and hand
- *    it the PLUS member price — while the repo's own entitlements module states
- *    the opposite intent for buyer tiers in as many words ("PRIME does NOT
- *    [inherit PLUS]: it is a delivery/priority tier for buyers"). And the
- *    owner's own enumeration includes "PLUS + PRO but not PRIME", which is
- *    simply unrepresentable as a linear minimum. `TIER_RANK` stays the only
- *    RANKING in the tree; this is a membership relation, not a second ranking.
+ * 2. WHO. `offerEligible` gates on the canonical membership inheritance from
+ *    entitlements.ts: PLUS is the base, PREMIUM inherits PLUS, and PRO inherits
+ *    both. An explicit `pro` requirement therefore remains PRO-exclusive.
  *
  * 3. HOW MUCH. `resolveOfferPrice` — a window carries its own price, or
  *    "limited offer" would be a countdown over an unchanged number. Exactly one
@@ -38,7 +31,7 @@
  */
 
 import { clampMemberLadder, TIER_RANK, type ResolvedPrice, type Tier } from './pricing';
-import { benefits, type TierStatus } from './entitlements';
+import { benefits, tierInherits, TIER_INHERITANCE, type TierStatus } from './entitlements';
 import { safeParse } from './types';
 import { newId } from './crypto';
 
@@ -88,18 +81,8 @@ export type Subject = [subjectType: string, subjectId: string];
 
 const subjectKey = (s: Subject) => `${s[0]}:${s[1]}`;
 
-/**
- * WHICH REQUIREMENTS A TIER SATISFIES. PRO inherits PLUS — the owner's rule,
- * and the same rule the merchant benefits already follow. PRIME stands alone:
- * it is a delivery/priority tier for buyers, and granting it PLUS access here
- * would hand it a PLUS-exclusive product and a PLUS price nobody sold it.
- */
-export const INHERITS: Record<Tier, Tier[]> = {
-  free: ['free'],
-  plus: ['free', 'plus'],
-  prime: ['free', 'prime'],
-  pro: ['free', 'plus', 'pro'],
-};
+/** Compatibility export for admin tooling; entitlements.ts owns the table. */
+export const INHERITS: Record<Tier, Tier[]> = TIER_INHERITANCE;
 
 const TIERS: Tier[] = ['free', 'plus', 'prime', 'pro'];
 
@@ -148,12 +131,13 @@ export function offerEligible(status: TierStatus | null, view: OfferView | null,
   // An admin restriction case pauses gated offer access without cancelling a
   // paid membership — that is what `gated_benefits` is for.
   if (!benefits.exclusiveSections(status)) return { ok: false, reason: 'MEMBERSHIP_REQUIRED', ...base };
-  const allowed = required.some((r) => INHERITS[status.tier].includes(r));
+  const allowed = required.some((r) => tierInherits(status.tier, r));
   return allowed ? { ok: true, reason: null, ...base } : { ok: false, reason: 'MEMBERSHIP_REQUIRED', ...base };
 }
 
-/** True when this viewer's tier may be charged the offer's PLUS rung. */
-const plusRungApplies = (tier: Tier, tierActive: boolean) => tier === 'plus' && tierActive;
+/** Higher tiers inherit the PLUS offer rung when no better rung exists. */
+const plusRungApplies = (tier: Tier, tierActive: boolean) =>
+  tierActive && tierInherits(tier, 'plus');
 
 /**
  * THE PRICE A LIVE WINDOW PRODUCES, and the ladder clamped against it.
@@ -251,8 +235,11 @@ export function resolveOfferPrice(input: {
   }
 
   let applied = regular;
-  if (input.tier === 'pro' && input.tierActive && pro !== null) applied = pro;
-  else if (input.tier === 'prime' && input.tierActive && prime !== null) applied = prime;
+  if (input.tier === 'pro' && input.tierActive && (pro !== null || prime !== null || plus !== null)) {
+    applied = pro ?? prime ?? plus!;
+  } else if (input.tier === 'prime' && input.tierActive && (prime !== null || plus !== null)) {
+    applied = prime ?? plus!;
+  }
   else if (plusRungApplies(input.tier, input.tierActive) && plus !== null) applied = plus;
 
   return { applied_iqd: applied, regular_iqd: regular, prime_iqd: prime, pro_iqd: pro, plus_iqd: plus, offer_id: w.id, source: 'offer', errors: [] };

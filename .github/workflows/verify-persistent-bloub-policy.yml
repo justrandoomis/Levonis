@@ -1,0 +1,97 @@
+name: 40 - Verify persistent Bloub and policies (no deployment)
+
+on:
+  push:
+    branches: [codex/persistent-bloub-policy]
+  pull_request:
+    branches: [Main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-bloub-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Install Studio workspace required by the existing checks
+        working-directory: studio
+        run: npm ci --no-audit --no-fund
+      - name: TypeScript, lint and architecture checks
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          set +e
+          npm run check > /tmp/levonis-diagnostics/check.log 2>&1
+          result=$?
+          tail -100 /tmp/levonis-diagnostics/check.log
+          exit "$result"
+      - name: All root and workspace unit tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          set +e
+          npm run test:unit > /tmp/levonis-diagnostics/unit.log 2>&1
+          result=$?
+          grep -n -A 18 '^not ok\|error:\|Error:' /tmp/levonis-diagnostics/unit.log | head -160
+          tail -25 /tmp/levonis-diagnostics/unit.log
+          exit "$result"
+      - name: Build without deployment
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          set +e
+          npm run build > /tmp/levonis-diagnostics/build.log 2>&1
+          result=$?
+          tail -60 /tmp/levonis-diagnostics/build.log
+          exit "$result"
+      - name: Install isolated browser driver
+        if: ${{ !cancelled() }}
+        run: |
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Browser geometry, navigation and accessibility
+        if: ${{ !cancelled() }}
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+        shell: bash
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4175 > /tmp/levonis-diagnostics/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4175/tests/browser/bloub.html > /dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-bloub-continuation.mjs > /tmp/levonis-diagnostics/browser.log 2>&1
+          result=$?
+          tail -60 /tmp/levonis-diagnostics/browser.log
+          exit "$result"
+      - name: Archive exact source for reproducible review
+        if: ${{ always() }}
+        run: |
+          mkdir -p /tmp/levonis-diagnostics
+          git rev-parse HEAD > /tmp/levonis-diagnostics/commit.txt
+          git archive --format=tar.gz HEAD -o /tmp/levonis-diagnostics/source.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: levonis-diagnostics-${{ github.run_id }}
+          path: /tmp/levonis-diagnostics/
+          retention-days: 7

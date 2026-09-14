@@ -165,6 +165,17 @@ export interface UsageGuideV2 {
   steps: UsageStepV2[];
 }
 
+export interface ProductDeliveryRuleV2 {
+  enabled: boolean;
+  quantity_step: number;
+  fee_iqd: number;
+}
+
+export interface ProductDeliveryOptionsV2 {
+  standard: ProductDeliveryRuleV2;
+  personal: ProductDeliveryRuleV2;
+}
+
 export interface ContentBlockV2 {
   id: string;
   kind: 'text' | 'image' | 'video_embed';
@@ -229,6 +240,8 @@ export interface ProductDocV2 {
   /** Whether a unit is recorded per physical device at delivery (the record an
    *  extended warranty attaches to). null = not stated; printers default true. */
   serialized: boolean | null;
+  /** null = legacy global tariff; object = product-owned allow-list + fee tiers. */
+  delivery_options?: ProductDeliveryOptionsV2 | null;
   content_blocks: ContentBlockV2[];
   translation_meta?: TranslationMetaV2;
   is_featured: boolean;

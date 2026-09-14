@@ -4,8 +4,10 @@ import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId, newOrderId } from '../lib/crypto';
+import { primaryMedia, readProductDeliveryOptions } from '../lib/productModel';
+import { productImageForSelection } from '../lib/productSelectionImage';
 import { getSettings, printerNoteIqdFrom } from '../lib/settings';
-import type { DeliveryMethod, CheckoutPaymentMethod } from '../lib/settings';
+import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
 import {
   resolveCartLine,
   pricingContextFrom,
@@ -57,6 +59,7 @@ import {
 import { loadOffers, offerEligible, offerKey, offerPriceRefusal, offerRedemptionStatement, subjectOf } from '../lib/offers';
 import {
   allowedPaymentMethods,
+  isBnpl,
   isCod,
   isPaymentMethodAllowed,
   isPrepaid,
@@ -75,8 +78,16 @@ import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import type { StockMove, StockTarget } from '../lib/inventory';
-import { pricingTierContext, preorderGiftFor } from '../lib/entitlements';
+import { benefits, pricingTierContext, preorderGiftFor, shippingEntitlementContext } from '../lib/entitlements';
 import type { PreorderGiftConfig, TierStatus } from '../lib/entitlements';
+import {
+  bnplCancellationStatement,
+  bnplChargeStatement,
+  bnplDueAt,
+  bnplEligibility,
+  type BnplEligibility,
+} from '../lib/bnpl';
+import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/priorityDelivery';
 import {
   referralFreeDeliveryApplies,
   validateCoupon,
@@ -102,8 +113,10 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { notifyAdmins } from '../lib/telegram';
 import { quoteShipping } from '../lib/shipping';
-import type { ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
-import { getRequiredCheckoutPolicies, verifyAndRecordAcceptance } from '../lib/policyOps';
+import { productDeliveryMethodAvailable } from '../lib/shipping';
+import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
+import { codDeliveryTaxIqd } from '../lib/codTax';
+import { getRequiredCheckoutPolicies, preparePolicyAcceptance, isPolicyAcceptanceConflict } from '../lib/policyOps';
 import { cartShippingType, typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
 import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
 import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
@@ -120,6 +133,9 @@ orderRoutes.use('*', requireAuth);
 function iqdToUsdCents(iqd: number, rate: number): number {
   return Math.ceil((iqd * 100) / rate);
 }
+
+const eventPaymentMethod = (id: string): 'wallet' | 'cash' | 'bnpl' =>
+  isBnpl(id) ? 'bnpl' : isCod(id) ? 'cash' : 'wallet';
 
 /**
  * §5 unified financial snapshot: ONE server-computed money view every cart,
@@ -165,8 +181,10 @@ function financialSnapshot(
       : Number(o.merchandise_iqd) || 0;
   const pointsUsed = Number(o.points_discount_iqd) || 0;
   const walletIqd = Number(o.wallet_applied_iqd) || 0;
+  const codTax = Number(o.cod_tax_iqd) || 0;
   const total = Number(o.total_iqd) || 0;
   const due = Number(o.due_on_delivery_iqd) || 0;
+  const bnplDue = Number(o.bnpl_due_iqd) || 0;
   const collected = snap ? snap.collected_iqd : null;
   const paid = collected === null ? walletIqd : collected;
   const outstanding = Math.max(0, total - paid);
@@ -182,6 +200,7 @@ function financialSnapshot(
     points_used: pointsUsed,
     points_value_iqd: pointsUsed,
     shipping_iqd: Number(o.shipping_iqd) || 0,
+    cod_tax_iqd: codTax,
     delivery_waived: !!o.delivery_waived,
     total_iqd: total,
     // Payment means, with its ledger reference.
@@ -189,9 +208,18 @@ function financialSnapshot(
     wallet_tx_id: walletIqd > 0 ? `wtx_ord_${String(o.id)}_usd` : null,
     points_tx_id: pointsUsed > 0 ? `wtx_ord_${String(o.id)}_pts` : null,
     due_on_delivery_iqd: due,
+    bnpl_due_iqd: bnplDue,
+    bnpl_due_at: o.bnpl_due_at ?? null,
     collected_iqd: collected,
-    outstanding_iqd: collected === null ? due : outstanding,
-    payment_state: outstanding <= 0 && (collected !== null || due <= 0) ? 'paid' : paid > 0 ? 'partial' : 'cod_due',
+    outstanding_iqd: bnplDue > 0 ? bnplDue : collected === null ? due : outstanding,
+    payment_state:
+      bnplDue > 0
+        ? 'bnpl_due'
+        : outstanding <= 0 && (collected !== null || due <= 0)
+          ? 'paid'
+          : paid > 0
+            ? 'partial'
+            : 'cod_due',
     settlement: snap
       ? { collected_iqd: snap.collected_iqd, settled_at: snap.settled_at, fully_settled: snap.settled_at !== null }
       : null,
@@ -353,9 +381,14 @@ export function orderPublic(
     payment_method_id: o.payment_method_id,
     subtotal_iqd: o.subtotal_iqd,
     shipping_iqd: o.shipping_iqd,
+    cod_tax_iqd: Number(o.cod_tax_iqd) || 0,
     delivery_waived: !!o.delivery_waived,
     membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
     priority: Number(o.priority) || 0,
+    fulfillment_service: o.fulfillment_service || 'standard',
+    priority_due_at: o.priority_due_at ?? null,
+    bnpl_due_iqd: Number(o.bnpl_due_iqd) || 0,
+    bnpl_due_at: o.bnpl_due_at ?? null,
     coupon, // {coupon_id, code, discount_iqd} — never includes cost data
     coupon_discount_iqd: coupon ? Number(coupon.discount_iqd) || 0 : 0,
     points_discount_iqd: o.points_discount_iqd,
@@ -603,7 +636,7 @@ function persistedItemRef(l: ComputedLine, all: ComputedLine[]) {
 }
 
 /** products.ops_policy facts the shipping engine needs (explicit config only). */
-function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['size_class']; is_spool: boolean } {
+function shippingFactsFrom(opsPolicyRaw: unknown): Pick<ShippingItem, 'size_class' | 'is_spool' | 'delivery'> {
   const o = safeParse<Record<string, unknown>>(
     typeof opsPolicyRaw === 'string' ? opsPolicyRaw : JSON.stringify(opsPolicyRaw ?? {}),
     {}
@@ -612,6 +645,7 @@ function shippingFactsFrom(opsPolicyRaw: unknown): { size_class: ShippingItem['s
   return {
     size_class: sc === 'printer_small' || sc === 'printer_large' || sc === 'ordinary' ? sc : null,
     is_spool: o.is_spool === true,
+    delivery: readProductDeliveryOptions(o) ?? undefined,
   };
 }
 
@@ -759,7 +793,7 @@ function priceCompositionLine(
       // receipt, the courier payload and every e-mail read this field.
       name: b.doc.name_en || b.doc.name_ar || b.doc.id,
       name_ar: b.doc.name_ar,
-      image: b.doc.media[0]?.url ?? '',
+      image: primaryMedia(b.doc.media)?.url ?? '',
       variant: '',
       option_id: '',
       color_id: '',
@@ -832,7 +866,7 @@ function priceCompositionLine(
      * other shipping fact.
      */
     const facts = shippingFactsFrom(b.row.ops_policy);
-    shippingItems.push({ product_id: String(b.doc.id), qty: 1, size_class: facts.size_class, is_spool: facts.is_spool });
+    shippingItems.push({ product_id: String(b.doc.id), qty: 1, ...facts });
   });
   included.forEach((k, i) => {
     const componentQty = k.qty_per_bundle * qty;
@@ -850,7 +884,7 @@ function priceCompositionLine(
       stock_targets: k.resolution.targets,
       name: k.doc.name_en || k.doc.name_ar || k.member_product_id,
       name_ar: k.doc.name_ar,
-      image: k.doc.media[0]?.url ?? '',
+      image: primaryMedia(k.doc.media)?.url ?? '',
       variant: componentVariantLabel(k),
       option_id: k.selection.option_value_ids[0] ?? '',
       color_id: k.selection.color_id ?? '',
@@ -879,8 +913,7 @@ function priceCompositionLine(
     shippingItems.push({
       product_id: k.member_product_id,
       qty: componentQty,
-      size_class: facts.size_class,
-      is_spool: facts.is_spool,
+      ...facts,
     });
     composition.items.push({
       order_item_id: lines[lines.length - 1].id,
@@ -915,7 +948,7 @@ function priceCompositionLine(
     stock_targets: [],
     name: b.doc.name_en || b.doc.name_ar || b.doc.id,
     name_ar: b.doc.name_ar,
-    image: b.doc.media[0]?.url ?? '',
+    image: primaryMedia(b.doc.media)?.url ?? '',
     variant: compositionOptionSnapshot(b),
     /** The `bx_…` composition key, kept as provenance. Nothing derives a
      *  selection from it, and price protection refuses a parent claim by name
@@ -1167,6 +1200,12 @@ interface CheckoutComputation {
   shippingType: ShippingType;
   /** The payment ids the storefront may offer for this cart (worker/lib/paymentPolicy.ts). */
   allowedPaymentMethods: string[];
+  /** Server-computed PRO financing; null means the account is not eligible. */
+  bnpl: BnplEligibility | null;
+  bnplAmount: number;
+  bnplDueAt: string | null;
+  /** Actual 12-hour service verdict for this method/address/cart. */
+  priorityDelivery: PriorityDeliveryVerdict;
   /** 'direct' when the lines were priced by the direct-sale rule — a direct
    *  cart, or a pre-order cart paid cash on delivery; 'preorder' otherwise. */
   pricingBasis: 'direct' | 'preorder';
@@ -1219,6 +1258,8 @@ interface CheckoutComputation {
   requiredAdvance: number;
   totalIqd: number; // payable after coupon+points (before wallet)
   dueOnDelivery: number;
+  /** Frozen cash-on-delivery tax; zero for pickup and non-COD payments. */
+  codTaxIqd: number;
   policies: PolicyRef[];
   printerGiftConfig: unknown;
   preorderGiftConfig: unknown;
@@ -1257,6 +1298,8 @@ async function computeCheckout(
     'preorderGiftConfig',
     'shippingPolicy',
     'printerHomeDeliveryNoteIqd',
+    'bnplPolicy',
+    'proPriorityDelivery',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -1282,8 +1325,6 @@ async function computeCheckout(
     user.id,
     address
   );
-  const gatedBenefits = new Set(tierStatus.gated_benefits ?? []);
-
   // Load and price the cart lines server-side.
   let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
                     ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, ci.draw_salt, p.*
@@ -1302,16 +1343,25 @@ async function computeCheckout(
   // the order. It decides which payment methods may be offered, and how a
   // pre-order line is priced once the method is known.
   const shippingType: ShippingType = cartShippingType(rows) ?? 'direct';
-  const allowedMethods = allowedPaymentMethods(shippingType);
+  // BNPL is added to the offered ids only after the server resolves an active
+  // PRO membership, account approval, KYC, approved address and available
+  // credit. A client-supplied `bnpl` id cannot put itself on this list.
+  const bnplBase = await bnplEligibility(c.env.DB, user.id, address);
+  const allowedMethods = allowedPaymentMethods(shippingType, { bnplEligible: bnplBase.eligible });
   // The owner's rule: pay in advance from the wallet, or cash on delivery.
   // An id the settings still list but the policy does not accept (a
   // half-advance) is refused with the offered list beside the refusal, so
   // the client can repaint its choices instead of guessing. Quote mode with
   // no id yet stays allowed and prices as prepaid.
-  if (input.paymentMethodId && !isPaymentMethodAllowed(input.paymentMethodId, shippingType)) {
+  if (
+    input.paymentMethodId &&
+    !isPaymentMethodAllowed(input.paymentMethodId, shippingType, { bnplEligible: bnplBase.eligible })
+  ) {
     throw badRequest(
-      'This payment method is not available for this order — pay in advance from your wallet or choose cash on delivery.',
-      PAYMENT_METHOD_NOT_ALLOWED,
+      isBnpl(input.paymentMethodId)
+        ? `BNPL is not available for this checkout (${bnplBase.reason ?? 'NOT_ELIGIBLE'}).`
+        : 'This payment method is not available for this order — pay in advance from your wallet or choose cash on delivery.',
+      isBnpl(input.paymentMethodId) ? bnplBase.reason ?? 'BNPL_NOT_ELIGIBLE' : PAYMENT_METHOD_NOT_ALLOWED,
       { payment_method_id: input.paymentMethodId, allowed_payment_methods: allowedMethods, shipping_type: shippingType }
     );
   }
@@ -1590,7 +1640,7 @@ async function computeCheckout(
       merchandise += resolved.applied_iqd * qty;
       productIds.push(String(row.id));
       const facts = shippingFactsFrom(row.ops_policy);
-      shippingItems.push({ product_id: String(row.id), qty, size_class: facts.size_class, is_spool: facts.is_spool });
+      shippingItems.push({ product_id: String(row.id), qty, ...facts });
       // Persisted resolver snapshot: cost fields must NEVER be stored on the
       // order (it is served back to the buyer). It carries `direct.waived`,
       // `transport.waived_by` and `pricing_basis`, so an invoice, a refund or
@@ -1628,7 +1678,10 @@ async function computeCheckout(
         stock_targets: stockRes.targets,
         name: String(row.name),
         name_ar: String(row.name_ar ?? ''),
-        image: (doc.media.find((m) => m.primary) ?? doc.media[0])?.url ?? '',
+        image: productImageForSelection(doc, {
+          optionValueIds: sel.optionValueIds ?? [],
+          colorId: sel.colorId || null,
+        }, view),
         variant: variantLabel,
         option_id: String(row.option_id ?? ''),
         color_id: String(row.color_id ?? ''),
@@ -1688,6 +1741,28 @@ async function computeCheckout(
 
   // Store pickup: no last-mile delivery happens, so no delivery fees at all.
   const isPickup = delivery.id === 'pickup';
+  const productDeliveryMethod: ProductDeliveryMethod | null =
+    delivery.id === 'standard' || delivery.id === 'personal' ? delivery.id : null;
+  if (!isPickup && priced.shippingItems.some((item) => item.delivery !== undefined)) {
+    if (!productDeliveryMethod) {
+      throw badRequest(
+        'This delivery method is not configured for one or more products in the cart.',
+        'DELIVERY_METHOD_UNAVAILABLE',
+        { delivery_method_id: delivery.id }
+      );
+    }
+    const availability = productDeliveryMethodAvailable(priced.shippingItems, productDeliveryMethod);
+    if (!availability.available) {
+      throw badRequest(
+        'The selected delivery method is unavailable for one or more products in the cart.',
+        'DELIVERY_METHOD_UNAVAILABLE',
+        {
+          delivery_method_id: productDeliveryMethod,
+          unavailable_product_ids: availability.unavailable_product_ids,
+        }
+      );
+    }
+  }
 
   // The selected delivery method's configured price is the ORDINARY tariff
   // for this order (standard = the confirmed 5,000 IQD default); printer and
@@ -1697,10 +1772,7 @@ async function computeCheckout(
     : shippingConfig.ordinary_iqd;
   const configForOrder: ShippingConfig = { ...shippingConfig, ordinary_iqd: methodOrdinary };
 
-  // The delivery benefit can be gated per tier by an active restriction case:
-  // PRO's waiver hangs off 'freeDelivery', PRIME's off 'primeDeliveryEligible'.
-  const deliveryGate =
-    tierStatus.tier === 'prime' ? 'primeDeliveryEligible' : 'freeDelivery';
+  const shippingEntitlements = shippingEntitlementContext(tierStatus);
 
   // Spendable balances only (mandate §11.1/§4.4: pending deposits and pending
   // points are NEVER spendable). getAvailableBalances is the wallet slice's
@@ -1732,10 +1804,12 @@ async function computeCheckout(
     const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
       quoteShipping({
         items: shippingItems,
+        deliveryMethod: productDeliveryMethod ?? undefined,
         merchandiseIqd: basisIqd,
         primeMerchandiseIqd: primeBasisIqd,
         tier: tierStatus.tier,
-        tierActive: tierStatus.active && !gatedBenefits.has(deliveryGate),
+        tierActive: tierStatus.active,
+        ...shippingEntitlements,
         atApprovedDefaultAddress: atApprovedDefault,
         independentFreeDelivery,
         // Store pickup has no last mile, so nothing to protect; the flag is
@@ -1841,7 +1915,14 @@ async function computeCheckout(
     }
     const finalWalletUsdCents =
       walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
-    const dueOnDelivery = afterPoints - walletApplied;
+    const payableBeforeCodTax = Math.max(0, afterPoints - walletApplied);
+    const codTaxIqd = codDeliveryTaxIqd({
+      paymentMethodId: input.paymentMethodId,
+      deliveryMethodId: delivery.id,
+      payableBeforeTaxIqd: payableBeforeCodTax,
+    });
+    const financedIqd = isBnpl(input.paymentMethodId) ? payableBeforeCodTax : 0;
+    const dueOnDelivery = isBnpl(input.paymentMethodId) ? 0 : payableBeforeCodTax + codTaxIqd;
 
     return {
       shipping,
@@ -1855,8 +1936,10 @@ async function computeCheckout(
       walletApplied,
       walletUsdCents: finalWalletUsdCents,
       requiredAdvance,
-      totalIqd: afterPoints,
+      totalIqd: afterPoints + codTaxIqd,
       dueOnDelivery,
+      codTaxIqd,
+      financedIqd,
     };
   };
 
@@ -1876,6 +1959,27 @@ async function computeCheckout(
     prepaidByWallet = settled.dueOnDelivery === 0;
   }
 
+  let finalBnpl: BnplEligibility | null = null;
+  let finalBnplDueAt: string | null = null;
+  if (isBnpl(input.paymentMethodId)) {
+    if (settled.financedIqd <= 0) throw badRequest('There is no remaining amount to finance', 'BNPL_AMOUNT_TOO_LOW');
+    finalBnpl = await bnplEligibility(c.env.DB, user.id, address, settled.financedIqd);
+    if (!finalBnpl.eligible) {
+      throw badRequest(`BNPL is not available for this amount (${finalBnpl.reason ?? 'NOT_ELIGIBLE'}).`, finalBnpl.reason ?? 'BNPL_NOT_ELIGIBLE');
+    }
+    finalBnplDueAt = bnplDueAt(new Date().toISOString(), finalBnpl.due_days);
+  }
+
+  const priorityDelivery = priorityDeliveryVerdict({
+    status: tierStatus,
+    atApprovedDefault,
+    config: settings.proPriorityDelivery as ProPriorityDeliveryConfig,
+    deliveryMethodId: delivery.id,
+    shippingType,
+    address,
+    nowIso: new Date().toISOString(),
+  });
+
   const policies = await getRequiredCheckoutPolicies(c.env);
 
   return {
@@ -1889,6 +1993,10 @@ async function computeCheckout(
     proContext,
     shippingType,
     allowedPaymentMethods: allowedMethods,
+    bnpl: finalBnpl ?? (bnplBase.eligible ? bnplBase : null),
+    bnplAmount: settled.financedIqd,
+    bnplDueAt: finalBnplDueAt,
+    priorityDelivery,
     pricingBasis: priced.pricingBasis,
     codReprices,
     prepaidByWallet,
@@ -1919,6 +2027,7 @@ async function computeCheckout(
     requiredAdvance: settled.requiredAdvance,
     totalIqd: settled.totalIqd,
     dueOnDelivery: settled.dueOnDelivery,
+    codTaxIqd: settled.codTaxIqd,
     policies,
     printerGiftConfig: settings.printerGiftConfig,
     preorderGiftConfig: settings.preorderGiftConfig,
@@ -2152,6 +2261,16 @@ orderRoutes.post('/quote', async (c) => {
       shipping_type: comp.shippingType,
       /** The payment ids the storefront may offer for this cart. */
       allowed_payment_methods: comp.allowedPaymentMethods,
+      bnpl: comp.bnpl
+        ? {
+            eligible: comp.bnpl.eligible,
+            available_iqd: comp.bnpl.available_iqd,
+            outstanding_iqd: comp.bnpl.outstanding_iqd,
+            financed_iqd: comp.bnplAmount,
+            due_at: comp.bnplDueAt,
+          }
+        : { eligible: false },
+      priority_delivery: comp.priorityDelivery,
       /** 'direct' when the lines were priced by the direct-sale rule (a direct
        *  cart, or a pre-order cart paid cash on delivery); 'preorder' when the
        *  transport commission applies. */
@@ -2222,6 +2341,7 @@ orderRoutes.post('/quote', async (c) => {
       },
       merchandise_after_coupon_iqd: comp.eligibleMerchandise,
       total_iqd: comp.totalIqd,
+      cod_tax_iqd: comp.codTaxIqd,
       due_on_delivery_iqd: comp.dueOnDelivery,
       tier: {
         tier: comp.tierStatus.tier,
@@ -2302,7 +2422,7 @@ orderRoutes.post('/', async (c) => {
           discount_iqd: Math.max(0, comp.couponDiscount + comp.pointsDiscount),
           grand_iqd: Math.max(0, comp.totalIqd),
         },
-        payment_method: isCod(input.paymentMethodId) ? 'cash' : 'wallet',
+        payment_method: eventPaymentMethod(input.paymentMethodId),
         seller_type: 'platform',
       },
       { aggregateId: idempotencyKey, actorId: user.id, aggregateSeq: 1 }
@@ -2329,7 +2449,9 @@ orderRoutes.post('/', async (c) => {
         version: Number(a?.version),
       }))
     : undefined;
-  await verifyAndRecordAcceptance(c.env, user.id, `order:${orderId}`, acceptanceList);
+  const policyAcceptance = await preparePolicyAcceptance(c.env, user.id, `order:${orderId}`, acceptanceList, {
+    locale: body.policyLocale ?? langOf(c), orderId,
+  });
 
   const shippingTotal = comp.shipping.total_iqd;
   const deliveryWaived = comp.shipping.total_iqd < comp.shipping.total_before_waiver_iqd ? 1 : 0;
@@ -2337,15 +2459,18 @@ orderRoutes.post('/', async (c) => {
   // it: the referral waiver is one-per-friend, and the check that enforces
   // "one" reads this column at the next checkout (referralFreeDeliveryApplies).
   const referralWaived = comp.shipping.waiver_source === 'promotion' ? 1 : 0;
-  // PRO priority preparation is a CONTEXTUAL purchase benefit: only in the
-  // eligible PRO checkout context (approved default address), and pausable
-  // by an active priorityService restriction case (§10).
-  const priority =
-    comp.proContext && !(comp.tierStatus.gated_benefits ?? []).includes('priorityService') ? 1 : 0;
+  // PRO preparation/support priority is membership-wide. The 12-hour SLA is
+  // narrower and is snapshot separately only where method/address/cart pass.
+  const priority = benefits.priorityService(comp.tierStatus) ? 1 : 0;
+  const fulfillmentService = comp.priorityDelivery.eligible ? 'pro_priority_12h' : priority ? 'pro_priority' : 'standard';
 
   // The delivery-method snapshot keeps its original fields (backward
   // compatible) and gains the authoritative shipping quote for transparency.
-  const deliverySnapshot = JSON.stringify({ ...comp.delivery, quote: comp.shipping });
+  const deliverySnapshot = JSON.stringify({
+    ...comp.delivery,
+    quote: comp.shipping,
+    priority_delivery: comp.priorityDelivery,
+  });
 
   /**
    * «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». The rule itself is in
@@ -2366,14 +2491,15 @@ orderRoutes.post('/', async (c) => {
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
-         payment_method_id, subtotal_iqd, shipping_iqd, points_discount_iqd, wallet_applied_iqd,
+         payment_method_id, subtotal_iqd, shipping_iqd, cod_tax_iqd, points_discount_iqd, wallet_applied_iqd,
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, client_idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
-         support_snapshot, shipping_type, membership_gift, referral_delivery_waived, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         support_snapshot, shipping_type, membership_gift, referral_delivery_waived,
+         fulfillment_service, priority_due_at, bnpl_due_iqd, bnpl_due_at, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
-      input.paymentMethodId, comp.subtotal, shippingTotal, comp.pointsDiscount, comp.walletApplied,
+      input.paymentMethodId, comp.subtotal, shippingTotal, comp.codTaxIqd, comp.pointsDiscount, comp.walletApplied,
       comp.walletUsdCents, comp.exchangeRate, comp.totalIqd, comp.dueOnDelivery, idempotencyKey,
       comp.tierStatus.active ? comp.tierStatus.tier : 'free', deliveryWaived, priority, comp.couponSnapshot,
       // §5: merchandise is stored apart from fees so every screen and the
@@ -2385,9 +2511,27 @@ orderRoutes.post('/', async (c) => {
       // state machine must not have to re-derive the path from lines that can
       // change afterwards. The cart guarantees one type, so the first line
       // speaks for all of them.
-      orderShippingType, membershipGift, referralWaived, now, now
+      orderShippingType, membershipGift, referralWaived,
+      fulfillmentService, comp.priorityDelivery.due_at, comp.bnplAmount, comp.bnplDueAt, now, now
     ),
   ];
+
+  // Foreign-key order association and consent commit or roll back together.
+  stmts.push(...policyAcceptance.statements);
+
+  if (comp.bnplAmount > 0 && comp.bnplDueAt) {
+    // The database trigger re-checks membership, approval, KYC, address and
+    // remaining limit inside this same transaction.
+    stmts.push(
+      bnplChargeStatement(c.env.DB, {
+        userId: user.id,
+        orderId,
+        amountIqd: comp.bnplAmount,
+        dueAt: comp.bnplDueAt,
+        createdAt: now,
+      })
+    );
+  }
 
   if (comp.couponId) {
     // UNIQUE(order_id) makes the redemption idempotent with the order itself.
@@ -2561,7 +2705,7 @@ orderRoutes.post('/', async (c) => {
   // commits the order (stock reserved, money and points debited). A failed
   // attempt writes nothing, so a cart or an aborted checkout can never start
   // the clock. available_at = purchase_at + 7×24h and never moves afterwards.
-  const settledAtPurchase = comp.dueOnDelivery <= 0;
+  const settledAtPurchase = comp.dueOnDelivery <= 0 && comp.bnplAmount <= 0;
   const { statements: accrualStmts, accrual } = buildPurchaseAccrualStatements(c.env, {
     orderId,
     userId: user.id,
@@ -2590,7 +2734,11 @@ orderRoutes.post('/', async (c) => {
       kind: 'prepaid_at_purchase',
       amountIqd: comp.walletApplied,
       eventKey: 'purchase',
-      note: settledAtPurchase ? 'Paid in full at purchase' : 'Advance paid at purchase; balance due on delivery',
+      note: settledAtPurchase
+        ? 'Paid in full at purchase'
+        : comp.bnplAmount > 0
+          ? 'Wallet portion collected; remaining balance financed by BNPL'
+          : 'Advance paid at purchase; balance due on delivery',
       recordedBy: 'system',
       settledAt: now,
     })
@@ -2668,7 +2816,7 @@ orderRoutes.post('/', async (c) => {
       seller_type: 'platform',
       merchant_id: null,
       store_id: null,
-      payment_state: comp.walletUsdCents > 0 ? 'authorized' : 'cod',
+      payment_state: comp.bnplAmount > 0 ? 'financed' : comp.walletUsdCents > 0 ? 'authorized' : 'cod',
       // WHAT THE DATABASE WILL HOLD, not what the cart computed (§7.7). The
       // NULL a mystery spool's row is bound with is applied here through the
       // SAME helper the INSERT above uses, so the bus can never publish a
@@ -2683,7 +2831,7 @@ orderRoutes.post('/', async (c) => {
         total_iqd: Math.max(0, comp.totalIqd),
       },
       payment: {
-        method: isCod(input.paymentMethodId) ? 'cash' : 'wallet',
+        method: eventPaymentMethod(input.paymentMethodId),
         wallet_usd_cents: Math.max(0, comp.walletUsdCents),
         points: Math.max(0, comp.pointsDiscount),
         cod_iqd: Math.max(0, comp.dueOnDelivery),
@@ -2704,6 +2852,9 @@ orderRoutes.post('/', async (c) => {
   try {
     await c.env.DB.batch(stmts);
   } catch (e) {
+    if (isPolicyAcceptanceConflict(e)) {
+      throw badRequest('Policies changed; reload and review them again', 'POLICY_ACCEPTANCE_REQUIRED');
+    }
     const msg = e instanceof Error ? e.message : String(e);
     // The ORDERS key, and nothing else. `inventory_ledger.idempotency_key` is
     // in this very batch (the reservation rows) and is also globally UNIQUE,
@@ -2752,6 +2903,18 @@ orderRoutes.post('/', async (c) => {
     if (msg.includes('OFFER_GLOBAL_LIMIT')) {
       throw badRequest('This offer has reached its limit (GLOBAL_LIMIT_REACHED)', 'GLOBAL_LIMIT_REACHED');
     }
+    for (const [internalCode, publicCode] of [
+      ['BNPL_PRO_REQUIRED', 'PRO_REQUIRED'],
+      ['BNPL_RESTRICTED', 'BNPL_RESTRICTED'],
+      ['BNPL_NOT_APPROVED', 'BNPL_NOT_APPROVED'],
+      ['BNPL_IDENTITY_REQUIRED', 'IDENTITY_VERIFICATION_REQUIRED'],
+      ['BNPL_APPROVED_ADDRESS_REQUIRED', 'APPROVED_ADDRESS_REQUIRED'],
+      ['BNPL_LIMIT_EXCEEDED', 'BNPL_LIMIT_EXCEEDED'],
+    ] as const) {
+      if (msg.includes(internalCode)) {
+        throw badRequest('BNPL eligibility changed. Please review checkout.', publicCode);
+      }
+    }
     if (msg.includes('CHECK')) {
       throw badRequest('Order could not be placed: a balance or stock level changed. Please review your cart and try again.', 'CONFLICT_RETRY');
     }
@@ -2791,9 +2954,12 @@ orderRoutes.post('/', async (c) => {
     tier: comp.tierStatus.active ? comp.tierStatus.tier : 'free',
     pro_context: comp.proContext, at_approved_default: comp.atApprovedDefault,
     shipping_iqd: shippingTotal, delivery_waived: deliveryWaived,
+    cod_tax_iqd: comp.codTaxIqd,
     merchandise_iqd: comp.merchandise, points_eligible_iqd: comp.netEligible,
     points_pending: accrual.points, points_rule: comp.pointsRule.version,
     points_available_at: accrual.available_at, settled_at_purchase: settledAtPurchase,
+    bnpl_iqd: comp.bnplAmount, bnpl_due_at: comp.bnplDueAt,
+    fulfillment_service: fulfillmentService, priority_due_at: comp.priorityDelivery.due_at,
     support_referrer: comp.supportSnapshot?.referrer_user_id ?? null,
   });
 
@@ -2811,7 +2977,7 @@ orderRoutes.post('/', async (c) => {
   c.executionCtx.waitUntil(
     notifyAdmins(
       c.env,
-      `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\nDue on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`
+      `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\n${comp.bnplAmount > 0 ? `BNPL due: ${comp.bnplAmount.toLocaleString()} IQD · ${comp.bnplDueAt}` : `Due on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`}\nFulfilment: ${fulfillmentService}`
     )
   );
   const data = (await loadOrder(c.env.DB, orderId))!;
@@ -3039,6 +3205,7 @@ orderRoutes.post('/:id/cancel', async (c) => {
       ).bind(id),
       ...(stock.plan?.statements ?? []),
       ...cancelledOrderRefundStatements(c.env, data.order, 'system', now),
+      bnplCancellationStatement(c.env.DB, user.id, id, now),
     ]);
   } catch (e) {
     // The fence aborts the batch when the flip matched no row — a concurrent

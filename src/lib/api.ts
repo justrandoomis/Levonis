@@ -1,3 +1,4 @@
+import { beginRequestFeedback, type MascotFeedback } from './mascotRequest';
 /**
  * Typed API client. All requests go to the Worker backend with cookie
  * credentials; the browser never builds SQL and never holds tokens.
@@ -46,6 +47,8 @@ export function isNotConfigured(e: unknown): boolean {
 export interface RequestOptions {
   /** The caller's own cancellation — a React effect cleanup, typically. */
   signal?: AbortSignal;
+  /** Silent background polling must not animate loading/success on every tick. */
+  mascot?: MascotFeedback;
   /** Deadline in ms. Defaults to DEFAULT_TIMEOUT_MS; 0 disables it. */
   timeoutMs?: number;
 }
@@ -58,7 +61,7 @@ export interface RequestOptions {
  */
 const DEFAULT_TIMEOUT_MS = 20000;
 
-async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+async function requestRaw<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
   const init: RequestInit = { method, credentials: 'same-origin', headers: {} };
   if (body !== undefined && !(body instanceof FormData)) {
     init.headers = { 'Content-Type': 'application/json' };
@@ -109,6 +112,18 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
     );
   }
   return data;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+  const feedback = beginRequestFeedback(method, path, opts?.mascot);
+  try {
+    const result = await requestRaw<T>(method, path, body, opts);
+    feedback.finish();
+    return result;
+  } catch (error) {
+    feedback.finish(error instanceof ApiError ? error : { status: 0 });
+    throw error;
+  }
 }
 
 export const api = {
@@ -209,12 +224,27 @@ export interface ApiProduct {
   description: string;
   description_ar: string;
   description_ku?: string;
+  /** Canonical media metadata. The explicit primary wins over legacy order. */
+  media?: Array<{
+    id: string;
+    url: string;
+    primary: boolean;
+    order: number;
+    alt_ar?: string;
+    alt_en?: string;
+    alt_ckb?: string;
+  }>;
   images: string[];
   options: Array<{ id: string; name?: string; name_ar?: string; image?: string; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   colors: Array<{ id: string; name?: string; name_ar?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
   sale_types?: Array<'direct_sale' | 'pre_order' | 'bundle'>;
   shipping_methods: Array<{ id: string; method?: string; delivery_time?: string; price_iqd?: number }>;
+  /** null on legacy products that still use the global delivery tariff. */
+  delivery_options?: {
+    standard: { enabled: boolean; quantity_step: number; fee_iqd: number };
+    personal: { enabled: boolean; quantity_step: number; fee_iqd: number };
+  } | null;
   price_iqd: number;
   prime_price_iqd?: number | null;
   pro_price_iqd?: number | null;
@@ -356,6 +386,8 @@ export interface CartItem {
   options: ApiProduct['options'];
   colors: ApiProduct['colors'];
   shipping_methods: ApiProduct['shipping_methods'];
+  /** Server-derived method availability for this exact physical line. */
+  delivery_availability?: { standard: boolean; personal: boolean };
   /** 'bundle' / 'mystery' for a composition line; absent on an ordinary one. */
   kind?: 'bundle' | 'mystery';
   /**
@@ -621,6 +653,8 @@ export interface ApiOrder {
   payment_method_id: string;
   subtotal_iqd: number;
   shipping_iqd: number;
+  /** Frozen cash-on-delivery tax. Zero for pickup and non-COD payments. */
+  cod_tax_iqd: number;
   points_discount_iqd: number;
   wallet_applied_iqd: number;
   total_iqd: number;
@@ -643,6 +677,17 @@ export interface ApiOrder {
   delivered_at?: string | null;
   delivery_waived?: boolean;
   membership_tier_snapshot?: string;
+  /** Server-snapshotted fulfilment lane. `pro_priority_12h` is only emitted
+   *  after the Worker proves the active PRO, approved address and service
+   *  coverage requirements at checkout. */
+  priority?: number;
+  fulfillment_service?: 'standard' | 'pro_priority' | 'pro_priority_12h' | string;
+  priority_due_at?: string | null;
+  /** Amount financed through the PRO-only BNPL ledger and its contractual due
+   *  date. These are server values, never calculated from the selected client
+   *  payment label. */
+  bnpl_due_iqd?: number;
+  bnpl_due_at?: string | null;
   coupon?: { coupon_id?: string; code?: string; discount_iqd?: number } | null;
   coupon_discount_iqd?: number;
   progress?: OrderStageProgress;
@@ -688,13 +733,17 @@ export interface OrderFinancial {
   points_used: number;
   points_value_iqd: number;
   shipping_iqd: number;
+  /** Server-calculated and snapshotted; clients must never recompute it. */
+  cod_tax_iqd: number;
   delivery_waived: boolean;
   total_iqd: number;
   wallet_applied_iqd: number;
   due_on_delivery_iqd: number;
+  bnpl_due_iqd?: number;
+  bnpl_due_at?: string | null;
   collected_iqd: number | null;
   outstanding_iqd: number;
-  payment_state: 'paid' | 'partial' | 'cod_due' | string;
+  payment_state: 'paid' | 'partial' | 'cod_due' | 'bnpl_due' | string;
   wallet_tx_id?: string | null;
   points_tx_id?: string | null;
   settlement?: { collected_iqd: number; settled_at: string | null; fully_settled: boolean } | null;
@@ -948,9 +997,25 @@ export function newIdempotencyKey(): string {
 export async function uploadFile(
   file: File,
   purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community'
-): Promise<{ key: string; url: string }> {
+): Promise<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }> {
+  const originalName = file.name;
+  let prepared = file;
+  let width: number | undefined;
+  let height: number | undefined;
+  if (purpose === 'product') {
+    // Lazy because image conversion belongs only to admin product workflows,
+    // not to the entry bundle used by every shopper.
+    const { prepareProductImage } = await import('./imagePreprocess');
+    const result = await prepareProductImage(file);
+    prepared = result.file;
+    width = result.width;
+    height = result.height;
+  }
   const form = new FormData();
   form.append('purpose', purpose);
-  form.append('file', file);
-  return api.post<{ key: string; url: string }>('/api/uploads', form);
+  form.append('file', prepared);
+  form.append('originalName', originalName);
+  if (width) form.append('width', String(width));
+  if (height) form.append('height', String(height));
+  return api.post<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }>('/api/uploads', form);
 }

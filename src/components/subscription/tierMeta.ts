@@ -3,14 +3,14 @@
  *
  * The card face, the ambient glow, the tier selector, every chip, the
  * confirmation window, the ledger, the Header pill and the Profile badge all
- * read this — so PRIME can never fall back to PLUS wording or PLUS colours
+ * read this — so PREMIUM can never fall back to PLUS wording or colours
  * again (it used to be labelled "PLUS" in the toast, the ledger, the pending
  * banner and the profile, and drawn in the free grey on the card).
  *
  * Colours are the site's established palette: the LEVONIS green the Header
  * already uses for PLUS (#59A846 — the `olive` token itself is a very dark
  * surface colour and is invisible as text on black), the gold token for
- * PRIME, and the PRO red (#B03142 / #e06070).
+ * PREMIUM, and the PRO red (#B03142 / #e06070).
  */
 import { Crown, Sparkles, Zap, type LucideIcon } from 'lucide-react';
 
@@ -74,7 +74,7 @@ export const TIER_META: Record<PaidTier, TierMeta> = {
   },
   prime: {
     id: 'prime',
-    label: 'PRIME',
+    label: 'PREMIUM',
     Icon: Crown,
     hex: '#BAA369',
     accentDeep: '#7A6836',
@@ -121,7 +121,7 @@ export function isPaidTier(t: unknown): t is PaidTier {
   return t === 'plus' || t === 'prime' || t === 'pro';
 }
 
-/** PLUS / PRIME / PRO — never "PLUS" for a PRIME member. */
+/** PLUS / PREMIUM / PRO. (`prime` remains the compatibility API id.) */
 export function tierLabel(tier: string | null | undefined): string {
   if (isPaidTier(tier)) return TIER_META[tier].label;
   return tier ? String(tier).toUpperCase() : '';

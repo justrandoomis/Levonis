@@ -28,6 +28,7 @@ import {
   Loader2, PackageX, Check, Printer, Layers, Hammer, ArrowLeft, ChevronLeft,
   MapPin, X, Heart, MoreHorizontal, Link2,
 } from 'lucide-react';
+import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import { useLanguage } from '../LanguageContext';
 import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { useAuth } from '../AuthContext';
@@ -295,7 +296,10 @@ export default function Storefront({
               )}
             </div>
             <div className="min-w-0 flex-1 pt-2.5">
-              <h1 className="text-white font-bold text-[17px] leading-tight truncate" dir="auto">{store.name}</h1>
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="min-w-0 truncate text-[17px] font-bold leading-tight text-white" dir="auto">{store.name}</h1>
+                {store.merchant.pro_badge && <ProMerchantBadge compact />}
+              </div>
               {profileOnly ? (
                 <p className="text-zinc-400 text-[12px] truncate" dir="auto">{joinedLine(store.created_at, loc, lang)}</p>
               ) : (
