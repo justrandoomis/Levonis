@@ -38,6 +38,7 @@ try {
   await run("INSERT INTO favorites(user_id,product_id) VALUES ('proof-user','proof-product')");
   await run("INSERT INTO orders(id,user_id,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd) VALUES ('order','proof-user','{}','standard','{}','cash',100000,1400,100000,100000)");
   await run("INSERT INTO order_items(id,order_id,product_id,name_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES ('item','order','proof-product','Historical product','Historical model',1,100000,100000)");
+  await run("INSERT INTO inventory_ledger(id,product_id,scope,scope_id,kind,qty,order_id,idempotency_key) VALUES ('held-stock','proof-product','fulfillment','f0-direct_sale','reserve',1,'order','reserve:order:item:fulfillment:f0-direct_sale')");
   const deletion=await deleteProductPermanently(env,'proof-product','proof-user');
   const after={};
   for(const table of Object.keys(deletion.rows_deleted_by_table)) {after[table]=await count(table,'proof-product').catch(async()=>Number((await DB.prepare(`SELECT COUNT(*) n FROM ${table}`).first()).n));assert.equal(after[table],0,table);}
@@ -45,6 +46,8 @@ try {
   assert.equal(deletion.r2_objects_deleted,20);assert.equal(deletion.r2_cleanup_pending,0);
   assert.equal((await BUCKET.list({prefix:'products/proof/'})).objects.length,0);
   assert.equal((await DB.prepare("SELECT name_snapshot FROM order_items WHERE id='item'").first()).name_snapshot,'Historical product');
+  const archivedInventory=JSON.parse((await DB.prepare("SELECT snapshot FROM historical_inventory_ledger WHERE id='held-stock'").first()).snapshot);
+  assert.equal(archivedInventory.order_id,'order');assert.equal(archivedInventory.qty,1);
   assert.equal((await deleteProductPermanently(env,'proof-product','proof-user')).already_deleted,true);
   await product('a');await product('b');await image('ia','a','products/shared.webp');await image('ib','b','products/shared.webp');
   const sharedA=await deleteProductPermanently(env,'a','proof-user');assert.ok(await BUCKET.head('products/shared.webp'));

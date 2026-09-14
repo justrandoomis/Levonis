@@ -94,7 +94,12 @@ export async function confirmProductOrphanCleanup(env: Env, scanId: string, acto
     const dep = graph.find((d) => d.table === candidate.table);
     if (!dep || dep.table === 'products') throw badRequest('Schema changed; run a new dry run');
     const fields = Object.entries(candidate.fingerprint);
-    statements.push(env.DB.prepare(`DELETE FROM ${qi(dep.table)} WHERE rowid=? AND (${dep.orphanPredicate}) AND ${fields.map(([k]) => `${qi(k)} IS ?`).join(' AND ')}`).bind(candidate.rowid, ...fields.map(([,v]) => v)));
+    const predicate = `rowid=? AND (${dep.orphanPredicate}) AND ${fields.map(([k]) => `${qi(k)} IS ?`).join(' AND ')}`;
+    const values = [candidate.rowid, ...fields.map(([,v]) => v)];
+    // A missing catalog parent does not make its inventory audit disposable.
+    // Archive only the unchanged, still-orphaned row that this batch deletes.
+    if (dep.table === 'inventory_ledger') statements.push(env.DB.prepare(`INSERT OR IGNORE INTO historical_inventory_ledger(id,product_id,snapshot) SELECT id,product_id,? FROM inventory_ledger WHERE ${predicate}`).bind(JSON.stringify(candidate.fingerprint), ...values));
+    statements.push(env.DB.prepare(`DELETE FROM ${qi(dep.table)} WHERE ${predicate}`).bind(...values));
   }
   // Only reviewed orphan objects and keys from reviewed orphan rows are queued.
   const keys = new Set(report.orphan_r2_files.map((o) => o.key));

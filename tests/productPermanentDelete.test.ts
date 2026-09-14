@@ -51,6 +51,7 @@ test('permanent delete removes the product and owned relationships, keeps order/
   raw.prepare("INSERT INTO favorites(user_id,product_id) VALUES ('u','p')").run();
   raw.prepare("INSERT INTO cart_items(id,user_id,product_id,qty) VALUES ('cart','u','p',1)").run();
   raw.prepare("INSERT INTO price_history(product_id,field,new_iqd) VALUES ('p','regular',100000)").run();
+  raw.prepare("INSERT INTO inventory_ledger(id,product_id,scope,scope_id,kind,qty,order_id,idempotency_key) VALUES ('held-stock','p','fulfillment','f0direct_sale','reserve',1,'o','reserve:o:oi:fulfillment:f0direct_sale')").run();
   const r = await deleteProductPermanently(env,'p','u');
   assert.equal(r.product_deleted,true);
   for(const t of ['products','product_option_groups','product_option_values','product_colors','product_images','product_option_fulfillment','product_option_transports','cart_items','favorites','price_history']) assert.equal(row(raw,`SELECT COUNT(*) n FROM ${t}`)?.n,0,t);
@@ -58,6 +59,9 @@ test('permanent delete removes the product and owned relationships, keeps order/
   assert.ok(r.cache_keys_invalidated.some(key=>key.startsWith('catalog-generation:')));
   assert.equal(row(raw,'SELECT name_snapshot FROM order_items WHERE id=?','oi')?.name_snapshot,'Historical product');
   assert.equal(row(raw,'SELECT product_id FROM reviews WHERE id=?','review')?.product_id,null);
+  assert.equal(row(raw,'SELECT COUNT(*) n FROM inventory_ledger')?.n,0);
+  const archived=JSON.parse(String(row(raw,"SELECT snapshot FROM historical_inventory_ledger WHERE id='held-stock'")?.snapshot));
+  assert.equal(archived.order_id,'o'); assert.equal(archived.qty,1);
   assert.equal((await deleteProductPermanently(env,'p','u')).already_deleted,true);
   product('p-new'); raw.prepare("UPDATE products SET slug='p' WHERE id='p-new'").run();
 });
@@ -78,10 +82,13 @@ test('old orphan dry run does not delete; confirmation cleans only reviewed unus
   const {raw,env,bucket}=setup();raw.exec('PRAGMA foreign_keys=OFF');
   raw.prepare("INSERT INTO product_images(id,product_id,url,r2_key) VALUES ('orphan-image','missing','/files/products/missing/image.webp','products/missing/image.webp')").run();
   raw.prepare("INSERT INTO product_option_values(id,product_id,group_id,name_en) VALUES ('orphan-option','missing','missing-group','Orphan')").run();
+  raw.prepare("INSERT INTO inventory_ledger(id,product_id,scope,kind,qty,idempotency_key,order_id) VALUES ('orphan-ledger','missing','base','deduct',1,'historical-deduct','historical-order')").run();
   raw.exec('PRAGMA foreign_keys=ON');bucket.objects.set('products/missing/image.webp',1024);bucket.objects.set('products/unused/image.webp',2048);
   const report=await scanProductOrphans(env,'owner');assert.equal(report.tables.find(t=>t.table==='product_images')?.orphan_rows,1);assert.equal(report.tables.find(t=>t.table==='product_option_values')?.orphan_rows,1);assert.equal(report.r2_objects,2);
   assert.equal(bucket.objects.size,2);assert.equal(row(raw,'SELECT COUNT(*) n FROM product_images')?.n,1);
   await confirmProductOrphanCleanup(env,report.scan_id,'owner');assert.equal(bucket.objects.size,0);assert.equal(row(raw,'SELECT COUNT(*) n FROM product_images')?.n,0);assert.equal(row(raw,'SELECT COUNT(*) n FROM product_option_values')?.n,0);
+  assert.equal(row(raw,'SELECT COUNT(*) n FROM inventory_ledger')?.n,0);
+  assert.equal(JSON.parse(String(row(raw,"SELECT snapshot FROM historical_inventory_ledger WHERE id='orphan-ledger'")?.snapshot)).order_id,'historical-order');
 });
 
 test('remote third-party URLs never become deletion keys',()=>{

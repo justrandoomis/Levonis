@@ -1,7 +1,7 @@
 {
   "runtime": "Cloudflare local workerd / Miniflare D1 and R2 bindings",
   "production_modified": false,
-  "checked_at": "2026-09-14T11:17:29.797Z",
+  "checked_at": "2026-09-14T11:33:27.232Z",
   "full_fixture": {
     "models": 2,
     "colors": 3,
@@ -16,7 +16,7 @@
   "deletion": {
     "product_deleted": true,
     "already_deleted": false,
-    "deletion_job_id": "pdel_c6b7001b90da40689ffa",
+    "deletion_job_id": "pdel_bfb7712e77aa49aaa05b",
     "rows_deleted_by_table": {
       "product_option_transports": 3,
       "product_color_option_links": 0,
@@ -31,7 +31,7 @@
       "bundle_items": 0,
       "cart_items": 1,
       "favorites": 1,
-      "inventory_ledger": 0,
+      "inventory_ledger": 1,
       "mystery_offer_secrets": 0,
       "mystery_offers": 0,
       "mystery_pool_entries": 0,

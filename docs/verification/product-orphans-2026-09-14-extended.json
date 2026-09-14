@@ -1,0 +1,114 @@
+{
+  "dry_run": true,
+  "destructive_actions": 0,
+  "legacy_delete_archives": {
+    "product_ids": [],
+    "rows_by_table": {},
+    "cleanup_authorized": false
+  },
+  "complete": true,
+  "checked_at": "2026-09-14T11:28:21.402Z",
+  "origin": "https://levonis-iq.com",
+  "worker": "levonis-staging",
+  "db_binding": "DB",
+  "tables": [
+    {
+      "table": "product_color_option_links",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_images",
+      "orphan_rows": 0
+    },
+    {
+      "table": "bundle_component_choices",
+      "orphan_rows": 0
+    },
+    {
+      "table": "cart_bundle_choices",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_option_values",
+      "orphan_rows": 0
+    },
+    {
+      "table": "bundle_components",
+      "orphan_rows": 0
+    },
+    {
+      "table": "bundle_config",
+      "orphan_rows": 0
+    },
+    {
+      "table": "bundle_items",
+      "orphan_rows": 0
+    },
+    {
+      "table": "cart_items",
+      "orphan_rows": 0
+    },
+    {
+      "table": "favorites",
+      "orphan_rows": 0
+    },
+    {
+      "table": "inventory_ledger",
+      "orphan_rows": 0
+    },
+    {
+      "table": "mystery_offer_secrets",
+      "orphan_rows": 0
+    },
+    {
+      "table": "mystery_offers",
+      "orphan_rows": 0
+    },
+    {
+      "table": "mystery_pool_entries",
+      "orphan_rows": 0
+    },
+    {
+      "table": "offer_limits",
+      "orphan_rows": 0
+    },
+    {
+      "table": "offer_windows",
+      "orphan_rows": 0
+    },
+    {
+      "table": "price_history",
+      "orphan_rows": 1
+    },
+    {
+      "table": "product_catalogs",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_colors",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_facets",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_option_groups",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_translations",
+      "orphan_rows": 0
+    },
+    {
+      "table": "product_variants",
+      "orphan_rows": 0
+    }
+  ],
+  "orphan_r2_files": [],
+  "r2_objects": 0,
+  "bytes": 0,
+  "dangling_db_media_refs": [],
+  "legacy_option_rows": 0,
+  "ambiguous_legacy_models": []
+}
