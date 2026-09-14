@@ -254,11 +254,11 @@ is what keeps the two formats from drifting into accepting different rules.
 | TXT key / CSV column | Accepted values | Rule column | Read-back | Status | Note |
 |---|---|---|---|---|---|
 | `membership.<tier>.discount_mode` | `percent` \| `fixed` \| `__NULL__` | `discount_mode` | `GET /api/admin/membership-benefits` | OK — rows, both formats | `<tier>` is `pro` (PRO) or `premium` (PREMIUM, stored as `prime`). `__NULL__` **removes** the rule. |
-| `membership.<tier>.percent` | integer 1..100 (%) | `percent` | same | OK | Required when the mode is `percent`; dropped when it is `fixed`, as the admin door drops it. |
-| `membership.<tier>.fixed_iqd` | integer IQD | `fixed_iqd` | same | OK | Required (> 0) when the mode is `fixed`. |
-| `membership.<tier>.max_discount_iqd` | integer IQD | `max_discount_iqd` | same | OK | A ceiling with no `cap_scope` is refused — *"Say whether the ceiling is per unit or per order"*. |
+| `membership.<tier>.percent` | integer 1..100 (%) | `percent` | same | OK | Required when the mode is `percent`; dropped when it is `fixed`, as the admin door drops it. Out of range is refused: *"percent must be between 1 and 100"*. |
+| `membership.<tier>.fixed_iqd` | integer IQD, 0..1,000,000,000 | `fixed_iqd` | same | OK | Required (> 0) when the mode is `fixed`. The ceiling is the admin door's own (`optInt`, `MEMBERSHIP_MAX_IQD`): without it a twenty-digit cell landed in the INTEGER column as a SQLite REAL and floored every member's price to zero. |
+| `membership.<tier>.max_discount_iqd` | integer IQD, 0..1,000,000,000 | `max_discount_iqd` | same | OK | A ceiling with no `cap_scope` is refused — *"Say whether the ceiling is per unit or per order"*. Same range as the admin door. |
 | `membership.<tier>.cap_scope` | `per_unit` \| `per_order` \| `__NULL__` | `cap_scope` | same | OK | A `cap_scope` with no ceiling is refused too. `per_order` moves the rule out of the unit price and into the line (`isUnitExpressible`). |
-| `membership.<tier>.max_quantity` | integer ≥ 1 | `max_quantity` | same | OK | Also makes the rule line-applied rather than unit-applied. |
+| `membership.<tier>.max_quantity` | integer 1..9999 | `max_quantity` | same | OK | Also makes the rule line-applied rather than unit-applied. The range is the admin door's (`int(..., { min: 1, max: 9999 })`). |
 | — (`enabled`, `priority`, `valid_from`, `valid_until`, `label`, `notes`, `min_subtotal_iqd`) | — | same columns | same | not in template — **preserved** | Read off the stored rule and written back unchanged on every update (`applyMembershipRules`, `worker/routes/adminImport.ts`). A bulk price edit must not cancel a scheduled promotion or re-enable a rule the owner switched off. |
 
 **The three states, and why silence is not a decision.**
@@ -267,7 +267,7 @@ is what keeps the two formats from drifting into accepting different rules.
 |---|---|
 | the keys/columns are absent, or every one of a tier's six is empty | **nothing.** The stored rule for that tier survives untouched. An export taken before §18 existed is exactly this case. |
 | values | the tier's product rule is created or updated. |
-| `discount_mode=__NULL__` | the tier's product rule is deleted. |
+| `discount_mode=__NULL__` | **every** product-scoped rule of that tier on this product is deleted, each as its own versioned, audited write. Nothing in the admin door forbids two overrides for one tier, and removing only the one that wins would leave the other pricing every order while the file, the preview and the next export all called the override gone. |
 
 An **export never writes `__NULL__`**: a tier with no rule exports six empty
 keys (TXT) or six empty cells (CSV). Otherwise an owner who exported on Monday,
@@ -283,6 +283,12 @@ row errors for the sheet, `POST /api/admin/template/parse` `errors[]` for the
 .txt — **before** anything is written. `/parse` additionally reports a
 `membership[]` array naming what the apply will `set` or `remove`, so a deletion
 is visible before it happens.
+
+Every RANGE the door enforces, the sheet enforces at the same boundary —
+`MEMBERSHIP_MAX_IQD`, `MEMBERSHIP_MAX_QUANTITY` and 1..100 in
+`worker/lib/importCsv.ts` are a copy of `ruleFromBody`'s limits, pinned to it by
+a test that drives BOTH doors with the same over-the-line value. A bound moved
+on one side and not the other fails there, not in the database.
 
 ---
 

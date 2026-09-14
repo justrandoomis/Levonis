@@ -144,7 +144,9 @@ export default function MembershipDiscountSection({
         setSchema(next);
         // The whole configuration comes back; this panel is about ONE product's
         // own overrides, so everything else is filtered out here rather than
-        // asked for — the door has no per-product read.
+        // asked for — the door has no per-product read. It is read even for an
+        // unsaved product, because the DISABLED panel still shows the real
+        // tiers, discount kinds and units rather than a guess at them.
         const mine = productId
           ? (payload.rules ?? []).filter(
               (r) => r.scope === 'product' && r.product_id === productId && r.benefit_type === 'product_discount'
@@ -397,7 +399,11 @@ export default function MembershipDiscountSection({
               {rule && (rule.valid_from || rule.valid_until) && (
                 <Banner kind="warn">
                   {loc('تسري ضمن نافذة زمنية فقط', 'It applies only inside a time window')}:{' '}
-                  {fmtDateTime(rule.valid_from)} → {fmtDateTime(rule.valid_until)}
+                  {/* The two instants are a LEFT-TO-RIGHT pair. Left in the RTL
+                      run, the arrow lands between the wrong two dates. */}
+                  <span dir="ltr" className="inline-block">
+                    {fmtDateTime(rule.valid_from)} → {fmtDateTime(rule.valid_until)}
+                  </span>
                 </Banner>
               )}
               {rule && rule.min_subtotal_iqd !== null && (
@@ -411,6 +417,14 @@ export default function MembershipDiscountSection({
                   {loc(
                     'لهذا المنتج أكثر من تجاوز لهذه العضوية. المعروض هنا هو الذي يسبق غيره؛ البقية تُدار من شاشة المزايا.',
                     'This product carries more than one override for this membership. The one shown here is the one that wins; the rest are managed on the benefits screen.'
+                  )}
+                </Banner>
+              )}
+              {rule && f.discount_mode === '' && (
+                <Banner kind="warn">
+                  {loc(
+                    'إفراغ نوع الخصم لا يحذف القاعدة — استخدم «إزالة» لرفع التجاوز عن هذا المنتج.',
+                    'Emptying the discount kind does not delete the rule — use “Clear” to lift the override off this product.'
                   )}
                 </Banner>
               )}

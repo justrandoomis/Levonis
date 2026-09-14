@@ -1101,19 +1101,33 @@ export async function applyMembershipRules(
   rules: readonly ParsedMembershipRule[]
 ): Promise<void> {
   for (const r of rules) {
-    const existing = await env.DB
+    const { results: matching } = await env.DB
       .prepare(
         `SELECT * FROM membership_benefit_rules
           WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ? AND tier = ?
-          ORDER BY priority DESC, id LIMIT 1`
+          ORDER BY priority DESC, id`
       )
       .bind(productId, r.tier)
-      .first<Record<string, unknown>>();
+      .all<Record<string, unknown>>();
+    // The one an update edits is the one that WINS (`selectRule`'s order:
+    // priority first, then a stable id), so the sheet edits the rule the
+    // checkout actually applies and the export shows the same one.
+    const existing = (matching ?? [])[0] ?? null;
 
     if (r.remove) {
-      // Nothing to delete is not a failure: a file may legitimately say "this
-      // product has no PRO rule" about a product that already has none.
-      if (existing) await deleteBenefitRule(env, actorId, String(existing.id));
+      /**
+       * EVERY rule of this tier, not only the winner. `__NULL__` says "this
+       * product has no PRO membership discount", and nothing in the door stops
+       * an owner from having created two. Deleting only the top one would
+       * leave the OTHER one pricing every PRO order while the file, the
+       * preview and the next export all said the override was gone — a silent
+       * discount nobody can see. Each deletion is its own versioned, audited
+       * write, so none of them is lost.
+       *
+       * Nothing to delete is not a failure: a file may legitimately say "this
+       * product has no PRO rule" about a product that already has none.
+       */
+      for (const row of matching ?? []) await deleteBenefitRule(env, actorId, String(row.id));
       continue;
     }
 

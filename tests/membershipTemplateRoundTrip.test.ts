@@ -31,8 +31,12 @@ import {
   templateDownloadDiagnostics,
   templateRoutes,
 } from '../worker/routes/template';
+import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
 import {
   MEMBERSHIP_COLUMNS,
+  MEMBERSHIP_MAX_IQD,
+  MEMBERSHIP_MAX_PERCENT,
+  MEMBERSHIP_MAX_QUANTITY,
   MEMBERSHIP_NULL,
   membershipReadme,
   parseImport,
@@ -673,7 +677,9 @@ test('the blank template and the example teach the keys without carrying a value
       assert.ok(text.includes(key), `the download omits ${key}`);
       // Commented out, and with no number beside it: a downloaded file must
       // never hide a commercial value the owner did not type.
-      assert.match(text, new RegExp(`^#\\s*${key.replace(/\\./g, '\\\\.')}=\\s*$`, 'm'), `${key} ships with a value`);
+      // The dots are LITERAL: `membership.pro.percent` must not be allowed to
+      // match `membershipXproXpercent`, and an unescaped `.` in a RegExp does.
+      assert.match(text, new RegExp(`^#\\s*${key.replace(/[.]/g, '\\.')}=\\s*$`, 'm'), `${key} ships with a value`);
     }
   }
   // And what they ship still parses with zero errors and no unknown keys.
@@ -682,4 +688,174 @@ test('the blank template and the example teach the keys without carrying a value
   assert.deepEqual(diag.blank.unknown_keys, []);
   assert.equal(diag.example.errors, 0);
   assert.deepEqual(diag.example.unknown_keys, []);
+});
+
+/* ======================================================================== */
+/*  THE SHEET IS NOT A WIDER DOOR THAN THE PANEL.                           */
+/*                                                                          */
+/*  A refusal that exists in `ruleFromBody` and not in                      */
+/*  `membershipRuleFromCells` is a rule the owner cannot type in the admin   */
+/*  screen and CAN type in a spreadsheet — which is the whole point of       */
+/*  having one validator. These tests drive BOTH doors with the same value,  */
+/*  so a ceiling moved on one side and not the other fails here rather than  */
+/*  in the database.                                                        */
+/* ======================================================================== */
+
+const doorApp = (db: unknown) =>
+  stubApp(db, { id: 'boss', role: 'admin', email: 'boss@x.co' }, (a) => {
+    a.route('/api/admin/import', adminImportRoutes);
+    a.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
+  });
+
+function setupBoth() {
+  const raw = freshDb();
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role)
+      VALUES ('boss','Admin','boss@x.co','h','admin');
+    INSERT INTO catalogs (id,parent_id,slug,name_ar,name_en,template_family,is_printer_catalog,active)
+      VALUES ('${SECTION}',NULL,'tpl-printers','طابعات القالب','Template Printers','devices',1,1);
+  `);
+  return { raw, app: doorApp(asD1(raw)) };
+}
+
+/** The admin door, asked to store exactly what the sheet was asked to store. */
+const adminRule = (app: App, over: Record<string, unknown>) =>
+  app.request(
+    '/api/admin/membership-benefits',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        tier: 'pro',
+        benefit_type: 'product_discount',
+        scope: 'product',
+        product_id: 'any-product',
+        ...over,
+      }),
+      headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
+    },
+    undefined,
+    ctx
+  );
+
+test('every range the admin door enforces, the sheet enforces — at the same boundary', async () => {
+  /** [the cells, the admin body, a fragment of the refusal] */
+  const overTheLine: Array<[Record<string, string>, Record<string, unknown>]> = [
+    [
+      { 'membership.pro.discount_mode': 'fixed', 'membership.pro.fixed_iqd': String(MEMBERSHIP_MAX_IQD + 1) },
+      { discount_mode: 'fixed', fixed_iqd: MEMBERSHIP_MAX_IQD + 1 },
+    ],
+    [
+      {
+        'membership.pro.discount_mode': 'percent',
+        'membership.pro.percent': '10',
+        'membership.pro.max_discount_iqd': String(MEMBERSHIP_MAX_IQD + 1),
+        'membership.pro.cap_scope': 'per_order',
+      },
+      { discount_mode: 'percent', percent: 10, max_discount_iqd: MEMBERSHIP_MAX_IQD + 1, cap_scope: 'per_order' },
+    ],
+    [
+      {
+        'membership.pro.discount_mode': 'percent',
+        'membership.pro.percent': '10',
+        'membership.pro.max_quantity': String(MEMBERSHIP_MAX_QUANTITY + 1),
+      },
+      { discount_mode: 'percent', percent: 10, max_quantity: MEMBERSHIP_MAX_QUANTITY + 1 },
+    ],
+    [
+      { 'membership.pro.discount_mode': 'percent', 'membership.pro.percent': String(MEMBERSHIP_MAX_PERCENT + 1) },
+      { discount_mode: 'percent', percent: MEMBERSHIP_MAX_PERCENT + 1 },
+    ],
+  ];
+
+  for (const [cells, body_] of overTheLine) {
+    const { raw, app } = setupBoth();
+    // The panel refuses it…
+    const viaDoor = await adminRule(app, body_);
+    assert.equal(viaDoor.status, 400, `the admin door accepted ${JSON.stringify(body_)}`);
+
+    // …so the sheet must refuse it too, in the preview, before any write.
+    const prev = await preview(app, sheet([...HEAD, ...MEMBERSHIP_COLUMNS], { ...productCells('OVER-1'), ...cells }));
+    assert.equal(prev.summary.failed, 1, `the sheet accepted ${JSON.stringify(cells)}`);
+    assert.ok(prev.rows[0].errors.length > 0);
+    await confirm(app, prev.import_id);
+    assert.equal(rules(raw).length, 0, `${JSON.stringify(cells)} reached the database from a spreadsheet`);
+  }
+});
+
+test('and the value ON the boundary is accepted by both, stored as a whole number', async () => {
+  const { raw, app } = setupBoth();
+  await importSheet(
+    app,
+    sheet([...HEAD, ...MEMBERSHIP_COLUMNS], {
+      ...productCells('EDGE-1'),
+      'membership.pro.discount_mode': 'fixed',
+      'membership.pro.fixed_iqd': String(MEMBERSHIP_MAX_IQD),
+      'membership.pro.max_quantity': String(MEMBERSHIP_MAX_QUANTITY),
+      'membership.premium.discount_mode': 'percent',
+      'membership.premium.percent': String(MEMBERSHIP_MAX_PERCENT),
+    })
+  );
+  const stored = rules(raw);
+  assert.equal(stored.length, 2, JSON.stringify(stored));
+  const pro = stored.find((r) => r.tier === 'pro')!;
+  assert.equal(pro.fixed_iqd, MEMBERSHIP_MAX_IQD);
+  assert.equal(pro.max_quantity, MEMBERSHIP_MAX_QUANTITY);
+  assert.equal(stored.find((r) => r.tier === 'prime')!.percent, MEMBERSHIP_MAX_PERCENT);
+
+  // A dinar column that holds a REAL is a price that no longer adds up: a
+  // twenty-digit cell used to land here as 1e20 and floor every member's
+  // price to zero.
+  assert.deepEqual(
+    all<{ t: string }>(raw, "SELECT typeof(fixed_iqd) AS t FROM membership_benefit_rules WHERE fixed_iqd IS NOT NULL"),
+    [{ t: 'integer' }]
+  );
+});
+
+test('__NULL__ removes EVERY override for that tier, not only the one that wins', async () => {
+  const { raw, app } = setupBoth();
+  await importSheet(app, sheet([...HEAD, ...MEMBERSHIP_COLUMNS], { ...productCells('TWO-1'), ...PRO_TEN_PERCENT }));
+  const productId = all<{ id: string }>(raw, 'SELECT id FROM products WHERE sku = ?', 'TWO-1')[0].id;
+
+  // A second PRO override on the same product, written from the panel exactly
+  // as an owner could write it — nothing in the door forbids it.
+  const second = await adminRule(app, { product_id: productId, discount_mode: 'percent', percent: 25, priority: 5 });
+  assert.equal(second.status, 200, JSON.stringify(await second.json()));
+  assert.equal(rules(raw).length, 2);
+
+  await importSheet(
+    app,
+    sheet([...HEAD, ...MEMBERSHIP_COLUMNS], {
+      ...productCells('TWO-1'),
+      'membership.pro.discount_mode': MEMBERSHIP_NULL,
+    })
+  );
+  assert.deepEqual(
+    rules(raw),
+    [],
+    'a discount the file, the preview and the next export all call gone was still pricing every PRO order'
+  );
+  // Both deletions are their own versioned, audited write.
+  assert.equal(
+    all<{ action: string }>(raw, 'SELECT action FROM membership_benefit_versions ORDER BY id DESC LIMIT 2').filter(
+      (v) => v.action === 'delete'
+    ).length,
+    2
+  );
+});
+
+test('a repeated membership key is ONE complaint, not also an "unknown key"', async () => {
+  const raw = freshDb();
+  const app = txtApp(asD1(raw));
+  // The lines are lifted out of the text before `parseTemplate` runs. A
+  // duplicate that was left behind reached the product parser, which knows
+  // nothing about benefit rules, and the owner was told the same line was both
+  // a duplicate AND an unknown key — two complaints, one of them wrong.
+  const res = await txtParse(app, txtWith('membership.pro.discount_mode=percent', 'membership.pro.percent=10', 'membership.pro.percent=20'));
+  assert.deepEqual(res.unknown_keys, [], 'a membership key reached the product parser');
+  assert.equal(res.errors.length, 1, JSON.stringify(res.errors));
+  assert.equal(res.errors[0].key, 'membership.pro.percent');
+  assert.match(res.errors[0].message, /duplicate key/);
+  // And the first value stands, so the preview describes the rule the apply
+  // would write — if the file were not refused for the duplicate.
+  assert.equal(res.membership[0].percent, 10);
 });

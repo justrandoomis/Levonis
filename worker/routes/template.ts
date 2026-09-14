@@ -92,6 +92,10 @@ import {
   MEMBERSHIP_CAP_SCOPES,
   MEMBERSHIP_COLUMNS,
   MEMBERSHIP_FIELDS,
+  MEMBERSHIP_MAX_IQD,
+  MEMBERSHIP_MAX_PERCENT,
+  MEMBERSHIP_MAX_QUANTITY,
+  MEMBERSHIP_MIN_PERCENT,
   MEMBERSHIP_MODES,
   MEMBERSHIP_NULL,
   MEMBERSHIP_PREFIX,
@@ -253,15 +257,17 @@ function extractMembership(text: string): MembershipTemplate {
       continue;
     }
     if (!MEMBERSHIP_KEYS.has(m[1])) continue;
+    // Blanked, not deleted: the product parser must still count lines the way
+    // the admin's editor does, or every error below this point points at the
+    // wrong row. A DUPLICATE is blanked too — it is reported here, and leaving
+    // it in the text would hand `parseTemplate` a key it does not know and the
+    // admin a second, misleading "unknown key" complaint about the same line.
+    out[lineNo - 1] = '';
     if (seen.has(m[1])) {
       errors.push({ line: lineNo, key: m[1], message: 'duplicate key' });
       continue;
     }
     seen.set(m[1], { value, line: lineNo });
-    // Blanked, not deleted: the product parser must still count lines the way
-    // the admin's editor does, or every error below this point points at the
-    // wrong row.
-    out[lineNo - 1] = '';
   }
 
   const issues: RowIssue[] = [];
@@ -302,9 +308,9 @@ function membershipLines(rules: readonly MembershipRuleValues[], commented = fal
     '# قاعدة خصم واحدة مربوطة بهذا المنتج وحده لكل فئة عضوية، وهي تتقدّم على قاعدة',
     '# القسم وعلى القاعدة العامة (docs/MEMBERSHIP_BENEFITS.md §1).',
     `#   المفتاح الغائب أو الفارغ  = لا تغيير على القاعدة المحفوظة`,
-    `#   discount_mode=${MEMBERSHIP_NULL}   = احذف قاعدة هذه الفئة (الحذف يُقال صراحةً)`,
-    `#   discount_mode: ${MEMBERSHIP_MODES.join(' / ')}   ·   percent: ٪ 1..100   ·   fixed_iqd و max_discount_iqd: د.ع`,
-    `#   cap_scope: ${MEMBERSHIP_CAP_SCOPES.join(' / ')} (السقف لكل قطعة أم لكل طلب)   ·   max_quantity: عدد قطع (1 فأكثر)`,
+    `#   discount_mode=${MEMBERSHIP_NULL}   = احذف قواعد هذه الفئة كلها (الحذف يُقال صراحةً)`,
+    `#   discount_mode: ${MEMBERSHIP_MODES.join(' / ')}   ·   percent: ٪ ${MEMBERSHIP_MIN_PERCENT}..${MEMBERSHIP_MAX_PERCENT}   ·   fixed_iqd و max_discount_iqd: د.ع 0..${MEMBERSHIP_MAX_IQD.toLocaleString('en-US')}`,
+    `#   cap_scope: ${MEMBERSHIP_CAP_SCOPES.join(' / ')} (السقف لكل قطعة أم لكل طلب)   ·   max_quantity: عدد قطع (1..${MEMBERSHIP_MAX_QUANTITY})`,
     '# التواريخ والأولوية والتفعيل والاسم والملاحظة تبقى كما ضُبطت في لوحة الإدارة.',
   ];
   for (const t of MEMBERSHIP_TIERS) {

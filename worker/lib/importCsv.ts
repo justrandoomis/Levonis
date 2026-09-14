@@ -353,6 +353,26 @@ export const MEMBERSHIP_MODES = ['percent', 'fixed'] as const;
 export const MEMBERSHIP_CAP_SCOPES = ['per_unit', 'per_order'] as const;
 
 /**
+ * THE RANGES THE ADMIN DOOR ENFORCES, so the sheet enforces exactly them.
+ *
+ * `worker/routes/adminMembershipBenefits.ts` `ruleFromBody` bounds every one of
+ * these: `optInt` caps a dinar field at 1,000,000,000, `max_quantity` is
+ * `int(..., { min: 1, max: 9999 })`, and a percentage is 1..100. A cell reader
+ * that only refused letters would let a spreadsheet store a rule the panel
+ * refuses — and `intCell` accepts any run of digits, so a twenty-digit amount
+ * was landing in the INTEGER column as a SQLite REAL (1e20) and floored every
+ * member's price to zero.
+ *
+ * These are not a second opinion about what is reasonable; they are a copy of
+ * the door's own limits, PINNED to it by a test that drives both at the
+ * boundary (`tests/membershipTemplateRoundTrip.test.ts`).
+ */
+export const MEMBERSHIP_MAX_IQD = 1_000_000_000;
+export const MEMBERSHIP_MAX_QUANTITY = 9999;
+export const MEMBERSHIP_MIN_PERCENT = 1;
+export const MEMBERSHIP_MAX_PERCENT = 100;
+
+/**
  * The explicit "there is no value here". Borrowed verbatim from the TXT
  * template's `NULL_TOKEN` (worker/lib/template.ts) rather than invented, so an
  * admin who has used one template already knows what it means in the other.
@@ -929,17 +949,40 @@ export function membershipRuleFromCells(
   }
 
   const percent = blank(raw.percent) ? null : intCell(raw.percent, line, col('percent'), issues);
-  if (percent !== null && (percent < 1 || percent > 100)) {
-    err(col('percent'), 'النسبة يجب أن تكون بين 1 و100', 'percent must be between 1 and 100');
+  if (percent !== null && (percent < MEMBERSHIP_MIN_PERCENT || percent > MEMBERSHIP_MAX_PERCENT)) {
+    err(
+      col('percent'),
+      `النسبة يجب أن تكون بين ${MEMBERSHIP_MIN_PERCENT} و${MEMBERSHIP_MAX_PERCENT}`,
+      `percent must be between ${MEMBERSHIP_MIN_PERCENT} and ${MEMBERSHIP_MAX_PERCENT}`
+    );
     return null;
   }
-  const fixedIqd = blank(raw.fixed_iqd) ? null : intCell(raw.fixed_iqd, line, col('fixed_iqd'), issues);
-  const maxDiscount = blank(raw.max_discount_iqd)
-    ? null
-    : intCell(raw.max_discount_iqd, line, col('max_discount_iqd'), issues);
+  /** A dinar cell, refused at the ADMIN DOOR'S ceiling rather than at the
+   *  largest number `Number()` will produce from a run of digits. */
+  const dinars = (field: 'fixed_iqd' | 'max_discount_iqd'): number | null | undefined => {
+    if (blank(raw[field])) return null;
+    const n = intCell(raw[field], line, col(field), issues);
+    if (n === null) return null;
+    if (n > MEMBERSHIP_MAX_IQD) {
+      err(
+        col(field),
+        `المبلغ يجب أن يكون بين 0 و${MEMBERSHIP_MAX_IQD.toLocaleString('en-US')} دينار`,
+        `${field} must be a whole number of dinars between 0 and ${MEMBERSHIP_MAX_IQD.toLocaleString('en-US')}`
+      );
+      return undefined;
+    }
+    return n;
+  };
+  const fixedIqd = dinars('fixed_iqd');
+  const maxDiscount = dinars('max_discount_iqd');
+  if (fixedIqd === undefined || maxDiscount === undefined) return null;
   const maxQuantity = blank(raw.max_quantity) ? null : intCell(raw.max_quantity, line, col('max_quantity'), issues);
-  if (maxQuantity !== null && maxQuantity < 1) {
-    err(col('max_quantity'), 'أقل عدد مقبول هو 1', 'max_quantity must be 1 or more');
+  if (maxQuantity !== null && (maxQuantity < 1 || maxQuantity > MEMBERSHIP_MAX_QUANTITY)) {
+    err(
+      col('max_quantity'),
+      `العدد يجب أن يكون بين 1 و${MEMBERSHIP_MAX_QUANTITY}`,
+      `max_quantity must be between 1 and ${MEMBERSHIP_MAX_QUANTITY}`
+    );
     return null;
   }
 
@@ -2140,27 +2183,29 @@ export function membershipReadme(): string {
 العامة (docs/MEMBERSHIP_BENEFITS.md §1)، ولا تُجمع قاعدتان أبدًا.
 
   ${MEMBERSHIP_PREFIX}<الفئة>.discount_mode      ${MEMBERSHIP_MODES.join(' / ')} — نوع الخصم
-  ${MEMBERSHIP_PREFIX}<الفئة>.percent            نسبة مئوية (٪): عدد صحيح بين 1 و100
-  ${MEMBERSHIP_PREFIX}<الفئة>.fixed_iqd          مبلغ ثابت بالدينار العراقي (د.ع)
-  ${MEMBERSHIP_PREFIX}<الفئة>.max_discount_iqd   سقف الخصم بالدينار العراقي (د.ع)
+  ${MEMBERSHIP_PREFIX}<الفئة>.percent            نسبة مئوية (٪): عدد صحيح بين ${MEMBERSHIP_MIN_PERCENT} و${MEMBERSHIP_MAX_PERCENT}
+  ${MEMBERSHIP_PREFIX}<الفئة>.fixed_iqd          مبلغ ثابت بالدينار العراقي (د.ع): 0..${MEMBERSHIP_MAX_IQD.toLocaleString('en-US')}
+  ${MEMBERSHIP_PREFIX}<الفئة>.max_discount_iqd   سقف الخصم بالدينار العراقي (د.ع): 0..${MEMBERSHIP_MAX_IQD.toLocaleString('en-US')}
   ${MEMBERSHIP_PREFIX}<الفئة>.cap_scope          ${MEMBERSHIP_CAP_SCOPES.join(' / ')} — السقف لكل قطعة أم لكل طلب
-  ${MEMBERSHIP_PREFIX}<الفئة>.max_quantity       أقصى عدد قطع يشمله الخصم (عدد صحيح، 1 فأكثر)
+  ${MEMBERSHIP_PREFIX}<الفئة>.max_quantity       أقصى عدد قطع يشمله الخصم (عدد صحيح، 1..${MEMBERSHIP_MAX_QUANTITY})
 
 الحالات الثلاث لكل فئة:
   * الأعمدة الستة كلها فارغة  =  الملف لا يقول شيئًا عن هذه الفئة، والقاعدة
     المحفوظة تبقى كما هي. الملف القديم الذي لا يحمل هذه الأعمدة أصلًا هو نفس
     الحالة — فإعادة استيراده لا تمسّ خصمًا كتبته في لوحة الإدارة بعده.
   * قيم مكتوبة                =  تُنشأ قاعدة المنتج لهذه الفئة أو تُحدَّث.
-  * discount_mode=${MEMBERSHIP_NULL}      =  تُحذف قاعدة المنتج لهذه الفئة. الحذف قرار،
-    فلا بد أن يقوله الملف صراحةً؛ الخلية الفارغة لا تحذف شيئًا أبدًا.
+  * discount_mode=${MEMBERSHIP_NULL}      =  تُحذف قواعد المنتج لهذه الفئة كلها. الحذف
+    قرار، فلا بد أن يقوله الملف صراحةً؛ الخلية الفارغة لا تحذف شيئًا أبدًا.
 
-قواعد القبول هي نفسها قواعد لوحة الإدارة تمامًا: سقف بلا cap_scope مرفوض،
-و cap_scope بلا سقف مرفوض، و percent يحتاج نسبة، و fixed يحتاج مبلغًا. أي رفض
-يظهر في المعاينة برقم السطر واسم العمود قبل التأكيد، لا بعده.
+قواعد القبول هي نفسها قواعد لوحة الإدارة تمامًا، بحدودها نفسها: سقف بلا
+cap_scope مرفوض، و cap_scope بلا سقف مرفوض، و percent يحتاج نسبة، و fixed
+يحتاج مبلغًا أكبر من صفر، والقيم خارج المدى أعلاه مرفوضة. أي رفض يظهر في
+المعاينة برقم السطر واسم العمود قبل التأكيد، لا بعده.
 
 الملف يحمل قاعدة واحدة لكل فئة. لو كان للمنتج أكثر من قاعدة لفئة واحدة (وهو
 ما يمكن إنشاؤه من اللوحة) فالملف يصف الأولى بحسب الأولوية ويحدّثها، ولا يمسّ
-غيرها.
+غيرها — أمّا ${MEMBERSHIP_NULL} فيحذفها جميعًا، لأن "لا خصم لهذه الفئة" لا يصحّ
+أن يترك خصمًا يعمل.
 
 بقية حقول القاعدة — تاريخ البداية والنهاية، الأولوية، التفعيل/الإيقاف،
 الاسم والملاحظة والحد الأدنى للسلة — ليست في الملف وتبقى كما ضُبطت في لوحة
