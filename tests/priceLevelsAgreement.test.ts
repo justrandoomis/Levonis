@@ -34,6 +34,7 @@ const ctxFor = (tier: Tier, tierActive: boolean): PricingCtx => ({
   proPolicy: DEFAULT_PRO_POLICY,
   transportDefaults: [],
   tierStatus: null,
+  benefitRules: [], catalogAncestry: null, benefitNowIso: '2026-09-14T12:00:00Z',
 });
 
 const TIERS: Array<[Tier, boolean]> = [

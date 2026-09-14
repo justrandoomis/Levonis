@@ -113,6 +113,10 @@ test('case 10b — a composition line derives an EMPTY selection, so neither the
   const { doc, resolved } = resolveCartLine(stored, sel, 'free', false, {
     proPolicy: { mode: 'explicit_only', percent: null },
     transportDefaults: [],
+    benefitRules: [],
+    benefitStatus: null,
+    catalogAncestry: null,
+    nowIso: '2026-09-14T12:00:00Z',
   });
   assert.deepEqual(resolved.errors, [], 'ResolvedPrice.errors must be empty for a composition line');
   const availability = saleAvailability(doc, {
@@ -459,6 +463,10 @@ test('resolveCartBundles keys by CART LINE, so two lines of one bundle keep thei
   const resolved = await resolveCartBundles(db, rows, 'free', false, {
     proPolicy: { mode: 'explicit_only', percent: null },
     transportDefaults: [],
+    benefitRules: [],
+    benefitStatus: null,
+    catalogAncestry: null,
+    nowIso: '2026-09-14T12:00:00Z',
   }, null);
   assert.equal(resolved.size, 2);
   const colours = [...resolved.values()].map((b) => b.components[0].selection.color_id).sort();

@@ -95,6 +95,8 @@ interface Copy {
   deliveryLabel: string;
   deliveryWaivedLabel: string;
   codTaxLabel: string;
+  codTaxExemptLabel: string;
+  membershipDiscountLabel: string;
   couponLabel: string;
   pointsLabel: string;
   walletLabel: string;
@@ -157,6 +159,8 @@ const COPY_AR: Copy = {
   deliveryLabel: 'رسوم التوصيل',
   deliveryWaivedLabel: 'رسوم التوصيل (مُعفاة)',
   codTaxLabel: 'ضريبة الدفع عند الاستلام',
+  codTaxExemptLabel: 'إعفاء ضريبة الدفع عند الاستلام',
+  membershipDiscountLabel: 'خصم العضوية',
   couponLabel: 'خصم الكوبون',
   pointsLabel: 'نقاط مستخدمة',
   walletLabel: 'مدفوع من المحفظة',
@@ -227,6 +231,8 @@ const COPY_EN: Copy = {
   deliveryLabel: 'Delivery fee',
   deliveryWaivedLabel: 'Delivery fee (waived)',
   codTaxLabel: 'Cash on Delivery Tax',
+  codTaxExemptLabel: 'Cash on Delivery Tax exemption',
+  membershipDiscountLabel: 'Membership discount',
   couponLabel: 'Coupon discount',
   pointsLabel: 'Points applied',
   walletLabel: 'Paid from wallet',
@@ -299,6 +305,8 @@ const COPY_CKB: Copy = {
   deliveryLabel: 'کرێی گەیاندن',
   deliveryWaivedLabel: 'کرێی گەیاندن (بەخۆڕایی)',
   codTaxLabel: 'باجی پارەدان لە کاتی وەرگرتن',
+  codTaxExemptLabel: 'باجی پارەدان لە کاتی وەرگرتن (بەخۆڕایی)',
+  membershipDiscountLabel: 'داشکاندنی ئەندامێتی',
   couponLabel: 'داشکاندنی کۆپۆن',
   pointsLabel: 'خاڵی بەکارهێنراو',
   walletLabel: 'لە جزدانەوە دراوە',
@@ -473,6 +481,13 @@ export interface InvoiceEmailData {
   subtotal_iqd: number;
   delivery_fee_iqd: number;
   cod_tax_iqd?: number;
+  /** §14: both halves of the cash-on-delivery tax, so "0" is never the whole
+   *  story. Absent on invoices issued before migration 0074. */
+  cod_tax_before_exemption_iqd?: number;
+  cod_tax_exemption_iqd?: number;
+  /** What the membership took off the merchandise, and which tier did it. */
+  membership_discount_iqd?: number;
+  membership_tier?: string;
   delivery_waived: boolean;
   coupon_discount_iqd: number;
   points_applied_iqd: number;
@@ -539,6 +554,17 @@ function invoiceLinesHtml(t: Copy, inv: InvoiceEmailData): string {
   return `<table role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 16px 0;">${head}${body}</table>`;
 }
 
+/**
+ * "Membership discount" with the tier named, where the order recorded one.
+ * The tier id `prime` is PREMIUM on every customer-facing surface; `pro` is
+ * PRO. An unknown or absent tier falls back to the unnamed label rather than
+ * printing a database value at a customer.
+ */
+function membershipLabel(t: Copy, inv: InvoiceEmailData): string {
+  const name = inv.membership_tier === 'pro' ? 'PRO' : inv.membership_tier === 'prime' ? 'PREMIUM' : '';
+  return name ? `${t.membershipDiscountLabel} ${name}` : t.membershipDiscountLabel;
+}
+
 function invoiceTotalsHtml(t: Copy, inv: InvoiceEmailData): string {
   const row = (label: string, value: string, opts: { bold?: boolean; color?: string } = {}) =>
     `<tr><td style="padding:3px 10px;font-size:13px;${opts.bold ? 'font-weight:bold;' : ''}">${escapeHtml(label)}</td>` +
@@ -548,7 +574,21 @@ function invoiceTotalsHtml(t: Copy, inv: InvoiceEmailData): string {
   rows += inv.delivery_waived
     ? row(t.deliveryWaivedLabel, iqd(0))
     : row(t.deliveryLabel, iqd(inv.delivery_fee_iqd));
-  if ((inv.cod_tax_iqd ?? 0) > 0) rows += row(t.codTaxLabel, iqd(inv.cod_tax_iqd ?? 0));
+  /**
+   * §14 — THE TAX, THEN THE EXEMPTION, AS TWO LINES.
+   *
+   * An exempted order shows what the tax WAS and what the membership took off
+   * it. Collapsing that to a single absent line leaves the customer with no
+   * record of a benefit they were given, and the store with nothing to
+   * reconcile against a courier's cash sheet.
+   */
+  const codBefore = inv.cod_tax_before_exemption_iqd ?? inv.cod_tax_iqd ?? 0;
+  const codExempt = inv.cod_tax_exemption_iqd ?? 0;
+  if (codBefore > 0) rows += row(t.codTaxLabel, iqd(codBefore));
+  if (codExempt > 0) rows += row(t.codTaxExemptLabel, `-${iqd(codExempt)}`);
+  if ((inv.membership_discount_iqd ?? 0) > 0) {
+    rows += row(membershipLabel(t, inv), `-${iqd(inv.membership_discount_iqd ?? 0)}`);
+  }
   if (inv.coupon_discount_iqd > 0) rows += row(t.couponLabel, `-${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) rows += row(t.pointsLabel, `-${iqd(inv.points_applied_iqd)}`);
   rows += row(t.totalLabel, iqd(inv.total_iqd), { bold: true });
@@ -574,7 +614,14 @@ function invoiceText(t: Copy, inv: InvoiceEmailData): string {
   out.push('');
   out.push(`${t.subtotalLabel}: ${iqd(inv.subtotal_iqd)}`);
   out.push(inv.delivery_waived ? `${t.deliveryWaivedLabel}: ${iqd(0)}` : `${t.deliveryLabel}: ${iqd(inv.delivery_fee_iqd)}`);
-  if ((inv.cod_tax_iqd ?? 0) > 0) out.push(`${t.codTaxLabel}: ${iqd(inv.cod_tax_iqd ?? 0)}`);
+  const codBeforeText = inv.cod_tax_before_exemption_iqd ?? inv.cod_tax_iqd ?? 0;
+  if (codBeforeText > 0) out.push(`${t.codTaxLabel}: ${iqd(codBeforeText)}`);
+  if ((inv.cod_tax_exemption_iqd ?? 0) > 0) {
+    out.push(`${t.codTaxExemptLabel}: -${iqd(inv.cod_tax_exemption_iqd ?? 0)}`);
+  }
+  if ((inv.membership_discount_iqd ?? 0) > 0) {
+    out.push(`${membershipLabel(t, inv)}: -${iqd(inv.membership_discount_iqd ?? 0)}`);
+  }
   if (inv.coupon_discount_iqd > 0) out.push(`${t.couponLabel}: -${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) out.push(`${t.pointsLabel}: -${iqd(inv.points_applied_iqd)}`);
   out.push(`${t.totalLabel}: ${iqd(inv.total_iqd)}`);

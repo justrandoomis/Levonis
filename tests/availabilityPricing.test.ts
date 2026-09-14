@@ -135,8 +135,11 @@ const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
 // `tierStatus` is the membership itself, resolved once per request so the
 // offer-eligibility check (docs/BUNDLES_MYSTERY.md §9) never re-reads it per
 // card. It plays no part in PRICING, so it is null in both of these fixtures.
-const freeCtx = { tier: 'free' as const, tierActive: false, membershipActive: false, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null };
-const primeCtx = { tier: 'prime' as const, tierActive: true, membershipActive: true, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null };
+// No benefit rule is configured in these fixtures: the card's own arithmetic
+// is what is under test, and an empty rule list is exactly what a store with
+// nothing configured hands the resolver.
+const freeCtx = { tier: 'free' as const, tierActive: false, membershipActive: false, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null, benefitRules: [], catalogAncestry: null, benefitNowIso: '2026-09-14T12:00:00Z' };
+const primeCtx = { tier: 'prime' as const, tierActive: true, membershipActive: true, proContext: false, proPolicy: DEFAULT_PRO_POLICY, transportDefaults: [], tierStatus: null, benefitRules: [], catalogAncestry: null, benefitNowIso: '2026-09-14T12:00:00Z' };
 
 test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»', () => {
   const out = publicWithDisplayPrice(row(), freeCtx);
