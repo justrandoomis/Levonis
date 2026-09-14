@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser } from './lib/session';
+import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
 import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
@@ -98,6 +99,29 @@ app.use('*', async (c, next) => {
 });
 
 app.use('*', async (c, next) => {
+  /**
+   * A PUBLIC IMAGE DOES NOT NEED TO KNOW WHO YOU ARE.
+   *
+   * `loadSessionUser` is a D1 JOIN (`sessions` x `users`). It was registered on
+   * '*', so it ran before R2 was touched for EVERY request — including the
+   * twenty-odd storefront images on a page. The session cookie is deliberately
+   * scoped to the parent domain, so it is sent on every one of those requests,
+   * which means a signed-in shopper paid one database read per image tile.
+   * (A signed-out visitor escaped it only because `loadSessionUser` returns
+   * early when there is no cookie.)
+   *
+   * The `/files` handler consults `user` ONLY in its private branch — an
+   * anonymous-public key is served to anyone who asks. So for exactly those
+   * keys the lookup is skipped. `isAnonymousPublicMediaKey` is the same
+   * predicate the handler itself authorises with, so the two cannot disagree:
+   * if a key is not recognised as public here, the session still loads and the
+   * handler still does its own check.
+   */
+  const path = c.req.path;
+  if (path.startsWith('/files/') && isAnonymousPublicMediaKey(path.slice('/files/'.length))) {
+    await next();
+    return;
+  }
   await loadSessionUser(c);
   await next();
 });

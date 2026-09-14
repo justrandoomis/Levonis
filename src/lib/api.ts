@@ -126,8 +126,48 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
   }
 }
 
+/**
+ * TWO COMPONENTS ASKING THE SAME QUESTION AT THE SAME MOMENT ASK IT ONCE.
+ *
+ * THE DEFECT. Nothing deduplicated anything. `/api/cart` is fetched
+ * independently by `BottomNav` (for the badge), by `Cart` and by `Checkout`;
+ * `/api/home` by `Home` and again by `Bundles` (which reads only the category
+ * list from it). Mounting a page therefore issued the same GET two or three
+ * times in the same tick, and every one of them was a real round trip.
+ *
+ * WHY COALESCING AND NOT A CACHE. A cache has to decide how long an answer
+ * stays true, and on this platform a price can move while the screen is open —
+ * `useFreshOnReturn` exists precisely because a stale total is worse than a
+ * slow one. This stores nothing and expires nothing. It only notices that a
+ * request for the same URL is ALREADY IN FLIGHT and hands the second caller
+ * the same promise. Both get the same fresh response the server is already
+ * composing; the instant it settles the entry is gone. There is no window in
+ * which a stored answer can be served, so there is no staleness to reason
+ * about.
+ *
+ * GET ONLY, and deliberately. A repeated POST/PUT/PATCH/DELETE is an ACTION,
+ * and two of them are two intentions — the cart's own double-tap guards decide
+ * that, not this. Merging them here would silently swallow a retry.
+ *
+ * A caller that passes its own AbortSignal opts out: it wants control over a
+ * request it can cancel, and cancelling a shared promise would cancel it for
+ * whoever else is waiting on it.
+ */
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function coalescedGet<T>(path: string, opts?: RequestOptions): Promise<T> {
+  if (opts?.signal) return request<T>('GET', path, undefined, opts);
+  const existing = inflightGets.get(path);
+  if (existing) return existing as Promise<T>;
+  const started = request<T>('GET', path, undefined, opts).finally(() => {
+    inflightGets.delete(path);
+  });
+  inflightGets.set(path, started);
+  return started;
+}
+
 export const api = {
-  get: <T>(path: string, opts?: RequestOptions) => request<T>('GET', path, undefined, opts),
+  get: <T>(path: string, opts?: RequestOptions) => coalescedGet<T>(path, opts),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('POST', path, body, opts),
   put: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PUT', path, body, opts),
   patch: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>('PATCH', path, body, opts),
@@ -1002,11 +1042,16 @@ export async function uploadFile(
   let prepared = file;
   let width: number | undefined;
   let height: number | undefined;
-  if (purpose === 'product') {
-    // Lazy because image conversion belongs only to admin product workflows,
-    // not to the entry bundle used by every shopper.
-    const { prepareProductImage } = await import('./imagePreprocess');
-    const result = await prepareProductImage(file);
+  if (purpose === 'product' || purpose === 'avatar') {
+    // Lazy because image conversion belongs to the upload moment, not to the
+    // entry bundle every shopper downloads.
+    //
+    // AN AVATAR IS CONVERTED TOO, and at its own much smaller ceiling. It was
+    // stored as the phone produced it — several megabytes of camera JPEG — and
+    // then downloaded in full to fill the 32x32 chip in the header, on every
+    // page, for every visitor.
+    const mod = await import('./imagePreprocess');
+    const result = purpose === 'avatar' ? await mod.prepareAvatarImage(file) : await mod.prepareProductImage(file);
     prepared = result.file;
     width = result.width;
     height = result.height;

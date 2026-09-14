@@ -230,6 +230,24 @@ html {
       opacity 150ms ease;
   }
 
+  /*
+    EVERY BUTTON SHOWS WHERE THE KEYBOARD IS.
+
+    `.lv-button` set geometry, colour and a transition and nothing else, so a
+    keyboard user tabbing through checkout — the one journey where being lost
+    costs money — saw only whatever ring the browser's default happened to
+    paint over these backgrounds, which on `#ece8dc` is close to nothing.
+
+    `:focus-visible`, not `:focus`: a mouse press must not leave a ring behind
+    it. The offset lifts the ring clear of the button's own edge so it reads on
+    a solid fill as well as on a ghost, and `--color-focus` is the token the
+    rest of the system already uses, so this is not a fourth focus colour.
+  */
+  .lv-button:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
   .lv-button-primary {
     color: #101114;
     background-color: #ece8dc;

@@ -2,6 +2,20 @@ export type ConvertibleRaster = 'png' | 'jpeg';
 
 export const PRODUCT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const PRODUCT_IMAGE_MAX_EDGE = 3_000;
+/**
+ * AN AVATAR IS NEVER SHOWN LARGE.
+ *
+ * The biggest box any avatar lands in is a profile hero; the one on every page
+ * is the 32x32 chip in the header. Until now `uploadFile` ran the WebP
+ * conversion ONLY for `purpose === 'product'`, so an avatar was stored exactly
+ * as the phone produced it — a modern camera JPEG of several megabytes — and
+ * then downloaded in full to fill 32 device-independent pixels, on every page,
+ * for every visitor.
+ *
+ * 512 is generous for a 2x profile hero and still two orders of magnitude
+ * smaller than the original.
+ */
+export const AVATAR_IMAGE_MAX_EDGE = 512;
 export const PRODUCT_IMAGE_MAX_PIXELS = 48_000_000;
 
 /** Detect bytes, never an extension or browser-declared MIME. */
@@ -49,7 +63,10 @@ async function loadImage(file: File): Promise<{ source: CanvasImageSource; width
 }
 
 /** Browser codec shared by every admin product-image uploader. */
-export async function encodeProductRasterAsWebp(file: File): Promise<WebpEncodeResult> {
+export async function encodeProductRasterAsWebp(
+  file: File,
+  maxEdge: number = PRODUCT_IMAGE_MAX_EDGE
+): Promise<WebpEncodeResult> {
   const decoded = await loadImage(file);
   try {
     if (
@@ -61,7 +78,7 @@ export async function encodeProductRasterAsWebp(file: File): Promise<WebpEncodeR
     ) {
       throw new Error('Image dimensions are unsupported');
     }
-    const scale = Math.min(1, PRODUCT_IMAGE_MAX_EDGE / Math.max(decoded.width, decoded.height));
+    const scale = Math.min(1, maxEdge / Math.max(decoded.width, decoded.height));
     const width = Math.max(1, Math.round(decoded.width * scale));
     const height = Math.max(1, Math.round(decoded.height * scale));
     const canvas = document.createElement('canvas');
@@ -98,6 +115,18 @@ export interface PreparedProductImage {
  * PNG/JPEG become WebP before network upload. GIF/AVIF/video are deliberately
  * left alone because converting those blindly can destroy animation or media.
  */
+/**
+ * The same conversion, at an avatar's ceiling. A format the codec does not
+ * convert (GIF, AVIF) is passed through untouched, exactly as for a product —
+ * blindly re-encoding an animated avatar would destroy it.
+ */
+export async function prepareAvatarImage(
+  file: File,
+  encoder: WebpEncoder = (f) => encodeProductRasterAsWebp(f, AVATAR_IMAGE_MAX_EDGE)
+): Promise<PreparedProductImage> {
+  return prepareProductImage(file, encoder);
+}
+
 export async function prepareProductImage(file: File, encoder: WebpEncoder = encodeProductRasterAsWebp): Promise<PreparedProductImage> {
   const signature = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   if (file.size > PRODUCT_IMAGE_MAX_BYTES && !isMp4(signature)) {

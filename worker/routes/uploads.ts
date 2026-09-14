@@ -179,13 +179,73 @@ fileRoutes.get('/*', async (c) => {
     }
   }
 
+  /**
+   * THE EDGE ANSWERS FOR A PUBLIC FILE BEFORE THE ORIGIN IS ASKED.
+   *
+   * Every cold hit on a storefront image was a Worker invocation plus an R2
+   * GET — a twenty-tile home rail is twenty origin reads for every new visitor,
+   * every new device, every cleared cache. `wrangler.jsonc` pins
+   * `run_worker_first: ["/api/*", "/files/*"]`, so the Worker is guaranteed to
+   * execute; the only thing that can make that cheap is participating in the
+   * edge cache ourselves.
+   *
+   * PUBLIC KEYS ONLY, and that restriction is the whole safety argument.
+   * `caches.default` is shared across every visitor to the colo, so anything
+   * stored in it is readable by anyone who can guess the URL. An anonymous
+   * public key is already served to anyone who asks — caching it changes
+   * nothing about who can read it. A private key is authorised per request
+   * above (receipt ownership, chat participation) and is never written here.
+   */
+  // `caches.default` is a Workers extension, and it is genuinely ABSENT in
+  // some runtimes this handler is exercised in — the route tests run it under
+  // Node, where `caches` is not defined at all. Referencing it unguarded threw
+  // a ReferenceError before R2 was ever reached, so the cache is treated as an
+  // optional capability: when it is missing the handler behaves exactly as it
+  // did before, just without the edge hit.
+  //
+  // (The type assertion is separate: the worker tsconfig knows `default`, the
+  // test tsconfig compiles these files against the DOM's `CacheStorage`, which
+  // does not.)
+  const cache =
+    typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default ?? null : null;
+  if (publicPrefix && cache) {
+    const hit = await cache.match(c.req.raw);
+    if (hit) return hit;
+  }
+
   const obj = await getMediaObject(c.env, publicPrefix ? 'public' : 'private', key);
   if (!obj) throw notFound();
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
-  if (!publicPrefix) headers.set('Cache-Control', 'private, max-age=300');
+  if (publicPrefix) {
+    // Media keys are content-addressed, so a given URL's bytes never change —
+    // a new upload is a new key. `immutable` is therefore honest, and it is
+    // set HERE rather than relying on stored R2 httpMetadata, which objects
+    // written before the media system carry nothing of.
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  } else {
+    headers.set('Cache-Control', 'private, max-age=300');
+  }
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
-  return new Response(obj.body, { headers });
+
+  // A revalidation should cost a header, not a body. The etag is R2's own.
+  if (c.req.header('If-None-Match') === obj.httpEtag) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  const res = new Response(obj.body, { headers });
+  if (publicPrefix && cache) {
+    // `clone()` before the body is streamed to the client, and `waitUntil` so
+    // the write never delays the response. `executionCtx` throws when there is
+    // none (again, the Node test harness), and a cache write is never worth
+    // failing a response that is otherwise complete.
+    try {
+      c.executionCtx.waitUntil(cache.put(c.req.raw, res.clone()));
+    } catch {
+      // No execution context: serve the response, skip the cache write.
+    }
+  }
+  return res;
 });

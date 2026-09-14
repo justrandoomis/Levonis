@@ -1130,6 +1130,68 @@ export async function compositionDetail(
 /** The listing card for one already-resolved bundle. Exported so
  *  `worker/routes/bundles.ts` serializes through the same two functions the
  *  detail does — a card and a page that disagree is the bug this prevents. */
+/**
+ * WHAT A CARD ACTUALLY NEEDS — and it is not the whole product.
+ *
+ * THE DEFECT. `/api/home` returns 30 products and `/api/products` up to 50,
+ * and every one of them was serialized through the FULL public projection: 42
+ * keys from `projectPublic` plus 14 legacy aliases plus the six display keys —
+ * the complete option ladder, every colour with its four price columns, the
+ * spec groups, the usage guide with its per-step media, the description in
+ * three languages, the warranty plans, the content blocks. A printer document
+ * measures tens of kilobytes on its own; a home page shipped hundreds of
+ * kilobytes to megabytes of JSON so that a grid could draw a picture, a name
+ * and a price.
+ *
+ * Every consumer was enumerated before this list was written — `Home.tsx`,
+ * `Products.tsx`, `Profile.tsx`, `ProductCard.tsx`, `CardPrice.tsx` and
+ * `productImage.ts` — and between them they read exactly the fields below.
+ * (`Bundles.tsx` reads only `categories` from `/api/home`; it was paying for
+ * thirty product documents it never opened.)
+ *
+ * WHAT THIS DELIBERATELY DOES NOT CHANGE. The SQL stays `SELECT *` and the
+ * resolver still runs over the whole document: `display_price_iqd` is computed
+ * by walking every option and colour (that loop is what makes the card price
+ * the cheapest way to buy the product), so narrowing the QUERY would change
+ * prices. This narrows only what is SERIALIZED, after the price is resolved.
+ * No number moves.
+ *
+ * It is also never applied to a composition row: `compositionCard` already
+ * returns its own deliberately narrow shape, and a locked bundle's card strips
+ * member prices there. Running this over it instead would be a different bug.
+ */
+const CARD_FIELDS = [
+  'id',
+  'slug',
+  // A composition links to /bundles/<product_slug>; an ordinary row has none.
+  'product_slug',
+  'name',
+  'status',
+  // `productImage.ts` prefers the primary media entry and falls back to the
+  // published `images` list, so a card needs both.
+  'media',
+  'images',
+  'price_iqd',
+  'display_price_iqd',
+  'display_regular_iqd',
+  'display_prime_iqd',
+  'display_pro_iqd',
+  'display_applied_tier',
+  'display_from',
+  // Set alongside `offer` when a live window has a PLUS rung.
+  'display_plus_iqd',
+  // The countdown and the members-only lock chip.
+  'offer',
+] as const;
+
+export function cardShape(out: Record<string, unknown>): Record<string, unknown> {
+  const card: Record<string, unknown> = {};
+  for (const k of CARD_FIELDS) {
+    if (out[k] !== undefined) card[k] = out[k];
+  }
+  return card;
+}
+
 export function compositionCard(b: ResolvedBundle, ctx: PricingCtx): Record<string, unknown> {
   return bundleCard(b, publicWithDisplayPrice(b.row, ctx, undefined, displayOverride(b)));
 }
@@ -1301,14 +1363,18 @@ productRoutes.get('/', async (c) => {
     success: true,
     products: results.map((p) => {
       const b = compositions.get(String(p.id));
+      // A composition card has its own narrow shape, and a LOCKED one has its
+      // member prices stripped in there. `cardShape` must not touch it.
       if (b) return compositionCard(b, ctx);
-      return publicWithDisplayPrice(
-        p,
-        ctx,
-        views.get(String(p.id)),
-        undefined,
-        offers.get(offerKey(subjectOf(String(p.id)))),
-        pooled.has(String(p.id))
+      return cardShape(
+        publicWithDisplayPrice(
+          p,
+          ctx,
+          views.get(String(p.id)),
+          undefined,
+          offers.get(offerKey(subjectOf(String(p.id)))),
+          pooled.has(String(p.id))
+        )
       );
     }),
   });
@@ -1766,10 +1832,10 @@ homeRoutes.get('/', async (c) => {
     success: true,
     settings: safeSettings,
     discounted: discounted.results.map((p) =>
-      publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id)))
+      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id))))
     ),
     latest: latest.results.map((p) =>
-      publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id)))
+      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id))))
     ),
     categories: categories.results.filter((r) => Number(r.product_count) > 0),
     brands: brands.results.filter((r) => Number(r.product_count) > 0),
