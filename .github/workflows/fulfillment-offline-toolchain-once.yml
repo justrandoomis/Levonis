@@ -1,0 +1,28 @@
+# Temporary development toolchain transfer; no deployment or production access.
+name: 48 - Fulfillment offline test toolchain (read-only)
+on:
+  push:
+    branches: [codex/model-fulfillment-pricing]
+    paths: ['.github/workflows/fulfillment-offline-toolchain-once.yml']
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Archive only lockfile-installed development dependencies
+        run: tar czf /tmp/fulfillment-node-modules.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fulfillment-offline-node-modules
+          path: /tmp/fulfillment-node-modules.tar.gz
+          retention-days: 1
