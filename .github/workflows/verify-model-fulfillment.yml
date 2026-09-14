@@ -4,7 +4,7 @@ on:
     branches: [codex/model-fulfillment-pricing]
   pull_request:
     branches: [Main]
-    paths: ['packages/pricing/src/fulfillment*.ts', 'tests/fulfillment*.test.ts', 'worker/lib/fulfillment*.ts', '.github/workflows/verify-model-fulfillment.yml']
+    paths: ['packages/pricing/src/**', 'tests/fulfillment*.test.ts', 'worker/lib/fulfillment*.ts', 'migrations/0072_model_fulfillment.sql', '.github/workflows/verify-model-fulfillment.yml']
 permissions:
   contents: read
 concurrency:
@@ -13,17 +13,24 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Archive exact source without git credentials or runner environment
+        run: git archive --format=tar.gz HEAD -o /tmp/fulfillment-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fulfillment-source-${{ github.run_id }}
+          path: /tmp/fulfillment-source.tar.gz
+          retention-days: 7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Focused domain and legacy normalization tests
+      - name: Fulfillment regression tests
         shell: bash
         run: |
           mkdir -p /tmp/fulfillment-proof
@@ -37,7 +44,7 @@ jobs:
         run: npm run check --workspace @levonis/pricing
       - name: Focused lint
         if: ${{ !cancelled() }}
-        run: npx --no-install eslint packages/pricing/src/fulfillment*.ts tests/fulfillment*.test.ts
+        run: npx --no-install eslint packages/pricing/src/fulfillment*.ts worker/lib/fulfillment*.ts tests/fulfillment*.test.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
