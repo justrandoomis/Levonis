@@ -57,6 +57,7 @@ import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { captureSupportRefFromSearch } from '../lib/supportRef';
 import { productGalleryForSelection } from '../lib/productImage';
+import { tierLabel } from '../components/subscription/tierMeta';
 
 // ------------------------------------------------------------------ strings
 
@@ -66,8 +67,19 @@ const STRINGS = {
     unfavorite: 'إزالة من المفضلة', gallery: 'صور المنتج', noImages: 'لا توجد صور لهذا المنتج',
     imageOf: 'صورة {n} من {total}', zoom: 'تكبير الصورة', close: 'إغلاق',
     officialStore: 'المتجر الرسمي', communityStore: 'متجر مجتمع', visitStore: 'زيارة المتجر',
-    price: 'السعر', from: 'يبدأ من', regularPrice: 'السعر العادي', proPrice: 'سعر أعضاء PRO',
-    proApplied: 'سعر عضويتك PRO مطبّق', primeApplied: 'سعر عضويتك PRIME مطبّق', subscribe: 'اشترك الآن', updatingPrice: 'يجري تحديث السعر…',
+    price: 'السعر', from: 'يبدأ من', regularPrice: 'السعر العادي',
+    /**
+     * NO TIER NAME IS TYPED ON THIS PAGE. It used to spell «PRIME» in all
+     * three languages while the one table that owns the customer-facing names
+     * (components/subscription/tierMeta.ts) says PREMIUM — this was the last
+     * surface in the store still calling a tier by its API id. The label is
+     * now an argument, and `tierLabel()` is the only thing that supplies it.
+     */
+    appliedPriceOf: (tier: string) => `سعر ${tier}`,
+    memberPriceOf: (tier: string) => `سعر أعضاء ${tier}`,
+    savedWithTier: (amount: string, tier: string) => `وفّرت ${amount} بعضوية ${tier}`,
+    upgradeTo: (tier: string) => `الترقية إلى ${tier}`,
+    subscribe: 'اشترك الآن', updatingPrice: 'يجري تحديث السعر…',
     priceUnavailable: 'أكمل الاختيار لعرض السعر النهائي',
     options: 'الخيارات المتاحة', colors: 'الألوان المتاحة', chooseOption: 'اختر خيارًا',
     chooseColor: 'اختر لونًا', transport: 'وسيلة النقل للطلب المسبق', chooseTransport: 'اختر وسيلة النقل',
@@ -91,7 +103,7 @@ const STRINGS = {
     qtyCapped: 'المتاح الآن {n} فقط — لم نضف الباقي كطلب مسبق',
     unitBreakdown: 'تفصيل سعر الوحدة', itemPrice: 'سعر المنتج', transportFee: 'عمولة النقل',
     directFee: 'زيادة البيع المباشر',
-    warrantyFee: 'رسوم الضمان', waivedPro: 'معفاة لعضوية PRO', lineTotal: 'إجمالي البنود',
+    warrantyFee: 'رسوم الضمان', waivedProOf: (tier: string) => `معفاة لعضوية ${tier}`, lineTotal: 'إجمالي البنود',
     preorderCodHint: 'الدفع مقدمًا من المحفظة يُبقي هذا السعر؛ الدفع عند الاستلام يُسعَّر كبيع مباشر ويبقى الطلب طلبًا مسبقًا.',
     CART_WARRANTY_CONFLICT: 'هذه الطابعة في سلتك بخيار ضمان ممدد مختلف — غيّره من السلة.',
     printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
@@ -120,8 +132,12 @@ const STRINGS = {
     unfavorite: 'Remove from favourites', gallery: 'Product images', noImages: 'This product has no images yet',
     imageOf: 'Image {n} of {total}', zoom: 'Zoom image', close: 'Close',
     officialStore: 'Official store', communityStore: 'Community store', visitStore: 'Visit store',
-    price: 'Price', from: 'From', regularPrice: 'Regular price', proPrice: 'PRO member price',
-    proApplied: 'Your PRO price is applied', primeApplied: 'Your PRIME price is applied', subscribe: 'Subscribe', updatingPrice: 'Updating price…',
+    price: 'Price', from: 'From', regularPrice: 'Regular price',
+    appliedPriceOf: (tier: string) => `${tier} price`,
+    memberPriceOf: (tier: string) => `${tier} member price`,
+    savedWithTier: (amount: string, tier: string) => `Saved ${amount} with ${tier} membership`,
+    upgradeTo: (tier: string) => `Upgrade to ${tier}`,
+    subscribe: 'Subscribe', updatingPrice: 'Updating price…',
     priceUnavailable: 'Complete your selection to see the final price',
     options: 'Options', colors: 'Colours', chooseOption: 'Choose an option',
     chooseColor: 'Choose a colour', transport: 'Pre-order transport', chooseTransport: 'Choose transport',
@@ -145,7 +161,7 @@ const STRINGS = {
     qtyCapped: 'Only {n} available now — the rest was not turned into a pre-order',
     unitBreakdown: 'Unit price breakdown', itemPrice: 'Item price', transportFee: 'Transport commission',
     directFee: 'Direct-sale surcharge',
-    warrantyFee: 'Warranty fee', waivedPro: 'Waived for PRO', lineTotal: 'Line total',
+    warrantyFee: 'Warranty fee', waivedProOf: (tier: string) => `Waived for ${tier}`, lineTotal: 'Line total',
     preorderCodHint: 'Paying in advance from the wallet keeps this price; cash on delivery is priced as a direct sale while the order stays a pre-order.',
     CART_WARRANTY_CONFLICT: 'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
     printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
@@ -173,8 +189,20 @@ const STRINGS = {
     unfavorite: 'لابردن لە دڵخوازەکان', gallery: 'وێنەکانی بەرهەم', noImages: 'ئەم بەرهەمە هێشتا وێنەی نییە',
     imageOf: 'وێنەی {n} لە {total}', zoom: 'گەورەکردنی وێنە', close: 'داخستن',
     officialStore: 'فرۆشگای فەرمی', communityStore: 'فرۆشگای کۆمەڵگا', visitStore: 'سەردانی فرۆشگا',
-    price: 'نرخ', from: 'دەست پێدەکات لە', regularPrice: 'نرخی ئاسایی', proPrice: 'نرخی ئەندامانی PRO',
-    proApplied: 'نرخی PRO جێبەجێ کراوە', primeApplied: 'نرخی PRIME جێبەجێ کراوە', subscribe: 'بەشداربە', updatingPrice: 'نرخ نوێ دەکرێتەوە…',
+    price: 'نرخ', from: 'دەست پێدەکات لە', regularPrice: 'نرخی ئاسایی',
+    /*
+     * The Kurdish below is the store's OWN wording, reused — nothing here was
+     * translated. «نرخی ئەندامانی …» and «نرخی PRO …» were already in this
+     * block; «پاشەکەوتت کرد» is the cart's saved line (pages/Cart.tsx);
+     * «ئەندامێتی PRO» is the referrals page (pages/Referrals.tsx); «بەشداری …
+     * بکە» is the merchant dashboard (pages/MerchantDashboardPage.tsx). Only
+     * the Latin tier name is a variable, as it is in every language.
+     */
+    appliedPriceOf: (tier: string) => `نرخی ${tier}`,
+    memberPriceOf: (tier: string) => `نرخی ئەندامانی ${tier}`,
+    savedWithTier: (amount: string, tier: string) => `پاشەکەوتت کرد ${amount} — ئەندامێتی ${tier}`,
+    upgradeTo: (tier: string) => `بەشداری ${tier} بکە`,
+    subscribe: 'بەشداربە', updatingPrice: 'نرخ نوێ دەکرێتەوە…',
     priceUnavailable: 'هەڵبژاردنەکەت تەواو بکە بۆ بینینی نرخی کۆتایی',
     options: 'هەڵبژاردەکان', colors: 'ڕەنگەکان', chooseOption: 'هەڵبژاردەیەک هەڵبژێرە',
     chooseColor: 'ڕەنگێک هەڵبژێرە', transport: 'گواستنەوەی پێشداواکاری', chooseTransport: 'شێوازی گواستنەوە هەڵبژێرە',
@@ -198,7 +226,7 @@ const STRINGS = {
     qtyCapped: 'تەنها {n} بەردەستە ئێستا — ئەوەی ماوە نەکرا بە پێشداواکاری',
     unitBreakdown: 'وردەکاری نرخی یەکە', itemPrice: 'نرخی بەرهەم', transportFee: 'کۆمیشنی گواستنەوە',
     directFee: 'زیادەی فرۆشتنی ڕاستەوخۆ',
-    warrantyFee: 'کرێی گەرەنتی', waivedPro: 'بۆ PRO بەخشراوە', lineTotal: 'کۆی گشتی',
+    warrantyFee: 'کرێی گەرەنتی', waivedProOf: (tier: string) => `بۆ ${tier} بەخشراوە`, lineTotal: 'کۆی گشتی',
     preorderCodHint: 'پارەدانی پێشوەخت لە جزدانەوە ئەم نرخە دەهێڵێتەوە؛ پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت و داواکارییەکە وەک پێش-داواکاری دەمێنێتەوە.',
     CART_WARRANTY_CONFLICT: 'ئەم پرینتەرە پێشتر لە سەبەتەکەتدایە بە هەڵبژاردەیەکی جیاوازی گەرەنتی درێژکراوە — لە سەبەتەوە بیگۆڕە.',
     printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
@@ -297,6 +325,14 @@ interface ProductDetail {
    *  it by resolving every one of them. This is what «يبدأ من» is allowed to
    *  key off — the page must never infer it from not having a quote yet. */
   display_from?: boolean;
+  /**
+   * The scheduled window on this product (worker/routes/products.ts
+   * `projectProduct`). `price_source: 'offer'` means a LIVE, eligible window
+   * is what set the regular price of every level — read here only to know
+   * whether a membership is the whole reason a price fell (see
+   * `memberSavingIqd`), never to price anything.
+   */
+  offer?: { schedule_state?: string; price_source?: 'ladder' | 'offer'; locked?: boolean } | null;
 }
 
 /** The relational structure (worker publicRelations): per-level sellable
@@ -403,12 +439,40 @@ interface PriceLevels {
   complete: boolean;
 }
 
+/**
+ * §8/§9 — WHAT A MEMBERSHIP WOULD PAY FOR THIS EXACT SELECTION.
+ *
+ * Resolved by the server (worker/routes/products.ts `membershipPreview`)
+ * through the very rules the checkout reads, so the figure shown to someone
+ * deciding whether to subscribe is the figure they are charged afterwards.
+ * `null` for a tier means there is NOTHING TO PROMISE for this selection — the
+ * page then says nothing at all, rather than an "up to" number it would have
+ * had to invent.
+ */
+interface MembershipPreviewTier {
+  /** What that tier pays for the goods. */
+  unit_iqd: number;
+  regular_iqd: number;
+  /** `regular_iqd - unit_iqd`, computed on the server. */
+  saving_iqd: number;
+  /** The benefit rule behind it, or null when a typed member price is. */
+  rule_id: string | null;
+}
+
+interface MembershipPreview {
+  prime: MembershipPreviewTier | null;
+  pro: MembershipPreviewTier | null;
+}
+
 interface DetailResponse {
   product: ProductDetail;
   /** The BASE selection's quote, already resolved by the server on this very
    *  request. The page used to discard it and re-ask for it over the network. */
   pricing?: Omit<Quote, 'qty' | 'line_total_iqd'>;
   price_levels?: PriceLevels;
+  /** The BASE selection's membership preview, so §8/§9 can be stated on the
+   *  FIRST PAINT instead of waiting for the debounced quote. */
+  membership_preview?: MembershipPreview;
   source: ProductSource;
   favorite: boolean;
   relations?: RelationsPayload | null;
@@ -424,6 +488,8 @@ interface DetailResponse {
 interface QuoteResponse {
   quote: Quote;
   availability: Availability;
+  /** The same preview, re-resolved for THIS selection. */
+  membership_preview?: MembershipPreview;
   /** The extended-warranty options re-priced for THIS selection's regular price. */
   warranty_plans?: WarrantyPlanItem[];
   /** The ways to buy THIS selection, priced by the server. */
@@ -434,6 +500,13 @@ interface QuoteResponse {
 // ------------------------------------------------------------------ helpers
 
 type Lang = 'ar' | 'en' | 'ckb';
+
+/**
+ * The tier §9's line invites the viewer to, named by the one table that owns
+ * the customer-facing names. PRO is the highest tier, so this line is shown to
+ * everyone below it — a PREMIUM member included.
+ */
+const PRO_LABEL = tierLabel('pro');
 
 /**
  * The product, option and colour NAMES are English in every language
@@ -568,6 +641,12 @@ export default function Product() {
   // is ever added up in the browser.
   const [detailModes, setDetailModes] = useState<PricingModes | null>(null);
   const [quotedModes, setQuotedModes] = useState<PricingModes | null>(null);
+  // §8/§9 — what PREMIUM and PRO pay for this selection, as the server
+  // resolved it: the detail response's answer for the base selection until a
+  // quote for the current one lands, then that quote's. Every dinar in the
+  // membership lines below comes from one of these two; none is computed here.
+  const [detailPreview, setDetailPreview] = useState<MembershipPreview | null>(null);
+  const [quotedPreview, setQuotedPreview] = useState<MembershipPreview | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -698,6 +777,8 @@ export default function Product() {
         setViewerTier(data.viewer_tier ?? null);
         setDetailModes(data.pricing_modes ?? null);
         setQuotedModes(null);
+        setDetailPreview(data.membership_preview ?? null);
+        setQuotedPreview(null);
         setLiveAvailability(null);
         setQuotedPlans(null);
         setQuoteError(null);
@@ -797,6 +878,11 @@ export default function Product() {
         setLiveAvailability(res.availability);
         if (Array.isArray(res.warranty_plans)) setQuotedPlans(res.warranty_plans);
         if (res.pricing_modes) setQuotedModes(res.pricing_modes);
+        // Assigned unconditionally: `null` for a tier is an ANSWER ("nothing
+        // to promise for this selection"), not a missing field, and keeping
+        // the previous selection's promise would be the "up to" number §9
+        // forbids.
+        setQuotedPreview(res.membership_preview ?? null);
         setQuoteError(null);
       } catch (err) {
         if (cancelled) return;
@@ -1229,10 +1315,85 @@ export default function Product() {
   // stepper is instant.
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
   const isPro = viewerTier?.tier === 'pro' && viewerTier.active;
-  // The PRO price FOR THIS SELECTION, from the server quote: an option or
-  // colour surcharge is paid by every tier, so the product-level number is
-  // only right for the base selection.
-  const proPrice = quoteFresh && quoteErrors.length === 0 ? (quote!.pro_iqd ?? null) : (product.pro_price_iqd ?? null);
+  const isPrime = viewerTier?.tier === 'prime' && viewerTier.active;
+
+  /**
+   * §8/§9 — THE MEMBERSHIP PREVIEW THAT ANSWERS THE SELECTION ON SCREEN.
+   *
+   * The confirmed quote's first; failing that the detail response's, which
+   * answered the BASE selection on the very request that delivered the page —
+   * which is what lets the membership line appear on the first paint instead
+   * of after a debounce and a round trip. It is the same fallback the price
+   * itself uses, for the same reason.
+   *
+   * This REPLACES the old `quote.pro_iqd` reading. That field is resolved in
+   * the VIEWER's membership context, so for the people §9 is addressed to —
+   * everyone who is not PRO — it could only ever see a typed `pro_price_iqd`
+   * and never a configured benefit rule. The preview asks the rules what PRO
+   * would actually pay.
+   *
+   * AND THE DETAIL RESPONSE'S PREVIEW IS READ ONLY FOR THE SELECTION IT
+   * ANSWERED — the BASE one: no option, no colour, no transport, no stated
+   * order type (`membershipPreview(ctx, doc, { optionId: null, colorId: null })`).
+   *
+   * Held past that, it is the "up to" number in disguise. A single-option
+   * product pre-selects its option on load, and an option or a transport rung
+   * may carry its own price: keeping the base answer would put a PRO figure
+   * hundreds of thousands of dinars below what PRO actually pays for what is
+   * on screen — for the debounce and the round trip, and, for a selection the
+   * server refuses to quote (out of stock, transport unconfigured), until the
+   * customer changes it. The line simply waits for the quote instead.
+   */
+  const detailPreviewAnswersSelection = !optionId && !colorId && !transportMethod && !orderType;
+  const membershipPreview =
+    quoteFresh && quoteErrors.length === 0 ? quotedPreview : detailPreviewAnswersSelection ? detailPreview : null;
+  const proPreview = membershipPreview?.pro ?? null;
+
+  /**
+   * §8 — WHAT THE VIEWER'S OWN MEMBERSHIP TOOK OFF THIS SELECTION, in dinars.
+   *
+   * `shownPrice` is already the server's resolution for this selection (the
+   * quote, or the price-levels grid for the same question), so the saving is
+   * the two numbers it carries — never a percentage applied here.
+   */
+  const appliedMemberTier: 'pro' | 'prime' | null =
+    shownPrice && (shownPrice.tier === 'pro' || shownPrice.tier === 'prime') ? shownPrice.tier : null;
+  const appliedMemberLabel = appliedMemberTier ? tierLabel(appliedMemberTier) : '';
+  /**
+   * ...AND NOT WHILE A SCHEDULED OFFER IS ALSO MOVING THE PRICE.
+   *
+   * `regular - applied` is the membership's whole saving only while the
+   * membership is the only thing that lowered this line. It is not, under a
+   * live window: `price_levels` prices through `resolveOfferPrice` and the
+   * `/quote` route does not (worker/routes/products.ts — `levelPrice` calls
+   * `applyOfferToResolved`, the quote handler's `resolveUnitPrice` is bare),
+   * so the same selection carries the offer's regular before the quote lands
+   * and the ladder's regular after it. A member would be told they saved the
+   * offer's discount too — a number the store could not stand behind on the
+   * invoice, and one that would change on screen as the quote arrived.
+   *
+   * The struck regular price and the tier badge still appear. Only the dinar
+   * ATTRIBUTION is withheld, because attributing it is exactly what the page
+   * cannot currently do.
+   */
+  const offerPricesThisLine = product.offer?.price_source === 'offer';
+  const memberSavingIqd =
+    shownPrice && appliedMemberTier !== null && !offerPricesThisLine && shownPrice.regular > shownPrice.applied
+      ? shownPrice.regular - shownPrice.applied
+      : null;
+
+  /**
+   * §9 — THE INVITATION, AND ONLY WHILE IT IS AN INVITATION TO SOMETHING.
+   *
+   * A PREMIUM member is shown the PRO line, because PRO is the higher tier and
+   * telling them otherwise would hide a real difference. But `clampMemberLadder`
+   * keeps PRO ≤ PREMIUM, and one rule covering both tiers resolves them to the
+   * SAME dinar — at which point a line reading "PRO pays 1,300,000" beside the
+   * 1,300,000 they are already paying invites them to buy nothing. Both figures
+   * are the server's; this compares them, it does not compute either.
+   */
+  const proInvite =
+    proPreview !== null && !isPro && (!shownPrice || proPreview.unit_iqd < shownPrice.applied) ? proPreview : null;
 
   const blockingCodes: string[] = [
     ...(availability?.selection.errors ?? []),
@@ -1309,19 +1470,34 @@ export default function Product() {
             >
               {formatIqd(unitPrice!)}
             </span>
-            {shownPrice.tier === 'pro' || shownPrice.tier === 'prime' ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-gold">
+            {appliedMemberTier ? (
+              /* §8 — NAMED BY TIER, from tierMeta: «سعر PRO» / «سعر PREMIUM». */
+              <span
+                data-testid="product-applied-tier"
+                data-tier={appliedMemberTier}
+                className="inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-gold"
+              >
                 <Star aria-hidden="true" className="w-3 h-3 fill-gold" />
-                {shownPrice.tier === 'pro' ? s.proApplied : s.primeApplied}
+                {s.appliedPriceOf(appliedMemberLabel)}
               </span>
             ) : (
               <span className="text-zinc-400 text-[12px] font-bold">{s.regularPrice}</span>
             )}
           </div>
           {/* §4: no compare-at. The regular price is struck through only when
-              the member's own resolved price is genuinely lower. */}
+              the member's own resolved price is genuinely lower.
+              §8: and when a MEMBERSHIP is the reason, the page says so in
+              dinars, here, rather than leaving the customer to subtract two
+              numbers or to discover the benefit at checkout. */}
           {shownPrice.applied < shownPrice.regular ? (
-            <div className="text-zinc-500 text-sm line-through mt-1 tabular-nums">{formatIqd(shownPrice.regular)}</div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="text-zinc-500 text-sm line-through tabular-nums">{formatIqd(shownPrice.regular)}</span>
+              {memberSavingIqd !== null ? (
+                <span data-testid="product-member-saving" className="text-gold text-[12.5px] font-bold tabular-nums">
+                  {s.savedWithTier(formatIqd(memberSavingIqd), appliedMemberLabel)}
+                </span>
+              ) : null}
+            </div>
           ) : null}
           {qty > 1 ? (
             <div className="text-zinc-400 text-[13px] mt-2">
@@ -1351,18 +1527,30 @@ export default function Product() {
         </>
       )}
 
-      {proPrice !== null && !isPro ? (
+      {/*
+        §9 — ONE LINE, AND ONLY WHEN THERE IS A REAL NUMBER TO PUT IN IT.
+        What PRO pays for THIS product, from the server's preview, and a link
+        to /subscription. A null preview means the rules promise PRO nothing
+        here, and the line then does not exist — there is no "up to" figure and
+        no gold advertisement. PRO is the top tier, so a PREMIUM member still
+        sees it; the sentence changes to acknowledge that they already hold a
+        membership rather than inviting them to start one.
+      */}
+      {proInvite !== null ? (
         <button
           type="button"
+          data-testid="product-pro-invite"
           onClick={() => navigate('/subscription')}
           className="group mt-3 flex min-h-11 w-full items-center justify-between gap-3 border-s-2 border-gold/55 py-1.5 ps-3 pe-1 text-start text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <span className="text-[12.5px] font-medium flex min-w-0 items-center gap-1.5">
             <Star aria-hidden="true" className="w-3.5 h-3.5 shrink-0 text-gold" />
-            <span className="truncate">{s.proPrice}</span>
-            <span className="shrink-0 tabular-nums font-bold text-gold">{formatIqd(proPrice)}</span>
+            <span className="truncate">{s.memberPriceOf(PRO_LABEL)}</span>
+            <span className="shrink-0 tabular-nums font-bold text-gold">{formatIqd(proInvite.unit_iqd)}</span>
           </span>
-          <span className="shrink-0 text-[11.5px] font-semibold text-text-muted group-hover:text-text-secondary">{s.subscribe}</span>
+          <span className="shrink-0 text-[11.5px] font-semibold text-text-muted group-hover:text-text-secondary">
+            {isPrime ? s.upgradeTo(PRO_LABEL) : s.subscribe}
+          </span>
         </button>
       ) : null}
 
@@ -1379,7 +1567,7 @@ export default function Product() {
                 {s.transportFee} · {transportLabel(s, quote!.transport.method)}
               </dt>
               <dd className="text-zinc-200 tabular-nums">
-                {quote!.transport.waived ? s.waivedPro : formatIqd(quote!.transport.commission_iqd)}
+                {quote!.transport.waived ? s.waivedProOf(PRO_LABEL) : formatIqd(quote!.transport.commission_iqd)}
               </dd>
             </div>
           ) : null}
@@ -1389,7 +1577,7 @@ export default function Product() {
             <div className="flex justify-between gap-3" data-direct-surcharge={quote!.direct.waived ? 'waived' : 'charged'}>
               <dt className="text-zinc-400">{s.directFee}</dt>
               <dd className="text-zinc-200 tabular-nums">
-                {quote!.direct.waived ? s.waivedPro : formatIqd(quote!.direct.surcharge_iqd)}
+                {quote!.direct.waived ? s.waivedProOf(PRO_LABEL) : formatIqd(quote!.direct.surcharge_iqd)}
               </dd>
             </div>
           ) : null}

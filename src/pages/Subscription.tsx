@@ -38,14 +38,13 @@ import { LevoCard } from '../components/subscription/LevoCard';
 import { PlanPicker } from '../components/subscription/PlanPicker';
 import { PlanSummary } from '../components/subscription/PlanSummary';
 import { PurchaseConfirm } from '../components/subscription/PurchaseConfirm';
-import { BenefitsSection } from '../components/subscription/BenefitsSection';
+import { BenefitsSection, type PlanBenefits } from '../components/subscription/BenefitsSection';
 import { MembershipLedger } from '../components/subscription/MembershipLedger';
 import { BnplPanel } from '../components/subscription/BnplPanel';
 import { FREE_FACE, TIER_META, isPaidTier, tierLabel, type AnyTier, type PaidTier } from '../components/subscription/tierMeta';
 import type {
   ApiPlan,
   ConfirmedFigures,
-  DeliveryThresholds,
   LaunchInfo,
   MineResponse,
   PlanFeatures,
@@ -67,7 +66,13 @@ export default function Subscription() {
   const [plansError, setPlansError] = useState<unknown>(null);
   const [launch, setLaunch] = useState<LaunchInfo | null>(null);
   const [features, setFeatures] = useState<PlanFeatures | null>(null);
-  const [delivery, setDelivery] = useState<DeliveryThresholds | null>(null);
+  /**
+   * §22 — what the store promises PREMIUM and PRO shoppers RIGHT NOW, read
+   * from `membership_benefit_rules` by the same server that applies them at
+   * the checkout. An older deployment sends no `benefits` at all, and the
+   * benefits section then states nothing rather than a figure nobody enforces.
+   */
+  const [benefits, setBenefits] = useState<PlanBenefits | null>(null);
   const [plansNonce, setPlansNonce] = useState(0);
   const reloadPlans = useCallback(() => setPlansNonce((n) => n + 1), []);
 
@@ -75,13 +80,13 @@ export default function Subscription() {
     let cancelled = false;
     setPlansError(null);
     api
-      .get<PlansResponse>('/api/memberships/plans')
+      .get<PlansResponse & { benefits?: PlanBenefits }>('/api/memberships/plans')
       .then((data) => {
         if (cancelled) return;
         setPlans(data.plans || []);
         setLaunch(data.launch || null);
         setFeatures(data.features ?? null);
-        setDelivery(data.delivery ?? null);
+        setBenefits(data.benefits ?? null);
       })
       .catch((e: unknown) => {
         // A failed fetch is an error, not an empty catalogue.
@@ -392,7 +397,7 @@ export default function Subscription() {
 
         {/* 4. What each card gives */}
         <motion.div {...enter(0.15)}>
-          <BenefitsSection features={features} delivery={delivery} loading={plans === null && !plansError} />
+          <BenefitsSection features={features} benefits={benefits} loading={plans === null && !plansError} />
         </motion.div>
       </div>
 

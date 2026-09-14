@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import DashboardLayout from '../components/DashboardLayout';
@@ -54,6 +54,12 @@ const AdminSerials = React.lazy(() => import('../components/AdminSerials'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
 const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
 const AdminMemberships = React.lazy(() => import('../components/AdminMemberships'));
+// What a PREMIUM or a PRO membership is WORTH at a checkout — the rules of
+// `membership_benefit_rules`, the simulator that prices a basket through the
+// checkout's own functions, and the version history (docs/MEMBERSHIP_BENEFITS.md
+// §6, §7). Its own chunk like every other panel: it carries a product picker
+// and a taxonomy reader nobody else on this page needs.
+const AdminBenefits = React.lazy(() => import('../components/adminBenefits/AdminBenefits'));
 const AdminFarmConfig = React.lazy(() => import('../components/adminFarm/AdminFarmConfig'));
 
 /**
@@ -90,6 +96,7 @@ type AdminTab =
   | 'reviews'
   | 'kyc'
   | 'memberships'
+  | 'membership_benefits'
   | 'coupons'
   | 'delivery'
   | 'community'
@@ -525,6 +532,7 @@ export default function Admin() {
     { id: 'reviews', icon: Star, label: dir === 'rtl' ? 'المراجعات والهدايا' : 'Reviews & Gifts' },
     { id: 'kyc', icon: ShieldCheck, label: dir === 'rtl' ? 'التحقق والعناوين' : 'KYC & Addresses' },
     { id: 'memberships', icon: Crown, label: dir === 'rtl' ? 'الأعضاء والدعم' : 'Members & Support' },
+    { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits') },
     { id: 'coupons', icon: Ticket, label: dir === 'rtl' ? 'أكواد الخصم' : 'Promo codes' },
     { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان') },
     { id: 'delivery', icon: Truck, label: dir === 'rtl' ? 'التوصيل المحلي' : 'Local delivery' },
@@ -540,7 +548,7 @@ export default function Admin() {
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'taxonomy' || activeTab === 'warranties' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -600,6 +608,8 @@ export default function Admin() {
         {activeTab === 'memberships' && (
            <AdminMemberships />
         )}
+
+        {activeTab === 'membership_benefits' && <AdminBenefits />}
 
         {activeTab === 'coupons' && <AdminCoupons dir={dir} />}
 

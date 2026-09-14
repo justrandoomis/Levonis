@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import {
@@ -30,6 +30,7 @@ import {
   type SupportRefState,
 } from '../lib/supportRef';
 import MerchantCartView from '../components/merchant/MerchantCartView';
+import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -212,6 +213,101 @@ function typeForTransport(method: unknown): ShippingType {
  *  render before, which defeated every memo below it. */
 const BLOCKING_STATES = new Set(['sold_out', 'ended', 'upcoming', 'locked', 'unconfigured']);
 
+/* ------------------------------------------------ the membership's answer
+ *
+ * WHAT `GET /api/cart` SAYS A MEMBERSHIP IS WORTH ON THIS CART
+ * (docs/MEMBERSHIP_BENEFITS.md §8; worker/routes/cart.ts, `loadCart`).
+ *
+ * This page used to declare the cart response as `{ items, scope }` and throw
+ * the rest of it away, then rebuild the whole summary out of
+ * `unit_price_iqd * qty` and `regular_iqd - applied_iqd`. Subtraction cannot
+ * see a quantity limit or a per-order ceiling: a rule that covers "the first
+ * two printers" saves less than the arithmetic claimed, and nothing on the
+ * screen could say so. Every dinar the shapes below carry is the SERVER's,
+ * and not one percentage, threshold or ceiling behind them lives in this file.
+ */
+
+type DeliveryMethodId = 'standard' | 'personal';
+
+/** What ONE cart row's membership rule was worth, and which ceiling bit. */
+interface MembershipLine {
+  /** The product the benefit was resolved for — `CartItem.productId`. */
+  product_id: string;
+  rule_id: string | null;
+  scope: string | null;
+  discount_mode: 'percent' | 'fixed' | null;
+  per_unit_iqd: number;
+  /** How many of the line's units the rule covers, after `max_quantity`. */
+  eligible_qty: number;
+  /** The line's WHOLE saving, after every ceiling the rule carries. */
+  total_iqd: number;
+  capped_by: 'none' | 'per_unit' | 'per_order' | 'quantity';
+  /**
+   * WHERE THE MONEY ALREADY IS (§2).
+   *
+   * 'unit' — `total_iqd` is ALREADY inside `unit_price_iqd`, so naming it as
+   * a deduction as well would take it twice.
+   * 'line' — the unit price is the regular one and the saving comes off the
+   * order exactly once.
+   */
+  applied_at: 'unit' | 'line';
+}
+
+/**
+ * Free delivery, answered PER METHOD because the cart is where the customer
+ * is still choosing one. `methods: null` means the rule covers every method.
+ */
+interface MembershipShipping {
+  method: DeliveryMethodId;
+  rule_id: string | null;
+  eligible: boolean;
+  threshold_iqd: number | null;
+  /** The figure the threshold was tested against, for the whole cart. */
+  basis_iqd: number;
+  methods: DeliveryMethodId[] | null;
+  max_subsidy_iqd: number | null;
+  reason: 'applied' | 'no_rule' | 'below_threshold' | 'method_not_covered';
+}
+
+interface CartMembership {
+  /** `prime` is the API id; PREMIUM is the name a customer reads, and
+   *  `tierLabel` is the only thing that supplies it. */
+  tier: string;
+  active: boolean;
+  /** The whole saving on merchandise, however it was applied. */
+  discount_total_iqd: number;
+  /** The part of it that is NOT yet in the unit prices. */
+  order_discount_iqd: number;
+  merchandise_iqd: number;
+  lines: MembershipLine[];
+  free_shipping: MembershipShipping[];
+  cod_tax_exempt: boolean;
+}
+
+interface CartResponse {
+  items: CartItem[];
+  membership?: CartMembership | null;
+  scope?: { seller_type?: string } | null;
+}
+
+/**
+ * What a cart WRITE answers with. The mutation routes re-price and return the
+ * whole cart, but they do not carry `membership` — so a saving that depends on
+ * the quantity is re-read rather than left describing the quantity before the
+ * tap. `membership` is declared optional so the day a route does carry it,
+ * the answer is used instead of a second read.
+ */
+interface CartWriteResponse {
+  items: CartItem[];
+  membership?: CartMembership | null;
+}
+
+/**
+ * The tier the non-member line invites the viewer to. PRO is the highest tier,
+ * and the name comes from the one table that owns the customer-facing names.
+ */
+const PRO_LABEL = tierLabel('pro');
+
 export default function Cart() {
   const navigate = useNavigate();
   const { t, lang, dir, loc } = useLanguage();
@@ -234,6 +330,14 @@ export default function Cart() {
   // One cart, one seller (§14): the server says whose cart this is, and a
   // merchant-store cart gets its own rendering with the shop's own terms.
   const [merchantScope, setMerchantScope] = useState<boolean | null>(null);
+  // §10 — WHAT THE MEMBERSHIP IS WORTH ON THIS CART, exactly as the server
+  // answered it. Nothing here is re-derived in the browser: the page pairs
+  // each line back to the row it was resolved for and adds up the rows the
+  // customer has actually ticked.
+  const [membership, setMembership] = useState<CartMembership | null>(null);
+  const membershipRef = useRef<CartMembership | null>(null);
+  // Only the latest re-read may answer: three quantity taps fire three of them.
+  const membershipSeqRef = useRef(0);
   // Action errors (qty/variant updates) show as a dismissible banner over the
   // existing content; a failed INITIAL load is a distinct full state below.
   const [error, setError] = useState('');
@@ -360,6 +464,50 @@ export default function Cart() {
     knownIdsRef.current = existing;
   }, []);
 
+  /** The server's answer, held where both the render and the next re-read can
+   *  see it — a ref as well as state, so a refresh can ask whether there is
+   *  anything on screen worth keeping true without re-creating itself. */
+  const putMembership = useCallback((next: CartMembership | null) => {
+    membershipRef.current = next;
+    setMembership(next);
+  }, []);
+
+  /**
+   * RE-READ WHAT THE MEMBERSHIP IS WORTH, after a write that moved the
+   * quantities its rules were resolved against.
+   *
+   * The cart's PATCH and DELETE routes answer with the re-priced items but
+   * without `membership`, so a saving carrying a quantity limit or a
+   * per-order ceiling would otherwise still describe the cart as it stood
+   * before the tap. It costs a read only for a customer who actually has a
+   * live membership — for everyone else there is nothing on screen to correct.
+   */
+  const refreshMembership = useCallback(async () => {
+    if (!membershipRef.current?.active) return;
+    const seq = membershipSeqRef.current + 1;
+    membershipSeqRef.current = seq;
+    try {
+      const data = await api.get<CartResponse>('/api/cart');
+      if (membershipSeqRef.current !== seq) return;
+      putMembership(data.membership ?? null);
+    } catch {
+      // Keep the last answer rather than blanking the summary under the
+      // customer's eyes; the next full read of the cart corrects it.
+    }
+  }, [putMembership]);
+
+  /** A write's answer: the re-priced cart, and what the membership is worth
+   *  on it — from the response where the route sends it, by a re-read where
+   *  it does not. */
+  const applyCartWrite = useCallback(
+    (data: CartWriteResponse) => {
+      applyItems(data.items || []);
+      if ('membership' in data) putMembership(data.membership ?? null);
+      else void refreshMembership();
+    },
+    [applyItems, putMembership, refreshMembership]
+  );
+
   /**
    * A refusal the customer can read, in their own language.
    *
@@ -376,13 +524,17 @@ export default function Cart() {
 
   const loadCart = useCallback(async (opts?: { silent?: boolean }) => {
     try {
-      const data = await api.get<{ items: CartItem[]; scope?: { seller_type?: string } | null }>('/api/cart');
+      const data = await api.get<CartResponse>('/api/cart');
       // The scope now rides on the cart itself, so the page knows which of the
       // two cart screens to render in the same tick it knows the items —
       // no second round trip, and no platform-cart flash before a merchant
       // cart swaps in.
       setMerchantScope(data.scope?.seller_type === 'merchant');
       applyItems(data.items || [], { detectPriceChange: !!opts?.silent });
+      // §10: the server's own answer about what this membership saved, per
+      // line and in total — null for a customer without one, and for one whose
+      // membership has lapsed.
+      putMembership(data.membership ?? null);
       setError('');
       setLoadError(null);
     } catch (err) {
@@ -401,7 +553,7 @@ export default function Cart() {
     } finally {
       setLoading(false);
     }
-  }, [applyItems, cartRefusal]);
+  }, [applyItems, cartRefusal, putMembership]);
 
   const retryLoadCart = useCallback(() => {
     setLoading(true);
@@ -529,11 +681,11 @@ export default function Cart() {
     qtySeqRef.current.set(item.id, seq);
     actionBusyRef.current += 1;
     try {
-      const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { qty: newQty });
+      const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, { qty: newQty });
       // A response that a newer tap has already superseded is thrown away
       // rather than allowed to rewrite the line backwards.
       if (qtySeqRef.current.get(item.id) !== seq) return;
-      applyItems(data.items || []);
+      applyCartWrite(data);
     } catch (err) {
       if (qtySeqRef.current.get(item.id) !== seq) return;
       setError(cartRefusal(err, 'Failed to update quantity'));
@@ -546,8 +698,8 @@ export default function Cart() {
   const deleteItem = async (item: CartItem) => {
     actionBusyRef.current += 1;
     try {
-      const data = await api.delete<{ items: CartItem[] }>(`/api/cart/items/${item.id}`);
-      applyItems(data.items || []);
+      const data = await api.delete<CartWriteResponse>(`/api/cart/items/${item.id}`);
+      applyCartWrite(data);
     } catch (err) {
       setError(cartRefusal(err, 'Failed to remove item'));
       loadCart();
@@ -589,11 +741,11 @@ export default function Cart() {
     setVariantSaving(true);
     setVariantError('');
     try {
-      const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, {
+      const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, {
         optionId: pendingOptionId,
         colorId: pendingColorId,
       });
-      applyItems(data.items || []);
+      applyCartWrite(data);
       setVariantModalOpen(false);
     } catch (err) {
       setVariantError(cartRefusal(err, 'Failed to update variant'));
@@ -613,10 +765,10 @@ export default function Cart() {
     setShippingSaving(true);
     setShippingError('');
     try {
-      const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, {
+      const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, {
         shippingMethodId: methodId,
       });
-      applyItems(data.items || []);
+      applyCartWrite(data);
       setShippingModalOpen(false);
     } catch (err) {
       setShippingError(cartRefusal(err, 'Failed to update shipping method'));
@@ -651,8 +803,8 @@ export default function Cart() {
     });
     actionBusyRef.current += 1;
     try {
-      const data = await api.patch<{ items: CartItem[] }>(`/api/cart/items/${item.id}`, { warrantyPlanId: planId });
-      applyItems(data.items || []);
+      const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, { warrantyPlanId: planId });
+      applyCartWrite(data);
       setWarrantyPickerId(null);
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
@@ -751,6 +903,73 @@ export default function Cart() {
   const totalOriginalPrice = subtotal + discounts;
   const selectedCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
+  /** The membership that is actually worth something on this screen, and the
+   *  name a customer reads for it — `prime` is PREMIUM, and `tierMeta` is the
+   *  only thing in the store that says so. */
+  const activeMembership = membership && membership.active && isPaidTier(membership.tier) ? membership : null;
+  const memberLabel = activeMembership ? tierLabel(activeMembership.tier) : '';
+
+  /**
+   * THE MEMBERSHIP'S LINE, PAIRED BACK TO THE ROW IT WAS RESOLVED FOR.
+   *
+   * `membership.lines` carries one entry per cart row, in the order the server
+   * priced them, keyed by `product_id`. Two rows of the SAME product — two
+   * colours, two options — therefore share a key, so the entries are handed
+   * out in order rather than looked up: the first row of a product takes the
+   * first entry, the second takes the second. A line with no rule behind it is
+   * not paired at all, so nothing is said about it.
+   */
+  const membershipByItemId = useMemo(() => {
+    const paired = new Map<string, MembershipLine>();
+    const queues = new Map<string, MembershipLine[]>();
+    for (const line of activeMembership?.lines ?? []) {
+      const queue = queues.get(line.product_id);
+      if (queue) queue.push(line);
+      else queues.set(line.product_id, [line]);
+    }
+    for (const item of items) {
+      const next = queues.get(item.productId)?.shift();
+      if (next && next.rule_id) paired.set(item.id, next);
+    }
+    return paired;
+  }, [items, activeMembership]);
+
+  /**
+   * WHAT THE MEMBERSHIP IS WORTH ON THE LINES THE CUSTOMER HAS TICKED.
+   *
+   * The server answered for the WHOLE cart; which of its lines are being
+   * bought is the one thing only this page knows. So these add up the
+   * SERVER's per-line figures for the selected rows — no percentage, no
+   * threshold and no ceiling is applied here. With every line ticked they come
+   * to `membership.discount_total_iqd` and `order_discount_iqd` exactly.
+   */
+  const memberInsideUnitPrices = selectedItems.reduce((sum, item) => {
+    const line = membershipByItemId.get(item.id);
+    return sum + (line && line.applied_at === 'unit' ? line.total_iqd : 0);
+  }, 0);
+  const memberOffTheOrder = selectedItems.reduce((sum, item) => {
+    const line = membershipByItemId.get(item.id);
+    return sum + (line && line.applied_at === 'line' ? line.total_iqd : 0);
+  }, 0);
+  /**
+   * §2 — WHY THE SUMMARY SPLITS THE SAVING IN TWO, AND STILL ADDS UP.
+   *
+   * The subtotal on screen is the REGULAR merchandise total, so the whole
+   * membership saving is named as a deduction from it. The part that is
+   * already inside the unit prices is taken OUT of the general "Levo discount"
+   * line rather than deducted a second time, and only `memberOffTheOrder`
+   * actually moves the total:
+   *
+   *   subtotal(regular) − other − membership − points + delivery = total
+   */
+  const memberAlreadyInPrices = Math.min(memberInsideUnitPrices, discounts);
+  const memberNamedSaving = memberAlreadyInPrices + memberOffTheOrder;
+  const otherDiscounts = discounts - memberAlreadyInPrices;
+  /** The merchandise after the part of the membership the order takes off. */
+  const merchandise = Math.max(0, subtotal - memberOffTheOrder);
+  /** Everything the selected lines saved, however each part was applied. */
+  const savedTotal = otherDiscounts + memberNamedSaving;
+
   // Shipping preview only — the standard delivery method's configured price,
   // a server setting. The final figure, and every waiver (PRO, PRIME, a
   // referred friend's printer), is the checkout quote's: the thresholds live
@@ -760,8 +979,78 @@ export default function Cart() {
     checkoutDeliveryMethods.find((m) => m.id === 'standard') ?? checkoutDeliveryMethods[0];
   const shipping = selectedCount > 0 ? standardDelivery?.price_iqd ?? 0 : 0;
 
-  const pointsDiscount = usePoints ? Math.min(pointBalance, subtotal) : 0;
-  const total = subtotal + shipping - pointsDiscount;
+  // §5: points come after the membership, against the merchandise the
+  // membership has already reduced.
+  const pointsDiscount = usePoints ? Math.min(pointBalance, merchandise) : 0;
+  const total = merchandise + shipping - pointsDiscount;
+
+  /** A delivery method in the store's OWN configured words (a setting, never a
+   *  label typed here); `dir` picks the script, as the shipping sheet does. */
+  const deliveryMethodName = (id: DeliveryMethodId) => {
+    const configured = checkoutDeliveryMethods.find((m) => m.id === id);
+    return configured ? (dir === 'rtl' ? configured.titleAr : configured.titleEn) : id;
+  };
+
+  /**
+   * FREE DELIVERY — ONLY WHAT THE SERVER'S ANSWER SUPPORTS.
+   *
+   * Every entry in `free_shipping` comes from the SAME rule (only the method
+   * check differs), so the threshold, the covered methods and the subsidy
+   * ceiling are read from the first entry that has a rule at all.
+   *
+   * The threshold is re-tested against the SELECTED merchandise, because
+   * ticking a line off is a decision the server has not been told about — with
+   * the store's one operator, STRICTLY GREATER (§3): 75,000 does not qualify,
+   * 75,001 does, so what is still missing is one dinar more than the
+   * difference. The NUMBER is the server's; only the comparison happens here,
+   * and with every line ticked it agrees with `eligible` exactly.
+   *
+   * A ceiling that binds means the member pays the difference, so no component
+   * may claim to be free (§3) — the amount the membership covers is stated
+   * instead.
+   */
+  const deliveryBenefit = (() => {
+    const answered = (activeMembership?.free_shipping ?? []).filter((s) => s.reason !== 'no_rule');
+    if (answered.length === 0) return null;
+    const covered = answered.filter((s) => s.reason !== 'method_not_covered');
+    if (covered.length === 0) return null;
+    const threshold = answered[0].threshold_iqd;
+    return {
+      qualifies: threshold === null || subtotal > threshold,
+      shortBy: threshold === null ? 0 : Math.max(1, threshold - subtotal + 1),
+      subsidy: answered[0].max_subsidy_iqd,
+      /** Named only where the rule does NOT cover every method on offer. */
+      methodNames: covered.length === answered.length ? [] : covered.map((s) => deliveryMethodName(s.method)),
+    };
+  })();
+
+  /**
+   * WHICH CEILING BIT, in one short phrase, so a line that saved less than its
+   * percentage suggests says why. The ceiling's own VALUE is never repeated
+   * here — the rule owns it, and the saving beside this phrase is already the
+   * capped figure.
+   *
+   * The Sorani reuses this file's own wording: «زۆرترین … بۆ هەر داواکارییەک»
+   * is the bundle per-order limit in the item list, «بۆ هەر یەکێک لە … یەکەکە»
+   * the extended-warranty per-unit line, and «داشکاندن» the discount row in
+   * the summary. Nothing here was translated.
+   */
+  const cappedPhrase = (line: MembershipLine): string => {
+    if (line.capped_by === 'per_unit') {
+      return loc('الخصم بحد أقصى لكل وحدة', 'The discount is capped per unit', 'زۆرترین داشکاندن بۆ هەر یەکێک');
+    }
+    if (line.capped_by === 'per_order') {
+      return loc('الخصم بحد أقصى لكل طلب', 'The discount is capped per order', 'زۆرترین داشکاندن بۆ هەر داواکارییەک');
+    }
+    if (line.capped_by === 'quantity') {
+      return loc(
+        `الخصم على ${line.eligible_qty} من الكمية`,
+        `The discount covers ${line.eligible_qty} of the quantity`,
+        `داشکاندن بۆ هەر یەکێک لە ${line.eligible_qty} یەکەکە`
+      );
+    }
+    return '';
+  };
 
   const variantItem = items.find((i) => i.id === variantItemId) ?? null;
   const shippingItem = items.find((i) => i.id === shippingItemId) ?? null;
@@ -880,6 +1169,21 @@ export default function Cart() {
             const discountPct = hasSale
               ? Math.round((1 - (appliedUnit as number) / (regularUnit as number)) * 100)
               : 0;
+            /**
+             * WHAT THE MEMBERSHIP TOOK OFF THIS LINE — the server's figure for
+             * this row, not the difference between two unit prices.
+             *
+             * The percentage above describes the UNIT price, which is a fact
+             * of the line whatever produced it (an offer window, a typed
+             * member price, a membership rule that fits a unit price). It
+             * cannot describe a rule that covers only the first two units, or
+             * one held down by a per-order ceiling — and a rule applied at the
+             * line leaves the unit price at the regular one, so it shows no
+             * percentage at all. `total_iqd` is the whole line's true saving,
+             * after every ceiling the rule carries.
+             */
+            const memberLine = membershipByItemId.get(item.id) ?? null;
+            const memberSaving = memberLine && memberLine.total_iqd > 0 ? memberLine.total_iqd : 0;
             const selected = selectedIds.has(item.id);
             // A line the server will refuse at checkout because it never chose
             // an option or colour (a row written before the cart enforced it).
@@ -990,6 +1294,25 @@ export default function Cart() {
                       </>
                     )}
                   </div>
+
+                  {/* The membership named on the line it paid for. The Sorani
+                      is this file's own «پاشەکەوتت کرد» (the summary bar) with
+                      the Referrals page's «ئەندامێتی PRO»; only the Latin tier
+                      name is a variable, as it is in every language. */}
+                  {memberSaving > 0 && memberLabel && (
+                    <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-gold/90" data-cart-member-saving={item.id}>
+                      <span className="tabular-nums">
+                        {loc(
+                          `وفّرت ${formatIqd(memberSaving)} بعضوية ${memberLabel}`,
+                          `Saved ${formatIqd(memberSaving)} with ${memberLabel} membership`,
+                          `پاشەکەوتت کرد ${formatIqd(memberSaving)} — ئەندامێتی ${memberLabel}`
+                        )}
+                      </span>
+                      {memberLine && memberLine.capped_by !== 'none' && (
+                        <span className="text-zinc-500"> · {cappedPhrase(memberLine)}</span>
+                      )}
+                    </p>
+                  )}
 
                   {/* A BUNDLE IS ONE LINE WITH ITS CONTENTS UNDERNEATH
                       (docs/BUNDLES_MYSTERY.md §5.2). The parts are never
@@ -1459,12 +1782,33 @@ export default function Cart() {
             <span className="text-zinc-200 text-[14px] font-medium">{formatIqd(totalOriginalPrice)}</span>
           </div>
 
-          {discounts > 0 && (
+          {otherDiscounts > 0 && (
             <div className="flex justify-between items-center text-gold/90">
               <div className="flex items-center gap-1">
                 <span className="text-[14px]">{loc('خصم ليفو', 'Levo Discount', 'داشکاندنی لیڤۆ')}</span>
               </div>
-              <span className="text-[14px] font-medium">- {formatIqd(discounts)}</span>
+              <span className="text-[14px] font-medium">- {formatIqd(otherDiscounts)}</span>
+            </div>
+          )}
+
+          {/* THE MEMBERSHIP, NAMED. "خصم ليفو" said nothing about who earned
+              the saving or why; the tier that did is on its own line now, with
+              the WHOLE saving beside it — the part already inside the line
+              prices and the part this order takes off. The row above carries
+              only what the membership did not do, so the column still adds up
+              to the total (§2). */}
+          {memberNamedSaving > 0 && memberLabel && (
+            <div className="flex justify-between items-center text-gold/90" data-cart-member-discount>
+              <div className="flex items-center gap-1">
+                <span className="text-[14px]">
+                  {loc(
+                    `خصم عضوية ${memberLabel}`,
+                    `${memberLabel} membership discount`,
+                    `داشکاندنی ئەندامێتی ${memberLabel}`
+                  )}
+                </span>
+              </div>
+              <span className="text-[14px] font-medium">- {formatIqd(memberNamedSaving)}</span>
             </div>
           )}
 
@@ -1489,6 +1833,65 @@ export default function Cart() {
               )}
             </span>
           </div>
+
+          {/* WHAT THE MEMBERSHIP DOES TO THE DELIVERY, beside the fee it
+              applies to. The row above stays the store's preview and the
+              checkout stays the authority on the figure; this only says what
+              the server already resolved about the membership's half of it.
+              The Sorani «گەیاندنی بێبەرامبەری PREMIUM» is the membership
+              ledger's own line, «لە سەرووی …» the subscription benefits page,
+              «زیاد بکە» the reorder and address screens. */}
+          {deliveryBenefit && memberLabel && (
+            <p className="-mt-1 text-[12px] leading-relaxed text-gold/90 tabular-nums" data-cart-member-delivery>
+              {deliveryBenefit.qualifies
+                ? deliveryBenefit.subsidy === null
+                  ? loc(
+                      `التوصيل مجاني بفضل عضوية ${memberLabel}`,
+                      `Delivery is free thanks to your ${memberLabel} membership`,
+                      `گەیاندنی بێبەرامبەری ${memberLabel}`
+                    )
+                  : loc(
+                      `عضوية ${memberLabel} تغطي ${formatIqd(deliveryBenefit.subsidy)} من أجرة التوصيل`,
+                      `Your ${memberLabel} membership covers ${formatIqd(deliveryBenefit.subsidy)} of the delivery fee`
+                    )
+                : loc(
+                    `أضف ${formatIqd(deliveryBenefit.shortBy)} ليصبح التوصيل مجانيًا بعضوية ${memberLabel}`,
+                    `Add ${formatIqd(deliveryBenefit.shortBy)} more for free delivery with your ${memberLabel} membership`,
+                    `${formatIqd(deliveryBenefit.shortBy)} زیاد بکە بۆ گەیاندنی بێبەرامبەری ${memberLabel}`
+                  )}
+              {deliveryBenefit.methodNames.length > 0 &&
+                ` (${deliveryBenefit.methodNames.join(loc('، ', ', '))})`}
+            </p>
+          )}
+
+          {/* §4: the cash-on-delivery tax is still calculated on every order
+              and then waived, so this says what happens rather than promising
+              there is no tax. No Sorani equivalent exists for the waiver, so
+              it reads in Arabic there rather than in invented Kurdish. */}
+          {activeMembership?.cod_tax_exempt && memberLabel && (
+            <p className="-mt-1 text-[12px] leading-relaxed text-gold/90" data-cart-member-cod>
+              {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
+            </p>
+          )}
+
+          {/* A signed-in customer with no membership on this cart: ONE line
+              and a link, in the quiet colour the rest of the summary's notes
+              use. It names no percentage, no threshold and no amount — the
+              subscription page states those, from these very rules. */}
+          {!activeMembership && (
+            <p className="-mt-1 text-[12px] leading-relaxed text-text-muted" data-cart-member-teaser>
+              {loc(
+                `عضوية ${PRO_LABEL} توفّر على مشترياتك.`,
+                `A ${PRO_LABEL} membership saves on what you buy.`
+              )}{' '}
+              <Link
+                to="/subscription"
+                className="rounded text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                {loc('اشترك الآن', 'Subscribe', 'بەشداربە')}
+              </Link>
+            </p>
+          )}
 
           <div className="h-[1px] w-full bg-zinc-800/50 my-1"></div>
 
@@ -1561,10 +1964,10 @@ export default function Cart() {
                   change the bar's height by appearing. */}
               <span
                 className={`text-[11px] tabular-nums whitespace-nowrap ${
-                  discounts > 0 ? 'text-gold/80' : 'invisible'
+                  savedTotal > 0 ? 'text-gold/80' : 'invisible'
                 }`}
               >
-                {loc('وفّرت', 'Saved', 'پاشەکەوتت کرد')} {formatIqd(discounts)}
+                {loc('وفّرت', 'Saved', 'پاشەکەوتت کرد')} {formatIqd(savedTotal)}
               </span>
             </div>
 

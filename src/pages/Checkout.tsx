@@ -16,6 +16,12 @@ import Note from '../components/ui/Note';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
 import AddressForm from '../components/address/AddressForm';
 import { apiRefusal } from '../lib/refusalStrings';
+/**
+ * The tier's CUSTOMER-FACING NAME. `prime` is PREMIUM on every screen in the
+ * store, and `tierMeta` is the one table that says so — nothing here branches
+ * on a tier id or spells a label out.
+ */
+import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 
 /**
  * The refusal codes validateCoupon can produce. A quote that fails with one
@@ -93,6 +99,65 @@ interface CheckoutQuoteLineDto {
   };
 }
 
+/**
+ * WHAT THE MEMBERSHIP IS WORTH ON THIS ORDER (docs/MEMBERSHIP_BENEFITS.md §11).
+ *
+ * Every figure here is the server's. Nothing on this screen knows a
+ * percentage, a threshold, a ceiling or a tier's entitlements — the rules live
+ * in `membership_benefit_rules` and the resolver answers with the money.
+ *
+ * THE TWO DISCOUNT FIGURES ARE NOT INTERCHANGEABLE (§2).
+ * `unit_discount_iqd` is already inside the line prices — and therefore inside
+ * `subtotal_iqd`. `order_discount_iqd` is the part deducted AFTER the
+ * subtotal, the way a coupon is. `discount_total_iqd` is their sum: the whole
+ * saving, which is what the customer is told they saved, and which the running
+ * column must never subtract — doing so would take the unit part off twice.
+ */
+interface MembershipBenefitsDto {
+  tier: string;
+  active: boolean;
+  /** The whole saving on merchandise — the headline, never a summary row. */
+  discount_total_iqd: number;
+  /** The part already inside the line prices above. */
+  unit_discount_iqd: number;
+  /** The part deducted after the subtotal — the only part a row may subtract. */
+  order_discount_iqd: number;
+  lines: Array<{
+    product_id: string;
+    rule_id: string | null;
+    scope: string | null;
+    per_unit_iqd: number;
+    eligible_qty: number;
+    total_iqd: number;
+    capped_by: 'none' | 'per_unit' | 'per_order' | 'quantity';
+    applied_at: 'unit' | 'line';
+  }>;
+  shipping: {
+    rule_id: string | null;
+    eligible: boolean;
+    reason: 'applied' | 'no_rule' | 'below_threshold' | 'method_not_covered';
+    threshold_iqd: number | null;
+    basis_iqd: number;
+    methods: string[] | null;
+    max_subsidy_iqd: number | null;
+    /** The delivery fee as quoted, before the membership touched it. */
+    fee_before_benefit_iqd: number;
+    /** What the customer actually pays for delivery. */
+    fee_paid_iqd: number;
+    /** What the membership covered of it. */
+    subsidy_iqd: number;
+    /** A ceiling bit: the member pays the rest, and nothing is "free" (§3). */
+    subsidy_capped: boolean;
+  };
+  cod_tax: {
+    rule_id: string | null;
+    exempt: boolean;
+    before_exemption_iqd: number;
+    exemption_iqd: number;
+    charged_iqd: number;
+  };
+}
+
 interface CheckoutQuoteDto {
   /**
    * THE PRICE AUTHORITY once it exists. The cart prices a pre-order line as
@@ -157,6 +222,17 @@ interface CheckoutQuoteDto {
   wallet: { balance_iqd: number; applied_iqd: number; required_advance_iqd: number };
   /** Authoritative server-side COD tax, already included in total_iqd. */
   cod_tax_iqd: number;
+  /**
+   * §14 — THE TAX AS CALCULATED, AND AS WAIVED, AS TWO NUMBERS. The engine
+   * runs on every order and the membership then exempts it; a single zero
+   * would tell the customer nothing about what happened. Optional here only
+   * so a worker that predates the benefit rules still renders a correct
+   * screen — the fallback is the charged figure, never an invented one.
+   */
+  cod_tax_before_exemption_iqd?: number;
+  cod_tax_exemption_iqd?: number;
+  /** §11 — what the membership is worth on this order, itemised. */
+  membership_benefits?: MembershipBenefitsDto;
   total_iqd: number;
   due_on_delivery_iqd: number;
   tier: { tier: string; active: boolean; at_approved_default_address: boolean; pro_benefits_context: boolean };
@@ -657,6 +733,45 @@ export default function Checkout() {
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
   const codTaxIqd = quote?.cod_tax_iqd ?? 0;
+  /**
+   * §14 — THE CASH-ON-DELIVERY TAX IS CALCULATED, THEN EXEMPTED, AND BOTH
+   * NUMBERS ARE SHOWN. The row carries what the tax engine worked out; the
+   * exemption is its own row beneath it. Collapsing them into the charged
+   * zero would hide the only place the customer ever sees what the exemption
+   * was worth — and would leave a courier's cash sheet nothing to reconcile.
+   */
+  const codTaxBeforeExemption = quote?.cod_tax_before_exemption_iqd ?? codTaxIqd;
+  const codTaxExemption = quote?.cod_tax_exemption_iqd ?? 0;
+
+  /**
+   * THE MEMBERSHIP, AS THE SERVER RESOLVED IT (§11).
+   *
+   * `active` is the entitlement answer from the memberships ledger — an
+   * expired or admin-restricted membership comes back false and this screen
+   * then says nothing about a membership at all, rather than advertising a
+   * benefit the order will not carry.
+   */
+  const benefits = quote?.membership_benefits ?? null;
+  const memberActive = !!benefits && benefits.active === true && isPaidTier(benefits.tier);
+  const memberLabel = memberActive && benefits ? tierLabel(benefits.tier) : '';
+  /**
+   * §2 — WHICH FIGURE MAY GO IN THE COLUMN.
+   *
+   * Only `order_discount_iqd`: the part the server deducts after the subtotal.
+   * `discount_total_iqd` also contains what `resolveUnitPrice` already took
+   * off the line prices above, so putting it in the running total would
+   * discount the same goods twice and the column would stop adding up.
+   */
+  const memberOrderDiscount = memberActive && benefits ? Math.max(0, benefits.order_discount_iqd) : 0;
+  /** The whole saving — the headline, and never a row. */
+  const memberSavingTotal = memberActive && benefits ? Math.max(0, benefits.discount_total_iqd) : 0;
+  /** The part already inside the prices above, named when the two differ. */
+  const memberUnitDiscount = memberActive && benefits ? Math.max(0, benefits.unit_discount_iqd) : 0;
+  /** The membership's half of the delivery fee, when it has one. */
+  const memberShipping =
+    memberActive && benefits && benefits.shipping.eligible && benefits.shipping.subsidy_iqd > 0
+      ? benefits.shipping
+      : null;
   const shippingWaived = !!quote && quote.shipping.total_iqd < quote.shipping.total_before_waiver_iqd;
   const shippingNeedsConfig = !!quote && quote.shipping.needs_config.length > 0;
   const requiredPolicies = quote?.policies ?? [];
@@ -1217,10 +1332,55 @@ export default function Checkout() {
               <span className="text-white font-normal tabular-nums">{formatIqd(total)}</span>
             </div>
 
-            {codTaxIqd > 0 && (
-              <div className="flex justify-between items-center text-zinc-400" data-checkout-cod-tax>
-                <span className="font-light">{S.codTax}</span>
-                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxIqd)}</span>
+            {/*
+              §11 — THE MEMBERSHIP, NAMED, IN THE COLUMN THAT ADDS UP.
+
+              The ROW carries `order_discount_iqd` and nothing else: the rest of
+              the saving is already inside the subtotal above, and a row
+              carrying the whole figure would take it off a second time (§2).
+              The SENTENCE under it carries `discount_total_iqd` — the whole
+              saving — precisely because it is not a row and cannot be summed;
+              when both halves exist the unit half is named, so the smaller row
+              above is not read as a contradiction.
+
+              The Sorani is the store's own: «داشکاندنی» from the promo field,
+              «ئەندامێتی PRO» from the product page, «پاشەکەوتت کرد … ئەندامێتی»
+              from the product page's member saving. The two-part sentence has
+              no existing Sorani, so it reads in Arabic there rather than in
+              invented Kurdish. Only the Latin tier name is ever a variable, and
+              it comes from `tierMeta` — «PREMIUM», never `prime`.
+            */}
+            {memberActive && (memberOrderDiscount > 0 || memberSavingTotal > 0) && (
+              <div>
+                {memberOrderDiscount > 0 && (
+                  <div className="flex justify-between items-center text-gold/90" data-checkout-member-discount>
+                    <span className="font-light">
+                      {loc(
+                        `خصم عضوية ${memberLabel}`,
+                        `${memberLabel} membership discount`,
+                        `داشکاندنی ئەندامێتی ${memberLabel}`
+                      )}
+                    </span>
+                    <span className="font-normal tabular-nums">-{formatIqd(memberOrderDiscount)}</span>
+                  </div>
+                )}
+                {memberSavingTotal > 0 && memberSavingTotal !== memberOrderDiscount && (
+                  <p
+                    className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
+                    data-checkout-member-saving
+                  >
+                    {memberOrderDiscount > 0 && memberUnitDiscount > 0
+                      ? loc(
+                          `وفّرت ${formatIqd(memberSavingTotal)} بعضوية ${memberLabel} — منها ${formatIqd(memberUnitDiscount)} مطبّقة في أسعار المنتجات أعلاه`,
+                          `Saved ${formatIqd(memberSavingTotal)} with your ${memberLabel} membership — ${formatIqd(memberUnitDiscount)} of it is already in the prices above`
+                        )
+                      : loc(
+                          `وفّرت ${formatIqd(memberSavingTotal)} بعضوية ${memberLabel}`,
+                          `Saved ${formatIqd(memberSavingTotal)} with ${memberLabel} membership`,
+                          `پاشەکەوتت کرد ${formatIqd(memberSavingTotal)} — ئەندامێتی ${memberLabel}`
+                        )}
+                  </p>
+                )}
               </div>
             )}
             {/* One line about the pricing rule in force on a pre-order cart:
@@ -1244,21 +1404,55 @@ export default function Checkout() {
                 <span className="font-light">{S.prepaidByWallet}</span>
               </Note>
             )}
-            <div className="flex justify-between items-center text-zinc-400">
-              <span className="font-light">{dir === 'rtl' ? 'الشحن' : 'Shipping'}</span>
-              {quoteLoading ? (
-                <span className="text-zinc-500 font-light text-xs">{S.quoteLoading}</span>
-              ) : shippingIqd === 0 ? (
-                <span className="text-emerald-400 font-normal">
-                  {shippingWaived && quote && quote.shipping.total_before_waiver_iqd > 0 && (
-                    <span className="text-zinc-500 line-through font-light mx-2 text-xs">
-                      {formatIqd(quote.shipping.total_before_waiver_iqd)}
-                    </span>
-                  )}
-                  {S.freeShipping}
-                </span>
-              ) : (
-                <span className="text-white font-normal">{formatIqd(shippingIqd)}</span>
+            <div>
+              <div className="flex justify-between items-center text-zinc-400">
+                <span className="font-light">{dir === 'rtl' ? 'الشحن' : 'Shipping'}</span>
+                {quoteLoading ? (
+                  <span className="text-zinc-500 font-light text-xs">{S.quoteLoading}</span>
+                ) : shippingIqd === 0 ? (
+                  <span className="text-emerald-400 font-normal">
+                    {shippingWaived && quote && quote.shipping.total_before_waiver_iqd > 0 && (
+                      <span className="text-zinc-500 line-through font-light mx-2 text-xs">
+                        {formatIqd(quote.shipping.total_before_waiver_iqd)}
+                      </span>
+                    )}
+                    {S.freeShipping}
+                  </span>
+                ) : (
+                  <span className="text-white font-normal">{formatIqd(shippingIqd)}</span>
+                )}
+              </div>
+
+              {/*
+                §11 — WHY THE DELIVERY COSTS WHAT IT COSTS, and whose membership
+                did it, said under the figure it explains.
+
+                A ceiling that BINDS means the customer paid part of the fee, so
+                nothing here may call it free (§3): what the membership covered,
+                the fee it came off and what is left to pay are all stated, and
+                all three are the server's own numbers.
+
+                The Sorani «گەیاندنی بێبەرامبەری PREMIUM» is the membership
+                ledger's own line; the covered-in-part sentence has no Sorani
+                equivalent in the store, so it reads in Arabic there rather than
+                in invented Kurdish.
+              */}
+              {memberShipping && !quoteLoading && (
+                <p
+                  className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
+                  data-checkout-member-delivery={memberShipping.subsidy_capped ? 'capped' : 'free'}
+                >
+                  {memberShipping.fee_paid_iqd === 0
+                    ? loc(
+                        `التوصيل مجاني بفضل عضوية ${memberLabel}`,
+                        `Delivery is free thanks to your ${memberLabel} membership`,
+                        `گەیاندنی بێبەرامبەری ${memberLabel}`
+                      )
+                    : loc(
+                        `عضوية ${memberLabel} غطّت ${formatIqd(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${formatIqd(memberShipping.fee_before_benefit_iqd)}، وتدفع ${formatIqd(memberShipping.fee_paid_iqd)}`,
+                        `Your ${memberLabel} membership covered ${formatIqd(memberShipping.subsidy_iqd)} of the ${formatIqd(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${formatIqd(memberShipping.fee_paid_iqd)}`
+                      )}
+                </p>
               )}
             </div>
 
@@ -1459,6 +1653,46 @@ export default function Checkout() {
               >
                 <span className="font-light truncate">{S.supportLine(quote.support.referrer_username || quote.support.ref)}</span>
                 <span className="font-normal shrink-0 text-zinc-400">{S.supportZero}</span>
+              </div>
+            )}
+
+            {/*
+              §14 — THE CASH-ON-DELIVERY TAX, AND ITS EXEMPTION, AS TWO ROWS.
+
+              The row shows what the tax engine calculated, which is the figure
+              on the courier's cash sheet. The exemption beneath it is what the
+              membership waived, and the two together come to what is charged —
+              so the column still reaches the total, and the customer can see
+              what the membership was worth instead of a silent zero.
+
+              It sits here, at the foot of the money column and before the
+              wallet, because that is the order §11 reads in: subtotal, the
+              membership, the coupon, the points, delivery, the tax, the
+              exemption — and only then what settles the bill. It used to sit
+              directly under the subtotal, showing the charged figure alone, so
+              an exempt member saw the tax vanish with nothing to say why.
+
+              The Sorani «باجی پارەدان لە کاتی گەیاندن» is this file's own; the
+              exemption has no Sorani equivalent in the store, so it reads in
+              Arabic there rather than in invented Kurdish.
+            */}
+            {codTaxBeforeExemption > 0 && (
+              <div className="flex justify-between items-center text-zinc-400" data-checkout-cod-tax>
+                <span className="font-light">{S.codTax}</span>
+                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxBeforeExemption)}</span>
+              </div>
+            )}
+            {memberActive && codTaxExemption > 0 && (
+              <div>
+                <div className="flex justify-between items-center text-gold/90" data-checkout-cod-tax-exemption>
+                  <span className="font-light">
+                    {loc(`إعفاء عضوية ${memberLabel}`, `${memberLabel} membership exemption`)}
+                  </span>
+                  <span className="font-normal tabular-nums">-{formatIqd(codTaxExemption)}</span>
+                </div>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-gold/90" data-checkout-member-cod>
+                  {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
+                </p>
               </div>
             )}
 
