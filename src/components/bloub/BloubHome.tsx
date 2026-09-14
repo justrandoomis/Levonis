@@ -50,27 +50,49 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
   const eyeB = React.useRef<SVGEllipseElement>(null);
   const alert = React.useRef<SVGGElement>(null);
 
-  React.useImperativeHandle(ref, (): CharacterHandle => ({
-    apply(r) {
-      body.current?.setAttribute('d', r.body);
-      gloss.current?.setAttribute('d', r.gloss);
-      mouth.current?.setAttribute('d', r.mouth);
-      mouth.current?.setAttribute('stroke-width', String(r.mouthWeight));
-      const eyes = [eyeA.current, eyeB.current];
-      for (let i = 0; i < 2; i++) {
-        const node = eyes[i];
-        const eye = r.eyes[i]!;
-        if (!node) continue;
-        node.setAttribute('transform', eye.matrix);
-        node.setAttribute('rx', String(eye.rx));
-        node.setAttribute('ry', String(eye.ry));
-        // An eye that has gone round the side of the head is not drawn small,
-        // it is not drawn. Scaling it to nothing leaves a sliver on the limb.
-        node.style.display = eye.visible ? '' : 'none';
-      }
-      if (alert.current) alert.current.style.opacity = String(r.alert);
-    },
-  }), []);
+  /** Last value written to each node. Writing an attribute invalidates the
+   * element whether or not the value changed, so a frame in which nothing
+   * moved — every frame under a reduced-motion preference, and most frames of
+   * a long hold — should cost nothing at all. */
+  const written = React.useRef<Record<string, string>>({});
+
+  React.useImperativeHandle(ref, (): CharacterHandle => {
+    const put = (node: Element | null, key: string, name: string, value: string) => {
+      if (!node || written.current[key] === value) return;
+      written.current[key] = value;
+      node.setAttribute(name, value);
+    };
+    return {
+      apply(r) {
+        put(body.current, 'body', 'd', r.body);
+        put(gloss.current, 'gloss', 'd', r.gloss);
+        put(mouth.current, 'mouth', 'd', r.mouth);
+        put(mouth.current, 'mouthWeight', 'stroke-width', String(r.mouthWeight));
+        const eyes = [eyeA.current, eyeB.current];
+        for (let i = 0; i < 2; i++) {
+          const node = eyes[i];
+          const eye = r.eyes[i]!;
+          if (!node) continue;
+          put(node, `eye${i}t`, 'transform', eye.matrix);
+          put(node, `eye${i}x`, 'rx', String(eye.rx));
+          put(node, `eye${i}y`, 'ry', String(eye.ry));
+          // An eye that has gone round the side of the head is not drawn
+          // small, it is not drawn. Scaling it to nothing leaves a sliver
+          // clinging to the limb.
+          const shown = eye.visible ? '' : 'none';
+          if (written.current[`eye${i}v`] !== shown) {
+            written.current[`eye${i}v`] = shown;
+            node.style.display = shown;
+          }
+        }
+        const alertOpacity = String(r.alert);
+        if (alert.current && written.current.alert !== alertOpacity) {
+          written.current.alert = alertOpacity;
+          alert.current.style.opacity = alertOpacity;
+        }
+      },
+    };
+  }, []);
 
   return (
     <svg
