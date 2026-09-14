@@ -382,9 +382,35 @@ export interface ResolvedPrice {
     source: 'stated' | 'inferred';
     /** The model's own cell priced this line (false = product fallbacks did). */
     from_option_cell: boolean;
+    /** The MODEL, by its own key — what `option_id` alone cannot name once a
+     *  model has been renamed or a duplicate merged away. */
+    variant_key: string;
     lead_time_text: string;
     lead_time_min_days: number | null;
     lead_time_max_days: number | null;
+  };
+  /**
+   * EVERY PIECE OF THIS PRICE, SEPARATELY — so a receipt, a refund or an admin
+   * never has to re-derive one.
+   *
+   * The four `*_iqd` values are the REGULAR price after each rung of the
+   * ladder, so a delta is a subtraction the reader can do without guessing
+   * which rung moved it: the model's difference is `option_iqd - base_iqd`,
+   * the order type's is `fulfillment_iqd - option_iqd`, and so on. The fees
+   * are what was actually CHARGED — zero where a waiver applied — because the
+   * snapshot has to add up to what the customer paid.
+   */
+  components: {
+    base_iqd: number;
+    option_iqd: number;
+    fulfillment_iqd: number;
+    transport_iqd: number;
+    color_iqd: number;
+    /** applied − regular: the membership's effect, zero for a non-member. */
+    membership_adjustment_iqd: number;
+    transport_fee_iqd: number;
+    direct_fee_iqd: number;
+    warranty_fee_iqd: number;
   };
   /**
    * The pre-order journey this line is on (null on a direct line). The
@@ -818,7 +844,29 @@ export function resolveUnitPrice(input: {
    * over one shared fulfilment decision.
    */
   const optionAvailability = effectiveAvailability(option, productSaleTypes);
-  const saleTypes = optionAvailability ? [optionAvailability] : productSaleTypes;
+  /**
+   * A STATED ORDER TYPE NARROWS THE LINE, exactly as an option's own
+   * declaration does — and it has to, or "pre-order" would still only be
+   * sayable by naming a route.
+   *
+   * Before this, a product selling BOTH ways let the transport decide: with no
+   * transport the line was a direct sale, whatever the customer had picked. So
+   * a stated `pre_order` with no route yet resolved as a direct sale and
+   * quietly skipped TRANSPORT_REQUIRED — the customer would be shown a direct
+   * price for a pre-order they had explicitly chosen.
+   *
+   * The two answers cannot contradict each other: asking for a type the model
+   * or the product does not sell is refused by name, never repriced.
+   */
+  if (statedType) {
+    const offersIt = option?.fulfillments?.some((f) => f.fulfillment_type === statedType && f.enabled !== false);
+    const declaresOther = optionAvailability && optionAvailability !== statedType;
+    const productOffers = productSaleTypes.includes(statedType) || productSaleTypes.includes('bundle');
+    if (!offersIt && (declaresOther || !productOffers)) {
+      if (!errors.includes('FULFILLMENT_NOT_OFFERED')) errors.push('FULFILLMENT_NOT_OFFERED');
+    }
+  }
+  const saleTypes = statedType ? [statedType] : optionAvailability ? [optionAvailability] : productSaleTypes;
   if (saleTypes.includes('pre_order') && (saleTypes.length === 1 || method)) {
     if (!method) {
       errors.push('TRANSPORT_REQUIRED');
@@ -961,6 +1009,7 @@ export function resolveUnitPrice(input: {
       type: lineType,
       source: statedType ? 'stated' : 'inferred',
       from_option_cell: priceRows.fulfillment !== null,
+      variant_key: option?.variant_key ?? '',
       // The most specific promise wins: this route's, else this order type's.
       lead_time_text: transportRow?.lead_time_text || fulfillment?.lead_time_text || option?.lead_time_text || '',
       lead_time_min_days:
@@ -973,6 +1022,17 @@ export function resolveUnitPrice(input: {
     pricing_basis: pricingBasis,
     warranty,
     unit_subtotal_iqd: unitSubtotal,
+    components: {
+      base_iqd: regular.at.base ?? regularIqd,
+      option_iqd: regular.at.option ?? regularIqd,
+      fulfillment_iqd: regular.at.fulfillment ?? regularIqd,
+      transport_iqd: regular.at.transport ?? regularIqd,
+      color_iqd: regular.at.color ?? regularIqd,
+      membership_adjustment_iqd: appliedIqd - regularIqd,
+      transport_fee_iqd: commissionEffective,
+      direct_fee_iqd: directFee,
+      warranty_fee_iqd: warrantyFee,
+    },
     errors,
   };
 }

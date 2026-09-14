@@ -599,11 +599,20 @@ export default function Product() {
   const [transportMethod, setTransportMethod] = useState('');
   const [warrantyPlanId, setWarrantyPlanId] = useState('');
   const [qty, setQty] = useState(1);
-  // When BOTH direct sale and pre-order are genuinely usable, the buyer picks
-  // the fulfilment (each shows its FINAL price). Sending a transport is what
-  // makes the server treat the line as pre-order, so this flag only decides
-  // which controls render — the price always comes back from the quote.
-  const [wantPreorder, setWantPreorder] = useState(false);
+  /**
+   * THE ORDER TYPE THE CUSTOMER ACTUALLY CHOSE — and '' until they do.
+   *
+   * This used to be a boolean, and sending a TRANSPORT was what made the
+   * server treat a line as a pre-order. That conflated two independent
+   * decisions ("PRODUCT OPTION != ORDER TYPE != PREORDER TRANSPORT") and made
+   * "pre-order by land" the only way to say "pre-order".
+   *
+   * '' is not a third kind of order — it means the customer has not been asked
+   * (the product sells one way, so no pills are shown), and the server then
+   * infers it exactly as it did before. The page never guesses on their behalf.
+   */
+  const [orderType, setOrderType] = useState<'' | 'direct_sale' | 'pre_order'>('');
+  const wantPreorder = orderType === 'pre_order';
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [liveAvailability, setLiveAvailability] = useState<Availability | null>(null);
@@ -710,7 +719,6 @@ export default function Product() {
         setWarrantyOpen(false);
         setActionError('');
         setNotice('');
-        setWantPreorder(false);
 
         // Deterministic pre-selection ONLY where a single possibility exists.
         const opts = data.product.options ?? [];
@@ -723,6 +731,8 @@ export default function Product() {
         setTransportMethod(
           data.availability?.mode === 'preorder' && usable.length === 1 ? usable[0].method : ''
         );
+        // A fresh product is an unanswered question, not a direct sale.
+        setOrderType('');
       } catch (err) {
         console.error(err);
         if (!cancelled) {
@@ -754,7 +764,7 @@ export default function Product() {
    * the old gate hid the price for the whole of that window, the figure the
    * customer was reading vanished each time they asked for one more.
    */
-  const priceKey = `${optionId}|${colorId}|${transportMethod}|${warrantyPlanId}`;
+  const priceKey = `${optionId}|${colorId}|${orderType}|${transportMethod}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
@@ -773,6 +783,7 @@ export default function Product() {
             optionId: optionId || undefined,
             colorId: colorId || undefined,
             transportMethod: transportMethod || undefined,
+            fulfillmentType: orderType || undefined,
             warrantyPlanId: warrantyPlanId || undefined,
           },
           // A superseded or abandoned quote is dropped at the socket instead of
@@ -804,7 +815,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, colorId, transportMethod, warrantyPlanId, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, colorId, orderType, transportMethod, warrantyPlanId, quoteToken]);
 
   /**
    * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
@@ -937,6 +948,9 @@ export default function Product() {
         if (optionId) body.optionId = optionId;
         if (colorId) body.colorId = colorId;
         if (availability?.mode === 'preorder' && transportMethod) body.transportMethod = transportMethod;
+        // The ORDER TYPE travels on its own, so the cart line records what the
+        // customer chose rather than what a transport implies.
+        if (orderType) body.fulfillmentType = orderType;
         if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
         if (replaceCart) body.replaceCart = true;
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
@@ -975,7 +989,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, colorId, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added, s.CART_WARRANTY_CONFLICT]
+    [product, qty, optionId, colorId, orderType, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added, s.CART_WARRANTY_CONFLICT]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -1474,7 +1488,18 @@ export default function Product() {
                         // option clears any transport, a pre-order one keeps
                         // the transport picker below for the journey.
                         if (next && opt.availability_type === 'direct_sale') setTransportMethod('');
-                        if (next) setWantPreorder(opt.availability_type === 'pre_order');
+                        // A LEGACY option that declares its own route answers the
+                        // order-type question by being chosen — so the page sends
+                        // that answer rather than leaving the server to infer it
+                        // from whether a transport happens to follow.
+                        if (next)
+                          setOrderType(
+                            opt.availability_type === 'pre_order'
+                              ? 'pre_order'
+                              : opt.availability_type === 'direct_sale'
+                                ? 'direct_sale'
+                                : ''
+                          );
                       }}
                       className="lv-choice flex min-h-[48px] items-center gap-3 px-3 py-2 text-start"
                     >
@@ -1602,7 +1627,7 @@ export default function Product() {
               type="button"
               aria-pressed={!wantPreorder}
               onClick={() => {
-                setWantPreorder(false);
+                setOrderType('direct_sale');
                 setTransportMethod('');
               }}
               className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start"
@@ -1620,7 +1645,7 @@ export default function Product() {
               type="button"
               aria-pressed={wantPreorder}
               onClick={() => {
-                setWantPreorder(true);
+                setOrderType('pre_order');
                 const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
                 if (usable.length === 1) setTransportMethod(usable[0].method);
               }}

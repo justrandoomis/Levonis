@@ -189,6 +189,12 @@ export interface CartSelection {
   optionId: string;
   colorId: string;
   transportMethod: string;
+  /**
+   * 0073. THE ORDER TYPE THE CUSTOMER CHOSE, stored on the line instead of
+   * being read back out of "did they pick a transport?". '' = a legacy line,
+   * or a product that sells one way, and both resolve exactly as before.
+   */
+  fulfillmentType: string;
   warrantyPlanId: string;
   /** §7 multi-group selection. `optionId` stays as the first entry so every
    *  pre-0018 reader keeps working. */
@@ -246,6 +252,8 @@ export function resolveCartLine(
     optionId: valueIds[0] || null,
     colorId: sel.colorId || null,
     transportMethod: sel.transportMethod || null,
+    fulfillmentType:
+      sel.fulfillmentType === 'direct_sale' || sel.fulfillmentType === 'pre_order' ? sel.fulfillmentType : null,
     warrantyPlanId: sel.warrantyPlanId || null,
     tier,
     tierActive,
@@ -353,17 +361,22 @@ const coarseLevel = <T extends Record<string, unknown>>(x: T, coarse: boolean): 
  */
 export function selectionFromCartRow(row: Record<string, unknown>): CartSelection {
   const transportMethod = String(row.transport_method ?? '');
+  // 0073. The stored order type, when the line has one. A composition has no
+  // model and therefore no cell, so it keeps the inference it always had.
+  const stored = String(row.fulfillment_type ?? '');
+  const fulfillmentType = stored === 'direct_sale' || stored === 'pre_order' ? stored : '';
   if (String(row.composition ?? '') !== '') {
-    return { optionId: '', optionValueIds: [], colorId: '', transportMethod, warrantyPlanId: '' };
+    return { optionId: '', optionValueIds: [], colorId: '', transportMethod, fulfillmentType: '', warrantyPlanId: '' };
   }
-  const stored = safeParse<unknown[]>(String(row.option_value_ids ?? '[]'), []);
-  const ids = stored.filter((x): x is string => typeof x === 'string' && !!x);
+  const storedIds = safeParse<unknown[]>(String(row.option_value_ids ?? '[]'), []);
+  const ids = storedIds.filter((x): x is string => typeof x === 'string' && !!x);
   const legacy = String(row.option_id ?? '');
   return {
     optionId: legacy,
     optionValueIds: ids.length ? ids : legacy ? [legacy] : [],
     colorId: String(row.color_id ?? ''),
     transportMethod,
+    fulfillmentType,
     warrantyPlanId: String(row.warranty_plan_id ?? ''),
   };
 }
@@ -511,7 +524,7 @@ async function loadCart(c: Context<AppContext>) {
   ]);
   const { results } = await c.env.DB.prepare(
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-            ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, p.*
+            ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.warranty_plan_id, p.*
        FROM cart_items ci JOIN products p ON p.id = ci.product_id
       WHERE ci.user_id = ? ORDER BY ci.created_at DESC`
   )
@@ -650,7 +663,9 @@ async function loadCart(c: Context<AppContext>) {
           })
         : undefined,
       links: view?.links,
-      preferredType: String(row.transport_method ?? '') ? 'pre_order' : null,
+      // 0073. What the customer CHOSE, falling back to the old inference for a
+      // line written before the order type was a field of its own.
+      preferredType: sel.fulfillmentType || (sel.transportMethod ? 'pre_order' : null),
     });
     items.push({
       id: row.cart_item_id,
@@ -876,6 +891,19 @@ function parseTransportMethod(v: unknown): string {
 }
 
 /**
+ * 0073. THE ORDER TYPE, AS AN INDEPENDENT ANSWER.
+ *
+ * Absent means "not stated", which is what every client sent before this
+ * existed — the resolver then infers it exactly as it always did. Only a word
+ * it actually knows is accepted; anything else is a bad request rather than a
+ * silent fallback, because guessing here would sell the wrong thing.
+ */
+export function parseFulfillmentType(v: unknown): string {
+  if (v === undefined || v === null || v === '') return '';
+  return oneOf(v, 'fulfillmentType', ['direct_sale', 'pre_order'] as const);
+}
+
+/**
  * ADD ONE BUNDLE LINE (§5.1, §5.2, §6.1).
  *
  * The client sends the bundle's product id, a quantity, a transport method for
@@ -1062,6 +1090,7 @@ cartRoutes.post('/items', async (c) => {
   ].slice(0, 12);
   const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
   const transportMethod = parseTransportMethod(body.transportMethod);
+  const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
 
   const product = await c.env.DB.prepare("SELECT * FROM products WHERE id = ? AND status = 'active'")
@@ -1104,7 +1133,7 @@ cartRoutes.post('/items', async (c) => {
   }
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
     tier,
     tierActive,
     ctx,
@@ -1211,20 +1240,21 @@ cartRoutes.post('/items', async (c) => {
 
   await c.env.DB.prepare(
     `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
-                             shipping_method_id, transport_method, warranty_plan_id, qty)
-     VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
+                             shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
+     VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
      ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
        WHERE product_id IS NOT NULL
      DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                    option_value_ids = excluded.option_value_ids,
                    transport_method = excluded.transport_method,
+                   fulfillment_type = excluded.fulfillment_type,
                    warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
                                            THEN cart_items.warranty_plan_id
                                            ELSE excluded.warranty_plan_id END`
   )
     .bind(
       newId('ci'), user.id, productId, primaryOption, JSON.stringify(canonical), colorId,
-      transportMethod, warrantyPlanId, qty
+      transportMethod, fulfillmentType, warrantyPlanId, qty
     )
     .run();
 
@@ -1426,6 +1456,10 @@ cartRoutes.patch('/items/:id', async (c) => {
     body.transportMethod !== undefined
       ? parseTransportMethod(body.transportMethod)
       : String(existing.transport_method ?? '');
+  const fulfillmentType =
+    body.fulfillmentType !== undefined
+      ? parseFulfillmentType(body.fulfillmentType)
+      : String(existing.fulfillment_type ?? '');
   const warrantyPlanId =
     body.warrantyPlanId !== undefined
       ? str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false })
@@ -1472,7 +1506,7 @@ cartRoutes.patch('/items/:id', async (c) => {
   const view = views.get(String(existing.product_id));
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
     tier,
     tierActive,
     ctx,
@@ -1530,12 +1564,12 @@ cartRoutes.patch('/items/:id', async (c) => {
   const canonical = [...optionValueIds].sort();
   await c.env.DB.prepare(
     `UPDATE cart_items SET qty = ?, option_id = ?, option_value_ids = ?, color_id = ?,
-            transport_method = ?, warranty_plan_id = ?
+            transport_method = ?, fulfillment_type = ?, warranty_plan_id = ?
       WHERE id = ? AND user_id = ?`
   )
     .bind(
       qty, canonical[0] ?? '', JSON.stringify(canonical), colorId,
-      transportMethod, warrantyPlanId, id, user.id
+      transportMethod, fulfillmentType, warrantyPlanId, id, user.id
     )
     .run();
 

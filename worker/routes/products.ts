@@ -1676,6 +1676,10 @@ productRoutes.post('/:slug/quote', async (c) => {
   const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
   const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
   const transportMethod = typeof body.transportMethod === 'string' ? body.transportMethod : null;
+  // 0073. The ORDER TYPE as its own answer. Absent = the page has not asked
+  // (the product sells one way), and the resolver infers it exactly as before.
+  const fulfillmentType =
+    body.fulfillmentType === 'direct_sale' || body.fulfillmentType === 'pre_order' ? body.fulfillmentType : null;
   const warrantyPlanId = typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null;
 
   const resolved = resolveUnitPrice({
@@ -1683,6 +1687,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     optionId,
     colorId,
     transportMethod,
+    fulfillmentType,
     warrantyPlanId,
     tier: ctx.tier,
     tierActive: ctx.tierActive,
@@ -1727,7 +1732,7 @@ productRoutes.post('/:slug/quote', async (c) => {
         low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
       }),
       links: relations.links,
-      preferredType: transportMethod ? 'pre_order' : null,
+      preferredType: fulfillmentType ?? (transportMethod ? 'pre_order' : null),
     }),
     viewer_tier: viewerTier(ctx),
   });

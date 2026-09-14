@@ -1327,7 +1327,7 @@ async function computeCheckout(
   );
   // Load and price the cart lines server-side.
   let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-                    ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, ci.draw_salt, p.*
+                    ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.warranty_plan_id, ci.draw_salt, p.*
                FROM cart_items ci JOIN products p ON p.id = ci.product_id
               WHERE ci.user_id = ?`;
   const params: unknown[] = [user.id];
