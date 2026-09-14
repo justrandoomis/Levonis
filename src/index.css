@@ -31,6 +31,37 @@ fieldset {
   margin-inline: 0;
 }
 
+/*
+  A SCROLLBAR THAT BELONGS TO A DARK PAGE.
+
+  `custom-scrollbar` was applied to the checkout's two scroll containers and
+  was never defined in any stylesheet — a class that did nothing, so those
+  columns rendered the platform's default light scrollbar over a near-black
+  surface. `color-scheme: dark` on <html> already fixes the widget colour on
+  Firefox; this makes it slim and quiet on WebKit and Chromium too, and only
+  where it is asked for.
+*/
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
 html, body, #root {
   background-color: #000;
   color: #fff;

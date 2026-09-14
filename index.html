@@ -46,9 +46,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--
-      300..900, not 200..1000. The store uses light through black and nothing
-      outside that range (grep: font-light … font-black), and a variable font's
-      payload scales with the axis it carries.
+      300..900 is the range the store actually uses — light through black, and
+      nothing outside it (grep: font-light … font-black).
+
+      IT SAVES NOTHING, AND THAT IS WORTH WRITING DOWN. An earlier version of
+      this comment claimed a narrower axis means a smaller download. Measured
+      against Google Fonts, it does not: `wght@200..1000` and `wght@300..900`
+      resolve to byte-identical woff2 files (30,896 / 16,648 / 33,820 B for the
+      three subsets), because the service serves one variable font per family
+      and the axis in the query only bounds what CSS may ask for. The narrower
+      range is kept because it states the truth about this design, not because
+      it is faster.
     -->
     <link
       rel="stylesheet"

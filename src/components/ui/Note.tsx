@@ -23,21 +23,36 @@ import { useMotion } from '../../lib/motion';
 
 export type NoteTone = 'gold' | 'amber' | 'zinc';
 
+/**
+ * A MARGIN NOTE, NOT A LIT PANEL.
+ *
+ * Each tone used to draw a tinted fill AND a tinted border on all four sides
+ * AND a heavier start edge. On a black page beside a price, that reads as a
+ * glowing box demanding attention — which is the "AI-looking callout" the
+ * owner named, with the printer home-delivery note as the example. Colour was
+ * doing three jobs: identifying the note, framing it, and shouting.
+ *
+ * Now it does one. The START EDGE carries the tone — the same convention a
+ * printed book uses for a marginal remark — over a fill so faint it only
+ * separates the note from the page, with the perimeter border gone entirely.
+ * The icon keeps the tone's colour, so the note is still identifiable at a
+ * glance without a frame around it.
+ */
 const TONES: Record<NoteTone, { box: string; icon: string; edge: string }> = {
   gold: {
-    box: 'border-[#BAA369]/30 bg-[#BAA369]/10 text-zinc-100',
+    box: 'border-transparent bg-[#BAA369]/[0.06] text-zinc-200',
     icon: 'text-[#BAA369]',
-    edge: 'border-s-[#BAA369]',
+    edge: 'border-s-[#BAA369]/70',
   },
   amber: {
-    box: 'border-amber-500/25 bg-amber-500/10 text-amber-100',
+    box: 'border-transparent bg-amber-500/[0.07] text-amber-100/90',
     icon: 'text-amber-300',
-    edge: 'border-s-amber-400',
+    edge: 'border-s-amber-400/70',
   },
   zinc: {
-    box: 'border-white/10 bg-white/[0.03] text-zinc-300',
+    box: 'border-transparent bg-white/[0.03] text-zinc-300',
     icon: 'text-zinc-400',
-    edge: 'border-s-zinc-500',
+    edge: 'border-s-zinc-600',
   },
 };
 
@@ -64,9 +79,11 @@ export default function Note({
 }: NoteProps) {
   const m = useMotion();
   const t = TONES[tone];
+  // A softer radius on the start edge would fight the hairline that defines
+  // it, so the note is squared off there and rounded away from it.
   const shape = compact
-    ? 'rounded-xl ps-3 pe-3 py-2 text-[12.5px]'
-    : 'rounded-2xl ps-3.5 pe-4 py-3 text-[13px]';
+    ? 'rounded-e-xl ps-3 pe-3 py-2 text-[12.5px]'
+    : 'rounded-e-2xl ps-3.5 pe-4 py-3 text-[13px]';
   return (
     <motion.div
       role="note"
