@@ -19,10 +19,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Archive only lockfile-installed development dependencies
-        run: tar czf /tmp/fulfillment-node-modules.tar.gz node_modules
+        working-directory: studio
+      - name: Mirror only public runtime and lockfile-installed workspace dependencies
+        run: |
+          mkdir -p /tmp/fulfillment-runtime/bin
+          cp "$(command -v node)" /tmp/fulfillment-runtime/bin/node
+          node --version > /tmp/fulfillment-runtime/version.txt
+          tar czf /tmp/fulfillment-runtime.tar.gz -C /tmp fulfillment-runtime
+          tar czf /tmp/fulfillment-studio-modules.tar.gz studio/node_modules
       - uses: actions/upload-artifact@v4
         with:
-          name: fulfillment-offline-node-modules
-          path: /tmp/fulfillment-node-modules.tar.gz
+          name: fulfillment-offline-runtime
+          path: |
+            /tmp/fulfillment-runtime.tar.gz
+            /tmp/fulfillment-studio-modules.tar.gz
           retention-days: 1
