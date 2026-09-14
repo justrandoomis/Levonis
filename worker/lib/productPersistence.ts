@@ -51,7 +51,8 @@ import { audit } from './audit';
 import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
 import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
 import { sha256Hex } from '@levonis/contracts/canonical';
-import { deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
+import { availabilityFromName, deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
+import { legacyShapeErrors } from './optionFulfillment';
 import {
   normalizeSaleTypes,
   parseProductRow,
@@ -334,7 +335,7 @@ export function snapshotForCreate(doc: ProductDoc): RelationsSnapshot {
     inventoryMode: 'BASE',
     saleTypes: [...doc.sale_types],
     baseReserved: 0,
-    existing: { groups: [], values: [], colors: [], links: [] },
+    existing: { groups: [], values: [], colors: [], links: [], fulfillments: [], transports: [] },
     existingVariants: [],
     existingImages: [],
     liveLines: [],
@@ -528,6 +529,32 @@ export async function planRelationsWriteFrom(
       });
     });
   }
+
+  /**
+   * 0073. THE OLD SHAPE CANNOT COME BACK THROUGH THIS DOOR.
+   *
+   * "لا تنشئ Pre-order / Direct / Air / Sea / Land كـProduct Options." The
+   * migration merged the duplicates away; this is what stops the next save
+   * from recreating them. It refuses only NEW or RENAMED rows, so an untouched
+   * legacy product stays editable — blocking a shape, not breaking a catalogue.
+   */
+  errors.push(
+    ...legacyShapeErrors(
+      valueInputs.map((v) => ({
+        id: v.id,
+        name_en: v.name_en,
+        variant_key: v.variant_key,
+        active: v.active,
+      })),
+      new Map(
+        snap.existing.values.map((v) => [
+          v.id,
+          { name_en: v.name_en, variant_key: (v.variant_key ?? '').trim() },
+        ])
+      ),
+      availabilityFromName
+    )
+  );
   const valueIds = new Set(valueInputs.map((v) => v.id));
   if (valueIds.size !== valueInputs.length) errors.push('values: duplicate value id');
   if (valueInputs.length > MAX_ROWS_PER_COLLECTION) {
@@ -1349,6 +1376,11 @@ function plannedRelationsView(
       }))
     ),
     variants: [],
+    // The (model x order type) cells are not part of the STRUCTURE payload —
+    // they are written by their own endpoint — so the planned mirror carries
+    // whatever the product already has rather than inventing or dropping them.
+    fulfillments: snap.existing.fulfillments,
+    transports: snap.existing.transports,
     images: req.images.map((i) => {
       const stored = storedImage.get(i.id);
       return {

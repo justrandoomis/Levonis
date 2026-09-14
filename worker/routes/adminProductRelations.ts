@@ -5,7 +5,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { parseProductRow } from '../lib/productModel';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
-import { loadProductRelations } from '../lib/productRelations';
+import { liveValues, loadProductRelations } from '../lib/productRelations';
+import { fulfillmentStatements, parseFulfillmentPayload, saleTypesFromCells } from '../lib/optionFulfillment';
 import {
   loadRelationsSnapshot,
   planRelationsWriteFrom,
@@ -262,6 +263,103 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
       ...rel,
       inventory_mode: plan.relations?.mode ?? 'BASE',
       warnings: plan.warnings,
+    })
+  );
+});
+
+/**
+ * THE MODEL'S ORDER TYPES AND ROUTES — read and written through their own door.
+ *
+ * Separate from `/:id/relations` on purpose. That endpoint writes MODELS; this
+ * one writes what each model DOES. Two doors is what makes the owner's first
+ * rule enforceable at the API rather than by convention: a structure payload
+ * has no field that could invent "A1 mini — Pre-order" as an option, and this
+ * payload has no field that could invent a model.
+ */
+adminProductRelationsRoutes.get('/:id/fulfillment', async (c) => {
+  const productId = c.req.param('id');
+  const product = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(productId).first();
+  if (!product) throw notFound('Product not found');
+
+  const rel = await loadProductRelations(c.env.DB, productId);
+  const byFulfillment = new Map<string, unknown[]>();
+  for (const t of rel.transports) {
+    const arr = byFulfillment.get(t.fulfillment_id);
+    if (arr) arr.push(t);
+    else byFulfillment.set(t.fulfillment_id, [t]);
+  }
+
+  return c.json(
+    projectForAdmin(c.env, c.get('user'), {
+      success: true,
+      // The MODELS this product has, so the form can render one card each
+      // without a second round trip — merged-away rows are already filtered.
+      models: liveValues(rel.values).map((v) => ({
+        id: v.id,
+        group_id: v.group_id,
+        name_en: v.name_en,
+        name_ar: v.name_ar ?? '',
+        sort: v.sort,
+        active: v.active,
+        stock: v.stock,
+      })),
+      fulfillments: rel.fulfillments.map((f) => ({ ...f, transports: byFulfillment.get(f.id) ?? [] })),
+    })
+  );
+});
+
+adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
+  const admin = c.get('user')!;
+  const productId = c.req.param('id');
+  const existing = await c.env.DB
+    .prepare('SELECT id, sale_types, selling_type FROM products WHERE id = ?')
+    .bind(productId)
+    .first<Record<string, unknown>>();
+  if (!existing) throw notFound('Product not found');
+
+  const rel = await loadProductRelations(c.env.DB, productId);
+  const live = liveValues(rel.values);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const cells = parseFulfillmentPayload(body, new Set(live.map((v) => v.id)));
+
+  // The product's sale types are DERIVED from what its models offer, never
+  // asked for — the direction 0043 set, so the two cannot drift apart.
+  const fallback = (() => {
+    try {
+      const parsed = JSON.parse(String(existing.sale_types ?? '[]'));
+      return Array.isArray(parsed) && parsed.length ? parsed.map(String) : [String(existing.selling_type ?? 'direct_sale')];
+    } catch {
+      return [String(existing.selling_type ?? 'direct_sale')];
+    }
+  })();
+  const saleTypes = saleTypesFromCells(rel.values, cells, fallback);
+
+  const statements = fulfillmentStatements(c.env.DB, productId, cells);
+  statements.push(
+    c.env.DB
+      .prepare("UPDATE products SET sale_types = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
+      .bind(JSON.stringify(saleTypes), productId)
+  );
+  await c.env.DB.batch(statements);
+
+  await audit(c.env.DB, admin.id, 'product_v2.fulfillment', productId, {
+    cells: cells.length,
+    transports: cells.reduce((n, cell) => n + cell.transports.length, 0),
+    sale_types: saleTypes,
+  });
+
+  const after = await loadProductRelations(c.env.DB, productId);
+  const byFulfillment = new Map<string, unknown[]>();
+  for (const t of after.transports) {
+    const arr = byFulfillment.get(t.fulfillment_id);
+    if (arr) arr.push(t);
+    else byFulfillment.set(t.fulfillment_id, [t]);
+  }
+  return c.json(
+    projectForAdmin(c.env, admin, {
+      success: true,
+      sale_types: saleTypes,
+      fulfillments: after.fulfillments.map((f) => ({ ...f, transports: byFulfillment.get(f.id) ?? [] })),
     })
   );
 });

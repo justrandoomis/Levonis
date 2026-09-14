@@ -23,12 +23,15 @@
  */
 
 import { primaryMediaFirst, type MediaV2, type ProductDoc } from './productModel';
-import type { ColorV2, OptionV2 } from './pricing';
+import type { ColorV2, OptionFulfillment, OptionV2 } from './pricing';
 import {
+  liveValues,
   loadProductRelations,
   type ColorLinkRow,
   type ColorRow,
+  type OptionFulfillmentRow,
   type OptionGroupRow,
+  type OptionTransportRow,
   type OptionValueRow,
 } from './productRelations';
 import { isInventoryMode, type InventoryMode, type InventorySnapshot } from './inventory';
@@ -94,6 +97,9 @@ export interface ProductRelationsView {
   links: ColorLinkRow[];
   variants: VariantRow[];
   images: ImageRow[];
+  /** 0073. The (model x order type) and (model x route) cells. */
+  fulfillments: OptionFulfillmentRow[];
+  transports: OptionTransportRow[];
 }
 
 export const EMPTY_RELATIONS: ProductRelationsView = {
@@ -105,6 +111,8 @@ export const EMPTY_RELATIONS: ProductRelationsView = {
   links: [],
   variants: [],
   images: [],
+  fulfillments: [],
+  transports: [],
 };
 
 /**
@@ -158,7 +166,7 @@ export async function loadRelationsView(
       console.error(
         `product relations unavailable (one product ${productId}): ${e instanceof Error ? e.message : String(e)}`
       );
-      return { groups: [], values: [], colors: [], links: [] };
+      return { groups: [], values: [], colors: [], links: [], fulfillments: [], transports: [] };
     }),
     softAll<VariantRow>('variants', () =>
       db
@@ -179,11 +187,15 @@ export async function loadRelationsView(
     has_relations: has,
     inventory_mode: isInventoryMode(inventoryMode) ? inventoryMode : 'BASE',
     groups: rel.groups,
-    values: rel.values,
+    // A row merged into another model by 0073 is history, not a model. It is
+    // filtered HERE, once, so no consumer has to remember.
+    values: liveValues(rel.values),
     colors: rel.colors,
     links: rel.links,
     variants,
     images,
+    fulfillments: rel.fulfillments,
+    transports: rel.transports,
   };
 }
 
@@ -197,7 +209,7 @@ export async function loadRelationsViews(
   const ids = rows.map((r) => r.id);
   const ph = ids.map(() => '?').join(', ');
 
-  const [groups, values, colors, links, variants, images] = await Promise.all([
+  const [groups, values, colors, links, variants, images, fulfillments, optionTransports] = await Promise.all([
     softAll<OptionGroupRow>('groups', () =>
       db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionGroupRow>()
     ),
@@ -234,6 +246,18 @@ export async function loadRelationsViews(
     softAll<ImageRow>('images', () =>
       db.prepare(`SELECT * FROM product_images WHERE product_id IN (${ph}) ORDER BY sort_order, id`).bind(...ids).all<ImageRow>()
     ),
+    softAll<OptionFulfillmentRow>('fulfillments', () =>
+      db
+        .prepare(`SELECT * FROM product_option_fulfillment WHERE product_id IN (${ph}) ORDER BY sort, id`)
+        .bind(...ids)
+        .all<OptionFulfillmentRow>()
+    ),
+    softAll<OptionTransportRow>('option transports', () =>
+      db
+        .prepare(`SELECT * FROM product_option_transports WHERE product_id IN (${ph}) ORDER BY sort, id`)
+        .bind(...ids)
+        .all<OptionTransportRow>()
+    ),
   ]);
 
   const bucket = <T extends { product_id: string }>(list: T[]) => {
@@ -251,10 +275,12 @@ export async function loadRelationsViews(
   const l = bucket(links);
   const vr = bucket(variants);
   const im = bucket(images);
+  const fl = bucket(fulfillments);
+  const ot = bucket(optionTransports);
 
   for (const row of rows) {
     const gs = g.get(row.id) ?? [];
-    const vs = v.get(row.id) ?? [];
+    const vs = liveValues(v.get(row.id) ?? []);
     const cs = c.get(row.id) ?? [];
     const ims = im.get(row.id) ?? [];
     out.set(row.id, {
@@ -270,6 +296,8 @@ export async function loadRelationsViews(
       })),
       variants: vr.get(row.id) ?? [],
       images: ims,
+      fulfillments: fl.get(row.id) ?? [],
+      transports: ot.get(row.id) ?? [],
     });
   }
   return out;
@@ -331,6 +359,72 @@ export function applyRelations(
     opts.authoredNames ? (typeof stored === 'string' ? stored : '') : authoredName(stored, english);
   const groupNameById = new Map(view.groups.map((g) => [g.id, g.name_en]));
 
+  /**
+   * 0073. THE MODEL'S OWN CELLS, indexed by the option they belong to.
+   *
+   * A disabled cell is CARRIED, not dropped — the resolver has to be able to
+   * say FULFILLMENT_DISABLED rather than quietly falling through to the
+   * product's fallback price, and the admin form needs to show the row it
+   * switched off. Whether a cell prices anything is the resolver's decision;
+   * whether it exists is this one's.
+   */
+  // Read DEFENSIVELY even though the type says required. This is the same
+  // rolling-deploy argument the whole overlay is built on: a view assembled by
+  // code that predates 0073 — a cached object, a caller not yet rebuilt, a
+  // fixture — simply has no such key, and an enrichment must never be the
+  // thing that throws on a storefront read.
+  const viewFulfillments = view.fulfillments ?? [];
+  const viewTransports = view.transports ?? [];
+  const transportsByFulfillment = new Map<string, OptionTransportRow[]>();
+  for (const t of viewTransports) {
+    const arr = transportsByFulfillment.get(t.fulfillment_id);
+    if (arr) arr.push(t);
+    else transportsByFulfillment.set(t.fulfillment_id, [t]);
+  }
+  const cellsByOption = new Map<string, OptionFulfillment[]>();
+  for (const f of viewFulfillments) {
+    const type = f.fulfillment_type === 'pre_order' ? 'pre_order' : 'direct_sale';
+    const cell: OptionFulfillment = {
+      fulfillment_type: type,
+      enabled: truthy(f.enabled),
+      regular_price_iqd: f.regular_price_iqd,
+      prime_price_iqd: f.prime_price_iqd,
+      pro_price_iqd: f.pro_price_iqd,
+      cost_iqd: f.cost_iqd,
+      regular_adjust_iqd: f.regular_adjust_iqd ?? null,
+      prime_adjust_iqd: f.prime_adjust_iqd ?? null,
+      pro_adjust_iqd: f.pro_adjust_iqd ?? null,
+      cost_adjust_iqd: f.cost_adjust_iqd ?? null,
+      lead_time_text: f.lead_time_text ?? '',
+      lead_time_min_days: f.lead_time_min_days ?? null,
+      lead_time_max_days: f.lead_time_max_days ?? null,
+      // A direct sale has no route, so its transports are never read; carrying
+      // them anyway would let a stray row price a line that has no journey.
+      transports:
+        type === 'pre_order'
+          ? (transportsByFulfillment.get(f.id) ?? []).map((t) => ({
+              method: t.method === 'air' || t.method === 'sea' ? t.method : 'land',
+              enabled: truthy(t.enabled),
+              surcharge_iqd: t.surcharge_iqd,
+              regular_price_iqd: t.regular_price_iqd,
+              prime_price_iqd: t.prime_price_iqd,
+              pro_price_iqd: t.pro_price_iqd,
+              cost_iqd: t.cost_iqd,
+              regular_adjust_iqd: t.regular_adjust_iqd ?? null,
+              prime_adjust_iqd: t.prime_adjust_iqd ?? null,
+              pro_adjust_iqd: t.pro_adjust_iqd ?? null,
+              cost_adjust_iqd: t.cost_adjust_iqd ?? null,
+              lead_time_text: t.lead_time_text ?? '',
+              lead_time_min_days: t.lead_time_min_days ?? null,
+              lead_time_max_days: t.lead_time_max_days ?? null,
+            }))
+          : [],
+    };
+    const arr = cellsByOption.get(f.option_id);
+    if (arr) arr.push(cell);
+    else cellsByOption.set(f.option_id, [cell]);
+  }
+
   const options: OptionV2[] = view.values
     .filter((v) => showAll || truthy(v.active))
     .map((v) => ({
@@ -366,6 +460,11 @@ export function applyRelations(
       variant_key:
         (v.variant_key ?? '').trim() ||
         variantKeyFrom((v.variant_label ?? '').trim() || variantLabelFallback(v.name_en)),
+      // 0073. Empty on a model that has not been given order types, which is
+      // every model written before the migration — and which resolves exactly
+      // as it always did, through `availability_type` above.
+      fulfillments: cellsByOption.get(v.id) ?? [],
+      merged_into: (v.merged_into ?? '').trim(),
       stock: v.stock,
     }));
 

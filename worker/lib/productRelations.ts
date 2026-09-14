@@ -70,6 +70,57 @@ export interface OptionValueRow {
   lead_time_max_days?: number | null;
   variant_key?: string;
   variant_label?: string;
+  /** 0073. Non-empty = this row was merged into that model and is history. */
+  merged_into?: string;
+}
+
+/**
+ * 0073. ONE CELL OF (MODEL x ORDER TYPE) — the row that lets one product carry
+ * a different direct-sale difference per model. Every column is optional on the
+ * type for the same reason the 0043 columns are: a Worker can reach an edge
+ * before its migration reaches D1, and an enrichment must never crash a
+ * storefront.
+ */
+export interface OptionFulfillmentRow {
+  id: string;
+  product_id: string;
+  option_id: string;
+  fulfillment_type: string;
+  enabled: number | boolean;
+  regular_price_iqd: number | null;
+  prime_price_iqd: number | null;
+  pro_price_iqd: number | null;
+  cost_iqd: number | null;
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  sort?: number;
+}
+
+/** 0073. ONE CELL OF (MODEL x PRE-ORDER x TRANSPORT). Never local delivery. */
+export interface OptionTransportRow {
+  id: string;
+  product_id: string;
+  fulfillment_id: string;
+  method: string;
+  enabled: number | boolean;
+  surcharge_iqd: number | null;
+  regular_price_iqd: number | null;
+  prime_price_iqd: number | null;
+  pro_price_iqd: number | null;
+  cost_iqd: number | null;
+  regular_adjust_iqd?: number | null;
+  prime_adjust_iqd?: number | null;
+  pro_adjust_iqd?: number | null;
+  cost_adjust_iqd?: number | null;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  sort?: number;
 }
 
 export interface ColorRow {
@@ -234,6 +285,9 @@ export interface ProductRelations {
   values: OptionValueRow[];
   colors: ColorRow[];
   links: ColorLinkRow[];
+  /** 0073. Empty on a database that has not run the migration yet. */
+  fulfillments: OptionFulfillmentRow[];
+  transports: OptionTransportRow[];
 }
 
 /**
@@ -250,12 +304,25 @@ export const VALUES_ORDER_SQL =
     WHERE v.product_id = ?
     ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`;
 
+/**
+ * 0073. A MERGED-AWAY ROW IS HISTORY, NOT A MODEL.
+ *
+ * `merged_into` names the model a duplicate was folded into. Those rows are
+ * kept so `order_items.option_id` still resolves, but nothing sellable may see
+ * them. Filtering in SQL rather than in every consumer is what makes that true
+ * everywhere at once — and `COALESCE` keeps the query valid against a database
+ * that has not run 0073, where the column is simply absent from the row.
+ */
+export function liveValues(values: OptionValueRow[]): OptionValueRow[] {
+  return values.filter((v) => !String(v.merged_into ?? '').trim());
+}
+
 /** Loads every relational piece of one product in four indexed reads. */
 export async function loadProductRelations(
   db: D1Database,
   productId: string
 ): Promise<ProductRelations> {
-  const [groups, values, colors, links] = await Promise.all([
+  const [groups, values, colors, links, fulfillments, transports] = await Promise.all([
     db
       .prepare('SELECT * FROM product_option_groups WHERE product_id = ? ORDER BY sort, name_en')
       .bind(productId)
@@ -274,13 +341,40 @@ export async function loadProductRelations(
       )
       .bind(productId)
       .all<ColorLinkRow>(),
+    // 0073 may not have reached this database yet; the cells are an
+    // enrichment, so their absence degrades to "this product has none" and
+    // every price falls back to the product's own, exactly as before.
+    softRows<OptionFulfillmentRow>(() =>
+      db
+        .prepare('SELECT * FROM product_option_fulfillment WHERE product_id = ? ORDER BY sort, id')
+        .bind(productId)
+        .all<OptionFulfillmentRow>()
+    ),
+    softRows<OptionTransportRow>(() =>
+      db
+        .prepare('SELECT * FROM product_option_transports WHERE product_id = ? ORDER BY sort, id')
+        .bind(productId)
+        .all<OptionTransportRow>()
+    ),
   ]);
   return {
     groups: groups.results,
     values: values.results,
     colors: colors.results,
     links: links.results,
+    fulfillments,
+    transports,
   };
+}
+
+/** A read whose table may not exist yet returns nothing rather than throwing. */
+async function softRows<T>(run: () => Promise<{ results: T[] }>): Promise<T[]> {
+  try {
+    return (await run()).results;
+  } catch (e) {
+    console.error(`option cells unavailable: ${e instanceof Error ? e.message : String(e)}`);
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------- validation
