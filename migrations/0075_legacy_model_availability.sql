@@ -6,12 +6,13 @@ SELECT v.id,v.product_id,
  (SELECT c.id FROM product_option_values c WHERE c.product_id=v.product_id
     AND CASE WHEN v.variant_key<>'' THEN c.variant_key=v.variant_key ELSE c.id=v.id END
     AND c.availability_type IN ('direct_sale','pre_order')
+    AND EXISTS(SELECT 1 FROM product_option_groups g WHERE g.id=c.group_id AND g.product_id=c.product_id)
     ORDER BY CASE c.availability_type WHEN 'pre_order' THEN 0 ELSE 1 END ,c.sort,c.id LIMIT 1),
  v.availability_type,json_object('id',v."id",'product_id',v."product_id",'group_id',v."group_id",'name_en',v."name_en",'sku_part',v."sku_part",'image',v."image",'sort',v."sort",'active',v."active",'stock',v."stock",'reserved',v."reserved",'low_stock_threshold',v."low_stock_threshold",'regular_price_iqd',v."regular_price_iqd",'prime_price_iqd',v."prime_price_iqd",'pro_price_iqd',v."pro_price_iqd",'cost_iqd',v."cost_iqd",'created_at',v."created_at",'availability_type',v."availability_type",'lead_time_text',v."lead_time_text",'lead_time_min_days',v."lead_time_min_days",'lead_time_max_days',v."lead_time_max_days",'variant_key',v."variant_key",'variant_label',v."variant_label",'regular_adjust_iqd',v."regular_adjust_iqd",'prime_adjust_iqd',v."prime_adjust_iqd",'pro_adjust_iqd',v."pro_adjust_iqd",'cost_adjust_iqd',v."cost_adjust_iqd",'name_ar',v."name_ar",'name_ckb',v."name_ckb")
 FROM product_option_values v
 WHERE v.availability_type IN ('direct_sale','pre_order')
   AND EXISTS(SELECT 1 FROM products p WHERE p.id=v.product_id)
-  AND EXISTS(SELECT 1 FROM product_option_groups g WHERE g.id=v.group_id);
+  AND EXISTS(SELECT 1 FROM product_option_groups g WHERE g.id=v.group_id AND g.product_id=v.product_id);
 
 -- Each legacy row becomes one availability row. A duplicate of the SAME
 -- model+route is ambiguous and the UNIQUE constraint aborts the migration.
@@ -69,7 +70,7 @@ WITH suffixes(suffix) AS (VALUES (' — pre-order'),(' – pre-order'),(' - pre-
 UPDATE product_option_values SET name_ckb=COALESCE((SELECT trim(substr(name_ckb,1,length(name_ckb)-length(suffix))) FROM suffixes WHERE lower(substr(name_ckb,-length(suffix)))=suffix AND length(name_ckb)>length(suffix) LIMIT 1),name_ckb) WHERE id IN (SELECT option_id FROM product_option_aliases);
 
 -- Prevent the legacy JSON mirror from resurrecting removed availability options.
-UPDATE products SET options=(SELECT json_group_array(json_object('id',v.id,'name_en',v.name_en,'name_ar',v.name_ar,'name_ckb',v.name_ckb,'active',json(CASE v.active WHEN 1 THEN 'true' ELSE 'false' END ),'image',v.image,'variant_key',v.variant_key,'regular_price_iqd',v.regular_price_iqd,'prime_price_iqd',v.prime_price_iqd,'pro_price_iqd',v.pro_price_iqd,'cost_iqd',v.cost_iqd,'regular_adjust_iqd',v.regular_adjust_iqd,'prime_adjust_iqd',v.prime_adjust_iqd,'pro_adjust_iqd',v.pro_adjust_iqd,'cost_adjust_iqd',v.cost_adjust_iqd)) FROM product_option_values v WHERE v.product_id=products.id)
+UPDATE products SET options=(SELECT json_group_array(json_object('id',v.id,'name_en',v.name_en,'name_ar',v.name_ar,'name_ckb',v.name_ckb,'active',json(CASE v.active WHEN 1 THEN 'true' ELSE 'false' END ),'image',v.image,'variant_key',v.variant_key,'regular_price_iqd',v.regular_price_iqd,'prime_price_iqd',v.prime_price_iqd,'pro_price_iqd',v.pro_price_iqd,'cost_iqd',v.cost_iqd,'regular_adjust_iqd',v.regular_adjust_iqd,'prime_adjust_iqd',v.prime_adjust_iqd,'pro_adjust_iqd',v.pro_adjust_iqd,'cost_adjust_iqd',v.cost_adjust_iqd)) FROM product_option_values v WHERE v.product_id=products.id AND EXISTS(SELECT 1 FROM product_option_groups g WHERE g.id=v.group_id AND g.product_id=v.product_id))
 WHERE id IN (SELECT product_id FROM product_option_aliases);
 
 CREATE INDEX IF NOT EXISTS idx_option_alias_model ON product_option_aliases(product_id,option_id);

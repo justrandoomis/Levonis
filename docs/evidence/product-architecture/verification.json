@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-14T12:00:01.890006+00:00",
+  "recorded_at": "2026-09-14T12:22:01.249796+00:00",
   "environment": "local isolated repository worktree; external network disabled for tests and native proof",
   "production_deployed": false,
   "production_orphan_dry_run": "not run: no authorized live D1/R2 or admin session connection available",
@@ -15,7 +15,7 @@
     "workspaces_and_probes": 10
   },
   "tests": {
-    "total_pass": 2934,
+    "total_pass": 2935,
     "root_command": "node --import tsx --test --test-concurrency=6 tests/*.test.ts",
     "workspaces_command": "npm run test:workspaces",
     "network_preload": "tests/fixtures/offline.cjs",
@@ -23,8 +23,8 @@
       {
         "suite": "root",
         "exit_code": 0,
-        "tests": 2572,
-        "pass": 2572,
+        "tests": 2573,
+        "pass": 2573,
         "fail": 0,
         "skipped": 0,
         "cancelled": 0
@@ -71,11 +71,11 @@
     "release_schema_ready": true
   },
   "log_sha256": {
-    "release-unit.log": "c213b9b742c179596d9382f2f5a6edbde3fc3e0dbe09c11510dafd6832296ca0",
-    "release-typecheck.log": "f1f12e99d24292377f4cfcbdd64369c0402511f3aab917e756a6b1692087acee",
-    "release-lint.log": "65d881799579c7a1c5e497f5dbecbaa0c4ec7faf6ae1af1edbf9b5c644a56b88",
-    "release-build.log": "ed5c4573c05f31bf24cc3dfba96a7d64dc95d8dd353893a01757c348a222fcb3",
-    "release-native.log": "ae0fa8976c21a50da3e89c617b075171562fa80100f2033f134c8f7477751aab"
+    "ownership-unit.log": "c70ba1bf39b5cf198be33cac3b2ab36f42c0c95ada86c9b36d40577cd54685e0",
+    "ownership-typecheck.log": "ea40baeba4bc494a6f31e9b558f1481c40e64637d060f74d9147ccdda65c3a0e",
+    "ownership-lint.log": "3ec97c869be2a85fdb4dba63d4cbfc530d80bb6c2dd7bcd4822230234b5636c7",
+    "ownership-build.log": "4ef1125d96c4b9bde44b269b7cbbff154386ae33d6fddd4dbf926c4de1c62271",
+    "ownership-native.log": "67456d7e020b65a239e4213b5ab5e67512f495f3dfab857939189172322c27fd"
   },
   "release_preflight": {
     "queries": "SELECT only",
@@ -83,5 +83,14 @@
     "blocks_automatic_deploy_before_migrations": true,
     "existing_live_workflow_confirmation_preserved": true,
     "live_preflight_run": false
+  },
+  "legacy_migration_orphan_isolation": {
+    "test": "tests/productModelMigration.test.ts",
+    "invalid_options_detected": 2,
+    "invalid_options_unchanged": true,
+    "canonical_models": 2,
+    "fulfillment_rows": 4,
+    "single_and_paged_reads_verified": true,
+    "production": false
   }
 }

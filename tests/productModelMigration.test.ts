@@ -6,6 +6,11 @@ import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { row, all, asD1 } from './fixtures/app';
 import { returnOrderStock } from '../worker/lib/orderInventory';
+import { loadProductRelations } from '../worker/lib/productRelations';
+import { loadRelationsViews } from '../worker/lib/productOverlay';
+import { scanProductOrphans } from '../worker/lib/productOrphans';
+import type { Env } from '../worker/lib/types';
+import { MemoryMedia } from './fixtures/media';
 
 const files = readdirSync(join(ROOT, 'migrations')).filter(f => f.endsWith('.sql')).sort();
 function apply(raw: DatabaseSync, file: string) {
@@ -77,4 +82,41 @@ test('ambiguous duplicate legacy journeys abort migration atomically rather than
   assert.equal(row(raw, 'SELECT COUNT(*) n FROM product_option_values')?.n, 4);
   assert.equal(row(raw, 'SELECT COUNT(*) n FROM product_option_fulfillment')?.n, 0);
   assert.equal(row(raw, 'SELECT COUNT(*) n FROM product_option_aliases')?.n, 0);
+});
+
+test('legacy upgrade cannot choose an orphan or a model in another product group; both remain for a reviewed audit', async () => {
+  const raw = legacy();
+  raw.exec(`
+    PRAGMA foreign_keys=OFF;
+    INSERT INTO products(id,slug,name,price_iqd) VALUES ('other','other','Other',1);
+    INSERT INTO product_option_groups(id,product_id,name_en) VALUES ('other-group','other','Model');
+    INSERT INTO product_option_values(id,product_id,group_id,name_en,variant_key,availability_type,sort,regular_price_iqd)
+    VALUES ('orphan-missing','a1','missing-group','Old orphan','mini','pre_order',-2,1),
+           ('orphan-cross-product','a1','other-group','Wrong product group','mini','pre_order',-1,2);
+    PRAGMA foreign_keys=ON;
+  `);
+  const orphanRows = () => all(raw, "SELECT * FROM product_option_values WHERE id LIKE 'orphan-%' ORDER BY id");
+  const before = orphanRows();
+  const violations = all(raw, 'PRAGMA foreign_key_check');
+  const { inspectProductRelease } = await import(new URL('../scripts/product-release-preflight.mjs', import.meta.url).href);
+  const read = async (sql: string) => { assert.match(sql, /^SELECT\s/i); return all(raw, sql); };
+  const preflight = await inspectProductRelease(read);
+  assert.equal(preflight.live_legacy_option_rows, 4);
+  assert.deepEqual(preflight.ambiguous_legacy_routes, []);
+  for (const f of files.filter(f => f >= '0072')) apply(raw, f);
+  assert.deepEqual(orphanRows(), before);
+  assert.deepEqual(all(raw, 'PRAGMA foreign_key_check'), violations);
+  assert.equal(row(raw, 'SELECT COUNT(*) n FROM product_option_aliases')?.n, 4);
+  assert.equal(row(raw, 'SELECT COUNT(*) n FROM product_option_fulfillment')?.n, 4);
+  assert.equal(row(raw, "SELECT regular_price_iqd FROM product_option_fulfillment WHERE option_id='mini-preorder' AND fulfillment_type='direct_sale'")?.regular_price_iqd, 549000);
+  const expectedIds = ['combo-preorder', 'mini-preorder'];
+  assert.deepEqual(all<{ id: string }>(raw, "SELECT json_extract(value,'$.id') id FROM products,json_each(products.options) WHERE products.id='a1' ORDER BY id").map(v => v.id), expectedIds);
+  const db = asD1(raw);
+  assert.deepEqual((await loadProductRelations(db, 'a1')).values.map(v => v.id).sort(), expectedIds);
+  assert.deepEqual((await loadRelationsViews(db, [{ id: 'a1' }])).get('a1')!.values.map(v => v.id).sort(), expectedIds);
+  assert.equal((await inspectProductRelease(read)).live_legacy_option_rows, 0);
+  const report = await scanProductOrphans({ DB: db, BUCKET: new MemoryMedia(), APP_ORIGIN: 'https://levonis-iq.com' } as unknown as Env, 'buyer');
+  assert.equal(report.dry_run, true);
+  assert.equal(report.tables.find(t => t.table === 'product_option_values')?.orphan_rows, 2);
+  assert.deepEqual(orphanRows(), before, 'the scanner reports the original rows without removing or rewriting them');
 });

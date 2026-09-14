@@ -6,7 +6,7 @@
   "deletion": {
     "product_deleted": true,
     "already_deleted": false,
-    "deletion_job_id": "pdel_8acc54ebc92a47ffa408",
+    "deletion_job_id": "pdel_f098243de2e049a5a9a9",
     "rows_deleted_by_table": {
       "product_option_transports": 6,
       "product_color_option_links": 0,

@@ -43,7 +43,7 @@ export async function inspectProductRelease(query) {
   let legacyRows = null;
   let duplicateLegacyRoutes = [];
   if (legacySchema) {
-    const live = "v.availability_type IN ('direct_sale','pre_order') AND EXISTS(SELECT 1 FROM products p WHERE p.id=v.product_id) AND EXISTS(SELECT 1 FROM product_option_groups g WHERE g.id=v.group_id)";
+    const live = "v.availability_type IN ('direct_sale','pre_order') AND EXISTS(SELECT 1 FROM products p WHERE p.id=v.product_id) AND EXISTS(SELECT 1 FROM product_option_groups g WHERE g.id=v.group_id AND g.product_id=v.product_id)";
     legacyRows = Number((await query(`SELECT COUNT(*) AS n FROM product_option_values v WHERE ${live}`))[0].n);
     duplicateLegacyRoutes = await query(`SELECT v.product_id,CASE WHEN v.variant_key<>'' THEN v.variant_key ELSE v.id END AS variant_key,v.availability_type,COUNT(*) AS rows FROM product_option_values v WHERE ${live} GROUP BY v.product_id,CASE WHEN v.variant_key<>'' THEN v.variant_key ELSE v.id END,v.availability_type HAVING COUNT(*)>1 LIMIT 101`);
   }

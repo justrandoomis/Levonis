@@ -207,7 +207,7 @@ export async function loadRelationsViews(
       db
         .prepare(
           `SELECT v.* FROM product_option_values v
-             LEFT JOIN product_option_groups g ON g.id = v.group_id
+             JOIN product_option_groups g ON g.id = v.group_id AND g.product_id = v.product_id
             WHERE v.product_id IN (${ph})
             ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`
         )

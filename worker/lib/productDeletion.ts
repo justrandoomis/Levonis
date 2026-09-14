@@ -72,6 +72,12 @@ export function productDependencyGraph(schema: TableInfo[]): ProductDependency[]
       const match = links.map((f) => `${qi(f.table)}.${qi(f.to || 'id')}=${qi(dep.table)}.${qi(f.from)}`).join(' AND ');
       return `(${links.map((f) => `${qi(dep.table)}.${qi(f.from)} IS NOT NULL`).join(' AND ')} AND NOT EXISTS (SELECT 1 FROM ${qi(parent.table)} WHERE ${match} AND NOT (${parent.orphanPredicate})))`;
     });
+    // The legacy group FK checks existence, but not ownership. A model whose
+    // group belongs to another product is invalid too. Declare this edge
+    // explicitly; cross-product bundle references have different semantics.
+    if (dep.table === 'product_option_values' && owned.has('product_option_groups')) {
+      clauses.push('NOT EXISTS (SELECT 1 FROM product_option_groups g WHERE g.id=product_option_values.group_id AND g.product_id=product_option_values.product_id)');
+    }
     if (clauses.length) dep.orphanPredicate = clauses.join(' OR ');
   }
   return [...owned.values()].sort((a, b) => b.depth - a.depth || a.table.localeCompare(b.table));
