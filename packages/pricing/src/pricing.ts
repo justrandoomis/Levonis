@@ -99,6 +99,35 @@ export const ADJUST_OF: Record<PriceKey, AdjustKey> = {
   pro_price_iqd: 'pro_adjust_iqd',
   cost_iqd: 'cost_adjust_iqd',
 };
+export const PRICE_KEYS: readonly PriceKey[] = Object.keys(ADJUST_OF) as PriceKey[];
+export const ADJUST_KEYS: readonly AdjustKey[] = Object.values(ADJUST_OF);
+
+/**
+ * THE RUNGS, MOST GENERAL FIRST — and the order is load-bearing.
+ *
+ *   base -> option -> fulfillment -> transport -> color
+ *
+ * COLOUR STAYS LAST, above even the transport, because a colour is a SURCHARGE
+ * for the colour and is paid on every route. Putting it beneath the fulfilment
+ * rung would make a fulfilment's fixed price swallow it — and that is a price
+ * change for every product where a model states an absolute price and a colour
+ * adds to it, which is precisely the shape migration 0073 creates from the
+ * legacy "A1 mini — Direct" rows. The owner's precedence list (transport beats
+ * fulfilment beats model beats product) is satisfied by the three rungs in the
+ * middle; colour is not in that list because it is a different axis.
+ */
+type PriceSource = 'color' | 'transport' | 'fulfillment' | 'option' | 'base';
+
+/** The walk order. `base` is the seed, so it is not a step. */
+const RUNGS: Array<Exclude<PriceSource, 'base'>> = ['option', 'fulfillment', 'transport', 'color'];
+
+/** The rows for each step, in walk order. */
+interface LadderRows {
+  option: PriceFields | null;
+  fulfillment: PriceFields | null;
+  transport: PriceFields | null;
+  color: PriceFields | null;
+}
 
 export type PriceMode = 'inherit' | 'adjust' | 'fixed';
 
@@ -114,6 +143,51 @@ export function priceMode(row: Partial<PriceFields> | null | undefined, field: P
   const adj = row[ADJUST_OF[field]];
   if (adj !== null && adj !== undefined && Number.isFinite(adj)) return 'adjust';
   return 'inherit';
+}
+
+/**
+ * ONE CELL OF (MODEL x ORDER TYPE) — migration 0073's `product_option_fulfillment`.
+ *
+ * A model that sells both ways carries two of these. Each prices ITSELF with
+ * the same four-field contract every other rung uses (NULL inherits, a fixed
+ * price replaces, an adjustment moves), which is how one product can charge
+ * +50,000 for a direct A1 mini and +20,000 for a direct A1 mini Combo at the
+ * same time — something `products.direct_surcharge_iqd`, being ONE number,
+ * never could.
+ */
+export interface OptionFulfillment extends PriceFields {
+  fulfillment_type: 'direct_sale' | 'pre_order';
+  enabled?: boolean;
+  /**
+   * NO STOCK FIELD, DELIBERATELY. A pre-order has no stock by definition, so
+   * there is one number — the MODEL's, on `OptionV2.stock`, counted by the
+   * inventory ledger. The direct-sale cell reads it; the pre-order cell does
+   * not. See migration 0073 for why a second counter would fork that ledger.
+   */
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  /** Pre-order only: how the unit reaches Iraq. Never local delivery. */
+  transports?: OptionTransport[];
+}
+
+/**
+ * ONE CELL OF (MODEL x PRE-ORDER x TRANSPORT) — `product_option_transports`.
+ *
+ * `surcharge_iqd` is a FEE and behaves like the product's transport
+ * commission: added on top, waived for an active PRO. The four price fields
+ * are the ITEM's own price on this route and no membership waives those. They
+ * are separate on purpose — collapsing them would make the PRO waiver either
+ * cancel a model's price difference or stop waiving shipping.
+ */
+export interface OptionTransport extends PriceFields {
+  method: 'air' | 'sea' | 'land';
+  enabled?: boolean;
+  /** Overrides the product's commission for this method. Never adds to it. */
+  surcharge_iqd?: number | null;
+  lead_time_text?: string;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
 }
 
 export interface OptionV2 extends PriceFields {
@@ -138,6 +212,16 @@ export interface OptionV2 extends PriceFields {
   /** The MODEL this option is a fulfilment of — 'a1' vs 'a1-combo'. */
   variant_key?: string;
   variant_label?: string;
+  /**
+   * THE OPTION IS THE MODEL; THESE ARE ITS ORDER TYPES.
+   *
+   * Present from migration 0073 on. While this is empty the option resolves
+   * exactly as it did before — `availability_type` above still decides its
+   * route — so nothing written before 0073 moves by a dinar.
+   */
+  fulfillments?: OptionFulfillment[];
+  /** Set by 0073 on a row merged into another model. Never sellable. */
+  merged_into?: string;
   /** Sellable units at this level; null = this level does not track stock. */
   stock?: number | null;
   // ---- carried for the ADMIN surfaces only; pricing never reads them ------
@@ -285,7 +369,23 @@ export interface ResolvedPrice {
   applied_iqd: number; // what this buyer pays for the item itself
   applied_tier: 'regular' | 'pro' | 'prime';
   cost_iqd: number | null; // admin only — strip before public serialization
-  price_source: 'color' | 'option' | 'base';
+  /** Which rung set the REGULAR price. See PriceSource for the walk order. */
+  price_source: PriceSource;
+  /**
+   * WHAT THIS LINE IS, once the model's own cells have been read — written
+   * into the order snapshot so a receipt never has to re-derive it.
+   * `source` says where the answer came from: the customer said it, or it was
+   * inferred from the presence of a transport the way it was before 0073.
+   */
+  fulfillment: {
+    type: 'direct_sale' | 'pre_order';
+    source: 'stated' | 'inferred';
+    /** The model's own cell priced this line (false = product fallbacks did). */
+    from_option_cell: boolean;
+    lead_time_text: string;
+    lead_time_min_days: number | null;
+    lead_time_max_days: number | null;
+  };
   /**
    * The pre-order journey this line is on (null on a direct line). The
    * method is what shipping_type, the stage path, tracking and the pre-order
@@ -314,7 +414,6 @@ export interface ResolvedPrice {
 /** How a pre-order line is being paid, which decides its availability fee. */
 export type PreorderPricing = 'prepaid' | 'cod';
 
-type PriceSource = 'color' | 'option' | 'base';
 
 /** The value of one field after each rung of the ladder — needed so a member
  *  adjustment with nothing of its own to inherit can anchor on the regular
@@ -455,48 +554,83 @@ export function derivedRung(
   return { regular, prime, pro, consumed, inverted: prime !== null && pro !== null && pro > prime };
 }
 
-/** Walks base → option → colour for PRIME or PRO with the rule above. */
+/**
+ * THE MODEL'S OWN CELL FOR THIS ORDER TYPE, or null when it has none. A model
+ * that publishes no fulfilment rows at all is a pre-0073 model: it keeps
+ * answering through `availability_type` and the product's own fallbacks.
+ */
+export function findFulfillment(
+  option: OptionV2 | null,
+  type: 'direct_sale' | 'pre_order'
+): OptionFulfillment | null {
+  return option?.fulfillments?.find((f) => f.fulfillment_type === type) ?? null;
+}
+
+/** That cell's own row for one route. */
+export function findTransport(fulfillment: OptionFulfillment | null, method: string): OptionTransport | null {
+  return fulfillment?.transports?.find((t) => t.method === method) ?? null;
+}
+
+/** True when a row states anything at all about price — fixed or adjustment. */
+export function statesPrice(row: PriceFields | null | undefined): boolean {
+  if (!row) return false;
+  return PRICE_KEYS.some((k) => row[k] !== null && row[k] !== undefined) ||
+    ADJUST_KEYS.some((k) => row[k] !== null && row[k] !== undefined);
+}
+
+/** Walks base → option → fulfilment → transport → colour for PRIME or PRO. */
 function pickMember(
   field: 'prime_price_iqd' | 'pro_price_iqd',
-  color: ColorV2 | null,
-  option: OptionV2 | null,
+  rows: LadderRows,
   base: number | null,
   regularAt: Record<PriceSource, number | null>
 ): LadderTrace {
-  const at: Record<PriceSource, number | null> = { base, option: base, color: base };
+  const at: Record<PriceSource, number | null> = {
+    base,
+    option: base,
+    fulfillment: base,
+    transport: base,
+    color: base,
+  };
   let value = base;
   let source: PriceSource = 'base';
-  const regularBase = regularAt.base ?? 0;
-  const regularOption = regularAt.option ?? regularBase;
-  const regularColor = regularAt.color ?? regularOption;
-  const rungs: Array<[Exclude<PriceSource, 'base'>, PriceFields | null, number, number | null]> = [
-    ['option', option, regularOption - regularBase, regularAt.option],
-    ['color', color, regularColor - regularOption, regularAt.color],
-  ];
-  for (const [rung, row, regularDelta, regularHere] of rungs) {
-    const next = memberAtRung({ inherited: value, regularDelta, regularHere, row, field });
-    if (row && (next !== value || regularDelta !== 0)) source = rung;
+  // The regular price BENEATH each rung, carried forward so a rung that says
+  // nothing about the regular price contributes a delta of zero.
+  let regularBeneath = regularAt.base ?? 0;
+  for (const rung of RUNGS) {
+    const regularHere = regularAt[rung] ?? regularBeneath;
+    const next = memberAtRung({
+      inherited: value,
+      regularDelta: regularHere - regularBeneath,
+      regularHere: regularAt[rung],
+      row: rows[rung],
+      field,
+    });
+    if (rows[rung] && (next !== value || regularHere !== regularBeneath)) source = rung;
     value = next;
     at[rung] = value;
+    regularBeneath = regularHere;
   }
   return { value: value ?? null, source, at };
 }
 
 function pick(
   field: PriceKey,
-  color: ColorV2 | null,
-  option: OptionV2 | null,
+  rows: LadderRows,
   base: number | null,
   regularAt?: Record<PriceSource, number | null>
 ): LadderTrace {
   let value = base;
   let source: PriceSource = 'base';
-  const at: Record<PriceSource, number | null> = { base, option: base, color: base };
-  const rungs: Array<[Exclude<PriceSource, 'base'>, PriceFields | null]> = [
-    ['option', option],
-    ['color', color],
-  ];
-  for (const [rung, row] of rungs) {
+  const at: Record<PriceSource, number | null> = {
+    base,
+    option: base,
+    fulfillment: base,
+    transport: base,
+    color: base,
+  };
+  for (const rung of RUNGS) {
+    const row = rows[rung];
     if (row) {
       const fixed = row[field];
       if (fixed !== null && fixed !== undefined) {
@@ -523,6 +657,18 @@ export function resolveUnitPrice(input: {
   optionId?: string | null;
   colorId?: string | null;
   transportMethod?: string | null; // '' | air | sea | land
+  /**
+   * THE ORDER TYPE, SAID OUT LOUD.
+   *
+   * Until migration 0073 this was INFERRED — a line was a pre-order if a
+   * transport came with it, and a direct sale otherwise. That conflated two
+   * independent decisions (`PRODUCT OPTION != ORDER TYPE != TRANSPORT`), and
+   * it made "pre-order by land" the only way to say "pre-order".
+   *
+   * Omit it and the old inference still runs, so every caller that has not
+   * been taught to send it behaves exactly as before.
+   */
+  fulfillmentType?: 'direct_sale' | 'pre_order' | null;
   warrantyPlanId?: string | null;
   tier: Tier;
   tierActive: boolean;
@@ -569,15 +715,49 @@ export function resolveUnitPrice(input: {
     errors.push('COLOR_OPTION_MISMATCH');
   }
 
+  /**
+   * THE ORDER TYPE AND THE ROUTE, RESOLVED BEFORE ANY MONEY.
+   *
+   * `fulfillmentType` is what the customer chose; with nothing chosen it is
+   * inferred the way it always was — a transport means a pre-order — so a
+   * caller that predates 0073 gets the behaviour it has always had.
+   *
+   * A cell that is not there, or is switched off, leaves BOTH rungs null and
+   * the ladder walks straight past them onto the product's own fallbacks.
+   */
+  const method = (input.transportMethod ?? '').trim();
+  const statedType = input.fulfillmentType === 'direct_sale' || input.fulfillmentType === 'pre_order'
+    ? input.fulfillmentType
+    : null;
+  const inferredType: 'direct_sale' | 'pre_order' = method ? 'pre_order' : 'direct_sale';
+  const lineType = statedType ?? inferredType;
+
+  const fulfillment = findFulfillment(option, lineType);
+  if (statedType && option && !fulfillment && (option.fulfillments?.length ?? 0) > 0) {
+    // The model publishes its order types and this is not one of them.
+    errors.push('FULFILLMENT_NOT_OFFERED');
+  }
+  if (fulfillment && fulfillment.enabled === false) errors.push('FULFILLMENT_DISABLED');
+
+  const transportRow = fulfillment && method ? findTransport(fulfillment, method) : null;
+  if (transportRow && transportRow.enabled === false) errors.push('TRANSPORT_DISABLED');
+
+  const priceRows: LadderRows = {
+    option,
+    fulfillment: fulfillment && fulfillment.enabled !== false ? fulfillment : null,
+    transport: transportRow && transportRow.enabled !== false ? transportRow : null,
+    color,
+  };
+
   // Per-field independent inheritance. Regular is resolved first because the
   // member fields may need to anchor an adjustment on it.
-  const regular = pick('regular_price_iqd', color, option, product.price_iqd);
+  const regular = pick('regular_price_iqd', priceRows, product.price_iqd);
   // PRIME and PRO carry every surcharge the regular ladder added (see
   // memberAtRung); cost does not — a surcharge says nothing about what the
   // extra costs the store, and inventing a cost would make §12 profit wrong.
-  const proExplicit = pickMember('pro_price_iqd', color, option, product.pro_price_iqd, regular.at);
-  const primeExplicit = pickMember('prime_price_iqd', color, option, product.prime_price_iqd, regular.at);
-  const cost = pick('cost_iqd', color, option, product.product_cost_iqd);
+  const proExplicit = pickMember('pro_price_iqd', priceRows, product.pro_price_iqd, regular.at);
+  const primeExplicit = pickMember('prime_price_iqd', priceRows, product.prime_price_iqd, regular.at);
+  const cost = pick('cost_iqd', priceRows, product.product_cost_iqd);
 
   const regularIqd = regular.value ?? product.price_iqd;
   if (!Number.isInteger(regularIqd) || regularIqd < 0) errors.push('REGULAR_PRICE_INVALID');
@@ -619,7 +799,6 @@ export function resolveUnitPrice(input: {
   // not charged at all when the line is paid cash on delivery (priced as a
   // direct sale below — the transport itself stays, because the journey does).
   let transport: ResolvedPrice['transport'] = null;
-  const method = (input.transportMethod ?? '').trim();
   const productSaleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
 
   /**
@@ -648,7 +827,27 @@ export function resolveUnitPrice(input: {
       if (!offer) {
         errors.push('TRANSPORT_NOT_OFFERED');
       } else {
-        let commission = offer.commission_iqd;
+        /**
+         * AN OVERRIDE REPLACES ITS FALLBACK. IT NEVER ADDS TO IT.
+         *
+         * The owner's rule, stated as a number: a model whose Air row says
+         * 80,000 on a product whose Air says 50,000 charges 80,000 — not
+         * 130,000. So the ladder is a first-match, not a sum:
+         *
+         *   1. this MODEL's own row for this route (`surcharge_iqd`)
+         *   2. ...or zero, when that row prices the ITEM instead — the
+         *      difference is already inside `applied_iqd` and charging the
+         *      product's commission on top would bill it twice
+         *   3. the PRODUCT's commission for this method
+         *   4. the admin default for this method
+         */
+        let commission: number | null = null;
+        if (transportRow && transportRow.enabled !== false) {
+          const own = transportRow.surcharge_iqd;
+          if (own !== null && own !== undefined && Number.isInteger(own) && own >= 0) commission = own;
+          else if (statesPrice(transportRow)) commission = 0;
+        }
+        if (commission === null) commission = offer.commission_iqd ?? null;
         if (commission === null || commission === undefined) {
           const def = (input.transportDefaults ?? []).find((d) => d.method === method);
           commission = def ? def.commission_iqd : null;
@@ -698,7 +897,18 @@ export function resolveUnitPrice(input: {
     (!optionAvailability && productSaleTypes.includes('bundle'));
   const codDirectPricing = transport !== null && transport.waived_by === 'cod_direct_pricing';
   const directPriced = (!method && directEnabled) || codDirectPricing;
-  if (directPriced && hasDirectPremium) {
+  /**
+   * THE MODEL'S OWN DIRECT DIFFERENCE WINS, and it wins by being IN the price.
+   *
+   * `products.direct_surcharge_iqd` is ONE number for a whole product, so it
+   * cannot say "+50,000 on the A1 mini and +20,000 on the Combo". A model that
+   * states its own direct-sale pricing has already expressed its difference in
+   * `applied_iqd` through the fulfilment rung — adding the product's premium
+   * on top of that would charge the difference twice. So the product number is
+   * what it was always meant to be: a FALLBACK, for a model that says nothing.
+   */
+  const cellPricesDirect = directPriced && statesPrice(priceRows.fulfillment);
+  if (directPriced && hasDirectPremium && !cellPricesDirect) {
     direct = { surcharge_iqd: directSurcharge as number, waived: isPro };
   }
   // 'preorder' only while the commission is the fee actually in force.
@@ -747,6 +957,17 @@ export function resolveUnitPrice(input: {
     applied_tier: appliedTier,
     cost_iqd: cost.value ?? null,
     price_source: regular.source,
+    fulfillment: {
+      type: lineType,
+      source: statedType ? 'stated' : 'inferred',
+      from_option_cell: priceRows.fulfillment !== null,
+      // The most specific promise wins: this route's, else this order type's.
+      lead_time_text: transportRow?.lead_time_text || fulfillment?.lead_time_text || option?.lead_time_text || '',
+      lead_time_min_days:
+        transportRow?.lead_time_min_days ?? fulfillment?.lead_time_min_days ?? option?.lead_time_min_days ?? null,
+      lead_time_max_days:
+        transportRow?.lead_time_max_days ?? fulfillment?.lead_time_max_days ?? option?.lead_time_max_days ?? null,
+    },
     transport,
     direct,
     pricing_basis: pricingBasis,

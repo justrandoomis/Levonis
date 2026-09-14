@@ -201,7 +201,15 @@ export default function PricePreview({
               strong
             />
             <Row ar="مصدر السعر" en="source" v={
-              quote.price_source === 'color' ? 'اللون / color' : quote.price_source === 'option' ? 'الخيار / option' : 'الأساسي / base'
+              quote.price_source === 'color'
+                ? 'اللون / color'
+                : quote.price_source === 'transport'
+                  ? 'الشحن / transport'
+                  : quote.price_source === 'fulfillment'
+                    ? 'نوع الطلب / order type'
+                    : quote.price_source === 'option'
+                      ? 'الخيار / option'
+                      : 'الأساسي / base'
             } />
             {quote.prime_iqd !== null && (
               <Row ar="سعر PRIME" en="PRIME price" v={formatIqd(quote.prime_iqd)} />

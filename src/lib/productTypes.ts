@@ -279,7 +279,8 @@ export interface ResolvedPriceV2 {
   prime_iqd: number | null;
   applied_iqd: number;
   applied_tier: 'regular' | 'pro' | 'prime';
-  price_source: 'color' | 'option' | 'base';
+  /** Which rung set the regular price — 0073 added `fulfillment` and `transport`. */
+  price_source: 'color' | 'transport' | 'fulfillment' | 'option' | 'base';
   transport: { method: string; commission_iqd: number; waived: boolean } | null;
   warranty: ResolvedWarrantyV2 | null;
   unit_subtotal_iqd: number;

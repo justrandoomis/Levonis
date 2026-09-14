@@ -61,6 +61,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   },
   { table: 'product_images', by: { column: 'product_id' } },
   { table: 'product_variants', by: { column: 'product_id' } },
+  // The fulfilment/transport cells (migration 0073) hang off an option row and
+  // are deleted before it — transports first, since they name a fulfilment.
+  { table: 'product_option_transports', by: { column: 'product_id' } },
+  { table: 'product_option_fulfillment', by: { column: 'product_id' } },
   { table: 'product_option_values', by: { column: 'product_id' } },
   { table: 'product_option_groups', by: { column: 'product_id' } },
   { table: 'product_colors', by: { column: 'product_id' } },

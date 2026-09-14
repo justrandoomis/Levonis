@@ -25,6 +25,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('catalog', [
     'products', 'product_option_groups', 'product_option_values', 'product_colors', 'product_color_option_links',
     'product_variants', 'product_images', 'product_facets', 'product_catalogs', 'product_translations', 'glossary',
+    // The MODEL x ORDER TYPE cell and the MODEL x PRE-ORDER x TRANSPORT cell
+    // (migration 0073). Catalogue shape and catalogue pricing, so they belong
+    // to the same owner as the option rows they hang off.
+    'product_option_fulfillment', 'product_option_transports',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
     // A bundle and a mystery offer ARE `products` rows (docs/BUNDLES_MYSTERY.md §1.2);
     // their composition is catalogue structure, beside options and colours.
