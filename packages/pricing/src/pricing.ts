@@ -58,6 +58,7 @@
 
 import { safeParse } from './json';
 import { effectiveAvailability } from './availability';
+import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
 
 export type Tier = 'free' | 'plus' | 'pro' | 'prime';
@@ -301,12 +302,68 @@ export interface WarrantyPlanV2 {
   active: boolean;
 }
 
+/**
+ * THE ORIGINAL, AND NOW NARROWEST, MEMBER-DISCOUNT RULE.
+ *
+ * One store-wide percentage for PRO, with no ceiling, no category, no
+ * quantity limit and no PREMIUM equivalent. Superseded by
+ * `membership_benefit_rules` (migration 0074) and kept because five routes and
+ * a dozen tests still speak it: `memberFallback` below takes precedence, and
+ * this shape is normalised into the same mechanism when no rule is supplied,
+ * so there is exactly ONE code path that turns a rule into a member price.
+ */
 export interface ProPricingPolicy {
   mode: 'explicit_only' | 'global_percent';
   percent: number | null; // e.g. 10 → 10% off regular, only in global_percent mode
 }
 
 export const DEFAULT_PRO_POLICY: ProPricingPolicy = { mode: 'explicit_only', percent: null };
+
+/**
+ * The rules that apply to THIS line, already selected by specificity. Null for
+ * a tier means no configured benefit — which is not the same as a zero
+ * discount: it means the tier's price is whatever the ladder says, and for a
+ * product with no explicit member price that is the regular price.
+ */
+export interface MemberFallback {
+  pro: BenefitRule | null;
+  prime: BenefitRule | null;
+}
+
+/** The legacy policy, expressed as the one rule shape the resolver uses. */
+export function fallbackFromProPolicy(policy: ProPricingPolicy): MemberFallback {
+  if (policy.mode !== 'global_percent' || policy.percent === null || !(policy.percent > 0)) {
+    return { pro: null, prime: null };
+  }
+  return {
+    pro: {
+      id: 'legacy:proPricingPolicy',
+      tier: 'pro',
+      benefit_type: 'product_discount',
+      scope: 'global',
+      category_id: null,
+      sub_category_id: null,
+      product_id: null,
+      discount_mode: 'percent',
+      percent: policy.percent,
+      fixed_iqd: null,
+      max_discount_iqd: null,
+      cap_scope: null,
+      max_quantity: null,
+      min_subtotal_iqd: null,
+      free_shipping_threshold_iqd: null,
+      shipping_methods: null,
+      max_shipping_subsidy_iqd: null,
+      cod_tax_exempt: null,
+      enabled: true,
+      priority: 0,
+      valid_from: null,
+      valid_until: null,
+      label: 'Store-wide PRO percentage (legacy setting)',
+    },
+    prime: null,
+  };
+}
 
 export interface PricingProduct {
   price_iqd: number; // base regular (required, canonical)
@@ -371,6 +428,15 @@ export interface ResolvedPrice {
   cost_iqd: number | null; // admin only — strip before public serialization
   /** Which rung set the REGULAR price. See PriceSource for the walk order. */
   price_source: PriceSource;
+  /**
+   * WHICH CONFIGURED RULE PRODUCED A MEMBER PRICE, per tier, or null when the
+   * price came from a typed number on the line (or from nothing at all).
+   *
+   * The order snapshot keeps this so a receipt can name the benefit that was
+   * applied, and so a later change to the rules can be told apart from a
+   * change to the product's own prices when a total is questioned.
+   */
+  member_rule: { pro: string | null; prime: string | null };
   /**
    * WHAT THIS LINE IS, once the model's own cells have been read — written
    * into the order snapshot so a receipt never has to re-derive it.
@@ -699,6 +765,17 @@ export function resolveUnitPrice(input: {
   tier: Tier;
   tierActive: boolean;
   proPolicy?: ProPricingPolicy;
+  /**
+   * THE CONFIGURED MEMBERSHIP BENEFIT for this line's product, one rule per
+   * tier, already selected by specificity (product > sub-section > section >
+   * tier default) by whoever read the table.
+   *
+   * It is a FALLBACK, exactly as `proPolicy` always was: a line carrying an
+   * explicit member price of its own keeps it, because an owner who typed the
+   * number a PRO member pays for this product has already answered the
+   * question, and applying a rule on top would discount the discount.
+   */
+  memberFallback?: MemberFallback;
   transportDefaults?: Array<{ method: string; commission_iqd: number }>;
   /**
    * How a PRE-ORDER line is paid. 'prepaid' (the default, and the only thing
@@ -718,6 +795,7 @@ export function resolveUnitPrice(input: {
 }): ResolvedPrice {
   const { product } = input;
   const proPolicy = input.proPolicy ?? DEFAULT_PRO_POLICY;
+  const memberFallback = input.memberFallback ?? fallbackFromProPolicy(proPolicy);
   const preorderPricing: PreorderPricing = input.preorderPricing === 'cod' ? 'cod' : 'prepaid';
   const errors: string[] = [];
   // The direct-sale premium, read once: it decides both what a direct-priced
@@ -788,19 +866,33 @@ export function resolveUnitPrice(input: {
   const regularIqd = regular.value ?? product.price_iqd;
   if (!Number.isInteger(regularIqd) || regularIqd < 0) errors.push('REGULAR_PRICE_INVALID');
 
-  // PRO resolution: explicit price, else policy, else (below) the line's PRIME
-  // price, else none.
-  let proIqd: number | null = null;
-  if (proExplicit.value !== null && proExplicit.value !== undefined) {
-    proIqd = proExplicit.value;
-  } else if (proPolicy.mode === 'global_percent' && proPolicy.percent !== null && proPolicy.percent > 0) {
-    proIqd = Math.max(0, regularIqd - Math.floor((regularIqd * proPolicy.percent) / 100));
-  }
+  /**
+   * MEMBER PRICES: an explicit number first, then the configured rule.
+   *
+   * The order is the whole precedence policy in two lines. A typed
+   * `pro_price_iqd` is the owner's answer for this exact product and wins over
+   * any rule; where they typed nothing, the rule that matches most specifically
+   * decides. Nothing adds the two together.
+   *
+   * PREMIUM resolves the same way now. It used to be explicit-price-only —
+   * "§5 defines the PRIME discount as a per-product price" — which is exactly
+   * the limitation that made a PREMIUM printer discount impossible to state
+   * once instead of per printer.
+   */
+  const memberPrice = (
+    explicit: number | null | undefined,
+    rule: BenefitRule | null
+  ): { value: number | null; rule_id: string | null } => {
+    if (explicit !== null && explicit !== undefined) return { value: explicit, rule_id: null };
+    const off = unitDiscountIqd(regularIqd, rule);
+    if (off <= 0) return { value: null, rule_id: null };
+    return { value: Math.max(0, regularIqd - off), rule_id: rule?.id ?? null };
+  };
 
-  // PRIME resolution: explicit price only — no store-wide percentage policy,
-  // because §5 defines the PRIME discount as a per-product/per-variant price.
-  let primeIqd: number | null =
-    primeExplicit.value !== null && primeExplicit.value !== undefined ? primeExplicit.value : null;
+  const proResolved = memberPrice(proExplicit.value, memberFallback.pro);
+  const primeResolved = memberPrice(primeExplicit.value, memberFallback.prime);
+  let proIqd: number | null = proResolved.value;
+  let primeIqd: number | null = primeResolved.value;
 
   // The ladder the customer is charged from is PRO <= PRIME <= Regular, and a
   // PRO member never pays more than a PRIME member (clampMemberLadder). The
@@ -1003,6 +1095,7 @@ export function resolveUnitPrice(input: {
     prime_iqd: primeIqd,
     applied_iqd: appliedIqd,
     applied_tier: appliedTier,
+    member_rule: { pro: proResolved.rule_id, prime: primeResolved.rule_id },
     cost_iqd: cost.value ?? null,
     price_source: regular.source,
     fulfillment: {

@@ -76,6 +76,18 @@ export const ENTITLEMENT_MINIMUM_TIER = {
   premiumDelivery: 'prime',
   premiumRewards: 'prime',
 
+  /**
+   * The cash-on-delivery tax exemption, as an entitlement an admin can
+   * restrict on one account the way every other benefit can be.
+   *
+   * Minimum tier PREMIUM, not PRO, and the distinction is the point: the
+   * entitlement says which tiers MAY be exempt, and the configured rule in
+   * `membership_benefit_rules` says whether they actually are. PREMIUM ships
+   * with a rule that says no. Putting the answer in the rule rather than in
+   * this table is what lets the owner change it without a deploy.
+   */
+  codTaxExemption: 'prime',
+
   proPricing: 'pro',
   freeDelivery: 'pro',
   noPreorderCommission: 'pro',

@@ -75,6 +75,12 @@ export const OWNED_TABLES: OwnedTable[] = [
   // ---- stock and pricing history owned by the product --------------------
   { table: 'inventory_ledger', by: { column: 'product_id' } },
   { table: 'price_history', by: { column: 'product_id' } },
+  // A membership benefit rule SCOPED TO THIS PRODUCT (migration 0074) is the
+  // product's own configuration and goes with it. Leaving it behind would let
+  // the next product to take this id inherit a discount nobody wrote for it —
+  // the exact class of residue this registry exists to prevent. Tier-wide and
+  // category rules carry no product_id and are untouched.
+  { table: 'membership_benefit_rules', by: { column: 'product_id' } },
   // ---- customer state that must not become a ghost -----------------------
   { table: 'favorites', by: { column: 'product_id' } },
   // Before `cart_items`, and by BOTH routes into it: a choice row can name this

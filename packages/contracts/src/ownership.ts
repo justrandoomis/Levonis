@@ -58,7 +58,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'wallet_deposit_meta', 'wallet_review_requests', 'admin_tg_identities', 'bnpl_accounts', 'bnpl_ledger', 'points_accruals',
     'points_reservations', 'points_awards', 'reward_claims', 'browse_sessions', 'mission_streaks', 'ticket_ledger', 'game_sessions',
   ]),
-  ...owned('subscriptions', ['membership_plans', 'memberships', 'entitlement_snapshots']),
+  ...owned('subscriptions', [
+    'membership_plans', 'memberships', 'entitlement_snapshots',
+    // What a membership is WORTH, and the versions an order was priced under.
+    'membership_benefit_rules', 'membership_benefit_versions',
+  ]),
   ...owned('referrals', ['referral_codes', 'referral_attributions', 'referral_rewards', 'support_gift_entitlements']),
   ...owned('marketplace', [
     'community_requests', 'community_request_files', 'community_offers', 'community_orders', 'community_order_items',
