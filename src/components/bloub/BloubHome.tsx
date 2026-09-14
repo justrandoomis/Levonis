@@ -1,5 +1,6 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
+import { useMascotReducedMotion } from './useMascotReducedMotion';
 import { type MascotDirection, type MascotState } from '../../lib/mascot';
 export type { BloubState } from './events';
 
@@ -28,7 +29,7 @@ export const BLOUB_VIEWBOX = '3 3 94 94';
 export default function BloubHome({ state = 'idle', direction = { x: 0, y: 0 }, sequence = 0, className = '' }: {
   state?: MascotState; direction?: MascotDirection; sequence?: number; className?: string;
 }) {
-  const reduced = !!useReducedMotion();
+  const reduced = useMascotReducedMotion();
   const travelling = state === 'navigating' || state === 'returning';
   const happy = state === 'success';
   const rest = state === 'sleep';

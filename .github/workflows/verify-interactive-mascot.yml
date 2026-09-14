@@ -34,7 +34,7 @@ jobs:
       - name: Controller, authorized typing routes and migrations
         run: |
           mkdir -p /tmp/mascot-proof
-          node --import tsx --test tests/mascotController.test.ts tests/chatPresence.test.ts tests/chatPresenceRoutes.test.ts tests/bloubGeometry.test.ts tests/bloubNavigation.test.ts > /tmp/mascot-proof/focused.log 2>&1
+          node --import tsx --test tests/mascotController.test.ts tests/mascotMotionPreference.test.ts tests/chatPresence.test.ts tests/chatPresenceRoutes.test.ts tests/bloubGeometry.test.ts tests/bloubNavigation.test.ts > /tmp/mascot-proof/focused.log 2>&1
           tail -20 /tmp/mascot-proof/focused.log
           node scripts/migrate-check.mjs --twice > /tmp/mascot-proof/migrations.log 2>&1
       - name: Build a standalone local fixture for reproducible offline review
