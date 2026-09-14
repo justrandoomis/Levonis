@@ -18,7 +18,10 @@
  * short by design:
  *
  *  1. `data-mascot="…"` — the explicit opt-in, and the way new controls join.
- *  2. A handful of `data-testid`s that already exist on this app's three
+ *  2. `.lv-button-primary` — the design system's own "this is the primary
+ *     action here" token. A new primary button is noticed the day it is
+ *     written, without anybody remembering to tell the mascot about it.
+ *  3. A handful of `data-testid`s that already exist on this app's three
  *     genuine commerce CTAs. Reusing them means the behaviour works today, on
  *     the buttons that actually matter, without editing three pages to say
  *     something those pages already say.
@@ -47,9 +50,25 @@ const KNOWN_CTA_TESTIDS = new Set([
   'checkout-place-order',
 ]);
 
+/**
+ * THE DESIGN SYSTEM'S OWN "this is the primary action here" token.
+ *
+ * `.lv-button-primary` (src/index.css) is declared once and used at twenty-odd
+ * sites, and it already carries exactly the meaning the character needs: the
+ * one button on this screen that commits the user to something. Reading it
+ * means a new primary button is noticed the day it is written, without anybody
+ * remembering to tell the mascot about it.
+ *
+ * It does NOT cover everything — auth submits use a different component,
+ * several storefront buttons are bespoke Tailwind — and that is what
+ * `data-mascot` is for. Between them the rule stays: importance is declared,
+ * never inferred from text or from being a button at all.
+ */
+const PRIMARY_CLASS = 'lv-button-primary';
+
 /** The selector the delegated listener climbs to. Interest is a property of a
  *  CONTROL, so a hover on the label inside a button resolves to the button. */
-const CONTROL = 'button, a[href], [role="button"], summary, input[type="submit"], [data-mascot]';
+const CONTROL = `button, a[href], [role="button"], summary, input[type="submit"], [data-mascot], .${PRIMARY_CLASS}`;
 
 export interface InterestTarget {
   kind: Exclude<InterestKind, 'ignore'>;
@@ -74,6 +93,7 @@ export function classify(element: Element | null): InterestKind | null {
   }
   const testid = element.getAttribute('data-testid');
   if (testid && KNOWN_CTA_TESTIDS.has(testid)) return 'cta';
+  if (element.classList.contains(PRIMARY_CLASS)) return 'cta';
   return null;
 }
 

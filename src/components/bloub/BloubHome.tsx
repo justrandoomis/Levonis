@@ -30,7 +30,7 @@ export interface CharacterHandle {
 
 /** The frame the markup is born with, so the very first paint — before any
  * loop has run — is already the character at rest rather than an empty box. */
-const FIRST: CharacterRender = sampleCharacter({ t: 0, state: 'idle', from: null, age: 9, travel: null, attention: null, reduced: false });
+const FIRST: CharacterRender = sampleCharacter({ t: 0, state: 'idle', from: null, age: 9, travel: null, attention: null, intro: null, reduced: false });
 
 interface Props {
   state?: MascotState;

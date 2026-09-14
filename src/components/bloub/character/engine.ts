@@ -68,7 +68,18 @@ export interface CharacterInput {
    * deserves, whatever happened before it. The loop owns the follower; this
    * function is handed the result.
    */
-  attention: Attention | null;
+  attention?: Attention | null;
+  /**
+   * §18 — SECONDS SINCE THE CHARACTER FIRST APPEARED, or null once the
+   * introduction is over.
+   *
+   * On a cold first visit the character owns the middle of the screen for a
+   * moment, and the brief asks it not to be found already smiling there. It
+   * OPENS: eyes shut, then a first look, then a blink, then it notices where
+   * it is. The whole thing is a function of this one number, so it is
+   * samplable and cannot desynchronise from anything else on the frame.
+   */
+  intro?: number | null;
   reduced: boolean;
 }
 
@@ -122,6 +133,45 @@ function searchGaze(t: number): { yaw: number; pitch: number } {
   };
 }
 
+/**
+ * THE FIRST TWO SECONDS OF THE CHARACTER'S LIFE.
+ *
+ * Four beats, and every one of them is a lid or a gaze rather than a motion:
+ * a creature waking up does not move, it opens.
+ *
+ *   0.00-0.28  shut. Present, and not yet awake.
+ *   0.28-0.62  opening — a slow lift, not a snap, because the lid is the
+ *              expression here and a fast one reads as a flinch.
+ *   0.62-1.05  a first look aside, the way anything does when it finds itself
+ *              somewhere: not at the viewer, past them.
+ *   1.05-1.22  a blink, which is what makes the opening read as an EYE rather
+ *              than as an animation of an ellipse.
+ *   1.22+      awake; the introduction contributes nothing and the ordinary
+ *              state takes over completely.
+ *
+ * Returns a multiplier on the lid and an additional gaze, both of which reach
+ * zero exactly at the end, so there is no step out of it.
+ */
+export function introOverlay(age: number): { lid: number; yaw: number; pitch: number } | null {
+  if (age >= 1.22) return null;
+  const at = Math.max(0, age);
+  if (at < 0.28) return { lid: 0.04, yaw: 0, pitch: 0 };
+  if (at < 0.62) {
+    // easeOutCubic on the lid: quick past the first sliver, slow into open.
+    const k = (at - 0.28) / 0.34;
+    return { lid: 0.04 + (1 - 0.04) * (1 - (1 - k) ** 3), yaw: 0, pitch: 0 };
+  }
+  if (at < 1.05) {
+    // The look. A half-sine so it leaves and returns without a corner.
+    const k = (at - 0.62) / 0.43;
+    const swing = Math.sin(Math.PI * k);
+    return { lid: 1, yaw: -13 * swing, pitch: 5 * swing };
+  }
+  const k = (at - 1.05) / 0.17;
+  // One blink: down and back up inside the beat.
+  return { lid: 1 - Math.sin(Math.PI * k) * 0.94, yaw: 0, pitch: 0 };
+}
+
 /** Resolve the pose in flight: the state being entered, blended out of the
  * pose that was actually on screen, on the incoming state's own curve. */
 export function currentPose(input: CharacterInput): Pose {
@@ -146,7 +196,7 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
    */
   const attention = travel && travel.lead > 0 && input.attention
     ? { ...input.attention, weight: input.attention.weight * (1 - travel.lead), curiosity: input.attention.curiosity * (1 - travel.lead) }
-    : input.attention;
+    : input.attention ?? null;
   const pose = applyAttention(currentPose(input), attention, reduced);
 
   // Idle life runs UNDERNEATH whatever the state is doing, damped by the
@@ -155,7 +205,16 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
   const life = liveliness(t, { wander: reduced ? 0 : pose.wander, float: !reduced });
   // A blink that is fading out closes less far each frame rather than being
   // cut off partway down.
-  const lidLife = 1 - (1 - life.lid) * clamp(pose.blink);
+  let lidLife = 1 - (1 - life.lid) * clamp(pose.blink);
+
+  // §18. The introduction multiplies the lid rather than replacing it, so a
+  // blink that happens to land inside the opening still closes the eye — the
+  // two are the same mechanism and must not fight over it.
+  // `typeof`, not `!== null`: an omitted field is `undefined`, and passing
+  // that to the overlay produced NaN lids — an eye matrix full of NaN, which
+  // renders as nothing at all and is invisible in a diff.
+  const intro = typeof input.intro === 'number' ? introOverlay(input.intro) : null;
+  if (intro) lidLife = Math.min(lidLife, intro.lid);
   const flick = reduced || pose.wander <= 0 ? { yaw: 0, pitch: 0 } : saccade(t);
 
   let gaze: HeadGaze = {
@@ -163,6 +222,10 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     pitch: pose.gaze.pitch + life.dPitch + flick.pitch * pose.wander,
     roll: pose.gaze.roll + life.dRoll,
   };
+
+  if (intro) {
+    gaze = { yaw: gaze.yaw + intro.yaw, pitch: gaze.pitch + intro.pitch, roll: gaze.roll };
+  }
 
   if (pose.sweep > 0 && !reduced) {
     const sweep = searchGaze(t);

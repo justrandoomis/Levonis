@@ -71,6 +71,21 @@ function Fixture() {
           <button id="notification" onClick={()=>notify.observe(++unread)}>New notification</button>
         </div>
         <PresenceProbe active={location.pathname.startsWith('/chat/')} />
+        {/* THE THREE CLASSES OF CONTROL THE CHARACTER SORTS THE PAGE INTO.
+            `interest.ts` decides what is worth noticing by a declared registry
+            rather than by text or by being a button, so the fixture carries one
+            of each kind: the design system's own primary token, an explicit
+            opt-in stepper, an explicit opt-out, and a plain button that is
+            invisible to the character on purpose. */}
+        <div className="flex flex-wrap gap-3">
+          <button id="cta-primary" className="lv-button lv-button-primary">Primary action</button>
+          <button id="qty-inc" data-mascot="qty-inc">+</button>
+          <button id="decoy-ignored" data-mascot="ignore">Explicitly ignored</button>
+          <button id="decoy-plain">Plain button</button>
+        </div>
+        {/* Tall enough to scroll: the pointer listeners are passive, and the
+            only way to prove that from outside is to scroll while they run. */}
+        <div id="tall" style={{ height: '2400px' }} aria-hidden />
       </main>
       {!focused && <BottomNav />}
     </div>

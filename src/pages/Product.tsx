@@ -1,4 +1,5 @@
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
+import { mascot } from '../lib/mascot';
 /**
  * Product detail (integrated mandate §7).
  *
@@ -678,6 +679,24 @@ export default function Product() {
   const [transportMethod, setTransportMethod] = useState('');
   const [warrantyPlanId, setWarrantyPlanId] = useState('');
   const [qty, setQty] = useState(1);
+  /**
+   * §11 — THE CHARACTER WATCHES THE QUANTITY, and the controller decides what
+   * that is worth.
+   *
+   * The stepper here is pure local state with no request behind it, so the
+   * API-level feedback the rest of the app rides on cannot see it at all. This
+   * is the only place that knows the number changed. It reports the change and
+   * nothing more: whether a step up is a glance, a run of them is interest, or
+   * a jump is genuinely surprising is escalation policy, and that lives in
+   * `mascot.quantity` where the run is remembered.
+   */
+  const stepQty = React.useCallback((next: (q: number) => number) => {
+    setQty((q) => {
+      const to = next(q);
+      if (to !== q) mascot.quantity(to, q);
+      return to;
+    });
+  }, []);
   /**
    * THE ORDER TYPE THE CUSTOMER ACTUALLY CHOSE — and '' until they do.
    *
@@ -2033,7 +2052,8 @@ export default function Product() {
         <button
           type="button"
           aria-label={s.decrease}
-          onClick={() => setQty((q) => Math.max(1, q - 1))}
+          data-mascot="qty-dec"
+          onClick={() => stepQty((q) => Math.max(1, q - 1))}
           disabled={qty <= 1}
           className="w-10 h-10 flex items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.06] disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
@@ -2043,7 +2063,8 @@ export default function Product() {
         <button
           type="button"
           aria-label={s.increase}
-          onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+          data-mascot="qty-inc"
+          onClick={() => stepQty((q) => Math.min(maxQty, q + 1))}
           disabled={qty >= maxQty}
           className="w-10 h-10 flex items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.06] disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
@@ -2069,7 +2090,8 @@ export default function Product() {
         <button
           type="button"
           aria-label={s.decrease}
-          onClick={() => setQty((q) => Math.max(1, q - 1))}
+          data-mascot="qty-dec"
+          onClick={() => stepQty((q) => Math.max(1, q - 1))}
           disabled={qty <= 1}
           className="w-11 h-11 flex items-center justify-center rounded-s-lg text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
@@ -2081,7 +2103,8 @@ export default function Product() {
         <button
           type="button"
           aria-label={s.increase}
-          onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+          data-mascot="qty-inc"
+          onClick={() => stepQty((q) => Math.min(maxQty, q + 1))}
           disabled={qty >= maxQty}
           className="w-11 h-11 flex items-center justify-center rounded-e-lg text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >

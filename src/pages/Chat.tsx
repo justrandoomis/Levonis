@@ -520,6 +520,7 @@ export default function Chat() {
              <button
                type="button"
                aria-label={dir === 'rtl' ? 'إرسال الرسالة' : 'Send message'}
+               data-mascot="send"
                className="min-w-11 min-h-11 inline-flex items-center justify-center text-[#101114] bg-[#ece8dc] rounded-md hover:bg-[#fffaf0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                onClick={handleSendMessage}
              >
@@ -529,6 +530,7 @@ export default function Chat() {
             <button
               type="button"
               data-chat-plus
+              data-mascot="upload"
               aria-label={dir === 'rtl' ? 'إرفاق' : 'Attach'}
               aria-expanded={isPlusMenuOpen}
               className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-primary hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus relative"

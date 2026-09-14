@@ -327,6 +327,7 @@ export default function ReviewSheet({
                     onClick={submit}
                     disabled={!canSubmit}
                     data-submit-review
+                    data-mascot="review"
                     className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-white text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-50 inline-flex items-center justify-center gap-2"
                   >
                     {busy && <Spinner size="sm" delayMs={0} decorative className="text-white" />}

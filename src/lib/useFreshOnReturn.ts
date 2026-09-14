@@ -28,6 +28,7 @@
  *     so a reload never lands under a dialog they are typing in.
  */
 import { useEffect, useRef } from 'react';
+import { duringBackgroundRefresh } from './mascotRequest';
 
 export interface FreshOnReturnOptions {
   /** Ignore a wake that arrives within this long of the last refresh. */
@@ -70,7 +71,7 @@ export function useFreshOnReturn(
   useEffect(() => {
     let cancelled = false;
 
-    const run = async (force: boolean) => {
+    const run = async (force: boolean, background = false) => {
       if (cancelled || inFlightRef.current) return;
       if (!enabledRef.current) {
         pendingRef.current = true;
@@ -82,7 +83,10 @@ export function useFreshOnReturn(
       inFlightRef.current = true;
       lastRef.current = now;
       try {
-        await fnRef.current();
+        // A refresh the USER caused (a wake, a return to the tab) is work they
+        // are waiting for and the mascot may say so. One this hook started on
+        // a timer is housekeeping, and the character must not perform it.
+        await (background ? duringBackgroundRefresh(() => fnRef.current()) : fnRef.current());
       } catch {
         // The caller owns its own error surface; a failed refresh must never
         // replace what is already on screen with an exception.
@@ -107,7 +111,7 @@ export function useFreshOnReturn(
     let timer: number | null = null;
     if (pollWhileVisibleMs > 0) {
       timer = window.setInterval(() => {
-        if (document.visibilityState === 'visible') void run(false);
+        if (document.visibilityState === 'visible') void run(false, true);
       }, pollWhileVisibleMs);
     }
 

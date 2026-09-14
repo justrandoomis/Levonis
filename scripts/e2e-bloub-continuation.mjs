@@ -92,6 +92,128 @@ async function gazeLeads(page) {
   return {turned,moved,travelled};
 }
 
+/** Hold the page still for `ms` of REAL animation frames, in one round trip. */
+const frames=(page,ms)=>page.evaluate(ms=>new Promise(done=>{const t0=performance.now();
+  const step=()=>performance.now()-t0<ms?requestAnimationFrame(step):done();requestAnimationFrame(step);}),ms);
+/** Horizontal position of the left eye, in viewBox units, read out of the one
+ *  matrix the renderer writes per frame. That matrix IS the gaze. */
+const eyeX=page=>page.locator('[data-bloub-eye="0"]').evaluate(e=>{
+  const m=e.getAttribute('transform')?.match(/matrix\(([^)]+)\)/);
+  return m?Number(m[1].trim().split(/\s+/)[4]):NaN;});
+
+/** Mean eye position over a window of real frames. The character is alive
+ *  even at rest — it drifts and it makes saccades — so a single sample carries
+ *  that noise and an average does not. */
+const meanEyeX=(page,ms)=>page.evaluate(ms=>new Promise(done=>{
+  const xs=[]; const t0=performance.now();
+  const step=()=>{
+    const m=document.querySelector('[data-bloub-eye="0"]')?.getAttribute('transform')?.match(/matrix\(([^)]+)\)/);
+    if(m) xs.push(Number(m[1].trim().split(/\s+/)[4]));
+    if(performance.now()-t0<ms) requestAnimationFrame(step);
+    else done(xs.reduce((a,b)=>a+b,0)/Math.max(1,xs.length));
+  };
+  requestAnimationFrame(step);
+}),ms);
+
+/**
+ * §4 §5 §7 — IT LOOKS AT THE POINTER, IT LAGS, AND THEN IT LETS GO.
+ *
+ * None of this can be seen in a screenshot, so it is driven with a real pointer
+ * across a real viewport and read out of the one matrix the renderer writes per
+ * frame. Three claims, all the brief's:
+ *
+ *  1. THE GAZE FOLLOWS. Left edge and right edge must put the eyes in visibly
+ *     different places.
+ *  2. IT IS A LAG, NOT A JUMP. One frame after the pointer teleports across the
+ *     screen the eyes must still be most of the way back where they were.
+ *  3. IT RELEASES (§7). After a couple of seconds of stillness the character
+ *     stops staring — which is provable without knowing where "rest" is: park
+ *     the pointer left, let go, and park it right, let go, and the two resting
+ *     gazes must agree even though the two engaged ones did not.
+ */
+async function gazeFollowsPointer(page,width) {
+  const dock=await page.locator('.lv-app-intro__character').boundingBox();
+  const y=Math.max(30,dock.y-90);
+  const park=async x=>{await page.mouse.move(x,y,{steps:10});await frames(page,700);};
+
+  await park(8);
+  const engagedLeft=await meanEyeX(page,260);
+
+  // Teleport, then read the very next frames: a follower with a 0.13s time
+  // constant cannot have arrived, and a character that snaps would have.
+  await page.mouse.move(width-8,y,{steps:1});
+  await frames(page,24);
+  const oneFrame=await eyeX(page);
+
+  await frames(page,700);
+  const engagedRight=await meanEyeX(page,260);
+  const swing=engagedRight-engagedLeft;
+  assert.ok(swing>0.5,`the eyes tracked the pointer across the viewport (${swing.toFixed(2)} viewBox units)`);
+  const arrived=(oneFrame-engagedLeft)/swing;
+  assert.ok(arrived<0.45,`the gaze lags rather than snapping (${(arrived*100).toFixed(0)}% of the way after one frame)`);
+
+  // §7: hold two to three seconds, then fade. Five seconds is past any roll.
+  await frames(page,5200);
+  const restedRight=await meanEyeX(page,420);
+  await park(8);
+  await frames(page,5200);
+  const restedLeft=await meanEyeX(page,420);
+  const forgot=Math.abs(restedRight-restedLeft);
+  assert.ok(forgot<Math.abs(swing)*0.4,
+    `the character let go of the pointer (${forgot.toFixed(2)} apart at rest vs ${Math.abs(swing).toFixed(2)} engaged)`);
+  return {swing,forgot};
+}
+
+/**
+ * §9 — IMPORTANCE IS DECLARED, AND EVERYTHING ELSE IS INVISIBLE.
+ *
+ * The fixture carries one control of each class. A character that notices the
+ * primary action and the stepper, and does NOT notice the opt-out or the plain
+ * button beside them, is the difference between perceptive and twitchy.
+ */
+async function noticesDeclaredControls(page) {
+  const mascotState=()=>page.locator('.lv-app-intro').getAttribute('data-mascot-state');
+  const hover=async id=>{await page.locator(id).hover();await frames(page,220);return mascotState();};
+  const away=async()=>{await page.mouse.move(4,4);await frames(page,900);};
+
+  assert.equal(await hover('#cta-primary'),'curious','the design system’s own primary token is noticed');
+  await away();
+  assert.equal(await hover('#qty-inc'),'curious','an explicit data-mascot opt-in is noticed');
+  await away();
+  assert.equal(await hover('#decoy-ignored'),'idle','data-mascot="ignore" silences a control that would otherwise match');
+  assert.equal(await hover('#decoy-plain'),'idle','a plain button is invisible to the character, which is the feature');
+  await away();
+
+  // A KEYBOARD USER HAS ARRIVED AT THE CONTROL TOO (§10).
+  await page.locator('#cta-primary').focus();
+  await frames(page,220);
+  assert.equal(await mascotState(),'curious','focus is arrival, not just hover');
+  await page.locator('#decoy-plain').focus();
+  await frames(page,900);
+  assert.equal(await mascotState(),'idle');
+}
+
+/**
+ * §6 §23 — THE TRACKING NEVER TAKES THE PAGE AWAY FROM THE USER.
+ *
+ * Every listener is passive and on the capture phase; a unit test pins that at
+ * the registration, and this pins the consequence: the page still scrolls, and
+ * a wheel gesture over the character is the page's, not the character's.
+ */
+async function neverCapturesTheGesture(page) {
+  await page.mouse.move(200,400);
+  await page.mouse.wheel(0,600);
+  await page.waitForFunction(()=>window.scrollY>200,null,{timeout:2000});
+  const dock=await page.locator('.lv-app-intro__character').boundingBox();
+  await page.mouse.move(dock.x+dock.width/2,dock.y+dock.height/2);
+  const before=await page.evaluate(()=>window.scrollY);
+  await page.mouse.wheel(0,-400);
+  await page.waitForFunction(before=>window.scrollY<before-100,before,{timeout:2000});
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.waitForFunction(()=>window.scrollY===0);
+  await frames(page,200);
+}
+
 async function aligned(page,kind) {
   await page.waitForFunction(kind=>{
     const a=document.querySelector(`[data-bloub-anchor="${kind}"]`)?.getBoundingClientRect();
@@ -122,7 +244,19 @@ async function dimensions(page,kind) {
   }
   return m;
 }
-const click=async(page,id)=>page.locator(id).click();
+/**
+ * Activate a control WITHOUT moving the cursor.
+ *
+ * `locator.click()` drives the real mouse, which parks the pointer on whatever
+ * was just pressed — and the character now looks at the pointer. That makes
+ * every gaze measurement taken after a click a measurement of two things at
+ * once: a journey that had already turned the eyes towards the link the user
+ * clicked reads as a smaller lead than the same journey from rest.
+ *
+ * So the ordinary flow activates controls the way the keyboard does, and the
+ * pointer is driven explicitly, only by the checks that are about the pointer.
+ */
+const click=async(page,id)=>page.locator(id).evaluate(e=>e.click());
 /** Under a reduced-motion preference the BODY must hold perfectly still: no
  * breathing, no drift, no resting wobble. Blinking is intentionally still
  * running — it is not vestibular, and a face that never blinks reads as broken
@@ -206,6 +340,15 @@ for(const [engineName,engine] of engines) {
           await page.locator('#force-rest').evaluate(e=>e.click()); await state(page,'sleep');
           await page.locator('#force-wake').evaluate(e=>e.click()); await state(page,'idle');
           assert.deepEqual(errors,[]); cases++;
+          // THE SENSES. Back to the dock first: the gaze measurements are taken
+          // relative to where the character actually is.
+          await page.locator('.lv-character-home').click(); await aligned(page,'bottom-home'); await state(page,'idle');
+          await neverCapturesTheGesture(page);
+          const gaze=await gazeFollowsPointer(page,width);
+          await noticesDeclaredControls(page);
+          assert.deepEqual(errors,[]);
+          console.log(`ok ${engineName} ${lang} ${width}: gaze swung ${gaze.swing.toFixed(2)} units across the viewport, let go to within ${gaze.forgot.toFixed(2)}, noticed only declared controls, never took the scroll`);
+          cases++;
         }
       } catch(e) {
         const diagnostic=await page.evaluate(()=>({state:document.querySelector('.lv-app-intro')?.getAttribute('data-mascot-state'),phase:document.querySelector('.lv-app-intro')?.getAttribute('data-phase'),history:window.__states,html:document.querySelector('.lv-app-intro')?.outerHTML}));

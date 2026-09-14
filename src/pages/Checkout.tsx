@@ -16,6 +16,7 @@ import Note from '../components/ui/Note';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
 import AddressForm from '../components/address/AddressForm';
 import { apiRefusal } from '../lib/refusalStrings';
+import { mascot } from '../lib/mascot';
 /**
  * The tier's CUSTOMER-FACING NAME. `prime` is PREMIUM on every screen in the
  * store, and `tierMeta` is the one table that says so — nothing here branches
@@ -900,6 +901,16 @@ export default function Checkout() {
       setPlacedInvoiceNo(data.invoice_no ?? null);
       setPlacedOrder(data.order);
       refreshWallet().catch(() => {});
+      /**
+       * §15 — THE ONE MOMENT THAT DESERVES MORE THAN THE HOUSE SUCCESS.
+       *
+       * Every mutation in the app already drives a small success face through
+       * the request funnel, which is right for adding a filament to the cart
+       * and much too small for the order it has been building towards. The
+       * page names what happened; the controller decides what that looks like
+       * and outranks the generic reaction it has already queued.
+       */
+      mascot.outcome('ordered');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         navigate('/auth');

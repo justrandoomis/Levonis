@@ -6,6 +6,7 @@ import {
   ShieldCheck, FileText, Sparkles,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
+import { mascot } from '../lib/mascot';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
@@ -675,6 +676,11 @@ export default function Cart() {
     }
     const newQty = clampQty(item, item.qty + delta);
     if (newQty === item.qty) return;
+    // §11. Reported before the request, because the character is reacting to
+    // what the USER did — and at the stock ceiling there is no request at all
+    // (the line above returns), so waiting for one would make the escalation
+    // stop working exactly where a large quantity becomes interesting.
+    mascot.quantity(newQty, item.qty);
     // Optimistic update, reconciled with the server's returned cart.
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, qty: newQty } : i)));
     const seq = (qtySeqRef.current.get(item.id) ?? 0) + 1;
@@ -700,6 +706,11 @@ export default function Cart() {
     try {
       const data = await api.delete<CartWriteResponse>(`/api/cart/items/${item.id}`);
       applyCartWrite(data);
+      // §14 — the funnel's blanket «a mutation succeeded» would congratulate
+      // the customer for emptying their cart. The user asked for this: the
+      // character notices it and does not celebrate it, and does not sulk
+      // about it either.
+      mascot.outcome('removed');
     } catch (err) {
       setError(cartRefusal(err, 'Failed to remove item'));
       loadCart();
@@ -1504,6 +1515,7 @@ export default function Cart() {
                         <button
                           type="button"
                           aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
+                          data-mascot="qty-dec"
                           onClick={() => updateQuantity(item, -1)}
                           disabled={item.qty <= 1}
                           className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
@@ -1519,6 +1531,7 @@ export default function Cart() {
                         <button
                           type="button"
                           aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
+                          data-mascot="qty-inc"
                           onClick={() => updateQuantity(item, 1)}
                           disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
                           className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"

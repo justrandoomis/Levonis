@@ -239,6 +239,7 @@ export default function FillButton({
         id={id}
         type="submit"
         disabled={disabled}
+        data-mascot="auth"
         aria-disabled={disabled || undefined}
         aria-busy={submitting || undefined}
         aria-describedby={showHint ? hintId : undefined}

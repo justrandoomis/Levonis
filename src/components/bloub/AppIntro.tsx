@@ -228,6 +228,12 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     };
 
     let lastFrameAt = 0;
+    /**
+     * When the character first appeared. Null once the opening is spent, so
+     * `introOverlay` is not called sixty times a second for the rest of the
+     * session to be told the same nothing.
+     */
+    let introAt: number | null = performance.now();
 
     const tick = (now: number) => {
       rafId = running ? window.requestAnimationFrame(tick) : 0;
@@ -235,6 +241,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // enormous step that teleports the gaze — the very thing §4 forbids.
       const dt = lastFrameAt ? Math.min(0.05, Math.max(0, (now - lastFrameAt) / 1000)) : 1 / 60;
       lastFrameAt = now;
+      if (introAt !== null && now - introAt > 1400) introAt = null;
       let travel: TravelSample | null = null;
       const journey = journeyRef.current;
       if (journey) {
@@ -256,6 +263,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         age: (now - b.since) / 1000,
         travel,
         attention: aimAt(now, dt),
+        // §18: the opening runs from the character's own first frame and is
+        // over inside 1.4s, before any journey can start. `introAt` is stamped
+        // when this loop is created — once per page load — so a client-side
+        // route change, which never remounts this component, cannot replay it.
+        intro: introAt === null ? null : (now - introAt) / 1000,
         reduced: reducedRef.current,
       });
       livePose.current = render.pose;

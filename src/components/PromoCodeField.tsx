@@ -23,6 +23,7 @@
 import { useState } from 'react';
 import { Tag, Check, X, Loader2 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
+import { mascot } from '../lib/mascot';
 
 export const PROMO_STORAGE_KEY = 'levonis.promo_code';
 
@@ -164,11 +165,19 @@ export default function PromoCodeField({
         setApplied(null);
         storePromo('');
         onApplied?.('');
+        // THE REQUEST SUCCEEDED AND THE THING THE USER WANTED DID NOT HAPPEN.
+        // This route answers a refused code with a 200, so the client's blanket
+        // «a mutation that returned is a success» rule cannot see the
+        // difference and deliberately stays out of it. Only this screen knows,
+        // so this screen says so — the face reads the application result,
+        // which is what the brief's §13 asks for.
+        mascot.outcome('rejected');
         return;
       }
       setApplied(res);
       storePromo(res.code ?? code);
       onApplied?.(res.code ?? code);
+      mascot.outcome('saved');
     } catch (err) {
       const code2 = err instanceof ApiError ? err.code ?? '' : '';
       setError(s.reasons[code2] ?? (err instanceof Error ? err.message : ''));
@@ -234,6 +243,7 @@ export default function PromoCodeField({
             type="button"
             onClick={() => void apply()}
             disabled={busy || !input.trim()}
+            data-mascot="coupon"
             className="bg-white text-black font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-200 transition-colors min-w-[88px]"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin mx-auto" aria-label={s.checking} /> : s.apply}
