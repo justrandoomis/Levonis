@@ -21,9 +21,11 @@ import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
 import type { ProductDoc } from '../lib/productModel';
-import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY } from '../lib/pricing';
+import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
+import { activeBenefitRules, ancestryFor, catalogAncestry, fallbackFor } from '../lib/membershipBenefits';
+import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
 import { resolveStock, isLowStock } from '../lib/inventory';
@@ -118,6 +120,40 @@ export interface PricingCtx {
    * visitor, who is eligible for anything that requires no tier.
    */
   tierStatus: TierStatus | null;
+  /**
+   * THE CONFIGURED MEMBERSHIP BENEFITS (migration 0074), so a product page
+   * quotes the member price the cart and the checkout will charge.
+   *
+   * Empty for a signed-out visitor and for an inactive membership: the rules
+   * are a benefit, and a benefit without a membership is the regular price.
+   * `ancestry` lets a rule written on "Printers" reach a product filed under a
+   * sub-section of it.
+   */
+  benefitRules: readonly BenefitRule[];
+  catalogAncestry: Map<string, string[]> | null;
+  /** Frozen per request so two quotes in one response cannot disagree about
+   *  whether a dated rule was live. */
+  benefitNowIso: string;
+}
+
+/** The rule that applies to ONE product for this viewer, in the shape
+ *  `resolveUnitPrice` consults. The section comes from the product ROW. */
+export function benefitFallbackFor(
+  ctx: PricingCtx,
+  doc: { id?: string | null; category_id?: string | null; sub_category_id?: string | null }
+): MemberFallback {
+  if (!ctx.tierStatus) return { pro: null, prime: null };
+  return fallbackFor(
+    ctx.benefitRules,
+    ctx.tierStatus,
+    {
+      product_id: doc.id ?? null,
+      category_id: doc.category_id ?? null,
+      sub_category_id: doc.sub_category_id ?? null,
+      ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id ?? null, doc.sub_category_id ?? null),
+    },
+    ctx.benefitNowIso
+  );
 }
 
 // ------------------------------------------------- sale mode / availability
@@ -543,7 +579,16 @@ export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
     getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
   ]);
   const s = settings as Record<string, unknown>;
+  // A guest and a lapsed member earn nothing, so neither request pays for the
+  // two queries — the same bargain `loadPricingContext` strikes in the cart.
+  const member = !!tierInfo && tierInfo.tierStatus.active;
+  const [benefitRules, ancestry] = member
+    ? await Promise.all([activeBenefitRules(c.env.DB), catalogAncestry(c.env.DB)])
+    : [[] as BenefitRule[], null];
   return {
+    benefitRules,
+    catalogAncestry: ancestry,
+    benefitNowIso: new Date().toISOString(),
     tier: tierInfo ? tierInfo.tierStatus.tier : 'free',
     tierActive: tierInfo ? tierInfo.pricingTierActive : false,
     membershipActive: tierInfo ? tierInfo.tierStatus.active : false,
@@ -614,6 +659,7 @@ export function pricingModes(
       tierActive: ctx.tierActive,
       proPolicy: ctx.proPolicy,
       transportDefaults: ctx.transportDefaults,
+      memberFallback: benefitFallbackFor(ctx, doc),
       preorderPricing,
       isPrinter,
     });
@@ -798,6 +844,7 @@ function levelPrice(
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
+    memberFallback: benefitFallbackFor(ctx, doc),
   });
   if (offer && (doc.composition ?? '') === '' && offerEligible(ctx.tierStatus, offer, now).ok) {
     r = applyOfferToResolved(r, offer, ctx.tier, ctx.tierActive, now).resolved;
@@ -937,6 +984,7 @@ export function publicWithDisplayPrice(
       tierActive: ctx.tierActive,
       proPolicy: ctx.proPolicy,
       transportDefaults: ctx.transportDefaults,
+      memberFallback: benefitFallbackFor(ctx, doc),
     });
     if (!best || r.applied_iqd < best.applied_iqd) best = r;
     if (r.applied_iqd > maxApplied) maxApplied = r.applied_iqd;
@@ -1006,6 +1054,9 @@ export function compositionViewer(ctx: PricingCtx, nowMs = Date.now()): Composit
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
+    // The COMPONENTS carry the member's configured rule; the bundle's own
+    // price does not (see `CompositionViewer.memberFallbackFor`).
+    memberFallbackFor: (doc) => benefitFallbackFor(ctx, doc),
     status: ctx.tierStatus,
     nowMs,
   };
@@ -1441,6 +1492,7 @@ productRoutes.get('/:slug', async (c) => {
       tierActive: ctx.tierActive,
       proPolicy: ctx.proPolicy,
       transportDefaults: ctx.transportDefaults,
+      memberFallback: benefitFallbackFor(ctx, doc),
       isPrinter,
     });
     // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
@@ -1693,6 +1745,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
+    memberFallback: benefitFallbackFor(ctx, doc),
     isPrinter,
   });
   // The same printers-only rule the cart enforces, reported the way the page

@@ -81,6 +81,8 @@ import type { StockMove, StockTarget } from '../lib/inventory';
 import { benefits, pricingTierContext, preorderGiftFor, shippingEntitlementContext } from '../lib/entitlements';
 import {
   activeBenefitRules,
+  ancestryFor,
+  catalogAncestry,
   currentBenefitVersionId,
   resolveOrderBenefits,
   resolveProductBenefits,
@@ -1376,7 +1378,7 @@ async function computeCheckout(
   // approved default PRO address, and an active restriction case on
   // 'proPricing' / 'noPreorderCommission' pauses the whole pricing context.
   // 'freeDelivery' gates only the shipping waiver below.
-  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules] = await Promise.all([
+  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules, benefitAncestry] = await Promise.all([
     pricingTierContext(c.env.DB, user.id, address),
     /**
      * THE CONFIGURED MEMBERSHIP BENEFITS (migration 0074), read ONCE for the
@@ -1388,6 +1390,9 @@ async function computeCheckout(
      * THIS member earns one is decided per line by the entitlement gate.
      */
     activeBenefitRules(c.env.DB),
+    // The section tree, so a rule on "Printers" reaches a product filed under
+    // a sub-section of it (`catalogAncestry`).
+    catalogAncestry(c.env.DB),
   ]);
   /**
    * The rules the ORDER was priced with, frozen at this instant. Every pass
@@ -1400,6 +1405,7 @@ async function computeCheckout(
   const pricingCtx = pricingContextFrom(settings, {
     rules: tierStatus.active ? benefitRules : [],
     status: tierStatus,
+    ancestry: benefitAncestry,
     nowIso: benefitNowIso,
   });
   // Load and price the cart lines server-side.
@@ -1898,6 +1904,7 @@ async function computeCheckout(
             product_id: l.product_id,
             category_id: l.benefit.category_id,
             sub_category_id: l.benefit.sub_category_id,
+            ancestry: ancestryFor(benefitAncestry, l.benefit.category_id, l.benefit.sub_category_id),
             regular_unit_iqd: l.benefit.regular_unit_iqd,
             applied_unit_iqd: l.applied_iqd,
             qty: l.qty,

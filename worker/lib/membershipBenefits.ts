@@ -20,10 +20,12 @@ import {
   NO_TAX_BENEFIT,
   isUnitExpressible,
   lineBenefit,
+  SCOPE_RANK,
   selectRule,
   shippingAfterBenefit,
   shippingBenefit,
   taxBenefit,
+  withinWindow,
   type BenefitRule,
   type BenefitTarget,
   type BenefitType,
@@ -107,6 +109,49 @@ export function ruleFromRow(row: RuleRow): BenefitRule | null {
     valid_until: row.valid_until,
     label: row.label,
   };
+}
+
+/**
+ * THE SECTION TREE AS AN ANCESTOR INDEX: catalog id -> itself and every
+ * section above it.
+ *
+ * `catalogs` is a handful of rows and every cart request already reads more
+ * than this, so the walk is done here rather than in SQL. It is cycle-safe by
+ * construction (a visited set), because `adminTaxonomy` refuses a cycle at
+ * write time but a legacy row is not worth trusting with an infinite loop.
+ */
+export async function catalogAncestry(db: D1Database): Promise<Map<string, string[]>> {
+  const { results } = await db.prepare('SELECT id, parent_id FROM catalogs').all<{ id: string; parent_id: string | null }>();
+  const parent = new Map<string, string | null>();
+  for (const row of results ?? []) parent.set(String(row.id), row.parent_id ? String(row.parent_id) : null);
+  const index = new Map<string, string[]>();
+  for (const id of parent.keys()) {
+    const chain: string[] = [];
+    const seen = new Set<string>();
+    let cursor: string | null = id;
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      chain.push(cursor);
+      cursor = parent.get(cursor) ?? null;
+    }
+    index.set(id, chain);
+  }
+  return index;
+}
+
+/** The sections a product belongs to, nearest first, with every ancestor. */
+export function ancestryFor(
+  index: Map<string, string[]> | null,
+  categoryId: string | null,
+  subCategoryId: string | null
+): string[] | null {
+  if (!index) return null;
+  const out = new Set<string>();
+  for (const id of [subCategoryId, categoryId]) {
+    if (!id) continue;
+    for (const step of index.get(id) ?? [id]) out.add(step);
+  }
+  return out.size ? [...out] : null;
 }
 
 /** Every rule, including disabled ones — the admin's view. */
@@ -195,6 +240,8 @@ export interface BenefitLineInput {
   product_id: string;
   category_id: string | null;
   sub_category_id: string | null;
+  /** Every section above the two above — see `ancestryFor`. */
+  ancestry?: readonly string[] | null;
   /** The REGULAR unit price this line resolved to, before any membership. */
   regular_unit_iqd: number;
   /** What the buyer is actually charged per unit, after the ladder. */
@@ -248,7 +295,12 @@ export function resolveProductBenefits(input: {
       rules,
       status,
       'product_discount',
-      { product_id: line.product_id, category_id: line.category_id, sub_category_id: line.sub_category_id },
+      {
+        product_id: line.product_id,
+        category_id: line.category_id,
+        sub_category_id: line.sub_category_id,
+        ancestry: line.ancestry ?? null,
+      },
       nowIso,
       merchandise
     );
@@ -450,4 +502,117 @@ async function appendVersion(
     ...statements,
   ]);
   return (await currentBenefitVersionId(db)) ?? 0;
+}
+
+/* ------------------------------------------------------- the public view */
+
+export interface PublicDiscountRule {
+  rule_id: string;
+  scope: BenefitRule['scope'];
+  /** The section, sub-section or product the rule covers, named. */
+  target_id: string | null;
+  target_name_ar: string;
+  target_name_en: string;
+  discount_mode: BenefitRule['discount_mode'];
+  percent: number | null;
+  fixed_iqd: number | null;
+  max_discount_iqd: number | null;
+  cap_scope: BenefitRule['cap_scope'];
+  max_quantity: number | null;
+  min_subtotal_iqd: number | null;
+  label: string | null;
+}
+
+export interface PublicTierBenefits {
+  discounts: PublicDiscountRule[];
+  free_shipping: {
+    rule_id: string;
+    threshold_iqd: number | null;
+    methods: DeliveryMethodId[] | null;
+    max_subsidy_iqd: number | null;
+  } | null;
+  cod_tax_exempt: boolean;
+}
+
+/**
+ * WHAT THE STORE CURRENTLY PROMISES EACH TIER — the same rows the checkout
+ * reads, named and stripped of anything internal.
+ *
+ * This exists so the subscription page can STATE the benefits instead of
+ * carrying its own copy of them (§22). A percentage that lives in a React
+ * string is a promise nobody can keep: the owner lowers it in the admin, the
+ * page keeps advertising the old one, and the customer finds out at checkout.
+ *
+ * `notes` never leaves the server — it is the owner's note to themselves.
+ * Rules that are switched off or outside their window are omitted, because
+ * this is a list of what a member gets TODAY.
+ */
+export async function publicBenefitSummary(
+  db: D1Database,
+  nowIso: string
+): Promise<Record<'prime' | 'pro', PublicTierBenefits>> {
+  const [rules, { results: catalogRows }] = await Promise.all([
+    activeBenefitRules(db),
+    db.prepare('SELECT id, name_ar, name_en FROM catalogs').all<{ id: string; name_ar: string; name_en: string }>(),
+  ]);
+  const names = new Map((catalogRows ?? []).map((r) => [String(r.id), r]));
+
+  const productIds = [...new Set(rules.filter((r) => r.scope === 'product' && r.product_id).map((r) => r.product_id!))];
+  const products = new Map<string, { name_ar: string; name: string }>();
+  if (productIds.length) {
+    const { results } = await db
+      .prepare(`SELECT id, name_ar, name FROM products WHERE id IN (${productIds.map(() => '?').join(',')})`)
+      .bind(...productIds)
+      .all<{ id: string; name_ar: string; name: string }>();
+    for (const row of results ?? []) products.set(String(row.id), { name_ar: row.name_ar, name: row.name });
+  }
+
+  const empty = (): PublicTierBenefits => ({ discounts: [], free_shipping: null, cod_tax_exempt: false });
+  const out: Record<'prime' | 'pro', PublicTierBenefits> = { prime: empty(), pro: empty() };
+
+  for (const rule of rules) {
+    if (rule.tier !== 'prime' && rule.tier !== 'pro') continue;
+    if (!withinWindow(rule, nowIso)) continue;
+    const bucket = out[rule.tier];
+    if (rule.benefit_type === 'product_discount') {
+      const targetId = rule.scope === 'product' ? rule.product_id : rule.scope === 'sub_category' ? rule.sub_category_id : rule.category_id;
+      const catalog = targetId ? names.get(targetId) : undefined;
+      const product = targetId ? products.get(targetId) : undefined;
+      bucket.discounts.push({
+        rule_id: rule.id,
+        scope: rule.scope,
+        target_id: targetId ?? null,
+        target_name_ar: product?.name_ar ?? catalog?.name_ar ?? '',
+        target_name_en: product?.name ?? catalog?.name_en ?? '',
+        discount_mode: rule.discount_mode,
+        percent: rule.percent,
+        fixed_iqd: rule.fixed_iqd,
+        max_discount_iqd: rule.max_discount_iqd,
+        cap_scope: rule.cap_scope,
+        max_quantity: rule.max_quantity,
+        min_subtotal_iqd: rule.min_subtotal_iqd,
+        label: rule.label,
+      });
+    } else if (rule.benefit_type === 'free_shipping') {
+      // The most specific live rule wins here for the same reason it does at
+      // the checkout — `selectRule`'s specificity order, of which free
+      // shipping only ever uses priority.
+      if (!bucket.free_shipping || rule.priority > 0) {
+        bucket.free_shipping = {
+          rule_id: rule.id,
+          threshold_iqd: rule.free_shipping_threshold_iqd,
+          methods: rule.shipping_methods,
+          max_subsidy_iqd: rule.max_shipping_subsidy_iqd,
+        };
+      }
+    } else if (rule.benefit_type === 'cod_tax_exemption') {
+      bucket.cod_tax_exempt = rule.cod_tax_exempt === true;
+    }
+  }
+  // Most specific first, so a page listing them reads "printers, filament,
+  // then everything else" rather than in insertion order.
+  for (const tier of ['prime', 'pro'] as const) {
+    out[tier].discounts.sort((a, b) => SCOPE_RANK[b.scope] - SCOPE_RANK[a.scope]);
+  }
+  return out;
 }

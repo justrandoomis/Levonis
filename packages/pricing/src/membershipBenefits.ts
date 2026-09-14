@@ -73,6 +73,13 @@ export interface BenefitTarget {
   product_id?: string | null;
   category_id?: string | null;
   sub_category_id?: string | null;
+  /**
+   * Every section ABOVE this product's own two, so a rule written on
+   * "Printers" reaches a product filed under "Printers → FDM → Bambu".
+   * Supplied by the worker from the `catalogs` tree; omitting it falls back to
+   * exact matching (see `scopeMatches`).
+   */
+  ancestry?: readonly string[] | null;
 }
 
 /**
@@ -92,14 +99,32 @@ export const SCOPE_RANK: Record<BenefitScope, number> = {
 };
 
 /** Whether a rule's scope names this product. A global rule names everything. */
+/**
+ * A SECTION RULE COVERS THE WHOLE BRANCH BENEATH IT.
+ *
+ * The taxonomy has no fixed depth: an admin can file a product under
+ * "Printers → FDM → Bambu" and nothing stops them. Matching only the id on the
+ * product row would leave a rule on "Printers" quietly skipping that product —
+ * the discount would simply not appear, on some products, for some members,
+ * with nothing on any screen to say why. So the caller supplies the product's
+ * `ancestry` (every section above it, inclusive) and a rule matches anywhere in
+ * it. Callers with no tree to walk pass nothing and get exact matching, which
+ * is what every pure test does.
+ */
+function inBranch(ruleId: string | null, exact: string | null | undefined, ancestry: readonly string[] | null | undefined): boolean {
+  if (!ruleId) return false;
+  if (ruleId === (exact ?? null)) return true;
+  return ancestry ? ancestry.includes(ruleId) : false;
+}
+
 export function scopeMatches(rule: BenefitRule, target: BenefitTarget): boolean {
   switch (rule.scope) {
     case 'product':
       return !!rule.product_id && rule.product_id === (target.product_id ?? null);
     case 'sub_category':
-      return !!rule.sub_category_id && rule.sub_category_id === (target.sub_category_id ?? null);
+      return inBranch(rule.sub_category_id, target.sub_category_id, target.ancestry);
     case 'category':
-      return !!rule.category_id && rule.category_id === (target.category_id ?? null);
+      return inBranch(rule.category_id, target.category_id, target.ancestry);
     case 'global':
       return true;
     default:

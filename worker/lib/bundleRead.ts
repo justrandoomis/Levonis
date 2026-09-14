@@ -61,7 +61,7 @@ import { offerEligible, windowFromRow, type OfferCheck, type OfferWindow } from 
 import { resolveStock } from './inventory';
 import type { InventorySnapshot, StockResolution } from './inventory';
 import { resolveUnitPrice, clampMemberLadder } from './pricing';
-import type { PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './pricing';
+import type { MemberFallback, PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './pricing';
 import { tierInherits, type TierStatus } from './entitlements';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
@@ -231,6 +231,18 @@ export interface CompositionViewer {
   /** The membership itself, for `offerEligible`. `null` = a signed-out
    *  visitor, who is eligible unless a tier is actually required (§9). */
   status: TierStatus | null;
+  /**
+   * THE CONFIGURED MEMBERSHIP BENEFIT for one COMPONENT, supplied as a
+   * function so this module needs no database of its own.
+   *
+   * It is deliberately applied to the components and NOT to the bundle's own
+   * price. A bundle price is already a composed discount over what its parts
+   * are worth; letting a category rule take another percentage off the parent
+   * as well would discount the same goods twice — the exact stacking the
+   * benefit rules refuse elsewhere. An owner who wants a bundle cheaper for
+   * members types a member price on the bundle, which still wins outright.
+   */
+  memberFallbackFor?: (doc: { id?: string | null; category_id?: string | null; sub_category_id?: string | null }) => MemberFallback;
   nowMs: number;
   /**
    * HOW THE CUSTOMER PAYS, when the caller knows (the checkout does; a card
@@ -521,6 +533,7 @@ function resolveComponent(
       tierActive: viewer.tierActive,
       proPolicy: viewer.proPolicy,
       transportDefaults: viewer.transportDefaults,
+      memberFallback: viewer.memberFallbackFor?.(doc),
       preorderPricing: viewer.preorderPricing ?? 'prepaid',
     });
 

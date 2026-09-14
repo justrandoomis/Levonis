@@ -46,6 +46,7 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/template': 'CATALOG',
   '/api/admin/media': 'CATALOG',
   '/api/admin/taxonomy': 'CATALOG',
+  '/api/admin/membership-benefits': 'SUBSCRIPTIONS',
   '/api/warranty': 'DEVICES',
   '/api/admin/warranties': 'DEVICES',
   '/api/admin/community': 'MARKETPLACE',

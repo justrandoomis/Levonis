@@ -19,6 +19,7 @@ import { bnplEligibility, bnplOutstanding, bnplRepaymentStatement } from '../lib
 import { iqdToUsdCents } from '../lib/escrowOps';
 import { addMonths, attributeReferral, onProSubscriptionPurchased } from '../lib/membershipOps';
 import { TIER_RANK } from '../lib/pricing';
+import { publicBenefitSummary } from '../lib/membershipBenefits';
 import { audit } from '../lib/audit';
 import { emitEvent, eventsEnabled } from '../lib/eventBus';
 import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/SubscriptionChanged';
@@ -691,7 +692,7 @@ function entitlementsForTier(tier: PaidTier) {
  */
 membershipsRoutes.get('/plans', async (c) => {
   const db = c.env.DB;
-  const [{ results }, launch, printerGift, preorderGift, shippingPolicy] = await Promise.all([
+  const [{ results }, launch, printerGift, preorderGift, shippingPolicy, benefits] = await Promise.all([
     db.prepare(
       'SELECT id, tier, duration_months, price_iqd, active, sort FROM membership_plans WHERE active = 1 ORDER BY sort, duration_months'
     ).all<PlanRow>(),
@@ -699,6 +700,7 @@ membershipsRoutes.get('/plans', async (c) => {
     getSetting(db, 'printerGiftConfig'),
     getSetting(db, 'preorderGiftConfig'),
     getSetting(db, 'shippingPolicy'),
+    publicBenefitSummary(db, new Date().toISOString()),
   ]);
 
   // The printer gift is granted only when the configured plan actually
@@ -723,6 +725,15 @@ membershipsRoutes.get('/plans', async (c) => {
       pro_threshold_iqd: thresholdOr(policy.pro_threshold_iqd, SETTING_DEFAULTS.shippingPolicy.pro_threshold_iqd),
       prime_threshold_iqd: thresholdOr(policy.prime_threshold_iqd, SETTING_DEFAULTS.shippingPolicy.prime_threshold_iqd),
     },
+    /**
+     * §22 — THE SHOPPING BENEFITS AS CONFIGURED RIGHT NOW.
+     *
+     * The subscription page states these instead of shipping its own copy.
+     * A percentage written into a React string is a promise nobody can keep:
+     * the owner lowers it in the admin, the page keeps advertising the old
+     * number, and the customer discovers the difference at the checkout.
+     */
+    benefits,
     entitlement_contract: {
       minimum_tier: ENTITLEMENT_MINIMUM_TIER,
       tiers: {

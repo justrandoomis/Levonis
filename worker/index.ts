@@ -23,6 +23,7 @@ import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
 import { adminTaxonomyRoutes } from './routes/adminTaxonomy';
+import { adminMembershipBenefitRoutes } from './routes/adminMembershipBenefits';
 import { warrantyAdminRoutes, warrantyPublicRoutes } from './routes/warranty';
 import { adminImportRoutes } from './routes/adminImport';
 import { adminProductRelationsRoutes } from './routes/adminProductRelations';
@@ -188,6 +189,8 @@ app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);
 app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
+// Every commercial value PRO and PREMIUM shopping benefits are made of (§6).
+app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 // The issued warranty document: public verification by receipt number or by
 // the serial on the device, and the admin side that issues and prints it.
 app.route('/api/warranty', warrantyPublicRoutes);

@@ -143,6 +143,9 @@ export const ROUTES: readonly RouteRule[] = [
   // -------------------------------------------- subscriptions and referrals
   { prefix: '/api/memberships/referral', hosts: 'root', owner: 'REFERRALS', flipPhase: 6, requires: 'auth', rateClass: 'user' },
   { prefix: '/api/memberships/admin/referrals', hosts: 'main', owner: 'REFERRALS', flipPhase: 6, requires: 'admin:full', rateClass: 'admin-write' },
+  // What a membership is WORTH: the configured PRO/PREMIUM shopping benefit
+  // rules (migration 0074). Subscriptions owns the tables, so it owns the door.
+  { prefix: '/api/admin/membership-benefits', hosts: 'main', owner: 'SUBSCRIPTIONS', flipPhase: 6, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/memberships/admin', hosts: 'main', owner: 'SUBSCRIPTIONS', flipPhase: 6, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/memberships', hosts: 'root', owner: 'SUBSCRIPTIONS', flipPhase: 6, requires: 'none', rateClass: 'user' },
   { prefix: '/api/subscription', hosts: 'root', owner: 'SUBSCRIPTIONS', flipPhase: 6, requires: 'auth', rateClass: 'user' },

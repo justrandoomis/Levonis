@@ -57,7 +57,7 @@ import {
 } from '../lib/pricing';
 import { pricingTierContext, type TierStatus } from '../lib/entitlements';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from '../lib/offers';
-import { activeBenefitRules, fallbackFor } from '../lib/membershipBenefits';
+import { activeBenefitRules, ancestryFor, catalogAncestry, fallbackFor } from '../lib/membershipBenefits';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { MemberFallback } from '@levonis/pricing/pricing';
 
@@ -168,6 +168,12 @@ export interface PricingContext {
    */
   benefitRules: readonly BenefitRule[];
   benefitStatus: TierStatus | null;
+  /**
+   * The section tree as an ancestor index, so a rule written on "Printers"
+   * reaches a product filed three levels down. Null where the caller had no
+   * reason to read it, which degrades to exact section matching.
+   */
+  catalogAncestry: Map<string, string[]> | null;
   /** Frozen per request so three passes over the same cart cannot disagree
    *  about whether a dated rule was live. */
   nowIso: string;
@@ -194,6 +200,7 @@ export function memberFallbackFor(
       product_id: doc.id ?? null,
       category_id: doc.category_id ?? null,
       sub_category_id: doc.sub_category_id ?? null,
+      ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id ?? null, doc.sub_category_id ?? null),
     },
     ctx.nowIso
   );
@@ -220,24 +227,32 @@ export function transportDefaultsFrom(value: unknown): PricingContext['transport
 
 export function pricingContextFrom(
   settings: Record<string, unknown>,
-  benefits?: { rules: readonly BenefitRule[]; status: TierStatus | null; nowIso?: string }
+  benefits?: {
+    rules: readonly BenefitRule[];
+    status: TierStatus | null;
+    ancestry?: Map<string, string[]> | null;
+    nowIso?: string;
+  }
 ): PricingContext {
   return {
     proPolicy: proPolicyFrom(settings.proPricingPolicy),
     transportDefaults: transportDefaultsFrom(settings.preorderTransportDefaults),
     benefitRules: benefits?.rules ?? [],
     benefitStatus: benefits?.status ?? null,
+    catalogAncestry: benefits?.ancestry ?? null,
     nowIso: benefits?.nowIso ?? new Date().toISOString(),
   };
 }
 
 export async function loadPricingContext(db: D1Database, status?: TierStatus | null): Promise<PricingContext> {
-  const [settings, rules] = await Promise.all([
+  const member = !!status && status.active;
+  const [settings, rules, ancestry] = await Promise.all([
     getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']),
-    // A guest earns no benefit, so their request does not pay for the query.
-    status && status.active ? activeBenefitRules(db) : Promise.resolve([] as BenefitRule[]),
+    // A guest earns no benefit, so their request does not pay for either query.
+    member ? activeBenefitRules(db) : Promise.resolve([] as BenefitRule[]),
+    member ? catalogAncestry(db) : Promise.resolve(null),
   ]);
-  return pricingContextFrom(settings, { rules, status: status ?? null });
+  return pricingContextFrom(settings, { rules, status: status ?? null, ancestry });
 }
 
 /**
@@ -250,11 +265,12 @@ export async function loadPricingContext(db: D1Database, status?: TierStatus | n
  * one query and saves a round trip on the hot path.
  */
 async function loadPricingParts(db: D1Database) {
-  const [settings, rules] = await Promise.all([
+  const [settings, rules, ancestry] = await Promise.all([
     getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']),
     activeBenefitRules(db),
+    catalogAncestry(db),
   ]);
-  return { settings, rules };
+  return { settings, rules, ancestry };
 }
 
 /**
@@ -277,6 +293,7 @@ export async function cartPricing(
       // context as well means a stale `status` can never leak one.
       rules: t.status.active ? parts.rules : [],
       status: t.status,
+      ancestry: parts.ancestry,
     }),
   };
 }
@@ -516,6 +533,9 @@ export async function resolveCartBundles(
     tierActive,
     proPolicy: ctx.proPolicy,
     transportDefaults: ctx.transportDefaults,
+    // The COMPONENTS carry the member's configured rule; the bundle's own
+    // price does not (see `CompositionViewer.memberFallbackFor`).
+    memberFallbackFor: (doc) => memberFallbackFor(ctx, doc),
     status,
     nowMs,
     preorderPricing,
