@@ -1,3 +1,4 @@
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
 /**
  * Frontend mirror of the canonical product document (worker/lib/productModel.ts)
  * plus the resolver result shape. Shared by the editor, storefront pages and
@@ -31,7 +32,7 @@ export interface PriceFieldsV2 {
  * document, the overlay copies them from the relational rows, and the editor
  * reads them when a product has a document but no relation rows yet.
  */
-export interface OptionV2 extends PriceFieldsV2 {
+export interface OptionV2 extends PriceFieldsV2, ModelAvailability {
   id: string;
   name_ar: string;
   name_en: string;

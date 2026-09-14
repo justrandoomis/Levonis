@@ -72,7 +72,7 @@ const stamp = (raw: DatabaseSync, id: string) =>
 
 /** The store's own export, which is the field inventory this audit walks. */
 async function exportOf(a: App, id: string): Promise<string> {
-  const res = await get(a, `/api/admin/template/export/${id}`);
+  const res = await get(a, `/api/admin/template/export/${id}?include_media=false`);
   const text = await res.text();
   assert.equal(res.status, 200, text);
   return text;

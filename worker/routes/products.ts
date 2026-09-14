@@ -16,7 +16,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse, localeToApi } from '../lib/types';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
-import { notFound, int, str } from '../lib/http';
+import { notFound, badRequest, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
@@ -27,6 +27,7 @@ import { pricingTierContext } from '../lib/entitlements';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
 import { resolveStock, isLowStock } from '../lib/inventory';
+import { modelSaleTypes, modelTransports, leadTimeOf } from '@levonis/pricing/fulfillment';
 import { COMPOSITION_LOW_BUNDLES } from '../lib/bundleComposition';
 import type { SaleModeName } from '../lib/bundleComposition';
 import type { InventorySnapshot } from '../lib/inventory';
@@ -157,6 +158,7 @@ export interface PricingCtx {
 export type SaleMode = 'direct_sale' | 'preorder' | 'unavailable';
 
 export interface TransportOptionView {
+  lead_time?: { text: string; min_days: number | null; max_days: number | null };
   method: string;
   commission_iqd: number | null; // resolved (own value, else admin default)
   configured: boolean; // false = no integer commission anywhere → unusable
@@ -172,7 +174,7 @@ export interface SaleAvailability {
     /** Which level actually answered — never a guess. 'composition' is a
      *  bundle or mystery row, whose own stock column is NULL by design and
      *  whose answer is computed from its members (§2.4). */
-    scope: 'product' | 'base' | 'option' | 'color' | 'variant' | 'composition';
+    scope: 'product' | 'base' | 'option' | 'color' | 'variant' | 'fulfillment' | 'composition';
     on_hand: number | null; // null = untracked
     reserved: number; // units held for live orders — not sellable
     available: number | null; // sellable now; null = untracked
@@ -325,6 +327,7 @@ export function saleAvailability(
     const res = resolveStock(input.inventory, {
       option_value_ids: selectedValueIds,
       color_id: color ? color.id : null,
+      fulfillment_type: input.preferredType === 'pre_order' ? 'pre_order' : 'direct_sale',
     });
     tracked = res.tracked;
     scope = res.targets[0]?.scope ?? (input.inventory.inventory_mode === 'BASE' ? 'base' : 'variant');
@@ -366,8 +369,7 @@ export function saleAvailability(
   }
 
   // ---- sale types (§6): a product may offer more than one at a time
-  const saleTypes =
-    doc.sale_types && doc.sale_types.length ? doc.sale_types : [doc.selling_type || 'direct_sale'];
+  const saleTypes = modelSaleTypes(option, doc.sale_types && doc.sale_types.length ? doc.sale_types : [doc.selling_type || 'direct_sale']);
   /**
    * A COMPOSITION ROW'S MODES COME FROM ITS COMPONENTS, NEVER FROM THE 'bundle'
    * TOKEN. `sale_types = ["bundle","pre_order"]` would otherwise turn direct
@@ -378,16 +380,16 @@ export function saleAvailability(
   const compositionModes = input.compositionModes ?? [];
   const directEnabled = isComposition
     ? compositionModes.includes('direct_sale')
-    : saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+    : saleTypes.includes('direct_sale');
   const preorderEnabled = isComposition ? compositionModes.includes('pre_order') : saleTypes.includes('pre_order');
 
-  const transports: TransportOptionView[] = doc.preorder_transports
+  const transports: TransportOptionView[] = modelTransports(doc, option)
     .filter((t) => t.active !== false)
     .map((t) => {
-      const own = Number.isInteger(t.commission_iqd) ? (t.commission_iqd as number) : null;
+      const own = t.regular_price_iqd != null || t.regular_adjust_iqd != null ? 0 : t.surcharge_iqd ?? (Number.isInteger(t.commission_iqd) ? (t.commission_iqd as number) : null);
       const fallback = defaults.find((d) => d.method === t.method);
       const commission = own !== null ? own : fallback ? fallback.commission_iqd : null;
-      return { method: t.method, commission_iqd: commission, configured: commission !== null };
+      return { method: t.method, commission_iqd: commission, configured: commission !== null, ...((t.lead_time_text || t.lead_time_min_days != null || t.lead_time_max_days != null || option?.preorder?.lead_time_text) ? { lead_time: leadTimeOf(t, option?.preorder) } : {}) };
     });
   const preorderUsable = preorderEnabled && transports.some((t) => t.configured);
   const preorderReason = preorderEnabled
@@ -398,7 +400,8 @@ export function saleAvailability(
         : 'TRANSPORT_COMMISSION_UNCONFIGURED'
     : 'PREORDER_NOT_ENABLED';
 
-  const directUsable = directEnabled && (available === null || available > 0);
+  const directAvailable = input.inventory && !isComposition ? resolveStock(input.inventory, { option_value_ids: selectedValueIds, color_id: color?.id ?? null, fulfillment_type: 'direct_sale' }).available : available;
+  const directUsable = directEnabled && (directAvailable === null || directAvailable > 0);
   const directReason = directEnabled ? (directUsable ? null : 'OUT_OF_STOCK') : 'DIRECT_SALE_NOT_ENABLED';
 
   const modes: SaleAvailability['modes'] = [];
@@ -411,7 +414,10 @@ export function saleAvailability(
   let mode: SaleMode;
   let reason: string | null = null;
   const wants = input.preferredType;
-  if (wants === 'pre_order' && preorderUsable) {
+  if (wants && !(wants === 'pre_order' ? preorderUsable : directUsable)) {
+    mode = 'unavailable';
+    reason = wants === 'pre_order' ? preorderReason : directReason;
+  } else if (wants === 'pre_order' && preorderUsable) {
     mode = 'preorder';
   } else if (wants === 'direct_sale' && directUsable) {
     mode = 'direct_sale';
@@ -618,10 +624,10 @@ export function pricingModes(
       isPrinter,
     });
   const d = resolve(null, 'prepaid');
-  const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd, direct: d.direct };
-  const unusable = new Set(['TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
+  const direct = d.errors.length ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd, direct: d.direct };
+  const unusable = new Set(['FULFILLMENT_NOT_OFFERED', 'TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
   const preorder: PricingModes['preorder'] = [];
-  for (const t of doc.preorder_transports) {
+  for (const t of modelTransports(doc, doc.options.find((o) => o.id === sel.optionId))) {
     if (t.active === false) continue;
     const prepaid = resolve(t.method, 'prepaid');
     if (prepaid.errors.some((e) => unusable.has(e))) {
@@ -1610,6 +1616,8 @@ productRoutes.post('/:slug/quote', async (c) => {
   const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
   const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
   const transportMethod = typeof body.transportMethod === 'string' ? body.transportMethod : null;
+  const fulfillmentType = body.fulfillmentType === 'direct_sale' || body.fulfillmentType === 'pre_order' ? body.fulfillmentType : null;
+  if (body.fulfillmentType != null && !fulfillmentType) throw badRequest('Invalid fulfillment type');
   const warrantyPlanId = typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null;
 
   const resolved = resolveUnitPrice({
@@ -1617,6 +1625,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     optionId,
     colorId,
     transportMethod,
+    fulfillmentType,
     warrantyPlanId,
     tier: ctx.tier,
     tierActive: ctx.tierActive,
@@ -1661,7 +1670,7 @@ productRoutes.post('/:slug/quote', async (c) => {
         low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
       }),
       links: relations.links,
-      preferredType: transportMethod ? 'pre_order' : null,
+      preferredType: fulfillmentType ?? (transportMethod ? 'pre_order' : null),
     }),
     viewer_tier: viewerTier(ctx),
   });

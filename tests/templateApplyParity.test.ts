@@ -372,7 +372,7 @@ test('root cause 5: option and colour Arabic/Kurdish names reach the ROWS, the r
   assert.equal(n04.name_ckb, '');
 
   // The export writes the authored names, so the round trip keeps them.
-  const text = await (await get(app, `/api/admin/template/export/${id}`)).text();
+  const text = await (await get(app, `/api/admin/template/export/${id}?include_media=false`)).text();
   assert.match(text, /^options\.1\.name_ar=إيه ١$/m);
   assert.match(text, /^options\.1\.name_ckb=ئەی ١$/m);
   assert.match(text, /^colors\.1\.name_ar=أسود$/m);
@@ -629,14 +629,14 @@ test('root cause 13: export → parse → apply is order-stable for groups, valu
   });
   const before = snapshot();
 
-  const text = await (await get(app, `/api/admin/template/export/${id}`)).text();
+  const text = await (await get(app, `/api/admin/template/export/${id}?include_media=false`)).text();
   const { status, body } = await apply(app, text, 'update');
   assert.equal(status, 200, JSON.stringify(body));
   assert.deepEqual(body.mismatches, []);
   assert.deepEqual(snapshot(), before, 'the round trip moved the structure it was supposed to preserve');
 
   // A second round trip is a no-op too — the export is a fixed point.
-  const text2 = await (await get(app, `/api/admin/template/export/${id}`)).text();
+  const text2 = await (await get(app, `/api/admin/template/export/${id}?include_media=false`)).text();
   assert.equal((await apply(app, text2, 'update')).status, 200);
   assert.deepEqual(snapshot(), before);
 });

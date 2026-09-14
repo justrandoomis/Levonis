@@ -5,6 +5,7 @@ import type { ProductRelationsView } from './productOverlay';
 export interface ProductImageSelection {
   optionValueIds: string[];
   colorId: string | null;
+  fulfillmentType?: 'direct_sale' | 'pre_order';
 }
 
 /**
@@ -38,6 +39,9 @@ export function productImageForSelection(
   }
 
   for (const optionId of selection.optionValueIds) {
+    const option = doc.options.find(o=>o.id===optionId);
+    const fulfillment = selection.fulfillmentType === 'pre_order' ? option?.preorder : option?.direct;
+    if (fulfillment?.image) return fulfillment.image;
     const optionBound = bound((m) => m.option_value_id === optionId);
     if (optionBound) return optionBound;
     const optionImage = doc.options.find((o) => o.id === optionId)?.image;

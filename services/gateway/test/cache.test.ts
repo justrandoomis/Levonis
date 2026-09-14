@@ -68,25 +68,26 @@ test('the shared TTL lives on the entry; the client is told private, max-age=0',
 });
 
 function appWithCache(envOver: Record<string, unknown> = {}) {
-  const core = stubTarget();
+  const core = stubTarget(r => new URL(r.url).pathname === '/api/products/cache/revision' ? Response.json({revision:1}) : Response.json({success:true,ok:true}));
   const cache = new MemoryEdgeCache();
   const env = makeEnv({ CORE: core, CACHE_MODE: 'on', ...envOver });
   const app = createApp({ cache });
   return { core, cache, call: (r: Request) => app.fetch(r, env as unknown as Record<string, unknown>) };
 }
 
-test('through the app: the second identical anonymous GET never reaches the core', async () => {
+test('through the app: a second anonymous GET validates the generation and reuses the cached body', async () => {
   const { core, cache, call } = appWithCache();
   const first = await call(request(`${APEX}/api/products?a=1`));
   assert.equal(first.status, 200);
-  assert.equal(core.calls.length, 1);
+  assert.equal(core.calls.filter(r => !r.url.includes('/cache/revision')).length, 1);
   assert.equal(cache.puts, 1);
   assert.equal([...cache.entries.values()][0].headers.get('Cache-Control'), 'public, s-maxage=60', 'the stored entry carries the shared TTL');
   assert.equal(first.headers.get('Cache-Control'), 'private, max-age=0', 'the client never learns it');
 
   const second = await call(request(`${APEX}/api/products?a=1`));
-  assert.equal(core.calls.length, 1, 'served from the Cache API');
+  assert.equal(core.calls.filter(r => !r.url.includes('/cache/revision')).length, 1, 'served from the Cache API');
   assert.deepEqual(await second.json(), { success: true, ok: true });
+  assert.equal(core.calls.filter(r => r.url.includes('/cache/revision')).length, 2, 'every POP revalidates the primary generation');
   assert.equal(second.headers.get('Cache-Control'), 'private, max-age=0');
 });
 
@@ -95,7 +96,7 @@ test('a request carrying a session neither reads nor writes the cache', async ()
   await call(request(`${APEX}/api/products`));
   assert.equal(cache.puts, 1);
   await call(request(`${APEX}/api/products`, { headers: { cookie: 'levonis_session=abc' } }));
-  assert.equal(core.calls.length, 2, 'a signed-in reader always gets a fresh answer');
+  assert.equal(core.calls.filter(r => !r.url.includes('/cache/revision')).length, 2, 'a signed-in reader always gets a fresh answer');
   assert.equal(cache.puts, 1, 'and never writes one');
 });
 
@@ -103,7 +104,7 @@ test('a mutation is never cached, even on a cacheable prefix', async () => {
   const { core, cache, call } = appWithCache();
   await call(request(`${APEX}/api/products/slug/quote`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }));
   assert.equal(cache.puts, 0);
-  assert.equal(core.calls.length, 1);
+  assert.equal(core.calls.filter(r => !r.url.includes('/cache/revision')).length, 1);
 });
 
 test('a success:false body is never stored', async () => {
@@ -138,7 +139,7 @@ test('CACHE_MODE off means the Cache API is never touched', async () => {
   await call(request(`${APEX}/api/products`));
   await call(request(`${APEX}/api/products`));
   assert.equal(cache.puts, 0);
-  assert.equal(core.calls.length, 2);
+  assert.equal(core.calls.filter(r => !r.url.includes('/cache/revision')).length, 2);
 });
 
 /**
@@ -172,7 +173,7 @@ test('through the app: an anonymous HEAD cannot blank the GET body for the next 
   // The upstream behaves as Hono does: a HEAD on a GET route answers 200 with
   // the JSON content type and an EMPTY body.
   const core = stubTarget((r) =>
-    r.method === 'HEAD'
+    new URL(r.url).pathname === '/api/products/cache/revision' ? Response.json({revision:1}) : r.method === 'HEAD'
       ? new Response(null, { status: 200, headers: { 'Content-Type': 'application/json' } })
       : new Response(JSON.stringify({ success: true, ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   );
@@ -187,5 +188,26 @@ test('through the app: an anonymous HEAD cannot blank the GET body for the next 
 
   const get = await call(request(`${APEX}/api/products?a=1`));
   assert.deepEqual(await get.json(), { success: true, ok: true }, 'the GET body is intact');
-  assert.equal(core.calls.length, 2, 'the GET was answered by the core, not by a poisoned entry');
+  assert.equal(core.calls.filter(r => !r.url.includes('/cache/revision')).length, 2, 'the GET was answered by the core, not by a poisoned entry');
+});
+
+test('a committed deletion invalidates every cached language/query/POP through the primary generation', async () => {
+  let revision = 1; let deleted = false; let unavailable = false;
+  const core = stubTarget(r => {
+    if (new URL(r.url).pathname === '/api/products/cache/revision') return unavailable ? new Response('',{status:503}) : Response.json({revision});
+    return deleted ? Response.json({success:false,code:'NOT_FOUND'},{status:404}) : Response.json({success:true,id:'p'});
+  });
+  const env=makeEnv({CORE:core,CACHE_MODE:'on'});
+  const pops=[new MemoryEdgeCache(),new MemoryEdgeCache()];
+  const urls=['/api/products/p?lang=ar','/api/products/p?lang=en','/api/products?q=p&lang=ar'];
+  for(const cache of pops) for(const path of urls) assert.equal((await createApp({cache}).fetch(request(APEX+path),env as unknown as Record<string,unknown>)).status,200);
+  deleted=true;revision++;
+  for(const cache of pops) for(const path of urls) assert.equal((await createApp({cache}).fetch(request(APEX+path),env as unknown as Record<string,unknown>)).status,404);
+  // A generation outage must bypass the old entries instead of serving them.
+  unavailable=true;
+  assert.equal((await createApp({cache:pops[0]}).fetch(request(APEX+urls[0]),env as unknown as Record<string,unknown>)).status,404);
+});
+
+test('no-store media is never retained by the edge cache',()=>{
+  assert.equal(canStore(new Response('bytes',{headers:{'Cache-Control':'no-store','Content-Type':'image/webp'}}),null),false);
 });

@@ -59,6 +59,7 @@
 import { safeParse } from './json';
 import { effectiveAvailability } from './availability';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
+import { modelSaleTypes, modelTransports, leadTimeOf, type ModelAvailability, type ModelTransport, type FulfillmentType, type SelectionPriceSnapshot } from './fulfillment';
 
 export type Tier = 'free' | 'plus' | 'pro' | 'prime';
 
@@ -116,7 +117,7 @@ export function priceMode(row: Partial<PriceFields> | null | undefined, field: P
   return 'inherit';
 }
 
-export interface OptionV2 extends PriceFields {
+export interface OptionV2 extends PriceFields, ModelAvailability {
   id: string;
   name_ar: string;
   name_en: string;
@@ -185,7 +186,7 @@ export interface ColorV2 extends PriceFields {
   sku_part?: string;
 }
 
-export interface TransportOffer {
+export interface TransportOffer extends Partial<Omit<ModelTransport, 'enabled'>> {
   method: 'air' | 'sea' | 'land';
   commission_iqd: number | null; // null = inherit admin default
   active: boolean;
@@ -279,6 +280,7 @@ export interface ResolvedWarranty {
 }
 
 export interface ResolvedPrice {
+  selection_snapshot?: SelectionPriceSnapshot;
   regular_iqd: number;
   pro_iqd: number | null; // resolved explicit-or-policy PRO price (null = none applies)
   prime_iqd: number | null; // resolved explicit PRIME price (null = none applies)
@@ -523,6 +525,7 @@ export function resolveUnitPrice(input: {
   optionId?: string | null;
   colorId?: string | null;
   transportMethod?: string | null; // '' | air | sea | land
+  fulfillmentType?: FulfillmentType | null;
   warrantyPlanId?: string | null;
   tier: Tier;
   tierActive: boolean;
@@ -579,7 +582,7 @@ export function resolveUnitPrice(input: {
   const primeExplicit = pickMember('prime_price_iqd', color, option, product.prime_price_iqd, regular.at);
   const cost = pick('cost_iqd', color, option, product.product_cost_iqd);
 
-  const regularIqd = regular.value ?? product.price_iqd;
+  let regularIqd = regular.value ?? product.price_iqd;
   if (!Number.isInteger(regularIqd) || regularIqd < 0) errors.push('REGULAR_PRICE_INVALID');
 
   // PRO resolution: explicit price, else policy, else (below) the line's PRIME
@@ -622,40 +625,34 @@ export function resolveUnitPrice(input: {
   const method = (input.transportMethod ?? '').trim();
   const productSaleTypes = product.sale_types && product.sale_types.length ? product.sale_types : [product.selling_type];
 
-  /**
-   * THE CHOSEN OPTION MAY DECIDE HOW THIS LINE IS FULFILLED.
-   *
-   * Until now a line's route came only from the product: a pre-order-only
-   * product demanded a transport, a direct-only one refused it, and a product
-   * selling both ways let the transport selection decide. That is still
-   * exactly what happens when the option has no opinion — which is every
-   * option that existed before this feature, so no priced line changes.
-   *
-   * When the option DOES declare itself, it narrows the line to its own route
-   * and nothing else: choosing "A1 Combo — Direct Sale" cannot be turned into
-   * a pre-order by adding a transport to the request, and choosing
-   * "A1 Combo — Pre-order" cannot skip one. That is what makes the four
-   * cells of the owner's grid genuinely independent rather than four labels
-   * over one shared fulfilment decision.
-   */
+  // Options are real models. Fulfillment and transport select independent
+  // pricing/availability rows. Legacy availability is read-only compatibility.
   const optionAvailability = effectiveAvailability(option, productSaleTypes);
-  const saleTypes = optionAvailability ? [optionAvailability] : productSaleTypes;
+  const canonical = option?.direct !== undefined || option?.preorder !== undefined;
+  const allowedTypes = canonical ? modelSaleTypes(option, productSaleTypes) : optionAvailability ? [optionAvailability] : productSaleTypes;
+  const fulfillmentType = input.fulfillmentType ?? ((method && allowedTypes.includes('pre_order')) || (allowedTypes.includes('pre_order') && !allowedTypes.includes('direct_sale') && !allowedTypes.includes('bundle')) ? 'pre_order' : 'direct_sale');
+  if (!allowedTypes.includes(fulfillmentType) && !(fulfillmentType === 'direct_sale' && allowedTypes.includes('bundle'))) errors.push('FULFILLMENT_NOT_OFFERED');
+  if (method && !allowedTypes.includes('pre_order')) errors.push('TRANSPORT_NOT_APPLICABLE');
+  const saleTypes = [fulfillmentType];
+  const offers = modelTransports(product, option);
   if (saleTypes.includes('pre_order') && (saleTypes.length === 1 || method)) {
     if (!method) {
       errors.push('TRANSPORT_REQUIRED');
     } else {
-      const offer = product.preorder_transports.find((t) => t.method === method && t.active !== false);
+      const offer = offers.find((t) => t.method === method && t.active !== false);
       if (!offer) {
         errors.push('TRANSPORT_NOT_OFFERED');
       } else {
-        let commission = offer.commission_iqd;
+        let commission = offer.surcharge_iqd ?? offer.commission_iqd;
+        // An exact transport price/adjustment replaces the inherited commission.
+        if (offer.regular_price_iqd != null || offer.regular_adjust_iqd != null) commission = 0;
         if (commission === null || commission === undefined) {
           const def = (input.transportDefaults ?? []).find((d) => d.method === method);
           commission = def ? def.commission_iqd : null;
         }
         if (commission === null || commission === undefined) {
           errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
-        } else if (preorderPricing === 'cod' && hasDirectPremium) {
+        } else if (!canonical && preorderPricing === 'cod' && hasDirectPremium) {
           // Cash on delivery: the owner's rule is that this line follows the
           // DIRECT-SALE pricing, so the commission is not the fee here — the
           // direct premium below is. The method stays: shipping_type, the
@@ -704,6 +701,53 @@ export function resolveUnitPrice(input: {
   // 'preorder' only while the commission is the fee actually in force.
   const pricingBasis: ResolvedPrice['pricing_basis'] = transport !== null && !codDirectPricing ? 'preorder' : 'direct';
 
+  const modelRegular = regularIqd;
+  let fulfillmentDelta = 0;
+  let transportDelta = 0;
+  const fulfillment = fulfillmentType === 'pre_order' ? option?.preorder : option?.direct;
+  const selectedTransport = fulfillmentType === 'pre_order' ? offers.find((t) => t.method === method && t.active !== false) : undefined;
+  const fields = (row: Partial<PriceFields>): PriceFields => ({ regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null, ...row });
+  let resolvedCost = cost.value;
+  const applyCost = (row: Partial<PriceFields>) => {
+    if (row.cost_iqd != null) resolvedCost = row.cost_iqd;
+    else if (row.cost_adjust_iqd != null && resolvedCost != null) resolvedCost = Math.max(0, resolvedCost + row.cost_adjust_iqd);
+  };
+  if (fulfillment) {
+    const directFallback = fulfillmentType === 'direct_sale' && fulfillment.regular_price_iqd == null && fulfillment.regular_adjust_iqd == null;
+    const row = fields({ ...fulfillment, ...(directFallback ? { regular_adjust_iqd: directSurcharge ?? 0 } : {}) });
+    const beneath = { regular: regularIqd, prime: primeIqd, pro: proIqd };
+    const rung = derivedRung(row, { regular: regularIqd, prime: primeIqd, pro: proIqd });
+    fulfillmentDelta = rung.regular - regularIqd;
+    regularIqd = rung.regular;
+    primeIqd = rung.prime;
+    proIqd = rung.pro;
+    if (directFallback && isPro && fulfillment.pro_price_iqd == null) proIqd = (beneath.pro ?? beneath.prime ?? beneath.regular) + (fulfillment.pro_adjust_iqd ?? 0);
+    if (fulfillmentType === 'direct_sale') direct = null;
+    applyCost(fulfillment);
+  }
+  if (selectedTransport && (canonical || (['regular_price_iqd', 'prime_price_iqd', 'pro_price_iqd', 'regular_adjust_iqd', 'prime_adjust_iqd', 'pro_adjust_iqd'] as const).some((k) => selectedTransport[k] != null))) {
+    const surcharge = selectedTransport.surcharge_iqd ?? selectedTransport.commission_iqd ?? input.transportDefaults?.find((t) => t.method === method)?.commission_iqd ?? 0;
+    const transportFields = fields({ ...selectedTransport, regular_adjust_iqd: selectedTransport.regular_adjust_iqd ?? surcharge });
+    const beneath = { regular: regularIqd, prime: primeIqd, pro: proIqd };
+    const rung = derivedRung(transportFields, beneath);
+    transportDelta = rung.regular - regularIqd;
+    regularIqd = rung.regular;
+    primeIqd = rung.prime;
+    proIqd = rung.pro;
+    // Exempt only the transport move. The model and fulfillment rungs survive.
+    if (isPro && selectedTransport.pro_price_iqd == null) {
+      proIqd = (beneath.pro ?? beneath.prime ?? beneath.regular) + (selectedTransport.pro_adjust_iqd ?? 0);
+    }
+    applyCost(selectedTransport);
+    // The transport price is now in the ladder, so it must not be charged twice.
+    if (transport) transport = { ...transport, commission_iqd: 0 };
+  }
+  if (fulfillment || selectedTransport) {
+    ({ prime: primeIqd, pro: proIqd } = clampMemberLadder(regularIqd, primeIqd, proIqd));
+    appliedIqd = isPro ? proIqd ?? regularIqd : isPrime ? primeIqd ?? regularIqd : regularIqd;
+    appliedTier = isPro && proIqd !== null ? 'pro' : isPrime && primeIqd !== null ? 'prime' : 'regular';
+  }
+
   // Warranty fee — added on top of the resolved price; never waived by tier.
   // A percent plan is priced on the REGULAR price of this exact selection
   // (option and colour surcharges included), so a PRO and a guest pay the
@@ -740,12 +784,25 @@ export function resolveUnitPrice(input: {
   const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
 
   return {
+    selection_snapshot: {
+      fulfillment_type: fulfillmentType,
+      transport_method: transport ? transport.method as 'air' | 'sea' | 'land' : null,
+      membership_tier: isPro ? 'pro' : isPrime ? 'prime' : 'regular',
+      resolved_product_base: product.price_iqd,
+      resolved_option_delta: modelRegular - product.price_iqd,
+      resolved_fulfillment_delta: fulfillmentDelta + directFee,
+      resolved_transport_delta: transportDelta + commissionEffective,
+      resolved_membership_adjustment: appliedIqd - regularIqd,
+      resolved_delivery_fee: 0,
+      resolved_final_price: unitSubtotal,
+      lead_time: leadTimeOf(selectedTransport, fulfillment, option),
+    },
     regular_iqd: regularIqd,
     pro_iqd: proIqd,
     prime_iqd: primeIqd,
     applied_iqd: appliedIqd,
     applied_tier: appliedTier,
-    cost_iqd: cost.value ?? null,
+    cost_iqd: resolvedCost ?? null,
     price_source: regular.source,
     transport,
     direct,

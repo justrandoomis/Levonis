@@ -42,6 +42,7 @@
 
 import { InventoryChangedV1 } from '@levonis/contracts/events/v1/InventoryChanged';
 import { outboxStatement } from './eventBus';
+import type { ModelAvailability, FulfillmentType } from '@levonis/pricing/fulfillment';
 
 export type InventoryMode = 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION';
 
@@ -56,7 +57,7 @@ export function isInventoryMode(v: unknown): v is InventoryMode {
   return typeof v === 'string' && (INVENTORY_MODES as readonly string[]).includes(v);
 }
 
-export type StockScope = 'base' | 'option' | 'color' | 'variant';
+export type StockScope = 'base' | 'option' | 'color' | 'variant' | 'fulfillment';
 
 /** One authoritative row that a purchase consumes. */
 export interface StockTarget {
@@ -91,7 +92,7 @@ export interface StockResolution {
 export interface InventorySnapshot {
   inventory_mode: InventoryMode;
   base: { stock: number | null; reserved: number; low_stock_threshold: number | null };
-  option_values: Array<{
+  option_values: Array<ModelAvailability & {
     id: string;
     group_id: string;
     name_en: string;
@@ -122,6 +123,7 @@ export interface InventorySnapshot {
 export interface Selection {
   option_value_ids: string[];
   color_id: string | null;
+  fulfillment_type?: FulfillmentType;
 }
 
 /**
@@ -142,6 +144,14 @@ const availableOf = (t: StockTarget): number | null =>
 /** Resolves the single authoritative stock source for one selection. */
 export function resolveStock(snap: InventorySnapshot, sel: Selection): StockResolution {
   const untracked: StockResolution = { targets: [], tracked: false, available: null, error: null };
+  const model = snap.option_values.find((v) => v.id === sel.option_value_ids[0]);
+  const fulfillment = sel.fulfillment_type === 'pre_order' ? model?.preorder : model?.direct;
+  if (fulfillment && (fulfillment.stock != null || sel.fulfillment_type === 'pre_order')) {
+    if (!fulfillment.enabled) return { ...untracked, available: 0, error: 'SELECTION_INCOMPLETE' };
+    if (fulfillment.stock == null) return untracked;
+    const target: StockTarget = { scope: 'fulfillment', scope_id: fulfillment.id ?? `ful_${model!.id}_${sel.fulfillment_type ?? 'direct_sale'}`, stock: fulfillment.stock, reserved: fulfillment.reserved ?? 0, low_stock_threshold: model!.low_stock_threshold, label: model!.name_en };
+    return { targets: [target], tracked: true, available: availableOf(target), error: null };
+  }
 
   switch (snap.inventory_mode) {
     case 'BASE': {
@@ -356,6 +366,7 @@ function counterSql(
 }
 
 function tableFor(scope: StockScope): string {
+  if (scope === 'fulfillment') return 'product_option_fulfillment';
   return scope === 'base'
     ? 'products'
     : scope === 'option'
@@ -717,7 +728,8 @@ export async function planReservationFence(
 }
 
 /** The table whose stock row moved, as the event catalogue spells it. */
-function eventTableFor(scope: StockScope): 'products' | 'product_option_values' | 'product_colors' | 'product_variants' {
+function eventTableFor(scope: StockScope): 'products' | 'product_option_values' | 'product_colors' | 'product_variants' | 'product_option_fulfillment' {
+  if (scope === 'fulfillment') return 'product_option_fulfillment';
   return scope === 'base' ? 'products' : scope === 'option' ? 'product_option_values' : scope === 'color' ? 'product_colors' : 'product_variants';
 }
 
@@ -783,14 +795,7 @@ export async function assertMovesApplied(
   const short: string[] = [];
   for (const move of moves) {
     for (const t of move.targets) {
-      const table =
-        t.scope === 'base'
-          ? 'products'
-          : t.scope === 'option'
-            ? 'product_option_values'
-            : t.scope === 'color'
-              ? 'product_colors'
-              : 'product_variants';
+      const table = tableFor(t.scope);
       const reservedCol = t.scope === 'base' ? 'stock_reserved' : 'reserved';
       const id = t.scope === 'base' ? move.product_id : t.scope_id;
       const row = await db

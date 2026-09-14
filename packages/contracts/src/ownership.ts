@@ -23,6 +23,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('kyc', ['kyc_cases', 'approved_addresses']),
   ...owned('catalog', [
+    'product_option_fulfillment', 'product_option_transports', 'product_option_aliases', 'product_deletion_jobs', 'media_cleanup_jobs', 'product_orphan_reports', 'historical_inventory_ledger', 'inventory_ledger_preserved', 'catalog_revision', 'media_cleanup_locks',
     'products', 'product_option_groups', 'product_option_values', 'product_colors', 'product_color_option_links',
     'product_variants', 'product_images', 'product_facets', 'product_catalogs', 'product_translations', 'glossary',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
@@ -46,7 +47,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'offer_windows', 'offer_limits', 'offer_redemptions',
     // What one order actually drew, frozen, and the candidate list it drew
     // against — per-order facts, written in the order's own batch (§1.9).
-    'mystery_allocations', 'mystery_draw_audits',
+    'mystery_allocations', 'mystery_allocations_preserved', 'mystery_draw_audits',
   ]),
   ...owned('fulfilment', ['order_status_history', 'delivery_status_map', 'order_fulfilment']),
   ...owned('ledger', [
@@ -64,7 +65,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
   ]),
-  ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
+  ...owned('reviews', ['reviews_preserved', 'reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts']),
   ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
   ...owned('notifications', [

@@ -1,4 +1,5 @@
 import type { Env } from './types';
+import { processProductMediaCleanup } from './productDeletion';
 import { processOutbox } from './outbox';
 import { pumpOutbox, pruneOutbox, type RetentionReport } from './eventBus';
 import { releaseDueAccruals } from './pointsOps';
@@ -119,6 +120,8 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   };
 
   // 0. Deliver whatever the per-request pumps missed. FIRST, and its own step:
+  await step('product_media_cleanup', async () => { await processProductMediaCleanup(env); });
+
   //    a producer whose events sit undelivered is a producer nobody can trust,
   //    and the lock means two overlapping cron runs cannot double-deliver.
   await step('event_pump', async () => {

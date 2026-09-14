@@ -51,6 +51,7 @@ function dbWithRelations(): { d1: SqliteD1; raw: DatabaseSync } {
   ]) {
     raw.exec(createTableIfNotExistsSql('0018_prime_taxonomy_inventory.sql', t));
   }
+  for (const t of ['product_option_fulfillment','product_option_transports']) raw.exec(createTableIfNotExistsSql('0072_model_fulfillment.sql',t));
   return { d1: new SqliteD1(raw), raw };
 }
 

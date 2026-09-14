@@ -81,7 +81,7 @@ function view(): ProductRelationsView {
         image: '/files/opt-a1.jpg', sort: 0, active: 1, stock: 5, low_stock_threshold: 2,
         regular_price_iqd: 899_000, prime_price_iqd: 885_000, pro_price_iqd: 799_000, cost_iqd: 700_000,
         regular_adjust_iqd: null, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: null,
-        availability_type: 'direct_sale', lead_time_text: '', lead_time_min_days: null,
+        availability_type: '', lead_time_text: '', lead_time_min_days: null,
         lead_time_max_days: null, variant_key: 'a1', variant_label: 'A1',
       },
       {
@@ -89,7 +89,7 @@ function view(): ProductRelationsView {
         image: '', sort: 1, active: 1, stock: null, low_stock_threshold: null,
         regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
         regular_adjust_iqd: 300_000, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: 250_000,
-        availability_type: 'pre_order', lead_time_text: '25-40 يوم', lead_time_min_days: 25,
+        availability_type: '', lead_time_text: '25-40 يوم', lead_time_min_days: 25,
         lead_time_max_days: 40, variant_key: 'a1-combo', variant_label: 'A1 Combo',
       },
       {
@@ -620,15 +620,15 @@ test('a usage step with neither title nor body is warned about, not silently dro
 test('the transport surcharge may be written with the word the form uses', () => {
   const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
   const text = exportProduct(doc, { includeCost: true })
-    .replace(/^transports\.3\.commission_iqd=__NULL__$/m, 'transports.3.surcharge_iqd=15000')
-    .replace(/^transports\.3\.active=false$/m, 'transports.3.active=true');
+    .replace(/^transports\.3\.surcharge_iqd=__NULL__$/m, 'transports.3.surcharge_iqd=15000')
+    .replace(/^transports\.3\.enabled=false$/m, 'transports.3.enabled=true');
   const parsed = parseTemplate(text);
   assert.deepEqual(parsed.errors, []);
   const built = validateProductDoc(toDocBody(parsed, doc, { needs_review: [] }).body);
   const land = built.preorder_transports.find((t) => t.method === 'land')!;
   assert.equal(land.commission_iqd, 15_000, 'surcharge_iqd is commission_iqd');
   assert.equal(land.active, true);
-  assert.ok(!/^transports\.\d+\.surcharge_iqd=/m.test(exportProduct(doc, { includeCost: true })), 'the alias is import-only, never exported');
+  assert.ok(!/^transports\.\d+\.commission_iqd=/m.test(exportProduct(doc, { includeCost: true })), 'the legacy spelling is input-only');
 });
 
 // ------------------------------------------------------------- the usage guide
@@ -698,7 +698,7 @@ test('all three pre-order routes are listed even when the product declares none'
   for (const m of ['air', 'sea', 'land']) {
     assert.ok(text.includes(`.method=${m}\n`), `${m} must be listed so it can be switched on`);
   }
-  assert.match(text, /transports\.1\.active=false/);
+  assert.match(text, /transports\.1\.enabled=false/);
 });
 
 test('an inheriting transport commission names the admin default', () => {
@@ -714,7 +714,7 @@ test('an inheriting transport commission names the admin default', () => {
     includeCost: true,
     transportDefaults: [{ method: 'air', commission_iqd: 250_000 }],
   });
-  assert.match(text, /transports\.1\.commission_iqd=__NULL__\n#\s+↳ العمولة الفعلية 250,000 د\.ع/);
+  assert.match(text, /transports\.1\.surcharge_iqd=__NULL__\n#\s+↳ العمولة الفعلية 250,000 د\.ع/);
 });
 
 test('an unconfigured transport default says so rather than inventing a number', () => {

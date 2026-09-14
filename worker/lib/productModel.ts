@@ -17,6 +17,7 @@
  */
 
 import { safeParse } from './types';
+import { readModelAvailability, mergeLegacyModels } from './modelAvailability';
 import { safeLink } from './homeContent';
 import { badRequest } from './http';
 import { newId } from './crypto';
@@ -459,6 +460,7 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
       order: typeof o.order === 'number' ? (o.order as number) : i,
       active: o.active !== false,
       ...upgradePriceFields(o),
+      ...readModelAvailability(o),
       availability_type: normalizeAvailability(o.availability_type),
       stock: num(o.stock),
       lead_time_text: s(o.lead_time_text, 200),
@@ -638,8 +640,12 @@ export function upgradeTransports(raw: unknown): TransportOffer[] {
     if (METHODS.includes(t.method as never)) {
       out.push({
         method: t.method as TransportOffer['method'],
-        commission_iqd: num(t.commission_iqd),
-        active: t.active !== false,
+        commission_iqd: num(t.surcharge_iqd ?? t.commission_iqd),
+        active: t.enabled !== undefined ? t.enabled === true : t.active !== false,
+        ...Object.fromEntries(Object.entries(upgradePriceFields(t)).filter(([, v]) => v != null)),
+        ...(t.lead_time_text ? { lead_time_text: s(t.lead_time_text, 200) } : {}),
+        ...(t.lead_time_min_days != null ? { lead_time_min_days: num(t.lead_time_min_days) } : {}),
+        ...(t.lead_time_max_days != null ? { lead_time_max_days: num(t.lead_time_max_days) } : {}),
       });
     }
   }
@@ -838,9 +844,15 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
 
   // Repeatable groups run through the same upgraders (they accept v2 shapes),
   // then get structural checks.
-  const options = upgradeOptions(body.options ?? []);
+  const legacy = mergeLegacyModels(upgradeOptions(body.options ?? []));
+  const options = legacy.options;
   const colors = upgradeColors(body.colors ?? []);
   const media = upgradeMedia(body.media ?? body.images ?? []);
+  for (const color of colors) {
+    if (color.option_id) color.option_id = legacy.aliases.get(color.option_id) ?? color.option_id;
+    if (color.option_ids) color.option_ids = [...new Set(color.option_ids.map((id) => legacy.aliases.get(id) ?? id))];
+  }
+  for (const image of media) image.option_value_id = legacy.aliases.get(image.option_value_id) ?? image.option_value_id;
   const specGroups = upgradeSpecGroups(body.spec_groups ?? body.specifications ?? []);
   const labels = upgradeLabels(body.labels ?? []);
   const warranty = upgradeWarranty(body.warranty_plans ?? []);
@@ -907,10 +919,9 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     deriveSaleTypes(options, declaredSaleTypes),
     declaredSaleTypes[0]
   );
-  if (!saleTypesForTransport.includes('pre_order') && transports.some((t) => t.active)) {
-    // Transport offers are meaningless outside preorder — kept stored but inactive.
-    transports.forEach((t) => (t.active = false));
-  }
+  // Product transports are defaults. Keep their configuration even while
+  // pre-order is disabled; the resolver controls whether they can be selected.
+
 
   /**
    * A pre-order option with no lead time is not refused — the owner asked for
@@ -1309,15 +1320,28 @@ export function projectAdmin(doc: ProductDoc) {
  */
 const COST_KEYS = ['cost_iqd', 'cost_adjust_iqd'] as const;
 
-const stripCostFields = <T extends PriceFields>(x: T) => {
-  const rest = { ...x } as Record<string, unknown>;
-  for (const k of COST_KEYS) delete rest[k];
+export const stripCostFields = <T extends object>(x: T) => {
+  const clean = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(clean);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(Object.entries(value).filter(([k]) => !(COST_KEYS as readonly string[]).includes(k)).map(([k, v]) => [k, clean(v)]));
+  };
+  const rest = clean(x) as Record<string, unknown>;
   return rest as Omit<T, (typeof COST_KEYS)[number]>;
 };
 
 /** The per-level stock counters a coarse projection blanks (§8.2 row 18). */
-const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
-  ({ ...x, stock: null, low_stock_threshold: null }) as T;
+const publicStockLevel = <T extends Record<string, unknown>>(x: T, coarse: boolean): T => {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== 'object') return v;
+    const r = v as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'reserved').map(([k, value]) => [k,
+      k === 'stock' ? (coarse || value == null ? null : Math.max(0, Number(value) - Number(r.reserved ?? 0)))
+        : k === 'low_stock_threshold' && coarse ? null : walk(value)]));
+  };
+  return walk(x) as T;
+};
 
 /**
  * Public storefront projection — NO cost fields anywhere (product, option,
@@ -1350,7 +1374,7 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     composition: doc.composition,
     selling_type: doc.selling_type,
     sale_types: doc.sale_types,
-    preorder_transports: doc.preorder_transports.filter((t) => t.active),
+    preorder_transports: doc.preorder_transports.filter((t) => t.active).map(stripCostFields),
     // A price component (availability premium), not a cost — safe to show.
     direct_surcharge_iqd: doc.direct_surcharge_iqd,
     stock: coarse ? null : doc.stock,
@@ -1366,11 +1390,11 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     options: doc.options
       .filter((o) => o.active)
       .map(stripCostFields)
-      .map((o) => (coarse ? coarseLevel(o) : o)),
+      .map((o) => publicStockLevel(o, coarse)),
     colors: doc.colors
       .filter((c) => c.active)
       .map(stripCostFields)
-      .map((c) => (coarse ? coarseLevel(c) : c)),
+      .map((c) => publicStockLevel(c, coarse)),
     /**
      * The hand-typed groups first, then the family's own filled-in fields
      * (printer specs: maximum acceleration, supported nozzle sizes, build

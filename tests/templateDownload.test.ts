@@ -174,6 +174,7 @@ test('blank template keeps the RICH field set — nothing is slimmed away', () =
   }
   for (const group of FIELD_REGISTRY.groups) {
     for (const spec of group.fields) {
+      if (spec.key === 'availability_type') { assert.ok(!text.includes('options.1.availability_type=')); continue; }
       assert.ok(text.includes(`${group.name}.1.${spec.key}=`), `missing ${group.name}.1.${spec.key}`);
     }
     for (const spec of group.rowFields ?? []) {

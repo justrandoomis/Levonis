@@ -130,6 +130,13 @@ app.use('*', async (c, next) => {
 app.use('/api/admin/*', requireMainHost);
 
 app.route('/api/auth', authRoutes);
+// This small primary-D1 read is never cached. The gateway uses it to put
+// catalogue, search and image responses in a post-commit generation.
+app.get('/api/products/cache/revision', async (c) => {
+  const row = await c.env.DB.prepare('SELECT revision FROM catalog_revision WHERE id=1').first<{revision:number}>();
+  c.header('Cache-Control','no-store');
+  return c.json({ revision: row?.revision ?? null });
+});
 app.route('/api/products', productRoutes);
 // Members-only bundles section; mounted before the '/api' misc catch-all so
 // nothing there can ever shadow it. Same for its admin CRUD below.

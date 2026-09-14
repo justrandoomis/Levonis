@@ -140,6 +140,7 @@ export function canStore(res: { status: number; headers: Headers }, bodyText: st
   // the route for everyone until the entry expires.
   if (bodyText !== null && bodyText.length === 0) return false;
   if (res.headers.has('set-cookie')) return false;
+  if (/no-store/.test(res.headers.get('cache-control') ?? '')) return false;
   const vary = (res.headers.get('vary') ?? '').toLowerCase();
   if (vary.includes('cookie') || vary === '*') return false;
   if (bodyText !== null && /"success"\s*:\s*false/.test(bodyText.slice(0, 4096))) return false;

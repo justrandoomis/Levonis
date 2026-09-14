@@ -1,3 +1,5 @@
+import { deleteProductPermanently } from '../lib/productDeletion';
+import { exportTemplateMedia, prepareTemplateMedia, uploadTemplateMedia, MAX_TEMPLATE_CHARS } from '../lib/templateMedia';
 /**
  * Admin TXT template pipeline routes (mandate §6) — mounted at
  * /api/admin/template. Deterministic parse/export only; NO AI anywhere.
@@ -91,7 +93,7 @@ import {
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
 
-const MAX_TEMPLATE_CHARS = 1_500_000;
+
 const MAX_ZIP_BYTES = 15 * 1024 * 1024;
 const MAX_ZIP_FILES = 100;
 
@@ -685,7 +687,7 @@ async function analyzeTemplate(
      * the preview says so.
      */
     if (touchesPricingStructure(parsed)) {
-      const norm = normalizeCheapestBase(validated, { money: opts.money });
+      const norm = validated.options.some((o) => o.direct !== undefined || o.preorder !== undefined) ? { doc: validated, changed: [], warnings: [] } : normalizeCheapestBase(validated, { money: opts.money });
       if (norm.changed.length > 0) {
         try {
           a.doc = validateProductDoc({
@@ -1105,15 +1107,15 @@ templateRoutes.get('/export/:productId', async (c) => {
   const opts = await exportOptsFor(c.env.DB, doc);
   // §11, the same gate the CSV export has always applied: an assistant admin
   // downloads the product without its cost, not the whole cost sheet.
-  return attachment(
-    exportProduct(doc, {
+  const text = exportProduct(doc, {
       ...opts,
       // Symmetric with the parser: the file says which level counts the stock.
       inventoryMode: loaded.view.inventory_mode,
       includeCost: canViewFinancials(c.env, c.get('user')!),
-    }),
-    `levonis-product-${doc.id}.txt`
-  );
+    });
+  // Explicit metadata-only export is useful for editing; the default is a
+  // self-contained backup that can survive permanent deletion of its files.
+  return attachment(c.req.query('include_media') === 'false' ? text : await exportTemplateMedia(c.env, doc, text), `levonis-product-${doc.id}.txt`);
 });
 
 // ---------------------------------------------------------------- POST /parse
@@ -1286,7 +1288,7 @@ templateRoutes.post('/apply', async (c) => {
     );
   }
   if (a.validation_error) throw new HttpError(400, a.validation_error.message, a.validation_error.code);
-  const doc = a.doc!;
+  let doc = a.doc!;
   const merge = a.merge!;
   warnings.push(...merge.warnings);
   warnings.push(...priceWarnings(doc));
@@ -1337,6 +1339,8 @@ templateRoutes.post('/apply', async (c) => {
    * with no rows receiving its first option gets rows (docs/TXT_IMPORT_PARITY.md,
    * root causes 1 and 2). The old `hasRelationalStructure` gate is gone.
    */
+  const mediaImport = await prepareTemplateMedia(c.env, doc, text);
+  doc = mediaImport.doc;
   const relationsWanted = !isUpdate || touchesStructure(a.parsed) || merge.inventory_mode !== undefined;
   const bridge: BridgeDiagnostics = { warnings: [] };
   const relations = relationsWanted
@@ -1409,6 +1413,7 @@ templateRoutes.post('/apply', async (c) => {
 
   // ---- ONE batch: everything lands, or nothing does --------------------
   try {
+    await uploadTemplateMedia(c.env, doc.id, adminUser.id, mediaImport.uploads);
     await saveProductAtomic(c.env.DB, plan, [
       {
         action: 'template.apply',
@@ -1483,11 +1488,8 @@ templateRoutes.post('/apply', async (c) => {
       // it, migrations 0018/0048); the hashtag vocabulary rows do not, so the
       // ones THIS apply registered are named explicitly.
       try {
-        await c.env.DB.batch([
-          ...plan.hashtagsAdded.map((tag) => c.env.DB.prepare('DELETE FROM hashtags WHERE tag = ?').bind(tag)),
-          c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(doc.id),
-          c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(doc.id),
-        ]);
+        await deleteProductPermanently(c.env, doc.id, adminUser.id);
+        if (plan.hashtagsAdded.length) await c.env.DB.batch(plan.hashtagsAdded.map((tag) => c.env.DB.prepare('DELETE FROM hashtags WHERE tag = ?').bind(tag)));
       } catch (e) {
         rollbackFailed = e instanceof Error ? e.message : String(e);
         console.error('template apply rollback failed', rollbackFailed);

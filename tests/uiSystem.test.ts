@@ -29,9 +29,11 @@ test('the dark system is semantic and selection uses a small cue rather than a g
 test('product variants and availability modes share the restrained accessible choice primitive', () => {
   const product = read('src/pages/Product.tsx');
   assert.match(product, /className="lv-choice[^\n]+"/);
-  assert.match(product, /aria-pressed=\{!wantPreorder\}/);
-  assert.match(product, /aria-pressed=\{wantPreorder\}/);
-  assert.match(product, /<SafeImage[\s\S]{0,500}lv-choice-mark/);
+  assert.match(product, /aria-pressed=\{fulfillmentType === 'direct_sale'\}/);
+  assert.match(product, /aria-pressed=\{fulfillmentType === 'pre_order'\}/);
+  const imageChoices = [...product.matchAll(/<button\b(?:(?!<\/button>)[\s\S])*<\/button>/g)].map(m=>m[0]).filter(button=>button.includes('lv-choice') && button.includes('<SafeImage'));
+  assert.ok(imageChoices.length > 0);
+  for (const button of imageChoices) { assert.match(button,/aria-pressed=/); assert.match(button,/lv-choice-mark/); }
   assert.doesNotMatch(product, /border-gold\s+bg-gold\/15\s+text-gold/);
 });
 
