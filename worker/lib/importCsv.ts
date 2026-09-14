@@ -194,6 +194,23 @@ export const BASE_COLUMNS = [
   'pro_price_iqd',
   'cost_iqd',
   'direct_surcharge_iqd',
+  // ---- §18: ONE product-scoped membership discount rule per member tier.
+  // Optional in every direction. All six cells of a tier empty = this file
+  // says NOTHING about that tier and the stored rule is left exactly as it
+  // is; `__NULL__` in the discount_mode cell is the explicit "remove it".
+  // See MEMBERSHIP_COLUMNS below — the two lists are pinned to each other.
+  'membership.pro.discount_mode',
+  'membership.pro.percent',
+  'membership.pro.fixed_iqd',
+  'membership.pro.max_discount_iqd',
+  'membership.pro.cap_scope',
+  'membership.pro.max_quantity',
+  'membership.premium.discount_mode',
+  'membership.premium.percent',
+  'membership.premium.fixed_iqd',
+  'membership.premium.max_discount_iqd',
+  'membership.premium.cap_scope',
+  'membership.premium.max_quantity',
   'stock',
   'low_stock_threshold',
   // Product-owned last-mile delivery rules. Empty across all six columns is
@@ -277,6 +294,93 @@ export const WARRANTY_KINDS = ['total', 'extension'] as const;
 export const CONTENT_KINDS = ['text', 'image', 'video_embed'] as const;
 export const GUIDE_KINDS = ['setup', 'usage'] as const;
 export const LABEL_KEYS = ['featured', 'warranty_included', 'free_returns', 'free_plus'] as const;
+
+/* --------------------------------- §18: the product-scoped membership rule */
+
+/**
+ * ONE PRODUCT-SCOPED MEMBERSHIP DISCOUNT PER TIER, CARRIED BY THE SHEET.
+ *
+ * `membership_benefit_rules` (migration 0074) is the one place a membership
+ * discount lives, and docs/MEMBERSHIP_BENEFITS.md §1 says a rule scoped to a
+ * PRODUCT beats a section rule and a global one. §18 asks for that override
+ * to be settable from the product editor AND to travel with the template, so
+ * an owner can price a hundred printers for PRO members in a spreadsheet
+ * instead of a hundred admin screens.
+ *
+ * SIX CELLS PER TIER, all optional, all on the `product` row — they describe
+ * exactly one `product_discount` rule whose `scope` is `product` and whose
+ * `product_id` is this product. They are NOT a new pricing engine: the values
+ * are the same columns the admin door writes, validated by the same rules
+ * (worker/routes/adminMembershipBenefits.ts `ruleFromBody`), and written
+ * through the same `saveBenefitRule`, so every change from a spreadsheet is
+ * versioned and audited like every change from the panel.
+ *
+ * THE THREE STATES OF A TIER'S BLOCK, and why silence is not a decision:
+ *
+ *   all six cells empty   the file says NOTHING about this tier — the stored
+ *                         rule is untouched. An OLD export, or a sheet from a
+ *                         shape that has no membership columns at all, is
+ *                         exactly this case: re-importing it can never wipe a
+ *                         discount somebody set in the admin panel afterwards.
+ *   values filled         create or update this tier's product rule.
+ *   discount_mode=__NULL__  remove it. Deleting a price is a decision, so the
+ *                         file has to SAY it; a blank cell never will.
+ *
+ * The rule's OTHER fields — its date window, priority, on/off switch, label,
+ * note and minimum subtotal — are not in the sheet and are PRESERVED from the
+ * stored rule on an update (see worker/routes/adminImport.ts). A template that
+ * carried six of a rule's fields and silently cleared the rest would be a
+ * worse way to lose a scheduled promotion than having no template at all.
+ */
+export const MEMBERSHIP_PREFIX = 'membership.';
+
+/** The sheet's word for each tier, and the tier the database stores. */
+export const MEMBERSHIP_TIERS = [
+  { key: 'pro', tier: 'pro', label_ar: 'PRO' },
+  { key: 'premium', tier: 'prime', label_ar: 'PREMIUM' },
+] as const;
+
+export const MEMBERSHIP_FIELDS = [
+  'discount_mode',
+  'percent',
+  'fixed_iqd',
+  'max_discount_iqd',
+  'cap_scope',
+  'max_quantity',
+] as const;
+
+export const MEMBERSHIP_MODES = ['percent', 'fixed'] as const;
+export const MEMBERSHIP_CAP_SCOPES = ['per_unit', 'per_order'] as const;
+
+/**
+ * The explicit "there is no value here". Borrowed verbatim from the TXT
+ * template's `NULL_TOKEN` (worker/lib/template.ts) rather than invented, so an
+ * admin who has used one template already knows what it means in the other.
+ */
+export const MEMBERSHIP_NULL = '__NULL__';
+
+/** `membership.<tier key>.<field>` for every tier and field, in column order. */
+export const MEMBERSHIP_COLUMNS: string[] = MEMBERSHIP_TIERS.flatMap((t) =>
+  MEMBERSHIP_FIELDS.map((f) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`)
+);
+
+/** The six values one tier's block states, in the database's own words. */
+export interface MembershipRuleValues {
+  /** The stored tier: `pro` = PRO, `prime` = PREMIUM. */
+  tier: 'pro' | 'prime';
+  discount_mode: 'percent' | 'fixed' | null;
+  percent: number | null;
+  fixed_iqd: number | null;
+  max_discount_iqd: number | null;
+  cap_scope: 'per_unit' | 'per_order' | null;
+  max_quantity: number | null;
+}
+
+export interface ParsedMembershipRule extends MembershipRuleValues {
+  line: number;
+  /** The file wrote `__NULL__`: delete this tier's product rule. */
+  remove: boolean;
+}
 
 export interface TemplateShape {
   columns: string[];
@@ -371,6 +475,19 @@ export function labelRow(shape: TemplateShape): string[] {
     primary: 'صورة رئيسية (yes/no)',
     active: 'مفعّل / ظاهر (yes/no)',
   };
+  // §18 — generated per tier rather than typed out twelve times, so a tier
+  // can never gain a column that the label row leaves blank (which is what
+  // shifts every Arabic heading one cell to the left in a spreadsheet).
+  for (const t of MEMBERSHIP_TIERS) {
+    const at = (f: string) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`;
+    labels[at('discount_mode')] =
+      `خصم عضوية ${t.label_ar} لهذا المنتج (${MEMBERSHIP_MODES.join('/')}؛ فارغ = بلا تغيير، ${MEMBERSHIP_NULL} = احذف القاعدة)`;
+    labels[at('percent')] = `نسبة خصم ${t.label_ar} (٪ — عدد صحيح بين 1 و100)`;
+    labels[at('fixed_iqd')] = `خصم ${t.label_ar} مبلغًا ثابتًا (د.ع)`;
+    labels[at('max_discount_iqd')] = `سقف خصم ${t.label_ar} (د.ع)`;
+    labels[at('cap_scope')] = `نطاق سقف ${t.label_ar} (${MEMBERSHIP_CAP_SCOPES.join('/')} — لكل قطعة أو لكل طلب)`;
+    labels[at('max_quantity')] = `أقصى عدد قطع يشمله خصم ${t.label_ar} (عدد صحيح 1 فأكثر)`;
+  }
   const byId = new Map(shape.specFields.map((f) => [f.id, f]));
   return shape.columns.map((c) => {
     if (c.startsWith(SPEC_PREFIX)) {
@@ -424,6 +541,13 @@ export interface ParsedProduct {
   /** null when the sheet has no hashtags column at all, so an older file
    *  leaves a product's stored tags alone instead of clearing them. */
   hashtags: string[] | null;
+  /**
+   * §18 — the product-scoped membership discount rules this row STATES, one
+   * entry per tier it spoke about. An empty array means the file said nothing
+   * (old sheet, or blank cells) and every stored rule survives untouched;
+   * `remove: true` is the file asking for one to be deleted.
+   */
+  membership_rules: ParsedMembershipRule[];
   spec_fields: Record<string, string>;
   options: ParsedOption[];
   colors: ParsedColor[];
@@ -703,6 +827,209 @@ function checkSpecCell(f: TemplateField, raw: string, line: number, issues: RowI
 }
 
 /**
+ * §18 — the membership block of one `product` row, per tier.
+ *
+ * EVERY REFUSAL HERE IS THE ADMIN DOOR'S OWN REFUSAL, in the same words
+ * (`worker/routes/adminMembershipBenefits.ts` `ruleFromBody`): a ceiling with
+ * no per-unit/per-order choice, a percentage rule with no percentage, a fixed
+ * rule with no amount. The sheet cannot be a back door into a rule the panel
+ * would not accept — and because this runs inside `parseImport`, which is what
+ * `POST /api/admin/import/preview` calls, the owner reads the refusal BEFORE
+ * confirming rather than in a report afterwards.
+ *
+ * `has` distinguishes a column that is ABSENT from one that is EMPTY. Both
+ * mean "change nothing", but only the first can happen to a file exported
+ * before these columns existed, and the two are worth telling apart when
+ * reading this back.
+ */
+function membershipRulesFrom(
+  get: (name: string) => string,
+  has: (name: string) => boolean,
+  line: number,
+  issues: RowIssue[]
+): ParsedMembershipRule[] {
+  const out: ParsedMembershipRule[] = [];
+  for (const t of MEMBERSHIP_TIERS) {
+    const col = (f: string) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`;
+    if (!MEMBERSHIP_FIELDS.some((f) => has(col(f)))) continue; // older sheet
+    const raw = Object.fromEntries(MEMBERSHIP_FIELDS.map((f) => [f, get(col(f))])) as MembershipCells;
+    const rule = membershipRuleFromCells(t, raw, line, issues);
+    if (rule) out.push(rule);
+  }
+  return out;
+}
+
+/** The six raw cells of one tier, before anything is believed about them. */
+export type MembershipCells = Record<(typeof MEMBERSHIP_FIELDS)[number], string>;
+
+/**
+ * ONE TIER'S BLOCK, JUDGED — the single validator BOTH templates use.
+ *
+ * The CSV sheet reads it out of six columns and the TXT template out of six
+ * `membership.<tier>.<field>` keys, and they call this same function, because
+ * two copies of "a ceiling needs a per-unit/per-order choice" is exactly how
+ * one file format ends up accepting a rule the other refuses.
+ *
+ * Returns `null` when the block says nothing at all — the file is silent about
+ * this tier and the stored rule must survive untouched — and pushes an issue
+ * and returns `null` when it says something impossible.
+ */
+export function membershipRuleFromCells(
+  t: (typeof MEMBERSHIP_TIERS)[number],
+  raw: MembershipCells,
+  line: number,
+  issues: RowIssue[]
+): ParsedMembershipRule | null {
+  const col = (f: string) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`;
+  const err = (c: string, ar: string, en: string) =>
+    issues.push({ line, severity: 'error', message: `${c}: ${ar} — ${en}` });
+  const mode = raw.discount_mode;
+  // Silence is never a decision: an untouched block leaves the stored rule
+  // alone. Only `__NULL__` in the mode cell asks for a deletion.
+  if (mode !== MEMBERSHIP_NULL && MEMBERSHIP_FIELDS.every((f) => raw[f] === '' || raw[f] === MEMBERSHIP_NULL)) {
+    return null;
+  }
+
+  if (mode === MEMBERSHIP_NULL) {
+    const stated = MEMBERSHIP_FIELDS.filter((f) => f !== 'discount_mode' && raw[f] !== '' && raw[f] !== MEMBERSHIP_NULL);
+    if (stated.length) {
+      err(
+        col('discount_mode'),
+        `${MEMBERSHIP_NULL} يحذف قاعدة ${t.label_ar} لهذا المنتج، فلا تملأ معه ${stated.join(' / ')} — أفرغ تلك الخلايا أو اكتب نوع الخصم`,
+        `${MEMBERSHIP_NULL} removes the rule; clear the other cells or state a discount mode`
+      );
+      return null;
+    }
+    return {
+      line,
+      tier: t.tier,
+      remove: true,
+      discount_mode: null,
+      percent: null,
+      fixed_iqd: null,
+      max_discount_iqd: null,
+      cap_scope: null,
+      max_quantity: null,
+    };
+  }
+
+  const blank = (v: string) => v === '' || v === MEMBERSHIP_NULL;
+  let discountMode: 'percent' | 'fixed' | null = null;
+  if (!blank(mode)) {
+    const hit = MEMBERSHIP_MODES.find((m) => m === mode.toLowerCase());
+    if (!hit) {
+      issues.push({
+        line,
+        severity: 'error',
+        message: `${col('discount_mode')}: "${mode}" غير مقبول — القيم المتاحة: ${MEMBERSHIP_MODES.join(' / ')} / ${MEMBERSHIP_NULL}`,
+      });
+      return null;
+    }
+    discountMode = hit;
+  }
+
+  const percent = blank(raw.percent) ? null : intCell(raw.percent, line, col('percent'), issues);
+  if (percent !== null && (percent < 1 || percent > 100)) {
+    err(col('percent'), 'النسبة يجب أن تكون بين 1 و100', 'percent must be between 1 and 100');
+    return null;
+  }
+  const fixedIqd = blank(raw.fixed_iqd) ? null : intCell(raw.fixed_iqd, line, col('fixed_iqd'), issues);
+  const maxDiscount = blank(raw.max_discount_iqd)
+    ? null
+    : intCell(raw.max_discount_iqd, line, col('max_discount_iqd'), issues);
+  const maxQuantity = blank(raw.max_quantity) ? null : intCell(raw.max_quantity, line, col('max_quantity'), issues);
+  if (maxQuantity !== null && maxQuantity < 1) {
+    err(col('max_quantity'), 'أقل عدد مقبول هو 1', 'max_quantity must be 1 or more');
+    return null;
+  }
+
+  let capScope: 'per_unit' | 'per_order' | null = null;
+  if (!blank(raw.cap_scope)) {
+    const hit = MEMBERSHIP_CAP_SCOPES.find((s) => s === raw.cap_scope.toLowerCase());
+    if (!hit) {
+      issues.push({
+        line,
+        severity: 'error',
+        message: `${col('cap_scope')}: "${raw.cap_scope}" غير مقبول — القيم المتاحة: ${MEMBERSHIP_CAP_SCOPES.join(' / ')} / ${MEMBERSHIP_NULL}`,
+      });
+      return null;
+    }
+    capScope = hit;
+  }
+
+  if (discountMode === null) {
+    err(
+      col('discount_mode'),
+      'قاعدة الخصم تحتاج نسبة أو مبلغًا ثابتًا',
+      'A discount rule needs a percentage or a fixed amount'
+    );
+    return null;
+  }
+  if (discountMode === 'percent' && percent === null) {
+    err(col('percent'), 'اكتب النسبة', 'Enter the percentage');
+    return null;
+  }
+  if (discountMode === 'fixed' && (fixedIqd === null || fixedIqd <= 0)) {
+    err(col('fixed_iqd'), 'اكتب المبلغ بالدينار', 'Enter the amount in dinars');
+    return null;
+  }
+  // "up to 100,000" means nothing until it says per what — and a per-unit
+  // choice with no ceiling is the same half-sentence read backwards.
+  if (maxDiscount !== null && capScope === null) {
+    err(
+      col('cap_scope'),
+      'حدِّد ما إذا كان السقف لكل قطعة أم لكل طلب',
+      'Say whether the ceiling is per unit or per order'
+    );
+    return null;
+  }
+  if (capScope !== null && maxDiscount === null) {
+    err(
+      col('max_discount_iqd'),
+      'اكتب السقف، أو امسح اختيار per_unit/per_order',
+      'Enter the ceiling, or clear the per-unit/per-order choice'
+    );
+    return null;
+  }
+
+  return {
+    line,
+    tier: t.tier,
+    remove: false,
+    discount_mode: discountMode,
+    // The unused half is dropped exactly as the admin door drops it, so a
+    // sheet that fills both cells cannot store a fixed amount on a rule the
+    // resolver will read as a percentage.
+    percent: discountMode === 'percent' ? percent : null,
+    fixed_iqd: discountMode === 'fixed' ? fixedIqd : null,
+    max_discount_iqd: maxDiscount,
+    cap_scope: capScope,
+    max_quantity: maxQuantity,
+  };
+}
+
+/** The twelve membership cells of one product row, for `serializeProducts`. */
+function membershipCells(rules: readonly MembershipRuleValues[] | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const t of MEMBERSHIP_TIERS) {
+    // A tier with no product-scoped rule exports SIX EMPTY CELLS, never
+    // `__NULL__`: an export must not carry a deletion nobody asked for. An
+    // owner who exports today, writes a PRO discount in the panel tomorrow and
+    // re-imports the old file still has that discount afterwards.
+    const rule = rules?.find((r) => r.tier === t.tier);
+    if (!rule) continue;
+    const at = (f: string) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`;
+    out[at('discount_mode')] = rule.discount_mode ?? '';
+    out[at('percent')] = num(rule.percent);
+    out[at('fixed_iqd')] = num(rule.fixed_iqd);
+    out[at('max_discount_iqd')] = num(rule.max_discount_iqd);
+    out[at('cap_scope')] = rule.cap_scope ?? '';
+    out[at('max_quantity')] = num(rule.max_quantity);
+  }
+  return out;
+}
+
+/**
  * Parses a completed template. Pure and side-effect free — this is what the
  * PREVIEW endpoint runs, and §10 requires preview to write nothing.
  */
@@ -836,6 +1163,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         how_to_use: index.has('how_to_use') ? cell(r, 'how_to_use') : null,
         usage_url: index.has('usage_url') ? cell(r, 'usage_url') : null,
         hashtags: index.has('hashtags') ? splitList(cell(r, 'hashtags')) : null,
+        membership_rules: membershipRulesFrom((name) => cell(r, name), (name) => index.has(name), line, issues),
         spec_fields: spec,
         options: [],
         colors: [],
@@ -1375,6 +1703,13 @@ export interface ExportProduct {
   how_to_use: string;
   usage_url: string;
   hashtags: string[];
+  /**
+   * §18 — the product-scoped membership discount rules this product has, at
+   * most one per tier. OPTIONAL, and a tier with no rule simply has no entry:
+   * `serializeProducts` then writes six empty cells for it, which the importer
+   * reads as "this file says nothing" (see `membershipCells`).
+   */
+  membership_rules?: MembershipRuleValues[];
   spec_fields: Record<string, string>;
   options: Array<Omit<ParsedOption, 'line'>>;
   colors: Array<Omit<ParsedColor, 'line'>>;
@@ -1436,6 +1771,7 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       how_to_use: p.how_to_use,
       usage_url: p.usage_url,
       hashtags: p.hashtags.join('|'),
+      ...membershipCells(p.membership_rules),
       ...spec,
     });
     for (const o of p.options) {
@@ -1788,6 +2124,50 @@ export function exampleRows(shape: TemplateShape): Array<Record<string, string>>
 // a template that offered filter slugs would be offering a value nobody can
 // see or correct in the browser afterwards.
 
+/**
+ * §18 — the README block for the membership columns, WITH THEIR UNITS.
+ *
+ * Generated from the same constants the columns and the parser use, so a
+ * seventh field or a third tier cannot appear in the sheet and be missing
+ * from the only page most admins read.
+ */
+export function membershipReadme(): string {
+  const tiers = MEMBERSHIP_TIERS.map((t) => `${MEMBERSHIP_PREFIX}${t.key}.*  (${t.label_ar})`).join('  ·  ');
+  return `خصم العضوية الخاص بهذا المنتج (أعمدة membership.*)
+------------------------------------------------
+سطر product يحمل ستة أعمدة لكل فئة عضوية — ${tiers} — تصف قاعدة خصم واحدة
+مربوطة بهذا المنتج وحده. قاعدة المنتج تتقدّم على قاعدة القسم وعلى القاعدة
+العامة (docs/MEMBERSHIP_BENEFITS.md §1)، ولا تُجمع قاعدتان أبدًا.
+
+  ${MEMBERSHIP_PREFIX}<الفئة>.discount_mode      ${MEMBERSHIP_MODES.join(' / ')} — نوع الخصم
+  ${MEMBERSHIP_PREFIX}<الفئة>.percent            نسبة مئوية (٪): عدد صحيح بين 1 و100
+  ${MEMBERSHIP_PREFIX}<الفئة>.fixed_iqd          مبلغ ثابت بالدينار العراقي (د.ع)
+  ${MEMBERSHIP_PREFIX}<الفئة>.max_discount_iqd   سقف الخصم بالدينار العراقي (د.ع)
+  ${MEMBERSHIP_PREFIX}<الفئة>.cap_scope          ${MEMBERSHIP_CAP_SCOPES.join(' / ')} — السقف لكل قطعة أم لكل طلب
+  ${MEMBERSHIP_PREFIX}<الفئة>.max_quantity       أقصى عدد قطع يشمله الخصم (عدد صحيح، 1 فأكثر)
+
+الحالات الثلاث لكل فئة:
+  * الأعمدة الستة كلها فارغة  =  الملف لا يقول شيئًا عن هذه الفئة، والقاعدة
+    المحفوظة تبقى كما هي. الملف القديم الذي لا يحمل هذه الأعمدة أصلًا هو نفس
+    الحالة — فإعادة استيراده لا تمسّ خصمًا كتبته في لوحة الإدارة بعده.
+  * قيم مكتوبة                =  تُنشأ قاعدة المنتج لهذه الفئة أو تُحدَّث.
+  * discount_mode=${MEMBERSHIP_NULL}      =  تُحذف قاعدة المنتج لهذه الفئة. الحذف قرار،
+    فلا بد أن يقوله الملف صراحةً؛ الخلية الفارغة لا تحذف شيئًا أبدًا.
+
+قواعد القبول هي نفسها قواعد لوحة الإدارة تمامًا: سقف بلا cap_scope مرفوض،
+و cap_scope بلا سقف مرفوض، و percent يحتاج نسبة، و fixed يحتاج مبلغًا. أي رفض
+يظهر في المعاينة برقم السطر واسم العمود قبل التأكيد، لا بعده.
+
+الملف يحمل قاعدة واحدة لكل فئة. لو كان للمنتج أكثر من قاعدة لفئة واحدة (وهو
+ما يمكن إنشاؤه من اللوحة) فالملف يصف الأولى بحسب الأولوية ويحدّثها، ولا يمسّ
+غيرها.
+
+بقية حقول القاعدة — تاريخ البداية والنهاية، الأولوية، التفعيل/الإيقاف،
+الاسم والملاحظة والحد الأدنى للسلة — ليست في الملف وتبقى كما ضُبطت في لوحة
+الإدارة. كل تعديل من هذا الملف يُسجَّل بنسخة (membership_benefit_versions)
+وبسطر تدقيق، تمامًا كتعديل من اللوحة.`;
+}
+
 /** One human-readable line per value, for the README. */
 function lookupLine(value: string, ar: string, note: string): string {
   const tail = [ar, note].filter(Boolean).join(' — ');
@@ -1944,7 +2324,7 @@ ${def.hint_ar}
 أنواع الأسطر
 ------------
 ${[
-    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*'),
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, membership.*, spec.*'),
     rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
@@ -1987,6 +2367,8 @@ ${[
   وإعادة التأكيد بنفس import_id لا تكرر شيئًا.
 * الأسطر التي تبدأ بـ # (مثل #labels و #lookup:) يتجاهلها المستورد.
 * احذف أسطر المثال (المفتاح EXAMPLE-…) قبل الاستيراد، وإلا أُنشئ منتج بهذا الاسم.
+
+${membershipReadme()}
 
 أعمدة المواصفات الخاصة بهذا النوع
 --------------------------------

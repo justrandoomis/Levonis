@@ -127,33 +127,85 @@ export function bodyPath(o: BodyOptions, cx: number, cy: number): string {
 }
 
 /**
- * The gloss.
+ * A HIGHLIGHT THAT IS IN THE MATERIAL, NOT ON IT.
  *
- * Derived from the same samples rather than drawn separately, so it deforms
- * with the body instead of sliding across it. A highlight that keeps its shape
- * while the surface under it moves is the cheapest possible way to tell a
- * viewer that they are looking at a decal, not a material.
+ * The previous gloss was an open arc STROKED in near-white. However low the
+ * opacity, a stroke has a constant width and two ends, so it reads as a line
+ * someone drew on the character — the exact failure the brief names. What the
+ * reference shows instead is a broad soft lobe of lighter olive, brightest
+ * somewhere inside the upper-left mass and fading to nothing long before it
+ * reaches any edge of itself.
+ *
+ * So the gloss is now a CLOSED lens, filled with a radial gradient that is
+ * already fully transparent at its own boundary. The geometry therefore has no
+ * visible edge anywhere — the gradient decides what is seen, and the gradient
+ * ends in nothing. The lens is still derived from the SAME body samples, so it
+ * deforms with the surface rather than sliding across it, and its ends taper
+ * to points rather than being cut off by a chord, which is what stops the two
+ * tips from showing as bright commas at high deformation.
+ *
+ * No SVG filter is involved. A `feGaussianBlur` would have been the obvious
+ * way to soften an edge and it re-rasterises the element on every frame the
+ * path changes — which here is every frame. A gradient that fades to alpha 0
+ * costs the compositor nothing and never blurs the body underneath it.
+ *
+ * `from`/`to` are fractions of the way round the outline, `depth` is how far
+ * the lens reaches in towards the middle at its widest.
  */
-export function glossPath(pts: Array<[number, number]>, cx: number, cy: number): string {
+function lens(
+  pts: Array<[number, number]>,
+  cx: number,
+  cy: number,
+  from: number,
+  to: number,
+  outer: number,
+  depth: number
+): string {
   const n = pts.length;
-  // The upper-left arc, in SVG's y-down frame: from just past nine o'clock
-  // round to about one o'clock.
-  const from = Math.round(n * 0.56);
-  const to = Math.round(n * 0.86);
-  const inset = 0.8;
-  const arc: Array<[number, number]> = [];
-  for (let i = from; i <= to; i++) {
-    const p = pts[i % n]!;
-    arc.push([p[0] * inset, p[1] * inset]);
+  const i0 = Math.round(n * from);
+  const i1 = Math.round(n * to);
+  const span = i1 - i0;
+  if (span < 2) return '';
+  const at = (i: number) => pts[((i % n) + n) % n]!;
+  const outward: Array<[number, number]> = [];
+  const inward: Array<[number, number]> = [];
+  for (let i = i0; i <= i1; i++) {
+    const p = at(i);
+    const u = (i - i0) / span;
+    // sin(pi*u) is 0 at both ends and 1 in the middle: the lens closes to a
+    // point where it starts and where it stops, and is at its deepest halfway.
+    const belly = Math.sin(Math.PI * u);
+    outward.push([p[0] * outer, p[1] * outer]);
+    inward.push([p[0] * (outer - depth * belly), p[1] * (outer - depth * belly)]);
   }
-  if (arc.length < 2) return '';
-  let d = `M ${r2(cx + arc[0]![0])} ${r2(cy + arc[0]![1])}`;
-  for (let i = 1; i < arc.length; i++) {
-    const prev = arc[i - 1]!;
-    const cur = arc[i]!;
-    const mx = (prev[0] + cur[0]) / 2;
-    const my = (prev[1] + cur[1]) / 2;
-    d += ` Q ${r2(cx + prev[0])} ${r2(cy + prev[1])} ${r2(cx + mx)} ${r2(cy + my)}`;
+  let d = `M ${r2(cx + outward[0]![0])} ${r2(cy + outward[0]![1])}`;
+  for (let i = 1; i < outward.length; i++) {
+    const prev = outward[i - 1]!;
+    const cur = outward[i]!;
+    d += ` Q ${r2(cx + prev[0])} ${r2(cy + prev[1])} ${r2(cx + (prev[0] + cur[0]) / 2)} ${r2(cy + (prev[1] + cur[1]) / 2)}`;
   }
-  return d;
+  for (let i = inward.length - 1; i >= 0; i--) {
+    const cur = inward[i]!;
+    const prev = inward[Math.min(i + 1, inward.length - 1)]!;
+    d += ` Q ${r2(cx + prev[0])} ${r2(cy + prev[1])} ${r2(cx + (prev[0] + cur[0]) / 2)} ${r2(cy + (prev[1] + cur[1]) / 2)}`;
+  }
+  return `${d} Z`;
+}
+
+/** The main specular: a broad lobe across the upper-left shoulder, where the
+ *  reference puts its light. */
+export function glossPath(pts: Array<[number, number]>, cx: number, cy: number): string {
+  return lens(pts, cx, cy, 0.53, 0.9, 0.92, 0.62);
+}
+
+/**
+ * The bounce.
+ *
+ * A much dimmer, thinner lift along the lower-left edge — light coming back up
+ * off whatever the character is sitting on. It is the difference between a
+ * shape with a highlight and a shape with volume, and it costs one more path.
+ * Nothing else in the drawing says the body is round rather than flat.
+ */
+export function bouncePath(pts: Array<[number, number]>, cx: number, cy: number): string {
+  return lens(pts, cx, cy, 0.14, 0.44, 0.97, 0.2);
 }

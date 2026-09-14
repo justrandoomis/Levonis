@@ -772,6 +772,21 @@ export default function Checkout() {
     memberActive && benefits && benefits.shipping.eligible && benefits.shipping.subsidy_iqd > 0
       ? benefits.shipping
       : null;
+  /**
+   * THE TWO TAX ROWS ARE ONE DECISION, NOT TWO.
+   *
+   * The exemption is shown as its own row only when this screen is also
+   * naming the membership that earned it, so the row ABOVE must carry the
+   * figure the two net against — and the CHARGED figure whenever that row is
+   * not going to appear. Reading the gross figure from one condition and the
+   * exemption from another is how a column ends up overstating the total by
+   * an exemption it never displayed: the three quote fields above are
+   * deliberately optional, so a payload carrying the tax pair without a
+   * resolvable `membership_benefits` is exactly the skew they exist to
+   * survive.
+   */
+  const showCodExemption = memberActive && codTaxExemption > 0;
+  const codTaxRowIqd = showCodExemption ? codTaxBeforeExemption : codTaxIqd;
   const shippingWaived = !!quote && quote.shipping.total_iqd < quote.shipping.total_before_waiver_iqd;
   const shippingNeedsConfig = !!quote && quote.shipping.needs_config.length > 0;
   const requiredPolicies = quote?.policies ?? [];
@@ -1440,7 +1455,9 @@ export default function Checkout() {
               {memberShipping && !quoteLoading && (
                 <p
                   className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
-                  data-checkout-member-delivery={memberShipping.subsidy_capped ? 'capped' : 'free'}
+                  data-checkout-member-delivery={
+                    memberShipping.fee_paid_iqd === 0 ? 'free' : memberShipping.subsidy_capped ? 'capped' : 'partial'
+                  }
                 >
                   {memberShipping.fee_paid_iqd === 0
                     ? loc(
@@ -1676,13 +1693,13 @@ export default function Checkout() {
               exemption has no Sorani equivalent in the store, so it reads in
               Arabic there rather than in invented Kurdish.
             */}
-            {codTaxBeforeExemption > 0 && (
+            {codTaxRowIqd > 0 && (
               <div className="flex justify-between items-center text-zinc-400" data-checkout-cod-tax>
                 <span className="font-light">{S.codTax}</span>
-                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxBeforeExemption)}</span>
+                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxRowIqd)}</span>
               </div>
             )}
-            {memberActive && codTaxExemption > 0 && (
+            {showCodExemption && (
               <div>
                 <div className="flex justify-between items-center text-gold/90" data-checkout-cod-tax-exemption>
                   <span className="font-light">

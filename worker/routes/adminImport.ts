@@ -58,6 +58,7 @@ import {
   templateTypeChoices,
   toCsv,
   type ExportProduct,
+  type ParsedMembershipRule,
   type ParseResult,
   type RowIssue,
   type TemplateShape,
@@ -70,6 +71,11 @@ import {
   type ExistingShape,
   type ImportMaps,
 } from '../lib/importApply';
+import {
+  deleteBenefitRule,
+  saveBenefitRule,
+  type RuleWrite,
+} from '../lib/membershipBenefits';
 import {
   isProductType,
   isTemplateFamily,
@@ -348,6 +354,22 @@ async function exportProducts(
     .prepare(`SELECT * FROM product_variants WHERE product_id IN (${ph}) ORDER BY rowid`)
     .bind(...productIds)
     .all<Record<string, unknown>>();
+  /**
+   * §18 — the product-scoped membership discount rules, so an export carries
+   * what a member actually pays for these products and not only the regular
+   * ladder. `priority DESC, id` is the panel's own order (`allBenefitRules`),
+   * so the sheet describes the same rule the owner sees at the top of the
+   * list when two exist for one tier.
+   */
+  const { results: benefitRules } = await db
+    .prepare(
+      `SELECT tier, product_id, discount_mode, percent, fixed_iqd, max_discount_iqd, cap_scope, max_quantity
+         FROM membership_benefit_rules
+        WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id IN (${ph})
+        ORDER BY priority DESC, id`
+    )
+    .bind(...productIds)
+    .all<Record<string, unknown>>();
 
   const catalogs = await loadCatalogs(db);
   const catById = new Map(catalogs.map((r) => [r.id, r]));
@@ -414,6 +436,22 @@ async function exportProducts(
       how_to_use: doc.how_to_use,
       usage_url: doc.usage_guide?.official_url ?? '',
       hashtags: doc.hashtags,
+      // §18. A tier with no product rule contributes NO entry, and
+      // `serializeProducts` then writes six empty cells for it — never
+      // `__NULL__`, which would turn an export into a deletion order for a
+      // discount the owner may write in the panel tomorrow.
+      membership_rules: benefitRules
+        .filter((r) => r.product_id === pid && (r.tier === 'pro' || r.tier === 'prime'))
+        .filter((r, i, list) => list.findIndex((x) => x.tier === r.tier) === i)
+        .map((r) => ({
+          tier: r.tier as 'pro' | 'prime',
+          discount_mode: r.discount_mode === 'percent' || r.discount_mode === 'fixed' ? r.discount_mode : null,
+          percent: n(r.percent),
+          fixed_iqd: n(r.fixed_iqd),
+          max_discount_iqd: n(r.max_discount_iqd),
+          cap_scope: r.cap_scope === 'per_unit' || r.cap_scope === 'per_order' ? r.cap_scope : null,
+          max_quantity: n(r.max_quantity),
+        })),
       spec_fields: doc.spec_fields,
       transports: doc.preorder_transports.map((tr) => ({
         method: tr.method,
@@ -969,6 +1007,9 @@ adminImportRoutes.post('/preview', async (c) => {
       doc: r.doc,
       relations: r.relations,
       catalogIds: r.catalogIds,
+      // §18 — carried into the stored payload so the confirm writes exactly
+      // what the preview showed, through `saveBenefitRule` and nothing else.
+      membership: r.membership,
     });
   }
 
@@ -1032,6 +1073,83 @@ adminImportRoutes.post('/preview', async (c) => {
 });
 
 // ------------------------------------------------------------- confirm
+
+/**
+ * §18 — the sheet's membership block, written the ONLY way a benefit rule may
+ * be written: through `saveBenefitRule` / `deleteBenefitRule`, each of which
+ * appends a `membership_benefit_versions` row and an audit entry in the same
+ * batch as the rule itself. A spreadsheet is not a side door into pricing.
+ *
+ * WHAT THE SHEET DOES NOT SAY IS PRESERVED. Six columns describe a rule that
+ * has sixteen; the date window, the priority, the on/off switch, the label,
+ * the note and the minimum subtotal are read back off the stored row and
+ * written again unchanged. Defaulting them instead would mean a bulk price
+ * edit silently cancelled a scheduled promotion and re-enabled every rule an
+ * owner had switched off — from a file that never mentioned either.
+ *
+ * An empty list is the ordinary case: the file said nothing, so nothing here
+ * runs and no version row is appended.
+ *
+ * Exported because the TXT template (`worker/routes/template.ts`) writes the
+ * same six values from the same `membership.<tier>.<field>` keys. One writer,
+ * so the two file formats cannot drift into writing a rule differently.
+ */
+export async function applyMembershipRules(
+  env: Env,
+  actorId: string,
+  productId: string,
+  rules: readonly ParsedMembershipRule[]
+): Promise<void> {
+  for (const r of rules) {
+    const existing = await env.DB
+      .prepare(
+        `SELECT * FROM membership_benefit_rules
+          WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ? AND tier = ?
+          ORDER BY priority DESC, id LIMIT 1`
+      )
+      .bind(productId, r.tier)
+      .first<Record<string, unknown>>();
+
+    if (r.remove) {
+      // Nothing to delete is not a failure: a file may legitimately say "this
+      // product has no PRO rule" about a product that already has none.
+      if (existing) await deleteBenefitRule(env, actorId, String(existing.id));
+      continue;
+    }
+
+    /** A field the sheet cannot express: kept as stored, null on a first write. */
+    const kept = <T>(column: string): T | null => (existing ? ((existing[column] as T | null) ?? null) : null);
+    const write: RuleWrite = {
+      id: existing ? String(existing.id) : newId('mbr'),
+      tier: r.tier,
+      benefit_type: 'product_discount',
+      scope: 'product',
+      category_id: null,
+      sub_category_id: null,
+      product_id: productId,
+      discount_mode: r.discount_mode,
+      percent: r.percent,
+      fixed_iqd: r.fixed_iqd,
+      max_discount_iqd: r.max_discount_iqd,
+      cap_scope: r.cap_scope,
+      max_quantity: r.max_quantity,
+      min_subtotal_iqd: kept<number>('min_subtotal_iqd'),
+      // A product discount carries no delivery or tax fields at all; the admin
+      // door nulls them for this benefit_type too.
+      free_shipping_threshold_iqd: null,
+      shipping_methods: null,
+      max_shipping_subsidy_iqd: null,
+      cod_tax_exempt: null,
+      enabled: existing ? Number(existing.enabled) === 1 : true,
+      priority: existing ? Number(existing.priority ?? 0) : 0,
+      valid_from: kept<string>('valid_from'),
+      valid_until: kept<string>('valid_until'),
+      label: kept<string>('label'),
+      notes: kept<string>('notes'),
+    };
+    await saveBenefitRule(env, actorId, write, existing ? 'update' : 'create');
+  }
+}
 
 interface ReportRow {
   key: string;
@@ -1190,6 +1308,11 @@ adminImportRoutes.post('/confirm', async (c) => {
         );
       }
       await c.env.DB.batch(relStmts);
+
+      // §18 — after the product row exists, because a product-scoped rule has
+      // to name a product. Inside the same try, so a failure is reported
+      // against this row rather than swallowed into a silent success.
+      await applyMembershipRules(c.env, admin.id, productId, (item.membership as ParsedMembershipRule[]) ?? []);
 
       try {
         await syncProductTranslations(c.env.DB, productId, localized.fields);

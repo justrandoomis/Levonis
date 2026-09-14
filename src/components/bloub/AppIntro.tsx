@@ -6,6 +6,11 @@ import BloubHome, { type CharacterHandle } from './BloubHome';
 import { mascot, type MascotState } from '../../lib/mascot';
 import { BLOUB_EVENT, bloubDuration, isBloubState, canonicalBloubState } from './events';
 import { sampleCharacter } from './character/engine';
+import {
+  NO_ATTENTION, attentionFrom, engagementAfter, followAttention, releaseDelay, type Attention,
+} from './character/attention';
+import { readPointer, watchPointer } from './pointer';
+import { watchInterest, centreOf, type InterestTarget } from './interest';
 import { POSES, type Pose } from './character/expressions';
 import { isTravelWorthAnimating, planTravel, sampleTravel, type TravelPlan, type TravelSample } from './character/travel';
 import {
@@ -75,6 +80,29 @@ export default function AppIntro({ ready }: { ready: boolean }) {
   /** The pose the last drawn frame resolved to. This, not a table entry, is
    * what the next blend starts from — see `CharacterInput.from`. */
   const livePose = React.useRef<Pose | null>(null);
+
+  /**
+   * THE GAZE, AS IT IS RIGHT NOW — not as the pointer says it should be.
+   *
+   * This is the only genuinely stateful thing in the character, and it has to
+   * be: following is defined by the previous frame. Everything else is a pure
+   * function of the clock. Keeping it in a ref rather than in state is what
+   * makes §23 achievable — the pointer can move a hundred times a second and
+   * React never learns about any of it.
+   */
+  const aim = React.useRef<Attention>(NO_ATTENTION);
+  /** The control the character has noticed, if any (§9/§10), with the centre
+   *  measured when the pointer arrived rather than every frame. */
+  const interest = React.useRef<InterestTarget | null>(null);
+  /**
+   * How long this particular disengagement takes, in seconds — re-rolled on
+   * every release so the character never lets go on a schedule the user could
+   * learn (§7). Math.random is right here and nowhere else in the character:
+   * this is the one value that must NOT be reproducible from the clock, or the
+   * irregularity would be the same irregularity every session.
+   */
+  const hold = React.useRef(releaseDelay(0.5));
+  const lastActivity = React.useRef(0);
 
   /** What the face is blending FROM, and since when. Kept in a ref because it
    * changes on the animation clock, not on React's — pushing it through state
@@ -150,8 +178,63 @@ export default function AppIntro({ ready }: { ready: boolean }) {
      * after a long pause is simply the frame that moment of the clock
      * describes — there is nothing to resynchronise.
      */
+    /**
+     * WHAT THE CHARACTER IS LOOKING AT THIS FRAME.
+     *
+     * One read of the pointer tracker, one arithmetic pass, no layout. The
+     * character's own centre comes from the frame it is already drawing, so
+     * the whole of §4, §5 and §6 costs no measurement at all.
+     *
+     * A noticed CONTROL outranks the bare pointer: once the user has arrived
+     * on the checkout button, the thing worth looking at is the button, not
+     * the four pixels of cursor hovering over it. That is what makes the
+     * anticipation in §10 land on the control rather than wobbling around it.
+     */
+    const aimAt = (now: number, dt: number) => {
+      const pointer = readPointer();
+      const target = interest.current;
+      const frame = frameRef.current;
+      const centre = { x: frame.x + frame.size / 2, y: frame.y + frame.size / 2 };
+      const viewport = {
+        w: window.visualViewport?.width ?? window.innerWidth,
+        h: window.visualViewport?.height ?? window.innerHeight,
+      };
+
+      if (pointer.present && pointer.movedAt > lastActivity.current) {
+        // New activity: re-roll how long this engagement will be held, so the
+        // release is never twice the same length.
+        lastActivity.current = pointer.movedAt;
+        hold.current = releaseDelay(Math.random());
+      }
+
+      const point = target
+        ? { x: target.x, y: target.y }
+        : pointer.present
+          ? { x: pointer.x, y: pointer.y }
+          : null;
+
+      // A touch that is still down is live attention; one that has been
+      // released decays like a mouse that stopped moving. Neither ever snaps.
+      const since = (now - (lastActivity.current || now)) / 1000;
+      const engagement = target
+        ? 1
+        : pointer.down
+          ? 1
+          : engagementAfter(since, hold.current);
+
+      const want = attentionFrom({ point, center: centre, viewport, engagement, deliberate: !!target });
+      aim.current = followAttention(aim.current, want, dt, reducedRef.current ? 1.6 : 1);
+      return aim.current;
+    };
+
+    let lastFrameAt = 0;
+
     const tick = (now: number) => {
       rafId = running ? window.requestAnimationFrame(tick) : 0;
+      // Clamped so a tab that was throttled does not resume with a single
+      // enormous step that teleports the gaze — the very thing §4 forbids.
+      const dt = lastFrameAt ? Math.min(0.05, Math.max(0, (now - lastFrameAt) / 1000)) : 1 / 60;
+      lastFrameAt = now;
       let travel: TravelSample | null = null;
       const journey = journeyRef.current;
       if (journey) {
@@ -172,6 +255,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         from: b.from,
         age: (now - b.since) / 1000,
         travel,
+        attention: aimAt(now, dt),
         reduced: reducedRef.current,
       });
       livePose.current = render.pose;
@@ -193,6 +277,17 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       frameId = 0;
       const animate = animateNext;
       animateNext = false;
+      // The noticed control may have scrolled since the pointer arrived on it.
+      // Re-measured HERE, on the same rAF-throttled pass the character's own
+      // dock uses, and never inside the draw loop.
+      const noticed = interest.current;
+      if (noticed) {
+        if (!noticed.element.isConnected) interest.current = null;
+        else {
+          const centre = centreOf(noticed.element);
+          if (centre) { noticed.x = centre.x; noticed.y = centre.y; }
+        }
+      }
       const target = measureCharacterAnchor();
       if (observed !== (target?.element ?? null)) {
         if (observed) resizeObserver?.unobserve(observed);
@@ -297,6 +392,38 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       mascot.trigger(canonicalBloubState(detail.state), bloubDuration(detail.durationMs));
     };
 
+    /**
+     * §4, §5, §6, §9, §10 — THE CHARACTER'S SENSES.
+     *
+     * Both watchers are passive and capture-phase, both write into plain
+     * objects, and neither of them touches React. The loop reads them once a
+     * frame. Nothing here can delay a scroll or swallow a tap.
+     */
+    const unwatchPointer = watchPointer();
+    const unwatchInterest = watchInterest({
+      enter(target) {
+        interest.current = target;
+        lastActivity.current = performance.now();
+        // Curiosity is HELD for as long as the control is under the pointer,
+        // and it sits one rung above idle — so it can never interrupt an
+        // error, a journey or a success (§22).
+        mascot.activity('interest', 'curious');
+      },
+      leave() {
+        interest.current = null;
+        lastActivity.current = performance.now();
+        hold.current = releaseDelay(Math.random());
+        mascot.activity('interest', null);
+      },
+      activate(kind) {
+        // The press itself. A quantity press is answered by the controller's
+        // own escalation, which knows about the run; a CTA gets the small
+        // physical acknowledgement a press deserves, and whatever the request
+        // actually does then outranks it.
+        if (kind === 'cta') mascot.trigger('tap');
+      },
+    });
+
     window.addEventListener('resize', onResize);
     window.visualViewport?.addEventListener('resize', onResize);
     window.visualViewport?.addEventListener('scroll', onResize);
@@ -309,6 +436,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
     return () => {
       unsubscribe();
+      unwatchPointer();
+      unwatchInterest();
+      interest.current = null;
+      aim.current = NO_ATTENTION;
+      mascot.activity('interest', null);
       scheduleRef.current = () => {};
       stop();
       window.cancelAnimationFrame(frameId);

@@ -65,6 +65,7 @@ import {
   TEMPLATE_VERSION,
   type ParsedTemplate,
   type ResolvedRefs,
+  type TemplateError,
   type ToDocResult,
 } from '../lib/template';
 import { normalizeCheapestBase } from '../lib/cheapestBase';
@@ -87,6 +88,21 @@ import {
   type ProductTypeId,
   type TemplateField,
 } from '../lib/templateFamilies';
+import {
+  MEMBERSHIP_CAP_SCOPES,
+  MEMBERSHIP_COLUMNS,
+  MEMBERSHIP_FIELDS,
+  MEMBERSHIP_MODES,
+  MEMBERSHIP_NULL,
+  MEMBERSHIP_PREFIX,
+  MEMBERSHIP_TIERS,
+  membershipRuleFromCells,
+  type MembershipCells,
+  type MembershipRuleValues,
+  type ParsedMembershipRule,
+  type RowIssue,
+} from '../lib/importCsv';
+import { applyMembershipRules } from './adminImport';
 
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
@@ -172,6 +188,169 @@ function disableUnparsableLines(text: string): { text: string; disabled: Disable
   return { text: current, disabled };
 }
 
+/* -------------------- §18: the product-scoped membership discount, in TXT */
+
+/**
+ * SIX KEYS PER MEMBER TIER, SPELT EXACTLY AS THE CSV SHEET SPELLS THEM.
+ *
+ * `membership.pro.percent`, `membership.premium.cap_scope`, … — the same
+ * names, the same accepted values and the same refusals as the spreadsheet
+ * columns, because the two are imported from `worker/lib/importCsv.ts` rather
+ * than written down twice. An admin who has filled one file already knows
+ * this one, and a rule the CSV accepts can never be a rule the .txt refuses.
+ *
+ * WHY THESE KEYS ARE NOT IN THE FIELD REGISTRY. A membership discount is a row
+ * in `membership_benefit_rules`, not a field of a product: it carries a tier,
+ * a scope, a date window, a version history and an audit trail of its own, and
+ * it must be written through `saveBenefitRule` so those go with it. Merging it
+ * into the ProductDoc would make it a product column that the checkout does
+ * not read and the benefit engine does not see. So the lines are lifted out of
+ * the file BEFORE the product parser runs — replaced with blanks, which keeps
+ * every other line's number truthful — and applied beside the product.
+ *
+ * THE THREE STATES ARE THE SHEET'S THREE STATES (docs/TXT_IMPORT_PARITY.md):
+ * a key that is absent or empty changes nothing, values create or update the
+ * tier's product rule, and `discount_mode=__NULL__` removes it. An export
+ * therefore writes the keys EMPTY for a tier that has no rule — never
+ * `__NULL__`, which would turn a re-import of an old file into a deletion.
+ */
+const MEMBERSHIP_KEYS = new Set<string>(MEMBERSHIP_COLUMNS);
+const MEMBERSHIP_LINE_RE = /^([A-Za-z0-9_.]+)\s*=(.*)$/;
+
+interface MembershipTemplate {
+  /** The template with the membership lines blanked out — same line numbers. */
+  text: string;
+  rules: ParsedMembershipRule[];
+  errors: TemplateError[];
+}
+
+function extractMembership(text: string): MembershipTemplate {
+  const lines = String(text ?? '')
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n');
+  const out = lines.slice();
+  const seen = new Map<string, { value: string; line: number }>();
+  const errors: TemplateError[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const lineNo = i + 1;
+    const trimmed = lines[i].trim();
+    i++;
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const m = MEMBERSHIP_LINE_RE.exec(trimmed);
+    if (!m) continue;
+    const value = m[2].trim();
+    // A heredoc BODY is verbatim text — somebody's Arabic description may
+    // contain a line that looks like a key. Skipped wholesale, exactly as
+    // `parseTemplate` skips it, so a description can never set a price.
+    if (value.startsWith('<<<')) {
+      const token = value.slice(3).trim() || 'END';
+      while (i < lines.length && lines[i].trim() !== token) i++;
+      i++;
+      continue;
+    }
+    if (!MEMBERSHIP_KEYS.has(m[1])) continue;
+    if (seen.has(m[1])) {
+      errors.push({ line: lineNo, key: m[1], message: 'duplicate key' });
+      continue;
+    }
+    seen.set(m[1], { value, line: lineNo });
+    // Blanked, not deleted: the product parser must still count lines the way
+    // the admin's editor does, or every error below this point points at the
+    // wrong row.
+    out[lineNo - 1] = '';
+  }
+
+  const issues: RowIssue[] = [];
+  const rules: ParsedMembershipRule[] = [];
+  for (const t of MEMBERSHIP_TIERS) {
+    const at = (f: string) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`;
+    const present = MEMBERSHIP_FIELDS.filter((f) => seen.has(at(f)));
+    if (present.length === 0) continue;
+    const raw = Object.fromEntries(
+      MEMBERSHIP_FIELDS.map((f) => [f, seen.get(at(f))?.value ?? ''])
+    ) as MembershipCells;
+    const rule = membershipRuleFromCells(t, raw, seen.get(at(present[0]))!.line, issues);
+    if (rule) rules.push(rule);
+  }
+  for (const issue of issues) {
+    errors.push({ line: issue.line, key: issue.message.split(':')[0], message: issue.message });
+  }
+
+  return { text: out.join('\n'), rules, errors };
+}
+
+/** `null` writes an EMPTY value, which the importer reads as "no change". */
+const membershipValue = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v));
+
+/**
+ * The membership block of an export, and of the two downloads.
+ *
+ * `commented` ships the keys as documentation on the blank template and the
+ * example, where filling them in would mean the file carried a commercial
+ * value nobody typed. A real export writes them live, with the product's own
+ * rules — or empty, when it has none.
+ */
+function membershipLines(rules: readonly MembershipRuleValues[], commented = false): string[] {
+  const hash = commented ? '# ' : '';
+  const out = [
+    '',
+    '# ------------------------------ خصم العضوية لهذا المنتج / membership discount',
+    '# قاعدة خصم واحدة مربوطة بهذا المنتج وحده لكل فئة عضوية، وهي تتقدّم على قاعدة',
+    '# القسم وعلى القاعدة العامة (docs/MEMBERSHIP_BENEFITS.md §1).',
+    `#   المفتاح الغائب أو الفارغ  = لا تغيير على القاعدة المحفوظة`,
+    `#   discount_mode=${MEMBERSHIP_NULL}   = احذف قاعدة هذه الفئة (الحذف يُقال صراحةً)`,
+    `#   discount_mode: ${MEMBERSHIP_MODES.join(' / ')}   ·   percent: ٪ 1..100   ·   fixed_iqd و max_discount_iqd: د.ع`,
+    `#   cap_scope: ${MEMBERSHIP_CAP_SCOPES.join(' / ')} (السقف لكل قطعة أم لكل طلب)   ·   max_quantity: عدد قطع (1 فأكثر)`,
+    '# التواريخ والأولوية والتفعيل والاسم والملاحظة تبقى كما ضُبطت في لوحة الإدارة.',
+  ];
+  for (const t of MEMBERSHIP_TIERS) {
+    const rule = rules.find((r) => r.tier === t.tier);
+    const at = (f: string) => `${hash}${MEMBERSHIP_PREFIX}${t.key}.${f}`;
+    out.push(
+      `${at('discount_mode')}=${rule?.discount_mode ?? ''}`,
+      `${at('percent')}=${membershipValue(rule?.percent)}`,
+      `${at('fixed_iqd')}=${membershipValue(rule?.fixed_iqd)}`,
+      `${at('max_discount_iqd')}=${membershipValue(rule?.max_discount_iqd)}`,
+      `${at('cap_scope')}=${rule?.cap_scope ?? ''}`,
+      `${at('max_quantity')}=${membershipValue(rule?.max_quantity)}`
+    );
+  }
+  return out;
+}
+
+/** The product-scoped rules a product has now, in the panel's own order. */
+async function loadMembershipRules(db: D1Database, productId: string): Promise<MembershipRuleValues[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT tier, discount_mode, percent, fixed_iqd, max_discount_iqd, cap_scope, max_quantity
+         FROM membership_benefit_rules
+        WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ?
+        ORDER BY priority DESC, id`
+    )
+    .bind(productId)
+    .all<Record<string, unknown>>();
+  const out: MembershipRuleValues[] = [];
+  for (const r of results ?? []) {
+    if (r.tier !== 'pro' && r.tier !== 'prime') continue;
+    if (out.some((x) => x.tier === r.tier)) continue;
+    const n = (v: unknown) => (typeof v === 'number' ? v : null);
+    out.push({
+      tier: r.tier,
+      discount_mode: r.discount_mode === 'percent' || r.discount_mode === 'fixed' ? r.discount_mode : null,
+      percent: n(r.percent),
+      fixed_iqd: n(r.fixed_iqd),
+      max_discount_iqd: n(r.max_discount_iqd),
+      cap_scope: r.cap_scope === 'per_unit' || r.cap_scope === 'per_order' ? r.cap_scope : null,
+      max_quantity: n(r.max_quantity),
+    });
+  }
+  return out;
+}
+
 const GROUP_ITEM_LINE_RE = /^([a-z_]+)\.(\d+)\./;
 
 /**
@@ -213,7 +392,11 @@ export function buildBlankTemplate(): { text: string; disabled: DisabledLine[]; 
     }
     out.push(`# ${trimmed}`);
   }
-  const healed = disableUnparsableLines(out.join('\n'));
+  // §18 — the membership keys are not in the field registry (they describe a
+  // benefit rule, not a product), so the generator cannot emit them. They ship
+  // COMMENTED and EMPTY: the shape is taught, and no commercial value the
+  // owner never typed is hidden in a downloaded file.
+  const healed = disableUnparsableLines([...out, ...membershipLines([], true)].join('\n'));
   return { text: healed.text, disabled: healed.disabled, groupsDisabled };
 }
 
@@ -262,6 +445,28 @@ pro_price_iqd=__NULL__
 original_price_iqd=125000
 # الكلفة داخلية ولا تُنشر أبداً للزبون
 product_cost_iqd=__NULL__
+
+# ------------------------------ خصم العضوية لهذا المنتج / membership discount
+# ستة مفاتيح لكل فئة عضوية تصف قاعدة خصم واحدة مربوطة بهذا المنتج وحده، وهي
+# تتقدّم على قاعدة القسم وعلى القاعدة العامة (docs/MEMBERSHIP_BENEFITS.md §1).
+# كلها اختيارية، ومعطّلة هنا عمداً: المثال يعلّم الشكل ولا يحمل رقماً تجارياً
+# لم يكتبه المالك. احذف علامة # واكتب القيم لتفعيل القاعدة.
+#   المفتاح الغائب أو الفارغ = لا تغيير على القاعدة المحفوظة
+#   discount_mode=__NULL__   = احذف قاعدة هذه الفئة
+#   discount_mode: percent / fixed  ·  percent: ٪ 1..100  ·  fixed_iqd و max_discount_iqd: د.ع
+#   cap_scope: per_unit / per_order  ·  max_quantity: عدد قطع (1 فأكثر)
+# membership.pro.discount_mode=
+# membership.pro.percent=
+# membership.pro.fixed_iqd=
+# membership.pro.max_discount_iqd=
+# membership.pro.cap_scope=
+# membership.pro.max_quantity=
+# membership.premium.discount_mode=
+# membership.premium.percent=
+# membership.premium.fixed_iqd=
+# membership.premium.max_discount_iqd=
+# membership.premium.cap_scope=
+# membership.premium.max_quantity=
 
 # ------------------------------ التصنيف / classification
 # لا علامة ولا كتالوج في المثال: أي قيمة غير موجودة توقف الاستيراد للمراجعة
@@ -615,6 +820,9 @@ interface Analysis {
   doc: ProductDoc | null;
   validation_error: { message: string; code?: string } | null;
   spec: SpecSheetReport | null;
+  /** §18 — the product-scoped membership rules the file states, lifted out of
+   *  the text before the product parser ran (see `extractMembership`). */
+  membership: ParsedMembershipRule[];
 }
 
 /** Shared dry-run pipeline: parse → resolve refs → merge → validate.
@@ -627,9 +835,15 @@ async function analyzeTemplate(
   target?: string | null,
   opts: { money: boolean } = { money: true }
 ): Promise<Analysis> {
-  const parsed = parseTemplate(text);
+  // §18 — the membership keys are lifted out FIRST, so the product parser
+  // never sees a key it would have to file under `unknown_keys`, and a rule the
+  // panel would refuse stops the import here rather than after the write.
+  const membership = extractMembership(text);
+  const parsed = parseTemplate(membership.text);
+  parsed.errors.push(...membership.errors);
   const a: Analysis = {
     parsed, refs: {}, existing: null, existingView: null, merge: null, doc: null, validation_error: null, spec: null,
+    membership: membership.rules,
   };
   if (parsed.errors.length > 0) return a;
 
@@ -1103,15 +1317,19 @@ templateRoutes.get('/export/:productId', async (c) => {
   if (!loaded) throw notFound('Product not found');
   const doc = loaded.doc;
   const opts = await exportOptsFor(c.env.DB, doc);
-  // §11, the same gate the CSV export has always applied: an assistant admin
-  // downloads the product without its cost, not the whole cost sheet.
+  // §18 — the membership block travels with the product, live. A tier with no
+  // rule exports EMPTY keys, so editing and re-applying this very file changes
+  // nothing about it; only typing values or `__NULL__` does.
+  const benefits = membershipLines(await loadMembershipRules(c.env.DB, doc.id)).join('\n');
   return attachment(
-    exportProduct(doc, {
+    `${exportProduct(doc, {
       ...opts,
       // Symmetric with the parser: the file says which level counts the stock.
       inventoryMode: loaded.view.inventory_mode,
+      // §11, the same gate the CSV export has always applied: an assistant
+      // admin downloads the product without its cost, not the whole cost sheet.
       includeCost: canViewFinancials(c.env, c.get('user')!),
-    }),
+    })}\n${benefits}\n`,
     `levonis-product-${doc.id}.txt`
   );
 });
@@ -1163,6 +1381,20 @@ templateRoutes.post('/parse', async (c) => {
     // check step says it before anything is written.
     spec_fields: a.spec,
     inventory_mode: plannedInventoryMode(a, !!a.existing),
+    // §18 — and what it will do to this product's membership discount. An
+    // empty list is the ordinary answer: the file said nothing, so nothing
+    // changes. A `remove` entry is the one thing that deletes pricing, and it
+    // is named here BEFORE the owner presses apply.
+    membership: a.membership.map((r) => ({
+      tier: r.tier,
+      action: r.remove ? 'remove' : 'set',
+      discount_mode: r.discount_mode,
+      percent: r.percent,
+      fixed_iqd: r.fixed_iqd,
+      max_discount_iqd: r.max_discount_iqd,
+      cap_scope: r.cap_scope,
+      max_quantity: r.max_quantity,
+    })),
   }));
 });
 
@@ -1453,6 +1685,36 @@ templateRoutes.post('/apply', async (c) => {
     }
     await releaseApplyFingerprint(c.env.DB, fingerprint);
     throw e;
+  }
+
+  /**
+   * §18 — the membership rule, written beside the product and only after it
+   * exists (a product-scoped rule has to name a product). It goes through
+   * `saveBenefitRule` / `deleteBenefitRule`, so the version row and the audit
+   * entry are appended in the same batch as the rule, exactly as they are for
+   * a change made in the admin panel.
+   *
+   * The product row is already committed at this point, so a failure here is
+   * reported as itself — naming the product that WAS saved — rather than as a
+   * generic 500 that would leave the owner unsure what landed.
+   */
+  if (a.membership.length > 0) {
+    try {
+      await applyMembershipRules(c.env, adminUser.id, doc.id, a.membership);
+    } catch (e) {
+      return c.json(
+        {
+          success: false,
+          code: 'MEMBERSHIP_WRITE_FAILED',
+          error: 'The product was saved, but its membership discount was not written — try the membership panel',
+          product_id: doc.id,
+          created: !isUpdate,
+          detail: e instanceof Error ? e.message : String(e),
+          warnings,
+        },
+        500
+      );
+    }
   }
 
   // ---- read back through the form's own endpoints and compare -----------

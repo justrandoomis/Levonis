@@ -1,5 +1,6 @@
 import type { MascotState } from '../../../lib/mascot';
-import { easings, type Easing } from './math';
+import { clamp, easings, lerp, type Easing } from './math';
+import type { Attention } from './attention';
 import { EYE_SPLIT, REST_GAZE, type HeadGaze } from './face';
 
 /**
@@ -253,6 +254,79 @@ export const POSES: Record<MascotState, Pose> = {
   }),
 
   /**
+   * NOTICING. The quietest reaction in the table, and the one that happens
+   * most: every time the pointer settles on a control worth attending to.
+   *
+   * Everything about it is under-stated on purpose. The eyes open a little and
+   * the head tips a few degrees — the amount a person's face changes when they
+   * see where a conversation is going, not when they are startled. The mouth
+   * shortens and lifts into the smallest interested curve the geometry can
+   * make. If this read as a REACTION rather than as attention it would fire
+   * hundreds of times a session and the character would be exhausting.
+   *
+   * `wander` stays high: being interested in something does not stop a
+   * creature breathing, and dropping it here made the character freeze
+   * whenever the pointer crossed a button.
+   */
+  curious: make({
+    gaze: { yaw: 7, pitch: 6, roll: -4 },
+    split: EYE_SPLIT + 1,
+    eyes: pair(1.08, 1.07, 2),
+    mouth: mouth(0.5, 0.45, 0.05, 0.35, 0.85),
+    wander: 0.7,
+    wobble: 0.008,
+    wobbleRate: 0.24,
+    blend: 0.3,
+    ease: easings.easeOutCubic,
+  }),
+
+  /**
+   * TAKEN ABACK — a quantity that jumped, a line removed from the cart.
+   *
+   * The whole expression is in the mouth: a tiny open "o", which is the one
+   * shape the single-curve mouth can make that is unmistakably not a smile and
+   * not a frown. `open` lifts the corners into a bow while `curve` stays
+   * barely positive, so it reads round rather than as a grin.
+   *
+   * Eyes go WIDE and slightly further apart. Crucially the tilt stays at zero:
+   * tilt is what carries worry, and surprise is not worry. «Oh, that's a lot»
+   * — not «oh no».
+   */
+  surprised: make({
+    gaze: { yaw: 1, pitch: 5, roll: 0 },
+    split: EYE_SPLIT + 3,
+    eyes: pair(1.3, 1.26),
+    mouth: mouth(0.34, 0.15, 0.95, 0.15, 1.05),
+    wander: 0.3,
+    swell: 1.03,
+    wobble: 0.004,
+    blend: 0.13,
+    ease: easings.easeOutQuint,
+  }),
+
+  /**
+   * THE ORDER WENT THROUGH.
+   *
+   * The same grammar as `success` — eyes squeezed to arcs, tops converging —
+   * pushed one notch further and held four times as long, because an order is
+   * not an add-to-cart. It is still an arc and a smile, not a jump: the brief
+   * asks for stronger, and then asks twice for restrained.
+   */
+  celebrate: make({
+    gaze: { yaw: 3, pitch: 14, roll: 0 },
+    split: EYE_SPLIT + 3,
+    eyes: pair(1.24, 0.2, 19),
+    mouth: mouth(1.05, 1.9, 0.4, -0.3, 1.2),
+    wander: 0.45,
+    blink: 0,
+    swell: 1.045,
+    wobble: 0.012,
+    wobbleRate: 0.5,
+    blend: 0.26,
+    ease: easings.easeOutQuint,
+  }),
+
+  /**
    * Dormant. The long blend is the expression: you cannot snap into sleepy.
    * Ease-in-out because this is a body settling, not a value landing.
    */
@@ -267,6 +341,96 @@ export const POSES: Record<MascotState, Pose> = {
     ease: easings.easeInOutCubic,
   }),
 };
+
+/**
+ * HOW FAR THE HEAD TURNS TO FOLLOW SOMETHING, at full attention.
+ *
+ * Under the sphere projection these are real head angles, not pixel offsets,
+ * so the far eye narrows and the near one moves further — the whole set of
+ * cues that makes a turn read as a turn. Past about 34 degrees of yaw the far
+ * eye starts to leave round the limb, which is striking once and wrong as a
+ * constant state, so tracking stops short of it.
+ */
+const TRACK_YAW = 27;
+const TRACK_PITCH = 19;
+
+/**
+ * THE FACE, TOLD WHAT IT IS LOOKING AT.
+ *
+ * Attention is applied as a POSE MODIFIER rather than as a separate gaze added
+ * downstream, and that is the whole reason the character reads as one creature
+ * rather than as a face with a tracking layer bolted to it. The brief's §21 is
+ * explicit: gaze, eyes, mouth and body must coordinate. Here they cannot do
+ * anything else — one number moves all four, so there is no arrangement of
+ * inputs that produces eyes pointed at a button above a mouth that has not
+ * noticed it.
+ *
+ * What changes, and why:
+ *  - the head turns towards the target, by `weight`;
+ *  - the idle wander is damped by the same amount, because a creature locked
+ *    onto something stops drifting — without this the eyes shimmer around the
+ *    target and the tracking reads as loose rather than attentive;
+ *  - `curiosity` alone opens the eyes and moves them very slightly apart,
+ *    which is the face widening rather than merely turning;
+ *  - the mouth shortens and lifts a little. This is the smallest of the four
+ *    changes and the one that stops a widened pair of eyes reading as alarm.
+ *
+ * Returns the SAME pose object when there is nothing to attend to, so the
+ * common case allocates nothing.
+ */
+export function applyAttention(pose: Pose, attention: Attention | null, reduced = false): Pose {
+  if (!attention || attention.weight <= 0.002) return pose;
+  const w = clamp(attention.weight);
+  const c = clamp(attention.curiosity);
+  // Reduced motion keeps the gaze — the brief asks for semantic feedback to
+  // survive — at a fraction of the swing, and drops the widening entirely.
+  const swing = reduced ? 0.45 : 1;
+  const open = reduced ? 0 : c;
+
+  const yaw = attention.x * TRACK_YAW;
+  // Screen y grows downwards; a head that looks up has a POSITIVE pitch.
+  const pitch = -attention.y * TRACK_PITCH;
+
+  const widen = 1 + open * 0.14;
+  const tall = 1 + open * 0.1;
+  const eyes: [EyeCfg, EyeCfg] = [
+    { ...pose.eyes[0], w: pose.eyes[0].w * widen, h: pose.eyes[0].h * tall },
+    { ...pose.eyes[1], w: pose.eyes[1].w * widen, h: pose.eyes[1].h * tall },
+  ];
+
+  return {
+    ...pose,
+    gaze: {
+      yaw: lerp(pose.gaze.yaw, yaw, w * swing),
+      pitch: lerp(pose.gaze.pitch, pitch, w * swing),
+      // Roll is the character's own tilt, not a property of what it is looking
+      // at, so following straightens it out rather than replacing it.
+      roll: pose.gaze.roll * (1 - w * 0.55),
+    },
+    split: pose.split + open * 1.6,
+    eyes,
+    mouth: {
+      ...pose.mouth,
+      width: pose.mouth.width * (1 - open * 0.22),
+      curve: pose.mouth.curve + open * 0.18,
+      y: pose.mouth.y + open * 0.22,
+    },
+    wander: pose.wander * (1 - w * 0.62),
+  };
+}
+
+/**
+ * How far the body leans towards what it is attending to, as a `stretch`.
+ *
+ * Three percent at full attention. The brief asks for a lean and then twice
+ * for restraint, and at this scale it is not consciously visible — what is
+ * visible is its absence, because a head that turns while the mass behind it
+ * stays perfectly still reads as a mask rather than as a body.
+ */
+export function attentionLean(attention: Attention | null, reduced = false): number {
+  if (!attention || reduced) return 0;
+  return clamp(attention.weight) * 0.03;
+}
 
 /** Linear blend of two poses. Every field interpolates; nothing switches. A
  * field that jumped would be the one abrupt expression change the brief rules

@@ -1,7 +1,8 @@
 import type { MascotState } from '../../../lib/mascot';
-import { bodyPoints, glossPath, pathFromPoints } from './body';
+import { bodyPoints, bouncePath, glossPath, pathFromPoints } from './body';
 import { EYE_H, EYE_W, FACE_R, eyeMatrix, eyePoses, liveliness, saccade, type HeadGaze } from './face';
-import { POSES, blendPose, type Pose } from './expressions';
+import { POSES, applyAttention, attentionLean, blendPose, type Pose } from './expressions';
+import type { Attention } from './attention';
 import { clamp, deg, lerp, r2 } from './math';
 import type { TravelSample } from './travel';
 
@@ -56,6 +57,18 @@ export interface CharacterInput {
   /** Seconds since the current state was entered. */
   age: number;
   travel: TravelSample | null;
+  /**
+   * WHAT THE CHARACTER IS LOOKING AT RIGHT NOW — the pointer, a touch, or a
+   * control it has noticed — already smoothed by the caller.
+   *
+   * The smoothing lives outside this function on purpose. Following is the one
+   * part of the character that genuinely depends on the PREVIOUS frame rather
+   * than on the clock, and putting that state in here would cost the property
+   * every other part relies on: that `sampleCharacter(t)` is the frame time t
+   * deserves, whatever happened before it. The loop owns the follower; this
+   * function is handed the result.
+   */
+  attention: Attention | null;
   reduced: boolean;
 }
 
@@ -72,7 +85,11 @@ export interface CharacterRender {
    * and every interruption starts from what the viewer was actually shown. */
   pose: Pose;
   body: string;
+  /** The specular lobe across the upper-left shoulder. */
   gloss: string;
+  /** The dim lift along the lower-left edge — light coming back up off the
+   *  surface the character sits on. Volume, not decoration. */
+  bounce: string;
   eyes: [EyeRender, EyeRender];
   mouth: string;
   mouthWeight: number;
@@ -116,8 +133,21 @@ export function currentPose(input: CharacterInput): Pose {
 }
 
 export function sampleCharacter(input: CharacterInput): CharacterRender {
-  const pose = currentPose(input);
   const { t, travel, reduced } = input;
+  /**
+   * A JOURNEY OUTRANKS A POINTER.
+   *
+   * While the character is travelling its gaze belongs to where it is going —
+   * that is the lead that makes a journey read as intent rather than as a
+   * slide. Letting the pointer pull on the face at the same time produced a
+   * character looking at the cursor while flying somewhere else, which reads
+   * as being dragged. So attention is faded out across the travel's own lead
+   * ramp, and comes back as the character settles.
+   */
+  const attention = travel && travel.lead > 0 && input.attention
+    ? { ...input.attention, weight: input.attention.weight * (1 - travel.lead), curiosity: input.attention.curiosity * (1 - travel.lead) }
+    : input.attention;
+  const pose = applyAttention(currentPose(input), attention, reduced);
 
   // Idle life runs UNDERNEATH whatever the state is doing, damped by the
   // state's own `wander`. A character that stops breathing when it reacts is
@@ -169,6 +199,18 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
   // than appearing and vanishing with the state's name.
   if (!reduced) squash += pose.squash;
 
+  // THE BODY LEANS THE WAY THE HEAD TURNED. Only when it is not already
+  // travelling: a journey owns the deformation axis, and two things stretching
+  // the same body along two different axes is how a character starts to look
+  // like it is being pulled apart.
+  if (!travel && attention) {
+    const lean = attentionLean(attention, reduced);
+    if (lean > 0) {
+      stretch += lean;
+      axis = Math.atan2(attention.y, attention.x);
+    }
+  }
+
   const points = bodyPoints({
     radius: BODY_R,
     t,
@@ -212,9 +254,10 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     // to the sampler, and the highlight would visibly lag the body it sits on.
     body: pathFromPoints(points, CENTER + driftX, CENTER + driftY),
     gloss: glossPath(points, CENTER + driftX, CENTER + driftY),
+    bounce: bouncePath(points, CENTER + driftX, CENTER + driftY),
     eyes,
     mouth: mouthPath(pose, gaze, squash, driftX, driftY),
-    mouthWeight: r2(1.9 * pose.mouth.weight),
+    mouthWeight: r2(1.75 * pose.mouth.weight),
     alert: input.state === 'notify' ? clamp(input.age / 0.16) : 0,
     driftX: r2(driftX),
     driftY: r2(driftY),
@@ -235,8 +278,13 @@ function mouthPath(pose: Pose, gaze: HeadGaze, squash: number, driftX: number, d
   const pitchShift = -Math.sin(deg(gaze.pitch)) * FACE_R * 0.34;
   const cx = CENTER + yawShift + driftX;
   const cy = CENTER + 15.5 + pitchShift + m.y * 3 + driftY;
-  const half = 8.4 * m.width * (1 + squash * 0.9);
-  const depth = 5.2 * m.curve * (1 - squash);
+  // MINIMAL, measured off the reference: its mouth spans about an eighth of
+  // the body's width, not a fifth. A wider arc starts to dominate the face and
+  // the brief is explicit that the mouth supports the eyes rather than leading
+  // them — which at this size means it has to be small enough that the eyes
+  // are read first.
+  const half = 6.8 * m.width * (1 + squash * 0.9);
+  const depth = 4.4 * m.curve * (1 - squash);
   const lift = m.open * 3.2;
   const roll = deg(gaze.roll) * 0.6;
   const cr = Math.cos(roll);

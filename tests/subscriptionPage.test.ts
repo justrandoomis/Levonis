@@ -261,18 +261,49 @@ test('the Header draws every paid tier in its own colour, through the shared tab
   for (const m of Object.values(TIER_META)) assert.ok(m.accentDeep && m.accentLight, `${m.id} lacks gradient stops`);
 });
 
+/**
+ * THE PAGE NEVER RENDERS A FIGURE IT DOES NOT HAVE.
+ *
+ * This test used to pin a hardcoded fallback sentence — "the store's approved
+ * threshold" — which the page printed whenever it did not know the number. The
+ * benefits mandate removed that sentence on purpose: §22 requires this page to
+ * read the live configuration, and a fallback phrase is the same promise in
+ * words rather than digits. The guarantee it was really protecting survives
+ * and is asserted here instead: no threshold is ever interpolated unless it
+ * exists, and where one is missing the copy says the figure-less thing rather
+ * than leaving a gap.
+ */
 test('the benefits copy never renders an empty gap when the thresholds are unknown', () => {
   const src = read('src/components/subscription/BenefitsSection.tsx');
-  // A null threshold takes the figure-less wording; no template still interpolates an empty string.
-  assert.equal(/delivery \? formatIqd\([^)]*\) : ''/.test(src), false, "the thresholds still default to '' — an empty gap");
-  assert.match(src, /the store's approved threshold/);
-  assert.match(src, /حد المتجر المعتمد/);
-  assert.match(src, /سنووری پەسەندکراوی فرۆشگا/);
-  // Every interpolation of a threshold is guarded by the threshold itself.
-  for (const m of src.matchAll(/\$\{(prime|pro)\}/g)) {
-    const before = src.slice(Math.max(0, m.index! - 700), m.index!);
-    assert.match(before, new RegExp(`${m[1]}\\s*\\?\\s*loc\\(`), `an interpolation of ${m[1]} is not guarded by "${m[1]} ? loc("`);
+  // No interpolation may fall back to an empty string.
+  assert.equal(/\? *formatIqd\([^)]*\) *: *''/.test(src), false, "a threshold still defaults to '' — an empty gap");
+  assert.equal(/\$\{(threshold|subsidy) *\|\| *''\}/.test(src), false, 'an interpolation can still be blank');
+
+  // A missing threshold takes figure-less wording in every language the line
+  // is written in, rather than printing nothing or an empty span.
+  assert.match(src, /توصيل مجاني على الطلبات المؤهلة/);
+  assert.match(src, /Free delivery on eligible orders/);
+
+  // EVERY interpolation of a figure sits inside a branch that has already
+  // established the figure is there. `threshold` and `subsidy` are the two
+  // locals the copy is built from, and both are `string | null`.
+  for (const name of ['threshold', 'subsidy'] as const) {
+    for (const m of src.matchAll(new RegExp(`\\$\\{${name}\\}`, 'g'))) {
+      const before = src.slice(Math.max(0, m.index! - 900), m.index!);
+      // `\s` rather than a literal space: the guard is often written across a
+      // line break (`head = threshold\n  ? loc(`), and a space-only pattern
+      // silently fails to see it — which would have made this assertion a
+      // test that passes for the wrong reason.
+      assert.match(
+        before,
+        new RegExp(`\\b${name}\\s*(\\?|&&|!==\\s*null)`),
+        `an interpolation of ${name} is not guarded by a null check`
+      );
+    }
   }
+
+  // And a tier with no rule at all contributes no line, rather than a claim.
+  assert.match(src, /if \(!benefits\) return \[\];/);
 });
 
 test('the optional printer gift is a note under PLUS, not a fabricated core benefit', () => {

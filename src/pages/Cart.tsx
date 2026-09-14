@@ -992,32 +992,63 @@ export default function Cart() {
   };
 
   /**
+   * THE FIGURE A FREE-DELIVERY THRESHOLD IS TESTED AGAINST (§3, "The basis").
+   *
+   * NOT `subtotal`. `subtotal` is `unit_subtotal_iqd × qty` — the applied
+   * price PLUS the transport commission, the direct-sale premium and the
+   * extended-warranty fee — and a threshold has never been tested against a
+   * fee. The door's basis is `Σ applied price × qty` ("product prices only",
+   * `worker/routes/orders.ts`), less the order-level part of the membership,
+   * which §3 says the basis comes after. Comparing `subtotal` would promise
+   * free delivery on a cart that clears the threshold only because a warranty
+   * plan was ticked, and the checkout would then charge for it.
+   *
+   * Both figures in it are the server's — the unit price it applied and the
+   * per-line saving it resolved. Only WHICH ROWS are counted is this page's,
+   * because the ticks are the one thing the server was not told.
+   *
+   * (§3 tests the PREMIUM rule after points as well. That is the door's
+   * business, and the row above already says the fee is settled there, so this
+   * preview states the configured `merchandise_after_coupon` basis and
+   * branches on no tier name.)
+   */
+  const deliveryBasis = Math.max(
+    0,
+    selectedItems.reduce(
+      (sum, item) => sum + (item.breakdown ? item.breakdown.applied_iqd : item.unit_price_iqd) * item.qty,
+      0
+    ) - memberOffTheOrder
+  );
+
+  /**
    * FREE DELIVERY — ONLY WHAT THE SERVER'S ANSWER SUPPORTS.
    *
-   * Every entry in `free_shipping` comes from the SAME rule (only the method
-   * check differs), so the threshold, the covered methods and the subsidy
-   * ceiling are read from the first entry that has a rule at all.
+   * Every entry in `free_shipping` comes from the SAME rule — `ruleFor` is
+   * asked without a method and the method check happens after it — so the
+   * threshold, the covered methods and the subsidy ceiling are read from the
+   * first entry that has a rule at all.
    *
    * The threshold is re-tested against the SELECTED merchandise, because
    * ticking a line off is a decision the server has not been told about — with
    * the store's one operator, STRICTLY GREATER (§3): 75,000 does not qualify,
    * 75,001 does, so what is still missing is one dinar more than the
-   * difference. The NUMBER is the server's; only the comparison happens here,
-   * and with every line ticked it agrees with `eligible` exactly.
+   * difference. The NUMBER is the server's; only the comparison happens here.
    *
-   * A ceiling that binds means the member pays the difference, so no component
-   * may claim to be free (§3) — the amount the membership covers is stated
-   * instead.
+   * A ceiling is a MAXIMUM — `shippingAfterBenefit` covers `min(fee, ceiling)`
+   * — so one that BINDS means the member pays the difference and no component
+   * may claim to be free (§3), and one that does NOT bind must not be read out
+   * as though the whole of it had been spent on this order.
    */
   const deliveryBenefit = (() => {
+    if (selectedCount === 0) return null;
     const answered = (activeMembership?.free_shipping ?? []).filter((s) => s.reason !== 'no_rule');
     if (answered.length === 0) return null;
     const covered = answered.filter((s) => s.reason !== 'method_not_covered');
     if (covered.length === 0) return null;
     const threshold = answered[0].threshold_iqd;
     return {
-      qualifies: threshold === null || subtotal > threshold,
-      shortBy: threshold === null ? 0 : Math.max(1, threshold - subtotal + 1),
+      qualifies: threshold === null || deliveryBasis > threshold,
+      shortBy: threshold === null ? 0 : Math.max(1, threshold - deliveryBasis + 1),
       subsidy: answered[0].max_subsidy_iqd,
       /** Named only where the rule does NOT cover every method on offer. */
       methodNames: covered.length === answered.length ? [] : covered.map((s) => deliveryMethodName(s.method)),
@@ -1839,8 +1870,11 @@ export default function Cart() {
               checkout stays the authority on the figure; this only says what
               the server already resolved about the membership's half of it.
               The Sorani «گەیاندنی بێبەرامبەری PREMIUM» is the membership
-              ledger's own line, «لە سەرووی …» the subscription benefits page,
-              «زیاد بکە» the reorder and address screens. */}
+              ledger's own line and «زیاد بکە» the reorder and shipping-conflict
+              dialogs'. The capped-subsidy sentence has no Sorani anywhere, so
+              it reads in Arabic there rather than in invented Kurdish — and it
+              says «حتى / up to», because the ceiling is the most the
+              membership can cover, not what it spent on this fee. */}
           {deliveryBenefit && memberLabel && (
             <p className="-mt-1 text-[12px] leading-relaxed text-gold/90 tabular-nums" data-cart-member-delivery>
               {deliveryBenefit.qualifies
@@ -1851,8 +1885,8 @@ export default function Cart() {
                       `گەیاندنی بێبەرامبەری ${memberLabel}`
                     )
                   : loc(
-                      `عضوية ${memberLabel} تغطي ${formatIqd(deliveryBenefit.subsidy)} من أجرة التوصيل`,
-                      `Your ${memberLabel} membership covers ${formatIqd(deliveryBenefit.subsidy)} of the delivery fee`
+                      `عضوية ${memberLabel} تغطي حتى ${formatIqd(deliveryBenefit.subsidy)} من أجرة التوصيل`,
+                      `Your ${memberLabel} membership covers up to ${formatIqd(deliveryBenefit.subsidy)} of the delivery fee`
                     )
                 : loc(
                     `أضف ${formatIqd(deliveryBenefit.shortBy)} ليصبح التوصيل مجانيًا بعضوية ${memberLabel}`,

@@ -41,13 +41,21 @@ export const EYE_SPLIT = 13;
 
 /** Neutral eye, full extents in viewBox units.
  *
- * The old face used 7.6 x 9.6 — nearly round. Roundness is exactly what makes
- * an eye unable to say anything: a circle has no axis to squint along, close
- * along, or tilt. A tall capsule can narrow to a happy arc, widen to alarm,
- * and tilt in mirror to read as concern, all without changing anything else.
- * 2.2:1 is the reference's ratio and it survives the size drop intact. */
-export const EYE_W = 7.6;
-export const EYE_H = 16.6;
+ * Roundness is exactly what makes an eye unable to say anything: a circle has
+ * no axis to squint along, close along, or tilt. A tall capsule can narrow to
+ * a happy arc, widen to alarm, and tilt in mirror to read as concern, all
+ * without changing anything else.
+ *
+ * MEASURED OFF THE REFERENCE RENDER the brief supplies as the visual source of
+ * truth. Against a body about 82 units across, its eyes are a shade over a
+ * tenth of that wide and nearly a quarter of it tall — 2.24:1, and noticeably
+ * larger than the 7.6 x 16.6 this character carried before. The proportion is
+ * doing real work: at the 80px the character is usually drawn, a smaller eye
+ * has too few pixels of height left to show the difference between attentive,
+ * narrowed and delighted, and every expression collapses towards the same
+ * slot. */
+export const EYE_W = 8.6;
+export const EYE_H = 19.3;
 
 /**
  * Where the head rests.

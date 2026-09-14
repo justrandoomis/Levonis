@@ -38,7 +38,7 @@
 import { deriveSaleTypes } from './availability';
 import type { AvailabilityType } from './availability';
 import { normalizeHashtag } from './hashtags';
-import type { ParsedProduct, RowIssue } from './importCsv';
+import type { ParsedMembershipRule, ParsedProduct, RowIssue } from './importCsv';
 import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
 
 export interface CatalogRef {
@@ -119,6 +119,17 @@ export interface ResolvedProduct {
   /** Body for planRelationsWrite. */
   relations: Record<string, unknown>;
   catalogIds: string[];
+  /**
+   * §18 — the product-scoped membership discount rules the row STATES, one
+   * per tier it spoke about, carried straight through from `parseImport`.
+   *
+   * It is deliberately NOT merged into `doc`: a membership rule is a row in
+   * `membership_benefit_rules`, not a field of a product, and it has to be
+   * written through `saveBenefitRule` so the version and the audit entry go
+   * with it. An empty array is the ordinary case and means "the file said
+   * nothing" — every stored rule survives.
+   */
+  membership: ParsedMembershipRule[];
   issues: RowIssue[];
 }
 
@@ -827,6 +838,7 @@ export function resolveProduct(
     doc,
     relations,
     catalogIds: [...new Set([categoryId, subCategoryId].filter((x): x is string => !!x))],
+    membership: p.membership_rules,
     issues,
   };
 }

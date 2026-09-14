@@ -86,16 +86,38 @@ type Loc = (ar: string, en: string, ckb?: string) => string;
  * same benefit rather than manufacture Sorani.
  */
 
-/** Both methods the rules table knows — a list this long covers everything. */
-const ALL_DELIVERY_METHODS = 2;
+/**
+ * Every delivery method a rule is allowed to name — `DeliveryMethodId` in
+ * packages/pricing/src/membershipBenefits.ts, which the admin door filters
+ * every saved list against (`METHODS` in adminMembershipBenefits.ts). A rule
+ * that names all of them needs no qualifier; one that names fewer says which,
+ * so the page never promises a method the quote engine will charge for.
+ */
+const DELIVERY_METHOD_IDS = ['standard', 'personal'] as const;
+type DeliveryMethodId = (typeof DELIVERY_METHOD_IDS)[number];
 
-function methodLabel(id: string, loc: Loc): string {
+function isDeliveryMethodId(id: string): id is DeliveryMethodId {
+  return (DELIVERY_METHOD_IDS as readonly string[]).includes(id);
+}
+
+function methodLabel(id: DeliveryMethodId, loc: Loc): string {
   // A delivery method carries no Kurdish title anywhere in the store, so the
   // Arabic name is used there — exactly as the cart's `deliveryMethodName`
   // does with the configured titles.
-  if (id === 'standard') return loc('التوصيل العادي', 'Standard delivery', 'گەیاندنی ئاسایی');
-  if (id === 'personal') return loc('التوصيل الشخصي', 'Personal delivery');
-  return id;
+  return id === 'standard'
+    ? loc('التوصيل العادي', 'Standard delivery', 'گەیاندنی ئاسایی')
+    : loc('التوصيل الشخصي', 'Personal delivery');
+}
+
+/**
+ * Whether a free-delivery THRESHOLD figure actually reaches the screen for
+ * this tier. It is the one thing the note under the card explains, and a note
+ * about a bar the card never names explains nothing.
+ */
+function statesADeliveryThreshold(benefits: TierBenefits | null | undefined): boolean {
+  const fs = benefits?.free_shipping;
+  if (!fs || fs.threshold_iqd === null) return false;
+  return fs.methods === null || fs.methods.some(isDeliveryMethodId);
 }
 
 /** "خصم 10% على الطابعات — حتى 100,000 د.ع لكل وحدة", from the rule alone. */
@@ -141,7 +163,14 @@ function discountLine(rule: BenefitDiscountRule, loc: Loc): string | null {
     limits.push(
       rule.cap_scope === 'per_unit'
         ? loc(`حتى ${cap} لكل وحدة`, `up to ${cap} per unit`, `زۆرترین داشکاندن ${cap} بۆ هەر یەکێک`)
-        : loc(`حتى ${cap} لكل طلب`, `up to ${cap} per order`, `زۆرترین داشکاندن ${cap} بۆ هەر داواکارییەک`)
+        : // `cap_scope: 'per_order'` is NAMED for the order, but `lineBenefit`
+          // applies the ceiling to ONE LINE and `resolveProductBenefits` then
+          // sums the lines with no order-wide ceiling above them — a
+          // two-product order really does get the ceiling twice. "لكل طلب"
+          // would understate the benefit and be contradicted by the cart, so
+          // the copy says what the customer actually gets. No Sorani exists
+          // for a per-product ceiling, so it reads in Arabic there.
+          loc(`حتى ${cap} لكل منتج`, `up to ${cap} per product`)
     );
   }
   if (rule.max_quantity !== null && rule.max_quantity > 0) {
@@ -158,39 +187,41 @@ function discountLine(rule: BenefitDiscountRule, loc: Loc): string | null {
 
 /** "توصيل مجاني للطلبات فوق 75,000 د.ع", and which methods it covers. */
 function freeShippingLine(tier: 'prime' | 'pro', fs: BenefitFreeShipping, loc: Loc): string | null {
-  // An empty list covers no method: the rule is switched off everywhere it
-  // could apply, and there is no free delivery to promise.
-  if (fs.methods !== null && fs.methods.length === 0) return null;
+  // `methods: null` covers every method. A list covers exactly what it names,
+  // and an id this page cannot name is dropped rather than printed raw — a
+  // machine value must never reach a customer's screen.
+  const covered = fs.methods === null ? null : fs.methods.filter(isDeliveryMethodId);
+  // A list that covers nothing is a rule switched off everywhere it could
+  // apply, and there is no free delivery to promise.
+  if (covered !== null && covered.length === 0) return null;
 
   const threshold = fs.threshold_iqd !== null ? formatIqd(fs.threshold_iqd) : null;
   const subsidy = fs.max_subsidy_iqd !== null ? formatIqd(fs.max_subsidy_iqd) : null;
 
   // §3: with a subsidy ceiling the member can still pay a difference, so the
-  // delivery is never called free — it is called what it is.
-  let head: string;
-  if (subsidy) {
-    head = threshold
+  // delivery is never called free — it is called what it is. Each figure is
+  // interpolated only inside the branch its own guard opened, so a missing
+  // one takes the sentence written without it rather than leaving a gap.
+  const head = subsidy
+    ? threshold
       ? loc(
           `تغطي العضوية حتى ${subsidy} من أجرة التوصيل للطلبات فوق ${threshold}`,
           `The membership covers up to ${subsidy} of the delivery fee on orders above ${threshold}`
         )
-      : loc(
-          `تغطي العضوية حتى ${subsidy} من أجرة التوصيل`,
-          `The membership covers up to ${subsidy} of the delivery fee`
-        );
-  } else {
-    head = threshold
+      : loc(`تغطي العضوية حتى ${subsidy} من أجرة التوصيل`, `The membership covers up to ${subsidy} of the delivery fee`)
+    : threshold
       ? loc(
           `توصيل مجاني للطلبات فوق ${threshold}`,
           `Free delivery on orders above ${threshold}`,
           `گەیاندنی بێبەرامبەر لە سەرووی ${threshold}`
         )
       : loc('توصيل مجاني على الطلبات المؤهلة', 'Free delivery on eligible orders', 'گەیاندنی بێبەرامبەر');
-  }
 
   const parts = [head];
-  if (fs.methods !== null && fs.methods.length < ALL_DELIVERY_METHODS) {
-    parts.push(`(${fs.methods.map((m) => methodLabel(m, loc)).join(loc('، ', ', '))})`);
+  // Named only when the rule covers less than every method — a set test, not
+  // a length test, so a row that repeats an id cannot read as full coverage.
+  if (covered !== null && !DELIVERY_METHOD_IDS.every((id) => covered.includes(id))) {
+    parts.push(`(${covered.map((m) => methodLabel(m, loc)).join(loc('، ', ', '))})`);
   }
   // CONFIRMED, and deliberately NOT a rule: a PRO delivery benefit exists at
   // the approved default address (packages/shipping/src/shipping.ts keeps
@@ -320,7 +351,10 @@ export function BenefitsSection({ features, benefits, loading }: BenefitsSection
   // member genuinely inherits; the configured shopping numbers below are not,
   // because a PRO member is priced by PRO's rules and never by PREMIUM's.
   const premiumHeadLines = [
-    loc('أسعار PREMIUM/PRIME على المنتجات المؤهلة وخصومات أفضل من PLUS عند ضبطها', 'PREMIUM/PRIME pricing on eligible products and better configured discounts than PLUS', 'نرخی PREMIUM/PRIME بۆ بەرهەمی گونجاو و داشکاندنی باشتر لە PLUS'),
+    // `prime` is the API id; PREMIUM is the name on every customer-facing
+    // surface (TIER_META.prime.label). This line was the last place left in
+    // the app that still showed a customer the word PRIME.
+    loc('أسعار PREMIUM على المنتجات المؤهلة وخصومات أفضل من PLUS عند ضبطها', 'PREMIUM pricing on eligible products and better configured discounts than PLUS', 'نرخی PREMIUM بۆ بەرهەمی گونجاو و داشکاندنی باشتر لە PLUS'),
     loc('عروض وكوبونات حصرية للعضوية', 'Membership-exclusive offers and PREMIUM coupons', 'ئۆفەر و کۆپۆنی تایبەت بە PREMIUM'),
   ];
   const premiumTailLines = [
@@ -356,8 +390,10 @@ export function BenefitsSection({ features, benefits, loading }: BenefitsSection
 
   // Which methods the waiver covers is now stated by the line above, from the
   // rule — so the note keeps only what the rule does NOT say: the figure the
-  // threshold is tested against (§3).
-  const premiumNote = premiumShopping.length ? (
+  // threshold is tested against (§3). It appears only when a threshold was
+  // actually stated: a PREMIUM configured with a discount or a tax exemption
+  // and no free-delivery rule has no bar for this sentence to describe.
+  const premiumNote = statesADeliveryThreshold(benefits?.prime) ? (
     <p className="flex items-start gap-2">
       <Truck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span>{loc('يُحتسب الحد بعد الخصومات والكوبونات والنقاط.', 'The threshold is evaluated after discounts, coupons and points.', 'دوای داشکاندن و کۆپۆن و خاڵ هەژمار دەکرێت.')}</span>

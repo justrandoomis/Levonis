@@ -227,6 +227,63 @@ Persistence for the group: identical gate to images. Form reads `REL groups[]/va
 | `product_translations` rows | `product_translations` | — | — | OK | Form path `syncProductTranslations` (`adminProducts.ts:960`); TXT never writes them. |
 | Unknown / unsupported keys | — | ImportPanel shows `unknownColumns` one amber line at **check** time (`ImportPanel.tsx:776-781`); `/apply` response has no `unknown_keys` field (`worker/routes/template.ts:1397-1408`); `applyTxt` discards `out.warnings` (`ImportPanel.tsx:1012-1045`) | — | OK — in the `/apply` answer too | `options.1.colour=...` imports "successfully" with the value missing (repro D1). |
 
+### 2.14 Membership discount, product-scoped (`membership.<tier>.*`, §18)
+
+Six optional keys per member tier on the `product` level, describing **one**
+`product_discount` rule whose `scope` is `product` and whose `product_id` is
+this product. A product rule beats a section rule and a global one
+(`docs/MEMBERSHIP_BENEFITS.md` §1, `SCOPE_RANK`), and two rules are never summed.
+
+These keys are the one family that is deliberately **not** in
+`FIELD_REGISTRY`. A membership discount is a row in `membership_benefit_rules`
+— with a tier, a scope, a date window, a version history and an audit trail of
+its own — not a field of a product. Merging it into the `ProductDoc` would make
+it a product column that the checkout does not read and the benefit engine does
+not see. So `extractMembership` (`worker/routes/template.ts`) lifts the lines
+out of the text **before** `parseTemplate` runs, replacing each with a blank
+line so every other line number stays truthful, and the rule is written beside
+the product through `saveBenefitRule` / `deleteBenefitRule` — the only writers
+`membership_benefit_rules` has, each appending a version row and an audit row
+in the same batch as the rule itself.
+
+The CSV/ZIP sheet carries the identical six values under the identical
+spelling as **columns** (`worker/lib/importCsv.ts`, `MEMBERSHIP_COLUMNS`), and
+both files are validated by the same function, `membershipRuleFromCells`. That
+is what keeps the two formats from drifting into accepting different rules.
+
+| TXT key / CSV column | Accepted values | Rule column | Read-back | Status | Note |
+|---|---|---|---|---|---|
+| `membership.<tier>.discount_mode` | `percent` \| `fixed` \| `__NULL__` | `discount_mode` | `GET /api/admin/membership-benefits` | OK — rows, both formats | `<tier>` is `pro` (PRO) or `premium` (PREMIUM, stored as `prime`). `__NULL__` **removes** the rule. |
+| `membership.<tier>.percent` | integer 1..100 (%) | `percent` | same | OK | Required when the mode is `percent`; dropped when it is `fixed`, as the admin door drops it. |
+| `membership.<tier>.fixed_iqd` | integer IQD | `fixed_iqd` | same | OK | Required (> 0) when the mode is `fixed`. |
+| `membership.<tier>.max_discount_iqd` | integer IQD | `max_discount_iqd` | same | OK | A ceiling with no `cap_scope` is refused — *"Say whether the ceiling is per unit or per order"*. |
+| `membership.<tier>.cap_scope` | `per_unit` \| `per_order` \| `__NULL__` | `cap_scope` | same | OK | A `cap_scope` with no ceiling is refused too. `per_order` moves the rule out of the unit price and into the line (`isUnitExpressible`). |
+| `membership.<tier>.max_quantity` | integer ≥ 1 | `max_quantity` | same | OK | Also makes the rule line-applied rather than unit-applied. |
+| — (`enabled`, `priority`, `valid_from`, `valid_until`, `label`, `notes`, `min_subtotal_iqd`) | — | same columns | same | not in template — **preserved** | Read off the stored rule and written back unchanged on every update (`applyMembershipRules`, `worker/routes/adminImport.ts`). A bulk price edit must not cancel a scheduled promotion or re-enable a rule the owner switched off. |
+
+**The three states, and why silence is not a decision.**
+
+| the file says | what happens |
+|---|---|
+| the keys/columns are absent, or every one of a tier's six is empty | **nothing.** The stored rule for that tier survives untouched. An export taken before §18 existed is exactly this case. |
+| values | the tier's product rule is created or updated. |
+| `discount_mode=__NULL__` | the tier's product rule is deleted. |
+
+An **export never writes `__NULL__`**: a tier with no rule exports six empty
+keys (TXT) or six empty cells (CSV). Otherwise an owner who exported on Monday,
+wrote a PRO discount in the panel on Tuesday and re-imported Monday's file on
+Wednesday to fix a typo would silently lose Tuesday's pricing, with nothing on
+any screen to say why. `tests/membershipTemplateRoundTrip.test.ts` pins that
+case, the round trip, the refusals and the deletion marker.
+
+Refusals are the admin door's own (`ruleFromBody`,
+`worker/routes/adminMembershipBenefits.ts`) in the same words, and they surface
+through each format's existing preview channel — `POST /api/admin/import/preview`
+row errors for the sheet, `POST /api/admin/template/parse` `errors[]` for the
+.txt — **before** anything is written. `/parse` additionally reports a
+`membership[]` array naming what the apply will `set` or `remove`, so a deletion
+is visible before it happens.
+
 ---
 
 ## 3. Persistence contract comparison — FORM save vs TEMPLATE apply

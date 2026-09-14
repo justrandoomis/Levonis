@@ -61,7 +61,7 @@ slug، مكرر في كل أسطر المنتج).
 
 | `row_type` | يحمل | الأعمدة |
 |---|---|---|
-| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*` |
+| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, membership.*, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*` |
 | `option` | قيمة خيار | `group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd` |
 | `color` | لون وروابطه | `value, hex, sku_part, image, links, active, stock, …الأسعار` |
 | `variant` | توليفة مخزون | `links (Group:Value\|Group:Value\|color:Name), sku_part, active, stock, …الأسعار` |
@@ -79,7 +79,7 @@ slug، مكرر في كل أسطر المنتج).
 |---|---|
 | ١ التصنيف | `brand, category, sub_category, hashtags` |
 | ٢ المعلومات الأساسية | `name, description, status, sku, display_order, is_featured` |
-| ٣ الأسعار والعضويات | `price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd` |
+| ٣ الأسعار والعضويات | `price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd` + أعمدة `membership.*` (خصم العضوية الخاص بالمنتج — §١١) |
 | ٤ البيع والمخزون | `sale_types, inventory_mode, stock, low_stock_threshold, payment_options` + أسطر `transport` + للطابعات `warranty_base_months, serialized` |
 | ٥ الخيارات والألوان | أسطر `option` و`color` و`variant` |
 | ٦ الوسائط | أسطر `image` |
@@ -109,6 +109,9 @@ form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة �
 
 ينطبق الأمر نفسه على أعمدة المنتج القابلة للغياب: `hashtags` و`payment_options`
 و`how_to_use` و`usage_url` و`is_featured`. عمود موجود وخليته فارغة = مسح مقصود.
+
+**استثناء واحد مقصود: أعمدة `membership.*`.** الخلية الفارغة فيها لا تمسح شيئًا
+أبدًا — راجع §١١ — لأن حذف سعرٍ قرارٌ لا يجوز أن تتخذه خليةٌ فارغة في ملف قديم.
 
 التوليفات (`variant`) تتبع القاعدة نفسها: ملف بلا أسطر `variant` يمرر المحفوظ
 كما هو (ناقصًا ما صار يشير إلى خيار أو لون حذفه الملف)، وملف يحمل أسطرًا يقرر
@@ -144,6 +147,9 @@ form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة �
   خيار أو لون يبتلع سعر PRIME/PRO الموروث يُرفض ما لم يحدّد الصف سعر عضويته.
 * `row_type` غير معروف يُرفض بقائمة الأنواع الأحد عشر.
 * عمود لا يعرفه القالب يُبلَّغ عنه ولا يُخمَّن.
+* أعمدة `membership.*`: سقف بلا `cap_scope` يُرفض، و`cap_scope` بلا سقف يُرفض،
+  و`percent` يحتاج نسبة بين ١ و١٠٠، و`fixed` يحتاج مبلغًا أكبر من صفر — وهي
+  حرفيًا رفوضات لوحة الإدارة نفسها (§١١).
 
 ---
 
@@ -400,3 +406,43 @@ colors.1.regular_adjust_iqd=10000
 تُعاد لا تُولَّد: مجموعة بالاسم، قيمة بـ(المجموعة، الاسم)، لون بالاسم، صورة
 بالرابط، توليفة بمعرّفات ما تختاره، خطة ضمان بعنوانها، مواصفة بـ(المجموعة،
 الاسم) — لأن المخزون والوحدات المحجوزة تعيش على تلك الصفوف.
+
+---
+
+## ١١. خصم العضوية الخاص بالمنتج — أعمدة `membership.*`
+
+ستة أعمدة اختيارية لكل فئة عضوية على سطر `product`، تصف **قاعدة خصم واحدة**
+مربوطة بهذا المنتج وحده في جدول `membership_benefit_rules` (الترحيل 0074).
+قاعدة المنتج تتقدّم على قاعدة القسم وعلى القاعدة العامة ولا تُجمع معهما
+(`docs/MEMBERSHIP_BENEFITS.md` §1).
+
+| العمود | القيم | الوحدة |
+|---|---|---|
+| `membership.pro.discount_mode` · `membership.premium.discount_mode` | `percent` / `fixed` / `__NULL__` | — |
+| `membership.<الفئة>.percent` | عدد صحيح ١..١٠٠ | ٪ |
+| `membership.<الفئة>.fixed_iqd` | عدد صحيح | د.ع |
+| `membership.<الفئة>.max_discount_iqd` | عدد صحيح (سقف الخصم) | د.ع |
+| `membership.<الفئة>.cap_scope` | `per_unit` / `per_order` / `__NULL__` | — |
+| `membership.<الفئة>.max_quantity` | عدد صحيح ١ فأكثر | قطعة |
+
+`pro` هي PRO و`premium` هي PREMIUM (تُخزَّن `prime`).
+
+**ثلاث حالات لكل فئة:**
+
+* **الأعمدة الستة فارغة (أو غائبة من الملف أصلًا)** → الملف لا يقول شيئًا،
+  والقاعدة المحفوظة تبقى كما هي. هذا هو الاستثناء المذكور في §٣، وهو مقصود:
+  مالكٌ صدّر ملفًا اليوم، وكتب خصمًا في لوحة الإدارة غدًا، ثم أعاد استيراد ملف
+  اليوم بعد غد لتصحيح اسم — يجب ألّا يفقد خصمه بلا أن ينطق الملف بذلك.
+* **قيم مكتوبة** → تُنشأ قاعدة المنتج لهذه الفئة أو تُحدَّث.
+* **`discount_mode=__NULL__`** → تُحذف قاعدة المنتج لهذه الفئة.
+
+**التصدير لا يكتب `__NULL__` أبدًا**: فئة بلا قاعدة تُصدَّر بستّ خلايا فارغة.
+
+ما لا يحمله الملف — التواريخ والأولوية والتفعيل والاسم والملاحظة والحد الأدنى
+للسلة — يُقرأ من القاعدة المحفوظة ويُعاد كما هو عند كل تحديث، فتعديل أسعار
+جماعي لا يلغي عرضًا مجدولًا ولا يعيد تفعيل قاعدة أوقفها المالك.
+
+الكتابة تمرّ حصرًا عبر `saveBenefitRule` / `deleteBenefitRule`، فكل تغيير من
+جدول يُسجَّل بنسخة (`membership_benefit_versions`) وبسطر تدقيق، تمامًا كتغيير
+من اللوحة. والقالب النصّي (TXT) يحمل القيم الستّ نفسها بالمفاتيح نفسها
+(`docs/TXT_IMPORT_PARITY.md` §2.14).
