@@ -44,3 +44,9 @@ jobs:
 
       - name: Dry run
         run: npx tsx scripts/orphan-dry-run.ts --db "${{ github.event.inputs.database || 'levonis-db-staging' }}"
+
+      # The same read-only posture, asked of the OTHER migration this batch
+      # landed: did 0073 actually merge the duplicate models, on the rows that
+      # really exist? A fixture test proves the logic; only this proves the data.
+      - name: Product model shape after 0073
+        run: npx tsx scripts/model-shape-report.ts --db "${{ github.event.inputs.database || 'levonis-db-staging' }}"
