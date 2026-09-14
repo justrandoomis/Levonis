@@ -12,6 +12,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import { sampleCharacter, VIEWBOX, type CharacterInput } from '../src/components/bloub/character/engine.ts';
+import { POSES } from '../src/components/bloub/character/expressions.ts';
 import { planTravel, sampleTravel } from '../src/components/bloub/character/travel.ts';
 import type { MascotState } from '../src/lib/mascot.ts';
 
@@ -64,7 +65,7 @@ for (const [from, to] of [['idle', 'success'], ['idle', 'error'], ['idle', 'noti
   sections.push(`<h2>Blend ${from} &rarr; ${to}</h2><div class="grid small">${
     Array.from({ length: 10 }, (_, i) => {
       const age = i * 0.045;
-      return cell(`${(age * 1000).toFixed(0)}ms`, svg(sampleCharacter({ t: 6 + age, state: to, from, age, travel: null, reduced: false }), 84));
+      return cell(`${(age * 1000).toFixed(0)}ms`, svg(sampleCharacter({ t: 6 + age, state: to, from: POSES[from], age, travel: null, reduced: false }), 84));
     }).join('')
   }</div>`);
 }
@@ -75,7 +76,7 @@ sections.push(`<h2>Boot journey — centre &rarr; bottom home (total ${plan.tota
   Array.from({ length: 16 }, (_, i) => {
     const elapsed = (i / 15) * plan.total;
     const tv = sampleTravel(plan, elapsed);
-    const render = sampleCharacter({ t: 6 + elapsed, state: 'returning', from: 'loading', age: elapsed, travel: tv, reduced: false });
+    const render = sampleCharacter({ t: 6 + elapsed, state: 'returning', from: POSES.loading, age: elapsed, travel: tv, reduced: false });
     return cell(`${(elapsed * 1000).toFixed(0)}ms ${tv.phase}<br/>size ${tv.size.toFixed(0)} lead ${tv.lead.toFixed(2)}`, svg(render, 84));
   }).join('')
 }</div>`);

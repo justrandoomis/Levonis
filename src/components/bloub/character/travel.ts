@@ -1,4 +1,4 @@
-import { clamp, damped, easings, phaseProgress, travelEase } from './math';
+import { clamp, damped, easings, phaseProgress, travelEase, type Easing } from './math';
 
 /**
  * A JOURNEY, NOT A TRANSITION.
@@ -47,6 +47,12 @@ export interface TravelPlan {
   total: number;
   /** How far the wind-up pulls back, in pixels, opposite the travel. */
   windup: number;
+  /** The position curve. A journey begun from rest gathers before it commits;
+   * one that REPLACES a journey already under way must not, because the
+   * character is already moving — starting it on the gathering curve made the
+   * body stop dead for a frame at the hand-over, which is both a freeze and a
+   * collapse of the stretch that speed was driving. */
+  ease: Easing;
   /** A journey planned under a reduced-motion preference carries the flag, so
    * every sample of it is flat. Zeroing only the wind-up was not enough: the
    * stretch and the arrival squash are derived from SPEED, and a reduced
@@ -78,7 +84,11 @@ export interface TravelSample {
  * keyboard appearance would launch the character across the screen. */
 const MIN_DISTANCE = 6;
 
-export function planTravel(from: TravelFrame, to: TravelFrame, opts: { reduced?: boolean; boot?: boolean } = {}): TravelPlan {
+export function planTravel(
+  from: TravelFrame,
+  to: TravelFrame,
+  opts: { reduced?: boolean; boot?: boolean; continuation?: boolean } = {},
+): TravelPlan {
   const dx = to.x + to.size / 2 - (from.x + from.size / 2);
   const dy = to.y + to.size / 2 - (from.y + from.size / 2);
   const distance = Math.hypot(dx, dy);
@@ -88,15 +98,17 @@ export function planTravel(from: TravelFrame, to: TravelFrame, opts: { reduced?:
     // Reduced motion is not "no feedback": it is the same journey without the
     // vestibular part. The character still crosses, briefly, and still looks
     // where it is going — it simply does not wind up, stretch or squash.
-    return { from, to, angle, distance, anticipate: 0, move: 0.2, settle: 0, total: 0.2, windup: 0, reduced: true };
+    return { from, to, angle, distance, anticipate: 0, move: 0.2, settle: 0, total: 0.2, windup: 0, ease: travelEase, reduced: true };
   }
 
   // Duration follows distance, but sub-linearly: a journey twice as long
   // should not feel twice as slow, or crossing a tablet becomes a wait.
   const move = clamp(0.34 + Math.sqrt(distance) * 0.022, 0.34, 0.82);
-  // The first arrival earns a longer wind-up than a page change, because it
-  // is the one moment the character has the viewer's whole attention.
-  const anticipate = opts.boot ? 0.34 : clamp(0.13 + distance * 0.00035, 0.13, 0.26);
+  // The first arrival earns a longer wind-up than a page change, because it is
+  // the one moment the character has the viewer's whole attention. A
+  // continuation earns none at all: the gaze has already led, the body is
+  // already going, and there is nothing left to anticipate.
+  const anticipate = opts.continuation ? 0 : opts.boot ? 0.34 : clamp(0.13 + distance * 0.00035, 0.13, 0.26);
   const settle = 0.4;
   return {
     from,
@@ -109,7 +121,9 @@ export function planTravel(from: TravelFrame, to: TravelFrame, opts: { reduced?:
     total: anticipate + move + settle,
     // Capped hard. Anticipation is a hint, and a hint that is visible as a
     // movement in the wrong direction has become a mistake.
-    windup: Math.min(distance * 0.035, 7),
+    windup: opts.continuation ? 0 : Math.min(distance * 0.035, 7),
+    // Leaving at speed rather than gathering, for a hand-over.
+    ease: opts.continuation ? easings.easeOutQuint : travelEase,
     reduced: false,
   };
 }
@@ -154,7 +168,7 @@ export function sampleTravel(plan: TravelPlan, elapsed: number): TravelSample {
   const windX = -Math.cos(angle) * windOut;
   const windY = -Math.sin(angle) * windOut;
 
-  const pos = travelEase(mP);
+  const pos = plan.ease(mP);
   const cx = fromCx + (toCx - fromCx) * pos + windX * (1 - mP);
   const cy = fromCy + (toCy - fromCy) * pos + windY * (1 - mP);
 
@@ -168,7 +182,7 @@ export function sampleTravel(plan: TravelPlan, elapsed: number): TravelSample {
   // moving fastest and round again the instant it stops. Differentiating the
   // travel curve numerically keeps that true even if the curve is retuned.
   const h = 0.012;
-  const speed = move > 0 ? Math.abs(travelEase(clamp(mP + h)) - travelEase(clamp(mP - h))) / (2 * h) : 0;
+  const speed = move > 0 ? Math.abs(plan.ease(clamp(mP + h)) - plan.ease(clamp(mP - h))) / (2 * h) : 0;
   const reach = clamp(plan.distance / 320);
   // Coefficients sized so the fastest possible journey peaks just under the
   // ceiling rather than against it. A clipped peak holds one deformation flat

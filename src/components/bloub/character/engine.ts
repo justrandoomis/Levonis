@@ -41,8 +41,18 @@ export interface CharacterInput {
   /** Seconds. Any monotonic clock; the schedules inside are absolute. */
   t: number;
   state: MascotState;
-  /** The state being blended out of, if a blend is in flight. */
-  from: MascotState | null;
+  /**
+   * The pose being blended out of — THE ONE THAT WAS ON SCREEN, not the table
+   * entry for the previous state.
+   *
+   * This distinction is the whole reason interruptions look right. Blending
+   * out of `POSES[previousState]` assumes the face had finished arriving
+   * there; interrupt a reaction halfway and it had not, so the next blend
+   * started from a pose the viewer was never shown and the face jumped to it
+   * in one frame. Handing in the live pose makes every blend start exactly
+   * where the face is, which is what makes a reaction interruptible at all.
+   */
+  from: Pose | null;
   /** Seconds since the current state was entered. */
   age: number;
   travel: TravelSample | null;
@@ -58,6 +68,9 @@ export interface EyeRender {
 }
 
 export interface CharacterRender {
+  /** The pose this frame resolved to. Hand it back as the next blend's `from`
+   * and every interruption starts from what the viewer was actually shown. */
+  pose: Pose;
   body: string;
   gloss: string;
   eyes: [EyeRender, EyeRender];
@@ -92,16 +105,14 @@ function searchGaze(t: number): { yaw: number; pitch: number } {
   };
 }
 
-/** Resolve the pose in flight: the state being entered, blended out of the one
- * before it, on the incoming state's own curve and duration. */
+/** Resolve the pose in flight: the state being entered, blended out of the
+ * pose that was actually on screen, on the incoming state's own curve. */
 export function currentPose(input: CharacterInput): Pose {
   const to = POSES[input.state];
-  if (!input.from || input.from === input.state) return to;
-  const from = POSES[input.from];
-  if (to.blend <= 0) return to;
+  if (!input.from || to.blend <= 0) return to;
   const k = clamp(input.age / to.blend);
   if (k >= 1) return to;
-  return blendPose(from, to, to.ease(k));
+  return blendPose(input.from, to, to.ease(k));
 }
 
 export function sampleCharacter(input: CharacterInput): CharacterRender {
@@ -111,11 +122,10 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
   // Idle life runs UNDERNEATH whatever the state is doing, damped by the
   // state's own `wander`. A character that stops breathing when it reacts is
   // a slideshow of poses, not a character.
-  const life = liveliness(t, {
-    wander: reduced ? 0 : pose.wander,
-    blink: pose.blink,
-    float: !reduced,
-  });
+  const life = liveliness(t, { wander: reduced ? 0 : pose.wander, float: !reduced });
+  // A blink that is fading out closes less far each frame rather than being
+  // cut off partway down.
+  const lidLife = 1 - (1 - life.lid) * clamp(pose.blink);
   const flick = reduced || pose.wander <= 0 ? { yaw: 0, pitch: 0 } : saccade(t);
 
   let gaze: HeadGaze = {
@@ -124,9 +134,9 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     roll: pose.gaze.roll + life.dRoll,
   };
 
-  if (input.state === 'loading' && !reduced) {
+  if (pose.sweep > 0 && !reduced) {
     const sweep = searchGaze(t);
-    gaze = { yaw: gaze.yaw + sweep.yaw, pitch: gaze.pitch + sweep.pitch, roll: gaze.roll };
+    gaze = { yaw: gaze.yaw + sweep.yaw * pose.sweep, pitch: gaze.pitch + sweep.pitch * pose.sweep, roll: gaze.roll };
   }
 
   // THE GAZE LEADS THE BODY. `lead` is already at its peak while the wind-up
@@ -154,11 +164,10 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     }
   }
 
-  // A tap squashes on its own, without a journey, and it does so fast enough
-  // that the pose blend alone would not read as a press.
-  if (input.state === 'tap') {
-    squash += Math.sin(clamp(input.age / 0.21) * Math.PI) * 0.06;
-  }
+  // A press squashes the body without a journey. It rides the pose like every
+  // other part of an expression, so it arrives and leaves on the blend rather
+  // than appearing and vanishing with the state's name.
+  if (!reduced) squash += pose.squash;
 
   const points = bodyPoints({
     radius: BODY_R,
@@ -182,7 +191,7 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
   const poses = eyePoses(gaze, FACE_R, pose.split);
   const eyes = poses.map((p, i) => {
     const cfg = pose.eyes[i]!;
-    const lid = Math.min(clamp(cfg.open), clamp(life.lid));
+    const lid = Math.min(clamp(cfg.open), clamp(lidLife));
     const [a, b, c, d] = eyeMatrix(p, cfg.tilt, lid);
     // Stretch the eye placement with the body but not the eye itself: eyes
     // that stretch with the head look like a reflection, not a face.
@@ -197,6 +206,7 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
   }) as [EyeRender, EyeRender];
 
   return {
+    pose,
     // Both paths come from the SAME sampled outline. Recomputing it for the
     // gloss would let the two drift apart by a frame under any future change
     // to the sampler, and the highlight would visibly lag the body it sits on.

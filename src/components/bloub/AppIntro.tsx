@@ -6,6 +6,7 @@ import BloubHome, { type CharacterHandle } from './BloubHome';
 import { mascot, type MascotState } from '../../lib/mascot';
 import { BLOUB_EVENT, bloubDuration, isBloubState, canonicalBloubState } from './events';
 import { sampleCharacter } from './character/engine';
+import { POSES, type Pose } from './character/expressions';
 import { isTravelWorthAnimating, planTravel, sampleTravel, type TravelPlan, type TravelSample } from './character/travel';
 import {
   CHARACTER_CANVAS, bootstrapCharacterFrame, characterLayout, characterTransform,
@@ -71,10 +72,14 @@ export default function AppIntro({ ready }: { ready: boolean }) {
   const scheduleRef = React.useRef<(animate?: boolean) => void>(() => {});
   const firstPath = React.useRef(location.pathname);
 
+  /** The pose the last drawn frame resolved to. This, not a table entry, is
+   * what the next blend starts from — see `CharacterInput.from`. */
+  const livePose = React.useRef<Pose | null>(null);
+
   /** What the face is blending FROM, and since when. Kept in a ref because it
    * changes on the animation clock, not on React's — pushing it through state
    * would re-render the tree on every expression change for no benefit. */
-  const blend = React.useRef<{ from: MascotState | null; state: MascotState; since: number; sequence: number }>({
+  const blend = React.useRef<{ from: Pose | null; state: MascotState; since: number; sequence: number }>({
     from: null, state: expression.state, since: 0, sequence: expression.sequence,
   });
 
@@ -100,7 +105,9 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     const prev = blend.current;
     if (prev.state === expression.state && prev.sequence === expression.sequence) return;
     blend.current = {
-      from: prev.state === expression.state ? prev.from : prev.state,
+      // Wherever the face actually is right now, including halfway through the
+      // blend this one is interrupting.
+      from: livePose.current ?? POSES[prev.state],
       state: expression.state,
       since: performance.now(),
       sequence: expression.sequence,
@@ -129,6 +136,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       journeyRef.current = null;
       setPhase('docked');
       mascot.navigationComplete();
+      // Any sub-journey drift the anchor accumulated while the character was
+      // in the air is applied now, at rest, where a few pixels are invisible.
+      // Applying it mid-flight would have meant replacing the plan, and
+      // replacing the plan replays the departure.
+      schedule(false);
     };
 
     /**
@@ -154,14 +166,16 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         if (travel.phase === 'done') finishJourney();
       }
       const b = blend.current;
-      handle.current?.apply(sampleCharacter({
+      const render = sampleCharacter({
         t: (now - epoch) / 1000,
         state: b.state,
         from: b.from,
         age: (now - b.since) / 1000,
         travel,
         reduced: reducedRef.current,
-      }));
+      });
+      livePose.current = render.pose;
+      handle.current?.apply(render);
     };
 
     const start = () => {
@@ -215,16 +229,22 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // on to the OLD one, past the dock it was supposed to take.
       const inFlight = journeyRef.current;
       const heading = inFlight ? inFlight.plan.to : last;
-      if (Math.abs(heading.x - next.x) < 0.5 && Math.abs(heading.y - next.y) < 0.5 && Math.abs(heading.size - next.size) < 0.5) return;
 
-      const plan = planTravel(last, next, { reduced: reducedRef.current, boot });
-      if (!inFlight && !isTravelWorthAnimating(plan)) {
-        // A relayout of a few pixels is not a journey. Snapping here is
-        // correct: animating it would launch the character across the screen
-        // every time a keyboard opened.
-        writeFrame(next);
+      // IS THE DESTINATION ACTUALLY SOMEWHERE ELSE? That is the only question
+      // here, and it is asked of the destination — never of the character's
+      // live position, which during a journey is a moving target that sweeps
+      // past all sorts of places. A drift too small to be a journey is not one
+      // whether or not the character is already moving: mid-flight it is
+      // ignored outright, because the only way to apply it is to replace the
+      // plan, and a replaced plan replays the departure — a fresh gaze swing
+      // and a fresh deceleration, to cover a pixel. `finishJourney` schedules
+      // the measurement that puts it right, at rest.
+      if (!isTravelWorthAnimating(planTravel(heading, next, { reduced: reducedRef.current }))) {
+        if (!inFlight) writeFrame(next);
         return;
       }
+
+      const plan = planTravel(last, next, { reduced: reducedRef.current, boot, continuation: !!inFlight });
       if (!animate && !boot && !inFlight) {
         writeFrame(next);
         setPhase('docked');

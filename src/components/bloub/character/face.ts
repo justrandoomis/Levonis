@@ -256,13 +256,13 @@ export function blinkLid(t: number, schedule: readonly number[] = BLINKS): numbe
  * repetition to catch. `wander` scales the whole thing so a state that needs
  * the character to hold still can damp it without turning it off.
  */
-export function liveliness(t: number, opt: { wander?: number; blink?: boolean; float?: boolean } = {}): Liveliness {
-  const { wander = 1, blink = true, float = true } = opt;
+export function liveliness(t: number, opt: { wander?: number; float?: boolean } = {}): Liveliness {
+  const { wander = 1, float = true } = opt;
   return {
     dYaw: (loopNoise(t, 11.3, 0.4) * 5.2 + loopNoise(t, 3.7, 2.1) * 1.4) * wander,
     dPitch: (loopNoise(t, 9.1, 1.3) * 3.8 + loopNoise(t, 4.3, 0.7) * 1.2) * wander,
     dRoll: loopNoise(t, 13.7, 3.2) * 2.0 * wander,
-    lid: blink ? blinkLid(t) : 1,
+    lid: blinkLid(t),
     // The body itself is almost still. All the life is in the gaze and the
     // lids; a body that visibly wobbles at rest reads as a loading animation,
     // which is the specific thing the brief rules out. These are fractions of

@@ -50,8 +50,21 @@ export interface Pose {
   /** How much idle drift survives in this state. A reacting character should
    * not stop breathing, but it should not keep wandering either. */
   wander: number;
-  /** Whether the idle blink calendar keeps running. */
-  blink: boolean;
+  /** How much of the idle blink calendar reaches the eyes, 0..1.
+   *
+   * A weight rather than a flag because it has to INTERPOLATE. As a boolean it
+   * was switched at the halfway point of a blend, so a blend that crossed the
+   * midpoint while an eye was halfway shut snapped it open in a single frame —
+   * a face changing abruptly, which is the one thing the brief rules out. */
+  blink: number;
+  /** How much of the searching sweep the gaze performs, 0..1.
+   *
+   * Also a weight, and for the same reason: as a `state === 'loading'` test in
+   * the engine it added fifteen degrees of yaw the instant work began and
+   * removed them the instant it ended, so the whole face jumped twice per
+   * request. Carried on the pose, it arrives and leaves on the blend. */
+  sweep: number;
+
   /** Resting deformation of the body: how much it bulges, and how fast the
    * bulge travels round the outline. Zero is a perfect blob. */
   wobble: number;
@@ -59,6 +72,15 @@ export interface Pose {
   /** Uniform scale applied to the whole body. Reactions that need presence
    * grow by a couple of percent; nothing here ever pulses. */
   swell: number;
+
+  /** Resting vertical squash — how pressed the body is, 0..1-ish.
+   *
+   * The press used to be a sine pulse driven by the tap state's own age, which
+   * made it a step at both ends: the pulse was keyed off `state === 'tap'`, so
+   * the instant the state changed the squash vanished in a single frame. As a
+   * pose field the blends provide the shape for free — 70ms in, because a
+   * press must answer immediately, and the following state's own blend out. */
+  squash: number;
   /** How long the change INTO this state takes, seconds, and on what curve.
    * These differ per state on purpose — the brief forbids one shared spring,
    * and the reason is physical: falling asleep and flinching are not the same
@@ -78,7 +100,9 @@ const BASE: Pose = {
   eyes: pair(),
   mouth: mouth(1, 1, 0, 0, 1),
   wander: 1,
-  blink: true,
+  blink: 1,
+  sweep: 0,
+  squash: 0,
   wobble: 0.006,
   wobbleRate: 0.17,
   swell: 1,
@@ -102,6 +126,7 @@ export const POSES: Record<MascotState, Pose> = {
     gaze: { yaw: 4, pitch: 11, roll: -2 },
     eyes: pair(0.94, 0.84),
     mouth: mouth(0.7, 0.2, 0, 0.6, 0.9),
+    sweep: 1,
     wander: 0.45,
     wobble: 0.02,
     wobbleRate: 0.42,
@@ -164,7 +189,7 @@ export const POSES: Record<MascotState, Pose> = {
     eyes: pair(1.16, 0.32, 15),
     mouth: mouth(1.15, 1.6, 0.25, -0.2, 1.15),
     wander: 0.4,
-    blink: false,
+    blink: 0,
     swell: 1.025,
     blend: 0.24,
     ease: easings.easeOutQuint,
@@ -189,8 +214,9 @@ export const POSES: Record<MascotState, Pose> = {
   tap: make({
     eyes: pair(1.05, 0.5, 0, 0.55),
     mouth: mouth(0.85, 1.1, 0, 0.1),
+    squash: 0.055,
     wander: 0.2,
-    blink: false,
+    blink: 0,
     blend: 0.07,
     ease: easings.easeOutQuint,
   }),
@@ -235,7 +261,7 @@ export const POSES: Record<MascotState, Pose> = {
     eyes: pair(1.0, 0.7, 4, 0.1),
     mouth: mouth(0.5, 0.25, 0, 0.7, 0.8),
     wander: 0.25,
-    blink: false,
+    blink: 0,
     swell: 0.985,
     blend: 0.9,
     ease: easings.easeInOutCubic,
@@ -268,10 +294,12 @@ export function blendPose(a: Pose, b: Pose, t: number): Pose {
       weight: m(a.mouth.weight, b.mouth.weight),
     },
     wander: m(a.wander, b.wander),
-    blink: t < 0.5 ? a.blink : b.blink,
+    blink: m(a.blink, b.blink),
+    sweep: m(a.sweep, b.sweep),
     wobble: m(a.wobble, b.wobble),
     wobbleRate: m(a.wobbleRate, b.wobbleRate),
     swell: m(a.swell, b.swell),
+    squash: m(a.squash, b.squash),
     blend: b.blend,
     ease: b.ease,
   };

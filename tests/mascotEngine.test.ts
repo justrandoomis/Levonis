@@ -180,10 +180,92 @@ test('an expression change interpolates every field and lands exactly', () => {
 test('a repeated reaction replays rather than sticking', () => {
   // `sequence` distinguishes two errors in a row. Without it the second one
   // would find the state already equal and show nothing at all.
-  const first = currentPose({ t: 1, state: 'error', from: 'idle', age: 0, travel: null, reduced: false });
-  const settled = currentPose({ t: 1, state: 'error', from: 'idle', age: 5, travel: null, reduced: false });
+  const first = currentPose({ t: 1, state: 'error', from: POSES.idle, age: 0, travel: null, reduced: false });
+  const settled = currentPose({ t: 1, state: 'error', from: POSES.idle, age: 5, travel: null, reduced: false });
   assert.notDeepEqual(first.eyes[0], settled.eyes[0], 'the blend is visible at all');
   assert.deepEqual(settled.eyes[0], POSES.error.eyes[0], 'and it completes');
+});
+
+test('NO STATE CHANGE IS A STEP: every transition survives timestep refinement', () => {
+  // The general form of "never change expression abruptly", and the regression
+  // for three separate defects that each broke it in a different place: the
+  // loading sweep was applied by a boolean so fifteen degrees of yaw appeared
+  // the instant work began; the blink flag was switched at the blend midpoint
+  // so a half-shut eye snapped open; and the blend's source was the previous
+  // state's TABLE ENTRY rather than the pose on screen, so interrupting a
+  // reaction jumped to a face the viewer had never been shown.
+  //
+  // A flat per-frame bound cannot express this, because the blends are
+  // deliberately different lengths — a press answers in 70ms and legitimately
+  // covers most of its distance in the first frame, while falling asleep takes
+  // 900ms. What separates "fast" from "broken" is not size, it is CONTINUITY:
+  // halve the timestep and a continuous curve halves its largest step, while a
+  // discontinuity does not shrink at all. So the test refines the timestep.
+  //
+  // The clock is held still and only the blend's age advances, so liveliness,
+  // saccades and blinking contribute a constant and what is measured is the
+  // transition alone.
+  const eyeCentre = (m: string) => {
+    const p = m.slice(7, -1).trim().split(/\s+/).map(Number);
+    return { x: p[4]!, y: p[5]! };
+  };
+  // The previous frame is the OLD state mid-blend — the engine's own output,
+  // so the boundary being crossed is the real one. Sampling only from age 0 of
+  // the new state misses it entirely: at age 0 the POSE is still the old one,
+  // but anything keyed off `input.state` has already flipped, and that gap is
+  // exactly where a switch-shaped bug lives.
+  const boundary = (from: MascotState) =>
+    sampleCharacter({ t: 20, state: from, from: POSES.idle, age: POSES[from].blend * 0.5, travel: null, reduced: false });
+
+  const biggestStep = (from: MascotState, to: MascotState, dt: number) => {
+    const last = boundary(from);
+    let prev = eyeCentre(last.eyes[0].matrix);
+    let max = 0;
+    for (let age = 0; age <= 1.0001; age += dt) {
+      const r = sampleCharacter({ t: 20, state: to, from: last.pose, age, travel: null, reduced: false });
+      const c = eyeCentre(r.eyes[0].matrix);
+      max = Math.max(max, Math.hypot(c.x - prev.x, c.y - prev.y));
+      prev = c;
+    }
+    return max;
+  };
+  for (const from of STATES) {
+    for (const to of STATES) {
+      if (from === to) continue;
+      const coarse = biggestStep(from, to, 1 / 60);
+      if (coarse < 0.05) continue; // the two poses put the eye in the same place
+      const fine = biggestStep(from, to, 1 / 240);
+      // A quarter of the timestep gives about a quarter of the step for a
+      // continuous curve. A step function would not shrink at all.
+      assert.ok(fine < coarse * 0.6, `${from}->${to} did not shrink with the timestep (${coarse.toFixed(3)} -> ${fine.toFixed(3)}); that is a jump, not a fast blend`);
+    }
+  }
+});
+
+test('a blend interrupted halfway continues from the face on screen', () => {
+  const half = blendPose(POSES.idle, POSES.success, 0.5);
+  const resumed = currentPose({ t: 4, state: 'error', from: half, age: 0, travel: null, reduced: false });
+  assert.deepEqual(resumed.eyes[0], half.eyes[0], 'frame zero of the new blend IS the interrupted pose');
+  const landed = currentPose({ t: 4, state: 'error', from: half, age: 9, travel: null, reduced: false });
+  assert.deepEqual(landed.eyes[0], POSES.error.eyes[0], 'and it still arrives');
+});
+
+test('the searching sweep and the blink calendar are weights, not switches', () => {
+  assert.equal(POSES.loading.sweep, 1);
+  assert.equal(POSES.idle.sweep, 0);
+  assert.equal(blendPose(POSES.idle, POSES.loading, 0.5).sweep, 0.5, 'the sweep arrives gradually');
+  assert.equal(blendPose(POSES.idle, POSES.success, 0.5).blink, 0.5, 'and a blink fades rather than being cut');
+});
+
+test('reduced motion stills the body during a TAP too, not only at rest', () => {
+  const calm = sampleCharacter({ t: 5, state: 'idle', from: null, age: 9, travel: null, reduced: true }).body;
+  for (let i = 0; i <= 12; i++) {
+    const tapped = sampleCharacter({ t: 5, state: 'tap', from: null, age: i / 60, travel: null, reduced: true }).body;
+    assert.equal(tapped, calm, 'a press must not scale the body under the preference');
+  }
+  // Without the preference it does squash — the press still has to be felt.
+  const pressed = sampleCharacter({ t: 5, state: 'tap', from: null, age: 0.1, travel: null, reduced: false }).body;
+  assert.notEqual(pressed, sampleCharacter({ t: 5, state: 'idle', from: null, age: 9, travel: null, reduced: false }).body);
 });
 
 /* -------------------------------------------------------- the journey */
@@ -303,6 +385,35 @@ test('the body stretches along the direction of travel, fastest first', () => {
   assert.ok(peak > 1.1 && peak < 1.45, `stretch is present but restrained (peak ${peak.toFixed(3)})`);
 });
 
+test('a journey that replaces one already in flight hands over at speed', () => {
+  // A retarget is not a new departure. Planned like one it re-ran the wind-up,
+  // so the character stopped dead mid-travel and its stretch — which is driven
+  // by speed — collapsed to nothing for a frame at the hand-over.
+  const fresh = planTravel({ x: 0, y: 600, size: 90 }, { x: 600, y: 600, size: 90 });
+  const over = planTravel({ x: 300, y: 600, size: 90 }, { x: 600, y: 200, size: 72 }, { continuation: true });
+  assert.ok(fresh.anticipate > 0.1 && fresh.windup > 0, 'a departure gathers itself');
+  assert.equal(over.anticipate, 0, 'a hand-over has nothing left to anticipate');
+  assert.equal(over.windup, 0);
+  const h = 1e-3;
+  const speedAt = (p: typeof fresh, t: number) => (p.ease(Math.min(1, t + h)) - p.ease(Math.max(0, t - h))) / (2 * h);
+  assert.ok(speedAt(fresh, 0.01) < 0.35, 'a departure leaves slowly');
+  assert.ok(speedAt(over, 0.01) > 2, 'a hand-over leaves at the speed it already had');
+  // And it still deforms from the first moment rather than starting round.
+  assert.ok(sampleTravel(over, 0.02).stretch > 0.02, 'the body stays stretched through the turn');
+});
+
+test('a drift too small to be a journey is not one, in flight or at rest', () => {
+  // The question is asked of the DESTINATION, never of the character's live
+  // position — which during a journey sweeps past all sorts of places and once
+  // made a 1px anchor nudge look like a whole new trip.
+  const dockA = { x: 560, y: 660, size: 88 };
+  const nudged = { ...dockA, y: 662 };
+  assert.equal(isTravelWorthAnimating(planTravel(dockA, nudged)), false, 'destination barely moved');
+  const halfway = { x: 560, y: 400, size: 150 };
+  assert.equal(isTravelWorthAnimating(planTravel(dockA, nudged)), false,
+    'and it is still not a journey just because the character happens to be at ' + JSON.stringify(halfway));
+});
+
 test('a relayout of a few pixels is not a journey', () => {
   const dock = { x: 560, y: 660, size: 88 };
   assert.equal(isTravelWorthAnimating(planTravel(dock, { ...dock, y: 662 })), false);
@@ -343,7 +454,7 @@ test('reduced motion stills the body but keeps the character blinking', () => {
 
 test('every state produces a closed body, two eyes and a mouth', () => {
   for (const state of STATES) {
-    const r = sampleCharacter({ t: 7.3, state, from: 'idle', age: 0.4, travel: null, reduced: false });
+    const r = sampleCharacter({ t: 7.3, state, from: POSES.idle, age: 0.4, travel: null, reduced: false });
     assert.match(r.body, /^M [\d.-]+ [\d.-]+( C [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+)+ Z$/, `${state} body`);
     assert.ok(r.gloss.startsWith('M'), `${state} gloss`);
     assert.ok(r.mouth.startsWith('M'), `${state} mouth`);
