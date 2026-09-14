@@ -1,0 +1,35 @@
+name: 41 - Product Architecture and Old Orphan Audit (read-only)
+on:
+  pull_request:
+    paths:
+      - 'scripts/product-orphans-dry-run.mjs'
+      - '.github/workflows/product-architecture-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dry-run:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Inspect live D1 and R2 without changing either
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AUDIT_WORKER: levonis-staging
+          AUDIT_ORIGIN: https://levonis-iq.com
+        run: node --import tsx scripts/product-orphans-dry-run.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: product-orphans-dry-run
+          path: product-orphans-dry-run.json
+          if-no-files-found: error
