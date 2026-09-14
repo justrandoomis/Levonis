@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-14T11:38:43.519084+00:00",
+  "recorded_at": "2026-09-14T12:00:01.890006+00:00",
   "environment": "local isolated repository worktree; external network disabled for tests and native proof",
   "production_deployed": false,
   "production_orphan_dry_run": "not run: no authorized live D1/R2 or admin session connection available",
@@ -15,7 +15,7 @@
     "workspaces_and_probes": 10
   },
   "tests": {
-    "total_pass": 2929,
+    "total_pass": 2934,
     "root_command": "node --import tsx --test --test-concurrency=6 tests/*.test.ts",
     "workspaces_command": "npm run test:workspaces",
     "network_preload": "tests/fixtures/offline.cjs",
@@ -23,9 +23,8 @@
       {
         "suite": "root",
         "exit_code": 0,
-        "duration_seconds": 173.29,
-        "tests": 2567,
-        "pass": 2567,
+        "tests": 2572,
+        "pass": 2572,
         "fail": 0,
         "skipped": 0,
         "cancelled": 0
@@ -33,14 +32,15 @@
       {
         "suite": "workspaces",
         "exit_code": 0,
-        "duration_seconds": 6.89,
         "tests": 362,
         "pass": 362,
         "fail": 0,
         "skipped": 0,
         "cancelled": 0
       }
-    ]
+    ],
+    "command": "npm run test:unit",
+    "offline_preload_is_automatic": true
   },
   "eslint": {
     "command": "npm run lint",
@@ -67,14 +67,21 @@
       "success": true,
       "fresh_product_id": true,
       "restored_r2_objects": 5
-    }
+    },
+    "release_schema_ready": true
   },
   "log_sha256": {
-    "tests-complete-root.log": "402d4d4305b065b5a21d595e24c3144f8d4bc1dc8fef6e03363c850d11ae747b",
-    "tests-complete-workspaces.log": "7e13be5a6a13ba7d9086ec86e36756ef4d7608458f0c2501f8429e8075cc5086",
-    "typecheck-final5.log": "f1f12e99d24292377f4cfcbdd64369c0402511f3aab917e756a6b1692087acee",
-    "lint-final6.log": "65d881799579c7a1c5e497f5dbecbaa0c4ec7faf6ae1af1edbf9b5c644a56b88",
-    "build-final6.log": "74bc71ae431d7a98343228dc30851d77e4ce782564bc882d2b1fe3a586cdfcb3",
-    "native-proof-final.log": "8742e3e770142711e2f53463f94e2695a9351116ba560ec5841a87ce3e4e9737"
+    "release-unit.log": "c213b9b742c179596d9382f2f5a6edbde3fc3e0dbe09c11510dafd6832296ca0",
+    "release-typecheck.log": "f1f12e99d24292377f4cfcbdd64369c0402511f3aab917e756a6b1692087acee",
+    "release-lint.log": "65d881799579c7a1c5e497f5dbecbaa0c4ec7faf6ae1af1edbf9b5c644a56b88",
+    "release-build.log": "ed5c4573c05f31bf24cc3dfba96a7d64dc95d8dd353893a01757c348a222fcb3",
+    "release-native.log": "ae0fa8976c21a50da3e89c617b075171562fa80100f2033f134c8f7477751aab"
+  },
+  "release_preflight": {
+    "queries": "SELECT only",
+    "local_native_d1_verified": true,
+    "blocks_automatic_deploy_before_migrations": true,
+    "existing_live_workflow_confirmation_preserved": true,
+    "live_preflight_run": false
   }
 }

@@ -2,10 +2,11 @@
   "environment": "local Cloudflare workerd + native D1 and R2 bindings (Miniflare)",
   "production": false,
   "migrations": 75,
+  "release_schema_ready": true,
   "deletion": {
     "product_deleted": true,
     "already_deleted": false,
-    "deletion_job_id": "pdel_c49193d7f76143558003",
+    "deletion_job_id": "pdel_8acc54ebc92a47ffa408",
     "rows_deleted_by_table": {
       "product_option_transports": 6,
       "product_color_option_links": 0,

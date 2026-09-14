@@ -38,6 +38,12 @@ for p in sorted(Path(sys.argv[1]).glob('*.sql')):
 print(json.dumps(out))
 `,join(root,'migrations')],{encoding:'utf8',maxBuffer:10*1024*1024})) as Array<{file:string;statements:string[]}>;
   for(const m of migrations) {await sql(m.statements.map(text=>({sql:text}))); if(m.file.startsWith('007')) console.log(`applied ${m.file}`);}
+  // Wrangler records this metadata when applying a release. The HTTP fixture
+  // applies the same SQL directly, so record it explicitly for the read-only gate.
+  await sql([{sql:'CREATE TABLE IF NOT EXISTS d1_migrations(name TEXT PRIMARY KEY)'},...migrations.map(m=>({sql:'INSERT INTO d1_migrations(name) VALUES (?)',args:[m.file]}))]);
+  const release=await import(new URL('./product-release-preflight.mjs',import.meta.url).href);
+  const releaseReport=await release.inspectProductRelease(async(statement:string)=>(await sql([{sql:statement}]))[0].results);
+  release.assertProductRelease(releaseReport);assert.equal(releaseReport.ready,true);
   await sql([{sql:"INSERT INTO users(id,email,name,role) VALUES ('owner','owner@test.com','Owner','admin')"},{sql:"UPDATE catalogs SET is_printer_catalog=1 WHERE slug='printers'"}]);
   const files=new MemoryMedia();const text=completeTxt(files);
   for(const [key,bytes] of files.objects) await call('/r2',{key,bytes:[...bytes]});
@@ -60,7 +66,7 @@ print(json.dumps(out))
   const r2Restored=await (await call('/r2')).json() as {objects:Array<{key:string}>};assert.equal(r2Restored.objects.length,5);
   assert.ok(r2Restored.objects.every(o=>!files.objects.has(o.key)));
   assert.deepEqual((await sql([{sql:'PRAGMA foreign_key_check'}]))[0].results,[]);
-  const result={environment:'local Cloudflare workerd + native D1 and R2 bindings (Miniflare)',production:false,migrations:migrations.length,deletion,after_delete_counts:counts,r2_after_delete:r2After,historical_order_items:1,reimport:{success:true,fresh_product_id:restored.product_id!==id,restored_r2_objects:r2Restored.objects.length},foreign_key_violations:0};
+  const result={environment:'local Cloudflare workerd + native D1 and R2 bindings (Miniflare)',production:false,migrations:migrations.length,release_schema_ready:releaseReport.ready,deletion,after_delete_counts:counts,r2_after_delete:r2After,historical_order_items:1,reimport:{success:true,fresh_product_id:restored.product_id!==id,restored_r2_objects:r2Restored.objects.length},foreign_key_violations:0};
   writeFileSync(join(output,'native-d1-r2.json'),JSON.stringify(result,null,2)+'\n');
   // Old orphan proof is a READ-ONLY scan. The fixture alone creates bad rows.
   await assert.rejects(sql([{sql:'PRAGMA defer_foreign_keys=ON'},{sql:"INSERT INTO product_images(id,product_id,url,r2_key) VALUES ('orphan-image','missing','/files/products/orphan/image.webp','products/orphan/image.webp')"}]), /FOREIGN KEY constraint failed/);
