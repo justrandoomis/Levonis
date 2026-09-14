@@ -57,6 +57,10 @@ import {
 } from '../lib/pricing';
 import { pricingTierContext, type TierStatus } from '../lib/entitlements';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from '../lib/offers';
+import { activeBenefitRules, fallbackFor } from '../lib/membershipBenefits';
+import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
+import type { MemberFallback } from '@levonis/pricing/pricing';
+
 import { compositionKey, loadBundleComponents, type BundleComponentRow } from '../lib/bundleComposition';
 import {
   resolveCompositionLines,
@@ -152,6 +156,47 @@ export function planIsActive(plan: string, expiry: number): boolean {
 export interface PricingContext {
   proPolicy: ProPricingPolicy;
   transportDefaults: Array<{ method: string; commission_iqd: number }>;
+  /**
+   * THE CONFIGURED MEMBERSHIP BENEFITS (migration 0074), loaded once per
+   * request and applied per line.
+   *
+   * `status` is the SERVER's resolved membership, never a tier from a request
+   * body, and it is null for a guest or an admin preview — in which case no
+   * rule applies and every price is the regular one. The rules travel with the
+   * context rather than being re-queried per line because `priceLines` is a
+   * synchronous pure function the checkout calls up to three times.
+   */
+  benefitRules: readonly BenefitRule[];
+  benefitStatus: TierStatus | null;
+  /** Frozen per request so three passes over the same cart cannot disagree
+   *  about whether a dated rule was live. */
+  nowIso: string;
+}
+
+/**
+ * The rule that applies to ONE product for this member, in the shape
+ * `resolveUnitPrice` consults where a line has no explicit member price.
+ *
+ * The product's section and sub-section come from the product ROW. A cart
+ * payload could name any category it liked, and a discount that trusts the
+ * browser's word for what a product is would be a discount anyone can grant
+ * themselves.
+ */
+export function memberFallbackFor(
+  ctx: PricingContext,
+  doc: { category_id?: string | null; sub_category_id?: string | null; id?: string | null }
+): MemberFallback {
+  if (!ctx.benefitStatus) return { pro: null, prime: null };
+  return fallbackFor(
+    ctx.benefitRules,
+    ctx.benefitStatus,
+    {
+      product_id: doc.id ?? null,
+      category_id: doc.category_id ?? null,
+      sub_category_id: doc.sub_category_id ?? null,
+    },
+    ctx.nowIso
+  );
 }
 
 /** Keeps only defaults an admin actually configured (integer IQD >= 0). */
@@ -173,16 +218,67 @@ export function transportDefaultsFrom(value: unknown): PricingContext['transport
   return out;
 }
 
-export function pricingContextFrom(settings: Record<string, unknown>): PricingContext {
+export function pricingContextFrom(
+  settings: Record<string, unknown>,
+  benefits?: { rules: readonly BenefitRule[]; status: TierStatus | null; nowIso?: string }
+): PricingContext {
   return {
     proPolicy: proPolicyFrom(settings.proPricingPolicy),
     transportDefaults: transportDefaultsFrom(settings.preorderTransportDefaults),
+    benefitRules: benefits?.rules ?? [],
+    benefitStatus: benefits?.status ?? null,
+    nowIso: benefits?.nowIso ?? new Date().toISOString(),
   };
 }
 
-export async function loadPricingContext(db: D1Database): Promise<PricingContext> {
-  const settings = await getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']);
-  return pricingContextFrom(settings);
+export async function loadPricingContext(db: D1Database, status?: TierStatus | null): Promise<PricingContext> {
+  const [settings, rules] = await Promise.all([
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']),
+    // A guest earns no benefit, so their request does not pay for the query.
+    status && status.active ? activeBenefitRules(db) : Promise.resolve([] as BenefitRule[]),
+  ]);
+  return pricingContextFrom(settings, { rules, status: status ?? null });
+}
+
+/**
+ * THE SAME TWO LOADS, STARTED BEFORE THE TIER IS KNOWN.
+ *
+ * `loadPricingContext` needs the membership to decide whether the rules are
+ * worth querying, which would serialise it behind `cartTier`. Every cart door
+ * is authenticated, so the member is not hypothetical and the rules table is
+ * small and cached: starting both in the same `Promise.all` as the tier costs
+ * one query and saves a round trip on the hot path.
+ */
+async function loadPricingParts(db: D1Database) {
+  const [settings, rules] = await Promise.all([
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']),
+    activeBenefitRules(db),
+  ]);
+  return { settings, rules };
+}
+
+/**
+ * THE ONE CART PRICING PREAMBLE: who the member is, and what the admin has
+ * configured for them — resolved once per request and passed down.
+ *
+ * Both halves are server-side reads. Nothing here is taken from the request
+ * body, so a browser cannot name its own tier, its own category or its own
+ * discount (§24).
+ */
+export async function cartPricing(
+  c: Context<AppContext>
+): Promise<{ tier: Tier; active: boolean; status: TierStatus; ctx: PricingContext }> {
+  const [t, parts] = await Promise.all([cartTier(c), loadPricingParts(c.env.DB)]);
+  return {
+    ...t,
+    ctx: pricingContextFrom(parts.settings, {
+      // An expired or paused membership earns nothing, and `resolveMembershipBenefits`
+      // says so through the entitlement gate — but keeping the rules out of the
+      // context as well means a stale `status` can never leak one.
+      rules: t.status.active ? parts.rules : [],
+      status: t.status,
+    }),
+  };
 }
 
 export interface CartSelection {
@@ -258,6 +354,7 @@ export function resolveCartLine(
     tier,
     tierActive,
     proPolicy: ctx.proPolicy,
+    memberFallback: memberFallbackFor(ctx, doc),
     transportDefaults: ctx.transportDefaults,
     preorderPricing,
     isPrinter,
@@ -518,10 +615,7 @@ function compositionCartItem(
 
 async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
-  const [{ tier, active: tierActive, status }, ctx] = await Promise.all([
-    cartTier(c),
-    loadPricingContext(c.env.DB),
-  ]);
+  const { tier, active: tierActive, status, ctx } = await cartPricing(c);
   const { results } = await c.env.DB.prepare(
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
             ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.warranty_plan_id, p.*
@@ -950,9 +1044,8 @@ async function addCompositionLine(
    */
   await rateLimit(c, 'composition_quote', 60, 300);
 
-  const [{ tier, active: tierActive, status }, ctx, loaded] = await Promise.all([
-    cartTier(c),
-    loadPricingContext(c.env.DB),
+  const [{ tier, active: tierActive, status, ctx }, loaded] = await Promise.all([
+    cartPricing(c),
     loadBundleComponents(c.env.DB, [productId]),
   ]);
   const components: BundleComponentRow[] = loaded.byBundle.get(productId) ?? [];
@@ -1106,9 +1199,8 @@ cartRoutes.post('/items', async (c) => {
     return await addCompositionLine(c, product, qty, transportMethod, body);
   }
 
-  const [{ tier, active: tierActive, status: addStatus }, ctx, views, isPrinter, addOffers] = await Promise.all([
-    cartTier(c),
-    loadPricingContext(c.env.DB),
+  const [{ tier, active: tierActive, status: addStatus, ctx }, views, isPrinter, addOffers] = await Promise.all([
+    cartPricing(c),
     loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
     // The owner's catalog flag decides whether an extended warranty may ride
     // on this line at all — "this system applies to printers only".
@@ -1316,9 +1408,8 @@ async function patchCompositionLine(
   // §7.5 / §15.1 rule 9 — the same per-user bound as the add and the quote.
   await rateLimit(c, 'composition_quote', 60, 300);
 
-  const [{ tier, active: tierActive, status }, ctx, loaded, storedChoices] = await Promise.all([
-    cartTier(c),
-    loadPricingContext(c.env.DB),
+  const [{ tier, active: tierActive, status, ctx }, loaded, storedChoices] = await Promise.all([
+    cartPricing(c),
     loadBundleComponents(c.env.DB, [productId]),
     loadCartChoices(c.env.DB, [id]),
   ]);
@@ -1494,9 +1585,8 @@ cartRoutes.patch('/items/:id', async (c) => {
   // validation (previous behavior silently accepted any selection here).
   if (!product) throw badRequest('This product no longer exists — please remove it from your cart');
 
-  const [{ tier, active: tierActive }, ctx, views, isPrinter] = await Promise.all([
-    cartTier(c),
-    loadPricingContext(c.env.DB),
+  const [{ tier, active: tierActive, ctx }, views, isPrinter] = await Promise.all([
+    cartPricing(c),
     loadRelationsViews(c.env.DB, [{ id: String(existing.product_id), inventory_mode: product.inventory_mode }]),
     // Setting or changing the plan from the cart's disclosure runs the same
     // printers-only gate as the add; clearing it ('') needs no check.

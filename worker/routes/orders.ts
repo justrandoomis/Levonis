@@ -79,6 +79,15 @@ import { planOrderReturn } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import type { StockMove, StockTarget } from '../lib/inventory';
 import { benefits, pricingTierContext, preorderGiftFor, shippingEntitlementContext } from '../lib/entitlements';
+import {
+  activeBenefitRules,
+  currentBenefitVersionId,
+  resolveOrderBenefits,
+  resolveProductBenefits,
+} from '../lib/membershipBenefits';
+import type { BenefitLineInput, ProductBenefits } from '../lib/membershipBenefits';
+import type { ShippingBenefit, TaxBenefit } from '@levonis/pricing/membershipBenefits';
+import type { Tier as PricingTier } from '../lib/pricing';
 import type { PreorderGiftConfig, TierStatus } from '../lib/entitlements';
 import {
   bnplCancellationStatement,
@@ -1137,6 +1146,23 @@ interface ComputedLine {
   /** Which availability fee priced this line (worker/lib/pricing.ts). */
   pricing_basis: 'direct' | 'preorder';
   /**
+   * WHAT THE MEMBERSHIP BENEFIT RESOLVER NEEDS FROM THIS LINE (§3).
+   *
+   * The section and sub-section come from the PRODUCT ROW, never from a cart
+   * payload, and `regular_unit_iqd` is the price before any membership — the
+   * figure every percentage and ceiling in a rule is computed from.
+   *
+   * Absent on a composition parent and on its components: a bundle's price is
+   * already a composed discount over its parts, and those parts were resolved
+   * with this member's own rule inside them (`resolveCartBundles` is handed
+   * the same pricing context), so a second rule on the parent would be the
+   * double discount §17 forbids.
+   */
+  benefit?: { category_id: string | null; sub_category_id: string | null; regular_unit_iqd: number };
+  /** What the membership actually took off this line, frozen onto the order. */
+  membership_discount_iqd?: number;
+  membership_rule_id?: string | null;
+  /**
    * THE FOUR COMPOSITION FIELDS (§1.6, §5.3), and nothing else.
    *
    * A bundle produces one PARENT line carrying the money and no stock targets,
@@ -1184,6 +1210,28 @@ interface ComputedLine {
     option_value_ids: string[];
     color_id: string;
   } | null;
+}
+
+/** What the settlement resolved about this member, carried to the snapshot. */
+interface CheckoutBenefits {
+  tier: PricingTier;
+  tier_active: boolean;
+  /** The instant the rules were frozen for this settlement. */
+  resolved_at: string;
+  lines: ProductBenefits['lines'];
+  /** The same rows keyed by ORDER ITEM id, for the per-item snapshot columns. */
+  byLine: Map<string, ProductBenefits['lines'][number]>;
+  /** The membership's whole saving on merchandise — what the customer is told
+   *  they saved (§23). It is the sum of the next two. */
+  discount_total_iqd: number;
+  /** The part deducted AFTER the subtotal, the way a coupon is. */
+  line_discount_iqd: number;
+  /** The part already inside `subtotal_iqd`, because `resolveUnitPrice` put it
+   *  in the unit prices. Recorded so the stored totals can be reconciled
+   *  without re-running the resolver. */
+  unit_discount_iqd: number;
+  shipping: ShippingBenefit;
+  tax: TaxBenefit;
 }
 
 interface CheckoutComputation {
@@ -1258,8 +1306,17 @@ interface CheckoutComputation {
   requiredAdvance: number;
   totalIqd: number; // payable after coupon+points (before wallet)
   dueOnDelivery: number;
-  /** Frozen cash-on-delivery tax; zero for pickup and non-COD payments. */
+  /** Frozen cash-on-delivery tax as CHARGED — after any membership exemption. */
   codTaxIqd: number;
+  /** §14: what the existing tax engine calculated BEFORE the membership was
+   *  consulted, and what the membership then waived. Both are recorded so a
+   *  courier sheet, an invoice and a tax report can be reconciled against an
+   *  order whose customer paid no tax. */
+  codTaxBeforeExemptionIqd: number;
+  codTaxExemptionIqd: number;
+  codTaxExemptionRuleId: string | null;
+  /** §19: the membership's whole effect on this order, for the snapshot. */
+  benefits: CheckoutBenefits;
   policies: PolicyRef[];
   printerGiftConfig: unknown;
   preorderGiftConfig: unknown;
@@ -1309,7 +1366,6 @@ async function computeCheckout(
     if (!payment) throw badRequest('Please choose a valid payment method');
   }
   const exchangeRate = Number(settings.exchangeRate) || 1400;
-  const pricingCtx = pricingContextFrom(settings);
   const shippingConfig = shippingConfigFrom(settings.shippingPolicy);
 
   // Effective tier from the memberships ledger — never the client, never the
@@ -1320,11 +1376,32 @@ async function computeCheckout(
   // approved default PRO address, and an active restriction case on
   // 'proPricing' / 'noPreorderCommission' pauses the whole pricing context.
   // 'freeDelivery' gates only the shipping waiver below.
-  const { tierStatus, atApprovedDefault, proContext, pricingTierActive } = await pricingTierContext(
-    c.env.DB,
-    user.id,
-    address
-  );
+  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules] = await Promise.all([
+    pricingTierContext(c.env.DB, user.id, address),
+    /**
+     * THE CONFIGURED MEMBERSHIP BENEFITS (migration 0074), read ONCE for the
+     * whole settlement and frozen onto the order below.
+     *
+     * Read here, beside the tier, because everything downstream is either
+     * synchronous (`priceLines` runs up to three times) or inside the atomic
+     * write batch. `activeBenefitRules` returns only enabled rows; whether
+     * THIS member earns one is decided per line by the entitlement gate.
+     */
+    activeBenefitRules(c.env.DB),
+  ]);
+  /**
+   * The rules the ORDER was priced with, frozen at this instant. Every pass
+   * below reads this one context, so the requested-basis pass, the prepaid
+   * pass and the cash-on-delivery pass cannot disagree about whether a dated
+   * rule was live, and §21's version id recorded on the order names exactly
+   * the configuration these figures came from.
+   */
+  const benefitNowIso = new Date().toISOString();
+  const pricingCtx = pricingContextFrom(settings, {
+    rules: tierStatus.active ? benefitRules : [],
+    status: tierStatus,
+    nowIso: benefitNowIso,
+  });
   // Load and price the cart lines server-side.
   let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
                     ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.warranty_plan_id, ci.draw_salt, p.*
@@ -1697,6 +1774,11 @@ async function computeCheckout(
         breakdown: publicBreakdown(resolved),
         is_printer: isPrinter,
         pricing_basis: resolved.pricing_basis,
+        benefit: {
+          category_id: (row.category_id as string | null) ?? null,
+          sub_category_id: (row.sub_category_id as string | null) ?? null,
+          regular_unit_iqd: resolved.regular_iqd,
+        },
       });
     }
     // THE PHYSICAL-LINE CEILING (§3.1) — a door refusal naming the limit, not a
@@ -1796,11 +1878,81 @@ async function computeCheckout(
    * rather than patched.
    */
   const settle = async (p: PricedLines) => {
-    const { subtotal, merchandise, shippingItems } = p;
+    const { shippingItems } = p;
+
+    /**
+     * §3 / §10 — THE MEMBERSHIP'S EFFECT ON THE MERCHANDISE, resolved before
+     * anything else touches the money.
+     *
+     * Most of it is already in the unit prices: `resolveUnitPrice` consulted
+     * the same rules when it priced each line, which is what makes the product
+     * page, the cart and this door quote one number. What is left here is the
+     * part a unit price cannot carry — a quantity limit, a per-order ceiling,
+     * a minimum order value — and it is subtracted ONCE, from the line totals,
+     * before the coupon, the points and the delivery threshold are computed on
+     * them (§12: the basis is merchandise AFTER product discounts).
+     */
+    const benefitLines: BenefitLineInput[] = p.lines.flatMap((l) =>
+      l.benefit
+        ? [{
+            product_id: l.product_id,
+            category_id: l.benefit.category_id,
+            sub_category_id: l.benefit.sub_category_id,
+            regular_unit_iqd: l.benefit.regular_unit_iqd,
+            applied_unit_iqd: l.applied_iqd,
+            qty: l.qty,
+          }]
+        : []
+    );
+    const productBenefits = resolveProductBenefits({
+      rules: pricingCtx.benefitRules,
+      status: tierStatus,
+      lines: benefitLines,
+      nowIso: benefitNowIso,
+    });
+    /**
+     * Keyed by ORDER ITEM id, not product id: two cart lines can hold the same
+     * product with different options, and a map keyed by product would give
+     * both of them one line's benefit. `resolveProductBenefits` answers in
+     * input order, so zipping is exact.
+     */
+    const eligibleLines = p.lines.filter((l) => l.benefit);
+    const benefitByLine = new Map<string, ProductBenefits['lines'][number]>();
+    eligibleLines.forEach((l, i) => {
+      const b = productBenefits.lines[i];
+      if (b) benefitByLine.set(l.id, b);
+    });
+
+    /**
+     * `subtotal` and `merchandise` STAY as the lines came out, because that is
+     * what `orders.subtotal_iqd` and `merchandise_iqd` mean and what the
+     * `order_items` rows add up to. The order-level part of the membership is
+     * deducted the way a coupon is — after the subtotal, in its own column —
+     * so the stored figures still reconcile line by line.
+     */
+    const { subtotal, merchandise } = p;
+    const lineDiscount = Math.min(productBenefits.line_discount_iqd, merchandise);
+    /** Merchandise as every downstream rule should see it (§12: after product
+     *  discounts). */
+    const memberMerchandise = Math.max(0, merchandise - lineDiscount);
 
     /** `primeBasisIqd` is the §5 basis — merchandise after product discounts,
      *  coupons AND points, before delivery — which is a different number from
      *  the PRO rule's configurable basis. */
+    /**
+     * The configured free-delivery rule, resolved against the SAME basis the
+     * quote is about to compare. `deliveryMethodId` is the method the customer
+     * actually chose, so a PREMIUM rule listing standard only refuses a
+     * personal delivery here rather than in the UI.
+     */
+    const orderBenefitsAt = (basisIqd: number) =>
+      resolveOrderBenefits({
+        rules: pricingCtx.benefitRules,
+        status: tierStatus,
+        shippingBasisIqd: basisIqd,
+        deliveryMethod: delivery.id === 'standard' || delivery.id === 'personal' ? delivery.id : null,
+        nowIso: benefitNowIso,
+      });
     const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
       quoteShipping({
         items: shippingItems,
@@ -1812,6 +1964,12 @@ async function computeCheckout(
         ...shippingEntitlements,
         atApprovedDefaultAddress: atApprovedDefault,
         independentFreeDelivery,
+        // The PRO rule's own basis is `basisIqd`; PREMIUM's is the after-points
+        // figure the caller passes as `primeMerchandiseIqd` (§5), so the rule
+        // is tested against whichever number this member's tier is judged on.
+        membershipShipping: orderBenefitsAt(
+          tierStatus.tier === 'prime' ? (primeBasisIqd ?? basisIqd) : basisIqd
+        ).shipping,
         // Store pickup has no last mile, so nothing to protect; the flag is
         // dropped rather than charged for a delivery that does not happen.
         protectedDelivery: input.protectedDelivery && !isPickup,
@@ -1825,6 +1983,9 @@ async function computeCheckout(
       advance_due_iqd: 0,
       pro_waiver_applied: false,
       prime_waiver_applied: false,
+      membership_subsidy_iqd: 0,
+      membership_subsidy_capped: false,
+      membership_rule_id: null,
       waiver_source: 'none',
       waiver_basis_iqd: merchandise,
       needs_config: [],
@@ -1834,7 +1995,7 @@ async function computeCheckout(
 
     // Pass 1 (before coupon) prices the shipping used to validate the coupon;
     // the FINAL quote then applies the configured threshold basis.
-    let shipping = isPickup ? emptyQuote : runQuote(merchandise);
+    let shipping = isPickup ? emptyQuote : runQuote(memberMerchandise);
 
     // Coupon — validated against the honest payable total (subtotal + the
     // delivery actually charged); applied FIRST: coupon, then points, then wallet.
@@ -1842,13 +2003,14 @@ async function computeCheckout(
     let couponId: string | null = null;
     let couponSnapshot: string | null = null;
     if (input.couponCode) {
-      const check = await validateCoupon(c.env, user.id, input.couponCode, subtotal + shipping.total_iqd);
+      const couponBasis = Math.max(0, subtotal - lineDiscount) + shipping.total_iqd;
+      const check = await validateCoupon(c.env, user.id, input.couponCode, couponBasis);
       if (!check.ok || !check.coupon_id) {
         const reason = check.reason ?? 'COUPON_INVALID';
         throw badRequest(`Coupon could not be applied (${reason})`, reason);
       }
       couponId = check.coupon_id;
-      couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), subtotal + shipping.total_iqd));
+      couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), couponBasis));
       couponSnapshot = JSON.stringify({
         coupon_id: check.coupon_id,
         code: check.code ?? input.couponCode.toUpperCase(),
@@ -1867,7 +2029,7 @@ async function computeCheckout(
     // tested against merchandise after coupons AND points (product-form §5).
     // There is no circularity: neither the coupon cap nor the points cap depends
     // on the delivery fee.
-    const eligibleMerchandise = Math.max(0, merchandise - Math.min(couponDiscount, merchandise));
+    const eligibleMerchandise = Math.max(0, memberMerchandise - Math.min(couponDiscount, memberMerchandise));
     let pointsDiscount = 0;
     if (input.usePoints && available.points_available > 0) {
       pointsDiscount = capRedeemablePoints(available.points_available, eligibleMerchandise);
@@ -1880,16 +2042,16 @@ async function computeCheckout(
       const basis =
         configForOrder.threshold_basis === 'merchandise_after_coupon'
           ? eligibleMerchandise
-          : merchandise;
+          : memberMerchandise;
       shipping = runQuote(basis, Math.max(0, eligibleMerchandise - pointsDiscount));
     }
 
-    const beforeDiscounts = Math.max(0, subtotal + shipping.total_iqd - couponDiscount);
+    const beforeDiscounts = Math.max(0, subtotal - lineDiscount + shipping.total_iqd - couponDiscount);
     const afterPoints = beforeDiscounts - pointsDiscount;
 
     // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one
     // floor at the end).
-    const netEligible = netEligibleIqd(merchandise, couponDiscount, pointsDiscount);
+    const netEligible = netEligibleIqd(memberMerchandise, couponDiscount, pointsDiscount);
     const pointsEarnPending = pointsForEligibleIqd(netEligible, pointsRule.iqd_per_point);
 
     // Advance-payment requirements are paid from the wallet: "pay in advance"
@@ -1916,11 +2078,27 @@ async function computeCheckout(
     const finalWalletUsdCents =
       walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
     const payableBeforeCodTax = Math.max(0, afterPoints - walletApplied);
-    const codTaxIqd = codDeliveryTaxIqd({
+    /**
+     * §14 — THE TAX IS CALCULATED IN FULL, THEN EXEMPTED.
+     *
+     * The existing cash-on-delivery tax engine is untouched and still runs on
+     * every order: `codTaxBeforeExemptionIqd` is what the courier's cash sheet
+     * and the tax report see. The membership then waives it as a BENEFIT, and
+     * both numbers are recorded, so an invoice can say "COD tax 12,000 / PRO
+     * exemption -12,000" instead of a silent zero nobody can reconcile.
+     *
+     * Whether a tier is exempt is a CONFIGURED rule, never `tier === 'pro'`:
+     * an owner who switches the PRO exemption off in the admin switches it off
+     * here, and one who switches PREMIUM's on switches it on.
+     */
+    const codTaxBeforeExemptionIqd = codDeliveryTaxIqd({
       paymentMethodId: input.paymentMethodId,
       deliveryMethodId: delivery.id,
       payableBeforeTaxIqd: payableBeforeCodTax,
     });
+    const taxBenefit = orderBenefitsAt(shipping.waiver_basis_iqd).tax;
+    const codTaxExemptionIqd = taxBenefit.cod_exempt ? codTaxBeforeExemptionIqd : 0;
+    const codTaxIqd = Math.max(0, codTaxBeforeExemptionIqd - codTaxExemptionIqd);
     const financedIqd = isBnpl(input.paymentMethodId) ? payableBeforeCodTax : 0;
     const dueOnDelivery = isBnpl(input.paymentMethodId) ? 0 : payableBeforeCodTax + codTaxIqd;
 
@@ -1939,7 +2117,23 @@ async function computeCheckout(
       totalIqd: afterPoints + codTaxIqd,
       dueOnDelivery,
       codTaxIqd,
+      codTaxBeforeExemptionIqd,
+      codTaxExemptionIqd,
+      codTaxExemptionRuleId: codTaxExemptionIqd > 0 ? taxBenefit.rule_id : null,
       financedIqd,
+      /** §19 — everything the order freezes about this membership's effect. */
+      benefits: {
+        tier: tierStatus.tier,
+        tier_active: tierStatus.active,
+        resolved_at: benefitNowIso,
+        lines: productBenefits.lines,
+        byLine: benefitByLine,
+        discount_total_iqd: productBenefits.discount_total_iqd,
+        line_discount_iqd: lineDiscount,
+        unit_discount_iqd: Math.max(0, productBenefits.discount_total_iqd - productBenefits.line_discount_iqd),
+        shipping: orderBenefitsAt(shipping.waiver_basis_iqd).shipping,
+        tax: taxBenefit,
+      },
     };
   };
 
@@ -2028,6 +2222,10 @@ async function computeCheckout(
     totalIqd: settled.totalIqd,
     dueOnDelivery: settled.dueOnDelivery,
     codTaxIqd: settled.codTaxIqd,
+    codTaxBeforeExemptionIqd: settled.codTaxBeforeExemptionIqd,
+    codTaxExemptionIqd: settled.codTaxExemptionIqd,
+    codTaxExemptionRuleId: settled.codTaxExemptionRuleId,
+    benefits: settled.benefits,
     policies,
     printerGiftConfig: settings.printerGiftConfig,
     preorderGiftConfig: settings.preorderGiftConfig,
@@ -2455,6 +2653,37 @@ orderRoutes.post('/', async (c) => {
 
   const shippingTotal = comp.shipping.total_iqd;
   const deliveryWaived = comp.shipping.total_iqd < comp.shipping.total_before_waiver_iqd ? 1 : 0;
+  /**
+   * The configuration version these figures were computed under. Read at
+   * settlement rather than copied per rule so one integer answers "which set
+   * of rules produced this order" for every column below at once.
+   */
+  const benefitVersionId = await currentBenefitVersionId(c.env.DB);
+  const benefitSnapshot = JSON.stringify({
+    version_id: benefitVersionId,
+    tier: comp.benefits.tier,
+    tier_active: comp.benefits.tier_active,
+    resolved_at: comp.benefits.resolved_at,
+    discount_total_iqd: comp.benefits.discount_total_iqd,
+    line_discount_iqd: comp.benefits.line_discount_iqd,
+    unit_discount_iqd: comp.benefits.unit_discount_iqd,
+    lines: comp.benefits.lines,
+    shipping: {
+      ...comp.benefits.shipping,
+      fee_before_benefit_iqd: comp.shipping.total_before_waiver_iqd,
+      fee_paid_iqd: shippingTotal,
+      subsidy_iqd: comp.shipping.membership_subsidy_iqd,
+      subsidy_capped: comp.shipping.membership_subsidy_capped,
+      waiver_source: comp.shipping.waiver_source,
+    },
+    cod_tax: {
+      rule_id: comp.codTaxExemptionRuleId,
+      exempt: comp.benefits.tax.cod_exempt,
+      before_exemption_iqd: comp.codTaxBeforeExemptionIqd,
+      exemption_iqd: comp.codTaxExemptionIqd,
+      charged_iqd: comp.codTaxIqd,
+    },
+  });
   // WHICH waiver produced the free delivery is recorded apart from the fact of
   // it: the referral waiver is one-per-friend, and the check that enforces
   // "one" reads this column at the next checkout (referralFreeDeliveryApplies).
@@ -2495,8 +2724,10 @@ orderRoutes.post('/', async (c) => {
          wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, client_idempotency_key,
          membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
          support_snapshot, shipping_type, membership_gift, referral_delivery_waived,
-         fulfillment_service, priority_due_at, bnpl_due_iqd, bnpl_due_at, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         fulfillment_service, priority_due_at, bnpl_due_iqd, bnpl_due_at,
+         benefit_version_id, membership_discount_iqd, shipping_before_benefit_iqd, shipping_benefit_iqd,
+         cod_tax_before_exemption_iqd, cod_tax_exemption_iqd, benefit_snapshot, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.codTaxIqd, comp.pointsDiscount, comp.walletApplied,
@@ -2512,7 +2743,20 @@ orderRoutes.post('/', async (c) => {
       // change afterwards. The cart guarantees one type, so the first line
       // speaks for all of them.
       orderShippingType, membershipGift, referralWaived,
-      fulfillmentService, comp.priorityDelivery.due_at, comp.bnplAmount, comp.bnplDueAt, now, now
+      fulfillmentService, comp.priorityDelivery.due_at, comp.bnplAmount, comp.bnplDueAt,
+      /**
+       * §19 / §21 — THE MEMBERSHIP BENEFIT SNAPSHOT.
+       *
+       * Everything the membership was worth on THIS order, and the id of the
+       * configuration version it was worth it under, frozen at this instant.
+       * The owner may change a percentage, a threshold or a tax exemption
+       * tomorrow; none of it reaches these columns, which is the whole
+       * requirement — «تغيير الإعدادات غدًا يجب ألا يغيّر طلب الأمس». Nothing
+       * re-reads the live rules to explain an order once this row exists.
+       */
+      benefitVersionId, comp.benefits.discount_total_iqd,
+      comp.shipping.total_before_waiver_iqd, comp.shipping.total_before_waiver_iqd - shippingTotal,
+      comp.codTaxBeforeExemptionIqd, comp.codTaxExemptionIqd, benefitSnapshot, now, now
     ),
   ];
 
@@ -2571,8 +2815,9 @@ orderRoutes.post('/', async (c) => {
         `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot,
-           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
+           membership_discount_iqd, membership_rule_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         it.id, orderId,
         // §7.7: a MYSTERY SPOOL binds NULL here on purpose. It is the single
@@ -2592,7 +2837,13 @@ orderRoutes.post('/', async (c) => {
         it.mystery_spool ? null : it.pricing_snapshot,
         it.warranty_snapshot, it.transport_snapshot,
         it.bundle_parent_item_id ?? null, it.bundle_component_id ?? null,
-        it.component_value_iqd ?? null, it.component_alloc_iqd ?? null
+        it.component_value_iqd ?? null, it.component_alloc_iqd ?? null,
+        // §19 — WHAT THE MEMBERSHIP TOOK OFF THIS LINE, and under which rule.
+        // Frozen per item so a return, a partial refund or a question about
+        // one product answers from the row itself, and an admin editing the
+        // rule tomorrow cannot change the answer.
+        comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
+        comp.benefits.byLine.get(it.id)?.rule_id ?? null
       )
     );
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and

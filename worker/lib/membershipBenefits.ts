@@ -18,6 +18,7 @@ import { safeParse } from './types';
 import {
   NO_SHIPPING_BENEFIT,
   NO_TAX_BENEFIT,
+  isUnitExpressible,
   lineBenefit,
   selectRule,
   shippingAfterBenefit,
@@ -180,7 +181,11 @@ export function fallbackFor(
   nowIso: string
 ): MemberFallback {
   const rule = ruleFor(rules, status, 'product_discount', target, nowIso);
-  if (!rule) return { pro: null, prime: null };
+  // A rule whose effect depends on the ORDER (a quantity limit, a per-order
+  // ceiling, a minimum subtotal) cannot be a unit price and is applied once at
+  // the line instead — `isUnitExpressible` is the single place that decides,
+  // so the unit price and the line correction can never both take it.
+  if (!rule || !isUnitExpressible(rule)) return { pro: null, prime: null };
   return status.tier === 'pro' ? { pro: rule, prime: null } : { pro: null, prime: rule };
 }
 
@@ -202,36 +207,42 @@ export interface ResolvedBenefits {
   tier_active: boolean;
   version_id: number | null;
   lines: Array<LineBenefit & { product_id: string }>;
-  /** The membership's total saving on merchandise. */
+  /** The membership's total saving on merchandise, however it was applied. */
   discount_total_iqd: number;
+  /**
+   * The part of `discount_total_iqd` that is NOT yet in the unit prices and
+   * the caller must subtract from the line totals exactly once
+   * (`isUnitExpressible` in `@levonis/pricing/membershipBenefits`).
+   */
+  line_discount_iqd: number;
   shipping: ShippingBenefit;
   tax: TaxBenefit;
 }
 
+export interface ProductBenefits {
+  lines: Array<LineBenefit & { product_id: string }>;
+  discount_total_iqd: number;
+  line_discount_iqd: number;
+}
+
 /**
- * THE ONE RESOLVER the brief asks for: everything a membership is worth on
- * this cart, in one structured answer.
+ * WHAT THE MEMBERSHIP IS WORTH ON THE MERCHANDISE — the first half.
  *
- * It reports; it does not charge. The line discounts it returns are the ones
- * `resolveUnitPrice` has ALREADY applied to each unit price, recomputed here
- * only so the order can snapshot them and the cart can show them — with the
- * quantity and per-order ceilings, which a unit price cannot express, applied
- * on top. The shipping and tax parts are decisions their own engines act on.
+ * Split out from the shipping/tax half because the checkout needs the answers
+ * in that order: the product discount changes the merchandise total, the
+ * merchandise total changes the coupon and the points, and only then is the
+ * figure a free-delivery threshold should be tested against known. One
+ * function computing all three would have to be told a shipping basis it is
+ * itself about to invalidate.
  */
-export function resolveMembershipBenefits(input: {
+export function resolveProductBenefits(input: {
   rules: readonly BenefitRule[];
   status: TierStatus;
   lines: BenefitLineInput[];
-  /** The figure a free-shipping threshold is tested against. */
-  shippingBasisIqd: number;
-  deliveryMethod: DeliveryMethodId | null;
-  paymentMethodId: string;
   nowIso: string;
-  versionId?: number | null;
-}): ResolvedBenefits {
+}): ProductBenefits {
   const { rules, status, nowIso } = input;
   const merchandise = input.lines.reduce((n, l) => n + Math.max(0, l.applied_unit_iqd) * Math.max(0, l.qty), 0);
-
   const lines = input.lines.map((line) => {
     const rule = ruleFor(
       rules,
@@ -246,23 +257,65 @@ export function resolveMembershipBenefits(input: {
       ...lineBenefit({ regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule }),
     };
   });
+  return {
+    lines,
+    discount_total_iqd: lines.reduce((n, l) => n + l.total_iqd, 0),
+    line_discount_iqd: lines.reduce((n, l) => n + (l.applied_at === 'line' ? l.total_iqd : 0), 0),
+  };
+}
 
+/** The order-level half: is delivery free on this method, and is the
+ *  cash-on-delivery tax waived. */
+export function resolveOrderBenefits(input: {
+  rules: readonly BenefitRule[];
+  status: TierStatus;
+  /** The figure a free-shipping threshold is tested against. */
+  shippingBasisIqd: number;
+  deliveryMethod: DeliveryMethodId | null;
+  nowIso: string;
+}): { shipping: ShippingBenefit; tax: TaxBenefit } {
+  const { rules, status, nowIso } = input;
   const shippingRule = ruleFor(rules, status, 'free_shipping', {}, nowIso, input.shippingBasisIqd);
   const shipping = shippingRule
     ? shippingBenefit({ rule: shippingRule, basisIqd: input.shippingBasisIqd, method: input.deliveryMethod })
     : { ...NO_SHIPPING_BENEFIT, basis_iqd: input.shippingBasisIqd };
-
   const codRule = ruleFor(rules, status, 'cod_tax_exemption', {}, nowIso);
   const tax = codRule ? taxBenefit(codRule) : NO_TAX_BENEFIT;
+  return { shipping, tax };
+}
 
+/**
+ * THE ONE RESOLVER the brief asks for: everything a membership is worth on
+ * this cart, in one structured answer — `{ discount, shipping, tax }`.
+ *
+ * It reports; it does not charge. A line discount marked `applied_at: 'unit'`
+ * is ALREADY in the unit price `resolveUnitPrice` produced and is repeated
+ * here only so the cart can name it and the order can snapshot it; one marked
+ * `'line'` is the caller's to subtract, exactly once. The shipping and tax
+ * parts are decisions their own engines act on.
+ *
+ * The checkout uses the two halves separately (see `resolveProductBenefits`);
+ * this entry point is for every surface that knows the whole cart up front —
+ * the cart quote, the public preview and the admin simulator.
+ */
+export function resolveMembershipBenefits(input: {
+  rules: readonly BenefitRule[];
+  status: TierStatus;
+  lines: BenefitLineInput[];
+  /** The figure a free-shipping threshold is tested against. */
+  shippingBasisIqd: number;
+  deliveryMethod: DeliveryMethodId | null;
+  nowIso: string;
+  versionId?: number | null;
+}): ResolvedBenefits {
+  const product = resolveProductBenefits(input);
+  const order = resolveOrderBenefits(input);
   return {
-    tier: status.tier,
-    tier_active: status.active,
+    tier: input.status.tier,
+    tier_active: input.status.active,
     version_id: input.versionId ?? null,
-    lines,
-    discount_total_iqd: lines.reduce((n, l) => n + l.total_iqd, 0),
-    shipping,
-    tax,
+    ...product,
+    ...order,
   };
 }
 

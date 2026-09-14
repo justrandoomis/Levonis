@@ -221,16 +221,37 @@ const shipRule = (over: Partial<BenefitRule>) =>
 
 test('PRO free delivery covers STANDARD and PERSONAL above its threshold', () => {
   const pro = shipRule({ free_shipping_threshold_iqd: 75_000, shipping_methods: ['standard', 'personal'] });
-  assert.equal(shippingBenefit({ rule: pro, basisIqd: 75_000, method: 'standard' }).eligible, true);
-  assert.equal(shippingBenefit({ rule: pro, basisIqd: 75_000, method: 'personal' }).eligible, true);
+  assert.equal(shippingBenefit({ rule: pro, basisIqd: 75_001, method: 'standard' }).eligible, true);
+  assert.equal(shippingBenefit({ rule: pro, basisIqd: 75_001, method: 'personal' }).eligible, true);
   const below = shippingBenefit({ rule: pro, basisIqd: 74_999, method: 'standard' });
   assert.equal(below.eligible, false);
   assert.equal(below.reason, 'below_threshold');
 });
 
+/**
+ * ONE OPERATOR, IN BOTH ENGINES.
+ *
+ * `quoteShipping` has always compared STRICTLY GREATER — the owner's confirmed
+ * rule is "75,000 does not qualify, 75,001 does" — and the rules table changes
+ * only WHAT the number is. If these two ever diverged, the same basket would
+ * be free on the product page and charged at the door.
+ */
+test('the threshold is strictly greater, exactly as the shipping engine reads it', () => {
+  const pro = shipRule({ free_shipping_threshold_iqd: 75_000, shipping_methods: ['standard', 'personal'] });
+  const atExactly = shippingBenefit({ rule: pro, basisIqd: 75_000, method: 'standard' });
+  assert.equal(atExactly.eligible, false, '75,000 itself does NOT qualify');
+  assert.equal(atExactly.reason, 'below_threshold');
+  assert.equal(shippingBenefit({ rule: pro, basisIqd: 75_001, method: 'standard' }).eligible, true);
+});
+
 test('PREMIUM free delivery covers STANDARD ONLY — personal stays payable', () => {
   const premium = shipRule({ tier: 'prime', free_shipping_threshold_iqd: 100_000, shipping_methods: ['standard'] });
-  assert.equal(shippingBenefit({ rule: premium, basisIqd: 100_000, method: 'standard' }).eligible, true);
+  assert.equal(shippingBenefit({ rule: premium, basisIqd: 100_001, method: 'standard' }).eligible, true);
+  assert.equal(
+    shippingBenefit({ rule: premium, basisIqd: 100_000, method: 'standard' }).eligible,
+    false,
+    'strictly greater here too'
+  );
   const personal = shippingBenefit({ rule: premium, basisIqd: 500_000, method: 'personal' });
   assert.equal(personal.eligible, false, 'however large the order');
   assert.equal(personal.reason, 'method_not_covered');

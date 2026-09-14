@@ -105,6 +105,18 @@ export interface ShippingQuote {
   advance_due_iqd: number;      // printer fees payable in advance (post-waiver)
   pro_waiver_applied: boolean;
   prime_waiver_applied: boolean;
+  /**
+   * What the membership actually took off the delivery bill (§13). It equals
+   * the waived fees when the benefit rule sets no ceiling, and the ceiling
+   * when one is set and binds — in which case no single component is free in
+   * full and `membership_subsidy_capped` says so, because "free delivery" on
+   * a line the customer still partly paid for is a lie an invoice cannot
+   * survive.
+   */
+  membership_subsidy_iqd: number;
+  membership_subsidy_capped: boolean;
+  /** The benefit rule that produced the waiver, for the order snapshot. */
+  membership_rule_id: string | null;
   /** Auditable record of which membership rule produced a free delivery and
    *  what number it was tested against (§5: "مع مصدر السعر والإعفاء من
    *  التوصيل بصورة قابلة للتدقيق"). */
@@ -139,6 +151,24 @@ export function productDeliveryMethodAvailable(
   return { available: unavailable.length === 0, unavailable_product_ids: [...new Set(unavailable)] };
 }
 
+/**
+ * The already-resolved membership free-delivery decision.
+ *
+ * Declared here rather than imported so this package stays pure and
+ * dependency-free, and shaped to match `ShippingBenefit` in
+ * `@levonis/pricing/membershipBenefits` field for field, so the worker hands
+ * one straight to the other with no translation layer to drift.
+ */
+export interface MembershipShippingDecision {
+  rule_id: string | null;
+  /** Threshold AND eligible-method test already applied. */
+  eligible: boolean;
+  threshold_iqd: number | null;
+  basis_iqd: number;
+  max_subsidy_iqd: number | null;
+  reason: 'applied' | 'no_rule' | 'below_threshold' | 'method_not_covered';
+}
+
 export function quoteShipping(input: {
   items: ShippingItem[];
   /** Standard/personal checkout method. Omitted by legacy pure callers. */
@@ -161,6 +191,23 @@ export function quoteShipping(input: {
   independentFreeDelivery?: boolean;
   /** The customer asked for the parcel to be protected. */
   protectedDelivery?: boolean;
+  /**
+   * THE ADMIN'S CONFIGURED FREE-DELIVERY RULE for this member, already
+   * resolved (tier, date window, threshold, eligible methods) by
+   * `resolveMembershipBenefits`.
+   *
+   * When supplied it REPLACES the hardcoded `pro_threshold_iqd` /
+   * `prime_threshold_iqd` comparison and the "standard only" method test
+   * below — that is the whole point of the benefit rules: an owner changes
+   * the threshold or adds personal delivery in the admin, and the next quote
+   * follows without a deploy. It does NOT replace the approved-default-address
+   * condition on PRO, which is a CONFIRMED owner rule about WHERE a PRO
+   * benefit exists, not about what it is worth.
+   *
+   * Omitted by pure callers and by every pre-0074 test, which keep the
+   * historical quote exactly.
+   */
+  membershipShipping?: MembershipShippingDecision;
   config: ShippingConfig;
 }): ShippingQuote {
   const { config } = input;
@@ -188,12 +235,23 @@ export function quoteShipping(input: {
   // only, strictly greater than the threshold.
   const proEntitled = input.proShippingEntitled ?? (input.tier === 'pro' && input.tierActive);
   const premiumEntitled = input.premiumShippingEntitled ?? (input.tier === 'prime' && input.tierActive);
-  const proEligible =
-    proEntitled &&
-    input.atApprovedDefaultAddress &&
-    input.merchandiseIqd > config.pro_threshold_iqd;
+  /** An admin-configured rule, when the caller resolved one for this member. */
+  const rule = input.membershipShipping ?? null;
+  const ruleTier = rule ? input.tier : null;
+  const proEligible = rule
+    ? proEntitled && input.tier === 'pro' && input.atApprovedDefaultAddress && rule.eligible
+    : proEntitled && input.atApprovedDefaultAddress && input.merchandiseIqd > config.pro_threshold_iqd;
   if (proEntitled && input.atApprovedDefaultAddress && !proEligible) {
-    reasons.push(`PRO free delivery requires order value above ${config.pro_threshold_iqd.toLocaleString()} IQD (strictly greater).`);
+    if (rule && rule.reason === 'method_not_covered') {
+      reasons.push('PRO free delivery does not cover the delivery method you chose.');
+    } else {
+      const bar = rule && rule.threshold_iqd !== null ? rule.threshold_iqd : config.pro_threshold_iqd;
+      reasons.push(
+        rule
+          ? `PRO free delivery starts at ${bar.toLocaleString()} IQD.`
+          : `PRO free delivery requires order value above ${bar.toLocaleString()} IQD (strictly greater).`
+      );
+    }
   }
   if (proEntitled && !input.atApprovedDefaultAddress) {
     reasons.push('Alternate delivery address selected — ordinary pricing applies for this order (PRO benefits restore automatically at your approved address).');
@@ -204,11 +262,20 @@ export function quoteShipping(input: {
   // requirement is imposed: the owner stated that rule for PRO alone, and
   // inventing an extra condition would silently deny a paid benefit.
   const primeBasis = input.primeMerchandiseIqd ?? input.merchandiseIqd;
-  const primeEligible = premiumEntitled && primeBasis > config.prime_threshold_iqd;
+  const primeEligible = rule
+    ? premiumEntitled && input.tier === 'prime' && rule.eligible
+    : premiumEntitled && primeBasis > config.prime_threshold_iqd;
   if (premiumEntitled && !primeEligible) {
-    reasons.push(
-      `LEVO PRIME free delivery needs an order above ${config.prime_threshold_iqd.toLocaleString()} IQD (strictly greater; ${config.prime_threshold_iqd.toLocaleString()} itself does not qualify).`
-    );
+    if (rule && rule.reason === 'method_not_covered') {
+      reasons.push('LEVO PREMIUM free delivery covers standard delivery only — the method you chose is charged.');
+    } else {
+      const bar = rule && rule.threshold_iqd !== null ? rule.threshold_iqd : config.prime_threshold_iqd;
+      reasons.push(
+        rule
+          ? `LEVO PREMIUM free delivery starts at ${bar.toLocaleString()} IQD.`
+          : `LEVO PRIME free delivery needs an order above ${bar.toLocaleString()} IQD (strictly greater; ${bar.toLocaleString()} itself does not qualify).`
+      );
+    }
   }
 
   const waiverAll =
@@ -237,11 +304,16 @@ export function quoteShipping(input: {
       const fee = productDeliveryFeeIqd(item.qty, rule);
       // PREMIUM covers standard delivery only. PRO can cover a personal rule
       // only when the owner's existing policy explicitly says "all".
+      // The rule ALREADY tested the method (`method_not_covered` above), so a
+      // rule-driven waiver needs no second opinion about which method it
+      // covers. Without a rule the historical constant still applies.
       const waived =
         independent ||
-        (input.deliveryMethod === 'standard'
+        (rule
           ? waiverOrdinary
-          : proEligible && config.pro_waiver_covers === 'all');
+          : input.deliveryMethod === 'standard'
+            ? waiverOrdinary
+            : proEligible && config.pro_waiver_covers === 'all');
       components.push({
         kind: 'product',
         product_id: item.product_id,
@@ -322,11 +394,33 @@ export function quoteShipping(input: {
   }
 
   const before = components.reduce((n, comp) => n + comp.fee_iqd, 0);
-  const total = components.reduce((n, comp) => n + (comp.waived ? 0 : comp.fee_iqd), 0);
-  const advance = components.reduce(
+  /**
+   * §13 — THE OPTIONAL SUBSIDY CEILING.
+   *
+   * With no ceiling the waived components are free and the subsidy is simply
+   * what they came to. With a ceiling that BINDS, the member pays the excess,
+   * so no component can still claim to be free: the flags come back off and
+   * the quote carries the capped figure instead. An owner who never sets
+   * `max_shipping_subsidy_iqd` never reaches this branch.
+   */
+  const waivedSum = components.reduce((n, comp) => n + (comp.waived ? comp.fee_iqd : 0), 0);
+  const ceiling = (proEligible || primeEligible) && rule ? rule.max_subsidy_iqd : null;
+  let subsidy = waivedSum;
+  let capped = false;
+  if (ceiling !== null && waivedSum > Math.max(0, Math.trunc(ceiling))) {
+    subsidy = Math.max(0, Math.trunc(ceiling));
+    capped = true;
+    for (const comp of components) comp.waived = false;
+    reasons.push(`Your membership covers up to ${subsidy.toLocaleString()} IQD of delivery on this order.`);
+  }
+  const total = before - subsidy;
+  const advanceRaw = components.reduce(
     (n, comp) => n + (comp.advance_required && !comp.waived ? comp.fee_iqd : 0),
     0
   );
+  // A capped subsidy comes off the bill as a whole, so the advance portion can
+  // never be asked for more than the bill itself.
+  const advance = Math.min(advanceRaw, total);
 
   if (proEligible) reasons.push('LEVO PRO free delivery applied (approved address, order above threshold).');
   if (primeEligible) reasons.push('LEVO PRIME free delivery applied (order above the PRIME threshold).');
@@ -347,8 +441,17 @@ export function quoteShipping(input: {
     advance_due_iqd: advance,
     pro_waiver_applied: proEligible,
     prime_waiver_applied: primeEligible,
+    membership_subsidy_iqd: proEligible || primeEligible ? subsidy : 0,
+    membership_subsidy_capped: capped,
+    membership_rule_id: (proEligible || primeEligible) && rule ? rule.rule_id : null,
     waiver_source: waiverSource,
-    waiver_basis_iqd: proEligible ? input.merchandiseIqd : primeEligible ? primeBasis : input.merchandiseIqd,
+    waiver_basis_iqd: rule && ruleTier !== null && (proEligible || primeEligible)
+      ? rule.basis_iqd
+      : proEligible
+        ? input.merchandiseIqd
+        : primeEligible
+          ? primeBasis
+          : input.merchandiseIqd,
     needs_config: needs,
     assumptions,
     reasons,

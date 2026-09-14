@@ -599,11 +599,32 @@ export interface LadderRungs {
  *     swallowed by a reduction — charges PRO members the PRIME price.
  * Nothing here invents a discount: with no member price on the line at all,
  * both stay null and the regular price applies.
+ *
+ * `derived` SAYS WHICH SIDE CAME FROM A BENEFIT RULE RATHER THAN A TYPED
+ * NUMBER, and it decides which way an inversion is resolved.
+ *
+ * When both numbers were typed by the same person, an inversion is a data
+ * fault and PRIME is clamped UP to PRO, as it always was. But once one side
+ * can be GENERATED — a store-wide "PRO 5% off" rule against a product whose
+ * PREMIUM price the owner typed as 800 — clamping up would charge that PREMIUM
+ * member 950: a rule nobody wrote for this product silently overwriting a
+ * price somebody did. So when exactly one side is rule-derived, the
+ * rule-derived side moves and the typed one is left exactly as typed.
  */
-export function clampMemberLadder(regular: number, prime: number | null, pro: number | null): { prime: number | null; pro: number | null } {
+export function clampMemberLadder(
+  regular: number,
+  prime: number | null,
+  pro: number | null,
+  derived?: { prime?: boolean; pro?: boolean }
+): { prime: number | null; pro: number | null } {
   let proOut = pro === null ? null : Math.min(pro, regular);
   let primeOut = prime === null ? null : Math.min(prime, regular);
-  if (primeOut !== null && proOut !== null) primeOut = Math.max(primeOut, proOut);
+  if (primeOut !== null && proOut !== null && proOut > primeOut) {
+    const proDerived = derived?.pro === true;
+    const primeDerived = derived?.prime === true;
+    if (proDerived && !primeDerived) proOut = primeOut; // a rule never raises a typed PREMIUM
+    else primeOut = proOut; // both typed, both derived, or only PREMIUM derived
+  }
   if (proOut === null && primeOut !== null) proOut = primeOut;
   return { prime: primeOut, pro: proOut };
 }
@@ -898,7 +919,11 @@ export function resolveUnitPrice(input: {
   // PRO member never pays more than a PRIME member (clampMemberLadder). The
   // Quick Edit grid applies the same function to its cells, which is what
   // keeps the admin's numbers and the cart's identical.
-  ({ prime: primeIqd, pro: proIqd } = clampMemberLadder(regularIqd, primeIqd, proIqd));
+  const beforeClamp = { prime: primeIqd, pro: proIqd };
+  ({ prime: primeIqd, pro: proIqd } = clampMemberLadder(regularIqd, primeIqd, proIqd, {
+    prime: primeResolved.rule_id !== null,
+    pro: proResolved.rule_id !== null,
+  }));
 
   // §5 precedence: active PRO first, then active PRIME, then regular.
   const isPro = input.tier === 'pro' && input.tierActive;
@@ -1095,7 +1120,16 @@ export function resolveUnitPrice(input: {
     prime_iqd: primeIqd,
     applied_iqd: appliedIqd,
     applied_tier: appliedTier,
-    member_rule: { pro: proResolved.rule_id, prime: primeResolved.rule_id },
+    /**
+     * The rule is named only where it is still the reason for the number. A
+     * clamp that moved a rule-derived price to the other tier's typed one
+     * means the typed price is now the reason, and a receipt that still
+     * credited the rule would be pointing at arithmetic that was overruled.
+     */
+    member_rule: {
+      pro: proResolved.rule_id !== null && proIqd === beforeClamp.pro ? proResolved.rule_id : null,
+      prime: primeResolved.rule_id !== null && primeIqd === beforeClamp.prime ? primeResolved.rule_id : null,
+    },
     cost_iqd: cost.value ?? null,
     price_source: regular.source,
     fulfillment: {

@@ -143,9 +143,16 @@ export function selectRule(rules: readonly BenefitRule[], ctx: SelectContext): B
       rule.benefit_type === ctx.benefitType &&
       withinWindow(rule, ctx.nowIso) &&
       scopeMatches(rule, ctx.target ?? {}) &&
+      /**
+       * A minimum-order rule FAILS CLOSED when the caller does not know the
+       * order value. Passing it instead would put a discount on a product card
+       * that the checkout then refuses to honour, and "the price changed when
+       * I got to the cart" is the exact complaint this whole system exists to
+       * prevent. Surfaces that want to advertise such a rule say "from X",
+       * which is a different sentence from a price.
+       */
       (rule.min_subtotal_iqd === null ||
-        ctx.subtotalIqd === undefined ||
-        ctx.subtotalIqd >= rule.min_subtotal_iqd)
+        (ctx.subtotalIqd !== undefined && ctx.subtotalIqd >= rule.min_subtotal_iqd))
   );
   if (candidates.length === 0) return null;
   return candidates.sort((a, b) => {
@@ -197,6 +204,30 @@ export function unitDiscountIqd(regularUnitIqd: number, rule: BenefitRule | null
   return Math.max(0, Math.min(raw, regular));
 }
 
+/**
+ * WHETHER A RULE'S WHOLE EFFECT FITS IN A UNIT PRICE.
+ *
+ * This is the line that decides WHERE a rule is applied, and it exists so that
+ * every rule is applied exactly once. A percentage with a per-unit ceiling is
+ * a property of one unit, so `resolveUnitPrice` bakes it into the price and
+ * the product page, the cart and the checkout all quote the same number
+ * without any of them knowing about benefit rules.
+ *
+ * A quantity limit, a per-ORDER ceiling and a minimum order value are
+ * properties of the ORDER. None can be written as a unit price — "the first
+ * two printers" is not a price — so a rule carrying one is deliberately kept
+ * OUT of the unit price and applied once, at the line, where the quantity and
+ * the order total are known. Letting such a rule into the unit price is how a
+ * cart ends up discounting the third printer it promised not to.
+ */
+export function isUnitExpressible(rule: BenefitRule | null): boolean {
+  if (!rule || rule.benefit_type !== 'product_discount') return false;
+  if (rule.max_quantity !== null) return false;
+  if (rule.min_subtotal_iqd !== null) return false;
+  if (rule.cap_scope === 'per_order' && rule.max_discount_iqd !== null) return false;
+  return true;
+}
+
 export interface LineBenefit {
   rule_id: string | null;
   scope: BenefitScope | null;
@@ -209,6 +240,16 @@ export interface LineBenefit {
   total_iqd: number;
   /** Which ceiling actually bit, for the UI and the snapshot. */
   capped_by: 'none' | 'per_unit' | 'per_order' | 'quantity';
+  /**
+   * WHERE THE MONEY ALREADY IS.
+   *
+   * 'unit' — `resolveUnitPrice` has already taken `total_iqd` off this line's
+   * unit price, so the caller must NOT subtract it again; it is reported only
+   * so the cart can say what the membership was worth.
+   * 'line' — the unit price is the regular one and the caller subtracts
+   * `total_iqd` from the line once. See `isUnitExpressible`.
+   */
+  applied_at: 'unit' | 'line';
 }
 
 export const NO_LINE_BENEFIT: LineBenefit = {
@@ -219,6 +260,7 @@ export const NO_LINE_BENEFIT: LineBenefit = {
   eligible_qty: 0,
   total_iqd: 0,
   capped_by: 'none',
+  applied_at: 'unit',
 };
 
 /**
@@ -238,14 +280,15 @@ export function lineBenefit(input: {
   const { rule } = input;
   const qty = Math.max(0, Math.trunc(input.qty));
   if (!rule || qty === 0) return NO_LINE_BENEFIT;
+  const appliedAt: LineBenefit['applied_at'] = isUnitExpressible(rule) ? 'unit' : 'line';
 
   const perUnit = unitDiscountIqd(input.regularUnitIqd, rule);
-  if (perUnit <= 0) return { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope };
+  if (perUnit <= 0) return { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, applied_at: appliedAt };
 
   const limit = rule.max_quantity === null ? qty : Math.max(0, Math.trunc(rule.max_quantity));
   const eligible = Math.min(qty, limit);
   if (eligible === 0) {
-    return { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, capped_by: 'quantity' };
+    return { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, capped_by: 'quantity', applied_at: appliedAt };
   }
 
   let total = perUnit * eligible;
@@ -273,6 +316,7 @@ export function lineBenefit(input: {
     eligible_qty: eligible,
     total_iqd: Math.max(0, total),
     capped_by: cappedBy,
+    applied_at: appliedAt,
   };
 }
 
@@ -303,10 +347,13 @@ export const NO_SHIPPING_BENEFIT: ShippingBenefit = {
 /**
  * WHETHER DELIVERY IS FREE, and on which methods.
  *
- * The threshold is compared with `>=`: an owner who writes 75,000 means
- * "seventy-five thousand qualifies". (The store's older PRO waiver used a
- * strictly-greater test; the rule's own comparison is stated here so the two
- * can never be read off each other by accident — see `docs/MEMBERSHIP_BENEFITS.md`.)
+ * THE THRESHOLD IS STRICTLY GREATER: 75,000 does NOT qualify, 75,001 does.
+ * That is the owner's CONFIRMED rule and the comparison `quoteShipping` has
+ * always used (`packages/shipping/src/shipping.ts`), so the rules table
+ * changes WHAT the number is and never what comparing against it means. Two
+ * engines with two operators would make the same order free on one screen and
+ * not on the next, which is precisely the class of bug a single configured
+ * threshold exists to remove. Written down in `docs/MEMBERSHIP_BENEFITS.md`.
  *
  * `methods: null` means the rule covers every method. An empty array means it
  * covers none, which is how a rule is switched off for a method without
@@ -334,7 +381,7 @@ export function shippingBenefit(input: {
     return { ...base, reason: 'method_not_covered' };
   }
   const threshold = rule.free_shipping_threshold_iqd;
-  if (threshold !== null && input.basisIqd < threshold) return base;
+  if (threshold !== null && input.basisIqd <= threshold) return base;
   return { ...base, eligible: true, reason: 'applied' };
 }
 
