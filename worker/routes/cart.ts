@@ -783,6 +783,10 @@ async function loadCart(c: Context<AppContext>) {
       ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id ?? null, doc.sub_category_id ?? null),
       regular_unit_iqd: resolved.regular_iqd,
       applied_unit_iqd: resolved.applied_iqd,
+      // Which rule the resolver actually credited — a typed member price or a
+      // live offer beats one, and a rule that did not set this price must not
+      // be reported as having saved anything.
+      applied_rule_id: tier === 'pro' ? resolved.member_rule.pro : resolved.member_rule.prime,
       qty: Number(row.qty) || 0,
     });
     // Would cash on delivery change THIS line's price? Only when the product

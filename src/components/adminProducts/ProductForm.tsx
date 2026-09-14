@@ -92,6 +92,7 @@ import { OptionsSection } from './form/OptionsSection';
 import { UsageGuideSection } from './form/UsageGuideSection';
 import { WarrantySection } from './form/WarrantySection';
 import PricePreview from './PricePreview';
+import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { ImagesSection } from './form/ImagesSection';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 
@@ -1118,6 +1119,25 @@ export default function ProductForm({
             onDismiss={() => setPinnedDismissed(true)}
           />
         )}
+
+        {/* §18 — THE MEMBERSHIP DISCOUNT RULE FOR THIS ONE PRODUCT.
+            It belongs beside the typed member prices because the two answer the
+            same question and the typed one WINS: a `pro_price_iqd` entered
+            above is the owner's price for this exact product and beats any
+            rule (docs/MEMBERSHIP_BENEFITS.md §2). Reading them together is the
+            only way to see that, and the panel says so out loud.
+
+            It saves through the admin benefits door, NOT with this form: every
+            write to a benefit rule appends a version and an audit row in one
+            batch, and the product save has no business doing that. */}
+        <MembershipDiscountSection
+          // `doc.id`, not the `productId` prop: after the FIRST save the prop
+          // is still null (the parent list has not re-mounted the editor) while
+          // the document already carries the id the server assigned — the same
+          // reason PricePreview reads it from the document below.
+          productId={doc.id || null}
+          typedMemberPrice={{ prime: doc.prime_price_iqd, pro: doc.pro_price_iqd }}
+        />
       </SectionCard>
 
       {/* 4 ─────────────────────────────────────── sale types, availability */}

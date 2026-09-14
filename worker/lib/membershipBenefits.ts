@@ -16,6 +16,7 @@
 import type { Env } from './types';
 import { safeParse } from './types';
 import {
+  NO_LINE_BENEFIT,
   NO_SHIPPING_BENEFIT,
   NO_TAX_BENEFIT,
   isUnitExpressible,
@@ -247,6 +248,26 @@ export interface BenefitLineInput {
   /** What the buyer is actually charged per unit, after the ladder. */
   applied_unit_iqd: number;
   qty: number;
+  /**
+   * THE RULE `resolveUnitPrice` ACTUALLY CREDITED for this line's member
+   * price — `ResolvedPrice.member_rule` for the buyer's own tier — or null
+   * when the price came from a typed number, from an offer, or from nothing.
+   *
+   * Without this the resolver reports a saving the customer never received.
+   * A product can carry BOTH a typed `pro_price_iqd` and a matching rule, and
+   * the typed price wins outright (`memberPrice` in packages/pricing): the
+   * rule is never applied. Recomputing the rule's arithmetic here anyway
+   * credited it with the whole discount while the unit price had moved by
+   * whatever the owner typed — on a 1,000,000 product with a typed PRO price
+   * of 950,000 and a store-wide 10% rule, the cart said the membership saved
+   * 100,000 beside a gap of 50,000, and the order snapshot froze the wrong
+   * number onto the row.
+   *
+   * Optional so a caller that genuinely has no resolver output (the pure
+   * tests) can omit it; when it is omitted the actual movement is used
+   * instead, which is the same answer wherever there is one to check.
+   */
+  applied_rule_id?: string | null;
 }
 
 export interface ResolvedBenefits {
@@ -304,9 +325,54 @@ export function resolveProductBenefits(input: {
       nowIso,
       merchandise
     );
+    const computed = lineBenefit({ regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule });
+
+    /**
+     * A LINE IS ONLY CREDITED WITH WHAT ITS PRICE ACTUALLY MOVED.
+     *
+     * For a rule that lives in the unit price, `resolveUnitPrice` has already
+     * decided the answer, and it may not be this rule's answer: a typed member
+     * price on any rung beats it outright, an offer window can replace the
+     * regular price under it, and `clampMemberLadder` can lower it further
+     * still. So the arithmetic below is a CHECK, not the source — the figure
+     * reported is the gap between what this line costs and what it would have
+     * cost, which is the only number that can be true by construction.
+     *
+     * A rule applied at the LINE is untouched: its whole point is that it is
+     * NOT in the unit price, so there is no movement to measure and the
+     * caller's subtraction is the thing being described.
+     */
+    if (computed.applied_at === 'line') return { product_id: line.product_id, ...computed };
+
+    const moved = Math.max(0, Math.trunc(line.regular_unit_iqd) - Math.trunc(line.applied_unit_iqd));
+    if (moved <= 0) return { product_id: line.product_id, ...NO_LINE_BENEFIT, applied_at: computed.applied_at };
+
+    // The SAVING is the movement — whatever produced it. The customer saved
+    // what they saved, and a figure that disagreed with the two prices beside
+    // it on the screen would be wrong however it was arrived at.
+    //
+    // The RULE ID is a separate question, and it is the one the old code got
+    // wrong: a rule is named only when the resolver says that rule is why this
+    // price is what it is. A typed member price, an offer window, or a clamp
+    // to the other tier's number all produce a real saving that this rule did
+    // not cause, and crediting it would put the wrong id on the order row and
+    // the wrong explanation on the receipt.
+    const credited = line.applied_rule_id === undefined
+      ? computed.rule_id
+      : line.applied_rule_id !== null && line.applied_rule_id === computed.rule_id
+        ? computed.rule_id
+        : null;
+    const qty = Math.max(0, Math.trunc(line.qty));
     return {
       product_id: line.product_id,
-      ...lineBenefit({ regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule }),
+      ...computed,
+      rule_id: credited,
+      scope: credited ? computed.scope : null,
+      discount_mode: credited ? computed.discount_mode : null,
+      capped_by: credited ? computed.capped_by : 'none',
+      per_unit_iqd: moved,
+      eligible_qty: qty,
+      total_iqd: moved * qty,
     };
   });
   return {

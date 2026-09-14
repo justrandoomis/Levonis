@@ -746,3 +746,65 @@ test('the recommended starting values are a starting point, not a decision', asy
   const after = raw.prepare('SELECT percent FROM membership_benefit_rules WHERE id = ?').get(printers.id) as { percent: number };
   assert.equal(after.percent, 3, 'the action never overwrites a decision');
 });
+
+/* --------------------------------- the rule is credited only where it paid */
+
+/**
+ * A TYPED MEMBER PRICE BEATS A RULE — AND THE RULE MUST NOT TAKE THE CREDIT.
+ *
+ * `resolveUnitPrice` applies an explicit `pro_price_iqd` and ignores the rule
+ * entirely, which is the documented precedence. The resolver used to recompute
+ * the rule's arithmetic anyway, so a product with a typed PRO price of 950,000
+ * and a store-wide 10% rule reported a 100,000 saving beside a 50,000 gap: the
+ * cart said one thing, the subtotal said another, and the order snapshot froze
+ * the wrong one.
+ */
+test('a typed member price is the saving, and a rule that did not set it is credited with nothing', async () => {
+  const { raw, db } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  await send(admin, 'POST', '/api/admin/membership-benefits', {
+    tier: 'pro', benefit_type: 'product_discount', scope: 'global', discount_mode: 'percent', percent: 10,
+  });
+  // 1,850,000 with a typed PRO price of 1,800,000. The rule would have given
+  // 185,000; the owner's own number gives 50,000, and the owner's wins.
+  raw.exec("UPDATE products SET pro_price_iqd = 1800000 WHERE id = 'p_a1';");
+
+  cartLine(raw, 'ci_typed', 'promem', 'p_a1', 1);
+  const cart = await json(await send(appAs(db, 'promem', 'customer'), 'GET', '/api/cart'));
+  assert.equal(cart.items[0].unit_price_iqd, 1_800_000, 'the typed price is what is charged');
+  assert.equal(cart.membership.discount_total_iqd, 50_000, 'and 50,000 is what the customer actually saved');
+  assert.equal(cart.membership.lines[0].rule_id, null, 'no rule set this price, so none is credited');
+
+  const quote = await json(await send(appAs(db, 'promem', 'customer'), 'POST', '/api/orders/quote', checkoutBody('a_pro')));
+  assert.equal(quote.quote.membership_benefits.discount_total_iqd, 50_000);
+  // The whole point: the reported saving and the gap on screen are the same
+  // number, whichever of the two set the price.
+  assert.equal(
+    quote.quote.membership_benefits.discount_total_iqd,
+    1_850_000 - quote.quote.lines[0].unit_price_iqd,
+    'the reported saving IS the gap'
+  );
+});
+
+test('a scheduled offer is not credited to the membership either', async () => {
+  const { raw, db } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  await send(admin, 'POST', '/api/admin/membership-benefits', {
+    tier: 'pro', benefit_type: 'product_discount', scope: 'global', discount_mode: 'percent', percent: 10,
+  });
+  // A live window at a flat price. The member ladder is re-clamped against it
+  // (`resolveOfferPrice`), so the PRO member pays the offer price and the
+  // membership added nothing on top of it.
+  raw.exec(`
+    INSERT INTO offer_windows (id, subject_type, subject_id, active, starts_at, ends_at, offer_price_mode, offer_price_iqd, required_tiers)
+      VALUES ('ow1','product','p_a1',1,'2020-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z','fixed',1000000,'[]');
+  `);
+  cartLine(raw, 'ci_offer', 'promem', 'p_a1', 1);
+  const cart = await json(await send(appAs(db, 'promem', 'customer'), 'GET', '/api/cart'));
+  assert.equal(cart.items[0].unit_price_iqd, 1_000_000, 'the offer price');
+  assert.equal(
+    cart.membership.discount_total_iqd,
+    0,
+    'the offer is the offer’s saving; the membership took nothing further off'
+  );
+});

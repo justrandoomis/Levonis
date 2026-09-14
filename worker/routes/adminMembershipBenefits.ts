@@ -463,6 +463,7 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
         ancestry: target.ancestry,
         regular_unit_iqd: resolved.regular_iqd,
         applied_unit_iqd: resolved.applied_iqd,
+        applied_rule_id: tier === 'pro' ? resolved.member_rule.pro : resolved.member_rule.prime,
         qty: item.qty,
       },
     };

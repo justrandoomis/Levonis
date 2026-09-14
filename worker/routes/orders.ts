@@ -1160,7 +1160,14 @@ interface ComputedLine {
    * the same pricing context), so a second rule on the parent would be the
    * double discount §17 forbids.
    */
-  benefit?: { category_id: string | null; sub_category_id: string | null; regular_unit_iqd: number };
+  benefit?: {
+    category_id: string | null;
+    sub_category_id: string | null;
+    regular_unit_iqd: number;
+    /** The rule the RESOLVER credited for this line's member price, or null
+     *  when a typed price, an offer or nothing set it. See `BenefitLineInput`. */
+    applied_rule_id: string | null;
+  };
   /** What the membership actually took off this line, frozen onto the order. */
   membership_discount_iqd?: number;
   membership_rule_id?: string | null;
@@ -1784,6 +1791,7 @@ async function computeCheckout(
           category_id: (row.category_id as string | null) ?? null,
           sub_category_id: (row.sub_category_id as string | null) ?? null,
           regular_unit_iqd: resolved.regular_iqd,
+          applied_rule_id: tierStatus.tier === 'pro' ? resolved.member_rule.pro : resolved.member_rule.prime,
         },
       });
     }
@@ -1907,6 +1915,7 @@ async function computeCheckout(
             ancestry: ancestryFor(benefitAncestry, l.benefit.category_id, l.benefit.sub_category_id),
             regular_unit_iqd: l.benefit.regular_unit_iqd,
             applied_unit_iqd: l.applied_iqd,
+            applied_rule_id: l.benefit.applied_rule_id,
             qty: l.qty,
           }]
         : []
