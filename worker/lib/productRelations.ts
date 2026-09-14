@@ -24,6 +24,8 @@
  */
 
 import { derivedRung, type LadderRungs, type PriceFields } from './pricing';
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
+import { attachModelAvailability } from './modelAvailability';
 
 export interface OptionGroupRow {
   id: string;
@@ -33,7 +35,7 @@ export interface OptionGroupRow {
   active: number | boolean;
 }
 
-export interface OptionValueRow {
+export interface OptionValueRow extends ModelAvailability {
   id: string;
   product_id: string;
   group_id: string;
@@ -277,7 +279,7 @@ export async function loadProductRelations(
   ]);
   return {
     groups: groups.results,
-    values: values.results,
+    values: await attachModelAvailability(db, values.results),
     colors: colors.results,
     links: links.results,
   };

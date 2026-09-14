@@ -102,7 +102,7 @@ test('through the overlay, the export carries options, colours and images', () =
 test('every option carries its own cost, which is what «التكلفة» meant', () => {
   const doc = applyRelations(baseDoc(), relationalView());
   const entries = docToEntries(doc, { includeCost: true });
-  const costs = entries.filter((e) => /^options\.\d+\.cost_iqd$/.test(e.key));
+  const costs = entries.filter((e) => /^options\.\d+\.(?:direct|preorder)\.cost_iqd$/.test(e.key));
   assert.equal(costs.length, 2);
   assert.deepEqual(costs.map((e) => e.value).sort(), ['700000', '950000']);
   assert.equal(entries.find((e) => e.key === 'product_cost_iqd')?.value, '300000');
@@ -112,11 +112,12 @@ test('the 0043 fields survive, so a re-import cannot reset the variant', () => {
   const doc = applyRelations(baseDoc(), relationalView());
   const entries = docToEntries(doc, { includeCost: true });
   const at = (k: string) => entries.find((e) => e.key === k)?.value;
-  assert.equal(at('options.1.availability_type'), 'direct_sale');
-  assert.equal(at('options.2.availability_type'), 'pre_order');
-  assert.equal(at('options.2.lead_time_text'), '25-40 يوم');
+  assert.equal(at('options.1.availability_type'), undefined);
+  assert.equal(at('options.1.direct.enabled'), 'true');
+  assert.equal(at('options.1.preorder.enabled'), 'true');
+  assert.equal(at('options.1.preorder.lead_time_text'), '25-40 يوم');
   assert.equal(at('options.1.variant_key'), 'a1');
-  assert.equal(at('options.2.variant_label'), 'A1');
+  assert.equal(at('options.1.variant_label'), 'A1');
 });
 
 test('a relational image no longer crashes the whole export', () => {

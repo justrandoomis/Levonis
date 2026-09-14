@@ -57,18 +57,17 @@ test('the cap is 1 MB unless a class raises it, and multipart gets its envelope 
   assert.equal(maxBodyBytes('/api/kyc/upload', 'POST'), 8 * MB + FORM_OVERHEAD_BYTES);
   assert.equal(maxBodyBytes('/api/admin/template/parse-zip', 'POST'), 15 * MB + FORM_OVERHEAD_BYTES);
   assert.equal(maxBodyBytes('/api/admin/import/preview', 'POST'), 40 * MB + FORM_OVERHEAD_BYTES);
-  assert.equal(maxBodyBytes('/api/admin/template/apply', 'POST'), 6 * MB, 'a JSON class gets no multipart allowance');
+  assert.equal(maxBodyBytes('/api/admin/template/apply', 'POST'), 48 * MB, 'a JSON class gets no multipart allowance');
   assert.equal(maxBodyBytes('/api/uploads', 'GET'), DEFAULT_MAX_BODY_BYTES, 'a class is scoped to its methods');
   assert.equal(maxBodyBytes('/api/kyc/submit', 'POST'), DEFAULT_MAX_BODY_BYTES, 'a sibling path is not the upload route');
 });
 
 test('the admin JSON allowance covers the template body the core actually accepts', () => {
-  const chars = constantValue('worker/routes/template.ts', 'MAX_TEMPLATE_CHARS');
-  assert.ok(chars && chars > 1_000_000);
-  assert.ok(maxBodyBytes('/api/admin/template/apply', 'POST') >= chars * 4, 'a 1 MB flat cap would have refused a real admin save at the edge');
+  const bytes = constantValue('worker/lib/templateMedia.ts', 'MAX_TEMPLATE_BODY_BYTES');
+  assert.equal(maxBodyBytes('/api/admin/template/apply', 'POST'), bytes, 'the portable TXT envelope must reach the parser');
   assert.ok(JSON_CLASSES.some((r) => r.prefix === '/api/admin'), 'admin mutations are authenticated, apex-only and admin-write limited');
 });
 
 test('no class is wider than the largest thing the platform accepts', () => {
-  for (const row of BODY_CLASSES) assert.ok(row.maxBytes <= 40 * MB, `${row.prefix}: ${row.maxBytes}`);
+  for (const row of BODY_CLASSES) assert.ok(row.maxBytes <= 48 * MB, `${row.prefix}: ${row.maxBytes}`);
 });

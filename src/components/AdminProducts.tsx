@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
-import type { ListingItem, ListingResponse, DeleteResponse } from './adminProducts/types';
+import type { ListingItem, ListingResponse } from './adminProducts/types';
 import { Modal, ErrorBanner, fmtDate } from './adminProducts/ui';
 import { Spark } from './ui/statCards';
 import { downloadAdminFile, DownloadError } from './adminProducts/download';
@@ -93,7 +93,7 @@ const STRINGS = {
     untracked: 'غير محدود',
     updated: 'آخر تحديث',
     edit: 'تعديل',
-    del: 'حذف / أرشفة',
+    del: 'حذف نهائي',
     quickPrice: 'تعديل سريع للسعر',
     quickPriceTitle: 'تعديل سريع للأسعار',
     featured: 'مميز',
@@ -383,20 +383,17 @@ export default function AdminProducts() {
   const handleDelete = async (p: ListingItem) => {
     const name = p.name_ar || p.name_en || p.id;
     const msg = dir === 'rtl'
-      ? `حذف/أرشفة المنتج «${name}»؟ المنتجات المرتبطة بطلبات سابقة تُخفى بدل الحذف.`
-      : `Delete/archive "${name}"? Products referenced by past orders are hidden, not deleted.`;
+      ? `سيتم حذف المنتج «${name}» وبياناته وصوره الداخلية نهائيًا. الطلبات السابقة لن تُحذف.`
+      : `Permanently delete "${name}", its owned data and internal images? Historical orders will be preserved.`;
     if (!window.confirm(msg)) return;
+    if (window.prompt(dir === 'rtl' ? 'للتأكيد الإضافي اكتب DELETE' : 'Type DELETE to confirm permanent deletion') !== 'DELETE') return;
     setDeletingId(p.id);
     setNotice(null);
     try {
-      const res = await api.delete<DeleteResponse>(`/api/admin/products-v2/${p.id}`);
-      setNotice(
-        res.deleted
-          ? (dir === 'rtl' ? `حُذف «${name}» نهائياً.` : `"${name}" was permanently deleted.`)
-          : (dir === 'rtl'
-              ? `أُخفي «${name}» بدل حذفه — ${res.reason ?? 'مرتبط بطلبات سابقة.'}`
-              : `"${name}" was hidden instead of deleted — ${res.reason ?? 'referenced by past orders.'}`)
-      );
+      const res = await api.delete<{ product_deleted: boolean; already_deleted: boolean; r2_cleanup_pending: number }>(`/api/admin/products-v2/${p.id}?permanent=true`);
+      setItems((list) => list.filter((item) => item.id !== p.id));
+      setNotice((dir === 'rtl' ? `حُذف «${name}» نهائياً.` : `"${name}" was permanently deleted.`) +
+        (res.r2_cleanup_pending ? (dir === 'rtl' ? ` تنظيف ${res.r2_cleanup_pending} ملفات قيد إعادة المحاولة.` : ` ${res.r2_cleanup_pending} files queued for cleanup retry.`) : ''));
       reloadAll();
     } catch (e) {
       setNotice(t.deleteFailed + (e instanceof ApiError ? e.message : 'unknown error'));

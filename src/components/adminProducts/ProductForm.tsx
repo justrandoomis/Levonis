@@ -1,3 +1,4 @@
+import type { ProPricingPolicy } from '../../../worker/lib/pricing';
 /**
  * The rebuilt admin product form — mandate §1–§8.
  *
@@ -137,6 +138,8 @@ export default function ProductForm({
   onListChanged: () => void;
 }) {
   const { dir, lang } = useLanguage();
+  const [pricingContext, setPricingContext] = useState<{proPolicy:ProPricingPolicy;transportDefaults:Array<{method:string;commission_iqd:number}>} | null>(null);
+  useEffect(() => { let live=true; api.get<{proPolicy:ProPricingPolicy;transportDefaults:Array<{method:string;commission_iqd:number}>}>('/api/admin/products-v2/pricing-context').then((v)=>{if(live)setPricingContext(v);}).catch(()=>{}); return()=>{live=false;}; }, []);
   const { user } = useAuth();
   // §11: cost is only rendered for a financial admin. The SERVER refuses to
   // read or write it either way — this only avoids showing an input that
@@ -483,8 +486,9 @@ export default function ProductForm({
     for (const g of rel.groups) {
       for (const v of g.values) {
         if (v.active === false) continue;
-        if (v.availability_type === 'direct_sale' || v.availability_type === 'pre_order') {
-          declared.add(v.availability_type);
+        if (v.direct !== undefined || v.preorder !== undefined) {
+          if (v.direct?.enabled) declared.add('direct_sale');
+          if (v.preorder?.enabled) declared.add('pre_order');
         }
       }
     }
@@ -1144,24 +1148,24 @@ export default function ProductForm({
               checked={doc.sale_types.includes(t.id)}
               onChange={(on) => setSale(t.id, on)}
               title={t.ar}
-              sub={saleTypesAreDerived ? 'من الخيارات' : t.sub}
+              sub={saleTypesAreDerived ? 'من توفر الموديلات' : t.sub}
               disabled={saleTypesAreDerived}
             />
           ))}
         </div>
         {saleTypesAreDerived ? (
           <p className="text-[11px] text-zinc-400 mb-3" data-form="sale-types-derived">
-            نوع البيع مأخوذ من خياراتك تلقائيًا:{' '}
+            نوع البيع مشتق من إعدادات توفر الموديلات:{' '}
             <b className="text-zinc-200">
               {derivedSaleTypes.map((t) => SALE_TYPES.find((s) => s.id === t)?.ar ?? t).join(' + ')}
             </b>
-            {derivedSaleTypes.length > 1 ? ' (مختلط)' : ''} — لتغييره، غيّر «نوع التوفر» داخل الخيارات
+            {derivedSaleTypes.length > 1 ? ' (مختلط)' : ''} — لتغييره، عدّل البيع المباشر والطلب المسبق داخل الموديل
             في قسم ٥. لا حاجة لاختيار «مختلط» يدويًا.
           </p>
         ) : (
           <p className="text-[11px] text-zinc-500 mb-3">
             يمكن تفعيل النوعين معًا. الافتراضي للعميل: بيع مباشر عند توفر المخزون، وإلا الطلب المسبق.
-            وإذا حدّدت «نوع التوفر» داخل الخيارات، فسيُشتق النوع منها تلقائيًا.
+            تستطيع تخصيص البيع المباشر والطلب المسبق لكل موديل بصورة مستقلة.
           </p>
         )}
 
@@ -1413,6 +1417,7 @@ export default function ProductForm({
         {...section(5)}
       >
         <OptionsSection
+          fulfillmentDefaults={{ ...pricingContext, pricing_ready: !!pricingContext, sale_types: doc.sale_types, preorder_transports: doc.preorder_transports, direct_surcharge_iqd: doc.direct_surcharge_iqd }}
           rel={rel}
           setRel={setRel}
           // LIVE, not the loaded document: an admin who raises the base price in

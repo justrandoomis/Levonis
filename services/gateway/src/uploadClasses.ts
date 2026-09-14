@@ -56,8 +56,9 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
 ];
 
 export const JSON_CLASSES: readonly BodyClass[] = [
-  // 1,500,000 chars × up to 4 bytes/char, rounded up: the template text itself.
-  { prefix: '/api/admin/template', methods: ['POST'], kind: 'json', maxBytes: 6 * MB, source: 'worker/routes/template.ts#MAX_TEMPLATE_CHARS' },
+  // Portable TXT: at most 32 MiB ASCII media plus bounded multilingual
+  // metadata and JSON framing. The parser independently caps metadata.
+  { prefix: '/api/admin/template', methods: ['POST'], kind: 'json', maxBytes: 48 * MB, source: 'worker/lib/templateMedia.ts#MAX_TEMPLATE_BODY_BYTES' },
   // Every other admin mutation: apex-only, admin-authenticated, admin-write
   // limited. A product save with every option, colour, variant and translation
   // is the biggest of them and stays far below this.

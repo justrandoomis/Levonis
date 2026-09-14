@@ -17,7 +17,7 @@ import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
-import { parseProductRow, primaryMedia, type ProductDoc } from '../lib/productModel';
+import { parseProductRow, primaryMedia, stripCostFields, type ProductDoc } from '../lib/productModel';
 import {
   applyRelations,
   EMPTY_RELATIONS,
@@ -186,6 +186,7 @@ export async function loadPricingContext(db: D1Database): Promise<PricingContext
 }
 
 export interface CartSelection {
+  fulfillmentType?: 'direct_sale' | 'pre_order';
   optionId: string;
   colorId: string;
   transportMethod: string;
@@ -246,6 +247,7 @@ export function resolveCartLine(
     optionId: valueIds[0] || null,
     colorId: sel.colorId || null,
     transportMethod: sel.transportMethod || null,
+    fulfillmentType: sel.fulfillmentType,
     warrantyPlanId: sel.warrantyPlanId || null,
     tier,
     tierActive,
@@ -299,6 +301,7 @@ export function resolveCartLine(
 /** Public per-line breakdown — cost fields NEVER cross this boundary. */
 export function publicBreakdown(r: ResolvedPrice) {
   return {
+    selection_snapshot: r.selection_snapshot,
     applied_iqd: r.applied_iqd,
     applied_tier: r.applied_tier,
     // Compare-at is gone (mandate §4): no strikethrough price is derived from
@@ -320,11 +323,7 @@ export function publicBreakdown(r: ResolvedPrice) {
   };
 }
 
-const stripCost = <T extends { cost_iqd: number | null }>(x: T) => {
-  const { cost_iqd, ...rest } = x;
-  void cost_iqd;
-  return rest;
-};
+const stripCost = stripCostFields;
 
 /** §8.2 row 18 at option-value and colour level: a pool member's per-level
  *  counters are not published, in the cart any more than in the catalogue. */
@@ -361,6 +360,7 @@ export function selectionFromCartRow(row: Record<string, unknown>): CartSelectio
   const legacy = String(row.option_id ?? '');
   return {
     optionId: legacy,
+    fulfillmentType: row.fulfillment_type === 'pre_order' ? 'pre_order' : row.fulfillment_type === 'direct_sale' ? 'direct_sale' : undefined,
     optionValueIds: ids.length ? ids : legacy ? [legacy] : [],
     colorId: String(row.color_id ?? ''),
     transportMethod,
@@ -511,7 +511,7 @@ async function loadCart(c: Context<AppContext>) {
   ]);
   const { results } = await c.env.DB.prepare(
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-            ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, p.*
+            ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.local_delivery_method, ci.selection_snapshot, ci.warranty_plan_id, p.*
        FROM cart_items ci JOIN products p ON p.id = ci.product_id
       WHERE ci.user_id = ? ORDER BY ci.created_at DESC`
   )
@@ -659,6 +659,7 @@ async function loadCart(c: Context<AppContext>) {
       name: row.name,
       name_ar: row.name_ar,
       image: productImageForSelection(doc, {
+          fulfillmentType: sel.fulfillmentType,
         optionValueIds: sel.optionValueIds ?? [],
         colorId: sel.colorId || null,
       }, view),
@@ -1062,6 +1063,7 @@ cartRoutes.post('/items', async (c) => {
   ].slice(0, 12);
   const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
   const transportMethod = parseTransportMethod(body.transportMethod);
+  const fulfillmentType = oneOf(body.fulfillmentType ?? (transportMethod ? 'pre_order' : 'direct_sale'), 'fulfillmentType', ['direct_sale', 'pre_order'] as const);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
 
   const product = await c.env.DB.prepare("SELECT * FROM products WHERE id = ? AND status = 'active'")
@@ -1104,7 +1106,7 @@ cartRoutes.post('/items', async (c) => {
   }
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
     tier,
     tierActive,
     ctx,
@@ -1148,7 +1150,7 @@ cartRoutes.post('/items', async (c) => {
         })
       : undefined,
     links: view?.links,
-    preferredType: transportMethod ? 'pre_order' : null,
+    preferredType: fulfillmentType,
   });
   // A product with options or colours is sold as ONE of them. The relational
   // path enforces that in validateSelection; a legacy JSON-column product
@@ -1211,11 +1213,13 @@ cartRoutes.post('/items', async (c) => {
 
   await c.env.DB.prepare(
     `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
-                             shipping_method_id, transport_method, warranty_plan_id, qty)
-     VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
+                             shipping_method_id, transport_method, warranty_plan_id, qty, fulfillment_type, selection_snapshot)
+     VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)
      ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
        WHERE product_id IS NOT NULL
      DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+                   fulfillment_type = excluded.fulfillment_type,
+                   selection_snapshot = excluded.selection_snapshot,
                    option_value_ids = excluded.option_value_ids,
                    transport_method = excluded.transport_method,
                    warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
@@ -1224,7 +1228,8 @@ cartRoutes.post('/items', async (c) => {
   )
     .bind(
       newId('ci'), user.id, productId, primaryOption, JSON.stringify(canonical), colorId,
-      transportMethod, warrantyPlanId, qty
+      transportMethod, warrantyPlanId, qty, fulfillmentType,
+      JSON.stringify({ ...resolved.selection_snapshot, product_id: productId, option_id: primaryOption, variant_key: doc.options.find((o) => o.id === primaryOption)?.variant_key ?? '', local_delivery_method: null })
     )
     .run();
 
@@ -1426,6 +1431,7 @@ cartRoutes.patch('/items/:id', async (c) => {
     body.transportMethod !== undefined
       ? parseTransportMethod(body.transportMethod)
       : String(existing.transport_method ?? '');
+  const fulfillmentType = oneOf(body.fulfillmentType ?? (transportMethod ? 'pre_order' : 'direct_sale'), 'fulfillmentType', ['direct_sale', 'pre_order'] as const);
   const warrantyPlanId =
     body.warrantyPlanId !== undefined
       ? str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false })
@@ -1472,7 +1478,7 @@ cartRoutes.patch('/items/:id', async (c) => {
   const view = views.get(String(existing.product_id));
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, optionValueIds, colorId, transportMethod, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
     tier,
     tierActive,
     ctx,
@@ -1507,7 +1513,7 @@ cartRoutes.patch('/items/:id', async (c) => {
         })
       : undefined,
     links: view?.links,
-    preferredType: transportMethod ? 'pre_order' : null,
+    preferredType: fulfillmentType,
   });
   // An update may also CLEAR a chosen option (an explicit empty list is the
   // new selection) — the same rule as an add.
@@ -1530,12 +1536,12 @@ cartRoutes.patch('/items/:id', async (c) => {
   const canonical = [...optionValueIds].sort();
   await c.env.DB.prepare(
     `UPDATE cart_items SET qty = ?, option_id = ?, option_value_ids = ?, color_id = ?,
-            transport_method = ?, warranty_plan_id = ?
+            transport_method = ?, warranty_plan_id = ?, fulfillment_type = ?, selection_snapshot = ?
       WHERE id = ? AND user_id = ?`
   )
     .bind(
       qty, canonical[0] ?? '', JSON.stringify(canonical), colorId,
-      transportMethod, warrantyPlanId, id, user.id
+      transportMethod, warrantyPlanId, fulfillmentType, JSON.stringify({ ...resolved.selection_snapshot, product_id: String(existing.product_id), option_id: canonical[0] ?? null, variant_key: doc.options.find((o) => o.id === canonical[0])?.variant_key ?? '', local_delivery_method: null }), id, user.id
     )
     .run();
 

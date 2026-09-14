@@ -1,3 +1,4 @@
+import { deleteProductPermanently } from '../lib/productDeletion';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
 import { approvableWithdrawalSql, decideDeposit } from '../lib/walletOps';
@@ -405,10 +406,9 @@ adminRoutes.post('/products', async (c) => {
 adminRoutes.delete('/products/:id', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
-  const res = await c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
-  if (res.meta.changes === 0) throw notFound('Product not found');
-  await audit(c.env.DB, adminUser.id, 'product.delete', id);
-  return c.json({ success: true });
+  if (c.req.query('permanent') !== 'true') throw badRequest('Use permanent=true for permanent deletion');
+  const report = await deleteProductPermanently(c.env, id, adminUser.id);
+  return c.json({ success: true, ...report });
 });
 
 // ---------------------------------------------------------------- wallet review

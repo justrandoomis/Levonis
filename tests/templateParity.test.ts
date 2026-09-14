@@ -526,7 +526,7 @@ test('TEST C: create from TXT → export → parse → apply as update loses and
 
   // The export the owner downloads, checked through /parse exactly as the
   // import window does before applying it.
-  const exported = await (await get(app, `/api/admin/template/export/${id}`)).text();
+  const exported = await (await get(app, `/api/admin/template/export/${id}?include_media=false`)).text();
   assert.ok(exported.includes(`product_id=${id}`), 'the export carries no product_id — it cannot be applied as an update');
   const parsed = await json(await post(app, '/api/admin/template/parse', { text: exported }));
   assert.equal(parsed.success, true);
@@ -567,7 +567,7 @@ test('TEST C: create from TXT → export → parse → apply as update loses and
 
   // A second round trip is a FIXED POINT: identical text in, identical
   // product out — including the transports.
-  const exported2 = await (await get(app, `/api/admin/template/export/${id}`)).text();
+  const exported2 = await (await get(app, `/api/admin/template/export/${id}?include_media=false`)).text();
   // Everything but the freshness stamp the export puts in for the stale-edit
   // guard: the file the owner downloads after applying its own export is the
   // same file.

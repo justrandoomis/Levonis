@@ -51,9 +51,14 @@ export function normalizeAvailability(raw: unknown): AvailabilityType {
  * change the behaviour of a product nobody edited.
  */
 export function effectiveAvailability(
-  option: { availability_type?: AvailabilityType } | null | undefined,
+  option: { availability_type?: AvailabilityType; direct?: { enabled: boolean }; preorder?: { enabled: boolean } } | null | undefined,
   saleTypes: readonly string[]
 ): AvailabilityType {
+  if (option?.direct !== undefined || option?.preorder !== undefined) {
+    if (option.direct?.enabled && !option.preorder?.enabled) return 'direct_sale';
+    if (option.preorder?.enabled && !option.direct?.enabled) return 'pre_order';
+    return '';
+  }
   const own = normalizeAvailability(option?.availability_type);
   if (own) return own;
   const pre = saleTypes.includes('pre_order');
@@ -76,12 +81,17 @@ export function effectiveAvailability(
  * a fulfilment route, and no option ever claims it.
  */
 export function deriveSaleTypes(
-  options: ReadonlyArray<{ availability_type?: AvailabilityType; active?: boolean }>,
+  options: ReadonlyArray<{ availability_type?: AvailabilityType; active?: boolean; direct?: { enabled: boolean }; preorder?: { enabled: boolean } }>,
   fallback: readonly string[]
 ): string[] {
   const declared = new Set<string>();
   for (const o of options) {
     if (o.active === false) continue;
+    if (o.direct !== undefined || o.preorder !== undefined) {
+      if (o.direct?.enabled) declared.add('direct_sale');
+      if (o.preorder?.enabled) declared.add('pre_order');
+      continue;
+    }
     const a = normalizeAvailability(o.availability_type);
     if (a) declared.add(a);
   }

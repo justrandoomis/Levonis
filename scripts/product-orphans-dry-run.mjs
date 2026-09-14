@@ -2,7 +2,7 @@
  * No D1 mutation, R2 PUT/DELETE, cache purge, migration, or deployment exists
  * in this program. Output contains counts/keys, never customer records. */
 import { writeFile } from 'node:fs/promises';
-import { productSchema, productDependencyGraph, ownedMediaKeys } from '../worker/lib/productDeletion.ts';
+const { productSchema, productDependencyGraph, ownedMediaKeys } = await import(new URL('../worker/lib/productDeletion.ts', import.meta.url).href);
 const token = process.env.CLOUDFLARE_API_TOKEN;
 const account = process.env.CLOUDFLARE_ACCOUNT_ID;
 const origin = process.env.AUDIT_ORIGIN || 'https://levonis-iq.com';
@@ -31,6 +31,12 @@ for (const dep of graph.filter(d=>d.table!=='products')) {
   const result=await db.prepare(`SELECT COUNT(*) n FROM ${qi(dep.table)} WHERE ${dep.orphanPredicate}`).first();
   tables.push({table:dep.table,orphan_rows:Number(result.n)});
 }
+const legacyArchives=(await db.prepare("SELECT p.id FROM products p WHERE p.status='hidden' AND EXISTS(SELECT 1 FROM audit_log a WHERE a.target=p.id AND a.action='product_v2.archive')").all()).results.map(r=>r.id);
+const archivedRelations={};
+for(const id of legacyArchives) for(const dep of graph) {
+  const n=Number((await db.prepare(`SELECT COUNT(*) n FROM ${qi(dep.table)} WHERE ${dep.predicate}`).bind(id).first()).n);
+  archivedRelations[dep.table]=(archivedRelations[dep.table] ?? 0)+n;
+}
 const ignored=new Set(['file_objects','file_migration_log','product_deletion_jobs','media_cleanup_jobs','media_cleanup_locks','product_orphan_reports','audit_log','core_audit_details','historical_inventory_ledger']);
 const media=/(image|media|file|attachment|avatar|cover|logo|photo|video|asset|url|snapshot|content|options|colors|usage_guide|ops_policy|^key$)/i;
 for (const table of schema) {
@@ -45,7 +51,7 @@ for (const table of schema) {
   }
 }
 if (schema.some(t=>t.table==='file_objects')) for (const r of (await db.prepare("SELECT object_key FROM file_objects WHERE domain='products' AND deleted_at IS NULL").all()).results) owned.add(r.object_key);
-const buckets=[...new Set(settings.bindings.filter(b=>b.type==='r2_bucket' && ['BUCKET','R2_PUBLIC'].includes(b.name)).map(b=>b.bucket_name))];
+const buckets=[...new Set(settings.bindings.filter(b=>b.type==='r2_bucket' && ['BUCKET','R2_PUBLIC','R2_PRIVATE'].includes(b.name)).map(b=>b.bucket_name))];
 if (!buckets.length) throw new Error('No product R2 bucket binding on the audited worker');
 const present=new Set(); const objects=[];
 for (const bucket of buckets) {
@@ -67,6 +73,6 @@ for (const bucket of buckets) {
 }
 let legacy=[];
 if (schema.some(t=>t.table==='product_option_values' && t.columns.includes('availability_type'))) legacy=(await db.prepare("SELECT v.product_id,v.variant_key,v.availability_type,COUNT(*) rows FROM product_option_values v JOIN products p ON p.id=v.product_id WHERE v.availability_type IN ('direct_sale','pre_order') GROUP BY v.product_id,CASE WHEN v.variant_key<>'' THEN v.variant_key ELSE v.id END,v.availability_type").all()).results;
-const report={dry_run:true,destructive_actions:0,complete:true,checked_at:new Date().toISOString(),origin,worker,db_binding:'DB',tables,orphan_r2_files:objects,r2_objects:objects.length,bytes:objects.reduce((n,o)=>n+o.bytes,0),dangling_db_media_refs:[...owned].filter(k=>referenced.has(k)&&!present.has(k)),legacy_option_rows:legacy.reduce((n,r)=>n+Number(r.rows),0),ambiguous_legacy_models:legacy.filter(r=>Number(r.rows)>1)};
+const report={dry_run:true,destructive_actions:0, legacy_delete_archives:{product_ids:legacyArchives,rows_by_table:archivedRelations,cleanup_authorized:false},complete:true,checked_at:new Date().toISOString(),origin,worker,db_binding:'DB',tables,orphan_r2_files:objects,r2_objects:objects.length,bytes:objects.reduce((n,o)=>n+o.bytes,0),dangling_db_media_refs:[...owned].filter(k=>referenced.has(k)&&!present.has(k)),legacy_option_rows:legacy.reduce((n,r)=>n+Number(r.rows),0),ambiguous_legacy_models:legacy.filter(r=>Number(r.rows)>1)};
 await writeFile(process.env.AUDIT_OUTPUT || 'product-orphans-dry-run.json',JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify(report,null,2));

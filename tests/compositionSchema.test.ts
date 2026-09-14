@@ -43,7 +43,7 @@ const FEATURE_FILES = readdirSync(join(ROOT, 'migrations'))
 const sqlOf = (f: string) => readFileSync(join(ROOT, 'migrations', f), 'utf8').replace(/--[^\n]*/g, '');
 
 const FORBIDDEN = ['stock', 'stock_reserved', 'reserved', 'available', 'quantity'];
-const REAL_STOCK_TABLES = ['products', 'product_option_values', 'product_colors', 'product_variants'];
+const REAL_STOCK_TABLES = ['product_option_fulfillment', 'products', 'product_option_values', 'product_colors', 'product_variants'];
 const FEATURE_PREFIXES = /^(bundle_|mystery_|offer_|cart_bundle_|composition_|order_reservation_)/;
 
 interface Column {
@@ -77,6 +77,8 @@ test('every migration that creates a composition table is inside the invariantâ€
     // The legacy `bundles` / `bundle_items` pair of 0034 shares the prefix and
     // predates the feature; the era starts at 0058 (Â§1.1).
     if (FEATURE_FILES.includes(f) || f < '0058') continue;
+    // 0073 rebuilds historical tables; the live-schema assertions below verify them.
+    if (f === '0073_product_history_dependencies.sql') continue;
     for (const m of sqlOf(f).matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
       assert.ok(!FEATURE_PREFIXES.test(m[1]), `${f} creates ${m[1]} outside the range this file walks`);
     }

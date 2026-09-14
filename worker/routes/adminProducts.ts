@@ -20,6 +20,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
+import { deleteProductPermanently } from '../lib/productDeletion';
 import {
   parseProductRow,
   validateProductDoc,
@@ -639,6 +640,11 @@ adminProductsRoutes.patch('/:id/status', async (c) => {
 });
 
 /** The FULL canonical document + catalog placement — the edit payload. */
+adminProductsRoutes.get('/pricing-context', async (c) => {
+  const settings = await getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']);
+  return c.json({ proPolicy: proPolicyFrom(settings.proPricingPolicy), transportDefaults: transportDefaultsFrom(settings.preorderTransportDefaults) });
+});
+
 adminProductsRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
   // THE PRODUCT AS IT ACTUALLY IS: the relational overlay, inactive rows
@@ -1065,6 +1071,10 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
  * catalog placements.
  */
 adminProductsRoutes.delete('/:id', async (c) => {
+  if (c.req.query('permanent') === 'true') {
+    const report = await deleteProductPermanently(c.env, c.req.param('id'), c.get('user')!.id);
+    return c.json({ success: true, deleted: report.product_deleted || report.already_deleted, ...report });
+  }
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const row = await c.env.DB.prepare('SELECT id, name_ar, name FROM products WHERE id = ?')
@@ -1109,12 +1119,8 @@ adminProductsRoutes.delete('/:id', async (c) => {
     });
   }
 
-  await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id),
-  ]);
-  await audit(c.env.DB, admin.id, 'product_v2.delete', id, {});
-  return c.json({ success: true, archived: false, deleted: true });
+  const report = await deleteProductPermanently(c.env, id, admin.id);
+  return c.json({ success: true, archived: false, deleted: true, ...report });
 });
 
 /** Replace this product's catalog placements with exactly catalog_ids. */
@@ -1166,6 +1172,7 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
     optionId: typeof body.optionId === 'string' && body.optionId ? body.optionId : null,
     colorId: typeof body.colorId === 'string' && body.colorId ? body.colorId : null,
     transportMethod: typeof body.transportMethod === 'string' ? body.transportMethod : null,
+    fulfillmentType: body.fulfillmentType === 'pre_order' || body.fulfillmentType === 'direct_sale' ? body.fulfillmentType : null,
     warrantyPlanId: typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null,
     tier,
     tierActive: tier !== 'free', // admin preview assumes the previewed tier is active

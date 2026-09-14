@@ -90,7 +90,11 @@ export function ownedMediaKeys(value: unknown, origin = '', field = ''): Set<str
       try { const url = new URL(v); if (!origin || url.origin !== new URL(origin).origin) return; path = url.pathname; } catch { return; }
     }
     if (path.startsWith('/files/')) path = path.slice(7).split('?')[0];
-    else if (!/^(?:r2_key|media_key|object_key|key|image_key|cover_key|file_key|attachment_key)$/.test(name)) return;
+    else {
+      if (!/^(?:r2_key|media_key|object_key|key|image_key|cover_key|file_key|attachment_key)$/.test(name)) return;
+      // Labels/settings also have a generic `key`; they are not media.
+      if (name === 'key' && !path.includes('/') && !/\.[a-z0-9]{2,5}$/i.test(path)) return;
+    }
     if (isSafeMediaKey(path)) found.add(path);
   };
   walk(value, field); return found;
@@ -115,9 +119,12 @@ export async function mediaReferenceExists(db: D1Database, schema: TableInfo[], 
     const orphan = graph.find((d) => d.table === table.table)?.orphanPredicate;
     queries.push(`SELECT 1 found FROM ${qi(table.table)} WHERE (${clauses.join(' OR ')})${orphan ? ` AND NOT (${orphan})` : ''}`);
   }
+  // D1 restricts compound SELECT terms more tightly than desktop SQLite.
+  // Independent indexed/JSON reads in a bounded batch need no UNION and
+  // remain valid as the catalog's reference graph grows.
   for (let i = 0; i < queries.length; i += 10) {
-    const sql = queries.slice(i, i + 10).join(' UNION ALL ') + ' LIMIT 1';
-    if (await db.prepare(sql).bind(key, `/files/${key}`, `${origin.replace(/\/$/, '')}/files/${key}`).first()) return true;
+    const results = await Promise.all(queries.slice(i, i + 10).map(sql => db.prepare(sql + ' LIMIT 1').bind(key, `/files/${key}`, `${origin.replace(/\/$/, '')}/files/${key}`).first()));
+    if (results.some(Boolean)) return true;
   }
   return false;
 }
@@ -135,7 +142,10 @@ export interface ProductDeleteReport {
 
 export async function processProductMediaCleanup(env: Env, jobId?: string, limit = 30): Promise<{ deleted: number; shared: number; pending: number }> {
   const jobs = (await env.DB.prepare(`SELECT * FROM media_cleanup_jobs WHERE status IN ('pending','retry') AND not_before<=datetime('now') ${jobId ? 'AND deletion_job_id=?' : ''} ORDER BY attempts,id LIMIT ${Math.max(1, Math.min(limit, 200))}`).bind(...(jobId ? [jobId] : [])).all<Row>()).results;
-  if (!jobs.length) return { deleted: 0, shared: 0, pending: 0 };
+  if (!jobs.length) {
+    const pending = Number((await env.DB.prepare(`SELECT COUNT(*) n FROM media_cleanup_jobs WHERE status IN ('pending','retry') ${jobId ? 'AND deletion_job_id=?' : ''}`).bind(...(jobId ? [jobId] : [])).first<{n:number}>())?.n ?? 0);
+    return { deleted: 0, shared: 0, pending };
+  }
   const schema = await productSchema(env.DB);
   let deleted = 0; let shared = 0;
   for (const job of jobs) {
@@ -202,12 +212,18 @@ export async function deleteProductPermanently(env: Env, id: string, actorId: st
     if (dep.table === 'inventory_ledger') for (const r of rows) archive.push(env.DB.prepare('INSERT OR IGNORE INTO historical_inventory_ledger (id,product_id,snapshot) VALUES (?,?,?)').bind(r.id, id, JSON.stringify(r)));
   }
   for (const r of (await env.DB.prepare("SELECT object_key FROM file_objects WHERE domain='products' AND entity_id=?").bind(id).all<{ object_key: string }>()).results) if (isSafeMediaKey(r.object_key)) keys.add(r.object_key);
+  const visibility = new Map<string,string>();
+  const mediaKeys = [...keys];
+  for (let start=0; start<mediaKeys.length; start+=80) {
+    const chunk=mediaKeys.slice(start,start+80);
+    for (const meta of (await env.DB.prepare(`SELECT object_key,visibility FROM file_objects WHERE object_key IN (${chunk.map(()=>'?').join(',')})`).bind(...chunk).all<{object_key:string;visibility:string}>()).results) visibility.set(meta.object_key,meta.visibility);
+  }
   const jobId = newId('pdel');
   const statements = [
     // An optimistic fence aborts if another editor changed the product after
     // media collection. Product writes use the same updated_at contract.
     env.DB.prepare("INSERT INTO product_deletion_jobs(id,product_id,slug,actor_id,status,revision_matches) VALUES (?,?,?,?,'committed',(SELECT COUNT(*) FROM products WHERE id=? AND updated_at=? AND (SELECT revision FROM catalog_revision WHERE id=1)=?))").bind(jobId,id,row.slug,actorId,id,row.updated_at,before?.revision ?? -1),
-    ...[...keys].map((key) => env.DB.prepare('INSERT INTO media_cleanup_jobs(id,deletion_job_id,object_key) VALUES (?,?,?)').bind(newId('mclean'),jobId,key)),
+    ...[...keys].map((key) => env.DB.prepare('INSERT INTO media_cleanup_jobs(id,deletion_job_id,object_key,visibility) VALUES (?,?,?,?)').bind(newId('mclean'),jobId,key,visibility.get(key) === 'private' ? 'private' : 'public')),
     ...archive,
     env.DB.prepare("UPDATE file_objects SET entity_id='' WHERE domain='products' AND entity_id=?").bind(id),
     // Completed template fingerprints must not replay a now-deleted product.
@@ -218,6 +234,7 @@ export async function deleteProductPermanently(env: Env, id: string, actorId: st
   ];
   try { await env.DB.batch(statements); } catch (error) {
     if (!(await env.DB.prepare('SELECT id FROM products WHERE id=?').bind(id).first())) return deleteProductPermanently(env, id, actorId);
+    if (/revision_matches/.test(String(error))) throw new HttpError(409, 'The catalog changed during deletion. Retry with the current product.', 'PRODUCT_CHANGED');
     throw error;
   }
   if (await env.DB.prepare('SELECT id FROM products WHERE id=?').bind(id).first()) throw new HttpError(500, 'Product delete verification failed');

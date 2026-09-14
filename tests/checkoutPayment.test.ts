@@ -162,6 +162,58 @@ const orderBody = (addressId: string, paymentMethodId: string, over: Record<stri
   idempotencyKey: `chk-${Date.now()}-${++seq}`,
 });
 
+function canonicalModel(raw: DatabaseSync) {
+  raw.exec(`INSERT INTO product_option_groups(id,product_id,name_en) VALUES ('model-group','p_a1','Model');
+    INSERT INTO product_option_values(id,product_id,group_id,name_en,variant_key) VALUES ('model','p_a1','model-group','A1 mini','a1-mini');
+    INSERT INTO product_option_fulfillment(id,product_id,option_id,fulfillment_type,enabled,regular_price_iqd,stock,transports_override) VALUES
+      ('ful_model_direct_sale','p_a1','model','direct_sale',1,149000,1,0),
+      ('ful_model_pre_order','p_a1','model','pre_order',1,109000,NULL,1);
+    INSERT INTO product_option_transports(id,product_id,option_id,fulfillment_id,method,enabled,surcharge_iqd,lead_time_min_days,lead_time_max_days) VALUES
+      ('model-sea','p_a1','model','ful_model_pre_order','sea',1,33000,21,28);`);
+}
+
+test('canonical checkout revalidates route, transport, membership and current price; freezes its independent snapshot', async()=>{
+  const {raw,db}=setup();canonicalModel(raw);const app=appAs(db,'buyer');
+  const add=await post(app,'/api/cart/items',{productId:'p_a1',optionId:'model',fulfillmentType:'pre_order',transportMethod:'sea',qty:1,final_price:1,membership_tier:'pro'});
+  assert.equal(add.status,200,JSON.stringify(await json(add)));
+  raw.prepare("UPDATE product_option_fulfillment SET regular_price_iqd=119000 WHERE id='ful_model_pre_order'").run();
+  const quote=await json(await post(app,'/api/orders/quote',quoteBody('addr_b','cash',{final_price:1,membership_tier:'pro'})));
+  assert.equal(quote.success,true,JSON.stringify(quote));
+  assert.equal(quote.quote.subtotal_iqd,152000,'cash remains pre-order pricing and the updated server price replaces the cart quote');
+  const placed=await json(await post(app,'/api/orders',orderBody('addr_b','cash',{final_price:1,membership_tier:'pro'})));
+  assert.equal(placed.success,true,JSON.stringify(placed));
+  const item=raw.prepare('SELECT * FROM order_items WHERE order_id=?').get(placed.order.id) as Record<string,unknown>;
+  const snapshot=JSON.parse(String(item.selection_snapshot));
+  assert.equal(item.unit_price_iqd,152000);
+  assert.equal(snapshot.option_id,'model');assert.equal(snapshot.variant_key,'a1-mini');
+  assert.equal(snapshot.fulfillment_type,'pre_order');assert.equal(snapshot.transport_method,'sea');
+  assert.equal(snapshot.membership_tier,'regular');assert.equal(snapshot.local_delivery_method,'standard');
+  assert.equal(snapshot.lead_time.max_days,28);
+  raw.prepare("UPDATE product_option_fulfillment SET regular_price_iqd=999999 WHERE id='ful_model_pre_order'").run();
+  assert.equal((raw.prepare('SELECT selection_snapshot FROM order_items WHERE id=?').get(item.id as string) as {selection_snapshot:string}).selection_snapshot,item.selection_snapshot);
+});
+
+test('canonical model stock is reserved separately and unavailable model/fulfillment/transport is rejected server-side', async()=>{
+  const {raw,db}=setup();canonicalModel(raw);const app=appAs(db,'buyer');
+  const direct={productId:'p_a1',optionId:'model',fulfillmentType:'direct_sale',qty:1};
+  assert.equal((await post(app,'/api/cart/items',{...direct,qty:2})).status,400);
+  assert.equal((await post(app,'/api/cart/items',{...direct,transportMethod:'sea'})).status,400);
+  assert.equal((await post(app,'/api/cart/items',direct)).status,200);
+  const placed=await json(await post(app,'/api/orders',orderBody('addr_b','cash')));
+  assert.equal(placed.success,true,JSON.stringify(placed));
+  assert.equal((raw.prepare("SELECT reserved FROM product_option_fulfillment WHERE id='ful_model_direct_sale'").get() as {reserved:number}).reserved,1);
+  assert.equal((await post(app,'/api/cart/items',direct)).status,400,'held model stock cannot be sold again');
+  const pre={...direct,fulfillmentType:'pre_order',transportMethod:'sea'};
+  raw.prepare("UPDATE product_option_transports SET enabled=0 WHERE id='model-sea'").run();
+  assert.equal((await post(app,'/api/cart/items',pre)).status,400);
+  raw.prepare("UPDATE product_option_transports SET enabled=1 WHERE id='model-sea'").run();
+  raw.prepare("UPDATE product_option_fulfillment SET enabled=0 WHERE id='ful_model_pre_order'").run();
+  assert.equal((await post(app,'/api/cart/items',pre)).status,400);
+  raw.prepare("UPDATE product_option_fulfillment SET enabled=1 WHERE id='ful_model_pre_order'").run();
+  raw.prepare("UPDATE product_option_values SET active=0 WHERE id='model'").run();
+  assert.equal((await post(app,'/api/cart/items',pre)).status,400);
+});
+
 // -------------------------------------------------------------- the policy
 
 test('the payment policy: wallet and cash for every shipping type; half_advance refused; full_advance tolerated', () => {

@@ -57,6 +57,7 @@ export default function PricePreview({
   const [optionId, setOptionId] = useState('');
   const [colorId, setColorId] = useState('');
   const [transport, setTransport] = useState('');
+  const [fulfillment, setFulfillment] = useState<'direct_sale'|'pre_order'>('direct_sale');
   const [warrantyId, setWarrantyId] = useState('');
   const [tier, setTier] = useState<'free' | 'prime' | 'pro'>('free');
   const [quote, setQuote] = useState<QuoteResponse['quote'] | null>(null);
@@ -72,7 +73,8 @@ export default function PricePreview({
         const data = await api.post<QuoteResponse>(`/api/admin/products-v2/${productId}/quote`, {
           optionId: optionId || undefined,
           colorId: colorId || undefined,
-          transportMethod: transport || undefined,
+          transportMethod: fulfillment === 'pre_order' ? transport || undefined : undefined,
+          fulfillmentType: fulfillment,
           warrantyPlanId: warrantyId || undefined,
           tier: tier === 'free' ? undefined : tier,
         });
@@ -87,12 +89,14 @@ export default function PricePreview({
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [productId, optionId, colorId, transport, warrantyId, tier]);
+  }, [productId, optionId, colorId, transport, fulfillment, warrantyId, tier]);
 
-  const activeTransports = (savedDoc.preorder_transports ?? []).filter((t) => t.active);
+  const model = fromRel ? rel.groups.flatMap(g=>g.values).find(o=>o.id===optionId) : savedDoc.options?.find(o=>o.id===optionId);
+  const activeTransports = model?.preorder?.transports !== undefined ? model.preorder.transports.filter(t=>t.enabled) : (savedDoc.preorder_transports ?? []).filter((t) => t.active);
 
   return (
     <Section ar="معاينة السعر الحية" en="Live price preview" defaultOpen>
+      <label>نوع الطلب<select className={inputCls} value={fulfillment} onChange={e=>{setFulfillment(e.target.value as typeof fulfillment);setTransport('');}}><option value="direct_sale">بيع مباشر</option><option value="pre_order">طلب مسبق</option></select></label>
       {dirty && (
         <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-3 mb-4 text-xs">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />

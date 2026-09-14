@@ -1,3 +1,4 @@
+import { deleteProductPermanently } from '../lib/productDeletion';
 /**
  * THE BUNDLES PANEL — the admin API of docs/BUNDLES_MYSTERY.md §10 and §11.
  *
@@ -806,17 +807,7 @@ adminBundlesRoutes.delete('/:productId', async (c) => {
       reason: 'Referenced by past orders — archived instead of deleted.',
     });
   }
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      'DELETE FROM bundle_component_choices WHERE component_id IN (SELECT id FROM bundle_components WHERE bundle_product_id = ?)'
-    ).bind(id),
-    c.env.DB.prepare('DELETE FROM bundle_components WHERE bundle_product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM bundle_config WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM offer_windows WHERE subject_type = ? AND subject_id = ?').bind('product', id),
-    c.env.DB.prepare('DELETE FROM offer_limits WHERE subject_type = ? AND subject_id = ?').bind('product', id),
-    c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id),
-  ]);
+  const report = await deleteProductPermanently(c.env, id, admin.id);
   await audit(c.env.DB, admin.id, 'bundle.archive', id, { deleted: true, slug: loaded.doc.slug });
-  return c.json({ success: true, archived: false, deleted: true });
+  return c.json({ success: true, archived: false, deleted: true, ...report });
 });

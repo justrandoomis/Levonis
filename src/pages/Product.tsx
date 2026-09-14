@@ -1,3 +1,4 @@
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 /**
  * Product detail (integrated mandate §7).
@@ -233,7 +234,7 @@ interface MediaItem {
   id?: string; url: string; alt_ar?: string; alt_en?: string; alt_ckb?: string;
   order?: number; primary?: boolean;
 }
-interface OptionItem {
+interface OptionItem extends ModelAvailability {
   id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string; image?: string;
   /** 0043. Absent on every product written before per-option availability,
    *  which is exactly why the two-step chooser below is opt-in. */
@@ -270,6 +271,7 @@ interface ProductDetail {
   description?: string; description_ar?: string; description_en?: string; description_ckb?: string;
   price_iqd: number; pro_price_iqd?: number | null; prime_price_iqd?: number | null;
   selling_type?: string;
+  sale_types?: string[];
   /** The owner's catalog flag; the printer home-delivery note keys off it. */
   is_printer?: boolean;
   media?: MediaItem[]; images?: string[];
@@ -314,7 +316,7 @@ interface RelationsPayload {
   }>;
 }
 
-interface TransportView { method: string; commission_iqd: number | null; configured: boolean }
+interface TransportView { lead_time?: { text: string; min_days: number | null; max_days: number | null }; method: string; commission_iqd: number | null; configured: boolean }
 
 interface Availability {
   mode: 'direct_sale' | 'preorder' | 'unavailable';
@@ -700,7 +702,7 @@ export default function Product() {
         // the moment a variant IS chosen the page knows this quote no longer
         // answers the question.
         setQuote(data.pricing ? { ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd } : null);
-        setQuotedFor(data.pricing ? '|||' : null);
+        setQuotedFor(data.pricing ? '||||direct_sale' : null);
         // A quote left in flight by the PREVIOUS product must not leave this
         // one looking like it is still resolving.
         setQuoteLoading(false);
@@ -754,7 +756,13 @@ export default function Product() {
    * the old gate hid the price for the whole of that window, the figure the
    * customer was reading vanished each time they asked for one more.
    */
-  const priceKey = `${optionId}|${colorId}|${transportMethod}|${warrantyPlanId}`;
+  const selectedModel = product?.options?.find((o) => o.id === optionId);
+  const selectedTypes = selectedModel?.direct !== undefined || selectedModel?.preorder !== undefined
+    ? [selectedModel.direct?.enabled ? 'direct_sale' : '', selectedModel.preorder?.enabled ? 'pre_order' : ''].filter(Boolean)
+    : product?.sale_types ?? [product?.selling_type ?? 'direct_sale'];
+  const fulfillmentType = selectedTypes.length === 1 ? selectedTypes[0] : wantPreorder ? 'pre_order' : 'direct_sale';
+  const chosenTransport = fulfillmentType === 'pre_order' ? transportMethod : '';
+  const priceKey = `${optionId}|${colorId}|${chosenTransport}|${warrantyPlanId}|${fulfillmentType}`;
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
@@ -772,7 +780,8 @@ export default function Product() {
             qty: 1,
             optionId: optionId || undefined,
             colorId: colorId || undefined,
-            transportMethod: transportMethod || undefined,
+            transportMethod: chosenTransport || undefined,
+            fulfillmentType,
             warrantyPlanId: warrantyPlanId || undefined,
           },
           // A superseded or abandoned quote is dropped at the socket instead of
@@ -804,7 +813,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, colorId, transportMethod, warrantyPlanId, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, colorId, chosenTransport, fulfillmentType, warrantyPlanId, quoteToken]);
 
   /**
    * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
@@ -933,10 +942,10 @@ export default function Product() {
       setActionError('');
       setNotice('');
       try {
-        const body: Record<string, unknown> = { productId: product.id, qty };
+        const body: Record<string, unknown> = { productId: product.id, qty, fulfillmentType };
         if (optionId) body.optionId = optionId;
         if (colorId) body.colorId = colorId;
-        if (availability?.mode === 'preorder' && transportMethod) body.transportMethod = transportMethod;
+        if (chosenTransport) body.transportMethod = chosenTransport;
         if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
         if (replaceCart) body.replaceCart = true;
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
@@ -975,7 +984,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, colorId, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added, s.CART_WARRANTY_CONFLICT]
+    [product, qty, optionId, colorId, chosenTransport, fulfillmentType, warrantyPlanId, isAuthenticated, navigate, s.added, s.CART_WARRANTY_CONFLICT]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -986,49 +995,6 @@ export default function Product() {
   // rather than duplicated.
 
   // ------------------------------------------------------------ loading/error
-  /**
-   * TWO STEPS INSTEAD OF FOUR CARDS — but only when the data says so.
-   *
-   * The owner asked not to show "A1 pre-order / A1 direct / A1 Combo
-   * pre-order / A1 Combo direct" as four flat chips. So when the options carry
-   * a model key AND at least one of them names its own availability, they are
-   * folded into: pick the model, then pick how to get it.
-   *
-   * When they do NOT — every product in the catalogue before this feature —
-   * the flat chip list below renders exactly as it always has. That is the
-   * whole backward-compatibility story on this page: one boolean, and no old
-   * product takes the new path.
-   */
-  const tr = (ar: string, en: string, ckb: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb : ar);
-
-  const models = useMemo(() => {
-    const options = product?.options ?? [];
-    const declared = options.some((o) => o.availability_type === 'pre_order' || o.availability_type === 'direct_sale');
-    if (!declared) return null;
-    const byKey = new Map<string, { key: string; label: string; options: OptionItem[] }>();
-    for (const o of options) {
-      const key = o.variant_key || o.id;
-      const entry = byKey.get(key);
-      if (entry) entry.options.push(o);
-      else byKey.set(key, { key, label: o.variant_label || pickName(o.name_en, o.name, o.name_ar) || key, options: [o] });
-    }
-    return [...byKey.values()];
-  }, [product]);
-
-  const selectedOption = useMemo(
-    () => (optionId ? (product?.options ?? []).find((o) => o.id === optionId) ?? null : null),
-    [product, optionId]
-  );
-  const [modelKey, setModelKey] = useState('');
-  // The chosen option decides the model, so a deep link or a restored cart
-  // lands on the right step without the page guessing.
-  useEffect(() => {
-    if (selectedOption) setModelKey(selectedOption.variant_key || selectedOption.id);
-  }, [selectedOption]);
-  // With exactly one model there is no first step to take.
-  useEffect(() => {
-    if (models && models.length === 1 && !modelKey) setModelKey(models[0].key);
-  }, [models, modelKey]);
 
 
   if (loading || !product) {
@@ -1259,7 +1225,7 @@ export default function Product() {
   const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
   const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
   const bothUsable = directUsable && preUsable;
-  const showTransports = (bothUsable ? wantPreorder : mode === 'preorder') && (availability?.preorder.transports.length ?? 0) > 0;
+  const showTransports = fulfillmentType === 'pre_order' && (availability?.preorder.transports.length ?? 0) > 0;
   const pricingModes = quotedModes ?? detailModes;
   const directFinal: number | null = pricingModes?.direct?.unit_subtotal_iqd ?? null;
   const transportFinal = (t: TransportView): number | null =>
@@ -1404,102 +1370,9 @@ export default function Product() {
     </div>
   );
 
-  const activeModel = models?.find((m) => m.key === modelKey) ?? null;
-
   const selectionBlocks = (
     <>
-      {models ? (
-        <fieldset className="lv-section" data-variant-chooser>
-          <legend className="px-1 text-white font-bold text-[14px]">
-            {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
-            {!modelKey ? <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span> : null}
-          </legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {models.map((m) => {
-              const selected = modelKey === m.key;
-              return (
-                <button
-                  key={m.key}
-                  type="button"
-                  data-variant-model={m.key}
-                  aria-pressed={selected}
-                  onClick={() => {
-                    setModelKey(selected ? '' : m.key);
-                    // Changing the model invalidates the availability chosen
-                    // under the previous one.
-                    setOptionId('');
-                  }}
-                  className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
-                >
-                  {m.options[0]?.image ? (
-                    <SafeImage
-                      src={m.options[0].image}
-                      alt={m.label}
-                      aspect="square"
-                      fit="cover"
-                      className="h-10 w-10 shrink-0 rounded-md"
-                      bgClassName="bg-black"
-                    />
-                  ) : null}
-                  <span className="block truncate max-w-[12rem] text-start">{m.label}</span>
-                  <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                </button>
-              );
-            })}
-          </div>
-
-          {activeModel ? (
-            <div className="mt-4 border-t border-border-subtle pt-3" data-availability-chooser>
-              <p className="text-white font-bold text-[13px] mb-2">
-                {tr('طريقة التوفر', 'How to get it', 'چۆنیەتی بەردەستبوون')}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {activeModel.options.map((opt) => {
-                  const selected = optionId === opt.id;
-                  const isPre = opt.availability_type === 'pre_order';
-                  const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
-                  const wait = (opt.lead_time_text ?? '').trim();
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      data-availability-option={opt.id}
-                      data-availability={opt.availability_type || 'inherit'}
-                      aria-pressed={selected}
-                      onClick={() => {
-                        const next = selected ? '' : opt.id;
-                        setOptionId(next);
-                        // The option now decides the route, so the page stops
-                        // asking the fulfilment question separately: a direct
-                        // option clears any transport, a pre-order one keeps
-                        // the transport picker below for the journey.
-                        if (next && opt.availability_type === 'direct_sale') setTransportMethod('');
-                        if (next) setWantPreorder(opt.availability_type === 'pre_order');
-                      }}
-                      className="lv-choice flex min-h-[48px] items-center gap-3 px-3 py-2 text-start"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold">
-                          {isPre
-                            ? tr('طلب مسبق', 'Pre-order', 'پێش-داواکاری')
-                            : tr('بيع مباشر', 'Direct sale', 'فرۆشتنی ڕاستەوخۆ')}
-                        </span>
-                        {isPre && wait ? (
-                          <span className="block text-[11px] font-medium text-warning leading-tight">{wait}</span>
-                        ) : null}
-                        {chip ? (
-                          <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>
-                        ) : null}
-                      </span>
-                      <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </fieldset>
-      ) : options.length > 0 ? (
+      {options.length > 0 ? (
         <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.options}
@@ -1517,7 +1390,7 @@ export default function Product() {
                   key={opt.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => setOptionId(selected ? '' : opt.id)}
+                  onClick={() => { setOptionId(selected ? '' : opt.id); setTransportMethod(''); setWantPreorder(false); }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {opt.image ? (
@@ -1591,7 +1464,7 @@ export default function Product() {
         </fieldset>
       ) : null}
 
-      {bothUsable ? (
+      {selectedTypes.length > 1 ? (
         <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
@@ -1600,7 +1473,8 @@ export default function Product() {
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               type="button"
-              aria-pressed={!wantPreorder}
+              disabled={!directUsable}
+              aria-pressed={fulfillmentType === 'direct_sale'}
               onClick={() => {
                 setWantPreorder(false);
                 setTransportMethod('');
@@ -1618,7 +1492,8 @@ export default function Product() {
             </button>
             <button
               type="button"
-              aria-pressed={wantPreorder}
+              disabled={!preUsable}
+              aria-pressed={fulfillmentType === 'pre_order'}
               onClick={() => {
                 setWantPreorder(true);
                 const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
@@ -1672,7 +1547,7 @@ export default function Product() {
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                    <span>{transportLabel(s, t.method)}</span>
+                    <span>{transportLabel(s, t.method)}{t.lead_time && <small className="block text-zinc-400">{t.lead_time.text || `${t.lead_time.min_days ?? ""}–${t.lead_time.max_days ?? ""} ${lang === "ar" ? "يوم" : "days"}`}</small>}</span>
                   </span>
                   {/* The FINAL unit price for this journey — never "+X". */}
                   <span className="tabular-nums text-[13px] font-bold">

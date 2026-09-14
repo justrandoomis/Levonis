@@ -269,7 +269,15 @@ export async function handle(c: GatewayContext, deps: PipelineDeps): Promise<Res
   }
 
   // --------------------------------------------------------------- step 11
-  const decision = rule.cacheable ? canCache(req, isOn(env.CACHE_MODE)) : null;
+  let decision = rule.cacheable ? canCache(req, isOn(env.CACHE_MODE)) : null;
+  if (decision && (/^\/api\/(products|home|bundles|storefront)(?:\/|$)/.test(path) || path.startsWith('/files/'))) {
+    try {
+      const revisionResponse = await env.CORE?.fetch(new Request(new URL('/api/products/cache/revision', req.url), { headers: { 'Cache-Control': 'no-cache' } }));
+      const body = revisionResponse?.ok ? await revisionResponse.json() as {revision?:unknown} : null;
+      if (!Number.isSafeInteger(body?.revision)) decision = null;
+      else decision = { ...decision, key: `${decision.key}${decision.key.includes('?') ? '&' : '?'}catalog_revision=${body!.revision}` };
+    } catch { decision = null; } // fail closed to origin, never to stale data
+  }
   if (decision && deps.cache) {
     const hit = await deps.cache.match(decision.key);
     if (hit) {
