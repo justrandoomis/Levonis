@@ -52,7 +52,7 @@ import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
 import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
 import { sha256Hex } from '@levonis/contracts/canonical';
 import { availabilityFromName, deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
-import { legacyShapeErrors } from './optionFulfillment';
+import { fulfillmentStatements, legacyShapeErrors, parseFulfillmentPayload } from './optionFulfillment';
 import {
   normalizeSaleTypes,
   parseProductRow,
@@ -380,6 +380,12 @@ export interface RequestedRelations {
     lead_time_max_days: number | null;
     variant_key: string;
     variant_label: string;
+    /**
+     * 0073. This model's (order type) cells, as the CALLER supplied them.
+     * `undefined` = the caller said nothing, so the stored cells are kept.
+     * The form never sets it; the TXT document does.
+     */
+    fulfillments?: unknown[];
   }>;
   colors: Array<{
     id: string;
@@ -526,6 +532,17 @@ export async function planRelationsWriteFrom(
         lead_time_max_days: availability === 'direct_sale' ? null : leadMax,
         variant_key: key.trim() || variantKeyFrom(effectiveLabel),
         variant_label: effectiveLabel,
+        /**
+         * 0073. THE MODEL'S ORDER TYPES — only when the payload actually
+         * carries them.
+         *
+         * The FORM never sends this key: its structure editor writes models,
+         * and the order types have their own endpoint and their own panel.
+         * The TXT document does, because one file describes a whole product.
+         * Absent therefore means PRESERVE, which is what keeps the two doors
+         * separate without needing a second code path.
+         */
+        fulfillments: Array.isArray(v.fulfillments) ? v.fulfillments : undefined,
       });
     });
   }
@@ -1941,6 +1958,35 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
       );
     }
   }
+  /**
+   * 0073. THE ORDER-TYPE CELLS, IN THE SAME BATCH as the models they hang off.
+   *
+   * Only when the payload carried them — the form never does, so a form save
+   * leaves a product's order types exactly as they were. Validation is the
+   * SAME function the dedicated endpoint uses, so a file cannot express a cell
+   * the API would refuse (a direct sale with a transport, a duplicate route, a
+   * cell naming a model that is not on this product).
+   */
+  if (relations?.requested) {
+    const cells: unknown[] = [];
+    for (const v of relations.requested.values) {
+      if (!Array.isArray(v.fulfillments)) continue;
+      for (const raw of v.fulfillments) {
+        cells.push({ ...(raw as Record<string, unknown>), option_id: v.id });
+      }
+    }
+    // A payload that mentions cells for ANY model replaces the whole product's
+    // set, exactly as the endpoint does: the file is the statement of record
+    // for what it describes.
+    if (relations.requested.values.some((v) => Array.isArray(v.fulfillments))) {
+      const parsed = parseFulfillmentPayload(
+        { fulfillments: cells },
+        new Set(relations.requested.values.map((v) => v.id))
+      );
+      statements.push(...fulfillmentStatements(db, productId, parsed));
+    }
+  }
+
   statements.push(...relationStatements);
 
   // `inventory_mode` is not in PRODUCT_COLUMNS (the relations planner owns it),

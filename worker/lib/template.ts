@@ -104,6 +104,26 @@ export interface GroupSpec {
   fields: FieldSpec[];
   /** nested rows (spec_groups only): spec_groups.N.rows.M.<field> */
   rowFields?: FieldSpec[];
+  /**
+   * 0073. NAMED SUB-OBJECTS under one item, each optionally holding its own
+   * indexed list — `options.N.direct.<field>`, `options.N.preorder.<field>`
+   * and `options.N.preorder.transports.M.<field>`.
+   *
+   * A third level of nesting exists ONLY here, and only because the thing
+   * being described genuinely has three: a model, its order types, and the
+   * routes of one of them. Flattening it into a fourth top-level group would
+   * mean repeating the model id on every line and letting a route drift away
+   * from the order type it belongs to.
+   */
+  cellFields?: Record<string, CellSpec>;
+}
+
+export interface CellSpec {
+  titleAr: string;
+  titleEn: string;
+  fields: FieldSpec[];
+  /** The indexed list inside this cell, if it has one. */
+  list?: { name: string; fields: FieldSpec[] };
 }
 
 export interface ProtectedFieldSpec {
@@ -289,6 +309,61 @@ const GROUP_SPECS: GroupSpec[] = [
       f('sku_part', 'string', 'options', 'الجزء الذي يضيفه هذا الخيار إلى رمز المنتج — SKU fragment'),
       f('low_stock_threshold', 'int', 'options', 'حد التنبيه لمخزون هذا الخيار — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
     ],
+    /**
+     * 0073. WHAT THIS MODEL DOES — its order types, and the routes of its
+     * pre-order. The model itself is the block above; these say how it sells.
+     *
+     *   options.1.direct.enabled=true
+     *   options.1.direct.price_iqd=+50000
+     *   options.1.preorder.enabled=true
+     *   options.1.preorder.lead_time_text=٢١ إلى ٣٠ يوم
+     *   options.1.preorder.transports.1.method=air
+     *   options.1.preorder.transports.1.surcharge_iqd=80000
+     *
+     * A DIRECT SALE HAS NO TRANSPORTS BLOCK, and that is not an omission:
+     * air/sea/land is how a unit reaches Iraq, which only a pre-order asks.
+     * Delivery INSIDE Iraq is `standard_delivery_*` / `personal_delivery_*` at
+     * the top of the file and never appears here.
+     */
+    cellFields: {
+      direct: {
+        titleAr: 'البيع المباشر لهذا الموديل', titleEn: 'Direct sale for this model',
+        fields: [
+          f('enabled', 'bool', 'options', 'هل يُباع هذا الموديل مباشرةً من المخزون؟ حذف الكتلة كلها = لا يُباع مباشرة إطلاقًا'),
+          f('price_iqd', 'iqd', 'options', 'سعر البيع المباشر لهذا الموديل — +N = فرق عن سعر الموديل (مثال +50000)، رقم = سعر ثابت، __NULL__ = نفس سعر الموديل', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
+          f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للبيع المباشر — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
+          f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للبيع المباشر — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
+          f('cost_iqd', 'iqd', 'options', 'كلفة البيع المباشر (داخلي) — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
+        ],
+      },
+      preorder: {
+        titleAr: 'الطلب المسبق لهذا الموديل', titleEn: 'Pre-order for this model',
+        fields: [
+          f('enabled', 'bool', 'options', 'هل يمكن طلب هذا الموديل مسبقًا؟ حذف الكتلة كلها = لا طلب مسبق'),
+          f('price_iqd', 'iqd', 'options', 'سعر الطلب المسبق لهذا الموديل — +N = فرق عن سعر الموديل، __NULL__ = نفس سعر الموديل', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
+          f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
+          f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
+          f('cost_iqd', 'iqd', 'options', 'كلفة الطلب المسبق (داخلي) — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
+          f('lead_time_text', 'string', 'options', 'المدة كما تُعرض للزبون — النص يسبق الأرقام دائمًا'),
+          f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام — للترتيب والتقدير', { nullable: true, min: 0, max: 3650 }),
+          f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام', { nullable: true, min: 0, max: 3650 }),
+        ],
+        list: {
+          name: 'transports',
+          fields: [
+            f('method', 'enum', 'options', 'air | sea | land — كيف يصل الجهاز إلى العراق. ليست طريقة التوصيل داخل العراق.', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
+            f('enabled', 'bool', 'options', 'معروضة للزبائن — offered to customers'),
+            f('surcharge_iqd', 'iqd', 'options', 'زيادة هذه الطريقة لهذا الموديل — تحلّ محل زيادة المنتج لهذه الطريقة ولا تُضاف إليها. __NULL__ = استخدم زيادة المنتج.', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
+            f('price_iqd', 'iqd', 'options', 'سعر ثابت لهذا الموديل بهذه الطريقة — نادر؛ __NULL__ = احسب من المستويات الأعلى', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
+            f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME بهذه الطريقة — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
+            f('pro_price_iqd', 'iqd', 'options', 'سعر PRO بهذه الطريقة — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
+            f('lead_time_text', 'string', 'options', 'مدة هذه الطريقة — فارغ = مدة الطلب المسبق أعلاه'),
+            f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام لهذه الطريقة', { nullable: true, min: 0, max: 3650 }),
+            f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام لهذه الطريقة', { nullable: true, min: 0, max: 3650 }),
+          ],
+        },
+      },
+    },
   },
   {
     name: 'colors', bodyKey: 'colors', idPrefix: 'col', mergeKey: 'id', group: 'colors',
@@ -448,6 +523,8 @@ export interface ParsedGroupItem {
   line: number;
   fields: Record<string, ParsedField>;
   rows?: ParsedGroupItem[];
+  /** 0073. `direct` / `preorder`, each with its own fields and optional list. */
+  cells?: Record<string, ParsedCell>;
 }
 export interface ParsedTemplate {
   header: {
@@ -472,6 +549,17 @@ const MAX_TEMPLATE_BYTES = 1_500_000;
 const KEY_RE = /^([A-Za-z0-9_.]+)\s*=(.*)$/;
 const GROUP_KEY_RE = /^([a-z_]+)\.(\d+)\.(.+)$/;
 const ROW_KEY_RE = /^rows\.(\d+)\.(.+)$/;
+/** 0073. `direct.price_iqd`, `preorder.transports.2.method`, … */
+const CELL_KEY_RE = /^([a-z_]{1,24})\.(.+)$/;
+const CELL_LIST_RE = /^([a-z_]{1,24})\.(\d+)\.(.+)$/;
+
+export interface ParsedCell {
+  line: number;
+  fields: Record<string, ParsedField>;
+  list?: ParsedGroupItem[];
+  /** `options.1.preorder=__CLEAR__` — this model no longer sells that way. */
+  cleared?: boolean;
+}
 const HEREDOC_TOKEN_RE = /^[A-Za-z0-9_]{1,40}$/;
 
 function coerce(
@@ -756,6 +844,69 @@ export function parseTemplate(text: string): ParsedTemplate {
         continue;
       }
 
+      /**
+       * 0073. `options.N.direct.<field>`, `options.N.preorder.<field>` and
+       * `options.N.preorder.transports.M.<field>`.
+       *
+       * Tried BEFORE the flat field lookup and only when the head actually
+       * names a declared cell, so a key with a dot in it that is not a cell
+       * still falls through to `unknown_keys` exactly as it did.
+       */
+      /**
+       * 0073. REMOVING A CELL: `options.1.preorder=__CLEAR__`.
+       *
+       * The same idiom the format already uses for a whole group
+       * (`options=__CLEAR__`), one level down — a key with no subfield and the
+       * clear token. It needs its own statement because "the file did not
+       * mention this cell" and "the owner deleted it" have to be different
+       * things, or nothing could ever be taken away. `enabled=false` is not a
+       * substitute: that is a configured order type switched off, which an
+       * admin needs to tell apart from one that was never set up.
+       */
+      if (groupSpec.cellFields?.[sub]) {
+        if (value !== CLEAR_TOKEN) {
+          err(lineNo, key, `"${key}" is a block — use ${key}.<field>=…, or ${key}=${CLEAR_TOKEN} to remove it`);
+          continue;
+        }
+        if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
+        seenGroupField.add(key);
+        item.cells ??= {};
+        item.cells[sub] = { line: lineNo, fields: {}, cleared: true };
+        continue;
+      }
+
+      const cm = groupSpec.cellFields ? CELL_KEY_RE.exec(sub) : null;
+      const cellSpec = cm ? groupSpec.cellFields?.[cm[1]] : undefined;
+      if (cm && cellSpec) {
+        item.cells ??= {};
+        const cell = (item.cells[cm[1]] ??= { line: lineNo, fields: {} });
+        const rest = cm[2];
+
+        const lm = cellSpec.list ? CELL_LIST_RE.exec(rest) : null;
+        if (lm && cellSpec.list && lm[1] === cellSpec.list.name) {
+          const listIndex = parseInt(lm[2], 10);
+          if (listIndex < 1 || listIndex > 50) { err(lineNo, key, 'index must be between 1 and 50'); continue; }
+          const listField = cellSpec.list.fields.find((x) => x.key === lm[3]);
+          if (!listField) { out.unknown_keys.push(key); continue; }
+          if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
+          seenGroupField.add(key);
+          cell.list ??= [];
+          let entry = cell.list.find((r) => r.index === listIndex);
+          if (!entry) { entry = { index: listIndex, line: lineNo, fields: {} }; cell.list.push(entry); }
+          const pv = coerce(listField, value, lineNo, key, out.errors);
+          if (pv) entry.fields[lm[3]] = pv;
+          continue;
+        }
+
+        const cellField = cellSpec.fields.find((x) => x.key === rest);
+        if (!cellField) { out.unknown_keys.push(key); continue; }
+        if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
+        seenGroupField.add(key);
+        const pv = coerce(cellField, value, lineNo, key, out.errors);
+        if (pv) cell.fields[rest] = pv;
+        continue;
+      }
+
       const fieldSpec = groupSpec.fields.find((x) => x.key === sub);
       if (!fieldSpec) { out.unknown_keys.push(key); continue; }
       if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
@@ -775,7 +926,10 @@ export function parseTemplate(text: string): ParsedTemplate {
   // Materialize groups sorted by index; rows sorted too.
   for (const [name, map] of Object.entries(groupItems)) {
     const items = [...map.values()].sort((a, b) => a.index - b.index);
-    for (const it of items) it.rows?.sort((a, b) => a.index - b.index);
+    for (const it of items) {
+      it.rows?.sort((a, b) => a.index - b.index);
+      for (const cell of Object.values(it.cells ?? {})) cell.list?.sort((a, b) => a.index - b.index);
+    }
     out.groups[name] = items;
   }
   for (const key of out.unknown_keys) {
@@ -1056,6 +1210,40 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.variant_label`, o.variant_label ?? '');
     push(`${p}.sku_part`, o.sku_part ?? '');
     push(`${p}.low_stock_threshold`, numStr(o.low_stock_threshold ?? null));
+
+    /**
+     * 0073. WHAT THIS MODEL DOES. A cell that does not exist is written as
+     * NOTHING, not as `enabled=false`: an export is the bulk-EDIT path, and a
+     * file that lists every possible order type with a false beside it reads
+     * as a product that sells four ways and offers none. The block appears
+     * when the model actually has that order type; adding the block is how an
+     * admin adds one.
+     */
+    for (const cell of o.fulfillments ?? []) {
+      const cp = `${p}.${cell.fulfillment_type === 'pre_order' ? 'preorder' : 'direct'}`;
+      push(`${cp}.enabled`, boolStr(cell.enabled !== false));
+      push(`${cp}.price_iqd`, numStr(cell.regular_price_iqd ?? null));
+      push(`${cp}.prime_price_iqd`, numStr(cell.prime_price_iqd ?? null));
+      push(`${cp}.pro_price_iqd`, numStr(cell.pro_price_iqd ?? null));
+      if (money) push(`${cp}.cost_iqd`, numStr(cell.cost_iqd ?? null));
+      if (cell.fulfillment_type === 'pre_order') {
+        push(`${cp}.lead_time_text`, cell.lead_time_text ?? '');
+        push(`${cp}.lead_time_min_days`, numStr(cell.lead_time_min_days ?? null));
+        push(`${cp}.lead_time_max_days`, numStr(cell.lead_time_max_days ?? null));
+        (cell.transports ?? []).forEach((t, ti) => {
+          const tp = `${cp}.transports.${ti + 1}`;
+          push(`${tp}.method`, t.method);
+          push(`${tp}.enabled`, boolStr(t.enabled !== false));
+          push(`${tp}.surcharge_iqd`, numStr(t.surcharge_iqd ?? null));
+          push(`${tp}.price_iqd`, numStr(t.regular_price_iqd ?? null));
+          push(`${tp}.prime_price_iqd`, numStr(t.prime_price_iqd ?? null));
+          push(`${tp}.pro_price_iqd`, numStr(t.pro_price_iqd ?? null));
+          push(`${tp}.lead_time_text`, t.lead_time_text ?? '');
+          push(`${tp}.lead_time_min_days`, numStr(t.lead_time_min_days ?? null));
+          push(`${tp}.lead_time_max_days`, numStr(t.lead_time_max_days ?? null));
+        });
+      }
+    }
   });
 
   sorted(doc.colors).forEach((cItem, i) => {
@@ -1513,6 +1701,33 @@ export function generateBlankTemplate(): string {
         lines.push(`${g.name}.1.rows.1.${spec.key}=${blankValue(spec)}`);
       }
     }
+    /**
+     * 0073. WHAT THIS MODEL DOES — commented out in the blank, and that is the
+     * point. The model above is what a new product needs; its order types are
+     * an answer only the owner has. A block that is PRESENT means "this model
+     * sells that way", so printing them live would declare every new product
+     * as selling both ways before anyone said so.
+     */
+    for (const [cellName, cell] of Object.entries(g.cellFields ?? {})) {
+      lines.push(`# ${'─'.repeat(50)}`);
+      lines.push(`# ${cell.titleAr} — ${cell.titleEn}`);
+      lines.push(`# احذف الكتلة كلها = هذا الموديل لا يُباع بهذه الطريقة.`);
+      lines.push(`# لإزالتها من منتج موجود عند التحديث: ${g.name}.1.${cellName}=${CLEAR_TOKEN}`);
+      lines.push(`# أزل علامة # من الأسطر التالية لتفعيلها.`);
+      for (const spec of cell.fields) {
+        lines.push(fieldComment(spec));
+        lines.push(`# ${g.name}.1.${cellName}.${spec.key}=${blankValue(spec)}`);
+      }
+      if (cell.list) {
+        lines.push(
+          `# ${cell.list.name}: كرر بـ ${g.name}.1.${cellName}.${cell.list.name}.2.… — كيف يصل الجهاز إلى العراق، وليس التوصيل داخل العراق.`
+        );
+        for (const spec of cell.list.fields) {
+          lines.push(fieldComment(spec));
+          lines.push(`# ${g.name}.1.${cellName}.${cell.list.name}.1.${spec.key}=${blankValue(spec)}`);
+        }
+      }
+    }
   }
   lines.push('');
   return lines.join('\n');
@@ -1604,6 +1819,71 @@ function applyItemField(target: LooseItem, spec: FieldSpec, pf: ParsedField): vo
   target[key] = pf.value;
 }
 
+/**
+ * 0073. THE MODEL'S ORDER TYPES, out of the file and into the document.
+ *
+ * A cell PRESENT in the file — even as just `options.1.direct.enabled=true` —
+ * means "this model sells that way". A cell ABSENT means the file says nothing
+ * about it, so whatever the product already has is preserved; that is the same
+ * omission rule every other field in this format follows, and it is what lets
+ * an owner edit one price without accidentally deleting a route.
+ *
+ * `options.N.<cell>=__CLEAR__` is how a cell is REMOVED — the same idiom the
+ * format already uses for a whole group, one level down. It needs its own
+ * statement because "the file did not mention it" and "the owner deleted it"
+ * have to be different things, or nothing could ever be taken away. And
+ * `enabled=false` is not a substitute: that is a configured order type
+ * switched OFF, which an admin needs to tell apart from one never set up.
+ */
+function buildCells(
+  g: GroupSpec,
+  it: ParsedGroupItem,
+  existing: LooseItem[] | null
+): LooseItem[] | undefined {
+  if (!g.cellFields) return undefined;
+  const parsedCells = it.cells;
+  if (!parsedCells || !Object.keys(parsedCells).length) return existing ?? undefined;
+
+  const TYPE_OF: Record<string, string> = { direct: 'direct_sale', preorder: 'pre_order' };
+  const kept = new Map<string, LooseItem>();
+  for (const prev of existing ?? []) kept.set(String(prev.fulfillment_type ?? ''), { ...prev });
+
+  for (const [cellName, cellSpec] of Object.entries(g.cellFields)) {
+    const parsed = parsedCells[cellName];
+    if (!parsed) continue;
+    const type = TYPE_OF[cellName] ?? cellName;
+
+    // `options.N.<cell>=__CLEAR__` removes it. Nothing else does: a file that
+    // simply does not mention a cell leaves it exactly as it was.
+    if (parsed.cleared) { kept.delete(type); continue; }
+
+    const cell: LooseItem = { ...(kept.get(type) ?? {}), fulfillment_type: type };
+    applyItemFields(cell, cellSpec.fields, parsed.fields);
+    // The file spells the item price `price_iqd`; the document (and the
+    // ladder, and the table) call it `regular_price_iqd` like every other rung.
+    if ('price_iqd' in cell) { cell.regular_price_iqd = cell.price_iqd; delete cell.price_iqd; }
+    if (cell.enabled === undefined) cell.enabled = true;
+
+    if (cellSpec.list && parsed.list) {
+      const prevList = Array.isArray(cell[cellSpec.list.name]) ? (cell[cellSpec.list.name] as LooseItem[]) : [];
+      const byMethod = new Map(prevList.map((x) => [String(x.method ?? ''), x]));
+      const out: LooseItem[] = [];
+      for (const entry of parsed.list) {
+        const method = String(entry.fields.method?.value ?? '').trim();
+        if (!method) continue;
+        const row: LooseItem = { ...(byMethod.get(method) ?? {}), method };
+        applyItemFields(row, cellSpec.list.fields, entry.fields);
+        if ('price_iqd' in row) { row.regular_price_iqd = row.price_iqd; delete row.price_iqd; }
+        if (row.enabled === undefined) row.enabled = true;
+        out.push(row);
+      }
+      cell[cellSpec.list.name] = out;
+    }
+    kept.set(type, cell);
+  }
+  return [...kept.values()];
+}
+
 function buildGroupItems(
   g: GroupSpec,
   templateItems: ParsedGroupItem[],
@@ -1639,6 +1919,8 @@ function buildGroupItems(
       }
     }
     if (g.rowFields) item.rows = buildRows(g, it, null, result);
+    const freshCells = buildCells(g, it, null);
+    if (freshCells) item.fulfillments = freshCells;
     return item;
   };
 
@@ -1658,6 +1940,8 @@ function buildGroupItems(
         const item: LooseItem = { ...base, order: orderIndex };
         applyItemFields(item, g.fields, it.fields);
         if (g.rowFields) item.rows = buildRows(g, it, (base.rows as LooseItem[]) ?? [], result);
+        const mergedCells = buildCells(g, it, (base.fulfillments as LooseItem[]) ?? []);
+        if (mergedCells) item.fulfillments = mergedCells;
         merged.push(item);
       } else {
         merged.push(buildFresh(it, orderIndex));

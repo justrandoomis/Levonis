@@ -210,6 +210,10 @@ export function relationsBodyFromDoc(
       lead_time_max_days: o.lead_time_max_days ?? null,
       variant_key: o.variant_key ?? '',
       variant_label: o.variant_label ?? '',
+      // 0073. The model's order types, when the FILE carried them. Absent
+      // means the file said nothing, and the writer then leaves whatever the
+      // product already has — the same omission rule as every other field.
+      ...(o.fulfillments ? { fulfillments: o.fulfillments } : {}),
       ...priceBag(o),
     });
   });
