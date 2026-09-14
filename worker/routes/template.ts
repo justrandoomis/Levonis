@@ -1,3 +1,4 @@
+import { exportTemplateMedia, prepareTemplateMedia, uploadTemplateMedia, MAX_TEMPLATE_CHARS, assertTemplateBodySize } from '../lib/templateMedia';
 /**
  * Admin TXT template pipeline routes (mandate §6) — mounted at
  * /api/admin/template. Deterministic parse/export only; NO AI anywhere.
@@ -91,7 +92,7 @@ import {
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
 
-const MAX_TEMPLATE_CHARS = 1_500_000;
+
 const MAX_ZIP_BYTES = 15 * 1024 * 1024;
 const MAX_ZIP_FILES = 100;
 
@@ -285,23 +286,25 @@ payment_options=
 # images.1.alt_ar=صورة المنتج
 
 # ------------------------------ الخيارات / options
-# السعر الأساسي (100000) هو الأرخص؛ كل خيار زيادة فوقه. التوفر حسب المنتج:
-# اترك availability_type فارغًا، فالبيع المباشر/الطلب المسبق يُسعَّر بزيادات
-# المنتج (direct_surcharge_iqd وطرق الشحن) لا بخيارات منفصلة.
+# options تمثل الموديلات فقط. Direct وPre-order إعدادان مستقلان لكل موديل.
 options.1.id=opt_example_small
 options.1.name_ar=المقاس الصغير
 options.1.name_en=Small
 options.1.active=true
 # __NULL__ = نفس السعر الأساسي (لا يساوي صفراً)
 options.1.regular_price_iqd=__NULL__
-options.1.availability_type=
+options.1.direct.enabled=true
+options.1.direct.stock=5
+options.1.preorder.enabled=false
 options.2.id=opt_example_large
 options.2.name_ar=المقاس الكبير
 options.2.name_en=Large
 options.2.active=true
 # +20000 = زيادة عشرين ألفًا فوق السعر الأساسي (تُخزَّن في regular_adjust_iqd)
 options.2.regular_price_iqd=+20000
-options.2.availability_type=
+options.2.direct.enabled=true
+options.2.direct.stock=5
+options.2.preorder.enabled=false
 
 # ------------------------------ الألوان / colors
 # اللون زيادة فوق سعر الخيار المختار (لون ← خيار ← أساسي)
@@ -1106,12 +1109,12 @@ templateRoutes.get('/export/:productId', async (c) => {
   // §11, the same gate the CSV export has always applied: an assistant admin
   // downloads the product without its cost, not the whole cost sheet.
   return attachment(
-    exportProduct(doc, {
+    await exportTemplateMedia(c.env, doc, exportProduct(doc, {
       ...opts,
       // Symmetric with the parser: the file says which level counts the stock.
       inventoryMode: loaded.view.inventory_mode,
       includeCost: canViewFinancials(c.env, c.get('user')!),
-    }),
+    })),
     `levonis-product-${doc.id}.txt`
   );
 });
@@ -1121,6 +1124,7 @@ templateRoutes.get('/export/:productId', async (c) => {
 templateRoutes.post('/parse', async (c) => {
   await rateLimit(c, 'tpl_parse', 240, 3600);
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  assertTemplateBodySize(body);
   const text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
 
   const a = await analyzeTemplate(c.env.DB, text, undefined, { money: canViewFinancials(c.env, c.get('user')) });
@@ -1197,6 +1201,7 @@ templateRoutes.post('/apply', async (c) => {
   await rateLimit(c, 'tpl_apply', 120, 3600);
   const adminUser = c.get('user')!;
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  assertTemplateBodySize(body);
   const text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
   const mode = oneOf(body.mode, 'mode', APPLY_MODES);
   if (body.confirm !== true) {
@@ -1286,7 +1291,7 @@ templateRoutes.post('/apply', async (c) => {
     );
   }
   if (a.validation_error) throw new HttpError(400, a.validation_error.message, a.validation_error.code);
-  const doc = a.doc!;
+  let doc = a.doc!;
   const merge = a.merge!;
   warnings.push(...merge.warnings);
   warnings.push(...priceWarnings(doc));
@@ -1337,6 +1342,8 @@ templateRoutes.post('/apply', async (c) => {
    * with no rows receiving its first option gets rows (docs/TXT_IMPORT_PARITY.md,
    * root causes 1 and 2). The old `hasRelationalStructure` gate is gone.
    */
+  const mediaImport = await prepareTemplateMedia(c.env, doc, text);
+  doc = mediaImport.doc;
   const relationsWanted = !isUpdate || touchesStructure(a.parsed) || merge.inventory_mode !== undefined;
   const bridge: BridgeDiagnostics = { warnings: [] };
   const relations = relationsWanted
@@ -1409,6 +1416,7 @@ templateRoutes.post('/apply', async (c) => {
 
   // ---- ONE batch: everything lands, or nothing does --------------------
   try {
+    await uploadTemplateMedia(c.env, doc.id, adminUser.id, mediaImport.uploads);
     await saveProductAtomic(c.env.DB, plan, [
       {
         action: 'template.apply',

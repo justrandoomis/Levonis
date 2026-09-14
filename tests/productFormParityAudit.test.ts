@@ -1,3 +1,4 @@
+import { parityMediaEnv } from './fixtures/media';
 /**
  * THE PARITY AUDIT (mandate §5): «أي شيء يمكن إدخاله يدويًا في ProductForm يجب
  * أن ينجو من TXT Create → Save → Reload بنفس النتيجة».
@@ -59,7 +60,7 @@ const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
 function setup() {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
-  return { raw, app: stubApp(asD1(raw), OWNER, mount) };
+  return { raw, app: stubApp(asD1(raw), OWNER, mount, { env: parityMediaEnv() }) };
 }
 
 const apply = async (a: App, text: string, extra: Record<string, unknown> = {}) => {

@@ -5,7 +5,7 @@ import type { Infer } from '../../schema';
 
 const shape = {
   product_id: id,
-  scope: obj({ table: oneOf('products', 'product_option_values', 'product_colors', 'product_variants'), id }), // the row whose stock moved
+  scope: obj({ table: oneOf('products', 'product_option_values', 'product_colors', 'product_variants', 'product_option_fulfillment'), id }), // the row whose stock moved
   delta: int, // signed
   stock_after: int,
   reserved_after: int,

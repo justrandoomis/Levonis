@@ -23,6 +23,7 @@
  */
 
 import { primaryMediaFirst, type MediaV2, type ProductDoc } from './productModel';
+import { attachModelAvailability } from './modelAvailability';
 import type { ColorV2, OptionV2 } from './pricing';
 import {
   loadProductRelations,
@@ -33,7 +34,6 @@ import {
 } from './productRelations';
 import { isInventoryMode, type InventoryMode, type InventorySnapshot } from './inventory';
 import {
-  availabilityFromName,
   normalizeAvailability,
   variantKeyFrom,
   variantLabelFallback,
@@ -246,7 +246,7 @@ export async function loadRelationsViews(
     return m;
   };
   const g = bucket(groups);
-  const v = bucket(values);
+  const v = bucket(await attachModelAvailability(db, values));
   const c = bucket(colors);
   const l = bucket(links);
   const vr = bucket(variants);
@@ -335,6 +335,8 @@ export function applyRelations(
     .filter((v) => showAll || truthy(v.active))
     .map((v) => ({
       id: v.id,
+      direct: v.direct,
+      preorder: v.preorder,
       name_ar: nameIn(v.name_ar, v.name_en),
       name_en: v.name_en,
       name_ckb: nameIn(v.name_ckb, v.name_en),
@@ -358,7 +360,7 @@ export function applyRelations(
       // before variant_key existed still names its model; the KEY falls back
       // to that label's slug rather than to name parsing, so grouping is
       // stable even for a legacy row.
-      availability_type: normalizeAvailability(v.availability_type) || availabilityFromName(v.name_en),
+      availability_type: normalizeAvailability(v.availability_type),
       lead_time_text: v.lead_time_text ?? '',
       lead_time_min_days: v.lead_time_min_days ?? null,
       lead_time_max_days: v.lead_time_max_days ?? null,
@@ -459,6 +461,8 @@ export function snapshotFrom(
     inventory_mode: view.inventory_mode,
     base,
     option_values: view.values.map((v) => ({
+      direct: v.direct,
+      preorder: v.preorder,
       id: v.id,
       group_id: v.group_id,
       name_en: v.name_en,

@@ -1129,6 +1129,7 @@ interface ComputedLine {
    *  Empty when the line is untracked. */
   stock_targets: StockTarget[];
   pricing_snapshot: string;
+  selection_snapshot?: string;
   warranty_snapshot: string | null;
   transport_snapshot: string | null;
   breakdown: ReturnType<typeof publicBreakdown>;
@@ -1327,7 +1328,7 @@ async function computeCheckout(
   );
   // Load and price the cart lines server-side.
   let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-                    ci.shipping_method_id, ci.transport_method, ci.warranty_plan_id, ci.draw_salt, p.*
+                    ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.local_delivery_method, ci.selection_snapshot, ci.warranty_plan_id, ci.draw_salt, p.*
                FROM cart_items ci JOIN products p ON p.id = ci.product_id
               WHERE ci.user_id = ?`;
   const params: unknown[] = [user.id];
@@ -1609,7 +1610,7 @@ async function computeCheckout(
           transportDefaults: pricingCtx.transportDefaults,
           inventory: snapshot,
           links: view?.links,
-          preferredType: sel.transportMethod ? 'pre_order' : null,
+          preferredType: sel.fulfillmentType ?? (sel.transportMethod ? 'pre_order' : 'direct_sale'),
         }),
         displayName
       );
@@ -1623,6 +1624,7 @@ async function computeCheckout(
       const stockRes = resolveStock(snapshot, {
         option_value_ids: sel.optionValueIds ?? [],
         color_id: sel.colorId || null,
+        fulfillment_type: sel.fulfillmentType ?? (sel.transportMethod ? 'pre_order' : 'direct_sale'),
       });
       if (stockRes.error === 'VARIANT_NOT_MODELLED') {
         throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
@@ -1692,6 +1694,7 @@ async function computeCheckout(
         applied_iqd: resolved.applied_iqd,
         tracked: stockRes.tracked,
         pricing_snapshot: JSON.stringify(offerSnapshot ? { ...pricingSnapshot, offer: offerSnapshot } : pricingSnapshot),
+        selection_snapshot: JSON.stringify({ ...resolved.selection_snapshot, product_id: String(row.id), option_id: sel.optionId || null, option_name: variantLabel, variant_key: doc.options.find((o) => o.id === sel.optionId)?.variant_key ?? '', local_delivery_method: input.deliveryMethodId, qty, product_name: displayName }),
         warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
         transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
         breakdown: publicBreakdown(resolved),
@@ -1978,6 +1981,21 @@ async function computeCheckout(
     shippingType,
     address,
     nowIso: new Date().toISOString(),
+  });
+
+  // Snapshot local delivery after the shipping engine and all delivery waivers
+  // have resolved. Allocate integer dinars across parent lines, with no loss.
+  const parents = priced.lines.filter((line) => !line.bundle_parent_item_id);
+  let deliveryLeft = settled.shipping.total_iqd;
+  const weight = parents.reduce((sum,line) => sum + line.line, 0);
+  parents.forEach((line, index) => {
+    const fee = index === parents.length - 1 ? deliveryLeft : Math.floor(settled.shipping.total_iqd * (weight > 0 ? line.line / weight : 1 / parents.length));
+    deliveryLeft -= fee;
+    const snapshot = line.selection_snapshot ? JSON.parse(line.selection_snapshot) : {};
+    line.selection_snapshot = JSON.stringify({ ...snapshot, local_delivery_method: input.deliveryMethodId,
+      resolved_delivery_fee: fee, resolved_line_merchandise: line.line,
+      resolved_line_final_price: line.line + fee, resolved_final_price: line.line + fee, resolved_quantity: line.qty, delivery_fee_scope: 'line',
+    });
   });
 
   const policies = await getRequiredCheckoutPolicies(c.env);
@@ -2571,8 +2589,8 @@ orderRoutes.post('/', async (c) => {
         `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot,
-           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd, selection_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         it.id, orderId,
         // §7.7: a MYSTERY SPOOL binds NULL here on purpose. It is the single
@@ -2592,7 +2610,8 @@ orderRoutes.post('/', async (c) => {
         it.mystery_spool ? null : it.pricing_snapshot,
         it.warranty_snapshot, it.transport_snapshot,
         it.bundle_parent_item_id ?? null, it.bundle_component_id ?? null,
-        it.component_value_iqd ?? null, it.component_alloc_iqd ?? null
+        it.component_value_iqd ?? null, it.component_alloc_iqd ?? null,
+        it.mystery_spool ? '{}' : it.selection_snapshot ?? '{}'
       )
     );
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and

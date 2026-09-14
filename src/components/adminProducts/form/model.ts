@@ -17,6 +17,7 @@
  */
 
 import type { ColorV2, MediaV2, OptionV2 } from '../../../lib/productTypes';
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
 
 export type SaleType = 'direct_sale' | 'pre_order' | 'bundle';
 export type InventoryMode = 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION';
@@ -39,7 +40,7 @@ export interface FormPrices {
   cost_adjust_iqd?: number | null;
 }
 
-export interface FormValue extends FormPrices {
+export interface FormValue extends FormPrices, ModelAvailability {
   id: string;
   name_en: string;
   /**
@@ -237,7 +238,7 @@ function warrantyRules(w: WarrantyFormInput, out: FormErrors): void {
 
 // ------------------------------------------------------------------ wire IO
 
-interface WireValue extends FormPrices {
+interface WireValue extends FormPrices, ModelAvailability {
   id: string;
   group_id: string;
   name_en: string;
@@ -345,6 +346,8 @@ export function parseComboKey(key: string): { option_value_ids: string[]; color_
 }
 
 const valueFromWire = (v: WireValue): FormValue => ({
+  direct: v.direct,
+  preorder: v.preorder,
   id: v.id,
   name_en: v.name_en,
   ...(typeof v.name_ar === 'string' && v.name_ar !== '' ? { name_ar: v.name_ar } : {}),
@@ -545,6 +548,8 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
       stock: o.stock ?? null,
       low_stock_threshold: o.low_stock_threshold ?? null,
       ...docPrices(o),
+      direct: o.direct,
+      preorder: o.preorder,
       availability_type: readAvailability(o.availability_type),
       lead_time_text: o.lead_time_text ?? '',
       lead_time_min_days: o.lead_time_min_days ?? null,
@@ -655,6 +660,8 @@ export function relationsToWire(rel: RelationsState) {
       sort: gi,
       active: g.active,
       values: g.values.map((v, vi) => ({
+        direct: v.direct,
+        preorder: v.preorder,
         id: v.id,
         name_en: v.name_en,
         name_ar: v.name_ar ?? '',

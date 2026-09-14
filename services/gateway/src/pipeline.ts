@@ -269,7 +269,25 @@ export async function handle(c: GatewayContext, deps: PipelineDeps): Promise<Res
   }
 
   // --------------------------------------------------------------- step 11
-  const decision = rule.cacheable ? canCache(req, isOn(env.CACHE_MODE)) : null;
+  let decision = rule.cacheable ? canCache(req, isOn(env.CACHE_MODE)) : null;
+  if (path === '/api/products/cache-generation') decision = null;
+  if (decision && /^(?:\/api\/(?:products|home|bundles|storefront|v1\/search)(?:\/|$)|\/files\/)/.test(path)) {
+    try {
+      const revisionUrl = new URL('/api/products/cache-generation', req.url).href;
+      const revisionHeaders = sanitizeHeaders(new Headers(), cid);
+      revisionHeaders.set(HOST_HEADER, `${host.kind};${host.slug ?? ''}`);
+      if (signer) revisionHeaders.set(HOP_HEADER, JSON.stringify(await signHop(signer, {
+        method: HTTP_FORWARD_METHOD, args: forwardArgs('GET', revisionUrl, revisionHeaders.get(HOST_HEADER)),
+        principalHeader: null, nowSeconds: Math.floor((deps.now ?? Date.now)() / 1000),
+      })));
+      const revisionResponse = await env.CORE!.fetch(new Request(revisionUrl, { headers: revisionHeaders }));
+      const generation = await revisionResponse.json() as { revision?: number };
+      if (!revisionResponse.ok || !Number.isSafeInteger(generation.revision)) throw new Error('Catalog generation unavailable');
+      const key = new URL(decision.key);
+      key.searchParams.set('__catalog_revision', String(generation.revision));
+      decision = { ...decision, key: key.href };
+    } catch { decision = null; } // An unavailable primary cannot authorize stale data.
+  }
   if (decision && deps.cache) {
     const hit = await deps.cache.match(decision.key);
     if (hit) {

@@ -46,6 +46,8 @@
  */
 
 import { badRequest, notFound, str, int, HttpError } from './http';
+import { readModelAvailability, modelAvailabilityStatements } from './modelAvailability';
+import type { ModelAvailability } from '@levonis/pricing/fulfillment';
 import { newId } from './crypto';
 import { audit } from './audit';
 import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
@@ -360,7 +362,7 @@ export interface RelationsSummary {
 export interface RequestedRelations {
   inventory_mode: InventoryMode;
   groups: Array<{ id: string; name_en: string; sort: number; active: number }>;
-  values: Array<{
+  values: Array<ModelAvailability & {
     id: string;
     group_id: string;
     name_en: string;
@@ -483,28 +485,23 @@ export async function planRelationsWriteFrom(
       const prices = readPrices(v, where);
       errors.push(...validatePriceLadder(prices, where, baseLadder));
       const name = str(v.name_en, `${where}.name_en`, { max: 80 });
-      // 0043. Unknown words become '' (inherit) rather than an error: this
-      // endpoint is also how an old client saves an old product, and refusing
-      // a field it has never heard of would break editing the catalogue.
+      // Legacy availability belongs to the TXT conversion adapter. This
+      // writer accepts real models with independent fulfillment rows only.
       const availability = normalizeAvailability(v.availability_type);
+      if (availability) throw badRequest(`${where}: availability_type is import-only; use direct/preorder on one model`);
       const leadText = str(v.lead_time_text, `${where}.lead_time_text`, { max: 120, required: false }) ?? '';
       const leadMin = nullableInt(v.lead_time_min_days, `${where}.lead_time_min_days`, 3650);
       const leadMax = nullableInt(v.lead_time_max_days, `${where}.lead_time_max_days`, 3650);
       if (leadMin !== null && leadMax !== null && leadMin > leadMax) {
         errors.push(`${where}: lead_time_min_days is after lead_time_max_days`);
       }
-      // A direct-sale option has no journey to wait for, so a lead time on one
-      // is a contradiction the admin should see rather than a value to store.
-      if (availability === 'direct_sale' && (leadText.trim() || leadMin !== null || leadMax !== null)) {
-        errors.push(`${where}: a direct-sale option has no lead time`);
-      }
       const label = str(v.variant_label, `${where}.variant_label`, { max: 80, required: false }) ?? '';
       const key = str(v.variant_key, `${where}.variant_key`, { max: 60, required: false }) ?? '';
-      // The label falls back to the option's own name with the availability
-      // suffix removed, and the key to that label's slug — so a product saved
-      // by a client that does not know these fields still groups correctly.
+      // Keep a stable model label/key when a client omits optional identity
+      // fields. Legacy suffix normalization does not create availability rows.
       const effectiveLabel = label.trim() || variantLabelFallback(name);
       valueInputs.push({
+        ...readModelAvailability(v, where),
         id: typeof v.id === 'string' && v.id ? v.id : newId('ov'),
         group_id: g.id,
         name_en: name,
@@ -521,8 +518,8 @@ export async function planRelationsWriteFrom(
         prices,
         availability_type: availability,
         lead_time_text: leadText,
-        lead_time_min_days: availability === 'direct_sale' ? null : leadMin,
-        lead_time_max_days: availability === 'direct_sale' ? null : leadMax,
+        lead_time_min_days: leadMin,
+        lead_time_max_days: leadMax,
         variant_key: key.trim() || variantKeyFrom(effectiveLabel),
         variant_label: effectiveLabel,
       });
@@ -691,8 +688,8 @@ export async function planRelationsWriteFrom(
   const reservedOfColor = new Map(existing.colors.map((c) => [c.id, c.reserved ?? 0]));
   const reservedOfVariant = new Map(snap.existingVariants.map((v) => [v.id, v.reserved ?? 0]));
   for (const v of existing.values) {
-    if (!keptValues.has(v.id) && (v.reserved ?? 0) > 0) {
-      errors.push(`Option "${v.name_en}" has ${v.reserved} unit(s) reserved for live orders and cannot be removed`);
+    if (!keptValues.has(v.id) && ((v.reserved ?? 0) + (v.direct?.reserved ?? 0) + (v.preorder?.reserved ?? 0)) > 0) {
+      errors.push(`Option "${v.name_en}" has ${(v.reserved ?? 0) + (v.direct?.reserved ?? 0) + (v.preorder?.reserved ?? 0)} unit(s) reserved for live orders and cannot be removed`);
     }
   }
   for (const col of existing.colors) {
@@ -709,6 +706,12 @@ export async function planRelationsWriteFrom(
   // Reserved units are promised to customers; a count that cannot cover them
   // is not a correction but an oversell waiting to happen.
   for (const v of valueInputs) {
+    const previous = existing.values.find((o) => o.id === v.id);
+    for (const kind of ['direct', 'preorder'] as const) {
+      const held = previous?.[kind]?.reserved ?? 0;
+      const next = v[kind];
+      if (held > 0 && next !== undefined && (next.stock == null || next.stock < held)) errors.push(`Model "${v.name_en}" ${kind}: stock cannot discard ${held} reserved unit(s)`);
+    }
     const reserved = reservedOfValue.get(v.id) ?? 0;
     if (v.stock !== null && v.stock < reserved) {
       errors.push(`Option "${v.name_en}": stock ${v.stock} is below the ${reserved} unit(s) reserved for live orders`);
@@ -1005,6 +1008,8 @@ export async function planRelationsWriteFrom(
     );
   }
 
+  for (const v of valueInputs) stmts.push(...modelAvailabilityStatements(db, productId, v.id, v, money));
+
   // Now the rows the payload dropped. A value or colour an open order names is
   // deactivated rather than deleted, exactly as a variant is.
   const retainedValueIds = new Set(retainedValues.map((v) => v.id));
@@ -1287,6 +1292,8 @@ function plannedRelationsView(
       const stored = storedValue.get(v.id);
       return {
         id: v.id,
+        direct: v.direct ?? stored?.direct,
+        preorder: v.preorder ?? stored?.preorder,
         product_id: productId,
         group_id: v.group_id,
         name_en: v.name_en,

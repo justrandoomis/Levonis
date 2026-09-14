@@ -19,6 +19,30 @@ const STORE = 'https://ali3d.levonis-iq.com';
 
 const request = (url: string, init: RequestInit = {}) => req(url, init);
 
+test('a committed catalog revision invalidates cached product/slug/list answers in every POP; failed revision reads fail closed', async () => {
+  let revision = 1; let deleted = false; let revisionUnavailable = false;
+  const core = { fetch: async (r: Request) => {
+    if (new URL(r.url).pathname === '/api/products/cache-generation') return Response.json({ revision }, { status: revisionUnavailable ? 503 : 200 });
+    return Response.json({ success: true, products: deleted ? [] : [{ id: 'product' }] });
+  } };
+  const env = makeEnv({ CORE: core, CACHE_MODE: 'on' });
+  const pops = [new MemoryEdgeCache(), new MemoryEdgeCache()];
+  const apps = pops.map(cache => createApp({ cache }));
+  const call = (i: number) => apps[i].fetch(request(`${APEX}/api/products?__catalog_revision=forged`), env as unknown as Record<string, unknown>);
+  for (let i = 0; i < apps.length; i++) {
+    assert.deepEqual((await (await call(i)).json() as { products: unknown[] }).products, [{ id: 'product' }]);
+    assert.equal(pops[i].puts, 1);
+  }
+  deleted = true; revision++;
+  for (let i = 0; i < apps.length; i++) {
+    assert.deepEqual((await (await call(i)).json() as { products: unknown[] }).products, []);
+    assert.equal(pops[i].puts, 2, 'old physical entries can remain, but are unreachable');
+  }
+  revisionUnavailable = true; deleted = false;
+  assert.deepEqual((await (await call(0)).json() as { products: unknown[] }).products, [{ id: 'product' }], 'bypass every cached generation when the primary cannot answer');
+  assert.equal(pops[0].puts, 2);
+});
+
 test('only an anonymous GET of an allowlisted path is a candidate', () => {
   assert.ok(canCache(request(`${APEX}/api/products`), true));
   assert.equal(canCache(request(`${APEX}/api/products`), false), null, 'CACHE_MODE off is off');

@@ -81,12 +81,14 @@ pipeline**, so everything you write is applied literally.
   increase on import — the resolved prices never change. (The rewrite runs
   only when the file carries `options.*`/`colors.*` rows; `+N` on the price
   line wins over an untouched `*_adjust_iqd=__NULL__` line beneath it.)
-- **التوفر حسب المنتج.** اترك `options.N.availability_type` فارغًا؛ فرق البيع
-  المباشر زيادة على المنتج (`direct_surcharge_iqd`) وكل طريقة طلب مسبق زيادة
-  (`transports.N.commission_iqd`، وتُقبل بكلمة الواجهة `surcharge_iqd`) —
-  لا حاجة لخيارَين منفصلَين «بيع مباشر» و«طلب مسبق» لنفس النسخة.
-  Availability follows the product: leave the option's type empty; the
-  direct-sale premium and each pre-order route are product-level increases.
+- **الموديل مستقل عن التوفر والنقل.** كل `options.N` نسخة حقيقية واحدة.
+  اكتب `options.N.direct.enabled` وأسعار ومخزون البيع المباشر، ثم
+  `options.N.preorder.enabled` وأسعاره و`options.N.preorder.transports.M.*`.
+  الطرق `air|sea|land` لجلب الطلب؛ `standard_delivery_*` و`personal_delivery_*`
+  للتوصيل المحلي بعده. `transports.N.*` و`direct_surcharge_iqd` افتراضيات فقط:
+  تخصيص الموديل يحل محلها ولا يجمع معها. `availability_type` مدخل قديم فقط؛
+  يجمع المستورد صفوفه ذات `variant_key` المشترك ولا يحفظها كخيارات مستقلة.
+  See [the current architecture and examples](PRODUCT_ARCHITECTURE.md).
 - لربط لون بخيار: أعطِ الخيار `id` ثابتاً واستخدمه في `colors.N.option_id`،
   أو استخدم `colors.N.option_index=2` للإشارة إلى `options.2` في نفس الملف.
   To link a color to an option use ids, or `option_index` within one file.

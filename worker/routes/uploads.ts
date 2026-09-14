@@ -185,6 +185,7 @@ fileRoutes.get('/*', async (c) => {
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
   if (!publicPrefix) headers.set('Cache-Control', 'private, max-age=300');
+  else if (key.startsWith('products/')) headers.set('Cache-Control', 'no-store');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
   return new Response(obj.body, { headers });

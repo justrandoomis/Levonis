@@ -20,6 +20,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
+import { deleteProductPermanently } from '../lib/productDeletion';
 import {
   parseProductRow,
   validateProductDoc,
@@ -41,7 +42,7 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
-import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
+import { compositionConflict } from '../lib/bundleComposition';
 import {
   localizeRespectingAuthored,
   planProductSave,
@@ -1059,62 +1060,12 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
   });
 });
 
-/**
- * Archive policy: products referenced by any order become status='hidden'
- * (order history must keep resolving); otherwise a hard delete, including
- * catalog placements.
- */
+/** Explicit, permanent deletion uses the same dependency/outbox workflow as
+ * the canonical admin endpoint. Historical orders are independent snapshots. */
 adminProductsRoutes.delete('/:id', async (c) => {
-  const admin = c.get('user')!;
-  const id = c.req.param('id');
-  const row = await c.env.DB.prepare('SELECT id, name_ar, name FROM products WHERE id = ?')
-    .bind(id)
-    .first<Record<string, unknown>>();
-  if (!row) throw notFound('Product not found');
-
-  // A MEMBER OF A BUNDLE IS NEVER DELETED SILENTLY.
-  // `bundle_components.member_product_id` is ON DELETE RESTRICT on purpose, so
-  // the raw delete below would fail on a foreign key with a message no admin
-  // can read. This names the bundles instead — one indexed read through
-  // idx_bundle_components_member.
-  const usedBy = await bundlesUsing(c.env.DB, id);
-  if (usedBy.length) {
-    throw new HttpError(
-      409,
-      `هذا المنتج مكوّن في ${usedBy.length} حزمة / this product is a component of ${usedBy.length} bundle(s): ${usedBy
-        .map((b) => b.name)
-        .join(', ')}`,
-      'COMPOSITION_PRODUCT',
-      { bundles: usedBy }
-    );
-  }
-
-  const ref = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM order_items WHERE product_id = ?')
-    .bind(id)
-    .first<{ n: number }>();
-  const refs = ref?.n ?? 0;
-
-  if (refs > 0) {
-    await c.env.DB.prepare(
-      "UPDATE products SET status = 'hidden', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
-    )
-      .bind(id)
-      .run();
-    await audit(c.env.DB, admin.id, 'product_v2.archive', id, { order_item_refs: refs });
-    return c.json({
-      success: true,
-      archived: true,
-      deleted: false,
-      reason: 'Referenced by past orders — hidden instead of deleted.',
-    });
-  }
-
-  await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id),
-  ]);
-  await audit(c.env.DB, admin.id, 'product_v2.delete', id, {});
-  return c.json({ success: true, archived: false, deleted: true });
+  if (c.req.query('permanent') !== 'true') throw badRequest('Use permanent=true for permanent deletion');
+  const report = await deleteProductPermanently(c.env, c.req.param('id'), c.get('user')!.id);
+  return c.json({ success: true, deleted: report.product_deleted || report.already_deleted, ...report });
 });
 
 /** Replace this product's catalog placements with exactly catalog_ids. */
@@ -1166,6 +1117,7 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
     optionId: typeof body.optionId === 'string' && body.optionId ? body.optionId : null,
     colorId: typeof body.colorId === 'string' && body.colorId ? body.colorId : null,
     transportMethod: typeof body.transportMethod === 'string' ? body.transportMethod : null,
+    fulfillmentType: body.fulfillmentType === 'pre_order' ? 'pre_order' : body.fulfillmentType === 'direct_sale' ? 'direct_sale' : undefined,
     warrantyPlanId: typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null,
     tier,
     tierActive: tier !== 'free', // admin preview assumes the previewed tier is active

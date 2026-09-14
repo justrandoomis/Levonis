@@ -1,0 +1,80 @@
+{
+  "recorded_at": "2026-09-14T11:38:43.519084+00:00",
+  "environment": "local isolated repository worktree; external network disabled for tests and native proof",
+  "production_deployed": false,
+  "production_orphan_dry_run": "not run: no authorized live D1/R2 or admin session connection available",
+  "production_orphan_cleanup_performed": false,
+  "typecheck": {
+    "exit_code": 0,
+    "commands": [
+      "tsc --noEmit",
+      "tsc --noEmit -p worker/tsconfig.json",
+      "tsc --noEmit -p tests/tsconfig.json",
+      "npm run check:workspaces"
+    ],
+    "workspaces_and_probes": 10
+  },
+  "tests": {
+    "total_pass": 2929,
+    "root_command": "node --import tsx --test --test-concurrency=6 tests/*.test.ts",
+    "workspaces_command": "npm run test:workspaces",
+    "network_preload": "tests/fixtures/offline.cjs",
+    "suites": [
+      {
+        "suite": "root",
+        "exit_code": 0,
+        "duration_seconds": 173.29,
+        "tests": 2567,
+        "pass": 2567,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      {
+        "suite": "workspaces",
+        "exit_code": 0,
+        "duration_seconds": 6.89,
+        "tests": 362,
+        "pass": 362,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      }
+    ]
+  },
+  "eslint": {
+    "command": "npm run lint",
+    "exit_code": 0,
+    "errors": 0,
+    "warnings": 116
+  },
+  "build": {
+    "command": "npm run build",
+    "exit_code": 0,
+    "asset_headers_generated": true
+  },
+  "native_d1_r2": {
+    "command": "node --import tsx scripts/verify-product-architecture.ts",
+    "exit_code": 0,
+    "migrations_applied": 75,
+    "evidence": "native-d1-r2.json",
+    "historical_order_items": 1,
+    "foreign_key_violations": 0,
+    "product_and_owned_rows_remaining": 0,
+    "unused_owned_r2_objects_remaining": 0,
+    "owned_r2_objects_deleted": 5,
+    "reimport": {
+      "success": true,
+      "fresh_product_id": true,
+      "restored_r2_objects": 5
+    }
+  },
+  "log_sha256": {
+    "tests-complete-root.log": "402d4d4305b065b5a21d595e24c3144f8d4bc1dc8fef6e03363c850d11ae747b",
+    "tests-complete-workspaces.log": "7e13be5a6a13ba7d9086ec86e36756ef4d7608458f0c2501f8429e8075cc5086",
+    "typecheck-final5.log": "f1f12e99d24292377f4cfcbdd64369c0402511f3aab917e756a6b1692087acee",
+    "lint-final6.log": "65d881799579c7a1c5e497f5dbecbaa0c4ec7faf6ae1af1edbf9b5c644a56b88",
+    "build-final6.log": "74bc71ae431d7a98343228dc30851d77e4ce782564bc882d2b1fe3a586cdfcb3",
+    "native-proof-final.log": "8742e3e770142711e2f53463f94e2695a9351116ba560ec5841a87ce3e4e9737"
+  }
+}

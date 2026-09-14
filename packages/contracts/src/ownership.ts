@@ -25,6 +25,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('catalog', [
     'products', 'product_option_groups', 'product_option_values', 'product_colors', 'product_color_option_links',
     'product_variants', 'product_images', 'product_facets', 'product_catalogs', 'product_translations', 'glossary',
+    'product_option_fulfillment', 'product_option_transports', 'product_option_aliases',
+    'product_deletion_jobs', 'product_orphan_reports', 'catalog_revision', 'historical_inventory_ledger', 'inventory_ledger_preserved',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
     // A bundle and a mystery offer ARE `products` rows (docs/BUNDLES_MYSTERY.md §1.2);
     // their composition is catalogue structure, beside options and colours.
@@ -46,7 +48,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'offer_windows', 'offer_limits', 'offer_redemptions',
     // What one order actually drew, frozen, and the candidate list it drew
     // against — per-order facts, written in the order's own batch (§1.9).
-    'mystery_allocations', 'mystery_draw_audits',
+    'mystery_allocations', 'mystery_draw_audits', 'mystery_allocations_preserved',
   ]),
   ...owned('fulfilment', ['order_status_history', 'delivery_status_map', 'order_fulfilment']),
   ...owned('ledger', [
@@ -64,7 +66,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
   ]),
-  ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
+  ...owned('reviews', ['reviews_preserved', 'reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts']),
   ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
   ...owned('notifications', [
@@ -98,7 +100,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
-  ...owned('files', ['file_objects', 'file_migration_log']),
+  ...owned('files', ['media_cleanup_jobs', 'media_cleanup_locks', 'file_objects', 'file_migration_log']),
 ];
 
 export const TABLE_OWNER: Readonly<Record<string, Owner>> = Object.fromEntries(TABLE_OWNER_ENTRIES);
