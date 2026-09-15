@@ -52,7 +52,13 @@ import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
 import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
 import { sha256Hex } from '@levonis/contracts/canonical';
 import { availabilityFromName, deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
-import { existingCellsFrom, fulfillmentStatements, legacyShapeErrors, parseFulfillmentPayload } from './optionFulfillment';
+import {
+  existingCellsFrom,
+  fulfillmentStatements,
+  legacyShapeErrors,
+  parseFulfillmentPayload,
+  refuseStrandedCapacity,
+} from './optionFulfillment';
 import {
   normalizeSaleTypes,
   parseProductRow,
@@ -2016,15 +2022,14 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
        * before the cells inside `fulfillmentStatements`: a row is written after
        * the row it names.
        */
-      cellStatements.push(
-        ...fulfillmentStatements(
-          db,
-          productId,
-          parsed,
-          undefined,
-          existingCellsFrom(liveCells.results ?? [], liveRoutes.results ?? [])
-        )
-      );
+      const existing = existingCellsFrom(liveCells.results ?? [], liveRoutes.results ?? []);
+      // 0075. THE SAME REFUSALS THE ADMIN PANEL RAISES, ON THE FILE DOOR TOO.
+      // A spreadsheet is the likeliest way to cut a quota below the units
+      // already held, or to drop a cell that is holding some, precisely
+      // because nobody reads it row by row — and either one strands a live
+      // pre-order whose release would then match no row at all.
+      refuseStrandedCapacity(existing, parsed);
+      cellStatements.push(...fulfillmentStatements(db, productId, parsed, undefined, existing));
     }
   }
 

@@ -330,6 +330,77 @@ export function existingCellsFrom(
 }
 
 /**
+ * A SAVE MAY NOT STRAND SOMEBODY'S PRE-ORDER (0075).
+ *
+ * Two ways it could, and both are refused here with the count rather than left
+ * to a constraint error:
+ *
+ *  1. REMOVING a cell or a route that is holding units. The hold lives in that
+ *    row's `capacity_reserved`, and `inventory_ledger.scope_id` names the row;
+ *    delete it and the release for a live order matches nothing, so the units
+ *    are never given back and no screen can show where they went. This is the
+ *    same rule `/:id/relations` already applies to a stock row with reserved
+ *    units, applied to the counter 0075 added.
+ *
+ * EVERY WRITER INHERITS IT, not just the admin panel. A TXT template and a
+ * CSV sheet reach the same rows through `planProductSave`, and a file is the
+ * likeliest way to cut a quota by accident — nobody reviews a spreadsheet row
+ * by row. So the check lives beside the statements it guards rather than in
+ * one route, and a caller that forgets to run it is the defect.
+ *
+ *  2. LOWERING a capacity BELOW what is already held. `available` would go
+ *    negative — clamped to 0 everywhere, so the shop looks merely sold out —
+ *    and then the `deduct` at confirmation, which guards on
+ *    `capacity >= qty`, would silently match nothing and leave a confirmed
+ *    order that never consumed its unit. An admin who really wants to cut the
+ *    quota must cancel the orders first, which is a decision, not a side
+ *    effect of a form save.
+ */
+export function refuseStrandedCapacity(existing: ExistingCells, cells: FulfillmentCell[]): void {
+  const keptCells = new Set(cells.map((c) => cellKey(c.option_id, c.fulfillment_type)));
+  const keptRoutes = new Set(
+    cells.flatMap((c) => c.transports.map((t) => transportKey(c.option_id, c.fulfillment_type, t.method)))
+  );
+
+  for (const [key, row] of existing.cells) {
+    if (row.capacity_reserved > 0 && !keptCells.has(key)) {
+      throw badRequest(
+        `This order type is holding ${row.capacity_reserved} pre-ordered unit(s) — cancel or fulfil those orders before removing it.`,
+        'CAPACITY_RESERVED'
+      );
+    }
+  }
+  for (const [key, row] of existing.transports) {
+    if (row.capacity_reserved > 0 && !keptRoutes.has(key)) {
+      throw badRequest(
+        `This transport route is holding ${row.capacity_reserved} pre-ordered unit(s) — cancel or fulfil those orders before removing it.`,
+        'CAPACITY_RESERVED'
+      );
+    }
+  }
+
+  for (const cell of cells) {
+    const held = existing.cells.get(cellKey(cell.option_id, cell.fulfillment_type))?.capacity_reserved ?? 0;
+    if (cell.capacity !== null && cell.capacity < held) {
+      throw badRequest(
+        `Capacity cannot be set below the ${held} unit(s) already held for live pre-orders.`,
+        'CAPACITY_BELOW_RESERVED'
+      );
+    }
+    for (const t of cell.transports) {
+      const routeHeld =
+        existing.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method))?.capacity_reserved ?? 0;
+      if (t.capacity !== null && t.capacity < routeHeld) {
+        throw badRequest(
+          `${t.method}: capacity cannot be set below the ${routeHeld} unit(s) already held for live pre-orders.`,
+          'CAPACITY_BELOW_RESERVED'
+        );
+      }
+    }
+  }
+}
+
+/**
  * THE STATEMENTS THAT MAKE THE PRODUCT'S CELLS EXACTLY THIS SET.
  *
  * Delete-then-insert rather than a diff, for the same reason the structure

@@ -205,6 +205,51 @@ test('a save that does NOT mention fulfillments leaves the cells, and their hold
   assert.deepEqual(routes(raw), before.routes);
 });
 
+test('a FILE may not cut a capacity below the units already held', async () => {
+  const raw = seed();
+  // The cell holds 2; the file asks for 1. The admin panel has refused this
+  // since 0075 landed; the template and CSV doors reach the same rows through
+  // planProductSave, and nobody reads a spreadsheet row by row.
+  await assert.rejects(
+    () => save(raw, relationsBody({ capacity: 1 })),
+    (e: Error & { code?: string }) => e.code === 'CAPACITY_BELOW_RESERVED',
+    'a quota below the hold makes available negative, and the deduct at confirmation then matches nothing'
+  );
+  assert.equal(cells(raw)[0].capacity, 5, 'and the refusal leaves the stored quota exactly as it was');
+});
+
+test('a FILE may not drop a route that is holding units', async () => {
+  const raw = seed();
+  const body = relationsBody() as Record<string, unknown>;
+  const value = (body.groups as Array<{ values: Array<Record<string, unknown>> }>)[0].values[0];
+  (value.fulfillments as Array<Record<string, unknown>>)[0].transports = [];
+
+  await assert.rejects(
+    () => save(raw, body),
+    (e: Error & { code?: string }) => e.code === 'CAPACITY_RESERVED',
+    'inventory_ledger.scope_id names that route; delete it and the release finds nothing to give back to'
+  );
+  assert.equal(routes(raw).length, 1, 'the route is still there');
+  assert.equal(routes(raw)[0].capacity_reserved, 1);
+});
+
+test('a FILE may lower a capacity down TO the units held, but not past them', async () => {
+  const raw = seed();
+  await save(raw, relationsBody({ capacity: 2 }));
+  assert.equal(cells(raw)[0].capacity, 2, 'exactly the held count is legal — it means "no more places"');
+  assert.equal(cells(raw)[0].capacity_reserved, 2);
+});
+
+test('__CLEAR__/untracked from a file keeps the row and its hold', async () => {
+  const raw = seed();
+  // null = untracked. It is not a way to zero a counter, and it must not be a
+  // way to lose the units the counter is holding.
+  await save(raw, relationsBody({ capacity: null, routeCapacity: null }));
+  assert.equal(cells(raw)[0].capacity, null);
+  assert.equal(cells(raw)[0].capacity_reserved, 2, 'the hold survives going untracked');
+  assert.equal(routes(raw)[0].capacity_reserved, 1);
+});
+
 test('existingCellsFrom skips a transport whose cell is gone rather than keying it wrongly', () => {
   const built = existingCellsFrom(
     [{ id: 'f_pre', option_id: 'v_mini', fulfillment_type: 'pre_order', capacity_reserved: 2 }],
