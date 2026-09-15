@@ -185,10 +185,23 @@ export const FROZEN_HISTORY: FrozenTable[] = [
  */
 export interface BlockingRef {
   table: string;
+  /** The column whose EXISTENCE proves the migration that added this ref ran. */
   column: string;
   code: string;
   /** What the admin has to do first. */
   remedy: string;
+  /**
+   * Replaces the default `column = ?1` when a table can name a product
+   * INDIRECTLY — through one of its models or one of its colours. Bind `?1`
+   * as many times as needed; the product id is bound once.
+   */
+  match?: string;
+  /**
+   * ANDed onto the count, so a row that is already switched off does not block
+   * a delete for ever. A blocking ref with no remedy the admin can actually
+   * perform is not a guard, it is a dead end.
+   */
+  where?: string;
 }
 
 export const BLOCKING_REFS: BlockingRef[] = [
@@ -203,6 +216,38 @@ export const BLOCKING_REFS: BlockingRef[] = [
     column: 'product_id',
     code: 'PRODUCT_IN_MYSTERY_POOL',
     remedy: 'Remove this product from every mystery pool, then delete it.',
+  },
+  /**
+   * A COUPON THAT NAMES A PRODUCT MUST NEVER SILENTLY BECOME A COUPON THAT
+   * NAMES EVERYTHING.
+   *
+   * 0077 lets a coupon target a product, one of its MODELS, one of its COLOURS
+   * or a bundle. If the product were deleted underneath it, the row would
+   * survive with a target that no longer resolves — and a resolver that cannot
+   * find the named product has only two options, both wrong: refuse the coupon
+   * the owner is still advertising, or match nothing and quietly widen a
+   * 950,000 IQD discount to the whole catalogue. So the delete is refused
+   * instead, with a remedy the admin can actually carry out.
+   *
+   * ONLY AN ACTIVE COUPON BLOCKS. A campaign that ended must not pin a product
+   * in the catalogue for ever, and `active = 0` is one click away.
+   *
+   * The indirect arms matter as much as the direct one: deleting a product
+   * takes its `product_option_values` and `product_colors` rows with it, so a
+   * coupon scoped to "A1 Combo in black" is orphaned by exactly the same
+   * delete that orphans one scoped to the A1 itself.
+   */
+  {
+    table: 'coupons',
+    column: 'product_id',
+    code: 'PRODUCT_IN_COUPON',
+    remedy:
+      'Deactivate or retarget every active coupon that names this product, one of its models, one of its colours, or a bundle built on it — then delete it.',
+    where: 'active = 1',
+    match: `(product_id = ?1
+             OR bundle_product_id = ?1
+             OR option_value_id IN (SELECT id FROM product_option_values WHERE product_id = ?1)
+             OR color_id IN (SELECT id FROM product_colors WHERE product_id = ?1))`,
   },
 ];
 
@@ -479,8 +524,10 @@ export async function blockingReferences(db: DeletionDb, productId: string): Pro
   for (const ref of BLOCKING_REFS) {
     const cols = await columnsOf(db, ref.table);
     if (!cols.has(ref.column)) continue;
+    const predicate = ref.match ?? `"${ref.column}" = ?1`;
+    const guard = ref.where ? ` AND (${ref.where})` : '';
     const row = await db
-      .prepare(`SELECT COUNT(*) AS n FROM "${ref.table}" WHERE "${ref.column}" = ?`)
+      .prepare(`SELECT COUNT(*) AS n FROM "${ref.table}" WHERE ${predicate}${guard}`)
       .bind(productId)
       .first<{ n: number }>();
     const count = Number(row?.n ?? 0);
