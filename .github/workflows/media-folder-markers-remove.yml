@@ -1,0 +1,327 @@
+# ---------------------------------------------------------------------------
+#   REMOVE THE FOUR ZERO-BYTE FOLDER MARKERS FROM THE LEGACY MEDIA BUCKET
+# ---------------------------------------------------------------------------
+# WHAT THESE OBJECTS ARE
+# ----------------------
+# The Cloudflare dashboard creates a zero-byte object whose key ends in `/` to
+# make an empty "folder" visible. R2 has no directories; these are the whole
+# illusion. Four of them sit in levonis-files-staging:
+#
+#     UiUx/            0 B
+#     UiUx/Animation/  0 B
+#     UiUx/Icons/      0 B
+#     UiUx/Logo/       0 B
+#
+# They carry no content and nothing references them. `isSafeMediaKey` refuses
+# any key with an empty path segment, so the Worker will not serve one from any
+# bucket, and workflow 38 therefore reports all four as BLOCKED — which makes
+# its manifest unclean, which makes its prune job unreachable. Removing them is
+# what lets that migration finish.
+#
+# WHY THIS IS A SEPARATE WORKFLOW
+# -------------------------------
+# Deleting a marker looks exactly like deleting a folder, and in S3 it is not:
+# `UiUx/Logo/` and `UiUx/Logo/Logo.webp` are two unrelated keys that merely
+# share a prefix. One is an empty artefact; the other is the shop's logo. A job
+# that can delete the first must be incapable of touching the second, and the
+# only way to be sure of that is to make the set of deletable keys a CONSTANT
+# in the script rather than anything an operator can type.
+#
+# THE FIVE THINGS PROVEN BEFORE EACH DELETE
+# -----------------------------------------
+#   1. the key is one of the four literals below, compared exactly;
+#   2. head-object says ContentLength is 0 — a marker holds nothing;
+#   3. it is shaped like a marker: ends in `/`, has an empty path segment, and
+#      `isSafeMediaKey` (this repository's own rule) refuses it;
+#   4. every object UNDER that prefix is listed and recorded first, so what the
+#      delete must NOT touch is written down before it runs;
+#   5. after the delete, that prefix is listed again and every recorded child
+#      must still be present, byte-for-byte the same size.
+#
+# The delete itself is `aws s3api delete-object` with a single `--key`. None of
+# the bulk or prefix-capable forms of deletion appear anywhere in this file, and
+# tests/mediaBuckets.test.ts bans each of them by name — which is why this
+# paragraph describes them rather than spelling them, since that test reads the
+# whole file including its comments.
+#
+# This workflow NEVER deletes a bucket, and it never touches the destination
+# buckets at all — it opens only the legacy source bucket.
+name: 39 - Remove the four zero-byte folder markers (gated, exact keys only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type REMOVE-FOLDER-MARKERS to delete the four zero-byte markers. Nothing else is deletable by this workflow.'
+        required: true
+        default: ''
+      source_bucket:
+        description: 'The legacy bucket holding the markers'
+        required: true
+        default: 'levonis-files-staging'
+      dry_run:
+        description: 'true = prove everything and delete nothing (recommended first run)'
+        required: false
+        default: 'false'
+
+concurrency: media-bucket-move
+
+jobs:
+  markers:
+    name: Prove and remove the four folder markers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # The same R2 S3 credential workflow 38 uses, read under whichever of the
+      # two names this repository stores it. The values are never printed.
+      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID || secrets.R2_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY || secrets.R2_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - name: Confirmation gate
+        run: |
+          [ "${{ inputs.confirm }}" = "REMOVE-FOLDER-MARKERS" ] \
+            || { echo "::error::type REMOVE-FOLDER-MARKERS in the confirm input — aborting, nothing was touched"; exit 1; }
+
+      - name: The bucket name must be a bucket name
+        run: |
+          set -e
+          SRC='${{ inputs.source_bucket }}'
+          case "$SRC" in
+            ''|*[!a-z0-9-]*) echo "::error::\"$SRC\" is not a plain R2 bucket name"; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Preflight — credentials, tooling, and that the bucket exists
+        run: |
+          set -e
+          command -v aws >/dev/null \
+            || { echo "::error::the AWS CLI is not on this runner, and R2's object API is S3-only"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] \
+            || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID is not set"; exit 1; }
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::No R2 S3 credential is configured. This job reads, in order:"
+            echo "::error::  CLOUDFLARE_R2_ACCESS_KEY_ID / CLOUDFLARE_R2_SECRET_ACCESS_KEY"
+            echo "::error::  R2_S3_ACCESS_KEY_ID / R2_S3_SECRET_ACCESS_KEY"
+            exit 1
+          fi
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          echo "R2_ENDPOINT=$ENDPOINT" >> "$GITHUB_ENV"
+          aws s3api head-bucket --endpoint-url "$ENDPOINT" --bucket '${{ inputs.source_bucket }}' >/dev/null 2>&1 \
+            || { echo "::error::bucket \"${{ inputs.source_bucket }}\" does not exist on this account, or this token cannot see it."; exit 1; }
+          echo "bucket ok: ${{ inputs.source_bucket }}"
+
+      # Generated into scripts/ so tests/tsconfig.json typechecks it against the
+      # real worker/ sources it imports BEFORE it is allowed near R2. The
+      # marker test it applies is the Worker's own isSafeMediaKey, imported, not
+      # restated — the same discipline workflow 38 follows.
+      - name: Generate the marker runner
+        run: |
+          cat > ./scripts/media-folder-markers.gen.ts <<'TSEOF'
+          /**
+           * Remove four zero-byte folder markers, and nothing else, ever.
+           * Generated by .github/workflows/media-folder-markers-remove.yml.
+           */
+          import { execFileSync } from 'node:child_process';
+          import { isSafeMediaKey } from '../worker/lib/mediaStorage';
+
+          function required(name: string): string {
+            const value = process.env[name];
+            if (!value) throw new Error(`${name} is not set`);
+            return value;
+          }
+
+          const BUCKET = required('SOURCE_BUCKET');
+          const ENDPOINT = required('R2_ENDPOINT');
+          const DRY_RUN = process.env.DRY_RUN === 'true';
+
+          /**
+           * THE ONLY KEYS THIS SCRIPT MAY DELETE.
+           *
+           * A literal, not an input. An operator can choose the bucket and
+           * whether to run at all; they cannot choose the keys, so no typo and
+           * no crafted input can widen this to a prefix. Every candidate is
+           * compared against this array with ===.
+           */
+          const MARKERS = [
+            'UiUx/',
+            'UiUx/Animation/',
+            'UiUx/Icons/',
+            'UiUx/Logo/',
+          ] as const;
+
+          function aws(args: string[], expectJson = true): any {
+            const out = execFileSync(
+              'aws',
+              ['s3api', args[0], '--endpoint-url', ENDPOINT, '--output', 'json', ...args.slice(1)],
+              { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+            );
+            if (!expectJson) return null;
+            const text = out.trim();
+            return text ? JSON.parse(text) : null;
+          }
+
+          function awsOrNull(args: string[]): any {
+            try { return aws(args); } catch { return null; }
+          }
+
+          interface Child { key: string; size: number }
+
+          /** Every object whose key starts with this prefix, to the last page. */
+          function listUnder(prefix: string): Child[] {
+            const found: Child[] = [];
+            let token: string | null = null;
+            do {
+              const args = ['list-objects-v2', '--bucket', BUCKET, '--prefix', prefix,
+                            '--no-paginate', '--max-keys', '1000'];
+              if (token) args.push('--continuation-token', token);
+              const page = aws(args) ?? {};
+              for (const item of page.Contents ?? []) {
+                found.push({ key: String(item.Key), size: Number(item.Size) });
+              }
+              token = page.IsTruncated ? String(page.NextContinuationToken) : null;
+            } while (token);
+            return found;
+          }
+
+          /**
+           * Is this key a folder marker, by the repository's own rules rather
+           * than by how it looks to a human? All three must hold.
+           */
+          function markerShape(key: string): { ok: boolean; reasons: string[] } {
+            const reasons: string[] = [];
+            const endsInSlash = key.endsWith('/');
+            const hasEmptySegment = key.split('/').includes('');
+            const refused = !isSafeMediaKey(key);
+            reasons.push(`ends with "/": ${endsInSlash}`);
+            reasons.push(`has an empty path segment: ${hasEmptySegment}`);
+            reasons.push(`isSafeMediaKey refuses it: ${refused}`);
+            return { ok: endsInSlash && hasEmptySegment && refused, reasons };
+          }
+
+          let deleted = 0;
+          let skipped = 0;
+          const failures: string[] = [];
+
+          console.log(`bucket: ${BUCKET}`);
+          console.log(`mode:   ${DRY_RUN ? 'DRY RUN — proves everything, deletes nothing' : 'DELETE'}`);
+          console.log('');
+
+          for (const marker of MARKERS) {
+            console.log(`================ ${JSON.stringify(marker)}`);
+
+            // PROOF 1 — the key is one of the four literals, compared exactly.
+            const listed = MARKERS.filter((m) => m === marker);
+            if (listed.length !== 1) {
+              failures.push(`${marker}: not in the literal allow-list`);
+              continue;
+            }
+            console.log(`  [1] exact key match      : in the allow-list, and ${JSON.stringify(marker)} === itself`);
+
+            // PROOF 2 — it exists and holds zero bytes.
+            const head = awsOrNull(['head-object', '--bucket', BUCKET, '--key', marker]);
+            if (!head) {
+              // Already gone. Re-running must be a no-op, not an error.
+              console.log('  [2] head-object          : absent — already removed by an earlier run, skipping');
+              skipped++;
+              continue;
+            }
+            const size = Number(head.ContentLength);
+            console.log(`  [2] Content-Length       : ${size}`);
+            if (size !== 0) {
+              failures.push(`${marker}: ContentLength is ${size}, not 0 — this is not a marker, refusing`);
+              console.log('  ::error:: NOT ZERO BYTES — refusing to delete this key');
+              continue;
+            }
+
+            // PROOF 3 — it is shaped like a marker by this repository's rules.
+            const shape = markerShape(marker);
+            for (const reason of shape.reasons) console.log(`  [3] ${reason}`);
+            if (!shape.ok) {
+              failures.push(`${marker}: does not have folder-marker shape — refusing`);
+              console.log('  ::error:: NOT A FOLDER MARKER — refusing to delete this key');
+              continue;
+            }
+
+            // PROOF 4 — write down everything under this prefix FIRST. These are
+            // the objects the delete must not touch, and naming them before the
+            // delete is what makes the check afterwards mean anything.
+            const before = listUnder(marker).filter((c) => c.key !== marker);
+            console.log(`  [4] objects UNDER this prefix that must survive: ${before.length}`);
+            for (const child of before) console.log(`        keep: ${child.key}  (${child.size} B)`);
+
+            if (DRY_RUN) {
+              console.log('  [5] DRY RUN — no delete-object call was made');
+              skipped++;
+              continue;
+            }
+
+            // THE DELETE. One object, named in full, by its exact key.
+            // `delete-object` is the singular call: it takes exactly one --key
+            // and has no prefix form at all. It cannot reach a child even in
+            // principle, because in S3 a prefix is not a container.
+            aws(['delete-object', '--bucket', BUCKET, '--key', marker], false);
+            console.log(`  [-] DeleteObject         : single object, --key ${JSON.stringify(marker)}`);
+
+            // PROOF 5 — the marker is gone and every child is still there.
+            const gone = awsOrNull(['head-object', '--bucket', BUCKET, '--key', marker]);
+            if (gone) {
+              failures.push(`${marker}: still present after the delete`);
+              continue;
+            }
+            const after = new Map(listUnder(marker).map((c): [string, number] => [c.key, c.size]));
+            const lost = before.filter((c) => after.get(c.key) !== c.size);
+            if (lost.length > 0) {
+              // Nothing in the S3 API makes this reachable, which is exactly
+              // why it is worth asserting: if it ever fires, the assumption
+              // this whole workflow rests on was wrong.
+              for (const child of lost) {
+                failures.push(`${marker}: COLLATERAL DAMAGE — ${child.key} changed or disappeared`);
+                console.log(`  ::error:: ${child.key} did not survive the delete`);
+              }
+              continue;
+            }
+            console.log(`  [5] marker gone, ${before.length} child object(s) intact`);
+            deleted++;
+          }
+
+          console.log('');
+          console.log('===== SUMMARY =====');
+          console.log(`MARKERS DELETED: ${deleted}`);
+          console.log(`MARKERS SKIPPED: ${skipped}`);
+          console.log(`REFUSED/FAILED : ${failures.length}`);
+          console.log('DATA OBJECTS DELETED: 0');
+
+          // Whatever happened above, say what the bucket holds now.
+          const remaining = listUnder('UiUx/');
+          console.log('');
+          console.log('EVERYTHING STILL UNDER UiUx/ :');
+          for (const item of remaining) console.log(`  ${item.key}  (${item.size} B)`);
+          if (remaining.length === 0) console.log('  (nothing)');
+
+          if (failures.length > 0) {
+            console.error('');
+            for (const failure of failures) console.error(`  REFUSED  ${failure}`);
+            process.exit(1);
+          }
+          TSEOF
+          test -s ./scripts/media-folder-markers.gen.ts || { echo "::error::runner was not written"; exit 1; }
+          wc -l ./scripts/media-folder-markers.gen.ts
+
+      - name: Typecheck the runner against the repository it imports from
+        run: npx tsc --noEmit -p tests/tsconfig.json
+
+      - name: Prove each marker, then remove it
+        env:
+          SOURCE_BUCKET: ${{ inputs.source_bucket }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: npx tsx ./scripts/media-folder-markers.gen.ts

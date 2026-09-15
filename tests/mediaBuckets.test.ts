@@ -467,3 +467,80 @@ test('the docs the owner follows name the same buckets the config binds', () => 
   assert.ok(doc.includes('DELETE-LEGACY-SOURCE'), 'the doc must tell the owner the second phrase');
   assert.ok(doc.includes('media_legacy_fallback'), 'the doc must say how to tell the migration is finished');
 });
+
+// ------------------------------------------- 7. the folder-marker workflow
+//
+// `UiUx/Logo/` and `UiUx/Logo/Logo.webp` are two unrelated keys that share a
+// prefix; only the first is an empty artefact. A workflow that can remove the
+// marker must be structurally incapable of reaching the logo, and "structurally"
+// means the set of deletable keys is a constant in the file — not an input, not
+// a prefix, not a pattern. These tests are what stop that from being relaxed
+// later by someone who reads `--recursive` as a convenience.
+
+const MARKER_WORKFLOW = '.github/workflows/media-folder-markers-remove.yml';
+
+function markerRunner(): string {
+  const text = repoFile(MARKER_WORKFLOW);
+  const lines = text.split('\n').map((line) => line.replace(/^ {10}/, ''));
+  const start = lines.findIndex((l) => l.startsWith("cat > ./scripts/media-folder-markers.gen.ts <<'TSEOF'"));
+  const end = lines.findIndex((l, i) => i > start && l === 'TSEOF');
+  assert.ok(start >= 0 && end > start, 'the marker workflow no longer embeds a runner the way this test reads it');
+  return lines.slice(start + 1, end).join('\n');
+}
+
+test('the four deletable keys are a constant, not something anyone can type', () => {
+  const text = repoFile(MARKER_WORKFLOW);
+  const runner = markerRunner();
+
+  assert.match(text, /\[ "\$\{\{ inputs\.confirm \}\}" = "REMOVE-FOLDER-MARKERS" \]/, 'it must be gated on a typed phrase');
+
+  // The allow-list is in the SCRIPT. If a key ever becomes an input, the four
+  // literals stop being the only reachable set and this assertion fails.
+  for (const marker of ['UiUx/', 'UiUx/Animation/', 'UiUx/Icons/', 'UiUx/Logo/']) {
+    assert.ok(runner.includes(`'${marker}'`), `the runner must name ${marker} literally`);
+  }
+  assert.ok(!/inputs\.(key|keys|prefix|marker)/.test(text), 'the keys must never come from an input');
+  assert.match(runner, /const MARKERS = \[/, 'the allow-list must be a constant');
+});
+
+test('the marker workflow can only ever delete one object at a time', () => {
+  const text = repoFile(MARKER_WORKFLOW);
+  const runner = markerRunner();
+
+  // `delete-object` is singular and takes exactly one --key. Every one of these
+  // forms CAN take a prefix, so none of them may appear anywhere in the file.
+  for (const recursive of ['delete-objects', '--recursive', 's3 rm', 'delete-bucket', 'bucket delete']) {
+    assert.ok(!text.includes(recursive), `the workflow must never use ${recursive}`);
+  }
+  assert.equal(runner.split("'delete-object'").length - 1, 1, 'there must be exactly one delete call in the whole runner');
+  assert.match(runner, /aws\(\['delete-object', '--bucket', BUCKET, '--key', marker\], false\)/,
+    'the delete must name a single exact key');
+});
+
+test('a marker is proven empty and marker-shaped before it is deleted', () => {
+  const runner = markerRunner();
+  const headAt = runner.indexOf("awsOrNull(['head-object'");
+  const sizeAt = runner.indexOf('if (size !== 0)');
+  const shapeAt = runner.indexOf('const shape = markerShape(marker)');
+  const beforeAt = runner.indexOf('const before = listUnder(marker)');
+  const deleteAt = runner.indexOf("'delete-object'");
+
+  assert.ok(headAt > 0 && headAt < deleteAt, 'the object must be read before it is deleted');
+  assert.ok(sizeAt > headAt && sizeAt < deleteAt, 'a non-zero object must be refused BEFORE the delete');
+  assert.ok(shapeAt > 0 && shapeAt < deleteAt, 'marker shape must be checked BEFORE the delete');
+  assert.ok(beforeAt > 0 && beforeAt < deleteAt, 'the children must be recorded BEFORE the delete, or the check after it proves nothing');
+
+  // The shape test goes through the Worker's own rule, so "is this servable
+  // content?" has one answer in this repository.
+  assert.match(runner, /import \{ isSafeMediaKey \} from '\.\.\/worker\/lib\/mediaStorage';/);
+  assert.ok(!/startsWith\(['"]/.test(runner), 'the runner must not carry its own key rule');
+});
+
+test('the marker workflow never opens the destination buckets', () => {
+  const text = repoFile(MARKER_WORKFLOW);
+  // It reads one bucket. A job that cannot name the public or private bucket
+  // cannot damage a verified copy, whatever else goes wrong in it.
+  for (const bucket of ['public_bucket', 'private_bucket', 'levonis-media-public', 'levonis-media-private']) {
+    assert.ok(!text.includes(bucket), `the marker workflow must not reference ${bucket}`);
+  }
+});
