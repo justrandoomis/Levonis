@@ -43,6 +43,52 @@
     <meta name="theme-color" content="#000000" />
     <title>LEVONIS</title>
 
+    <!--
+      THE SHOP'S OWN FACE, IN THE TAB AND IN THE SHARE CARD.
+
+      Until now this document declared NO icon and NO Open Graph tags at all.
+      The consequences were both things the owner reported: the browser tab
+      showed a generic globe, and a link pasted into Instagram, Telegram,
+      WhatsApp or Messenger unfurled with no picture and no description —
+      because there was nothing for a crawler to read.
+
+      The image is the logo that already lives in R2 at a PUBLIC key, served
+      through the Worker's own /files route. It is verified anonymously
+      fetchable (200, 107,218 bytes), which is the only property that matters
+      here: a social crawler arrives with no cookie and no session, and an
+      image it cannot fetch is an image it will not show.
+
+      A relative URL is correct for the icons — the browser resolves it against
+      the page. og:image is NOT: every crawler requires an ABSOLUTE url, and
+      several silently drop a relative one. `og:url` and `og:image` are
+      therefore written against the canonical origin.
+
+      THESE ARE THE DEFAULTS, AND ONLY THE DEFAULTS. A product link overwrites
+      og:title, og:description and og:image in the Worker before the HTML ever
+      reaches the crawler — see worker/lib/socialPreview.ts. What stays here is
+      what a share of the site ITSELF should say.
+    -->
+    <link rel="icon" type="image/webp" href="/files/UiUx/Logo/Logo.webp" />
+    <link rel="apple-touch-icon" href="/files/UiUx/Logo/Logo.webp" />
+
+    <meta property="og:site_name" content="LEVONIS" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ar_IQ" />
+    <meta property="og:title" content="LEVONIS — متجر الطباعة ثلاثية الأبعاد" />
+    <meta
+      property="og:description"
+      content="طابعات وخيوط وقطع الطباعة ثلاثية الأبعاد في العراق، مع خدمة طباعة حسب الطلب."
+    />
+    <meta property="og:url" content="https://levonis-iq.com/" />
+    <meta property="og:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LEVONIS — متجر الطباعة ثلاثية الأبعاد" />
+    <meta
+      name="twitter:description"
+      content="طابعات وخيوط وقطع الطباعة ثلاثية الأبعاد في العراق، مع خدمة طباعة حسب الطلب."
+    />
+    <meta name="twitter:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--
