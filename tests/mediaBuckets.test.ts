@@ -589,3 +589,46 @@ test('the prune re-counts what survived instead of assuming it', () => {
   assert.match(runner, /throw new Error\('a destination object is missing after the prune/,
     'losing a destination object must fail the run, not be reported as a number and ignored');
 });
+
+test('a prune that deleted things can never report that it deleted nothing', () => {
+  const runner = embeddedRunner();
+  const text = repoFile(WORKFLOW);
+
+  // The count is taken from the rows, not asserted. `LEGACY DELETED: 0` was a
+  // literal — true of every copy run and of no prune run, including the one
+  // that deletes all eighteen exactly as intended.
+  assert.match(runner, /const deleted = rows\.filter\(\(r\) => r\.outcome === 'SOURCE-DELETED'\)\.length;/);
+  assert.match(runner, /console\.log\('LEGACY DELETED: ' \+ deleted\)/);
+  assert.ok(!runner.includes("'LEGACY DELETED: 0'"), 'the deleted count must never be a literal');
+
+  // "Deletion is refused" and "Nothing has been deleted" are true only in copy
+  // mode. Printing either after a partial prune tells someone holding no other
+  // copy that their originals are safe.
+  for (const claim of ['Nothing has been deleted', 'Deletion is refused', 'Nothing was deleted by this job']) {
+    const at = runner.indexOf(claim);
+    if (at < 0) continue;
+    const window = runner.slice(Math.max(0, at - 400), at);
+    assert.match(window, /MODE === 'copy'/, `"${claim}" must be reachable only in copy mode`);
+  }
+
+  // The job that deletes is the job that must say how much it deleted.
+  assert.match(text, /LEGACY SOURCE DELETED/, 'the prune job needs its own totals step');
+  assert.match(text, /\n {6}- name: Print what was actually deleted, last\n {8}if: always\(\)\n/);
+});
+
+test('a throw mid-prune still writes the record of what was already deleted', () => {
+  const runner = embeddedRunner();
+  const tryAt = runner.indexOf('let fatal: string | null = null;');
+  const catchAt = runner.indexOf('fatal = describeError(error);');
+  const writeAt = runner.indexOf('writeFileSync(MANIFEST, JSON.stringify(');
+  const deleteAt = runner.indexOf("'delete-object'");
+
+  assert.ok(tryAt > 0 && tryAt < deleteAt, 'the work must be wrapped before anything is deleted');
+  assert.ok(catchAt > deleteAt, 'the catch must cover the delete loop');
+  assert.ok(writeAt > catchAt,
+    'the manifest write must come AFTER the catch — otherwise an exception uploads job 1s copy manifest, which says nothing was deleted');
+  assert.match(runner, /const verifiedAll = !fatal && failures === 0 && blocked\.length === 0;/,
+    'a run that stopped early is not a clean run');
+  assert.match(runner, /if \(fatal\) console\.error\('The run stopped early: ' \+ fatal\);/);
+  assert.match(runner, /process\.exit\(1\)/, 'and it must still fail the job');
+});

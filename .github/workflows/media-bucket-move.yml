@@ -320,6 +320,25 @@ jobs:
           const rows: Row[] = [];
           const blocked: Row[] = [];
 
+          /**
+           * A THROW MUST NOT TAKE THE RECORD WITH IT.
+           *
+           * The prune loop deletes irreversibly, one object at a time. Without
+           * this, an exception on object 10 — a throttled delete, a 503 on the
+           * get-object inside a SHA-256 comparison — would exit node before the
+           * manifest was written and before anything was printed. The step that
+           * uploads `media-prune-manifest` is `if: always()`, so it would have
+           * uploaded the file still sitting on disk: job 1's COPY manifest,
+           * saying mode "copy", verified_all true, nothing deleted. The only
+           * forensic record of a half-finished destruction would have been a
+           * document asserting that nothing happened.
+           *
+           * So the work is caught, the report below always runs on whatever was
+           * accumulated, and the failure is re-raised at the very end.
+           */
+          let fatal: string | null = null;
+
+          try {
           if (MODE === 'copy') {
             const objects = listAll(SOURCE);
             const total = objects.reduce((n, o) => n + o.size, 0);
@@ -464,9 +483,19 @@ jobs:
               throw new Error('a destination object is missing after the prune — the copies are what survive, and one did not');
             }
           }
+          } catch (error) {
+            fatal = describeError(error);
+            console.error('');
+            console.error('::error::RUN STOPPED: ' + fatal);
+            console.error('The report below covers everything that happened BEFORE this point.');
+          }
 
           const failures = rows.filter((r) => r.outcome === 'FAILED').length;
-          const verifiedAll = failures === 0 && blocked.length === 0;
+          // COUNTED, not assumed. `LEGACY DELETED` used to be the literal 0 —
+          // true of every copy run and of no prune run, including the one that
+          // deletes all eighteen exactly as intended.
+          const deleted = rows.filter((r) => r.outcome === 'SOURCE-DELETED').length;
+          const verifiedAll = !fatal && failures === 0 && blocked.length === 0;
           writeFileSync(MANIFEST, JSON.stringify({
             mode: MODE, source: SOURCE, public_bucket: PUBLIC_BUCKET, private_bucket: PRIVATE_BUCKET,
             generated_at: new Date().toISOString(), verified_all: verifiedAll, rows, blocked,
@@ -484,10 +513,17 @@ jobs:
               lines.push('| `' + r.key + '` | ' + r.visibility + ' | ' + r.destination + ' | ' +
                 r.bytes + ' | ' + r.outcome + ' | ' + r.method + ': ' + r.detail + ' |');
             }
+            // A prune that deleted seventeen objects and kept one has NOT
+            // "refused deletion", and saying so to someone holding no other
+            // copy is the worst sentence this file could print.
             lines.push('', verifiedAll
-              ? '**' + rows.length + ' object(s) byte-verified at the destination.' +
-                (MODE === 'copy' ? ' Nothing was deleted by this job.**' : '**')
-              : '**' + failures + ' failed, ' + blocked.length + ' blocked. Deletion is refused.**');
+              ? (MODE === 'copy'
+                  ? '**' + rows.length + ' object(s) byte-verified at the destination. Nothing was deleted by this job.**'
+                  : '**' + deleted + ' legacy source object(s) deleted after re-verification. Every destination copy re-checked and present.**')
+              : (MODE === 'copy'
+                  ? '**' + failures + ' failed, ' + blocked.length + ' blocked. Nothing was deleted; deletion is refused.**'
+                  : '**RUN DID NOT COMPLETE CLEANLY. ' + deleted + ' source object(s) WERE ALREADY DELETED, ' +
+                    blocked.length + ' kept. Read the per-object list below before assuming anything.**'));
             writeFileSync(summaryPath, lines.join('\n') + '\n', { flag: 'a' });
           }
 
@@ -501,7 +537,9 @@ jobs:
           for (const r of all) {
             console.log(
               [
-                r.verified ? 'OK     ' : r.outcome === 'BLOCKED' ? 'BLOCKED' : r.outcome,
+                // In prune the outcome IS the news — SOURCE-DELETED must never
+                // be flattened into a cheerful "OK".
+                MODE === 'prune' ? r.outcome : r.verified ? 'OK     ' : r.outcome === 'BLOCKED' ? 'BLOCKED' : r.outcome,
                 'src=' + r.key,
                 'domain=' + r.domain,
                 'class=' + r.visibility,
@@ -520,7 +558,7 @@ jobs:
           console.log('PRIVATE VERIFIED: ' + priv.length);
           console.log('BLOCKED: ' + blocked.length);
           console.log('FAILED: ' + failures);
-          console.log('LEGACY DELETED: 0');
+          console.log('LEGACY DELETED: ' + deleted);
           console.log('\nPUBLIC OBJECT LIST:');
           for (const r of pub) console.log('  ' + r.key + '  (' + r.bytes + ' B, ' + r.method + ')');
           console.log('PRIVATE OBJECT LIST:');
@@ -531,6 +569,9 @@ jobs:
 
           if (!verifiedAll) {
             console.error('\n' + failures + ' object(s) failed verification, ' + blocked.length + ' blocked.');
+            if (MODE === 'prune' && deleted > 0) {
+              console.error(deleted + ' SOURCE OBJECT(S) WERE DELETED BEFORE THIS RUN STOPPED. They are listed above as SOURCE-DELETED.');
+            }
             // NAME THEM, IN THE LOG. These rows lived only in the step summary,
             // so a run that refused to delete could not tell anyone WHICH four
             // objects to fix without opening a web page and scrolling a table.
@@ -541,8 +582,13 @@ jobs:
             for (const r of blocked) {
               console.error('  BLOCKED ' + r.key + '  (' + r.method + ': ' + r.detail + ')');
             }
-            console.error('Nothing has been deleted. Fix or hand-move those objects, then re-run —');
-            console.error('objects already verified are skipped, so a re-run is cheap and safe.');
+            if (MODE === 'copy') {
+              console.error('Nothing has been deleted. Fix or hand-move those objects, then re-run —');
+              console.error('objects already verified are skipped, so a re-run is cheap and safe.');
+            } else {
+              console.error('A re-run will skip what is already gone and retry only what was kept.');
+            }
+            if (fatal) console.error('The run stopped early: ' + fatal);
             process.exit(1);
           }
           TSEOF
@@ -785,3 +831,37 @@ jobs:
           path: ${{ runner.temp }}/media-move-manifest.json
           if-no-files-found: warn
           retention-days: 30
+
+      # HOW MANY IRREPLACEABLE OBJECTS DID THIS JOB DESTROY?
+      #
+      # Job 1 has a totals step; job 2 had none, so the only place
+      # SOURCE-DELETED was ever counted was a step that runs in the job where
+      # that count is always zero. The job that actually deletes has to be the
+      # job that says how much it deleted, and it has to say it LAST, where a
+      # reader lands.
+      #
+      # `if: always()` because a run that stopped half-way is the run whose
+      # numbers matter most.
+      - name: Print what was actually deleted, last
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "${{ runner.temp }}/media-move-manifest.json";
+            if (!fs.existsSync(path)) { console.log("no manifest on disk — the run did not reach its report"); process.exit(0); }
+            const m = JSON.parse(fs.readFileSync(path, "utf8"));
+            const rows = m.rows ?? [], blocked = m.blocked ?? [];
+            const count = (o) => rows.filter((r) => r.outcome === o).length;
+            console.log("===== LEGACY SOURCE CLEANUP TOTALS =====");
+            console.log("MANIFEST MODE              : " + m.mode);
+            if (m.mode !== "prune") {
+              console.log("::error::this is not a prune manifest — the delete step did not write its record");
+            }
+            console.log("SOURCE BUCKET              : " + m.source);
+            console.log("LEGACY SOURCE DELETED      : " + count("SOURCE-DELETED"));
+            console.log("ALREADY GONE (earlier run) : " + count("ALREADY-GONE"));
+            console.log("KEPT (refused a check)     : " + blocked.length);
+            console.log("DESTINATION OBJECTS DELETED: 0");
+            console.log("CLEAN RUN                  : " + m.verified_all);
+            for (const r of blocked) console.log("  KEPT " + r.key + " -> " + r.method + ": " + r.detail);
+          '
