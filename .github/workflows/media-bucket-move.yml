@@ -219,6 +219,12 @@ jobs:
             return text ? JSON.parse(text) : null;
           }
 
+          /** An Error's name and message, bounded, for a log line. */
+          function describeError(error: unknown): string {
+            if (error instanceof Error) return (error.name + ': ' + error.message).slice(0, 300);
+            return String(error).slice(0, 300);
+          }
+
           function awsOrNull(args: string[]): any {
             try {
               return aws(args);
@@ -725,7 +731,12 @@ jobs:
         if: always()
         run: |
           node -e '
-            const m = require("${{ runner.temp }}/media-move-manifest.json");
+            const fs = require("fs");
+            const path = "${{ runner.temp }}/media-move-manifest.json";
+            // if: always() means this runs even when the copy step never got
+            // far enough to write anything. Saying so is the report.
+            if (!fs.existsSync(path)) { console.log("no manifest on disk — the copy step did not reach its report"); process.exit(0); }
+            const m = JSON.parse(fs.readFileSync(path, "utf8"));
             const rows = m.rows ?? [], blocked = m.blocked ?? [];
             const n = (v) => rows.filter((r) => r.visibility === v && r.verified).length;
             console.log("===== VERIFIED TOTALS =====");
