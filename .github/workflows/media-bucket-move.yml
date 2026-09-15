@@ -585,6 +585,37 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # THE NUMBERS GO LAST.
+      #
+      # The runner prints its totals when it finishes, which is the middle of
+      # the job — two more steps run after it, and a log reader (or an API
+      # client fetching the tail) lands past them every time. The counts that
+      # answer "did this migration succeed?" belong at the END of the job, so
+      # they are the first thing found and the last thing printed.
+      #
+      # Recomputed from the manifest rather than echoed from the step above, so
+      # these lines report what was actually WRITTEN, not what was intended.
+      - name: Print the verified totals last, where a reader will find them
+        if: always()
+        run: |
+          node -e '
+            const m = require("${{ runner.temp }}/media-move-manifest.json");
+            const rows = m.rows ?? [], blocked = m.blocked ?? [];
+            const n = (v) => rows.filter((r) => r.visibility === v && r.verified).length;
+            console.log("===== VERIFIED TOTALS =====");
+            console.log("SOURCE BUCKET        : " + m.source);
+            console.log("TOTAL REAL OBJECTS   : " + rows.length);
+            console.log("PUBLIC VERIFIED      : " + n("public"));
+            console.log("PRIVATE VERIFIED     : " + n("private"));
+            console.log("BLOCKED              : " + blocked.length);
+            console.log("FAILED               : " + rows.filter((r) => r.outcome === "FAILED").length);
+            console.log("LEGACY DATA FILES DELETED: " + rows.filter((r) => r.outcome === "SOURCE-DELETED").length);
+            console.log("VERIFIED ALL         : " + m.verified_all);
+            const byDomain = {};
+            for (const r of rows) byDomain[r.domain] = (byDomain[r.domain] ?? 0) + 1;
+            console.log("BY DOMAIN            : " + JSON.stringify(byDomain));
+          '
+
   # =========================================================================
   # JOB 2 — DELETE THE LEGACY SOURCE OBJECTS. SEPARATELY GATED.
   # =========================================================================
