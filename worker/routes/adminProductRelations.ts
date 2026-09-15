@@ -6,7 +6,16 @@ import { audit } from '../lib/audit';
 import { parseProductRow } from '../lib/productModel';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { liveValues, loadProductRelations } from '../lib/productRelations';
-import { fulfillmentStatements, parseFulfillmentPayload, saleTypesFromCells } from '../lib/optionFulfillment';
+import {
+  cellKey,
+  existingCellsFrom,
+  fulfillmentStatements,
+  parseFulfillmentPayload,
+  saleTypesFromCells,
+  transportKey,
+  type ExistingCells,
+  type FulfillmentCell,
+} from '../lib/optionFulfillment';
 import {
   loadRelationsSnapshot,
   planRelationsWriteFrom,
@@ -276,6 +285,82 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
  * has no field that could invent "A1 mini — Pre-order" as an option, and this
  * payload has no field that could invent a model.
  */
+/**
+ * The product's cells as they stand, keyed the way a payload names them —
+ * (model, order type) and (model, order type, route) — because that, and not
+ * the row id, is what an admin form can send back.
+ */
+function existingCells(rel: Awaited<ReturnType<typeof loadProductRelations>>): ExistingCells {
+  // The SAME builder the whole-product save path uses, so a hold survives both
+  // doors identically. See `existingCellsFrom`.
+  return existingCellsFrom(rel.fulfillments, rel.transports);
+}
+
+/**
+ * A SAVE MAY NOT STRAND SOMEBODY'S PRE-ORDER (0075).
+ *
+ * Two ways it could, and both are refused here with the count rather than left
+ * to a constraint error:
+ *
+ *  1. REMOVING a cell or a route that is holding units. The hold lives in that
+ *    row's `capacity_reserved`, and `inventory_ledger.scope_id` names the row;
+ *    delete it and the release for a live order matches nothing, so the units
+ *    are never given back and no screen can show where they went. This is the
+ *    same rule `/:id/relations` already applies to a stock row with reserved
+ *    units, applied to the counter 0075 added.
+ *
+ *  2. LOWERING a capacity BELOW what is already held. `available` would go
+ *    negative — clamped to 0 everywhere, so the shop looks merely sold out —
+ *    and then the `deduct` at confirmation, which guards on
+ *    `capacity >= qty`, would silently match nothing and leave a confirmed
+ *    order that never consumed its unit. An admin who really wants to cut the
+ *    quota must cancel the orders first, which is a decision, not a side
+ *    effect of a form save.
+ */
+function refuseStrandedCapacity(existing: ExistingCells, cells: FulfillmentCell[]): void {
+  const keptCells = new Set(cells.map((c) => cellKey(c.option_id, c.fulfillment_type)));
+  const keptRoutes = new Set(
+    cells.flatMap((c) => c.transports.map((t) => transportKey(c.option_id, c.fulfillment_type, t.method)))
+  );
+
+  for (const [key, row] of existing.cells) {
+    if (row.capacity_reserved > 0 && !keptCells.has(key)) {
+      throw badRequest(
+        `This order type is holding ${row.capacity_reserved} pre-ordered unit(s) — cancel or fulfil those orders before removing it.`,
+        'CAPACITY_RESERVED'
+      );
+    }
+  }
+  for (const [key, row] of existing.transports) {
+    if (row.capacity_reserved > 0 && !keptRoutes.has(key)) {
+      throw badRequest(
+        `This transport route is holding ${row.capacity_reserved} pre-ordered unit(s) — cancel or fulfil those orders before removing it.`,
+        'CAPACITY_RESERVED'
+      );
+    }
+  }
+
+  for (const cell of cells) {
+    const held = existing.cells.get(cellKey(cell.option_id, cell.fulfillment_type))?.capacity_reserved ?? 0;
+    if (cell.capacity !== null && cell.capacity < held) {
+      throw badRequest(
+        `Capacity cannot be set below the ${held} unit(s) already held for live pre-orders.`,
+        'CAPACITY_BELOW_RESERVED'
+      );
+    }
+    for (const t of cell.transports) {
+      const routeHeld =
+        existing.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method))?.capacity_reserved ?? 0;
+      if (t.capacity !== null && t.capacity < routeHeld) {
+        throw badRequest(
+          `${t.method}: capacity cannot be set below the ${routeHeld} unit(s) already held for live pre-orders.`,
+          'CAPACITY_BELOW_RESERVED'
+        );
+      }
+    }
+  }
+}
+
 adminProductRelationsRoutes.get('/:id/fulfillment', async (c) => {
   const productId = c.req.param('id');
   const product = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(productId).first();
@@ -322,6 +407,11 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const cells = parseFulfillmentPayload(body, new Set(live.map((v) => v.id)));
 
+  // 0075. What this product's cells ARE right now, so the replace below keeps
+  // each surviving row's id and its held units. See `refuseStrandedCapacity`.
+  const current = existingCells(rel);
+  refuseStrandedCapacity(current, cells);
+
   // The product's sale types are DERIVED from what its models offer, never
   // asked for — the direction 0043 set, so the two cannot drift apart.
   const fallback = (() => {
@@ -334,7 +424,7 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   })();
   const saleTypes = saleTypesFromCells(rel.values, cells, fallback);
 
-  const statements = fulfillmentStatements(c.env.DB, productId, cells);
+  const statements = fulfillmentStatements(c.env.DB, productId, cells, undefined, current);
   statements.push(
     c.env.DB
       .prepare("UPDATE products SET sale_types = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
@@ -375,6 +465,12 @@ adminProductRelationsRoutes.post('/:id/stock/adjust', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
   const scope = str(body.scope, 'scope', { max: 20 });
+  // THE FOUR SHELF SCOPES ONLY. A pre-order capacity is not corrected by
+  // recounting a shelf — it is a number the owner decides when they place a
+  // supplier order — so it is SET on the fulfilment form (which refuses to put
+  // it below what is already held) rather than nudged by a delta here. Letting
+  // an adjustment reach 'preorder' would also write an `adjust_in`/`adjust_out`
+  // row that no screen reads as an import decision.
   if (!['base', 'option', 'color', 'variant'].includes(scope)) throw badRequest('scope: unknown stock level');
   const scopeId = str(body.scope_id, 'scope_id', { max: 60, required: false }) ?? '';
   if (scope !== 'base' && !scopeId) throw badRequest('scope_id: required for this stock level');

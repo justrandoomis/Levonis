@@ -56,7 +56,55 @@ export function isInventoryMode(v: unknown): v is InventoryMode {
   return typeof v === 'string' && (INVENTORY_MODES as readonly string[]).includes(v);
 }
 
-export type StockScope = 'base' | 'option' | 'color' | 'variant';
+/**
+ * The six authoritative counters. The first four are STOCK — units on a shelf,
+ * chosen by `products.inventory_mode`. The last two are PRE-ORDER CAPACITY
+ * (migration 0075) — how many units the owner has undertaken to import — and
+ * they are reached only when the line's ORDER TYPE is `pre_order`.
+ *
+ *   preorder            product_option_fulfillment.capacity — the SHARED pool
+ *                       of one (model x pre-order) cell. Air, sea and land all
+ *                       draw on it unless a route holds its own quota.
+ *   preorder_transport  product_option_transports.capacity — one route's OWN
+ *                       quota, independent of the pool and of the other routes.
+ *
+ * A capacity row is a stock row with different column names: an on-hand number,
+ * a reserved number, and the same five verbs. That is why it is a `StockScope`
+ * and not a parallel engine — `planInventory`, `applyMoves`, `stockAfter` and
+ * the reservation fence all work on it unchanged.
+ */
+export type StockScope =
+  | 'base'
+  | 'option'
+  | 'color'
+  | 'variant'
+  | 'preorder'
+  | 'preorder_transport';
+
+/**
+ * WHERE EACH SCOPE'S TWO NUMBERS LIVE. One table, in one place, because three
+ * separate `scope === 'base' ? … : …` ladders is how a capacity write ends up
+ * pointed at `stock` on a table that has no such column.
+ */
+const SCOPE_COLUMNS: Record<StockScope, { table: string; stock: string; reserved: string }> = {
+  base: { table: 'products', stock: 'stock', reserved: 'stock_reserved' },
+  option: { table: 'product_option_values', stock: 'stock', reserved: 'reserved' },
+  color: { table: 'product_colors', stock: 'stock', reserved: 'reserved' },
+  variant: { table: 'product_variants', stock: 'stock', reserved: 'reserved' },
+  preorder: { table: 'product_option_fulfillment', stock: 'capacity', reserved: 'capacity_reserved' },
+  preorder_transport: {
+    table: 'product_option_transports',
+    stock: 'capacity',
+    reserved: 'capacity_reserved',
+  },
+};
+
+/** The four scopes `products.inventory_mode` chooses between — the ones whose
+ *  number is a physical shelf. A capacity scope is never one of these. */
+export const STOCK_SCOPES: readonly StockScope[] = ['base', 'option', 'color', 'variant'];
+
+export const isCapacityScope = (scope: StockScope): boolean =>
+  scope === 'preorder' || scope === 'preorder_transport';
 
 /** One authoritative row that a purchase consumes. */
 export interface StockTarget {
@@ -215,6 +263,119 @@ export function resolveStock(snap: InventorySnapshot, sel: Selection): StockReso
   }
 }
 
+// ------------------------------------------------- pre-order capacity (0075)
+
+/**
+ * WHICH COUNTER A LINE CONSUMES IS DECIDED BY THE ORDER TYPE ALONE (DECISION 4).
+ *
+ * Not by the transport, not by the payment method, not by what the product row
+ * happens to call itself. Cash on delivery is a way to PAY; it cannot turn a
+ * pre-order into a direct sale, and `resolveForOrderType` has no parameter it
+ * could do so through.
+ */
+export type OrderType = 'direct_sale' | 'pre_order';
+
+export const isOrderType = (v: unknown): v is OrderType =>
+  v === 'direct_sale' || v === 'pre_order';
+
+/** One capacity row: the (model x pre-order) cell, or one of its routes. */
+export interface CapacityRow {
+  id: string;
+  /** null = UNTRACKED. Not zero. See `resolveCapacity`. */
+  capacity: number | null;
+  reserved: number;
+  label: string;
+}
+
+export interface CapacityTransportRow extends CapacityRow {
+  method: string;
+  enabled: boolean;
+}
+
+/**
+ * The pre-order side of one MODEL, in the shape the resolver needs. `cell` is
+ * null when the model has no (model x pre-order) row at all — a product that
+ * predates 0073, or one whose pre-order is configured only at product level.
+ * That is UNTRACKED, exactly as it was before 0075 existed, and never a refusal.
+ */
+export interface CapacitySnapshot {
+  cell: CapacityRow | null;
+  transports: CapacityTransportRow[];
+}
+
+/**
+ * THE SHARED-VERSUS-INDEPENDENT RULE, in one function.
+ *
+ *   transport.capacity IS NULL  the route draws on the CELL's pool. Air, sea
+ *                               and land share it, so a unit sold by air is a
+ *                               unit sea can no longer sell.
+ *   transport.capacity = N      the route holds its OWN N. It does NOT also
+ *                               consume the pool: one counter per sale, never
+ *                               two, or a single unit would be deducted twice
+ *                               and the shop would run out at half its stated
+ *                               capacity.
+ *
+ * NULL IS NOT ZERO, AND THE DIFFERENCE IS THE WHOLE FEATURE. `null` claims no
+ * limit — nothing is reserved and the line is sellable, exactly how a NULL
+ * `stock` behaves today. `0` is a tracked counter that is empty, and it
+ * refuses. A `COALESCE(capacity, 0)` anywhere in this path would silently
+ * close every pre-order in the catalogue on the day 0075 shipped.
+ */
+export function resolveCapacity(snap: CapacitySnapshot | null, transportMethod: string): StockResolution {
+  const untracked: StockResolution = { targets: [], tracked: false, available: null, error: null };
+  if (!snap || !snap.cell) return untracked;
+
+  const route = transportMethod
+    ? (snap.transports.find((t) => t.method === transportMethod) ?? null)
+    : null;
+
+  // The route's own quota wins when it has one, and then the pool is not
+  // touched at all.
+  const row: CapacityRow = route && route.capacity !== null ? route : snap.cell;
+  const scope: StockScope = row === snap.cell ? 'preorder' : 'preorder_transport';
+  if (row.capacity === null) return untracked;
+
+  const t: StockTarget = {
+    scope,
+    scope_id: row.id,
+    stock: row.capacity,
+    reserved: row.reserved,
+    // A capacity has no "low capacity" warning of its own: the admin's
+    // low-stock threshold describes a shelf, and inventing one here would put
+    // an orange badge on a pre-order nobody has a threshold for.
+    low_stock_threshold: null,
+    label: row.label,
+  };
+  return { targets: [t], tracked: true, available: availableOf(t), error: null };
+}
+
+/**
+ * THE ONE COUNTER THIS LINE CONSUMES, given what the customer chose.
+ *
+ * A direct sale answers from `resolveStock` — unchanged, the same shape the
+ * storefront preview, the cart and the checkout already read. A pre-order
+ * answers from the capacity and NEVER from the model's stock: the two are
+ * different physical facts (units on the shelf versus units undertaken to
+ * import) and mixing them is what lets a sold-out model refuse a pre-order it
+ * could perfectly well accept, or a pre-order eat the shelf out from under a
+ * direct buyer.
+ *
+ * Availability stays a MINIMUM over tracked targets and is never a SUM, on
+ * either branch — the capacity branch returns exactly one target, so the
+ * minimum is that target.
+ */
+export function resolveForOrderType(
+  orderType: OrderType,
+  snap: InventorySnapshot,
+  sel: Selection,
+  capacity: CapacitySnapshot | null,
+  transportMethod: string
+): StockResolution {
+  return orderType === 'pre_order'
+    ? resolveCapacity(capacity, transportMethod)
+    : resolveStock(snap, sel);
+}
+
 /** True when the resolved availability is at or below the configured warning
  *  level. Never invents a threshold: unconfigured returns false. */
 export function isLowStock(res: StockResolution): boolean {
@@ -304,15 +465,22 @@ function counterSql(
 ): { table: string; set: string; setArgs: number[]; guard: string; guardArgs: number[] } {
   const table = tableFor(scope);
   const reserved = reservedColumn(scope);
+  // `on_hand` is `stock` on the four shelf scopes and `capacity` on the two
+  // pre-order scopes. The ARITHMETIC below is identical for both, and that is
+  // the whole point of DECISION 3: a capacity is a number of units with a hold
+  // against it, so it moves through the same five verbs and the same guards.
+  const onHand = stockColumn(scope);
 
   switch (kind) {
     case 'reserve':
-      // Never hold more than is physically on hand.
+      // Never hold more than is physically on hand. A NULL on-hand is
+      // UNTRACKED — no limit is claimed, so there is nothing to hold and the
+      // guard matches nothing; the caller reads that as NOT_TRACKED and sells.
       return {
         table,
         set: `${reserved} = ${reserved} + ?`,
         setArgs: [qty],
-        guard: `stock IS NOT NULL AND stock - ${reserved} >= ?`,
+        guard: `${onHand} IS NOT NULL AND ${onHand} - ${reserved} >= ?`,
         guardArgs: [qty],
       };
     case 'release':
@@ -325,48 +493,47 @@ function counterSql(
       };
     case 'deduct':
       // The hold becomes a real decrement; both counters move together, so
-      // available (= stock - reserved) is unchanged by confirmation.
+      // available (= on hand - reserved) is unchanged by confirmation.
       return {
         table,
-        set: `stock = stock - ?, ${reserved} = ${reserved} - ?`,
+        set: `${onHand} = ${onHand} - ?, ${reserved} = ${reserved} - ?`,
         setArgs: [qty, qty],
-        guard: `stock IS NOT NULL AND stock >= ? AND ${reserved} >= ?`,
+        guard: `${onHand} IS NOT NULL AND ${onHand} >= ? AND ${reserved} >= ?`,
         guardArgs: [qty, qty],
       };
     case 'restore':
     case 'adjust_in':
       return {
         table,
-        set: 'stock = stock + ?',
+        set: `${onHand} = ${onHand} + ?`,
         setArgs: [qty],
-        guard: 'stock IS NOT NULL',
+        guard: `${onHand} IS NOT NULL`,
         guardArgs: [],
       };
     case 'adjust_out':
-      // A write-off cannot take stock negative, and cannot eat into units
-      // already held for someone's order.
+      // A write-off cannot take the counter negative, and cannot eat into
+      // units already held for someone's order.
       return {
         table,
-        set: 'stock = stock - ?',
+        set: `${onHand} = ${onHand} - ?`,
         setArgs: [qty],
-        guard: `stock IS NOT NULL AND stock - ${reserved} >= ?`,
+        guard: `${onHand} IS NOT NULL AND ${onHand} - ${reserved} >= ?`,
         guardArgs: [qty],
       };
   }
 }
 
 function tableFor(scope: StockScope): string {
-  return scope === 'base'
-    ? 'products'
-    : scope === 'option'
-      ? 'product_option_values'
-      : scope === 'color'
-        ? 'product_colors'
-        : 'product_variants';
+  return SCOPE_COLUMNS[scope].table;
+}
+
+/** The ON-HAND column. `capacity` for a pre-order scope, `stock` for a shelf. */
+function stockColumn(scope: StockScope): string {
+  return SCOPE_COLUMNS[scope].stock;
 }
 
 function reservedColumn(scope: StockScope): string {
-  return scope === 'base' ? 'stock_reserved' : 'reserved';
+  return SCOPE_COLUMNS[scope].reserved;
 }
 
 /** Evaluates a guard against a row's CURRENT values, so a move that cannot
@@ -493,21 +660,24 @@ export async function planInventory(
   // ---- one batched read of every row this call touches, keyed (table, id) ---
   const rowKeyOf = (w: (typeof candidates)[number]) =>
     `${tableFor(w.target.scope)}#${w.target.scope === 'base' ? w.move.product_id : w.target.scope_id}`;
-  const byTable = new Map<string, Set<string>>();
+  // Grouped BY SCOPE, not by table name: the scope is what knows which two
+  // columns hold the numbers (`stock`/`stock_reserved`, `stock`/`reserved`,
+  // `capacity`/`capacity_reserved`), and each scope owns a distinct table, so
+  // the row key stays `table#id` exactly as before.
+  const byScope = new Map<StockScope, Set<string>>();
   for (const w of candidates) {
-    const table = tableFor(w.target.scope);
     const id = w.target.scope === 'base' ? w.move.product_id : w.target.scope_id;
-    const set = byTable.get(table);
+    const set = byScope.get(w.target.scope);
     if (set) set.add(id);
-    else byTable.set(table, new Set([id]));
+    else byScope.set(w.target.scope, new Set([id]));
   }
   const live = new Map<string, { stock: number | null; reserved: number }>();
-  for (const [table, ids] of byTable) {
-    const reserved = table === 'products' ? 'stock_reserved' : 'reserved';
+  for (const [scope, ids] of byScope) {
+    const { table, stock, reserved } = SCOPE_COLUMNS[scope];
     for (const part of chunk([...ids], IN_CHUNK)) {
       const { results } = await db
         .prepare(
-          `SELECT id, stock, ${reserved} AS reserved FROM ${table} WHERE id IN (${part.map(() => '?').join(', ')})`
+          `SELECT id, ${stock} AS stock, ${reserved} AS reserved FROM ${table} WHERE id IN (${part.map(() => '?').join(', ')})`
         )
         .bind(...part)
         .all<{ id: string; stock: number | null; reserved: number | null }>();
@@ -617,6 +787,16 @@ export async function planInventory(
   // `delta` and `op_id`; deriving the absolutes in SQL is not open to us
   // because the envelope is signed over its payload.
   for (const w of fresh) {
+    // A CAPACITY MOVEMENT PUBLISHES NO `InventoryChanged`, AND THAT IS NOT AN
+    // OVERSIGHT. The event's `scope.table` is an enum of the four catalogue
+    // stock tables in `@levonis/contracts` — a package this change does not
+    // own — and a pre-order quota has no row in any of them. Naming one of the
+    // four anyway would tell every bus consumer that a shelf moved when no
+    // shelf did, which is worse than silence for the analytics that price
+    // restocking. The LEDGER row is still written for every capacity move, so
+    // the audit trail DECISION 3 exists for is complete; only the bus is quiet,
+    // until the contract gains the two scopes.
+    if (isCapacityScope(w.target.scope)) continue;
     const b = before.get(w.key) ?? { stock: 0, reserved: 0 };
     const after = stockAfter(opts.kind, w.move.qty, b);
     const pending = await outboxStatement(
@@ -716,7 +896,9 @@ export async function planReservationFence(
   return reservationFenceStatement(db, orderId, kind, Number(row?.n ?? 0) + Math.max(0, plannedLedgerRows));
 }
 
-/** The table whose stock row moved, as the event catalogue spells it. */
+/** The table whose stock row moved, as the event catalogue spells it. Only the
+ *  four shelf scopes reach this — a capacity scope is filtered out above,
+ *  because the contract's enum has no name for it. */
 function eventTableFor(scope: StockScope): 'products' | 'product_option_values' | 'product_colors' | 'product_variants' {
   return scope === 'base' ? 'products' : scope === 'option' ? 'product_option_values' : scope === 'color' ? 'product_colors' : 'product_variants';
 }
@@ -783,18 +965,13 @@ export async function assertMovesApplied(
   const short: string[] = [];
   for (const move of moves) {
     for (const t of move.targets) {
-      const table =
-        t.scope === 'base'
-          ? 'products'
-          : t.scope === 'option'
-            ? 'product_option_values'
-            : t.scope === 'color'
-              ? 'product_colors'
-              : 'product_variants';
-      const reservedCol = t.scope === 'base' ? 'stock_reserved' : 'reserved';
+      // The same column lookup every other statement in this file uses, so a
+      // capacity row is verified against `capacity`/`capacity_reserved` rather
+      // than against a `stock` column its table does not have.
+      const { table, stock: stockCol, reserved: reservedCol } = SCOPE_COLUMNS[t.scope];
       const id = t.scope === 'base' ? move.product_id : t.scope_id;
       const row = await db
-        .prepare(`SELECT stock, ${reservedCol} AS reserved FROM ${table} WHERE id = ?`)
+        .prepare(`SELECT ${stockCol} AS stock, ${reservedCol} AS reserved FROM ${table} WHERE id = ?`)
         .bind(id)
         .first<{ stock: number | null; reserved: number }>();
       if (!row) {

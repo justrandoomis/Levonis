@@ -52,7 +52,7 @@ import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
 import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
 import { sha256Hex } from '@levonis/contracts/canonical';
 import { availabilityFromName, deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
-import { fulfillmentStatements, legacyShapeErrors, parseFulfillmentPayload } from './optionFulfillment';
+import { existingCellsFrom, fulfillmentStatements, legacyShapeErrors, parseFulfillmentPayload } from './optionFulfillment';
 import {
   normalizeSaleTypes,
   parseProductRow,
@@ -1983,7 +1983,35 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
         { fulfillments: cells },
         new Set(relations.requested.values.map((v) => v.id))
       );
-      statements.push(...fulfillmentStatements(db, productId, parsed));
+      // 0075. THE SAME HOLD-PRESERVING REPLACE THE ADMIN DOOR USES. Without
+      // this, a whole-product save (a TXT import, most of all) would delete a
+      // cell and re-insert it under a NEW id with `capacity_reserved` back at
+      // 0 — and `inventory_ledger.scope_id` names the row that just vanished,
+      // so the release for a live pre-order would match nothing and those
+      // units would never come back. Read here rather than threaded in,
+      // because the read is cheap, this is the only place that needs it on
+      // this path, and a caller that forgets to thread it is exactly the
+      // defect. Rows written before 0075 have no capacity, so this is a
+      // no-op replace for them — identical to the pre-0075 behaviour.
+      const [liveCells, liveRoutes] = await Promise.all([
+        db
+          .prepare('SELECT id, option_id, fulfillment_type, capacity_reserved FROM product_option_fulfillment WHERE product_id = ?')
+          .bind(productId)
+          .all<{ id: string; option_id: string; fulfillment_type: string; capacity_reserved: number | null }>(),
+        db
+          .prepare('SELECT id, fulfillment_id, method, capacity_reserved FROM product_option_transports WHERE product_id = ?')
+          .bind(productId)
+          .all<{ id: string; fulfillment_id: string; method: string; capacity_reserved: number | null }>(),
+      ]);
+      statements.push(
+        ...fulfillmentStatements(
+          db,
+          productId,
+          parsed,
+          undefined,
+          existingCellsFrom(liveCells.results ?? [], liveRoutes.results ?? [])
+        )
+      );
     }
   }
 

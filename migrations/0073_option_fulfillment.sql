@@ -84,22 +84,29 @@ CREATE TABLE IF NOT EXISTS product_option_fulfillment (
   pro_adjust_iqd INTEGER,
   cost_adjust_iqd INTEGER,
 
-  -- NO STOCK COLUMN HERE, AND THE REASON MATTERS.
+  -- NO *STOCK* COLUMN HERE. THE DIRECT-SALE NUMBER IS THE MODEL'S.
   --
   -- The request listed stock on the fulfilment cell, and the behaviour it asks
   -- for — a model that is sold out for direct sale but still open for
-  -- pre-order — is exactly right. But a PRE-ORDER has no stock by definition:
-  -- it is the sale of a unit that is not on the shelf. So there is only ever
-  -- ONE number, "how many we have", and that is the MODEL's stock, which
-  -- `product_option_values.stock` already is and which the inventory ledger
-  -- already counts (scope 'option', with 'base', 'color' and 'variant').
+  -- pre-order — is exactly right. For a DIRECT SALE there is only ever ONE
+  -- number, "how many we have on the shelf", and that is the MODEL's stock,
+  -- which `product_option_values.stock` already is and which the inventory
+  -- ledger already counts (scope 'option', with 'base', 'color' and 'variant').
+  -- A second direct-stock column here would give the store two places to be
+  -- wrong about one physical shelf, so there is none, and the behaviour comes
+  -- from WHO READS IT: the direct-sale cell consults the model's stock.
   --
-  -- The behaviour therefore comes from WHO READS IT: the direct-sale cell
-  -- consults the model's stock, the pre-order cell ignores it. Putting a fifth
-  -- counter here instead would fork the ledger — `inventory_ledger.scope` is
-  -- pinned by a CHECK that SQLite cannot widen without rebuilding an
-  -- append-only history table — and give the store two places to be wrong
-  -- about the same physical shelf.
+  -- THIS FILE ALSO CLAIMED THAT "a pre-order has no stock by definition" AND
+  -- THAT THE LEDGER COULD NOT LEARN A NEW SCOPE. THE OWNER HAS OVERRULED BOTH,
+  -- IN WRITING, AND MIGRATION 0075 IMPLEMENTS THE OVERRIDE.
+  -- A pre-order is sold against a fixed number of units bought from a supplier,
+  -- so the cell carries an OPTIONAL `capacity` (NULL = untracked = unlimited,
+  -- which is what every row created by this migration is) and each transport
+  -- may carry its own quota. That capacity is NEVER the model's stock and never
+  -- touches it. Widening `inventory_ledger.scope` cost one table rebuild — the
+  -- one 0020 had already done for `kind` — and it keeps ONE audit trail for
+  -- every unit that moves, which is cheaper than the fork this comment feared.
+  -- See migrations/0075_preorder_capacity.sql.
 
   -- A pre-order's promise. Prose wins over the numbers, which are for sorting
   -- and estimates. A direct sale normally leaves all three empty.

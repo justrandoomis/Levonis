@@ -22,6 +22,15 @@
  * Every step is idempotent through the same UNIQUE idempotency_key, so a
  * double-clicked confirmation, a replayed webhook or a retried cancellation
  * moves nothing a second time.
+ *
+ * PRE-ORDER CAPACITY NEEDS NOT ONE LINE OF ITS OWN HERE (migration 0075), and
+ * that is the design working rather than a gap. Everything below is driven by
+ * the LEDGER ROWS the reservation wrote — `scope`, `scope_id`, `qty` — and the
+ * two capacity scopes are ledger scopes like the other four. So a pre-order's
+ * hold is deducted at confirmation, released at cancellation and restored on a
+ * return by exactly the statements that move a shelf, with the same guards and
+ * the same UNIQUE key making a repeat a no-op. A second lifecycle for capacity
+ * would be a second place for a hold to be forgotten.
  */
 
 import { planInventory, planReservationFence, type InventoryPlan, type LedgerKind, type StockMove } from './inventory';
@@ -47,6 +56,11 @@ async function movesFor(db: D1Database, orderId: string, kind: string): Promise<
   return results.map((r) => ({
     product_id: r.product_id,
     qty: r.qty,
+    // `r.scope` is replayed VERBATIM, including 'preorder' and
+    // 'preorder_transport'. Recomputing it from the product's current shape is
+    // exactly what the header forbids: an admin who moved a route's quota onto
+    // the shared pool since checkout would otherwise have the release aimed at
+    // a counter that never took the hold.
     // The key is `<kind>:<operationId>:<lineId>:<scope>:<scopeId>`; the line id
     // is what keeps a two-line order with the same product from collapsing
     // into one movement.

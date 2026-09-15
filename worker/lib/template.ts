@@ -87,6 +87,22 @@ export interface FieldSpec {
    * the number (there is no adjustment twin to route to).
    */
   plusIsPlain?: boolean;
+  /**
+   * 0075 — A CELL FIELD THAT IS REALLY THE MODEL'S COLUMN.
+   *
+   * «استخدم مصدر مخزون واحد لكل اختيار فعلي» — one stock source per actual
+   * selection. Direct-sale availability is ALREADY the row
+   * `products.inventory_mode` selects, so `options.N.direct.stock` is not a
+   * second number: it is a DOCUMENTED ALIAS onto `options.N.stock`, applied
+   * to the parent item rather than to the cell, exactly as `aliasOf` routes a
+   * value to another key of the same item. Both spellings therefore reach the
+   * one column `product_option_values.stock`.
+   *
+   * Only the canonical spelling is EXPORTED (`exported: false` here), because
+   * writing both would make an export state one number twice and a round trip
+   * write it twice.
+   */
+  onModel?: boolean;
 }
 
 export interface GroupSpec {
@@ -123,7 +139,21 @@ export interface CellSpec {
   titleEn: string;
   fields: FieldSpec[];
   /** The indexed list inside this cell, if it has one. */
-  list?: { name: string; fields: FieldSpec[] };
+  list?: { name: string; fields: FieldSpec[]; notes?: string[] };
+  /**
+   * 0075 — SUBKEYS THIS CELL REFUSES BY NAME, with the sentence that says what
+   * to write instead (Arabic first, then English).
+   *
+   * An unknown subkey is a WARNING and is dropped, which is right for a key
+   * the format never had — but wrong for `options.N.direct.capacity`, which an
+   * admin writes on purpose after reading about the pre-order pool. Dropping
+   * it silently would let somebody type 50 into a file and believe they had
+   * limited a direct sale, when the direct number is the model's stock. So it
+   * is an ERROR, raised in the PREVIEW, before anything is written.
+   */
+  refused?: Record<string, string>;
+  /** Prose the blank template prints above this cell's keys. */
+  notes?: string[];
 }
 
 export interface ProtectedFieldSpec {
@@ -328,8 +358,29 @@ const GROUP_SPECS: GroupSpec[] = [
     cellFields: {
       direct: {
         titleAr: 'البيع المباشر لهذا الموديل', titleEn: 'Direct sale for this model',
+        notes: [
+          'مخزون البيع المباشر هو مخزون الموديل نفسه — مصدر واحد لكل اختيار فعلي.',
+          'options.N.direct.stock و options.N.direct.low_stock_threshold مرادفان لـ options.N.stock و options.N.low_stock_threshold،',
+          'ويكتبان في نفس العمود. التصدير يكتب التهجئة الأولى فقط حتى لا يُكتب الرقم مرتين.',
+          'Direct-sale stock IS the model stock: options.N.direct.stock is an alias onto options.N.stock',
+          '(one stock source per actual selection); only options.N.stock is exported.',
+          'لا سعة (capacity) للبيع المباشر — السعة للطلب المسبق وحده. / A direct sale has no capacity.',
+        ],
+        /**
+         * «لا تنشئ نظامًا موازيًا» — a direct sale's number is the model's
+         * stock, and this file must not offer a second box to type it into.
+         */
+        refused: {
+          capacity: 'السعة تخص الطلب المسبق وحده — للبيع المباشر اكتب options.N.stock (أو options.N.direct.stock، وهما نفس العمود). / capacity belongs to a pre-order only — for a direct sale write options.N.stock (or options.N.direct.stock, the same column).',
+        },
         fields: [
           f('enabled', 'bool', 'options', 'هل يُباع هذا الموديل مباشرةً من المخزون؟ حذف الكتلة كلها = لا يُباع مباشرة إطلاقًا'),
+          // 0075 / DECISION 1. THE SAME COLUMN AS options.N.stock, spelled the
+          // way an admin reading the direct block expects to find it. Applied
+          // to the MODEL (`onModel`), import-only (`exported: false`) so the
+          // export states the number once.
+          f('stock', 'int', 'options', 'مخزون البيع المباشر = مخزون الموديل — مرادف لـ options.N.stock ويكتب في نفس العمود؛ __NULL__ = لا يُتتبع، 0 = لا توجد وحدات. لا يُصدَّر بهذه التهجئة (يُصدَّر كـ options.N.stock).', { nullable: true, min: 0, max: 1_000_000, onModel: true, exported: false, aliasOf: 'stock' }),
+          f('low_stock_threshold', 'int', 'options', 'حد التنبيه لمخزون البيع المباشر — مرادف لـ options.N.low_stock_threshold ونفس العمود؛ __NULL__ = بلا تنبيه. لا يُصدَّر بهذه التهجئة.', { nullable: true, min: 0, max: 1_000_000, onModel: true, exported: false, aliasOf: 'low_stock_threshold' }),
           f('price_iqd', 'iqd', 'options', 'سعر البيع المباشر لهذا الموديل — +N = فرق عن سعر الموديل (مثال +50000)، رقم = سعر ثابت، __NULL__ = نفس سعر الموديل', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
           f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للبيع المباشر — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
           f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للبيع المباشر — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
@@ -338,8 +389,19 @@ const GROUP_SPECS: GroupSpec[] = [
       },
       preorder: {
         titleAr: 'الطلب المسبق لهذا الموديل', titleEn: 'Pre-order for this model',
+        notes: [
+          'السعة (capacity) هنا هي الحوض المشترك للطلب المسبق لهذا الموديل، وهي اختيارية تمامًا.',
+          'اتركها فارغة أو __NULL__ = غير متتبَّعة: الطلب المسبق بلا حد، وهو سلوك المتجر قبل هذه الإضافة.',
+          '0 = متتبَّعة ولا توجد وحدات الآن. السعة لا تمس مخزون البيع المباشر أبدًا.',
+          'capacity here is the SHARED pre-order pool for this model. Empty / __NULL__ = untracked',
+          '(unlimited, reserves nothing); 0 = tracked and empty. It never touches direct stock.',
+        ],
         fields: [
           f('enabled', 'bool', 'options', 'هل يمكن طلب هذا الموديل مسبقًا؟ حذف الكتلة كلها = لا طلب مسبق'),
+          // 0075 / DECISION 2. Optional, independent of the model's stock, and
+          // NULL by default so every product written before this behaves as it
+          // always did: an unlimited pre-order.
+          f('capacity', 'int', 'options', 'سعة الطلب المسبق المشتركة لهذا الموديل — __NULL__ أو فارغ = غير متتبَّعة (بلا حد)، 0 = لا توجد وحدات. الطرق التي تُترك سعتها فارغة تسحب من هذا الحوض. لا علاقة لها بمخزون البيع المباشر.', { nullable: true, min: 0, max: 1_000_000 }),
           f('price_iqd', 'iqd', 'options', 'سعر الطلب المسبق لهذا الموديل — +N = فرق عن سعر الموديل، __NULL__ = نفس سعر الموديل', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
           f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
           f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
@@ -350,9 +412,24 @@ const GROUP_SPECS: GroupSpec[] = [
         ],
         list: {
           name: 'transports',
+          notes: [
+            'السعة المشتركة مقابل الحصص المستقلة — SHARED pool vs INDEPENDENT quotas:',
+            '  • اترك سعة كل الطرق فارغة  → الجو والبحر والبر تسحب كلها من options.N.preorder.capacity.',
+            '    بيع وحدة جوًا ينقص وحدة من نصيب البحر والبر.',
+            '  • أعطِ طريقة رقمًا خاصًا بها → تلك الطريقة تملك حصتها المستقلة، ولا تسحب من الحوض المشترك.',
+            '    عدّاد واحد لكل عملية بيع، لا عدّادان.',
+            '  • لا تكرر نفس الكمية تلقائيًا على الطرق الثلاث — لا شيء هنا ينسخ رقمًا عنك.',
+            '  Leave every route capacity empty → air/sea/land all draw on the cell pool.',
+            '  Give a route a number → that route holds its own quota and does NOT also spend the pool.',
+            '  Never copy one quantity onto all three routes.',
+          ],
           fields: [
             f('method', 'enum', 'options', 'air | sea | land — كيف يصل الجهاز إلى العراق. ليست طريقة التوصيل داخل العراق.', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
             f('enabled', 'bool', 'options', 'معروضة للزبائن — offered to customers'),
+            // 0075 / DECISION 2. Blank is not zero and is not "copy the pool":
+            // it is "this route shares the pool", which is the default every
+            // route written before 0075 has.
+            f('capacity', 'int', 'options', 'حصة هذه الطريقة وحدها — فارغ أو __NULL__ = تسحب من السعة المشتركة أعلاه، ورقم = حصة مستقلة لا تمس الحوض المشترك. 0 = متتبَّعة ولا توجد وحدات على هذه الطريقة.', { nullable: true, min: 0, max: 1_000_000 }),
             f('surcharge_iqd', 'iqd', 'options', 'زيادة هذه الطريقة لهذا الموديل — تحلّ محل زيادة المنتج لهذه الطريقة ولا تُضاف إليها. __NULL__ = استخدم زيادة المنتج.', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
             f('price_iqd', 'iqd', 'options', 'سعر ثابت لهذا الموديل بهذه الطريقة — نادر؛ __NULL__ = احسب من المستويات الأعلى', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
             f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME بهذه الطريقة — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
@@ -898,6 +975,12 @@ export function parseTemplate(text: string): ParsedTemplate {
           continue;
         }
 
+        // 0075. A subkey this cell refuses BY NAME. It is an error and not a
+        // dropped unknown key, because the admin wrote it on purpose and has
+        // to be told which field carries the number instead.
+        const refusal = cellSpec.refused?.[rest];
+        if (refusal) { err(lineNo, key, refusal); continue; }
+
         const cellField = cellSpec.fields.find((x) => x.key === rest);
         if (!cellField) { out.unknown_keys.push(key); continue; }
         if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
@@ -1227,6 +1310,19 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
       push(`${cp}.pro_price_iqd`, numStr(cell.pro_price_iqd ?? null));
       if (money) push(`${cp}.cost_iqd`, numStr(cell.cost_iqd ?? null));
       if (cell.fulfillment_type === 'pre_order') {
+        /**
+         * 0075. THE PRE-ORDER POOL, written even when it is null.
+         *
+         * `numStr(null)` is `__NULL__`, which is UNTRACKED — the same word the
+         * file uses to say it. Writing `0` here instead would turn every
+         * unlimited pre-order in the catalogue into a sold-out one on the next
+         * re-import, so the null must survive the round trip as a null.
+         *
+         * THE DIRECT CELL GETS NO `stock` LINE. Its number is the model's,
+         * already written above as `options.N.stock`; emitting the alias too
+         * would state one column twice and a round trip would write it twice.
+         */
+        push(`${cp}.capacity`, numStr(cell.capacity ?? null));
         push(`${cp}.lead_time_text`, cell.lead_time_text ?? '');
         push(`${cp}.lead_time_min_days`, numStr(cell.lead_time_min_days ?? null));
         push(`${cp}.lead_time_max_days`, numStr(cell.lead_time_max_days ?? null));
@@ -1235,6 +1331,10 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
           push(`${tp}.method`, t.method);
           push(`${tp}.enabled`, boolStr(t.enabled !== false));
           push(`${tp}.surcharge_iqd`, numStr(t.surcharge_iqd ?? null));
+          // null = THIS ROUTE SHARES THE POOL. Exported as `__NULL__`, never
+          // as the pool's number: copying it here would be the automatic
+          // duplication onto the three routes the owner forbade.
+          push(`${tp}.capacity`, numStr(t.capacity ?? null));
           push(`${tp}.price_iqd`, numStr(t.regular_price_iqd ?? null));
           push(`${tp}.prime_price_iqd`, numStr(t.prime_price_iqd ?? null));
           push(`${tp}.pro_price_iqd`, numStr(t.pro_price_iqd ?? null));
@@ -1714,6 +1814,13 @@ export function generateBlankTemplate(): string {
       lines.push(`# احذف الكتلة كلها = هذا الموديل لا يُباع بهذه الطريقة.`);
       lines.push(`# لإزالتها من منتج موجود عند التحديث: ${g.name}.1.${cellName}=${CLEAR_TOKEN}`);
       lines.push(`# أزل علامة # من الأسطر التالية لتفعيلها.`);
+      // 0075. The cell's own prose — the shared-vs-independent rule and the
+      // one-stock-source rule — printed where the keys are, not only in the
+      // docs: the blank template is the only documentation many admins read.
+      for (const note of cell.notes ?? []) lines.push(`# ${note}`);
+      for (const [key, why] of Object.entries(cell.refused ?? {})) {
+        lines.push(`# (مرفوض / refused) ${g.name}.1.${cellName}.${key} — ${why}`);
+      }
       for (const spec of cell.fields) {
         lines.push(fieldComment(spec));
         lines.push(`# ${g.name}.1.${cellName}.${spec.key}=${blankValue(spec)}`);
@@ -1722,6 +1829,7 @@ export function generateBlankTemplate(): string {
         lines.push(
           `# ${cell.list.name}: كرر بـ ${g.name}.1.${cellName}.${cell.list.name}.2.… — كيف يصل الجهاز إلى العراق، وليس التوصيل داخل العراق.`
         );
+        for (const note of cell.list.notes ?? []) lines.push(`# ${note}`);
         for (const spec of cell.list.fields) {
           lines.push(fieldComment(spec));
           lines.push(`# ${g.name}.1.${cellName}.${cell.list.name}.1.${spec.key}=${blankValue(spec)}`);
@@ -1838,7 +1946,12 @@ function applyItemField(target: LooseItem, spec: FieldSpec, pf: ParsedField): vo
 function buildCells(
   g: GroupSpec,
   it: ParsedGroupItem,
-  existing: LooseItem[] | null
+  existing: LooseItem[] | null,
+  /** The MODEL row these cells hang off — `options.N.direct.stock` lands here
+   *  (0075 / DECISION 1), because it is `options.N.stock` spelled differently
+   *  and there is only one column. Optional so older callers still compile. */
+  model?: LooseItem,
+  result?: ToDocResult
 ): LooseItem[] | undefined {
   if (!g.cellFields) return undefined;
   const parsedCells = it.cells;
@@ -1858,7 +1971,30 @@ function buildCells(
     if (parsed.cleared) { kept.delete(type); continue; }
 
     const cell: LooseItem = { ...(kept.get(type) ?? {}), fulfillment_type: type };
-    applyItemFields(cell, cellSpec.fields, parsed.fields);
+    /**
+     * 0075 / DECISION 1. THE ALIAS FIELDS GO TO THE MODEL, NOT TO THE CELL.
+     *
+     * `options.N.direct.stock` and `options.N.stock` are two spellings of
+     * `product_option_values.stock`, so only one of them may be written and
+     * it is the model's. Applied AFTER the model's own scalar loop, so when a
+     * file carries both, the more specific spelling is the one that lands —
+     * and a warning names both keys, because a file stating one number twice
+     * is a file whose author expects one of them to be read.
+     */
+    const modelFields = cellSpec.fields.filter((x) => x.onModel);
+    if (modelFields.length && model) {
+      for (const spec of modelFields) {
+        if (!parsed.fields[spec.key]) continue;
+        const canonical = spec.aliasOf ?? spec.key;
+        if (it.fields[canonical]) {
+          result?.warnings.push(
+            `${g.name}.${it.index}: both ${g.name}.${it.index}.${canonical} and ${g.name}.${it.index}.${cellName}.${spec.key} were given for the same column — ${cellName}.${spec.key} was used`
+          );
+        }
+      }
+      applyItemFields(model, modelFields, parsed.fields);
+    }
+    applyItemFields(cell, cellSpec.fields.filter((x) => !x.onModel), parsed.fields);
     // The file spells the item price `price_iqd`; the document (and the
     // ladder, and the table) call it `regular_price_iqd` like every other rung.
     if ('price_iqd' in cell) { cell.regular_price_iqd = cell.price_iqd; delete cell.price_iqd; }
@@ -1919,7 +2055,7 @@ function buildGroupItems(
       }
     }
     if (g.rowFields) item.rows = buildRows(g, it, null, result);
-    const freshCells = buildCells(g, it, null);
+    const freshCells = buildCells(g, it, null, item, result);
     if (freshCells) item.fulfillments = freshCells;
     return item;
   };
@@ -1940,7 +2076,7 @@ function buildGroupItems(
         const item: LooseItem = { ...base, order: orderIndex };
         applyItemFields(item, g.fields, it.fields);
         if (g.rowFields) item.rows = buildRows(g, it, (base.rows as LooseItem[]) ?? [], result);
-        const mergedCells = buildCells(g, it, (base.fulfillments as LooseItem[]) ?? []);
+        const mergedCells = buildCells(g, it, (base.fulfillments as LooseItem[]) ?? [], item, result);
         if (mergedCells) item.fulfillments = mergedCells;
         merged.push(item);
       } else {

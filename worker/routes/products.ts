@@ -28,10 +28,10 @@ import { activeBenefitRules, ancestryFor, catalogAncestry, fallbackFor } from '.
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
-import { resolveStock, isLowStock } from '../lib/inventory';
+import { resolveStock, isLowStock, resolveCapacity } from '../lib/inventory';
 import { COMPOSITION_LOW_BUNDLES } from '../lib/bundleComposition';
 import type { SaleModeName } from '../lib/bundleComposition';
-import type { InventorySnapshot } from '../lib/inventory';
+import type { CapacitySnapshot, InventorySnapshot } from '../lib/inventory';
 import { colorVisibility } from '../lib/productRelations';
 import type { ColorLinkRow, GroupSelection } from '../lib/productRelations';
 import {
@@ -40,6 +40,7 @@ import {
   loadRelationsView,
   loadRelationsViews,
   publicRelations,
+  capacityFrom,
   snapshotFrom,
 } from '../lib/productOverlay';
 import type { ProductRelationsView } from '../lib/productOverlay';
@@ -198,6 +199,36 @@ export interface TransportOptionView {
   configured: boolean; // false = no integer commission anywhere → unusable
 }
 
+/**
+ * 0075 — PRE-ORDER CAPACITY, PER ROUTE. A SECOND ARRAY, NOT THREE MORE FIELDS
+ * ON `TransportOptionView`.
+ *
+ * `transports` is the PRICE answer and several screens and tests read it as an
+ * exact shape; capacity is a different question with a different lifetime (a
+ * commission changes when the admin edits the product, a quota changes on every
+ * sale). Keeping them apart means a client can cache one and re-read the other,
+ * and it keeps the older shape byte-identical for callers that only price.
+ *
+ * `available: null` = untracked, which is unlimited and is what every catalogue
+ * carried before 0075. `0` = tracked and full.
+ *
+ * `scope` says WHOSE number it is, and it is the field that makes the
+ * shared-versus-independent rule visible instead of guessable: 'preorder'
+ * means this route is spending from the model's SHARED pool (so air, sea and
+ * land all show the same figure, and selling one by air lowers what sea can
+ * sell), 'preorder_transport' means this route holds its OWN quota. `null` =
+ * no counter at all.
+ */
+export interface PreorderRouteCapacity {
+  method: string;
+  available: number | null;
+  scope: 'preorder' | 'preorder_transport' | null;
+  scope_id: string;
+  /** Commission configured AND a counter with room. */
+  usable: boolean;
+  reason: string | null;
+}
+
 export interface SaleAvailability {
   mode: SaleMode;
   /** Machine reason when mode = 'unavailable' (null otherwise). */
@@ -232,6 +263,24 @@ export interface SaleAvailability {
     usable: boolean;
     reason: string | null;
     transports: TransportOptionView[];
+    /** 0075 — one entry per offered route. See `PreorderRouteCapacity`. */
+    routes: PreorderRouteCapacity[];
+    /**
+     * 0075 — THE COUNTER A PRE-ORDER OF THIS LINE WOULD CONSUME. It is NEVER
+     * the `stock` block above: that is the shelf, and a pre-order does not
+     * come off the shelf. `available: null` = untracked = unlimited, exactly
+     * as a NULL `stock` means untracked.
+     *
+     * `scope_id` names the row so an admin screen can say WHICH counter, and
+     * so a client never has to re-derive the shared-versus-independent rule.
+     */
+    capacity: {
+      tracked: boolean;
+      scope: 'preorder' | 'preorder_transport' | null;
+      scope_id: string;
+      available: number | null;
+      max_qty: number;
+    };
   };
   /** Requested qty (when supplied) fits inside max_qty. */
   qty_ok: boolean;
@@ -280,6 +329,17 @@ export function saleAvailability(
     coarseStock?: boolean;
     /** Which sale type the buyer asked for, when both are offered. */
     preferredType?: string | null;
+    /**
+     * 0075 — THE PRE-ORDER COUNTER FOR THE CHOSEN MODEL (`capacityFrom`).
+     * Absent or null = the model has no pre-order cell, which is UNTRACKED and
+     * is how every product behaved before 0075: unlimited pre-orders. It is
+     * never derived from `inventory`, because the two describe different
+     * physical facts.
+     */
+    capacity?: CapacitySnapshot | null;
+    /** The route the buyer chose, when they have. It selects WHICH capacity
+     *  counter answers — never WHICH ORDER TYPE the line is (DECISION 4). */
+    transportMethod?: string | null;
     /**
      * A COMPOSITION ROW'S ANSWER, and the reason this function fails CLOSED.
      *
@@ -363,7 +423,18 @@ export function saleAvailability(
       color_id: color ? color.id : null,
     });
     tracked = res.tracked;
-    scope = res.targets[0]?.scope ?? (input.inventory.inventory_mode === 'BASE' ? 'base' : 'variant');
+    // `resolveStock` only ever answers with a SHELF scope; the two capacity
+    // scopes are reached through `resolveCapacity`, which this block never
+    // calls and whose answer lives in `preorder.capacity` below. Narrowed
+    // here rather than widened in the response type, so `stock.scope` cannot
+    // start meaning "a pre-order quota" to a client that reads it.
+    const answered = res.targets[0]?.scope;
+    scope =
+      answered && answered !== 'preorder' && answered !== 'preorder_transport'
+        ? answered
+        : input.inventory.inventory_mode === 'BASE'
+          ? 'base'
+          : 'variant';
     onHand = res.targets.length
       ? res.targets.reduce<number>((m, t) => Math.min(m, t.stock ?? Infinity), Infinity)
       : null;
@@ -417,6 +488,14 @@ export function saleAvailability(
     : saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
   const preorderEnabled = isComposition ? compositionModes.includes('pre_order') : saleTypes.includes('pre_order');
 
+  /**
+   * 0075 — WHAT ONE ROUTE'S COUNTER SAYS. `resolveCapacity` holds the whole
+   * shared-versus-independent rule, so this function never re-implements it:
+   * ask it per method and it answers with the route's own quota if there is
+   * one and the model's shared pool otherwise.
+   */
+  const capacityFor = (method: string) => resolveCapacity(input.capacity ?? null, method);
+
   const transports: TransportOptionView[] = doc.preorder_transports
     .filter((t) => t.active !== false)
     .map((t) => {
@@ -425,14 +504,49 @@ export function saleAvailability(
       const commission = own !== null ? own : fallback ? fallback.commission_iqd : null;
       return { method: t.method, commission_iqd: commission, configured: commission !== null };
     });
-  const preorderUsable = preorderEnabled && transports.some((t) => t.configured);
+  const routes: PreorderRouteCapacity[] = transports.map((t) => {
+    const cap = capacityFor(t.method);
+    const target = cap.targets[0] ?? null;
+    // UNTRACKED IS SELLABLE. `available === null` means no limit was claimed,
+    // so the route is usable on the strength of its commission alone — exactly
+    // how every pre-order in the catalogue behaved before 0075. Zero is a
+    // tracked counter that is empty, and it refuses. `COALESCE(capacity, 0)`
+    // here would close the whole catalogue.
+    const hasRoom = cap.available === null || cap.available > 0;
+    return {
+      method: t.method,
+      available: cap.available,
+      scope:
+        target && (target.scope === 'preorder' || target.scope === 'preorder_transport') ? target.scope : null,
+      scope_id: target?.scope_id ?? '',
+      usable: t.configured && hasRoom,
+      reason: !t.configured ? 'TRANSPORT_COMMISSION_UNCONFIGURED' : hasRoom ? null : 'PREORDER_CAPACITY_EXHAUSTED',
+    };
+  });
+  const preorderUsable = preorderEnabled && routes.some((r) => r.usable);
   const preorderReason = preorderEnabled
     ? preorderUsable
       ? null
       : transports.length === 0
         ? 'NO_TRANSPORT_OFFERED'
-        : 'TRANSPORT_COMMISSION_UNCONFIGURED'
+        : // A route that is priced but has no units left is a DIFFERENT refusal
+          // from one nobody priced, and the customer is owed the difference:
+          // "we are not selling this by sea" versus "this month's sea quota is
+          // full". Reported only when at least one route really is priced.
+          transports.some((t) => t.configured)
+          ? 'PREORDER_CAPACITY_EXHAUSTED'
+          : 'TRANSPORT_COMMISSION_UNCONFIGURED'
+
     : 'PREORDER_NOT_ENABLED';
+
+  /**
+   * THE COUNTER THIS LINE WOULD CONSUME AS A PRE-ORDER, for the route the
+   * buyer chose. With no route chosen the shared pool answers, which is the
+   * honest "before you pick air/sea/land" figure: it is what every route that
+   * has no quota of its own will spend from.
+   */
+  const chosenCapacity = capacityFor(String(input.transportMethod ?? ''));
+  const capacityTarget = chosenCapacity.targets[0] ?? null;
 
   const directUsable = directEnabled && (available === null || available > 0);
   const directReason = directEnabled ? (directUsable ? null : 'OUT_OF_STOCK') : 'DIRECT_SALE_NOT_ENABLED';
@@ -466,21 +580,29 @@ export function saleAvailability(
   }
 
   /**
-   * The pre-order branch discards `available` for an ordinary product, and that
-   * is right: a pre-order is bought from a supplier, not off a shelf. It is
-   * WRONG for a composition row, which may be a pre-order bundle carrying
-   * tracked direct components that reserve normally — so a composition row is
-   * clamped on BOTH branches, by its own `max_qty_per_order` as well.
+   * The pre-order branch discards the SHELF `available`, and that is right: a
+   * pre-order is bought from a supplier, not off a shelf. What it does NOT
+   * discard, since 0075, is the pre-order's OWN counter — an untracked
+   * capacity still gives the old unlimited ceiling, a tracked one caps the
+   * stepper at what is really left, and the two are told apart by null-versus-
+   * zero and never by `COALESCE`.
+   *
+   * A composition row is clamped on BOTH branches, by its own
+   * `max_qty_per_order` as well: it may be a pre-order bundle carrying tracked
+   * direct components that reserve normally.
    */
   const compositionCap = Math.min(QTY_CEILING, Math.max(0, Math.trunc(input.maxQtyPerOrder ?? QTY_CEILING)));
+  const preorderCap = chosenCapacity.available === null ? QTY_CEILING : Math.min(QTY_CEILING, chosenCapacity.available);
   const maxQty =
     mode === 'unavailable'
       ? 0
       : isComposition
         ? Math.min(compositionCap, available === null ? QTY_CEILING : available)
-        : mode === 'preorder' || available === null
-          ? QTY_CEILING
-          : Math.min(QTY_CEILING, available);
+        : mode === 'preorder'
+          ? preorderCap
+          : available === null
+            ? QTY_CEILING
+            : Math.min(QTY_CEILING, available);
 
   return {
     mode,
@@ -525,8 +647,69 @@ export function saleAvailability(
       errors: [...new Set(errors)],
     },
     modes,
-    preorder: { enabled: preorderEnabled, usable: preorderUsable, reason: preorderReason, transports },
+    preorder: {
+      enabled: preorderEnabled,
+      usable: preorderUsable,
+      reason: preorderReason,
+      transports,
+      routes,
+      capacity: {
+        tracked: chosenCapacity.tracked,
+        scope:
+          capacityTarget && (capacityTarget.scope === 'preorder' || capacityTarget.scope === 'preorder_transport')
+            ? capacityTarget.scope
+            : null,
+        scope_id: capacityTarget?.scope_id ?? '',
+        available: chosenCapacity.available,
+        max_qty: preorderCap,
+      },
+    },
     qty_ok: input.qty === undefined ? true : input.qty >= 1 && input.qty <= maxQty,
+  };
+}
+
+/**
+ * THE ORDER TYPE THE CUSTOMER STATED IS NOT A PREFERENCE THE DOOR MAY OVERRULE.
+ *
+ * `saleAvailability` DESCRIBES a product: with no stated type it falls back
+ * from direct sale to pre-order so a page can still show a buy button, and
+ * that fallback is right for a page. It is wrong for a DOOR. A customer who
+ * chose "buy now" on a model whose last unit has just gone must be told it is
+ * gone — not handed a pre-order with a different price, a different wait and a
+ * different counter behind their back. The same in reverse: a pre-order whose
+ * import quota is full must not become a direct sale off a shelf the customer
+ * never asked about.
+ *
+ * Returns the refusal for a stated type that cannot be used, or null when the
+ * line may proceed. `stated` empty — a legacy line, or a product that sells
+ * exactly one way — returns null and keeps the old behaviour untouched.
+ */
+export function unusableOrderType(
+  a: SaleAvailability,
+  stated: string
+): { code: string; message: string } | null {
+  if (stated !== 'direct_sale' && stated !== 'pre_order') return null;
+  // THE ROUTE THE CUSTOMER CHOSE, NOT THE PRODUCT'S BEST ROUTE. `modes` says
+  // whether the product can be pre-ordered AT ALL — true while any one route
+  // has room — so a customer who picked the one full route would otherwise be
+  // told "only 0 left" (a quantity problem) instead of "this route's quota is
+  // full" (a route problem they can solve by choosing another).
+  if (stated === 'pre_order' && a.preorder.capacity.tracked && (a.preorder.capacity.available ?? 0) <= 0) {
+    return { code: 'PREORDER_CAPACITY_EXHAUSTED', message: 'The pre-order quota for this selection is full.' };
+  }
+  const mode = a.modes.find((m) => m.type === stated);
+  if (mode?.usable) return null;
+  const code = mode?.reason ?? (stated === 'pre_order' ? 'PREORDER_NOT_ENABLED' : 'DIRECT_SALE_NOT_ENABLED');
+  return {
+    code,
+    message:
+      code === 'OUT_OF_STOCK'
+        ? 'That selection is out of stock.'
+        : code === 'PREORDER_CAPACITY_EXHAUSTED'
+          ? 'The pre-order quota for this selection is full.'
+          : stated === 'pre_order'
+            ? `This item cannot be pre-ordered right now (${code})`
+            : `This item cannot be bought directly right now (${code})`,
   };
 }
 
@@ -560,7 +743,14 @@ export function communityAvailability(): SaleAvailability {
       errors: [],
     },
     modes: [],
-    preorder: { enabled: false, usable: false, reason: 'PREORDER_NOT_ENABLED', transports: [] },
+    preorder: {
+      enabled: false,
+      usable: false,
+      reason: 'PREORDER_NOT_ENABLED',
+      transports: [],
+      routes: [],
+      capacity: { tracked: false, scope: null, scope_id: '', available: null, max_qty: 0 },
+    },
     qty_ok: false,
   };
 }
@@ -1635,6 +1825,15 @@ productRoutes.get('/:slug', async (c) => {
       pricing_modes: pricingModes(doc, ctx, { optionId: null, colorId: null }, isPrinter),
       // §7.2 — the sale mode the page may DEFAULT to, derived from the real
       // stock model and the admin pre-order policy (never from the browser).
+      //
+      // NO `capacity` HERE, AND THAT IS THE HONEST ANSWER. Capacity is
+      // configured per (model x pre-order) and this block describes the page
+      // before any model has been chosen. Reporting the largest model's quota
+      // would promise units of a model the customer has not picked; reporting
+      // the smallest would hide a model that is wide open. The per-selection
+      // quote below answers with the real counter the moment a model is
+      // tapped, and the cart and the checkout re-derive it server-side
+      // regardless of what this block said.
       availability: saleAvailability(doc, {
         coarseStock: poolMember,
         transportDefaults: ctx.transportDefaults,
@@ -1858,7 +2057,16 @@ productRoutes.post('/:slug/quote', async (c) => {
         low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
       }),
       links: relations.links,
+      // THE ORDER TYPE THE CUSTOMER STATED WINS. The transport is only the
+      // fallback for a client that has not learned to send `fulfillmentType`
+      // yet (0073's own rule), and it is an inference about the ORDER TYPE —
+      // never about the payment method, which cannot change either (DECISION 4).
       preferredType: fulfillmentType ?? (transportMethod ? 'pre_order' : null),
+      // 0075. The pre-order counter for the MODEL this selection names, and
+      // the route it named, so the page's transport rows show what is really
+      // left instead of an unconditional 99.
+      capacity: capacityFrom(relations, optionId ?? ''),
+      transportMethod,
     }),
     viewer_tier: viewerTier(ctx),
   });

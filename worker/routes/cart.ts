@@ -20,6 +20,7 @@ import { getSettings } from '../lib/settings';
 import { parseProductRow, primaryMedia, type ProductDoc } from '../lib/productModel';
 import {
   applyRelations,
+  capacityFrom,
   EMPTY_RELATIONS,
   loadRelationsViews,
   publicRelations,
@@ -29,7 +30,7 @@ import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
 import { rateLimit } from '../lib/ratelimit';
-import { saleAvailability } from './products';
+import { saleAvailability, unusableOrderType } from './products';
 import type { SaleAvailability } from './products';
 
 /**
@@ -815,6 +816,11 @@ async function loadCart(c: Context<AppContext>) {
       // 0073. What the customer CHOSE, falling back to the old inference for a
       // line written before the order type was a field of its own.
       preferredType: sel.fulfillmentType || (sel.transportMethod ? 'pre_order' : null),
+      // 0075. The pre-order counter for THIS line's model and route, so a cart
+      // line whose quota filled up while it sat there says so before the
+      // customer reaches the door.
+      capacity: view ? capacityFrom(view, sel.optionValueIds ?? []) : null,
+      transportMethod: sel.transportMethod,
     });
     items.push({
       id: row.cart_item_id,
@@ -1268,6 +1274,25 @@ async function addCompositionLine(
   return c.json({ success: true, items, tier: t, tierActive: ta });
 }
 
+/**
+ * "MORE THAN WE HAVE" — FROM THE COUNTER THAT ACTUALLY LIMITS THIS LINE.
+ *
+ * A pre-order's limit is its IMPORT QUOTA, not the shelf, so quoting
+ * `stock.available` on a pre-order line was doubly wrong: it named a number
+ * that does not constrain the line, and on a model that is merely sold out for
+ * direct sale it read "Only 0 left" for a pre-order the shop was happy to take.
+ * `max_qty` is already the clamp `saleAvailability` computed from whichever
+ * counter answered, so it is the honest ceiling in both modes.
+ */
+function refuseQty(availability: SaleAvailability) {
+  const remaining =
+    availability.mode === 'preorder' ? availability.preorder.capacity.available : availability.stock.available;
+  return badRequest(
+    remaining === null ? `At most ${availability.stock.max_qty} per order` : `Only ${remaining} left`,
+    'QTY_UNAVAILABLE'
+  );
+}
+
 cartRoutes.post('/items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -1371,7 +1396,14 @@ cartRoutes.post('/items', async (c) => {
         })
       : undefined,
     links: view?.links,
-    preferredType: transportMethod ? 'pre_order' : null,
+    // 0073/0075 — THE ORDER TYPE THE CUSTOMER STATED, NOT ONE INFERRED FROM
+    // THE ROUTE. The transport is only the fallback for a client that has not
+    // learned to send `fulfillmentType`; without this the add validated a
+    // stated pre-order against the model's SHELF, so a sold-out direct model
+    // refused a pre-order it had capacity for.
+    preferredType: fulfillmentType || (transportMethod ? 'pre_order' : null),
+    capacity: view ? capacityFrom(view, optionValueIds) : null,
+    transportMethod,
   });
   // A product with options or colours is sold as ONE of them. The relational
   // path enforces that in validateSelection; a legacy JSON-column product
@@ -1380,22 +1412,27 @@ cartRoutes.post('/items', async (c) => {
   // (it is what disables the storefront button), so the cart listens to it.
   // Checked before stock so "choose an option" wins over "out of stock".
   refuseIncompleteSelection(availability);
+  // THE STATED ORDER TYPE IS HONOURED OR REFUSED, NEVER QUIETLY SWAPPED. Without
+  // this, "buy now" on a model whose last unit had gone fell through to the
+  // pre-order branch and the line landed in the cart as a pre-order — a
+  // different price, a different wait and a different counter than the one the
+  // customer pressed.
+  const statedAdd = unusableOrderType(availability, fulfillmentType);
+  if (statedAdd) throw badRequest(statedAdd.message, statedAdd.code);
   if (availability.mode === 'unavailable') {
     throw badRequest(
       availability.reason === 'OUT_OF_STOCK'
         ? 'That selection is out of stock.'
-        : `This item cannot be added right now (${availability.reason ?? 'UNAVAILABLE'})`,
+        : availability.reason === 'PREORDER_CAPACITY_EXHAUSTED'
+          ? // "Out of stock" would be a lie about a pre-order: there is no
+            // shelf, the IMPORT QUOTA is full. The customer needs to know it is
+            // a different wait, not a different shop.
+            'The pre-order quota for this selection is full.'
+          : `This item cannot be added right now (${availability.reason ?? 'UNAVAILABLE'})`,
       availability.reason ?? 'UNAVAILABLE'
     );
   }
-  if (!availability.qty_ok) {
-    throw badRequest(
-      availability.stock.available === null
-        ? `At most ${availability.stock.max_qty} per order`
-        : `Only ${availability.stock.available} left`,
-      'QTY_UNAVAILABLE'
-    );
-  }
+  if (!availability.qty_ok) throw refuseQty(availability);
 
   // ONE SHIPPING TYPE PER CART and ONE SELLER PER CART, checked before
   // anything is written — the same two rules, in the same function, for an
@@ -1733,25 +1770,28 @@ cartRoutes.patch('/items/:id', async (c) => {
         })
       : undefined,
     links: view?.links,
-    preferredType: transportMethod ? 'pre_order' : null,
+    // The same rule as the add door: the stored/incoming ORDER TYPE decides
+    // which counter this line is judged against (DECISION 4).
+    preferredType: fulfillmentType || (transportMethod ? 'pre_order' : null),
+    capacity: view ? capacityFrom(view, optionValueIds) : null,
+    transportMethod,
   });
   // An update may also CLEAR a chosen option (an explicit empty list is the
   // new selection) — the same rule as an add.
   refuseIncompleteSelection(availability);
+  // The same rule on the edit door: changing the quantity of a stated
+  // pre-order must not silently re-type the line when its quota filled up.
+  const statedPatch = unusableOrderType(availability, fulfillmentType);
+  if (statedPatch) throw badRequest(statedPatch.message, statedPatch.code);
   if (availability.mode === 'unavailable') {
     throw badRequest(
-      `This item cannot be updated right now (${availability.reason ?? 'UNAVAILABLE'})`,
+      availability.reason === 'PREORDER_CAPACITY_EXHAUSTED'
+        ? 'The pre-order quota for this selection is full.'
+        : `This item cannot be updated right now (${availability.reason ?? 'UNAVAILABLE'})`,
       availability.reason ?? 'UNAVAILABLE'
     );
   }
-  if (!availability.qty_ok) {
-    throw badRequest(
-      availability.stock.available === null
-        ? `At most ${availability.stock.max_qty} per order`
-        : `Only ${availability.stock.available} left`,
-      'QTY_UNAVAILABLE'
-    );
-  }
+  if (!availability.qty_ok) throw refuseQty(availability);
 
   const canonical = [...optionValueIds].sort();
   await c.env.DB.prepare(

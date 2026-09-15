@@ -37,6 +37,20 @@
  * `moveOrderStage(to: 'cancelled')` instead would have returned the stock and
  * refunded nothing.
  *
+ * IT RELEASES A PRE-ORDER'S CAPACITY THE SAME WAY IT RELEASES STOCK, AND BY
+ * THE SAME CODE. `planOrderReturn` replays this order's `reserve` ledger rows,
+ * and since migration 0075 those rows may carry scope 'preorder' or
+ * 'preorder_transport' — a quota an abandoned checkout was sitting on comes
+ * back on the same sweep, in the same batch, under the same fence. There is no
+ * capacity-specific branch here and there must not be one: a second sweep is a
+ * second thing to forget to run, and the release would then depend on which
+ * counter the line happened to consume.
+ *
+ * RELEASED EXACTLY ONCE, even when the sweep overlaps the customer's own
+ * cancel. The hold's release is guarded by `inventory_ledger.idempotency_key`,
+ * which is UNIQUE and keyed on (kind, order, line, scope, scope_id): whoever
+ * gets there first writes it, and the second caller plans zero statements.
+ *
  * IT IS IDEMPOTENT BY CONSTRUCTION. Every write is already single-winner: the
  * inventory ledger's UNIQUE idempotency key makes a replayed release plan zero
  * statements, the reservation fence re-reads and upserts, the refund rows are

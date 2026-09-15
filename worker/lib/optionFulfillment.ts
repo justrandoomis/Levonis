@@ -50,6 +50,19 @@ export interface TransportCell extends CellPrices, LeadTime {
   enabled: boolean;
   surcharge_iqd: number | null;
   sort: number;
+  /**
+   * 0075 — THIS ROUTE'S OWN PRE-ORDER QUOTA, or null.
+   *
+   * null = this route draws on the fulfilment cell's SHARED pool, so selling
+   * one unit by air leaves one fewer for sea and for land. A number = this
+   * route holds its own quota, independent of the pool and of the other two
+   * routes, and it does NOT also spend the pool: one counter per sale.
+   *
+   * NOTHING COPIES A QUANTITY ONTO THE THREE ROUTES, here or anywhere else —
+   * "لا تكرر نفس الكمية تلقائيًا على الطرق الثلاث". Each route is written only
+   * if the admin wrote it.
+   */
+  capacity: number | null;
 }
 
 export interface FulfillmentCell extends CellPrices, LeadTime {
@@ -57,6 +70,19 @@ export interface FulfillmentCell extends CellPrices, LeadTime {
   fulfillment_type: FulfillmentType;
   enabled: boolean;
   sort: number;
+  /**
+   * 0075 — THE MODEL'S SHARED PRE-ORDER POOL, or null for UNTRACKED.
+   *
+   * null = no limit is claimed and pre-orders are unlimited, which is what
+   * every existing cell carries and how the shop behaved before 0075. 0 = the
+   * pool is tracked and empty, and a pre-order is refused. The two are
+   * different answers and the resolver never conflates them.
+   *
+   * MEANINGLESS ON A direct_sale CELL, and refused there: the direct-sale
+   * number is the MODEL's stock (`product_option_values.stock`), one source
+   * per actual selection. See `parseFulfillmentPayload`.
+   */
+  capacity: number | null;
   transports: TransportCell[];
 }
 
@@ -75,6 +101,24 @@ function adjust(raw: unknown, field: string): number | null {
   if (raw === null || raw === undefined || raw === '') return null;
   const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
   if (!Number.isInteger(n)) throw badRequest(`${field} must be a whole number of dinars, or empty`);
+  return n;
+}
+
+/**
+ * A CAPACITY: a whole number of units >= 0, or null for UNTRACKED.
+ *
+ * `''`, null and undefined all mean UNTRACKED — the field was left blank, and
+ * a blank capacity claims no limit. `0` is a real, tracked value meaning "none
+ * available right now" and must survive the round trip, which is why the check
+ * is on emptiness and not on falsiness.
+ */
+function capacity(raw: unknown, field: string): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+  if (!Number.isInteger(n) || n < 0) {
+    throw badRequest(`${field} must be a whole number of units (0 or more), or empty for unlimited`);
+  }
+  if (n > 1_000_000) throw badRequest(`${field} is larger than this shop can plan for`);
   return n;
 }
 
@@ -155,6 +199,23 @@ export function parseFulfillmentPayload(
       // choice that lives in ops_policy and never here.
       throw badRequest(`${where}: a direct sale has no transport — air/sea/land belongs to a pre-order`, 'TRANSPORT_ON_DIRECT');
     }
+    /**
+     * A DIRECT SALE HAS NO CAPACITY OF ITS OWN (0075, DECISION 1/2).
+     *
+     * Its availability IS the model's stock — the row `products.inventory_mode`
+     * already selects — and accepting a second number here would give the shop
+     * two places to be wrong about one physical shelf, which is the fork 0073
+     * warned about and the owner forbids ("لا تنشئ نظامًا موازيًا"). Refused
+     * with the field to use instead, because a silent drop would let an admin
+     * type 50 into a box and believe they had set something.
+     */
+    const cellCapacity = capacity(row.capacity, `${where}.capacity`);
+    if (type === 'direct_sale' && cellCapacity !== null) {
+      throw badRequest(
+        `${where}: a direct sale has no capacity of its own — set the model's stock instead`,
+        'CAPACITY_ON_DIRECT'
+      );
+    }
     const seenMethod = new Set<string>();
     const transports: TransportCell[] = transportsRaw.map((t, j) => {
       const tr = (t ?? {}) as Record<string, unknown>;
@@ -168,6 +229,10 @@ export function parseFulfillmentPayload(
         enabled: tr.enabled !== false,
         surcharge_iqd: money(tr.surcharge_iqd, `${tWhere}.surcharge_iqd`),
         sort: Number.isInteger(tr.sort) ? (tr.sort as number) : j,
+        // Left exactly as sent. A blank stays null — this route keeps drawing
+        // on the shared pool — and nothing here copies the cell's number, or
+        // another route's, onto it.
+        capacity: capacity(tr.capacity, `${tWhere}.capacity`),
         ...prices(tr, tWhere),
         ...leadTime(tr, tWhere),
       };
@@ -178,6 +243,7 @@ export function parseFulfillmentPayload(
       fulfillment_type: type,
       enabled: row.enabled !== false,
       sort: Number.isInteger(row.sort) ? (row.sort as number) : i,
+      capacity: cellCapacity,
       transports,
       ...prices(row, where),
       ...leadTime(row, where),
@@ -188,19 +254,104 @@ export function parseFulfillmentPayload(
 }
 
 /**
+ * WHAT A ROW ALREADY IS, so a replace does not destroy what only the ledger
+ * can put back (0075).
+ *
+ * `id` — a cell's row id is `inventory_ledger.scope_id` for every pre-order
+ * unit it is holding. Mint a new one on a save and the release for a live
+ * order aims at a row that no longer exists: the hold never comes back and the
+ * units are stranded for ever, invisibly. So a cell that is still in the
+ * payload KEEPS ITS ID.
+ *
+ * `capacity_reserved` — the units currently held. It is never sent by an admin
+ * form and never derived from one; it is carried across the replace verbatim,
+ * because it is the reservation itself, not a setting.
+ */
+export interface ExistingCells {
+  /** key: `<option_id>|<fulfillment_type>` */
+  cells: Map<string, { id: string; capacity_reserved: number }>;
+  /** key: `<option_id>|<fulfillment_type>|<method>` */
+  transports: Map<string, { id: string; capacity_reserved: number }>;
+}
+
+export const cellKey = (optionId: string, type: string) => `${optionId}|${type}`;
+export const transportKey = (optionId: string, type: string, method: string) =>
+  `${optionId}|${type}|${method}`;
+
+/**
+ * WHAT THE PRODUCT'S CELLS ARE RIGHT NOW, KEYED THE WAY THE REPLACE LOOKS THEM
+ * UP (0075).
+ *
+ * Every caller of `fulfillmentStatements` on an EXISTING product needs this,
+ * and each one deriving it for itself is how the two paths drift: the admin
+ * fulfilment door would keep a live pre-order's hold and a whole-product save
+ * would silently mint new row ids and zero `capacity_reserved`, stranding the
+ * units — `inventory_ledger.scope_id` names the row that no longer exists, so
+ * the release for that order matches nothing and no screen can show where the
+ * units went. One builder, both doors.
+ *
+ * A transport is keyed by its CELL's (option, type) rather than by
+ * `fulfillment_id`, because the payload side has no row ids at all — it names
+ * a model, an order type and a route. A transport whose cell has vanished is
+ * skipped: it cannot be matched to anything in the payload, and the FK drops
+ * it with the cell.
+ */
+export function existingCellsFrom(
+  fulfillments: readonly {
+    id: string;
+    option_id: string;
+    fulfillment_type: string;
+    capacity_reserved?: number | null;
+  }[],
+  transports: readonly {
+    id: string;
+    fulfillment_id: string;
+    method: string;
+    capacity_reserved?: number | null;
+  }[]
+): ExistingCells {
+  const byId = new Map(fulfillments.map((f) => [f.id, f] as const));
+  const out: ExistingCells = { cells: new Map(), transports: new Map() };
+  for (const f of fulfillments) {
+    out.cells.set(cellKey(f.option_id, String(f.fulfillment_type)), {
+      id: f.id,
+      capacity_reserved: f.capacity_reserved ?? 0,
+    });
+  }
+  for (const t of transports) {
+    const cell = byId.get(t.fulfillment_id);
+    if (!cell) continue;
+    out.transports.set(transportKey(cell.option_id, String(cell.fulfillment_type), String(t.method)), {
+      id: t.id,
+      capacity_reserved: t.capacity_reserved ?? 0,
+    });
+  }
+  return out;
+}
+
+/**
  * THE STATEMENTS THAT MAKE THE PRODUCT'S CELLS EXACTLY THIS SET.
  *
  * Delete-then-insert rather than a diff, for the same reason the structure
- * writer replaces: a cell has no identity a customer ever sees — it IS
- * (model, order type) — so rewriting it loses nothing, while diffing would
- * need an id the admin form has no reason to carry. The transports go first
- * because they name a fulfilment row.
+ * writer replaces: a cell's SETTINGS have no identity a customer ever sees —
+ * it IS (model, order type) — so rewriting them loses nothing, while diffing
+ * would need an id the admin form has no reason to carry. The transports go
+ * first because they name a fulfilment row.
+ *
+ * ITS ROW IDENTITY AND ITS HELD UNITS DO SURVIVE, WHEN THE CALLER SUPPLIES
+ * THEM. `existing` is what the product currently has; a cell still present in
+ * the payload is re-inserted under ITS OWN id with ITS OWN `capacity_reserved`,
+ * so a pre-order hold taken before the save is still releasable after it. A
+ * caller that passes nothing behaves exactly as this function did before 0075
+ * — correct for a catalogue where no cell tracks capacity, which is every
+ * catalogue until an admin sets one.
  */
 export function fulfillmentStatements(
   db: { prepare(sql: string): D1PreparedStatement },
   productId: string,
   cells: FulfillmentCell[],
-  makeId: () => string = () => newId('ofl')
+  makeId: () => string = () => newId('ofl'),
+  existing?: ExistingCells
 ): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [
     db.prepare('DELETE FROM product_option_transports WHERE product_id = ?').bind(productId),
@@ -208,7 +359,8 @@ export function fulfillmentStatements(
   ];
 
   for (const cell of cells) {
-    const id = makeId();
+    const kept = existing?.cells.get(cellKey(cell.option_id, cell.fulfillment_type));
+    const id = kept?.id ?? makeId();
     out.push(
       db
         .prepare(
@@ -216,8 +368,9 @@ export function fulfillmentStatements(
              (id, product_id, option_id, fulfillment_type, enabled,
               regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
               regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
-              lead_time_text, lead_time_min_days, lead_time_max_days, sort)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+              lead_time_text, lead_time_min_days, lead_time_max_days, sort,
+              capacity, capacity_reserved)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .bind(
           id,
@@ -236,10 +389,18 @@ export function fulfillmentStatements(
           cell.lead_time_text,
           cell.lead_time_min_days,
           cell.lead_time_max_days,
-          cell.sort
+          cell.sort,
+          // A direct-sale cell is parsed with `capacity: null` and could carry
+          // nothing else — the parser refuses it — so this is the pre-order
+          // pool or nothing.
+          cell.capacity,
+          kept?.capacity_reserved ?? 0
         )
     );
     for (const t of cell.transports) {
+      const keptRoute = existing?.transports.get(
+        transportKey(cell.option_id, cell.fulfillment_type, t.method)
+      );
       out.push(
         db
           .prepare(
@@ -247,11 +408,12 @@ export function fulfillmentStatements(
                (id, product_id, fulfillment_id, method, enabled, surcharge_iqd,
                 regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
                 regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
-                lead_time_text, lead_time_min_days, lead_time_max_days, sort)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+                lead_time_text, lead_time_min_days, lead_time_max_days, sort,
+                capacity, capacity_reserved)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
           )
           .bind(
-            makeId(),
+            keptRoute?.id ?? makeId(),
             productId,
             id,
             t.method,
@@ -268,7 +430,9 @@ export function fulfillmentStatements(
             t.lead_time_text,
             t.lead_time_min_days,
             t.lead_time_max_days,
-            t.sort
+            t.sort,
+            t.capacity,
+            keptRoute?.capacity_reserved ?? 0
           )
       );
     }

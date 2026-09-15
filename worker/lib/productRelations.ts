@@ -99,6 +99,16 @@ export interface OptionFulfillmentRow {
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   sort?: number;
+  /**
+   * 0075. THE PRE-ORDER'S OWN COUNTER. NULL = untracked, which means unlimited
+   * pre-orders and is what every row created before 0075 carries. Never the
+   * model's stock, and meaningless on a `direct_sale` cell (the writers refuse
+   * it there). Optional on the type for the same rolling-deploy reason every
+   * 0073 column is optional: a Worker can reach an edge before its migration
+   * reaches D1, and an enrichment must never crash a storefront.
+   */
+  capacity?: number | null;
+  capacity_reserved?: number | null;
 }
 
 /** 0073. ONE CELL OF (MODEL x PRE-ORDER x TRANSPORT). Never local delivery. */
@@ -121,6 +131,16 @@ export interface OptionTransportRow {
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   sort?: number;
+
+  /**
+   * 0075. NULL = THIS ROUTE DRAWS ON THE FULFILMENT CELL'S SHARED POOL — air,
+   * sea and land all spend from one pile. A number = this route holds its OWN
+   * independent quota and does not touch the pool. Nothing ever copies a
+   * quantity onto all three routes: three routes carrying N each is 3N units
+   * sold from a supply of N.
+   */
+  capacity?: number | null;
+  capacity_reserved?: number | null;
 }
 
 export interface ColorRow {

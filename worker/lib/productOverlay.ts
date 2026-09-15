@@ -34,7 +34,12 @@ import {
   type OptionTransportRow,
   type OptionValueRow,
 } from './productRelations';
-import { isInventoryMode, type InventoryMode, type InventorySnapshot } from './inventory';
+import {
+  isInventoryMode,
+  type CapacitySnapshot,
+  type InventoryMode,
+  type InventorySnapshot,
+} from './inventory';
 import {
   availabilityFromName,
   normalizeAvailability,
@@ -398,6 +403,12 @@ export function applyRelations(
       lead_time_text: f.lead_time_text ?? '',
       lead_time_min_days: f.lead_time_min_days ?? null,
       lead_time_max_days: f.lead_time_max_days ?? null,
+      // 0075. The pre-order pool, carried so the admin surfaces and the TXT
+      // export can state it. `?? null` is the ROLLING-DEPLOY default (the
+      // column may be absent from a cached view), never a reading of 0:
+      // null is UNTRACKED and 0 is tracked-and-empty. A direct cell's stray
+      // value is inert — the resolver never reads it.
+      capacity: type === 'pre_order' ? (f.capacity ?? null) : null,
       // A direct sale has no route, so its transports are never read; carrying
       // them anyway would let a stray row price a line that has no journey.
       transports:
@@ -406,6 +417,8 @@ export function applyRelations(
               method: t.method === 'air' || t.method === 'sea' ? t.method : 'land',
               enabled: truthy(t.enabled),
               surcharge_iqd: t.surcharge_iqd,
+              // null = this route draws on the cell's shared pool above.
+              capacity: t.capacity ?? null,
               regular_price_iqd: t.regular_price_iqd,
               prime_price_iqd: t.prime_price_iqd,
               pro_price_iqd: t.pro_price_iqd,
@@ -581,6 +594,66 @@ export function snapshotFrom(
       active: truthy(v.active),
     })),
     group_ids: view.groups.map((g) => g.id),
+  };
+}
+
+/**
+ * THE PRE-ORDER COUNTER FOR ONE MODEL (migration 0075), from an already-loaded
+ * view — the capacity half of what `snapshotFrom` does for stock.
+ *
+ * `selected` is the customer's option-value selection. Capacity is configured
+ * per (MODEL x pre-order), so the MODEL is the selected value that actually
+ * carries a pre-order cell — a multi-group selection names several values and
+ * only one of them is the model. There is deliberately no "all models" answer:
+ * a product with three models has up to three independent pools, and summing
+ * them would be the double count §7 forbids, while taking the largest would
+ * promise units of a model the customer did not choose.
+ *
+ * Returns null when nothing is selected, or when the selected model has no
+ * pre-order cell — a product from before 0073, or one whose pre-order lives
+ * only on the product row. The resolver reads that as UNTRACKED and sells,
+ * which is exactly how the shop behaved before this column existed
+ * (DECISION 6).
+ *
+ * A `direct_sale` cell is never consulted here even if some writer put a
+ * capacity on it: the direct-sale number is the model's stock, and a capacity
+ * on that cell is a payload mistake the parser refuses, not a counter.
+ */
+export function capacityFrom(
+  view: ProductRelationsView,
+  selected: string | readonly string[]
+): CapacitySnapshot | null {
+  const ids = (typeof selected === 'string' ? [selected] : [...selected]).filter(Boolean);
+  if (ids.length === 0) return null;
+  const cells = view.fulfillments ?? [];
+  // The first SELECTED value that has a pre-order cell is the model. Scanning
+  // the selection rather than the cell list keeps the answer deterministic for
+  // a caller that passes its ids in a canonical order.
+  const optionId = ids.find((id) => cells.some((f) => f.option_id === id && f.fulfillment_type === 'pre_order'));
+  if (!optionId) return null;
+  const cellRow = cells.find((f) => f.option_id === optionId && f.fulfillment_type === 'pre_order');
+  if (!cellRow) return null;
+  const label = (view.values ?? []).find((v) => v.id === optionId)?.name_en || optionId;
+  return {
+    cell: {
+      id: cellRow.id,
+      // `?? null` and NOT `?? 0`: a view assembled before 0075 has no such key,
+      // and reading the absent column as zero would report every pre-order in
+      // the catalogue as sold out.
+      capacity: cellRow.capacity ?? null,
+      reserved: cellRow.capacity_reserved ?? 0,
+      label,
+    },
+    transports: (view.transports ?? [])
+      .filter((t) => t.fulfillment_id === cellRow.id)
+      .map((t) => ({
+        id: t.id,
+        method: t.method,
+        enabled: truthy(t.enabled),
+        capacity: t.capacity ?? null,
+        reserved: t.capacity_reserved ?? 0,
+        label: `${label} — ${t.method}`,
+      })),
   };
 }
 

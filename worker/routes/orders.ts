@@ -70,8 +70,14 @@ import type { PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { saleAvailability } from './products';
-import { EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
-import { planInventory, reservationFenceStatement, resolveStock } from '../lib/inventory';
+import { capacityFrom, EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
+import {
+  isCapacityScope,
+  planInventory,
+  reservationFenceStatement,
+  resolveForOrderType,
+  type OrderType,
+} from '../lib/inventory';
 import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAfter, waitUntilFrom } from '../lib/eventBus';
 import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted';
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
@@ -1069,7 +1075,10 @@ function priceCompositionLine(
  * cart nobody is racing and no screen can explain.
  */
 function refuseAggregateDemand(lines: ComputedLine[], poolMemberIds: ReadonlySet<string>): void {
-  const demand = new Map<string, { needed: number; available: number | null; name: string; coarse: boolean }>();
+  const demand = new Map<
+    string,
+    { needed: number; available: number | null; name: string; coarse: boolean; preorder: boolean }
+  >();
   for (const l of lines) {
     for (const t of l.stock_targets) {
       // BASE stock lives on the product row itself, so its scope_id is '' and
@@ -1082,11 +1091,29 @@ function refuseAggregateDemand(lines: ComputedLine[], poolMemberIds: ReadonlySet
       if (found) {
         found.needed += l.qty;
         found.coarse = found.coarse || coarse;
-      } else demand.set(key, { needed: l.qty, available, name: l.name_ar || l.name, coarse });
+      } else
+        demand.set(key, {
+          needed: l.qty,
+          available,
+          name: l.name_ar || l.name,
+          coarse,
+          // 0075: a capacity row is aggregated exactly like a stock row — two
+          // lines sharing one pre-order pool sum before they are judged — but
+          // it is not a shelf, so the refusal must not call it one.
+          preorder: isCapacityScope(t.scope),
+        });
     }
   }
   for (const [, d] of demand) {
     if (d.available !== null && d.needed > d.available) {
+      if (d.preorder) {
+        throw badRequest(
+          d.available === 0
+            ? `The pre-order quota for "${d.name}" is full`
+            : `Only ${d.available} pre-order place(s) left for "${d.name}"`,
+          'PREORDER_CAPACITY_EXHAUSTED'
+        );
+      }
       // A MYSTERY-POOL MEMBER'S REFUSAL CARRIES NO COUNT (§8.2 row 18, §15.1
       // rule 9). Naming the number here would let a buyer binary-search the
       // exact free stock of one candidate colour, before and after a mystery
@@ -1684,6 +1711,26 @@ async function computeCheckout(
         reserved: Number(row.stock_reserved ?? 0),
         low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
       });
+      /**
+       * WHICH COUNTER THIS LINE CONSUMES — DECIDED BY THE ORDER TYPE ALONE
+       * (0075, DECISION 4).
+       *
+       * The stored `fulfillment_type` is the customer's own answer; the
+       * transport is only the fallback for a line written before that column
+       * existed. `preorderPricing` — which is CASH ON DELIVERY versus PREPAID —
+       * is deliberately not consulted here and is not in scope of this
+       * expression: a payment method is how the money arrives, not what the
+       * order is, and a COD pre-order must consume the pre-order capacity and
+       * leave the shelf alone exactly as a prepaid one does. `priceLines` runs
+       * twice, once per basis, and both passes resolve the same targets.
+       */
+      const orderType: OrderType =
+        sel.fulfillmentType === 'pre_order' || sel.fulfillmentType === 'direct_sale'
+          ? sel.fulfillmentType
+          : sel.transportMethod
+            ? 'pre_order'
+            : 'direct_sale';
+      const capacity = view ? capacityFrom(view, sel.optionValueIds ?? []) : null;
       // The checkout must not trust a cart row written before the cart refused
       // incomplete selections (or one a product acquired options after): a
       // legacy JSON-column line with no option is refused here with the same
@@ -1699,7 +1746,9 @@ async function computeCheckout(
           transportDefaults: pricingCtx.transportDefaults,
           inventory: snapshot,
           links: view?.links,
-          preferredType: sel.transportMethod ? 'pre_order' : null,
+          preferredType: orderType,
+          capacity,
+          transportMethod: sel.transportMethod,
         }),
         displayName
       );
@@ -1710,14 +1759,33 @@ async function computeCheckout(
       // moment a plan can be attached — nothing after this writes
       // warranty_snapshot.
       refuseNonPrinterWarranty(isPrinter, sel.warrantyPlanId, displayName);
-      const stockRes = resolveStock(snapshot, {
-        option_value_ids: sel.optionValueIds ?? [],
-        color_id: sel.colorId || null,
-      });
+      // THE ONE COUNTER, and the ONE authority. A direct sale reads the shelf
+      // `resolveStock` already returns; a pre-order reads its capacity and
+      // never the shelf — so a model that is sold out for direct sale is still
+      // pre-orderable, and a pre-order can never eat the units a direct buyer
+      // is about to take.
+      const stockRes = resolveForOrderType(
+        orderType,
+        snapshot,
+        { option_value_ids: sel.optionValueIds ?? [], color_id: sel.colorId || null },
+        capacity,
+        sel.transportMethod
+      );
       if (stockRes.error === 'VARIANT_NOT_MODELLED') {
         throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
       }
       if (stockRes.available !== null && stockRes.available < qty) {
+        // A PRE-ORDER IS NOT "OUT OF STOCK". There is no shelf; the import
+        // quota is full, which is a different fact and a different wait, and
+        // the existing code would have named the wrong one.
+        if (orderType === 'pre_order') {
+          throw badRequest(
+            stockRes.available === 0
+              ? `The pre-order quota for "${displayName}" is full`
+              : `Only ${stockRes.available} pre-order place(s) left for "${displayName}"`,
+            'PREORDER_CAPACITY_EXHAUSTED'
+          );
+        }
         // Count-free for a mystery-pool member (§8.2 row 18).
         if (poolMemberIds.has(String(row.id))) {
           throw badRequest(`"${displayName}" does not have enough stock for this order`, 'OUT_OF_STOCK');
