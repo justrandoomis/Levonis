@@ -3,6 +3,37 @@ import { isAnonymousPublicMediaKey, isSafeMediaKey, mediaBucket, type MediaDomai
 
 export type LegacyMediaAction = 'copy' | 'convert_webp' | 'orphan_candidate' | 'manual_review';
 
+/**
+ * THE BRAND FOLDER, IN EVERY CASE IT HAS EVER BEEN SPELLED.
+ *
+ * `ui/`, `UIUx/` and `UiUx/` are the same directory of admin-controlled brand
+ * assets, written differently by code, imports and hand uploads at different
+ * times. `isAnonymousPublicMediaKey` already matches all three — so when the
+ * checks in this file matched only the exact string `UIUx/`, the REAL object
+ * (`UiUx/Logo/Logo.webp`) came out of `planLegacyMediaKey` classified public
+ * but labelled `domain: 'support'` and `action: 'manual_review'`: a file the
+ * serving path treats as the site's logo and the migration path refuses to
+ * touch. One rule, one spelling-insensitive test, used by both.
+ *
+ * Deliberately scoped to THIS folder. Every other prefix below stays an exact
+ * match, because they are user-scoped: matching `Users/` as loosely as
+ * `users/` would make a letter of case a way to reach someone else's data.
+ */
+const BRAND_FOLDER_PREFIX = /^ui(?:ux)?$/i;
+
+/**
+ * The LEGACY spelling only, and this one is NOT the same rule.
+ *
+ * `uiux/*` in any case is the old hand-made directory, and it is the only
+ * thing the canonical rename (`ui/levonis/<kind>/<name>_<hash>`) may touch.
+ * `ui/*` is already the canonical namespace: renaming it again would file an
+ * object that had ALREADY been migrated into `ui/levonis/legacy/`, and the
+ * apply endpoint would rewrite the settings row to follow it — a migration
+ * that moves its own output every time it is re-run. Matching only the legacy
+ * spelling keeps the rename idempotent.
+ */
+const LEGACY_BRAND_FOLDER_KEY = /^uiux\//i;
+
 export interface LegacyMediaPlan {
   key: string;
   destinationKey: string;
@@ -14,6 +45,8 @@ export interface LegacyMediaPlan {
 
 function domainForKey(key: string): MediaDomain {
   const prefix = key.split('/')[0];
+  // The brand folder answers first, in any case. Below it the map is exact.
+  if (BRAND_FOLDER_PREFIX.test(prefix)) return 'ui';
   const map: Record<string, MediaDomain> = {
     products: 'products',
     avatars: 'users',
@@ -29,8 +62,6 @@ function domainForKey(key: string): MediaDomain {
     claims: 'claims',
     receipts: 'receipts',
     imports: 'imports',
-    ui: 'ui',
-    UIUx: 'ui',
     brands: 'brands',
     services: 'services',
     kyc: 'kyc',
@@ -52,12 +83,12 @@ export function planLegacyMediaKey(key: string, referenced: boolean): LegacyMedi
   const action: LegacyMediaAction =
     !referenced ? 'orphan_candidate' :
     !knownPrefix ? 'manual_review' :
-    key.startsWith('UIUx/') && !supportedUiExtension ? 'manual_review' :
+    LEGACY_BRAND_FOLDER_KEY.test(key) && !supportedUiExtension ? 'manual_review' :
     visibility === 'public' && domain === 'products' && ['png', 'jpg', 'jpeg'].includes(extension)
       ? 'convert_webp'
       : 'copy';
   let destinationKey = key;
-  if (key.startsWith('UIUx/') && action === 'copy') {
+  if (LEGACY_BRAND_FOLDER_KEY.test(key) && action === 'copy') {
     const parts = key.split('/');
     const sourceKind = (parts[1] || 'legacy').toLowerCase();
     const kind = sourceKind.startsWith('anim') ? 'animations' : sourceKind.startsWith('icon') ? 'icons' : sourceKind.startsWith('logo') ? 'logo' : 'legacy';

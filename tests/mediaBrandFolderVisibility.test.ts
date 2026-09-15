@@ -19,6 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isAnonymousPublicMediaKey, isSafeMediaKey } from '../worker/lib/mediaStorage';
+import { planLegacyMediaKey } from '../worker/lib/mediaMigration';
 
 test('the brand folder is public however it was capitalised', () => {
   for (const key of [
@@ -68,4 +69,73 @@ test('an unsafe key is never public, whatever it is named', () => {
     assert.equal(isSafeMediaKey(key), false, `${key} must be refused as unsafe`);
     assert.equal(isAnonymousPublicMediaKey(key), false, `${key} must never be public`);
   }
+});
+
+/**
+ * THE SECOND HALF OF THE SAME BUG.
+ *
+ * Fixing `isAnonymousPublicMediaKey` made `UiUx/Logo/Logo.webp` public, and the
+ * migration filed it in the public bucket — but `planLegacyMediaKey` still
+ * asked `key.startsWith('UIUx/')`, exact case, in three separate places. So the
+ * repository held two opinions about one file: the serving path called it the
+ * site's logo, and the migration path reported `domain: 'support'` and
+ * `action: 'manual_review'` — "I do not know what this is, a human should look
+ * at it." `POST /api/admin/media/migration/apply` returns early on
+ * `manual_review`, so the one rename this system exists to perform could never
+ * run on the one file it exists for.
+ *
+ * These tests pin the agreement, not the implementation: whatever the serving
+ * path decides about a key, the plan for that key must decide the same.
+ */
+
+test('every spelling of the brand folder plans the same as it serves', () => {
+  for (const key of ['UiUx/Logo/Logo.webp', 'UIUx/Logo/Logo.webp', 'uiux/Logo/Logo.webp']) {
+    const plan = planLegacyMediaKey(key, true);
+    assert.equal(plan.visibility, 'public', `${key} must plan public`);
+    assert.equal(
+      plan.visibility,
+      isAnonymousPublicMediaKey(key) ? 'public' : 'private',
+      `${key}: the plan and the serving path must not disagree`
+    );
+    // 'support' is the map's fallback and means "unknown prefix". The brand
+    // folder is not unknown, and a report that says so is a report nobody can
+    // read.
+    assert.equal(plan.domain, 'ui', `${key} must be reported as the ui domain`);
+    // manual_review is what blocked the rename. Nothing about a .webp logo
+    // needs a human.
+    assert.equal(plan.action, 'copy', `${key} must be actionable, not parked`);
+    assert.match(
+      plan.destinationKey,
+      /^ui\/levonis\/logo\/Logo_[0-9a-f]{8}\.webp$/,
+      `${key} must rename into the canonical namespace`
+    );
+  }
+});
+
+test('the canonical namespace is never renamed into itself again', () => {
+  // The rename may touch the LEGACY spelling only. `ui/levonis/*` is already
+  // the output of this migration: renaming it again would file an
+  // already-migrated object under `ui/levonis/legacy/`, and the apply endpoint
+  // would rewrite the settings row to follow it — every re-run moving the logo
+  // one directory deeper.
+  for (const key of ['ui/levonis/logo/Logo_124973c2.webp', 'ui/levonis/icons/cart_fafe9ba3.png']) {
+    const plan = planLegacyMediaKey(key, true);
+    assert.equal(plan.destinationKey, key, `${key} is already canonical and must not move`);
+    assert.equal(plan.visibility, 'public');
+    assert.equal(plan.domain, 'ui');
+  }
+});
+
+test('the case-insensitive folder is the brand folder and nothing next to it', () => {
+  // The whole risk of a loose match is that it is loose about the wrong thing.
+  // A near-miss prefix must NOT inherit the brand folder's public treatment.
+  for (const key of ['uiuxx/Logo/Logo.webp', 'uix/Logo/Logo.webp', 'Users/usr_x/avatar/a.png']) {
+    const plan = planLegacyMediaKey(key, true);
+    assert.equal(plan.visibility, 'private', `${key} must stay private`);
+    assert.equal(isAnonymousPublicMediaKey(key), false, `${key} must not serve anonymously`);
+    assert.notEqual(plan.domain, 'ui', `${key} is not the brand folder`);
+  }
+  // And the exact user-scoped prefix still works, so the guard above is
+  // pinning case-sensitivity rather than a broken path.
+  assert.equal(planLegacyMediaKey('users/usr_x/avatar/a.png', true).visibility, 'public');
 });
