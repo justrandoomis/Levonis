@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import type { AppContext, Env } from '../lib/types';
+import { getTierStatus } from '../lib/entitlements';
+import { applyMultiplierX100, multiplierLabel, rewardMultiplierX100 } from '../lib/pointsMultiplier';
 import { safeParse } from '../lib/types';
 import {
   requireAuth,
@@ -118,6 +120,47 @@ export async function getReviewPointsValue(db: D1Database): Promise<number | nul
     }
   }
   return null;
+}
+
+/**
+ * THE REVIEW AWARD, AT THE REVIEWER'S SUBSCRIPTION MULTIPLIER.
+ *
+ * The owner's rule covers four surfaces — signing in, earning from tasks,
+ * buying, and RATING — and this is the rating one. PREMIUM earns 1.5x and PRO
+ * 2x on a review exactly as they do on a check-in, and for the same reason:
+ * the multiplier belongs to the member, not to the kind of thing they did.
+ *
+ * SNAPSHOTTED, NEVER RECOMPUTED. The multiplier is resolved at the moment of
+ * the award and the resulting number is what is written; an expired
+ * subscription must not rewrite what a member already earned, and a new one
+ * must not retroactively inflate it. That is the same discipline
+ * `points_accruals` uses for a purchase.
+ *
+ * The 1x case is byte-identical to the previous behaviour, so a shop with no
+ * subscribers sees no change at all.
+ */
+async function reviewAward(
+  db: D1Database,
+  userId: string,
+  basePoints: number
+): Promise<{ points: number; base: number; multiplierX100: number }> {
+  const status = await getTierStatus(db, userId);
+  const multiplierX100 = rewardMultiplierX100(status);
+  return { points: applyMultiplierX100(basePoints, multiplierX100), base: basePoints, multiplierX100 };
+}
+
+/**
+ * THE NOTE THE CUSTOMER READS IN THEIR OWN WALLET.
+ *
+ * It has to add up. `2x base` described the whole award while the fallback
+ * was the only multiplier in play; once a membership multiplies it again, a
+ * PRO sees 100 points credited under a note that explains 50. The 1x string
+ * is left byte-identical, so nothing changes for a shop with no subscribers.
+ */
+function fallbackNote(multiplierX100: number): string {
+  return multiplierX100 <= 100
+    ? 'Valid manual review fallback (2x base)'
+    : `Valid manual review fallback (2x base x ${multiplierLabel(multiplierX100)} membership)`;
 }
 
 /** Masked reviewer display name — never the full identity. */
@@ -417,7 +460,10 @@ reviewRoutes.post('/', requireAuth, async (c) => {
     // honest (zero); no value is invented in code.
     const basePoints = await getReviewPointsValue(c.env.DB);
     if (basePoints !== null) {
-      const points = basePoints * 2;
+      // `* 2` is the long-standing fallback rule for a valid manual review;
+      // the SUBSCRIPTION multiplier then applies on top of it, because the
+      // owner's rule is about who the member is, not what they did.
+      const { points, multiplierX100 } = await reviewAward(c.env.DB, user.id, basePoints * 2);
       const sourceRef = `review-fallback:${reviewId}`;
       statements.push(
         c.env.DB.prepare('INSERT INTO points_awards (source_ref, user_id, points, created_at) VALUES (?, ?, ?, ?)')
@@ -426,7 +472,7 @@ reviewRoutes.post('/', requireAuth, async (c) => {
           `INSERT INTO wallet_transactions
              (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
            VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'system', ?)`
-        ).bind(`wtx_review_fallback_${reviewId}`, user.id, points, 'Valid manual review fallback (2x base)', sourceRef, now),
+        ).bind(`wtx_review_fallback_${reviewId}`, user.id, points, fallbackNote(multiplierX100), sourceRef, now),
         c.env.DB.prepare('UPDATE reviews SET fallback_points_awarded = ? WHERE id = ?')
           .bind(points, reviewId)
       );
@@ -522,7 +568,10 @@ reviewRoutes.put('/:id', requireAuth, async (c) => {
     ));
     const basePoints = await getReviewPointsValue(c.env.DB);
     if (basePoints !== null) {
-      const points = basePoints * 2;
+      // `* 2` is the long-standing fallback rule for a valid manual review;
+      // the SUBSCRIPTION multiplier then applies on top of it, because the
+      // owner's rule is about who the member is, not what they did.
+      const { points, multiplierX100 } = await reviewAward(c.env.DB, user.id, basePoints * 2);
       const sourceRef = `review-fallback:${id}`;
       statements.push(
         c.env.DB.prepare('INSERT INTO points_awards (source_ref, user_id, points, created_at) VALUES (?, ?, ?, ?)')
@@ -531,7 +580,7 @@ reviewRoutes.put('/:id', requireAuth, async (c) => {
           `INSERT INTO wallet_transactions
              (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
            VALUES (?, ?, 'deposit', 'POINT', ?, 'approved', ?, ?, 'system', ?)`
-        ).bind(`wtx_review_fallback_${id}`, user.id, points, 'Valid manual review fallback (2x base)', sourceRef, now),
+        ).bind(`wtx_review_fallback_${id}`, user.id, points, fallbackNote(multiplierX100), sourceRef, now),
         c.env.DB.prepare('UPDATE reviews SET fallback_points_awarded = ? WHERE id = ?').bind(points, id)
       );
     }
@@ -1398,13 +1447,15 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
 
   // kind === 'points'
   const reason = str(body.reason, 'reason', { min: 3, max: 1000 });
-  const points = await getReviewPointsValue(c.env.DB);
-  if (points === null) {
+  const configured = await getReviewPointsValue(c.env.DB);
+  if (configured === null) {
     throw unavailable(
       'Review point value is not configured yet (admin setting reviewPointsConfig) — no invented amounts',
       'REVIEW_POINTS_UNCONFIGURED'
     );
   }
+  // The multiplier belongs to the REVIEWER, not to the admin approving it.
+  const { points } = await reviewAward(c.env.DB, String(row.user_id), configured);
   const sourceRef = `review:${row.review_id}`;
   try {
     await c.env.DB.batch([

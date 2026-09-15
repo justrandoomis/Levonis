@@ -125,7 +125,7 @@ import {
   capRedeemablePoints,
   resolvePointsRule,
   getPointsRuleConfig,
-  buildPurchaseAccrualStatements,
+  buildPurchaseAccrual,
   buildSettlementStatements,
   recordOrderSettlement,
   releaseAccrualForOrder,
@@ -3226,7 +3226,21 @@ orderRoutes.post('/', async (c) => {
   // attempt writes nothing, so a cart or an aborted checkout can never start
   // the clock. available_at = purchase_at + 7×24h and never moves afterwards.
   const settledAtPurchase = comp.dueOnDelivery <= 0 && comp.bnplAmount <= 0;
-  const { statements: accrualStmts, accrual } = buildPurchaseAccrualStatements(c.env, {
+  /**
+   * THE AWAIT IS THE POINT. `buildPurchaseAccrualStatements` is synchronous and
+   * therefore cannot look up the buyer's subscription, so the plan it returns
+   * reports the PRE-multiplier base while the statement it returns writes the
+   * multiplied value. Every customer-facing surface reads the ROW and was
+   * always right; the `order.create` audit record below reads this plan, and
+   * said 750 for a PRO purchase that accrued 1,500.
+   *
+   * Nobody was short-changed, which is why it survived. But the audit log is
+   * where a points dispute is settled — an admin asked why a member holds
+   * 1,500 points reads the record of the purchase — and it disagreed with the
+   * ledger by a factor of two on every subscriber order. `buildPurchaseAccrual`
+   * resolves the tier first, so the plan states what was really written.
+   */
+  const { statements: accrualStmts, accrual } = await buildPurchaseAccrual(c.env, {
     orderId,
     userId: user.id,
     purchaseAt: now,
