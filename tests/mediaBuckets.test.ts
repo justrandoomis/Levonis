@@ -544,3 +544,48 @@ test('the marker workflow never opens the destination buckets', () => {
     assert.ok(!text.includes(bucket), `the marker workflow must not reference ${bucket}`);
   }
 });
+
+test('every source delete passes a named per-object gate first', () => {
+  const runner = embeddedRunner();
+  const gateAt = runner.indexOf('function pruneGate');
+  const deleteAt = runner.indexOf("'delete-object'");
+  const callAt = runner.indexOf('const refused = pruneGate(row, source)');
+  const verifyAt = runner.indexOf('const proof = verify(row.destination, source)');
+  assert.ok(gateAt > 0 && gateAt < deleteAt, 'the gate must be defined before the delete');
+  assert.ok(callAt > 0 && callAt < deleteAt, 'the gate must be CALLED before the delete');
+  assert.ok(verifyAt > callAt && verifyAt < deleteAt, 'the destination is re-proven between the gate and the delete');
+
+  // The five per-object facts. Each is compared, not assumed — a manifest is
+  // data, and the one thing a delete must never do is trust it.
+  for (const check of [
+    'row.verified === true',
+    'row.key === source.key',
+    'row.destination === PUBLIC_BUCKET || row.destination === PRIVATE_BUCKET',
+    'row.destination !== SOURCE',
+    'row.destinationKey === row.key',
+  ]) {
+    assert.ok(runner.includes(check), `the prune gate must check ${check}`);
+  }
+
+  // Whole-manifest refusals: one bad row is not a reason to delete the others.
+  assert.match(runner, /if \(!manifest\.verified_all \|\| manifestBlocked > 0 \|\| manifestFailed > 0\)/);
+  assert.match(runner, /if \(SOURCE === PUBLIC_BUCKET \|\| SOURCE === PRIVATE_BUCKET\)/,
+    'deleting from a bucket that is also a destination must be refused outright');
+
+  // The delete names the LEGACY bucket explicitly. Deleting from row.destination
+  // would remove the copy this whole workflow exists to create.
+  assert.match(runner, /aws\(\['delete-object', '--bucket', SOURCE, '--key', row\.key\], false\)/);
+  assert.ok(!runner.includes("'--bucket', row.destination, '--key'") ||
+    !/delete-object[^;]*row\.destination/.test(runner), 'nothing may ever delete from a destination bucket');
+});
+
+test('the prune re-counts what survived instead of assuming it', () => {
+  const runner = embeddedRunner();
+  const deleteAt = runner.indexOf("'delete-object'");
+  const recountAt = runner.indexOf('const stillInSource = listAll(SOURCE)');
+  const destAt = runner.indexOf('PUBLIC DESTINATION OBJECTS MISSING');
+  assert.ok(recountAt > deleteAt, 'the source must be re-listed AFTER the deletes, not before');
+  assert.ok(destAt > deleteAt, 'the destinations must be re-checked after the deletes');
+  assert.match(runner, /throw new Error\('a destination object is missing after the prune/,
+    'losing a destination object must fail the run, not be reported as a number and ignored');
+});

@@ -301,6 +301,12 @@ jobs:
              *  receipts, reviews… The report is unreadable without it. */
             domain: string;
             destination: string;
+            /** The key WRITTEN at the destination. `buildMediaKey` does not
+             *  encode visibility into a path, so a copy keeps its key and this
+             *  equals `key` — but the prune gate compares it instead of
+             *  assuming it, because "the key does not change" is precisely the
+             *  assumption that would delete the wrong source if it ever broke. */
+            destinationKey: string;
             bytes: number;
             /** The verdict itself. `outcome` is a label for humans; reading the
              *  verdict back out of that label would be a second rule to keep
@@ -324,8 +330,8 @@ jobs:
               // unreachable copy and let the run call that progress.
               if (!isSafeMediaKey(object.key)) {
                 blocked.push({
-                  key: object.key, visibility: '-', domain: '-', destination: '-', bytes: object.size,
-                  verified: false, outcome: 'BLOCKED', method: 'unsafe-key',
+                  key: object.key, visibility: '-', domain: '-', destination: '-', destinationKey: '-',
+                  bytes: object.size, verified: false, outcome: 'BLOCKED', method: 'unsafe-key',
                   detail: 'the Worker will not serve this key from any bucket; rename or move it by hand',
                 });
                 continue;
@@ -349,7 +355,8 @@ jobs:
               }
               const proof = verify(destination, object);
               rows.push({
-                key: object.key, visibility: plan.visibility, domain: plan.domain, destination, bytes: object.size,
+                key: object.key, visibility: plan.visibility, domain: plan.domain, destination,
+                destinationKey: object.key, bytes: object.size,
                 verified: proof.ok, outcome: proof.ok ? 'VERIFIED (' + action + ')' : 'FAILED',
                 method: proof.method, detail: proof.detail,
               });
@@ -361,27 +368,100 @@ jobs:
             // This re-proves it NOW, object by object, and deletes each source
             // only after that object's own destination has just answered for it.
             const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
-            if (!manifest.verified_all || (manifest.blocked ?? []).length > 0) {
+
+            // WHOLE-MANIFEST GATES. One bad row is not a reason to delete the
+            // other seventeen, so these refuse the entire run.
+            const manifestFailed = (manifest.rows as Row[]).filter((r) => r.outcome === 'FAILED').length;
+            const manifestBlocked = (manifest.blocked ?? []).length;
+            console.log('manifest BLOCKED: ' + manifestBlocked + '   manifest FAILED: ' + manifestFailed);
+            if (!manifest.verified_all || manifestBlocked > 0 || manifestFailed > 0) {
               throw new Error('the copy manifest is not a clean pass — refusing to delete anything');
             }
+            // The delete targets SOURCE by name. If SOURCE were ever also a
+            // destination, this loop would delete the copies it just proved.
+            if (SOURCE === PUBLIC_BUCKET || SOURCE === PRIVATE_BUCKET) {
+              throw new Error('the source bucket is also a destination — refusing to delete anything');
+            }
+
             const sources = new Map<string, SourceObject>(
               listAll(SOURCE).map((o): [string, SourceObject] => [o.key, o])
             );
+
+            /**
+             * THE PER-OBJECT GATE, one named check at a time.
+             *
+             * Everything below is checked BEFORE the delete for THIS object,
+             * and every check prints whether it held — so a reader can see the
+             * reason each source was allowed to go, rather than trusting that
+             * a loop somewhere did the right thing. Any single failure keeps
+             * that object's source and moves on; it never widens.
+             */
+            function pruneGate(row: Row, source: SourceObject): string | null {
+              const checks: Array<[string, boolean, string]> = [
+                ['manifest row verified=true', row.verified === true, String(row.verified)],
+                ['source key matches the manifest', row.key === source.key, row.key],
+                ['destination is an authorised bucket',
+                  row.destination === PUBLIC_BUCKET || row.destination === PRIVATE_BUCKET, row.destination],
+                ['destination is not the source bucket', row.destination !== SOURCE, row.destination],
+                ['destination key equals the manifest destination key',
+                  row.destinationKey === row.key, String(row.destinationKey)],
+              ];
+              for (const [name, held, value] of checks) {
+                console.log('    ' + (held ? 'ok  ' : 'FAIL') + '  ' + name + ' : ' + value);
+                if (!held) return name;
+              }
+              return null;
+            }
+
             for (const row of manifest.rows as Row[]) {
+              console.log('---- ' + row.key);
               const source = sources.get(row.key);
               if (!source) {
                 // Already pruned by an earlier run. Re-running is a no-op, not an error.
+                console.log('    skip  not in the legacy bucket — an earlier run already pruned it');
                 rows.push({ ...row, verified: true, outcome: 'ALREADY-GONE', method: 're-list', detail: 'not in the legacy bucket' });
                 continue;
               }
+              const refused = pruneGate(row, source);
+              if (refused) {
+                console.log('    ::error::KEPT — ' + refused);
+                blocked.push({ ...row, verified: false, outcome: 'KEPT', method: 'gate', detail: refused });
+                continue;
+              }
+              // Existence + size + ETag (or SHA-256 when either side is
+              // multipart), taken against the destination RIGHT NOW.
               const proof = verify(row.destination, source);
+              console.log('    ' + (proof.ok ? 'ok  ' : 'FAIL') + '  destination re-verified by ' + proof.method + ' : ' + proof.detail);
               if (!proof.ok) {
                 blocked.push({ ...row, verified: false, outcome: 'KEPT', method: proof.method, detail: proof.detail });
                 continue;
               }
+              // ONE object, from the LEGACY bucket, by its exact key.
               aws(['delete-object', '--bucket', SOURCE, '--key', row.key], false);
               rows.push({ ...row, verified: true, outcome: 'SOURCE-DELETED', method: proof.method, detail: proof.detail });
-              console.log('pruned ' + row.key + ' (re-verified in ' + row.destination + ' by ' + proof.method + ')');
+              console.log('    pruned ' + row.key + ' from ' + SOURCE + ' (copy in ' + row.destination + ' proved by ' + proof.method + ')');
+            }
+
+            // AFTERWARDS: the legacy bucket must hold none of the manifest's
+            // keys, and every destination object must still be there. Asking
+            // again, from scratch, is the only answer worth reporting.
+            const stillInSource = listAll(SOURCE).filter((o) => (manifest.rows as Row[]).some((r) => r.key === o.key));
+            console.log('');
+            console.log('LEGACY SOURCE COPIES REMAINING FROM THE MANIFEST: ' + stillInSource.length);
+            for (const leftover of stillInSource) console.log('  still present: ' + leftover.key + ' (' + leftover.size + ' B)');
+            let missingPublic = 0;
+            let missingPrivate = 0;
+            for (const row of manifest.rows as Row[]) {
+              const head = awsOrNull(['head-object', '--bucket', row.destination, '--key', row.destinationKey]);
+              if (head && Number(head.ContentLength) === row.bytes) continue;
+              if (row.visibility === 'public') missingPublic++;
+              else missingPrivate++;
+              console.log('  ::error::DESTINATION GONE OR CHANGED: ' + row.destination + '/' + row.destinationKey);
+            }
+            console.log('PUBLIC DESTINATION OBJECTS MISSING : ' + missingPublic);
+            console.log('PRIVATE DESTINATION OBJECTS MISSING: ' + missingPrivate);
+            if (missingPublic > 0 || missingPrivate > 0) {
+              throw new Error('a destination object is missing after the prune — the copies are what survive, and one did not');
             }
           }
 
